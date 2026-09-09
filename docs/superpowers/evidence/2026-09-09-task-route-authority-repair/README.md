@@ -1,8 +1,10 @@
 # Four-Task Route Authority Repair Evidence
 
-Status: final fix wave implemented at `20a77373`; full suites pass, but scoped
-re-review is NOT APPROVED because one P2 cold-restoration regression remains.
-Not ready to merge. Historical and post-fix evidence are separated below.
+Status: ready for separate merge authorization at code `b669d455`. The approved
+cold-restoration correction passes scoped re-review and final offline checks.
+The prior `20a77373` NOT-APPROVED report remains unchanged as historical evidence;
+its P2 is closed by the new correction, not erased from that report.
+Not merged or live-accepted. Historical and current evidence are separated below.
 This record does not authorize merge, push, an App restart, provider calls,
 or production-store access.
 
@@ -38,6 +40,65 @@ remain unknown. Legacy translations do not acquire current Settings metadata.
 An empty-prose no-op has no execution receipt and creates no translation version.
 
 ## Completed Task Checks
+
+### Current Acceptance At b669d455
+
+The user authorized the bounded cold-restoration correction on 2026-09-09.
+Commits `c13080e4`, `54148cfc`, and `b669d455` retain the saved conversation,
+current complete/incomplete selection and draft while history is unresolved.
+Send stays blocked until the intended context is available. Missing or failed
+restoration offers explicit recovery instead of silently picking a different
+conversation. New invalidates old responses; deleting a pending intended A
+cannot send into previously loaded B. Deleting other threads preserves A.
+Previous messages and their provenance are not rewritten.
+
+[Implementation](cold-restoration-implementation.md) and
+[scoped re-review](cold-restoration-review.md) are archived verbatim. The reviewer
+accepts the prior P2 and finds no new correction-induced breakage.
+[RED artifacts](cold-restoration-red-results.json) distinguish behavioral RED
+from intermediate harness/selector failures rather than presenting all failures
+as useful evidence.
+
+Fresh full backend: **7,593 passed / 12 skipped / three existing warnings**,
+830.31s. Fresh final frontend: **1,825 passed / 125 files**, 13.88s. Typecheck
+and production build pass; the existing >500 kB Vite chunk warning remains.
+Backend code/tests stayed identical through the frontend-only follow-ups and
+mutations. [Verification record](cold-restoration-verification-results.json)
+binds exact commands, JUnit digests, 45 changed code/test file hashes and the
+backend continuity check. No old run was relabeled as a new run.
+
+All six current frontend inverses ran the full **274-test / 11-file focus**:
+
+| Temporary regression | Failed / passed |
+| --- | --- |
+| Card UI forces Anthropic | 2 / 272 |
+| Research defaults to fixed Luna | 45 / 229 |
+| App omits its current-conversation ref | 50 / 224 |
+| Incomplete edit displays stale route captions | 8 / 266 |
+| Cold picker edit discards intended target | 25 / 249 |
+| Deleting intended target leaves prior loaded ID | 1 / 273 |
+
+The two new inverses kill all six completed-choice cold owners and the exact
+pending-A deletion owner respectively. No-edit/incomplete cold controls and
+delete-B/C controls remain green. Every inverse was restored before the next;
+the full frontend, typecheck and build followed final restoration. Exact patches,
+commands, hashes and all named failures are in the
+[current mutation record](cold-restoration-mutation-results.json). The five
+earlier backend inverses remain separately recorded below, not claimed rerun.
+
+The final-code [browser record](cold-restoration-browser-results.json) binds
+**56 synthetic contexts / 176 screenshots / 64 new-answer viewport checks**
+across both providers, locales and desktop/mobile widths, with no recorded page
+error or overflow. Images remain in `tmp/cold-restoration-ui/controller-final`.
+Earlier images/reports are retained. Tests and isolated browser servers have
+finished. These checks do not certify live provider behavior.
+
+The separate user-requested cache/cost hint is researched in
+[cache findings](cache-hint-research.md) and recorded in Priority Map P2.9.
+Its bounded presentation is pending approval; no hint, cache warming, retention
+change, counter repair or global usage ledger was implemented here.
+
+### Earlier Checkpoints
 
 | Task | Commits | Verified result |
 | --- | --- | --- |
@@ -161,7 +222,7 @@ in `tmp/final-fix/browser-caption-verified`. The initial 64 and intermediate 72
 image sets remain separate; the intermediate set is not final caption acceptance.
 No provider or production App was used.
 
-## Remaining Merge Blocker
+## Historical Merge Blocker (Now Closed)
 
 On a cold App mount, session storage may identify an existing conversation but
 the App-owned selection ref is still null. If the catalog loads first and the
@@ -180,8 +241,9 @@ browser scenes do not cover this saved-ID-only cold path.
 Required follow-up: distinguish unresolved restoration from an explicit New
 conversation, preserve the saved target across picker edits, and block Send
 until that target resolves. Retain intentional New/delete-current reset and
-same-conversation complete/incomplete choice preservation. The user has been
-asked to approve this bounded correction. No second fix wave has been started.
+same-conversation complete/incomplete choice preservation. The user approved
+this bounded correction on 2026-09-09. The current acceptance above closes it;
+the historical report is preserved, not rewritten.
 
 ## Rulings Made During Implementation
 
@@ -203,10 +265,11 @@ provider buttons, the pending model, the effort-required warning and disabled
 Send remain. Completing the tuple restores the new route's real captions and
 reason. This changes presentation, not execution admission.
 
-The cold-restoration finding is accepted and remains open, not parked as
-harmless. Merge readiness is withheld because routing a question without its
-intended conversation context violates the task. The cost is a further bounded
-UI correction before integration; this is not a claim of destructive data loss.
+The cold-restoration finding was accepted and merge readiness withheld rather
+than treating it as harmless. Routing without the intended context violates
+the task. The cost was a separately authorized correction before integration;
+it now passes scoped review and verification. No destructive data loss was
+claimed, and the earlier ruling/report remains part of the record.
 
 ## Separate Pre-Existing Issues
 

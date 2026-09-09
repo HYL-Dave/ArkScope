@@ -1,0 +1,1838 @@
+{
+  "code_commit": "b669d45519244bf14bfafa882c8ab3b8946996d2",
+  "source_results": "tmp/cold-restoration-ui/controller-final/results.json",
+  "source_sha256": "368e7db821b39582968d0098794309ffcecab88c1ea172c87625794376010cd7",
+  "context_count": 56,
+  "screenshot_count": 176,
+  "answer_viewport_checks": 64,
+  "error_count": 0,
+  "overflow_count": 0,
+  "contexts": [
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "complete",
+      "screenshot_count": 4,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "incomplete",
+      "screenshot_count": 5,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "synthetic-custom-model",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "new",
+      "screenshot_count": 5,
+      "request_count": 56,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 2,
+      "submitted_runs": [
+        {
+          "thread_id": "c0440583-a064-42ac-86c9-3b8f188cc9bc",
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "effort": "xhigh"
+        },
+        {
+          "thread_id": "c0440583-a064-42ac-86c9-3b8f188cc9bc",
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "effort": "xhigh"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "failed-list",
+      "screenshot_count": 2,
+      "request_count": 23,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "failed-detail",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "failed-messages",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "failed-missing",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "complete",
+      "screenshot_count": 4,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "incomplete",
+      "screenshot_count": 5,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "synthetic-custom-model",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "new",
+      "screenshot_count": 5,
+      "request_count": 56,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 2,
+      "submitted_runs": [
+        {
+          "thread_id": "db7ef219-1881-4bde-a0a9-44f0dccd1cda",
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "effort": "xhigh"
+        },
+        {
+          "thread_id": "db7ef219-1881-4bde-a0a9-44f0dccd1cda",
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "effort": "xhigh"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "failed-list",
+      "screenshot_count": 2,
+      "request_count": 23,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "failed-detail",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "failed-messages",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "failed-missing",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "complete",
+      "screenshot_count": 4,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "incomplete",
+      "screenshot_count": 5,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "synthetic-custom-model",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "new",
+      "screenshot_count": 5,
+      "request_count": 56,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 2,
+      "submitted_runs": [
+        {
+          "thread_id": "ca5c6a41-9dd1-490f-8f3d-a5a35057eb55",
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "effort": "xhigh"
+        },
+        {
+          "thread_id": "ca5c6a41-9dd1-490f-8f3d-a5a35057eb55",
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "effort": "xhigh"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "failed-list",
+      "screenshot_count": 2,
+      "request_count": 23,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "failed-detail",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "failed-messages",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "openai",
+      "cold_case": "failed-missing",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "complete",
+      "screenshot_count": 4,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "incomplete",
+      "screenshot_count": 5,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "synthetic-custom-model",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "new",
+      "screenshot_count": 5,
+      "request_count": 56,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 2,
+      "submitted_runs": [
+        {
+          "thread_id": "15a5acd7-fde1-45e8-8781-7f14893d054f",
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "effort": "xhigh"
+        },
+        {
+          "thread_id": "15a5acd7-fde1-45e8-8781-7f14893d054f",
+          "provider": "openai",
+          "model": "gpt-5.6-luna",
+          "effort": "xhigh"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "failed-list",
+      "screenshot_count": 2,
+      "request_count": 23,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "failed-detail",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "failed-messages",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "openai",
+      "cold_case": "failed-missing",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "complete",
+      "screenshot_count": 4,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "incomplete",
+      "screenshot_count": 5,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "synthetic-custom-model",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "new",
+      "screenshot_count": 5,
+      "request_count": 56,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 2,
+      "submitted_runs": [
+        {
+          "thread_id": "97318023-a97d-49b2-bc59-97d8e3ac3a45",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "medium"
+        },
+        {
+          "thread_id": "97318023-a97d-49b2-bc59-97d8e3ac3a45",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "medium"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-list",
+      "screenshot_count": 2,
+      "request_count": 23,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-detail",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-messages",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-missing",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "complete",
+      "screenshot_count": 4,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "incomplete",
+      "screenshot_count": 5,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "synthetic-custom-model",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "new",
+      "screenshot_count": 5,
+      "request_count": 56,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 2,
+      "submitted_runs": [
+        {
+          "thread_id": "1ae8ec0c-8920-4e05-b842-10fed1d00d3d",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "medium"
+        },
+        {
+          "thread_id": "1ae8ec0c-8920-4e05-b842-10fed1d00d3d",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "medium"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-list",
+      "screenshot_count": 2,
+      "request_count": 23,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-detail",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-messages",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-missing",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "complete",
+      "screenshot_count": 4,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "incomplete",
+      "screenshot_count": 5,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "synthetic-custom-model",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "new",
+      "screenshot_count": 5,
+      "request_count": 56,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 2,
+      "submitted_runs": [
+        {
+          "thread_id": "40a9f3a4-03e5-43df-973e-c56bec2d609e",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "medium"
+        },
+        {
+          "thread_id": "40a9f3a4-03e5-43df-973e-c56bec2d609e",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "medium"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-list",
+      "screenshot_count": 2,
+      "request_count": 23,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-detail",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-messages",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-missing",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "complete",
+      "screenshot_count": 4,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "incomplete",
+      "screenshot_count": 5,
+      "request_count": 45,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "synthetic-custom-model",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "new",
+      "screenshot_count": 5,
+      "request_count": 56,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 2,
+      "submitted_runs": [
+        {
+          "thread_id": "353d93e5-e707-4233-9837-c9f181d78ce2",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "medium"
+        },
+        {
+          "thread_id": "353d93e5-e707-4233-9837-c9f181d78ce2",
+          "provider": "anthropic",
+          "model": "claude-sonnet-5",
+          "effort": "medium"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-list",
+      "screenshot_count": 2,
+      "request_count": 23,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-detail",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-messages",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "cold_case": "failed-missing",
+      "screenshot_count": 2,
+      "request_count": 24,
+      "errors": [],
+      "overflow_count": 0,
+      "answer_viewport_checks": 1,
+      "submitted_runs": [
+        {
+          "thread_id": "history-a",
+          "provider": "openai",
+          "model": "gpt-5.6-sol",
+          "effort": "low"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-complete-list-pending-after-home.png",
+      "sha256": "5b94aac90c00a2182bcb6ec2b48ebdba7c6169fd6c15a9da5c297f8a637dcc3b"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-complete-list-pending-after-settings.png",
+      "sha256": "5b94aac90c00a2182bcb6ec2b48ebdba7c6169fd6c15a9da5c297f8a637dcc3b"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-complete-messages-pending.png",
+      "sha256": "7ea4f812e66db2d656255daf7a154758684173805529267bdd724ee0fbec6fd4"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-complete-completed-exact-context.png",
+      "sha256": "8a659879eb8fe1f800fa368a913b1dba97c684e35a4bbe332743e447228b6ac1"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-incomplete-list-pending-after-home.png",
+      "sha256": "dbd3b244af16a87ec22820f7a8e73feeefbf25a651136c44558cb076a6f63c52"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-incomplete-list-pending-after-settings.png",
+      "sha256": "dbd3b244af16a87ec22820f7a8e73feeefbf25a651136c44558cb076a6f63c52"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-incomplete-messages-pending.png",
+      "sha256": "10848e1fedbd2be05b0494152aaed6527c9286cd2f0cb914018ee67c699013a8"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-incomplete-restored-effort-required.png",
+      "sha256": "44ae5a612a7b1087f92eafdd3467ea5b39b091a12a39797f3486af24c996ebcb"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-incomplete-completed-exact-context.png",
+      "sha256": "bc026a281cd4ec8729a7cbc76243760278929a4a0734e67f664bfdcc9011a3f8"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-new-list-pending-after-home.png",
+      "sha256": "5b94aac90c00a2182bcb6ec2b48ebdba7c6169fd6c15a9da5c297f8a637dcc3b"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-new-list-pending-after-settings.png",
+      "sha256": "5b94aac90c00a2182bcb6ec2b48ebdba7c6169fd6c15a9da5c297f8a637dcc3b"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-new-messages-pending.png",
+      "sha256": "7ea4f812e66db2d656255daf7a154758684173805529267bdd724ee0fbec6fd4"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-new-completed-exact-context.png",
+      "sha256": "4da5845be2ef7a6ad75b92c0211d29d5c08b7d47c8a9e612bc9345cfaf667a98"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-new-new-first-id-retained.png",
+      "sha256": "0f6ef3be71c223a347ebc5491919d220c0ecd41ccaf6b03721a51f85c6f88954"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-failed-list-blocked.png",
+      "sha256": "3e4f285b517bfbe942ef322d7f4bf7d487f4183a324e1bece04a6d8d25f675d3"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-failed-list-completed-exact-context.png",
+      "sha256": "7168364cac97a3740d2a0e00d8ccf6450c797ece7a60bb2a49198f705e6fc7f7"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-failed-detail-blocked.png",
+      "sha256": "52835590688c30203fb01e2b38c711f718dd13fd534ac331af6678d967ecba5f"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-failed-detail-completed-exact-context.png",
+      "sha256": "a4ae1d812a7f5c6c50dc7c5a5eb48582337978672afa370b9b4db8fb8bb10c8f"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-failed-messages-blocked.png",
+      "sha256": "adf92f0937c7f99b60935a1f8687395e1eada731ae2f46945baec3835a696b2f"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-failed-messages-completed-exact-context.png",
+      "sha256": "eb47e887399949156cc6b15011f08104e4b8d27dabc2a2a23bb3f0ab4f62f7ec"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-failed-missing-blocked.png",
+      "sha256": "e7440809733426740cc44945de47f862498d813cde734bb40b8aaee8b2ed024f"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-openai-cold-failed-missing-completed-exact-context.png",
+      "sha256": "7168364cac97a3740d2a0e00d8ccf6450c797ece7a60bb2a49198f705e6fc7f7"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-complete-list-pending-after-home.png",
+      "sha256": "03fe688b65460060cc9320ed09e12be0ea6ade531ba31a8c730883166b8f73f4"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-complete-list-pending-after-settings.png",
+      "sha256": "03fe688b65460060cc9320ed09e12be0ea6ade531ba31a8c730883166b8f73f4"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-complete-messages-pending.png",
+      "sha256": "6f44a7a2ab548c1e3206fd9fac182262e9477f90353e5fa91a2fce5ec0552d79"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-complete-completed-exact-context.png",
+      "sha256": "80668d0145e4aeec76de0751e55e2be8c660143a78e67f2bba4312f519377be1"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-incomplete-list-pending-after-home.png",
+      "sha256": "b3823c6c47a4f2efe0ff8e09627a5400f40bf759f7fad0c3c888266dac349fdd"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-incomplete-list-pending-after-settings.png",
+      "sha256": "b3823c6c47a4f2efe0ff8e09627a5400f40bf759f7fad0c3c888266dac349fdd"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-incomplete-messages-pending.png",
+      "sha256": "8da83e5f4fafe64a85af5b96fbdd1b18c333d4abbda1e20d8f6a683e7b79067f"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-incomplete-restored-effort-required.png",
+      "sha256": "41bf360a2d6d909f877a583392d455d06217e0d088eafb6be82f4361540cd568"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-incomplete-completed-exact-context.png",
+      "sha256": "24597da075e0ffb5f77bccceed38acf7ee220f7ed73d94d8260a3b7b881671e8"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-new-list-pending-after-home.png",
+      "sha256": "03fe688b65460060cc9320ed09e12be0ea6ade531ba31a8c730883166b8f73f4"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-new-list-pending-after-settings.png",
+      "sha256": "03fe688b65460060cc9320ed09e12be0ea6ade531ba31a8c730883166b8f73f4"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-new-messages-pending.png",
+      "sha256": "6f44a7a2ab548c1e3206fd9fac182262e9477f90353e5fa91a2fce5ec0552d79"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-new-completed-exact-context.png",
+      "sha256": "95b02a731baaca1c8c057a30ab4e1a9a37328bc473d0074045a539d1695e5de0"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-new-new-first-id-retained.png",
+      "sha256": "86423b2a15721834b70508e2c6e9d969ea79dfc8bb8c53dccd17c97b4b84a3e0"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-failed-list-blocked.png",
+      "sha256": "29be1a095baa1fae3cd7740052aadcf77dddad7bdc79d26d7b65c16e538bff6e"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-failed-list-completed-exact-context.png",
+      "sha256": "45f92072a63b3678554fc908a1e85ce89401456f69bc48a89a425c476c2d436d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-failed-detail-blocked.png",
+      "sha256": "2d44f80a7105db59210b08d896579ac3cee2609202ac4aaf1ff3652501b09936"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-failed-detail-completed-exact-context.png",
+      "sha256": "45f92072a63b3678554fc908a1e85ce89401456f69bc48a89a425c476c2d436d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-failed-messages-blocked.png",
+      "sha256": "cd44a9b196544917ea6a22460438dca43c604659806c01d01bd3371f61e65d58"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-failed-messages-completed-exact-context.png",
+      "sha256": "9b3ea7c02f209da75b0e6206692d633d36ee243207c364f8d240fe26c9e011c7"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-failed-missing-blocked.png",
+      "sha256": "09bacd9273980e9c7ed8ca0d02cf4c2880081350e9fda3dec8b76946687b4d38"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-openai-cold-failed-missing-completed-exact-context.png",
+      "sha256": "45f92072a63b3678554fc908a1e85ce89401456f69bc48a89a425c476c2d436d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-complete-list-pending-after-home.png",
+      "sha256": "8dce693cc6255a95886ef7ce4c2be13dccc8170229986c23a475dd2615489a9a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-complete-list-pending-after-settings.png",
+      "sha256": "8dce693cc6255a95886ef7ce4c2be13dccc8170229986c23a475dd2615489a9a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-complete-messages-pending.png",
+      "sha256": "c53c7206039400e29eb8c5818f9f59b6a58f90ae80a9e686828c93be2dd1cc45"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-complete-completed-exact-context.png",
+      "sha256": "416fbe225b242ce108f7626aca4f7761b81ca9b064057a818e52724536351090"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-incomplete-list-pending-after-home.png",
+      "sha256": "6758894d69a218645d4e44c01b44722ebed9c12a2946d5ab21b696b98f6bf7fb"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-incomplete-list-pending-after-settings.png",
+      "sha256": "6758894d69a218645d4e44c01b44722ebed9c12a2946d5ab21b696b98f6bf7fb"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-incomplete-messages-pending.png",
+      "sha256": "0c395831334f0aaec7b75540dda73abc552a7eee24dcb249bbedc501ba282328"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-incomplete-restored-effort-required.png",
+      "sha256": "7bffda868bd6c771f4c127ec5e943ed548e3d26ac5c383b0a16ff87b3d628e62"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-incomplete-completed-exact-context.png",
+      "sha256": "8d9150e23ba11c1a72fa8391efd5f3a87f9507a83dd97dc9f226826ff927a563"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-new-list-pending-after-home.png",
+      "sha256": "8dce693cc6255a95886ef7ce4c2be13dccc8170229986c23a475dd2615489a9a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-new-list-pending-after-settings.png",
+      "sha256": "8dce693cc6255a95886ef7ce4c2be13dccc8170229986c23a475dd2615489a9a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-new-messages-pending.png",
+      "sha256": "c53c7206039400e29eb8c5818f9f59b6a58f90ae80a9e686828c93be2dd1cc45"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-new-completed-exact-context.png",
+      "sha256": "81dfa91b8f9388ff127e74369460566fb6a7f05f769f0c8316afd8271b45f3fa"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-new-new-first-id-retained.png",
+      "sha256": "4c71b08ef467767f085ef647cd95cddf4594e4e20bc217cc8f99aac632364d6e"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-failed-list-blocked.png",
+      "sha256": "756045801569667bdac0e6cb1b409597e4ab8b72f5943d54140d6e07b486e5b9"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-failed-list-completed-exact-context.png",
+      "sha256": "7e3d9989a9d1aaecdf44e45cd353dadac6626002a2ffa85444e0a37a2dfacd0a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-failed-detail-blocked.png",
+      "sha256": "c81c8a6be7a37afb70e43da902605359d73f38c937e60e2dfb41b63c0728df57"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-failed-detail-completed-exact-context.png",
+      "sha256": "7e3d9989a9d1aaecdf44e45cd353dadac6626002a2ffa85444e0a37a2dfacd0a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-failed-messages-blocked.png",
+      "sha256": "37cf9c1db198d2f08f3cb9b4988015f904a1c1520d552251fa5e88f1758f16c5"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-failed-messages-completed-exact-context.png",
+      "sha256": "10dd74cb5bc302bcb47aaf3d67a69f57a95470efa5748c086cad83a3eda5500a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-failed-missing-blocked.png",
+      "sha256": "8aa8f96c69c056fc04a9ad95cc6ac624dae2fec38e5faad4060de6542f3a48e9"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-openai-cold-failed-missing-completed-exact-context.png",
+      "sha256": "5285b3a716f9bb3f88a96ab854c1084eee317ef6ee5c687a3765697ea5f222ee"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-complete-list-pending-after-home.png",
+      "sha256": "d799d950209f526366bb91fcdb67febd0c7c68b8b259f4763b9051a1972e048e"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-complete-list-pending-after-settings.png",
+      "sha256": "d799d950209f526366bb91fcdb67febd0c7c68b8b259f4763b9051a1972e048e"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-complete-messages-pending.png",
+      "sha256": "a67369ba312ec5474fa3cc00f5b42acf9ef4ec7abfdc0f514404dac0698cc6b2"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-complete-completed-exact-context.png",
+      "sha256": "b56eaef73b8f0c42ac836cee8308494b190ab28ccf69d724135d68f3d423c009"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-incomplete-list-pending-after-home.png",
+      "sha256": "cecdb723630f02b4964587fac6b8b7a0e1f6c94d932763faba9e19f104f4acbe"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-incomplete-list-pending-after-settings.png",
+      "sha256": "cecdb723630f02b4964587fac6b8b7a0e1f6c94d932763faba9e19f104f4acbe"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-incomplete-messages-pending.png",
+      "sha256": "ae787ba82847ef6c1b8bc8fffa1bef02e49b08f7631ffd0812541b2b0be52d6f"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-incomplete-restored-effort-required.png",
+      "sha256": "5a284cb85021b81f69443e365cc9fd90c3602d80e717c3101aa240eaa6b71665"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-incomplete-completed-exact-context.png",
+      "sha256": "236dea2e28acc3caecc7537ce8707c34f71e00729f86d46e121712ad1fe5570c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-new-list-pending-after-home.png",
+      "sha256": "d799d950209f526366bb91fcdb67febd0c7c68b8b259f4763b9051a1972e048e"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-new-list-pending-after-settings.png",
+      "sha256": "d799d950209f526366bb91fcdb67febd0c7c68b8b259f4763b9051a1972e048e"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-new-messages-pending.png",
+      "sha256": "a67369ba312ec5474fa3cc00f5b42acf9ef4ec7abfdc0f514404dac0698cc6b2"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-new-completed-exact-context.png",
+      "sha256": "d9e03f9e119c2fbe8c9a9948833641738f5067dd109a511f8056bdaf4bbc5e3d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-new-new-first-id-retained.png",
+      "sha256": "91f6c5059f5132152063e0afd6eef7e1deab147685514faef7d7985ac866bd21"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-failed-list-blocked.png",
+      "sha256": "fb224c276a3c2eff682a6267dda572a0c58a73a3ab0c1f9295ae1145a8386f3d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-failed-list-completed-exact-context.png",
+      "sha256": "16a60bd23f2794fbce2f146ebc6bbf27a7a4f69df61ee673dbb88799e28e7ff8"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-failed-detail-blocked.png",
+      "sha256": "1ed3be0ffa8d7832c7270b7c69bf0966297d7e5977a836bcb0062d641212d88e"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-failed-detail-completed-exact-context.png",
+      "sha256": "b56eaef73b8f0c42ac836cee8308494b190ab28ccf69d724135d68f3d423c009"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-failed-messages-blocked.png",
+      "sha256": "811b31332c6503b262f33c39866315d8b4f973740d1ece0e5ee761dd2a0ca3aa"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-failed-messages-completed-exact-context.png",
+      "sha256": "b56eaef73b8f0c42ac836cee8308494b190ab28ccf69d724135d68f3d423c009"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-failed-missing-blocked.png",
+      "sha256": "5507e0c9809870369489965592409acfb0030071d790a49750d5415f2403d7dd"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-openai-cold-failed-missing-completed-exact-context.png",
+      "sha256": "b56eaef73b8f0c42ac836cee8308494b190ab28ccf69d724135d68f3d423c009"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-complete-list-pending-after-home.png",
+      "sha256": "981f3356ccdfa194f990ee3647e3dee837309ad22c475670a711541dddb64e8d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-complete-list-pending-after-settings.png",
+      "sha256": "981f3356ccdfa194f990ee3647e3dee837309ad22c475670a711541dddb64e8d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-complete-messages-pending.png",
+      "sha256": "8fe78f9c81c7c817ab45710682dabc56f7d5ebf6d29e5476d1ef3111989ab85d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-complete-completed-exact-context.png",
+      "sha256": "d07f0cc62908aee42a417817199f687a3937c807bf1a8df110e054ceb27b8b73"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-incomplete-list-pending-after-home.png",
+      "sha256": "04589127e1b8955ee9c62f9032144ed2e6251e7e70f079280e993c2fef94336b"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-incomplete-list-pending-after-settings.png",
+      "sha256": "04589127e1b8955ee9c62f9032144ed2e6251e7e70f079280e993c2fef94336b"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-incomplete-messages-pending.png",
+      "sha256": "30ec78c1bf1e3598ef43133ef6dfe6f2f5e43e01330e4b6f20a0b01137945c83"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-incomplete-restored-effort-required.png",
+      "sha256": "7e8f37477e90bf4714c03e23609eff9742afdda391cfc5182e3d74800a9eb042"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-incomplete-completed-exact-context.png",
+      "sha256": "b397b0a612e8520d9b6411522a1b35911875dcc2448e45df7f298239136e5237"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-new-list-pending-after-home.png",
+      "sha256": "981f3356ccdfa194f990ee3647e3dee837309ad22c475670a711541dddb64e8d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-new-list-pending-after-settings.png",
+      "sha256": "981f3356ccdfa194f990ee3647e3dee837309ad22c475670a711541dddb64e8d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-new-messages-pending.png",
+      "sha256": "8fe78f9c81c7c817ab45710682dabc56f7d5ebf6d29e5476d1ef3111989ab85d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-new-completed-exact-context.png",
+      "sha256": "092668fb21ac406d73c59f66a079aa4e780f812670f641db4a2dc09ae3c89994"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-new-new-first-id-retained.png",
+      "sha256": "a2f3089d06f88489d519b43fa16741103123787bfbb283a31c5896c011213251"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-failed-list-blocked.png",
+      "sha256": "a25d76e7a70b538f2e72a2bc03ebd934460ed0a671b41b46b93bf9282f5a94b1"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-failed-list-completed-exact-context.png",
+      "sha256": "02f8d9067f226389e0ccc9ce8456e97edb32c9ba3700840dd63f03a129c9db46"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-failed-detail-blocked.png",
+      "sha256": "69cc81938c8fdbd2fff4d50105c8649fe80e3e832875940ae24fe145090d54e7"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-failed-detail-completed-exact-context.png",
+      "sha256": "1b92a90871fceabf699c065a32fd5b9ed6b8e00fad91f410b758c77e977d4623"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-failed-messages-blocked.png",
+      "sha256": "ab9e79538f6486d79392eb0670450f2383665b4abaead93c94dc525aeab3406d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-failed-messages-completed-exact-context.png",
+      "sha256": "434893e70b71e66e49d13cd225a33a45e174026eae53efa77add9e2726210c4f"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-failed-missing-blocked.png",
+      "sha256": "d7a1c51955fb580bc99b1de63f1fe99b7887449b687037eae5614a315fd05e63"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-1280-shell-anthropic-cold-failed-missing-completed-exact-context.png",
+      "sha256": "1d2076b99875cc7f411dd09b0e402281aa6b99d4ff45b4d4c1f8266265af1322"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-complete-list-pending-after-home.png",
+      "sha256": "c305f513a8a8f36fd9947dc845b1b89f8f4f0e1049c78e096c7ceacdf750f890"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-complete-list-pending-after-settings.png",
+      "sha256": "c305f513a8a8f36fd9947dc845b1b89f8f4f0e1049c78e096c7ceacdf750f890"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-complete-messages-pending.png",
+      "sha256": "631c2bbbf276485177c06c934148165edca49c5c453f6b9eebd418cac8a3fba7"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-complete-completed-exact-context.png",
+      "sha256": "a7163aad0581c49179eca3be621fb291f4e2f58effaf221a2a3919a6cbde5b2d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-incomplete-list-pending-after-home.png",
+      "sha256": "4bd524b57ed1b41af442bddce25a8be72d1d445067a2186b7267c73dbcca9adb"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-incomplete-list-pending-after-settings.png",
+      "sha256": "4bd524b57ed1b41af442bddce25a8be72d1d445067a2186b7267c73dbcca9adb"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-incomplete-messages-pending.png",
+      "sha256": "22d0ce4c9d8986700a26da4dbb55c0820735e8165dd91284f9635debf92ed276"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-incomplete-restored-effort-required.png",
+      "sha256": "2b931af3160d0be1fae4d7b0f064352ddf47387de21e09081bc1abdcce6bd4e4"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-incomplete-completed-exact-context.png",
+      "sha256": "846ccb9645f3d450a31d63d70385a3b8feb8854c1c760a9c06cb724a3cca5f70"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-new-list-pending-after-home.png",
+      "sha256": "c305f513a8a8f36fd9947dc845b1b89f8f4f0e1049c78e096c7ceacdf750f890"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-new-list-pending-after-settings.png",
+      "sha256": "c305f513a8a8f36fd9947dc845b1b89f8f4f0e1049c78e096c7ceacdf750f890"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-new-messages-pending.png",
+      "sha256": "631c2bbbf276485177c06c934148165edca49c5c453f6b9eebd418cac8a3fba7"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-new-completed-exact-context.png",
+      "sha256": "378dcd38f572a4b6e36f0a4d3132266e2857d9c7c9b05b70d7d94c6092559324"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-new-new-first-id-retained.png",
+      "sha256": "7bbccca45b5754b3b7a9dbc15a2b09a64f0486312136953e3336a5e694dcd078"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-failed-list-blocked.png",
+      "sha256": "f6cdc5456a32e830798968ee975820d212da48918ae5d65e428e06eb9d00970d"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-failed-list-completed-exact-context.png",
+      "sha256": "dbdbdd6a7e4fe549ed2330c6c9d51e63f5ab83ee1f992155cedc1193cfd7a38a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-failed-detail-blocked.png",
+      "sha256": "a150576be47d31c43d6362f89e6126fe6356238767068e88ded943cfc8000159"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-failed-detail-completed-exact-context.png",
+      "sha256": "dbdbdd6a7e4fe549ed2330c6c9d51e63f5ab83ee1f992155cedc1193cfd7a38a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-failed-messages-blocked.png",
+      "sha256": "526d53b6be73d6f6280b101f9c8a8a330b0590500e205906f1b7eb160f999833"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-failed-messages-completed-exact-context.png",
+      "sha256": "dbdbdd6a7e4fe549ed2330c6c9d51e63f5ab83ee1f992155cedc1193cfd7a38a"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-failed-missing-blocked.png",
+      "sha256": "a61a43155393106e01c262a322ecb3b8aa06f8a5a21f69279f63a377967c9c5e"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/en-390-shell-anthropic-cold-failed-missing-completed-exact-context.png",
+      "sha256": "581d67697dbb80d6de094d78dc1fbba5364052803a4e9ca00198e2db87d74824"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-complete-list-pending-after-home.png",
+      "sha256": "9fdaa2518083fcf652d6b9a18aa6c87a8dcceb3a50f7dbf42b9db14097db9a05"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-complete-list-pending-after-settings.png",
+      "sha256": "9fdaa2518083fcf652d6b9a18aa6c87a8dcceb3a50f7dbf42b9db14097db9a05"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-complete-messages-pending.png",
+      "sha256": "32cff6fa505ab28ef310d83969e226964e785302abe7dfacf6ccd48175ce6450"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-complete-completed-exact-context.png",
+      "sha256": "718fdea11dbdfbb5c2aa87ed8da2cf8926b5aa3868d8da6be72141500367150c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-incomplete-list-pending-after-home.png",
+      "sha256": "a9b4dd2706724a0588e32970e8eac6188909dd92dab14d91f7c7bf2e375b3218"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-incomplete-list-pending-after-settings.png",
+      "sha256": "a9b4dd2706724a0588e32970e8eac6188909dd92dab14d91f7c7bf2e375b3218"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-incomplete-messages-pending.png",
+      "sha256": "40ed5ef0cddb0cfd866cf7716df0630aa3a48ec733408f69ed33472894988d43"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-incomplete-restored-effort-required.png",
+      "sha256": "fd185baed062c6116f8ee0369e6d765fda6ab76bdb055078f1e762e5cb6bc2ef"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-incomplete-completed-exact-context.png",
+      "sha256": "5eed8f5e6d4dd44835509942f5f09f3d09030423f860fba3772686bd347c1bcc"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-new-list-pending-after-home.png",
+      "sha256": "9fdaa2518083fcf652d6b9a18aa6c87a8dcceb3a50f7dbf42b9db14097db9a05"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-new-list-pending-after-settings.png",
+      "sha256": "9fdaa2518083fcf652d6b9a18aa6c87a8dcceb3a50f7dbf42b9db14097db9a05"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-new-messages-pending.png",
+      "sha256": "32cff6fa505ab28ef310d83969e226964e785302abe7dfacf6ccd48175ce6450"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-new-completed-exact-context.png",
+      "sha256": "c6a17aeaae02cd5fa0ab056787592437fb0dd60fbe8f815e67d48cebf3a78f65"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-new-new-first-id-retained.png",
+      "sha256": "6b1ce257c526cd4a6348cb8da599a447993cc4833a12c3f4314ba0c4e9a00807"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-failed-list-blocked.png",
+      "sha256": "2c893ed54076de4c52e52c5465f8c679f6c6aa0630b94f84bab299068a8aba5e"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-failed-list-completed-exact-context.png",
+      "sha256": "0f370ac7c8915235f34f6f1a2bcbf0d4403b53f0e0e9dcbb2f665becdde39ace"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-failed-detail-blocked.png",
+      "sha256": "4ffccc3d0ceef6badd8a70bcbadc811f45835608985dff1719cd378d5c647891"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-failed-detail-completed-exact-context.png",
+      "sha256": "0f370ac7c8915235f34f6f1a2bcbf0d4403b53f0e0e9dcbb2f665becdde39ace"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-failed-messages-blocked.png",
+      "sha256": "6388672ac16df5a22498937025d468f85fc1e2acea884f6c67fea603f253a630"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-failed-messages-completed-exact-context.png",
+      "sha256": "101b2272e0031880cf59f661b2d15c2206029fb6243c60f5947a7d02e51dd06f"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-failed-missing-blocked.png",
+      "sha256": "4ed43d54885aad28a1c7fe042067d6efb87eb15a58cd629856bcc730310d4e7c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-1280-shell-anthropic-cold-failed-missing-completed-exact-context.png",
+      "sha256": "718fdea11dbdfbb5c2aa87ed8da2cf8926b5aa3868d8da6be72141500367150c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-complete-list-pending-after-home.png",
+      "sha256": "e52a6d8aedc9b42aac6dae70e9e7256e4bfffeb8856871e94d3d1499983fb405"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-complete-list-pending-after-settings.png",
+      "sha256": "e52a6d8aedc9b42aac6dae70e9e7256e4bfffeb8856871e94d3d1499983fb405"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-complete-messages-pending.png",
+      "sha256": "f9a5a3782c2575d2af175469445f8d65ca921aba6ae0e7ab2c9ba71f7fc13430"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-complete-completed-exact-context.png",
+      "sha256": "f3e7190a60c870e50d24b7ea2b6fa2e2979bf1f5e896803b37235a7713e56b5c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-incomplete-list-pending-after-home.png",
+      "sha256": "4c027324efd8e7afd7e8d913ee1a50fd69301dd268beb1cc035238f676b6e64b"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-incomplete-list-pending-after-settings.png",
+      "sha256": "4c027324efd8e7afd7e8d913ee1a50fd69301dd268beb1cc035238f676b6e64b"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-incomplete-messages-pending.png",
+      "sha256": "47781e54b7bbc6aac683c44c7ecbf995e332069e79ea42b2f6771fc23c188126"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-incomplete-restored-effort-required.png",
+      "sha256": "7edf82679d453553a840f4bd0b803f1a32470fbdfbaba0539e3cc6cd3eb4d636"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-incomplete-completed-exact-context.png",
+      "sha256": "30a4730af4c2b380cf772a40eb8b79b9bd5cf4ee11092a1297c9b02e492af67c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-new-list-pending-after-home.png",
+      "sha256": "e52a6d8aedc9b42aac6dae70e9e7256e4bfffeb8856871e94d3d1499983fb405"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-new-list-pending-after-settings.png",
+      "sha256": "e52a6d8aedc9b42aac6dae70e9e7256e4bfffeb8856871e94d3d1499983fb405"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-new-messages-pending.png",
+      "sha256": "f9a5a3782c2575d2af175469445f8d65ca921aba6ae0e7ab2c9ba71f7fc13430"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-new-completed-exact-context.png",
+      "sha256": "95c481862a63fe4155b262028c6712310ad42e224fe9cb3b6c27340e3d716806"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-new-new-first-id-retained.png",
+      "sha256": "84ceb3cfae41d5c54eb0fa24dd126261475850dc94adc9408a54f5758e1df31b"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-failed-list-blocked.png",
+      "sha256": "36c08ce7099fe9ed0b143bd8a6b80769642367e5720a0be53c37592279e0e79c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-failed-list-completed-exact-context.png",
+      "sha256": "f3e7190a60c870e50d24b7ea2b6fa2e2979bf1f5e896803b37235a7713e56b5c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-failed-detail-blocked.png",
+      "sha256": "36c08ce7099fe9ed0b143bd8a6b80769642367e5720a0be53c37592279e0e79c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-failed-detail-completed-exact-context.png",
+      "sha256": "f3e7190a60c870e50d24b7ea2b6fa2e2979bf1f5e896803b37235a7713e56b5c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-failed-messages-blocked.png",
+      "sha256": "3d6234f2046f8a3a392c13d5e87f664f76e9a32763e5f74232dded407d4b6d82"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-failed-messages-completed-exact-context.png",
+      "sha256": "f3e7190a60c870e50d24b7ea2b6fa2e2979bf1f5e896803b37235a7713e56b5c"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-failed-missing-blocked.png",
+      "sha256": "c91ed321e4fd89041115f9edc4153e9d360785af83c2d22fef940cbf0e102345"
+    },
+    {
+      "path": "tmp/cold-restoration-ui/controller-final/zh-Hant-390-shell-anthropic-cold-failed-missing-completed-exact-context.png",
+      "sha256": "f3e7190a60c870e50d24b7ea2b6fa2e2979bf1f5e896803b37235a7713e56b5c"
+    }
+  ],
+  "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin HOME=/tmp LANG=C.UTF-8 PLAYWRIGHT_BROWSERS_PATH=/home/hyl/.cache/ms-playwright ARKSCOPE_UI_EVIDENCE_DIR=tmp/cold-restoration-ui/controller-final ARKSCOPE_COLD_RESTORATION_ONLY=1 /usr/bin/unshare --user --map-root-user --net /home/hyl/.virtualenvs/llm_app/bin/python ../../docs/superpowers/evidence/2026-09-09-task-route-authority-repair/task-3-browser.py",
+  "cwd": "/tmp/arkscope-task-route-authority/apps/arkscope-web",
+  "notes": [
+    "Synthetic HTTP fixtures only; no provider or production App was used.",
+    "The raw result JSON binds all request bodies and viewport measurements. Summary omits repeated request details.",
+    "Observed context status does not independently attest any provider-selected model.",
+    "The 54148cfc attempt-5 output and all older evidence remain unchanged; this is a separate final-code run."
+  ]
+}

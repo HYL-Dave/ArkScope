@@ -1,0 +1,222 @@
+{
+  "notes": [
+    "Historical worker XMLs were structurally parsed by the controller.",
+    "frontend-red.xml has a transform/selector setup problem; it is not the behavioral RED.",
+    "frontend-empty-recovery-red.xml has an incorrect selector; use the red-verified successor for behavioral evidence.",
+    "The deletion RED's five skipped cases are from its disclosed initial -t scope. Every controller inverse uses the full unfiltered 11-file focus."
+  ],
+  "artifacts": [
+    {
+      "artifact": "tmp/cold-restoration/backend-context-green.xml",
+      "sha256": "07e02957a5b6b830aa02601dd87f24081938f72d5b6305f785a2f06cb0f0b128",
+      "tests": 252,
+      "passed": 252,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failed_owners": [],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/controller-backend-full.xml",
+      "sha256": "db0a126208d5807960dc9371b6884660f3a74f414c13f7d2cd3b9897bcd93db1",
+      "tests": 7605,
+      "passed": 7593,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 12,
+      "failed_owners": [],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-delete-target-final-green.xml",
+      "sha256": "cb894e725e2eae3603672bfe29e8f166dbf3b81495c97323c215a6f532fbfa97",
+      "tests": 274,
+      "passed": 274,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failed_owners": [],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-delete-target-red.xml",
+      "sha256": "b799a819c3d06581758794967ff1ff3b41f1c61fbc6898f6678e5347b21bad1d",
+      "tests": 8,
+      "passed": 2,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 5,
+      "failed_owners": [
+        "src/ResearchShellNavigation.test.tsx::Research shell navigation > keeps the intended target after deleting thread a during delayed ID navigation"
+      ],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-display-final-green.xml",
+      "sha256": "159c5c365500a71c94d30972a5bc00e0a0fcb3af7275e3a474d8152f3b2bc962",
+      "tests": 271,
+      "passed": 271,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failed_owners": [],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-empty-recovery-red-verified.xml",
+      "sha256": "1b5e817afac43ce17d63dca359d43f54149af8a34ad23caca4ea64356700b41c",
+      "tests": 125,
+      "passed": 3,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 121,
+      "failed_owners": [
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > recovers unresolved initial history with no saved ID (hasHistory=false, 'refresh')"
+      ],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-empty-recovery-red.xml",
+      "sha256": "0714546f2a83c0ea6fcf783f8bd2fab966fa7c791a2808d3cfef73024ffda736",
+      "tests": 125,
+      "passed": 2,
+      "failures": 2,
+      "errors": 0,
+      "skipped": 121,
+      "failed_owners": [
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > recovers unresolved initial history with no saved ID (hasHistory=false, 'refresh')",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > recovers unresolved initial history with no saved ID (hasHistory=true, 'refresh')"
+      ],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-focus-final-green.xml",
+      "sha256": "aeb2e2cde91be6a9543e617234e10423c917bcaa5f64ded5838c3af57be8dbee",
+      "tests": 271,
+      "passed": 271,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failed_owners": [],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-focus-green.xml",
+      "sha256": "1c609c616a724c0fae7771f0e9119b3055f57641a25c1e4ad465e6b75c1f5426",
+      "tests": 267,
+      "passed": 267,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failed_owners": [],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-full-green.xml",
+      "sha256": "1b9bfb7bd23ae02df5711181b44fbce3a81196de8dc59d68ce83d00d089e959d",
+      "tests": 1822,
+      "passed": 1822,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failed_owners": [],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-heading-red.xml",
+      "sha256": "dc61b5fca9b7613ed114cf12f76bd7ffd4c7e0ddadafed9f2ad3e3fc03e4b4ae",
+      "tests": 130,
+      "passed": 102,
+      "failures": 28,
+      "errors": 0,
+      "skipped": 0,
+      "failed_owners": [
+        "src/ResearchShellNavigation.test.tsx::Research shell navigation > preserves thread load errors but does not require historical selection to use Settings",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'none' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'none' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'none' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'complete' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'complete' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'complete' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'incomplete' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'incomplete' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'incomplete' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'none' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'none' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'none' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'complete' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'complete' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'complete' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'incomplete' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'incomplete' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'incomplete' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'list' restoration without losing input and supports explicit 'retry'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'list' restoration without losing input and supports explicit 'new'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'list' restoration without losing input and supports explicit 'other'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'detail' restoration without losing input and supports explicit 'retry'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'detail' restoration without losing input and supports explicit 'new'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'detail' restoration without losing input and supports explicit 'other'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'missing' restoration without losing input and supports explicit 'retry'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'missing' restoration without losing input and supports explicit 'new'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'missing' restoration without losing input and supports explicit 'other'"
+      ],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-red-verified.xml",
+      "sha256": "993b0d7390a3887c78cfcb895ce768bfe8a8c22ed805edfab4a3b3545fec82fd",
+      "tests": 267,
+      "passed": 238,
+      "failures": 29,
+      "errors": 0,
+      "skipped": 0,
+      "failed_owners": [
+        "src/ResearchShellNavigation.test.tsx::Research shell navigation > preserves thread load errors but does not require historical selection to use Settings",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'none' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'none' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'none' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'complete' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'complete' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'complete' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'incomplete' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'incomplete' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'openai' after 'incomplete' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'none' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'none' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'none' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'complete' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'complete' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'complete' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'incomplete' selection and 'none' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'incomplete' selection and 'Home' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > restores cold saved context from 'anthropic' after 'incomplete' selection and 'Settings' navigation",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'list' restoration without losing input and supports explicit 'retry'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'list' restoration without losing input and supports explicit 'new'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'list' restoration without losing input and supports explicit 'other'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'detail' restoration without losing input and supports explicit 'retry'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'detail' restoration without losing input and supports explicit 'new'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'detail' restoration without losing input and supports explicit 'other'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'messages' restoration without losing input and supports explicit 'retry'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'missing' restoration without losing input and supports explicit 'retry'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'missing' restoration without losing input and supports explicit 'new'",
+        "src/ResearchWorkspace.test.tsx::Research workspace contracts > blocks cold 'missing' restoration without losing input and supports explicit 'other'"
+      ],
+      "error_owners": []
+    },
+    {
+      "artifact": "tmp/cold-restoration/frontend-red.xml",
+      "sha256": "d43ef7bde5694d1e8f71fa05ff1c2f933cf5a79d08b7f9310db6eb50c02acbc3",
+      "tests": 147,
+      "passed": 145,
+      "failures": 2,
+      "errors": 0,
+      "skipped": 0,
+      "failed_owners": [
+        "src/ResearchShellNavigation.test.tsx::Research shell navigation > preserves thread load errors but does not require historical selection to use Settings",
+        "src/ResearchWorkspace.test.tsx::src/ResearchWorkspace.test.tsx"
+      ],
+      "error_owners": []
+    }
+  ]
+}

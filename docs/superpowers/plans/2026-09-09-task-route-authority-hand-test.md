@@ -1,18 +1,17 @@
 # Four-Task Route Repair Hand Test
 
-Status: `codex/task-route-authority` is NOT ready to merge. One cold App-start Research restoration regression remains after scoped re-review. Not merged, not a request to restart yet.
+Status: `codex/task-route-authority`, code `b669d455`, is ready for separate
+merge authorization. The cold-restoration finding passes scoped re-review.
+Not merged; restart only after integration, not against the unchanged master.
 
-Pre-fix offline verification: 7,537 backend passed / 12 skipped; 1,739 frontend passed;
-typecheck/build passed; six regression mutations killed and restored. The
+Current offline verification: 7,593 backend passed / 12 skipped; 1,825 frontend
+passed; typecheck/build passed. Six final frontend mutations were killed and
+restored, including both new context guards; 176 final-code synthetic browser
+screenshots cover desktop/mobile and both locales/providers. Three existing
+backend warnings and the existing Vite large-chunk warning remain. The
 [evidence record](../evidence/2026-09-09-task-route-authority-repair/README.md)
-separates these results from still-pending live acceptance.
-
-Post-fix verification: 7,591 backend passed / 12 skipped; 1,781 frontend passed,
-typecheck/build passed; nine mutations killed and restored; 96 new synthetic
-browser screenshots. These checks do not cover the remaining cold-restoration case: editing
-a model before the saved conversation loads can silently start a new conversation
-instead. Its old messages are not deleted. A bounded correction has been proposed;
-do not treat waiting before editing as a completed fix.
+preserves earlier failed reviews separately from this correction and from
+still-pending live acceptance.
 
 ## Boundaries
 
@@ -34,10 +33,18 @@ Home/Settings and back must keep Send disabled and that pending model selected.
 Do not display the previous route's auth/quota/reason as the pending choice's
 source. Completing effort restores the new choice's own source and eligibility.
 
-The currently failing cold-start gate must pass before this checklist becomes
-an operator handoff: restore a saved conversation with delayed history, edit the
-model before it loads, then confirm the next request retains that conversation
-and the chosen tuple. A deliberate New action must still create a new conversation.
+For cold restoration, reopen Research with a previously selected conversation.
+Editing the model or draft while history loads must not create a new conversation:
+Send remains disabled until the intended history is available. The eventual
+answer must stay in that conversation and show the selected new tuple; old
+messages retain their old sources. New is the explicit way to start separately.
+If history is missing or fails to load, the draft remains and Retry/History/New
+provide recovery; no silent fallback to an unrelated conversation is allowed.
+The delayed-response and deletion races are covered offline, so do not delete
+valuable research just to manufacture a manual race.
+
+Cache/cost hints are a separate recorded proposal, not included in this build.
+Do not infer cache hits or misses from model choice, latency, or a short interval.
 
 ## Negative Controls
 
