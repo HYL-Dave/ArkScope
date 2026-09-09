@@ -507,6 +507,80 @@ describe("Research shell navigation", () => {
     expect(host!.textContent).toContain("Exact archived result");
   });
 
+  it.each(["a", "b", "c"])("keeps the intended target after deleting thread %s during delayed ID navigation", async deleted => {
+    const rows = [thread("thread-a", "Thread A"), thread("thread-b", "Thread B"), thread("thread-c", "Thread C")];
+    const target = rows[0];
+    const detail = deferred<Response>();
+    const fetchMock = stubResearchFetch({
+      threads: rows,
+      exactResponses: { "thread-a": detail.promise },
+      messages: {
+        "thread-a": [persistedMessage("assistant", "Answer from A")],
+        "thread-b": [persistedMessage("assistant", "Answer from B")],
+      },
+    });
+    const bodies: Array<Record<string, unknown>> = [];
+    let accepted: ResearchRunDTO;
+    vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname;
+      if (init?.method === "DELETE") {
+        const id = path.split("/").at(-1)!;
+        rows.splice(rows.findIndex(row => row.id === id), 1);
+        return Promise.resolve(json({ thread_id: id, deleted: true }));
+      }
+      if (path === "/research/runs" && init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        bodies.push(body);
+        accepted = { ...run("accepted", body.thread_id, "succeeded"), question: body.question };
+        return Promise.resolve(json({ run: accepted }));
+      }
+      if (path === "/research/runs/accepted/events") return Promise.resolve(json({ run: accepted, events: [], has_more: false }));
+      return fetchMock(input, init);
+    });
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "thread-b");
+    const mounted = await mountResearch({ strictMode: true });
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread B");
+    const textarea = host!.querySelector("textarea")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "Retain intended draft");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await mounted.render({ sequence: 1, target: { kind: "research_thread", threadId: "thread-a", runId: "source-run" } });
+    const button = (name: string) => Array.from(document.querySelectorAll("button"))
+      .find(candidate => candidate.textContent?.trim() === name)!;
+    expect(button("送出").disabled).toBe(true);
+    expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("thread-a");
+    await click(button("歷史"));
+    await click(document.querySelector(`[aria-label='永久刪除 Thread ${deleted.toUpperCase()}']`)!);
+    await click(button("永久刪除"));
+    await flush();
+    await click(document.querySelector("[aria-label='關閉']")!);
+    expect(textarea.value).toBe("Retain intended draft");
+    expect(bodies).toEqual([]);
+    if (deleted === "a") {
+      expect.soft(host!.querySelector(".research-conversation-title")?.textContent).toBe("新對話");
+      expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBeNull();
+      expect(button("送出").disabled).toBe(false);
+      await click(button("送出"));
+    } else {
+      expect(button("送出").disabled).toBe(true);
+      expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("thread-a");
+    }
+    detail.resolve(json({ thread: target }));
+    await flush();
+    if (deleted === "a") expect(host!.textContent).not.toContain("Answer from A");
+    else {
+      expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread A");
+      expect(host!.textContent).toContain("Answer from A");
+      expect(button("送出").disabled).toBe(false);
+      await click(button("送出"));
+    }
+    expect(bodies).toHaveLength(1);
+    if (deleted === "a") expect(bodies[0].thread_id).not.toMatch(/^thread-[abc]$/);
+    else expect(bodies[0].thread_id).toBe("thread-a");
+    expect(bodies[0]).toMatchObject({ question: "Retain intended draft", provider: "openai", model: "gpt-5.6-luna", effort: "high" });
+  });
+
   it("reports each hydrated active run to the shell observer", async () => {
     const active = run("active-run", "active-thread", "running");
     const stale = run("stale-run", "stale-thread", "running");
