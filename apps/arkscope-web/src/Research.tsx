@@ -270,7 +270,7 @@ export function ResearchView({
       : null,
     [catalog, sdk, userSelection],
   );
-  const selectionPresentation = selection
+  const selectionPresentation = selection && !incompleteSelection
     ? presentResearchSelection({
         provenance: selection.provenance,
         authMode: selection.authMode,
@@ -1110,7 +1110,7 @@ export function ResearchView({
                     {selectionPresentation?.billingCopy && (
                       <span className="muted tiny">{selectionPresentation.billingCopy}</span>
                     )}
-                    {selection?.state === "blocked" && (
+                    {!incompleteSelection && selection?.state === "blocked" && (
                       <span className="warn-text tiny">
                         {selectionPresentation?.reasonLabel ?? selection.reasonCode}
                       </span>

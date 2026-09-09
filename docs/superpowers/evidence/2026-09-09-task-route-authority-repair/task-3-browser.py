@@ -291,6 +291,18 @@ def verify(browser, locale, width, height, shell_provider=None):
             page.get_by_role("button", name="Send" if locale == "en" else "\u9001\u51fa", exact=True).click()
             expect(page.get_by_text("Synthetic completed answer: " + question, exact=True)).to_be_visible()
 
+        def captions(provider=None):
+            muted = page.locator(".research-pickerbar > span.muted")
+            if provider is None:
+                expect(muted).to_have_count(0)
+                required = "Choose an effort for this provider and model before submitting." if locale == "en" else "\u8acb\u5148\u70ba\u9019\u500b provider \u8207\u6a21\u578b\u9078\u64c7 effort\uff0c\u624d\u80fd\u9001\u51fa\u3002"
+                expect(page.locator(".research-pickerbar > span.warn-text")).to_have_text([required])
+            else:
+                auth = "ChatGPT" if provider == "openai" else "Claude"
+                auth += " subscription sign-in" if locale == "en" else " \u8a02\u95b1\u767b\u5165"
+                quota = "Uses subscription quota, not API billing" if locale == "en" else "\u4f7f\u7528\u8a02\u95b1\u984d\u5ea6\uff0c\u975e API \u5e33\u55ae"
+                expect(muted).to_have_text([auth, quota])
+
         page.goto(BASE + "/__task3?view=shell&locale=" + locale)
         shell_nav("Research")
         model = page.locator(".research-pickerbar select").nth(0)
@@ -298,6 +310,7 @@ def verify(browser, locale, width, height, shell_provider=None):
         default = state["catalog"]["routes"]["ai_research"]
         expect(model).to_have_value(default["model"])
         expect(effort).to_have_value(default["effort"])
+        captions(shell_provider)
         shot("settings-default")
         page.locator(".research-providerbar button").filter(has_text="OpenAI").click()
         model.select_option("gpt-5.6-sol")
@@ -308,34 +321,40 @@ def verify(browser, locale, width, height, shell_provider=None):
             page.locator("textarea").fill("Effort still required")
             expect(page.get_by_role("button", name="Send" if locale == "en" else "\u9001\u51fa", exact=True)).to_be_disabled()
             assert not [row for row in requests if row["path"] == "/research/runs" and row["method"] == "POST"]
+            captions()
             shot("incomplete-after-" + destination.lower())
         effort.select_option("low")
         round_trip("Home")
         expect(model).to_have_value("gpt-5.6-sol")
         expect(effort).to_have_value("low")
+        captions("openai")
         send("Retained existing conversation")
         shot("complete-after-home")
         round_trip("Settings")
         expect(model).to_have_value("gpt-5.6-sol")
         expect(effort).to_have_value("low")
+        captions("openai")
         send("Retained second existing turn")
         shot("complete-after-settings")
 
         page.get_by_role("button", name="New Research" if locale == "en" else "\u65b0\u7814\u7a76", exact=True).click()
         expect(model).to_have_value(default["model"])
         expect(effort).to_have_value(default["effort"])
+        captions(shell_provider)
         shot("new-reset")
         page.locator(".research-providerbar button").filter(has_text="OpenAI").click()
         model.select_option("gpt-5.6-sol")
         round_trip("Home")
         expect(page.locator(".research-conversation-title")).to_have_text("New conversation" if locale == "en" else "\u65b0\u5c0d\u8a71")
         expect(effort).to_have_value("")
+        captions()
         shot("new-incomplete-after-home")
         effort.select_option("high")
         send("First assigned conversation")
         round_trip("Settings")
         expect(model).to_have_value("gpt-5.6-sol")
         expect(effort).to_have_value("high")
+        captions("openai")
         send("After first ID assignment")
         shot("first-id-retained")
         runs = [row["body"] for row in requests if row["path"] == "/research/runs" and row["method"] == "POST"]
@@ -350,7 +369,37 @@ def verify(browser, locale, width, height, shell_provider=None):
         page.locator(".research-history-select").filter(has_text="Another conversation").click()
         expect(model).to_have_value(default["model"])
         expect(effort).to_have_value(default["effort"])
+        captions(shell_provider)
         shot("other-reset")
+
+        page.locator(".research-providerbar button").filter(has_text="OpenAI").click()
+        model.select_option("gpt-5.6-sol")
+        effort.select_option("low")
+        captions("openai")
+        page.locator(".research-providerbar button").filter(has_text="Anthropic").click()
+        model.select_option("claude-sonnet-5")
+        for destination in ["Home", "Settings"]:
+            round_trip(destination)
+            expect(model).to_have_value("claude-sonnet-5")
+            expect(effort).to_have_value("")
+            expect(page.locator(".research-providerbar .ui-button-primary")).to_contain_text("Anthropic")
+            page.locator("textarea").fill("Claude effort still required")
+            expect(page.get_by_role("button", name="Send" if locale == "en" else "\u9001\u51fa", exact=True)).to_be_disabled()
+            captions()
+            shot("reverse-incomplete-after-" + destination.lower())
+        assert len([row for row in requests if row["path"] == "/research/runs" and row["method"] == "POST"]) == 4
+        effort.select_option("medium")
+        round_trip("Settings")
+        expect(model).to_have_value("claude-sonnet-5")
+        expect(effort).to_have_value("medium")
+        captions("anthropic")
+        send("Completed reverse-provider choice")
+        shot("reverse-complete-after-settings")
+        runs = [row["body"] for row in requests if row["path"] == "/research/runs" and row["method"] == "POST"]
+        assert len(runs) == 5
+        assert (runs[-1]["thread_id"], runs[-1]["provider"], runs[-1]["model"], runs[-1]["effort"]) == (
+            "history-b", "anthropic", "claude-sonnet-5", "medium",
+        )
         assert not errors, errors
         context.close()
         return dict(locale=locale, width=width, shell_provider=shell_provider, screenshots=screenshots,
