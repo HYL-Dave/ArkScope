@@ -694,6 +694,8 @@ export function ResearchView({
       detachLocalPolling();
       setThreadError(null);
       rememberConversation(null, null);
+      // The intended target can differ from the last hydrated reducer thread.
+      dispatch({ kind: "newThread" });
     }
     dispatch({ kind: "deleteThread", threadId });
   }, [conversationRef, detachLocalPolling, rememberConversation]);
