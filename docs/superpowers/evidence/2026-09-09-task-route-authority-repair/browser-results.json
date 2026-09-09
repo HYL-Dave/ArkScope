@@ -1,0 +1,625 @@
+{
+  "kind": "synthetic_actual_component_browser_verification",
+  "code_commit": "c5146a9a581f7e81ee5890a109e3f9ae81047ce9",
+  "result_sha256": "ffa53a59cc0c68de14eede097d4faaae67e900d0c42babb3df8aa4fa4ccdcf0a",
+  "provider_calls": 0,
+  "production_backend_started": false,
+  "contexts": [
+    {
+      "locale": "en",
+      "width": 1280,
+      "layouts": [
+        {
+          "view": "card-original",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-cached",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refresh-pending",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refresh-failed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refreshed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-legacy-saved",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-saved-refresh-failed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-malformed-safe-error",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-no-op",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-openai-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "settings-research-route",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-anthropic-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-current-override",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-open-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "lifecycle-previous",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "lifecycle-next-confirmation",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 38,
+      "screenshots": [
+        {
+          "path": "tmp/task-3-ui/en-1280-card-original.png",
+          "sha256": "70e16fbbc123954b25fc83783985ca330c01b98f446b1a943e205d7001a40e04"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-card-cached.png",
+          "sha256": "6b5ccda9833d2ba4be45aaa0cab23e470929a20068de0681cafbfa53566ced8c"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-card-refresh-pending.png",
+          "sha256": "2c3a0ea05f90574c169e76446357d1ddc930c360b2e6ae4cb6abcf5a80f09ea2"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-card-refresh-failed.png",
+          "sha256": "dc441c13f7dc3af0fdcc61def8798a98339aada77a4087954a5372ab4e362812"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-card-refreshed.png",
+          "sha256": "075e1b555554d962726c7fea1bfa018243f0d4bed7662cf0b49c402dc26e0e37"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-card-legacy-saved.png",
+          "sha256": "b54fb392c7532464793867bc99f8e0a43ce30e2c735d7f65e0e2a9e46f146d2f"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-card-saved-refresh-failed.png",
+          "sha256": "09bc8fb3282e96aad3c298368dd7e8fdf4015836390c0232b8b26fa0a0eb0309"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-card-malformed-safe-error.png",
+          "sha256": "0c270d3dcf203bd30f9033178460a760419d708b02968028d266a6201dceb47f"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-card-no-op.png",
+          "sha256": "652c7bfc3b5b4a755c04d537a60d6a80ac864f5bbed1dd56ef24887ace8d2407"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-research-openai-settings.png",
+          "sha256": "9ce1b6fe28e8c96fbcc7f0fe2e20c1e1d7ca2627b597b927701ba6c864012509"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-settings-research-route.png",
+          "sha256": "d7974799f0ee5b175c51828b264e9e69cc63c33f8986ae620e57efb12573c20e"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-research-anthropic-settings.png",
+          "sha256": "1b1e9395f412cec6b3a4364b7a6100f9c9a2ca1c208490a5fe8c5ac28296e534"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-research-current-override.png",
+          "sha256": "8216f5ed098bedb9d563f478cf8132dd7e76f071100b2b1f1f0c8231f501330c"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-research-open-other-reset.png",
+          "sha256": "52a356ec39c59c5fe580395cefe3971fcad37baaeb8638045b95be95a0d83934"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-lifecycle-previous.png",
+          "sha256": "430070327bedc26ce8551d8edb3e7c4e11afb86daf39188e332b45006c6cdbf0"
+        },
+        {
+          "path": "tmp/task-3-ui/en-1280-lifecycle-next-confirmation.png",
+          "sha256": "e7ee01e0de0cb4b7c46e1e6283d78dc8b59f447c3624ba0609f1ae188b8109dd"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "layouts": [
+        {
+          "view": "card-original",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-cached",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refresh-pending",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refresh-failed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refreshed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-legacy-saved",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-saved-refresh-failed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-malformed-safe-error",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-no-op",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-openai-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "settings-research-route",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-anthropic-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-current-override",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-open-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "lifecycle-previous",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "lifecycle-next-confirmation",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 38,
+      "screenshots": [
+        {
+          "path": "tmp/task-3-ui/en-390-card-original.png",
+          "sha256": "6b5c8bec2a6cc6caff055fa61715f95384c27fc66e66e0467f47ac3adcc70c8f"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-card-cached.png",
+          "sha256": "8819a2b1eb8e9dab211280812b937d3e796ceebe7878c762424fb96f2b6a7b52"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-card-refresh-pending.png",
+          "sha256": "abf30834ed869bdb884bf60cf278ff45ad1003abe29f662b9384f16db66f0129"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-card-refresh-failed.png",
+          "sha256": "49e5ab4eba420b7a2125da3ee622345937d44649e11c58f5cc161e4d6f440a1c"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-card-refreshed.png",
+          "sha256": "bd9d0b152ab67d454c374b2d657c97d7389f05d942701d00d4518d79430387d8"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-card-legacy-saved.png",
+          "sha256": "6b72174191679f85b1171f3340caf30139e9a248750d726b38fc9e47a91f8668"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-card-saved-refresh-failed.png",
+          "sha256": "d1433df02df01b4d84a5c7c3ad425ab217efb32bf4c1389972be94b6eddb26d4"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-card-malformed-safe-error.png",
+          "sha256": "2651092ba7c07e840ade08a2bb2ab2fd524b273d8cf833eab0d92effccf78575"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-card-no-op.png",
+          "sha256": "e8ba47b6b32110ac7adea041376c2cb122cd397542d613fb2244d12ebc26c48f"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-research-openai-settings.png",
+          "sha256": "98f3bfda242c6c0745cd6b4e3c8d227bf4b289b1ad95cda6e9c6fa435a9f8da3"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-settings-research-route.png",
+          "sha256": "2eb60ea7489c91f3d501be3bf96b871ffc1355db492c2dfb566ae7ba7793840b"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-research-anthropic-settings.png",
+          "sha256": "b60dcd0f70840af44712e96e204943cfd768d5282712a186988185b5d9be27ef"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-research-current-override.png",
+          "sha256": "1d5d357f767e80cc2e713f0098160f34c246d689b9c845b8f5fa049fbd3fd578"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-research-open-other-reset.png",
+          "sha256": "2e59a30e979c5335c8a2964b93692461a6c118f058d89b28b3e3e69fc3111dc2"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-lifecycle-previous.png",
+          "sha256": "60992a1e81571aaab66fa3a6c658b525fc3ad8fa56dd3954295704f27f8843ea"
+        },
+        {
+          "path": "tmp/task-3-ui/en-390-lifecycle-next-confirmation.png",
+          "sha256": "0ac4ebe03fa3b7dc6c4555b312219324818d78e0feebb57492c05cf6625b7f38"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "layouts": [
+        {
+          "view": "card-original",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-cached",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refresh-pending",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refresh-failed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refreshed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-legacy-saved",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-saved-refresh-failed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-malformed-safe-error",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-no-op",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-openai-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "settings-research-route",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-anthropic-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-current-override",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-open-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "lifecycle-previous",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "lifecycle-next-confirmation",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 38,
+      "screenshots": [
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-card-original.png",
+          "sha256": "328ba438db69f9c64c79a3a5af4be1e0f7db0a0e0aa4ef8f778b658a170528f4"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-card-cached.png",
+          "sha256": "bce2143d168268c6da5406297f78ab98f4660fbb257e6e631be6e70160697d26"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-card-refresh-pending.png",
+          "sha256": "e1d23ce13b42c2ce1572d05eca8111027f5b40d84d09ae25f5739a934ef6aeea"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-card-refresh-failed.png",
+          "sha256": "efc8821eda209baecffae754293d62708214747038bf4587c4dfe5166645df44"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-card-refreshed.png",
+          "sha256": "c552f68b04b06b90a9ecf37d6bdc593f05cfb75d6782ebb527506f3f4c9be34f"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-card-legacy-saved.png",
+          "sha256": "b2f9ed65a25df877266f4358287c7f8721a47c58213816ec7eb03d9fe11fc8f1"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-card-saved-refresh-failed.png",
+          "sha256": "bf4d3467e1518c35ae0621fe66ea8ca1cbf6b468cb519a6b1cf0c3e8d314981b"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-card-malformed-safe-error.png",
+          "sha256": "b354c62f0369077327cd024302771fed1550bb01b9c7e1a66a56d908657d8ce8"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-card-no-op.png",
+          "sha256": "c00288d99626df8aa105d9faf58f9c6ce799387c8cc9618b6b8dcac7c88e9486"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-research-openai-settings.png",
+          "sha256": "8fd5b8eebff6a09557211864b3a082ee443d76b3cb709d7836ffb2ce2cb07916"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-settings-research-route.png",
+          "sha256": "265e0a482985c790c37125843bd6c876ea5ea93c6502b2f1aea8dc2ef09a38a3"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-research-anthropic-settings.png",
+          "sha256": "c634a46a050ee8071b1e91b11b4bc39e3c7b1f5c020afd75dc738e655503c144"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-research-current-override.png",
+          "sha256": "ea3f52d914d78db20fdb520f89df956e20e2c1d89e713dd9b0caad94fcf974e2"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-research-open-other-reset.png",
+          "sha256": "74a37d77cdb707e9d9c36088891d1bfb6ba7dea1391ffdc44481ff6c5e836fb5"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-lifecycle-previous.png",
+          "sha256": "75bd98a3c157b3b93492ccf536fa92bf4aab1371a2776e6a97efed64ea8ee41a"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-1280-lifecycle-next-confirmation.png",
+          "sha256": "b5cbd835f8c700973c8c76bb765db5936c39ee549b732b9a5ec704120ad4cae8"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "layouts": [
+        {
+          "view": "card-original",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-cached",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refresh-pending",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refresh-failed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-refreshed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-legacy-saved",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-saved-refresh-failed",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-malformed-safe-error",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "card-no-op",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-openai-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "settings-research-route",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-anthropic-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-current-override",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "research-open-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "lifecycle-previous",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "lifecycle-next-confirmation",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 38,
+      "screenshots": [
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-card-original.png",
+          "sha256": "579d604d4dc8a2250437bca18542d2eb6915514f15b165bfbbff6b4b57c944ef"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-card-cached.png",
+          "sha256": "b70f2a9fc3628b65d93a6a1ccb9993c5f514e6e62526c46bd2fbdd29b24219db"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-card-refresh-pending.png",
+          "sha256": "bc23ca58444630f2606d5b7566a62ca3d53e3b67afaa0a07ec0860d46ecda143"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-card-refresh-failed.png",
+          "sha256": "bf8cd25f2accb06a044fbf44183b0669554bb0ac6b992b6101ba456ccabd8bab"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-card-refreshed.png",
+          "sha256": "fa55f4a75bd1c91daf2dc5d326dcce211f92cc238b7d439d9d8cacef3b15b748"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-card-legacy-saved.png",
+          "sha256": "fb6a7cdaada07e8b633a3a100db96c11f4ff7270b996674702e5c2f0ad92ebd9"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-card-saved-refresh-failed.png",
+          "sha256": "d364dde9a76d377d55b3a09468d8847df3a5fb3dab45d9c1613c8bc86c3c97bf"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-card-malformed-safe-error.png",
+          "sha256": "a1774b059026099980dbc8a23f0e58b91a55cc72eba8c7f8f6dc7a6924d91b93"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-card-no-op.png",
+          "sha256": "487de1fc14b58717643d5ff0cf180729ab38851dc94615d1a40f553965b85580"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-research-openai-settings.png",
+          "sha256": "0a47aefb9341d5c662fb6d60445a8c6bd733a71604aa12188636bf03a6158f92"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-settings-research-route.png",
+          "sha256": "8c8a7dfacf4a0cc999885d8604808e3aac7e346cc138c2cde0770de1eaba1c77"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-research-anthropic-settings.png",
+          "sha256": "f55234da7147f86890eff6308a93abe748566c8376d70bd81472b74bc2f5ce52"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-research-current-override.png",
+          "sha256": "42d9ee5f2589e677ebf6c86c24efa5d9c42de44809a6d3d27dd2365968091dfe"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-research-open-other-reset.png",
+          "sha256": "e187c24a804d18acd94641c1e65d67bc390b21a8f5984854a72b306da0fb300a"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-lifecycle-previous.png",
+          "sha256": "5bd6e1f0a021b27dc36a0f55c070072f491dda47ed23f49d3ed2d9f65b06018a"
+        },
+        {
+          "path": "tmp/task-3-ui/zh-Hant-390-lifecycle-next-confirmation.png",
+          "sha256": "43303f5eada9474e8a8f273c094b7ac1f370a062fb66b91864406d702c4e068c"
+        }
+      ]
+    }
+  ]
+}

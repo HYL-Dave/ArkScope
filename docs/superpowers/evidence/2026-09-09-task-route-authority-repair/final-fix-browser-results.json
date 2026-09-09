@@ -1,0 +1,961 @@
+{
+  "kind": "synthetic_actual_shell_navigation_verification",
+  "code_commit": "20a7737300fb0557cbc0e1712f833163cadb61ce",
+  "result_sha256": "91de9c434c35ad95754e95c9467e14a0e1f6d85bfaa80d9e891ecd17d6228013",
+  "provider_calls": 0,
+  "production_backend_started": false,
+  "contexts": [
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "openai",
+      "layouts": [
+        {
+          "view": "shell-openai-settings-default",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-complete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-new-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-new-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-first-id-retained",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 79,
+      "screenshots": [
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-settings-default.png",
+          "sha256": "beeadef3dc90a6f9a40c03b7283842ac476e9b3076d0445cea479a63a3c395a2"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-incomplete-after-home.png",
+          "sha256": "51ddf735c2b2aaed79f2bacd2e4e1984d5772b7e61ff17b2ad93b451b1a48ef6"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-incomplete-after-settings.png",
+          "sha256": "7728a9aafd1dedf272ce809ebac70164c5e6aeaf1db83ff3cac6e152a74f7357"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-complete-after-home.png",
+          "sha256": "0d09076b91b0a087a39110f46881b20943702dd857607372a7e149ab786697b7"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-complete-after-settings.png",
+          "sha256": "fbd625745d5e5a4c2f47e6abd622e6009bdf92f4db3eb829ab509c0eb9d0e06f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-new-reset.png",
+          "sha256": "2df83ac682c731ac40e5536d54c4e65cca408a5a1e5bde42e669de8407ded82f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-new-incomplete-after-home.png",
+          "sha256": "9980f7d7bb87f86d1fa5dcd9eb3832a46fba30703601f4afa907a97732d363aa"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-first-id-retained.png",
+          "sha256": "31ecd92eff3f124662bee1fdfb64afb9c74245f707ec68594783d4b8004ac47e"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-other-reset.png",
+          "sha256": "fc8e98a95f8b34fcb8cb5844ba674312b13290be7619879b8eb6ecec03dcfac1"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-reverse-incomplete-after-home.png",
+          "sha256": "1765c5774bca850b9078f2827b459c4ed9ceb6608f7df89d2026cbe5052352d4"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-reverse-incomplete-after-settings.png",
+          "sha256": "391aeb25e9e92976caa45fe80351d4175b3d275b05fee5ce8bafa5a9bf4bcf70"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-openai-reverse-complete-after-settings.png",
+          "sha256": "c93f29b366221452c243be1ec370e1978fb0c5ecd137364b7ee0a998f0c9f3f2"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "openai",
+      "layouts": [
+        {
+          "view": "shell-openai-settings-default",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-complete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-new-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-new-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-first-id-retained",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 79,
+      "screenshots": [
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-settings-default.png",
+          "sha256": "39ff5b3b1f43242c8ea5928d29be4d4111d0fe41e38dd0d6fee3f54117ad74f9"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-incomplete-after-home.png",
+          "sha256": "50dd013f219b722156f1e2c84d161288ca1c9d4a6bec5398e6e4be69a457d5d0"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-incomplete-after-settings.png",
+          "sha256": "50dd013f219b722156f1e2c84d161288ca1c9d4a6bec5398e6e4be69a457d5d0"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-complete-after-home.png",
+          "sha256": "aeb04c7f5caf6f1188e122aeded590d5b03945db3a014a7120b21787f11c6f7b"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-complete-after-settings.png",
+          "sha256": "1fdfb3e005d0dea50dbbf74eb29e37b3071ea8f4ac34cd4fd2e9aea98c3396dd"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-new-reset.png",
+          "sha256": "c0daa8d1e245c171b334bfa99c1ab5207395fd99788dfe2debc1a28e44947dd6"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-new-incomplete-after-home.png",
+          "sha256": "edbc8014ac29d06935cd0d181925083dbd3968b30b72d4989deaeadf2f50fe28"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-first-id-retained.png",
+          "sha256": "8751f0533d6cb234222523ae0aade3d3a0a8475b6079f49feb629d072eb669d9"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-other-reset.png",
+          "sha256": "a4851bc959031704a2c5f16fdb557c8e7bba190279c4126de278a402dbe94270"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-reverse-incomplete-after-home.png",
+          "sha256": "e7aca97015164c8993279fd78745a56794e173bd37c70e277834ab4f35f4d027"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-reverse-incomplete-after-settings.png",
+          "sha256": "e7aca97015164c8993279fd78745a56794e173bd37c70e277834ab4f35f4d027"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-openai-reverse-complete-after-settings.png",
+          "sha256": "2e9ba78a5a2d6a028bab4b0dfc9daad3120eaca335c823a3545fa770a43e2fc8"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "openai",
+      "layouts": [
+        {
+          "view": "shell-openai-settings-default",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-complete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-new-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-new-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-first-id-retained",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 79,
+      "screenshots": [
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-settings-default.png",
+          "sha256": "6cbbb7a01cf79f3f151258f13bc2fd993de28b8f4b8b2ad44a4682ca1d768426"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-incomplete-after-home.png",
+          "sha256": "cbd3d967b6fe27af8d78a3d90c214d496be0f723d8d72d9546e59a30b0de0ff2"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-incomplete-after-settings.png",
+          "sha256": "278cb04e0c808907633e20dd65ba362445f7dfd2b61c176eaeb7bc65179fe14c"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-complete-after-home.png",
+          "sha256": "e41c8188352834ab80be7834b8724f68b4d861e46ab183d0e34449efe1b3e1a2"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-complete-after-settings.png",
+          "sha256": "9b63eb4a5f2309f92503d303fe694ff8d99e5d709b2f189b57d01cae69a3dacc"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-new-reset.png",
+          "sha256": "c1e9935cb959b5277fb708a9cbb5b82f9e78f49da11e93f2a0248690949a6a9c"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-new-incomplete-after-home.png",
+          "sha256": "4536cb8210e1c6da7004094a82bf6b46202c4dc115f48418c667b5c2265971c0"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-first-id-retained.png",
+          "sha256": "71d79c6c2d100e0437967022fa2faccd772730a72a463db7c7fda5443cba575f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-other-reset.png",
+          "sha256": "8622439c3a9b9b36c70c0e22fb848eb0adb7e58d4ad006d965f7c9a403dcaac2"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-reverse-incomplete-after-home.png",
+          "sha256": "ea735c25f96d05e9d171bd40535faf5268b71cc12da69f764f2bdc28d49fd1d1"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-reverse-incomplete-after-settings.png",
+          "sha256": "ea735c25f96d05e9d171bd40535faf5268b71cc12da69f764f2bdc28d49fd1d1"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-openai-reverse-complete-after-settings.png",
+          "sha256": "682064a1a77f45d8f7a0c9859c90b864eb655945cc4bd315804359b3b9ff5839"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "openai",
+      "layouts": [
+        {
+          "view": "shell-openai-settings-default",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-complete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-new-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-new-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-first-id-retained",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-openai-reverse-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 79,
+      "screenshots": [
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-settings-default.png",
+          "sha256": "55e5f90f5f920b007ca24da3aa44acbf4a4e461ac5e070747eff35490852352f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-incomplete-after-home.png",
+          "sha256": "17e002d915e87f560f307a4cd184b9b54a22e4a1a03acdf1dc54f8a706ca68f0"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-incomplete-after-settings.png",
+          "sha256": "7b5deebd99e4b9ec7de5fdd10c5234a156ca6e6a4f338c6ac99960d32ae3196f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-complete-after-home.png",
+          "sha256": "9d938534911436314fd2d3c26563bcebd3c1bf8d2a6a3ef7697cd404f1ccc06f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-complete-after-settings.png",
+          "sha256": "45d53c2b32811d873e161a70ed2aa76875abb5507ca61e4ca21430a20192bfc7"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-new-reset.png",
+          "sha256": "f794297604a7684a177e2089167f4fbda25ff35529951b3ad444e78ea5abd503"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-new-incomplete-after-home.png",
+          "sha256": "b4188ed0b931db8f15b15618713fc65e66f7eaedf72348b688973ad292a400ca"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-first-id-retained.png",
+          "sha256": "f9be8c465ac3efd2d75f7484d97fd48c3ee422ca7ffdf0632264b1c0b16f7843"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-other-reset.png",
+          "sha256": "7a741e55efa26b9a6735a575cf689dd0aefa7b0d9a69ed6c44eae844338964de"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-reverse-incomplete-after-home.png",
+          "sha256": "0a217cf56dd0d98d9f364335b634dbea7f8616a1e8a83256085e36b59449cf8c"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-reverse-incomplete-after-settings.png",
+          "sha256": "4b6ccab5800099df16b1cea226193858cf1a60caec4462bb0a352e9afe0aa8ab"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-openai-reverse-complete-after-settings.png",
+          "sha256": "56be49309c434053c863ff27eba7244dbde87185d5a29b3574d5ae5018168c63"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "layouts": [
+        {
+          "view": "shell-anthropic-settings-default",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-complete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-new-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-new-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-first-id-retained",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 79,
+      "screenshots": [
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-settings-default.png",
+          "sha256": "f429cd1a8a90dce13aad65d85d84aa408bb92829cd7df879a74c9962c82fc434"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-incomplete-after-home.png",
+          "sha256": "51ddf735c2b2aaed79f2bacd2e4e1984d5772b7e61ff17b2ad93b451b1a48ef6"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-incomplete-after-settings.png",
+          "sha256": "51ddf735c2b2aaed79f2bacd2e4e1984d5772b7e61ff17b2ad93b451b1a48ef6"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-complete-after-home.png",
+          "sha256": "169ee309c66863a7c15f0599f7b312fb09f4ce022d824af142e5189427696d06"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-complete-after-settings.png",
+          "sha256": "fbd625745d5e5a4c2f47e6abd622e6009bdf92f4db3eb829ab509c0eb9d0e06f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-new-reset.png",
+          "sha256": "3b81ab875956783ffbc31443050c61fcb2da46bb657755fd23a60c6c0f3d6de6"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-new-incomplete-after-home.png",
+          "sha256": "9980f7d7bb87f86d1fa5dcd9eb3832a46fba30703601f4afa907a97732d363aa"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-first-id-retained.png",
+          "sha256": "31ecd92eff3f124662bee1fdfb64afb9c74245f707ec68594783d4b8004ac47e"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-other-reset.png",
+          "sha256": "21c79b94b546bcdf9419c8e23b048b194dae4a5897d09ac1a008efab6afefc51"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-reverse-incomplete-after-home.png",
+          "sha256": "121022bc1a118f224d98c08236a3e3d15618d3190f12cf0a4a0620cbf9616016"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-reverse-incomplete-after-settings.png",
+          "sha256": "391aeb25e9e92976caa45fe80351d4175b3d275b05fee5ce8bafa5a9bf4bcf70"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-1280-shell-anthropic-reverse-complete-after-settings.png",
+          "sha256": "c93f29b366221452c243be1ec370e1978fb0c5ecd137364b7ee0a998f0c9f3f2"
+        }
+      ]
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "layouts": [
+        {
+          "view": "shell-anthropic-settings-default",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-complete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-new-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-new-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-first-id-retained",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 79,
+      "screenshots": [
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-settings-default.png",
+          "sha256": "a8d839c5bbdacbdba8d1cfe79525bf6fd558322a9a2df83f8ebdcc4f334412b6"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-incomplete-after-home.png",
+          "sha256": "50dd013f219b722156f1e2c84d161288ca1c9d4a6bec5398e6e4be69a457d5d0"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-incomplete-after-settings.png",
+          "sha256": "50dd013f219b722156f1e2c84d161288ca1c9d4a6bec5398e6e4be69a457d5d0"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-complete-after-home.png",
+          "sha256": "9f6b46ef4b90073fdc00654520e55e55653bf408f5cac36a82c823a968c2d9c9"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-complete-after-settings.png",
+          "sha256": "1fdfb3e005d0dea50dbbf74eb29e37b3071ea8f4ac34cd4fd2e9aea98c3396dd"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-new-reset.png",
+          "sha256": "4accba322803e326f6ba59ed558b7d6b05097d3945a91a9a2b8a8c036aa5c674"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-new-incomplete-after-home.png",
+          "sha256": "edbc8014ac29d06935cd0d181925083dbd3968b30b72d4989deaeadf2f50fe28"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-first-id-retained.png",
+          "sha256": "8751f0533d6cb234222523ae0aade3d3a0a8475b6079f49feb629d072eb669d9"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-other-reset.png",
+          "sha256": "9f2310975a69753d6c26a96e11ceea8f7e7f7d5e9be355b608226244a30e6b2f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-reverse-incomplete-after-home.png",
+          "sha256": "e7aca97015164c8993279fd78745a56794e173bd37c70e277834ab4f35f4d027"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-reverse-incomplete-after-settings.png",
+          "sha256": "e7aca97015164c8993279fd78745a56794e173bd37c70e277834ab4f35f4d027"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/en-390-shell-anthropic-reverse-complete-after-settings.png",
+          "sha256": "2e9ba78a5a2d6a028bab4b0dfc9daad3120eaca335c823a3545fa770a43e2fc8"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "shell_provider": "anthropic",
+      "layouts": [
+        {
+          "view": "shell-anthropic-settings-default",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-complete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-new-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-new-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-first-id-retained",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 79,
+      "screenshots": [
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-settings-default.png",
+          "sha256": "28053f762dd72c9cd145e0acb7988ef811467443978fbb4c9ccbe3407d2cd020"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-incomplete-after-home.png",
+          "sha256": "c73d6463053e8dd1fbe07e2bf4794deede30fc2a468293f31c240cdf7c9836eb"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-incomplete-after-settings.png",
+          "sha256": "cbd3d967b6fe27af8d78a3d90c214d496be0f723d8d72d9546e59a30b0de0ff2"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-complete-after-home.png",
+          "sha256": "e41c8188352834ab80be7834b8724f68b4d861e46ab183d0e34449efe1b3e1a2"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-complete-after-settings.png",
+          "sha256": "e791f5e4ea3a7ecd50ac012ae7ba6f4aaba46259f4ca36bf953ae846f9b63798"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-new-reset.png",
+          "sha256": "ee54f8eb1338e08fbe74072cc54ea59b68c3a4bfb6878288740a58951e3765c5"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-new-incomplete-after-home.png",
+          "sha256": "4536cb8210e1c6da7004094a82bf6b46202c4dc115f48418c667b5c2265971c0"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-first-id-retained.png",
+          "sha256": "71d79c6c2d100e0437967022fa2faccd772730a72a463db7c7fda5443cba575f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-other-reset.png",
+          "sha256": "d0f4f27f2aaea900db26f57b961af69eedd6fa71b0907b147c35870d2fb5f5cb"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-reverse-incomplete-after-home.png",
+          "sha256": "ea735c25f96d05e9d171bd40535faf5268b71cc12da69f764f2bdc28d49fd1d1"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-reverse-incomplete-after-settings.png",
+          "sha256": "ea735c25f96d05e9d171bd40535faf5268b71cc12da69f764f2bdc28d49fd1d1"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-1280-shell-anthropic-reverse-complete-after-settings.png",
+          "sha256": "0f3da4ff5eaa4ac6318ff82705f16f1d6b84c04d08e0c7fea74e686dd9b04745"
+        }
+      ]
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "shell_provider": "anthropic",
+      "layouts": [
+        {
+          "view": "shell-anthropic-settings-default",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-complete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-new-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-new-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-first-id-retained",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-other-reset",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-incomplete-after-home",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-incomplete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        },
+        {
+          "view": "shell-anthropic-reverse-complete-after-settings",
+          "overflow": [],
+          "narrow_prose": []
+        }
+      ],
+      "errors": [],
+      "synthetic_request_count": 79,
+      "screenshots": [
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-settings-default.png",
+          "sha256": "6f936ee08ea54674e26731c86200f2974077379c766947d5d691c11e7e5b2df3"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-incomplete-after-home.png",
+          "sha256": "486733992c23f294ff649a074723f2dbf0c77399fd6dcfcd83767470b8ad7e73"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-incomplete-after-settings.png",
+          "sha256": "17e002d915e87f560f307a4cd184b9b54a22e4a1a03acdf1dc54f8a706ca68f0"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-complete-after-home.png",
+          "sha256": "9d938534911436314fd2d3c26563bcebd3c1bf8d2a6a3ef7697cd404f1ccc06f"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-complete-after-settings.png",
+          "sha256": "45d53c2b32811d873e161a70ed2aa76875abb5507ca61e4ca21430a20192bfc7"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-new-reset.png",
+          "sha256": "c4f6086584d90eda042ec452e852b93528ed6222bffb47232bc77f713d98a0d0"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-new-incomplete-after-home.png",
+          "sha256": "b4188ed0b931db8f15b15618713fc65e66f7eaedf72348b688973ad292a400ca"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-first-id-retained.png",
+          "sha256": "307290ad3fe53633edb9f466f3a6d7160a8e980c8e6d2dfd9e73211a8772406a"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-other-reset.png",
+          "sha256": "a1183a479754ed7a5abca2adba299f5ecc86a30498ac1801e8f1c00c78d8d65b"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-reverse-incomplete-after-home.png",
+          "sha256": "4b6ccab5800099df16b1cea226193858cf1a60caec4462bb0a352e9afe0aa8ab"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-reverse-incomplete-after-settings.png",
+          "sha256": "4b6ccab5800099df16b1cea226193858cf1a60caec4462bb0a352e9afe0aa8ab"
+        },
+        {
+          "path": "tmp/final-fix/browser-caption-verified/zh-Hant-390-shell-anthropic-reverse-complete-after-settings.png",
+          "sha256": "56be49309c434053c863ff27eba7244dbde87185d5a29b3574d5ae5018168c63"
+        }
+      ]
+    }
+  ]
+}

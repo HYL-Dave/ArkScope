@@ -1,0 +1,248 @@
+{
+  "code_commit": "090a72258e76f84367c886da0e41ae79e181d2c0",
+  "base_commit": "fb12f27e92c182ae5ff425595a4e9d2f947d601d",
+  "after_all_mutations_restored": true,
+  "suites": [
+    {
+      "artifact": "backend-final.xml",
+      "sha256": "5ad890ebc9f8cdd3292b6d7abb048f72ee91ac90c77c48798b81fcbedf63f09c",
+      "tests": 7549,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 12,
+      "collected_testcase_elements": 7549,
+      "xml_suite_seconds": 818.499
+    },
+    {
+      "artifact": "frontend-final.xml",
+      "sha256": "f2cf676954cd2dda8fdcf0f4618c775aead14e823e0a0670559cd0cfa8e2ebf8",
+      "tests": 1739,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "collected_testcase_elements": 1739,
+      "xml_suite_seconds": 74.31066675499993
+    }
+  ],
+  "changed_code_file_digests": [
+    {
+      "path": "apps/arkscope-web/src/AICard.test.tsx",
+      "sha256": "9f4716a09a81ea6ef8dbf6d9efa8980ff1f03401cd63c1941792f73a1b892943"
+    },
+    {
+      "path": "apps/arkscope-web/src/AICard.tsx",
+      "sha256": "6c1f0c2a02e905aeb58a7435d44d9e81a6eb87e1d09f6deabf532b3f230caf97"
+    },
+    {
+      "path": "apps/arkscope-web/src/CardExecutionApi.test.ts",
+      "sha256": "c1da2dc76b2aba6492125edb0b78860cbef81990b0f74e56bc5df9b7a819ed29"
+    },
+    {
+      "path": "apps/arkscope-web/src/ExecutionSource.tsx",
+      "sha256": "766c48d1a18976592ea7f33be8f34aeac66cd87983c770088f7124b44290cdea"
+    },
+    {
+      "path": "apps/arkscope-web/src/Research.tsx",
+      "sha256": "fa8aee76d2e6bd287e47efccd7572e759b642c11b60e75a4d638b827c01ca1d8"
+    },
+    {
+      "path": "apps/arkscope-web/src/ResearchShellNavigation.test.tsx",
+      "sha256": "16bd90d8e23f574a106acd86dbca75576c8f36e07b5557adeabc4af716bc1f52"
+    },
+    {
+      "path": "apps/arkscope-web/src/ResearchWorkspace.test.tsx",
+      "sha256": "eefedf2d3e7b29d22804bf4963545cb36be3c22432479bfaba86f4799c558f50"
+    },
+    {
+      "path": "apps/arkscope-web/src/api.ts",
+      "sha256": "91dcd5ecd7d00b74835028fbfa67fa8f2d40361a5d8e4d7ca4abc3b72365f620"
+    },
+    {
+      "path": "apps/arkscope-web/src/i18n/resources.test.ts",
+      "sha256": "5d1ef10f6d25be14d0042d8fe6c3efa6e16a7c7ca345b3f8ec8a196c6d925226"
+    },
+    {
+      "path": "apps/arkscope-web/src/i18n/resources/en/common.ts",
+      "sha256": "e5842b2fc20c4edee3fbac6f0f510a36804a52faff1a13ebd1e1366380ef021e"
+    },
+    {
+      "path": "apps/arkscope-web/src/i18n/resources/en/explore.ts",
+      "sha256": "868645aa460bdb2ba7776a73a9dffb509a4840c91aab861ce2c914a45998afb9"
+    },
+    {
+      "path": "apps/arkscope-web/src/i18n/resources/zh-Hant/common.ts",
+      "sha256": "9ada40e2047d449c6c17b6d03878e9661c4ab6eb35d13761e1cd60d673c5fb93"
+    },
+    {
+      "path": "apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts",
+      "sha256": "f4da1224b7d7c4cc495c6614d5788736f17ed6fb712d4347c78131dc504af971"
+    },
+    {
+      "path": "apps/arkscope-web/src/lifecycle/InvestigationView.test.tsx",
+      "sha256": "07f10b2f6714f906f7d40d7653f4ff2aa5fe5a1d2122a049d2353f231829902c"
+    },
+    {
+      "path": "apps/arkscope-web/src/lifecycle/InvestigationView.tsx",
+      "sha256": "7c04fd64245d652cbf880d20a655f8433c73532e03236b24b246548ec86bc8fd"
+    },
+    {
+      "path": "apps/arkscope-web/src/researchSelection.test.ts",
+      "sha256": "574f20a110bcdbe7b5b568310b90b5ad8025e7504957046fb841f9f01a599f26"
+    },
+    {
+      "path": "apps/arkscope-web/src/researchSelection.ts",
+      "sha256": "70db1cc129448bef91af8c07263dddcf73b71fa8b1a8fb4b9ff9f1e2a604957e"
+    },
+    {
+      "path": "apps/arkscope-web/src/styles.css",
+      "sha256": "239779ad6a4368223eed433e8b47864a54396220e371688fc238b430c709f56d"
+    },
+    {
+      "path": "src/agents/anthropic_agent/agent.py",
+      "sha256": "e6b55076369bbea1ff04577a91ee4d573c94c5f25b412db2aa5749fb7b89e3ac"
+    },
+    {
+      "path": "src/agents/config.py",
+      "sha256": "3ced5ef40d69043dbad335b66d30ffc29f5662f8d75297c687be861c8b45b1d1"
+    },
+    {
+      "path": "src/agents/openai_agent/agent.py",
+      "sha256": "f0c95bd3c02eabfca76d993c2e87f050eede75b505f084e9a36479e414358abb"
+    },
+    {
+      "path": "src/agents/shared/subagent.py",
+      "sha256": "a9490bf1fa112d72174dafb385cfa292c6add883d7789cff896ff323287bfad4"
+    },
+    {
+      "path": "src/api/routes/analysis_cards.py",
+      "sha256": "83d762e308c5ef773a0b0caa3abe457492114c1d126088f405622f822c2fe8d6"
+    },
+    {
+      "path": "src/api/routes/config_routes.py",
+      "sha256": "6ca17c89c64716409f6dd47248f92a4b506f1700e1f4733d2b829e339382ebb9"
+    },
+    {
+      "path": "src/api/routes/query.py",
+      "sha256": "0b0028f3aaf40e6eb5825123ea6856e29f56bb260212307c617a754b26246e61"
+    },
+    {
+      "path": "src/api/routes/research.py",
+      "sha256": "2c266c10538a04e761149836ef2f34c8be068fa4b8bdee9e41e701379c056449"
+    },
+    {
+      "path": "src/api/routes/security_lifecycle.py",
+      "sha256": "1d36dd74ba8f4258b153c424c8596240f452ec40d8562958a2007e0083fb9c3b"
+    },
+    {
+      "path": "src/auth_drivers/live_resolver.py",
+      "sha256": "97b44dc9f12690699629d0f4b444dba12134a7ec44d608952c6d4f44339a4738"
+    },
+    {
+      "path": "src/auth_drivers/runtime_binding.py",
+      "sha256": "3f3c10343e1616d519bca782c3344423fc5818d9dc4b880db6ffc01ca8f44efe"
+    },
+    {
+      "path": "src/card_execution.py",
+      "sha256": "c3fe97caf9fcfb532927c8e4e986dce843b2ec61cba4a5168447a8322e7c268e"
+    },
+    {
+      "path": "src/card_runs.py",
+      "sha256": "5a1f3d7db70448b46d54d0096a2c5381fa7a1e6342bf2199157553eaf485db60"
+    },
+    {
+      "path": "src/card_synthesis.py",
+      "sha256": "f44eede9b9641751dd71df0da9bf1889c65f7383dab2e4e155e855ac685d680f"
+    },
+    {
+      "path": "src/model_credentials.py",
+      "sha256": "80b50070a75e6fa3e6f60715e8c5731cc4275e3f663994f65063fec8e499eb05"
+    },
+    {
+      "path": "src/research_errors.py",
+      "sha256": "4359d7f9002ff1a19790b2ddb0206e907c1b4ea90fabb2b2090a7075a8e355e1"
+    },
+    {
+      "path": "src/research_run_manager.py",
+      "sha256": "33c6727ffdea73ef5f2fdeb40c69c66b5e343fa3ae2094121fce82130c8feba8"
+    },
+    {
+      "path": "tests/test_analysis_cards_api.py",
+      "sha256": "7336f85043d5ace8ceb18f3ad4b845b019b6863194d360bfdc0ffe5d6b512d33"
+    },
+    {
+      "path": "tests/test_card_execution_authority.py",
+      "sha256": "d345327f6eaccdc4cbff944ab1bbe881a1e88a8ba88b129275049838a33a335b"
+    },
+    {
+      "path": "tests/test_events.py",
+      "sha256": "722beddca7d9fc486fe37c8414c8ec2cbf9b60507adb913ca804011b4c023469"
+    },
+    {
+      "path": "tests/test_lifecycle_investigation_routing.py",
+      "sha256": "36300d4bdd8bf9a1df4cd35bf4b9a8b7b280088352cbc1ea76fca7322bbb8fa9"
+    },
+    {
+      "path": "tests/test_model_routing.py",
+      "sha256": "24dc60640b45ad73e1fed07b502a60ba438320349134c0fa55e3c2e3286c9e26"
+    },
+    {
+      "path": "tests/test_research_runs.py",
+      "sha256": "65c6a1f977f5473e71b0797c28bb820f0de8bd4ac1120bdb871a5c9ac1b762bc"
+    },
+    {
+      "path": "tests/test_task_runtime_binding.py",
+      "sha256": "e985cc9ba8090b4fa92e6c2ddc1df7666ed42814f233de689a99c3b6437f84d9"
+    }
+  ],
+  "reproduction_commands": {
+    "backend": "env -u PYTHONPATH /home/hyl/.virtualenvs/llm_app/bin/python docs/superpowers/evidence/2026-09-08-automation-modes-gpt6/offline_check.py pytest -q tests --tb=short --junitxml=.superpowers/sdd/2026-09-09-task-route-authority-repair/backend-final.xml",
+    "frontend": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin HOME=/tmp LANG=C.UTF-8 /usr/bin/unshare --user --map-root-user --net /home/hyl/.nvm/versions/node/v22.14.0/bin/node ../../node_modules/vitest/vitest.mjs run --silent=passed-only --reporter=default --reporter=junit --outputFile=../../.superpowers/sdd/2026-09-09-task-route-authority-repair/frontend-final.xml",
+    "typecheck": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin HOME=/tmp LANG=C.UTF-8 /usr/bin/unshare --user --map-root-user --net /home/hyl/.nvm/versions/node/v22.14.0/bin/node ../../node_modules/typescript/bin/tsc --noEmit",
+    "build": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin HOME=/tmp LANG=C.UTF-8 /usr/bin/unshare --user --map-root-user --net /home/hyl/.nvm/versions/node/v22.14.0/bin/node --input-type=module -e 'import { build } from \"vite\"; await build({ envFile: false });'"
+  },
+  "command_cwd": {
+    "backend": "/tmp/arkscope-task-route-authority",
+    "frontend_typecheck_build": "/tmp/arkscope-task-route-authority/apps/arkscope-web"
+  },
+  "results": {
+    "backend": {
+      "exit_code": 0,
+      "passed": 7537,
+      "skipped": 12,
+      "warnings": 3,
+      "wall_seconds": 818.88
+    },
+    "frontend": {
+      "exit_code": 0,
+      "passed": 1739,
+      "files": 125,
+      "wall_seconds": 12.03
+    },
+    "typecheck": {
+      "exit_code": 0,
+      "diagnostics": 0
+    },
+    "build": {
+      "exit_code": 0,
+      "wall_seconds": 2.75,
+      "warnings": [
+        "existing_vite_chunk_size_over_500kb"
+      ]
+    }
+  },
+  "isolation": {
+    "network_namespace": "loopback only",
+    "external_backend_probe": "ENETUNREACH",
+    "inherited_provider_credentials": false,
+    "provider_calls": 0,
+    "production_store_access": false,
+    "production_app_restart": false
+  },
+  "notes": [
+    "Commands are reproduction commands; the captured suite totals, wall times and XML hashes record the completed runs.",
+    "XML suite seconds are not frontend wall-clock time: multiple workers execute concurrently.",
+    "All code file digests were read after the final tests; no runtime/test/frontend changes followed mutation restoration.",
+    "The final full suite does not establish arbitrary import-order safety; see the separately reproduced eventkit issue in README.md.",
+    "Three warnings are existing edgar deprecated HTML module imports in test_sec_user_agent.py."
+  ]
+}
