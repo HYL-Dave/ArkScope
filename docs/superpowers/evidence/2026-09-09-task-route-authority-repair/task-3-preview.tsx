@@ -26,7 +26,7 @@ function Preview() {
   const [view, setView] = useState(params.get("view") ?? "cards");
   const [modal, setModal] = useState(false);
   const navigate = () => setView("settings");
-  if (view === "shell") return <App />;
+  if (view === "shell") return params.get("cold") === "1" ? <React.StrictMode><App /></React.StrictMode> : <App />;
   return <div style={{ maxWidth: 1120, margin: "16px auto", padding: "0 16px" }}>
     <nav aria-label="Fixture views" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
       {["cards", "research", "settings", "lifecycle"].map(name => <button key={name} onClick={() => setView(name)}>{name}</button>)}

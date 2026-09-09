@@ -103,7 +103,7 @@ HTML = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport"
 <script type="module" src="/@fs/ENTRY"></script></body></html>""".replace("ENTRY", str(OWN / "task-3-preview.tsx"))
 
 
-def verify(browser, locale, width, height, shell_provider=None):
+def verify(browser, locale, width, height, shell_provider=None, cold_case=None):
     context = browser.new_context(viewport=dict(width=width, height=height), service_workers="block")
     context.add_init_script("window.arkscope={apiBase:" + json.dumps(BASE + "/__mock") + "}; window.requestIdleCallback=()=>1; window.cancelIdleCallback=()=>{}; "
                             "sessionStorage.setItem('arkscope.aiResearch.activeThreadId','history-a');"
@@ -113,12 +113,20 @@ def verify(browser, locale, width, height, shell_provider=None):
     page.set_default_timeout(8000)
     errors, requests, screenshots, layouts, pending = [], [], [], [], []
     state = dict(catalog=catalog(), translation="cached", detail="receipt", runs={}, threads=copy.deepcopy(THREADS))
+    cold_messages = {"history-a": [copy.deepcopy(MESSAGE)], "history-b": []}
+    cold_pending = []
+    held = {"list", "messages"} if cold_case in {"complete", "incomplete", "new"} else set()
+    failure = cold_case if cold_case and cold_case.startswith("failed-") else None
     if shell_provider:
         state["catalog"]["routes"]["ai_research"].update(
             provider=shell_provider,
             model="gpt-5.6-luna" if shell_provider == "openai" else "claude-sonnet-5",
             effort="xhigh" if shell_provider == "openai" else "medium",
         )
+    if cold_case == "incomplete":
+        next_provider = "anthropic" if shell_provider == "openai" else "openai"
+        entries = state["catalog"]["effective"]["tasks"]["ai_research"]["providers"][next_provider]["models"]
+        entries.append(dict(entries[0], id="synthetic-custom-model", label="synthetic-custom-model"))
     page.on("pageerror", lambda error: errors.append(str(error)))
 
     def route(request):
@@ -140,6 +148,19 @@ def verify(browser, locale, width, height, shell_provider=None):
         path, method = url.path.removeprefix("/__mock"), request.request.method
         body = request.request.post_data_json if request.request.post_data else None
         requests.append(dict(path=path, method=method, body=body))
+        phase = "list" if path == "/research/threads" else "messages" if path == "/research/threads/history-a/messages" else None
+        if phase in held:
+            cold_pending.append((phase, request))
+            return
+        failed_path = {
+            "failed-list": "/research/threads", "failed-detail": "/research/threads/history-a",
+            "failed-messages": "/research/threads/history-a/messages", "failed-missing": "/research/threads/history-a",
+        }.get(failure)
+        if failed_path == path:
+            detail = "thread not found" if failure == "failed-missing" else dict(code="synthetic_restoration_failure")
+            request.fulfill(status=404 if failure == "failed-missing" else 500,
+                            content_type="application/json", body=json.dumps(dict(detail=detail)))
+            return
         status = 200
         if path == "/status":
             value = dict(status="ok", timestamp=DATE, tools_registered=0, tool_categories={}, data_sources={})
@@ -194,9 +215,11 @@ def verify(browser, locale, width, height, shell_provider=None):
             elif state["translation"] == "no_op":
                 value.update(card=dict(ticker="AAPL"), cached=False, no_op=True, execution_receipt=None)
         elif path == "/research/threads":
-            value = dict(threads=state["threads"], total=len(state["threads"]), limit=50, offset=0)
+            rows = state["threads"][1:] if failure in {"failed-detail", "failed-missing"} else state["threads"]
+            value = dict(threads=rows, total=len(rows), limit=50, offset=0)
         elif path.endswith("/messages") and path.startswith("/research/threads/"):
-            value = dict(thread_id=path.split("/")[3], messages=[MESSAGE])
+            thread_id = path.split("/")[3]
+            value = dict(thread_id=thread_id, messages=cold_messages.get(thread_id, []) if cold_case else [MESSAGE])
         elif path.startswith("/research/threads/") and path.endswith("/selection"):
             errors.append("historical selection used as authority")
             value = dict(provider="openai", model="gpt-5.4-mini", effort="default")
@@ -212,6 +235,11 @@ def verify(browser, locale, width, height, shell_provider=None):
             state["runs"][run_id] = run
             if not any(row["id"] == run["thread_id"] for row in state["threads"]):
                 state["threads"].append(dict(THREADS[0], id=run["thread_id"], title="Created conversation"))
+            if cold_case:
+                cold_messages.setdefault(run["thread_id"], []).extend([
+                    dict(MESSAGE, role="user", content=run["question"], provider=run["provider"], model=run["model"], effort=run["effort"], elapsed_seconds=None),
+                    dict(MESSAGE, content="Synthetic completed answer: " + run["question"], provider=run["provider"], model=run["model"], effort=run["effort"], elapsed_seconds=0),
+                ])
             value = dict(run=run)
         elif path.startswith("/research/runs/"):
             run = state["runs"][path.split("/")[3]]
@@ -240,6 +268,8 @@ def verify(browser, locale, width, height, shell_provider=None):
     page.route("**/*", route)
 
     def shot(name):
+        if cold_case:
+            name = f"cold-{cold_case}-{name}"
         if shell_provider:
             name = f"shell-{shell_provider}-{name}"
             assert page.locator(".app-shell-layout").evaluate("e => getComputedStyle(e).display") == "grid"
@@ -302,6 +332,118 @@ def verify(browser, locale, width, height, shell_provider=None):
                 auth += " subscription sign-in" if locale == "en" else " \u8a02\u95b1\u767b\u5165"
                 quota = "Uses subscription quota, not API billing" if locale == "en" else "\u4f7f\u7528\u8a02\u95b1\u984d\u5ea6\uff0c\u975e API \u5e33\u55ae"
                 expect(muted).to_have_text([auth, quota])
+
+        if cold_case:
+            def runs():
+                return [row["body"] for row in requests if row["path"] == "/research/runs" and row["method"] == "POST"]
+
+            def release(phase):
+                held.remove(phase)
+                waiting = [item for item in cold_pending if item[0] == phase]
+                assert waiting, (phase, requests)
+                cold_pending[:] = [item for item in cold_pending if item[0] != phase]
+                value = (dict(threads=state["threads"], total=len(state["threads"]), limit=50, offset=0)
+                         if phase == "list" else dict(thread_id="history-a", messages=cold_messages["history-a"]))
+                for _, request in waiting:
+                    request.fulfill(status=200, content_type="application/json", body=json.dumps(value))
+
+            page.goto(BASE + "/__task3?view=shell&cold=1&locale=" + locale)
+            shell_nav("Research")
+            model = page.locator(".research-pickerbar select").nth(0)
+            effort = page.locator(".research-pickerbar select").nth(1)
+            submit = page.get_by_role("button", name="Send" if locale == "en" else "\u9001\u51fa", exact=True)
+            default = state["catalog"]["routes"]["ai_research"]
+            expect(model).to_have_value(default["model"])
+            next_provider = "anthropic" if shell_provider == "openai" else "openai"
+            next_model = "claude-sonnet-5" if next_provider == "anthropic" else "gpt-5.6-sol"
+            if cold_case == "incomplete":
+                next_model = "synthetic-custom-model"
+            page.locator(".research-providerbar button").filter(has_text="Anthropic" if next_provider == "anthropic" else "OpenAI").click()
+            model.select_option(next_model)
+            if cold_case != "incomplete":
+                effort.select_option("low")
+            draft = "Cold restoration draft"
+            page.locator("textarea").fill(draft)
+            assert page.evaluate("sessionStorage.getItem('arkscope.aiResearch.activeThreadId')") == "history-a"
+            expect(submit).to_be_disabled()
+            assert not runs()
+
+            if failure:
+                error_key = "activeThreadLoadFailed" if failure == "failed-messages" else "threadNotFound" if failure == "failed-missing" else "threadLoadFailed"
+                labels = {
+                    "activeThreadLoadFailed": ("This Research conversation could not be loaded. Select it again from History.", "\u7121\u6cd5\u8f09\u5165\u9019\u500b\u7814\u7a76\u5c0d\u8a71\uff0c\u8acb\u5f9e\u6b77\u53f2\u91cd\u65b0\u9078\u53d6\u3002"),
+                    "threadNotFound": ("The requested Research conversation was not found and may have been deleted.", "\u627e\u4e0d\u5230\u6307\u5b9a\u7684\u7814\u7a76\u5c0d\u8a71\uff0c\u53ef\u80fd\u5df2\u88ab\u522a\u9664\u3002"),
+                    "threadLoadFailed": ("The requested Research conversation could not be loaded. Try again later.", "\u66ab\u6642\u7121\u6cd5\u8f09\u5165\u6307\u5b9a\u7684\u7814\u7a76\u5c0d\u8a71\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002"),
+                }
+                expect(page.locator(".research-convo > .error-text")).to_have_text(labels[error_key][locale != "en"])
+                captions(next_provider)
+                shot("blocked")
+                failure = None
+                page.get_by_role("button", name="Retry" if locale == "en" else "\u91cd\u8a66", exact=True).click()
+                expect(page.locator(".research-convo > .error-text")).to_have_count(0)
+            else:
+                for destination in ["Home", "Settings"]:
+                    round_trip(destination)
+                    expect(model).to_have_value(next_model)
+                    expect(effort).to_have_value("" if cold_case == "incomplete" else "low")
+                    expect(page.locator("textarea")).to_have_value(draft)
+                    expect(submit).to_be_disabled()
+                    assert not runs()
+                    captions(None if cold_case == "incomplete" else next_provider)
+                    shot("list-pending-after-" + destination.lower())
+                release("list")
+                expect(page.locator(".research-conversation-title")).to_have_text("Historical conversation")
+                expect(page.get_by_text(MESSAGE["content"], exact=True)).to_have_count(0)
+                expect(submit).to_be_disabled()
+                assert not runs()
+                shot("messages-pending")
+                if cold_case == "new":
+                    page.get_by_role("button", name="New Research" if locale == "en" else "\u65b0\u7814\u7a76", exact=True).click()
+                release("messages")
+
+            if cold_case == "new":
+                page.wait_for_timeout(100)
+                expect(page.locator(".research-conversation-title")).to_have_text("New conversation" if locale == "en" else "\u65b0\u5c0d\u8a71")
+                expect(page.get_by_text(MESSAGE["content"], exact=True)).to_have_count(0)
+                assert page.evaluate("sessionStorage.getItem('arkscope.aiResearch.activeThreadId')") is None
+                next_provider, next_model, next_effort = (default[key] for key in ("provider", "model", "effort"))
+                expect(model).to_have_value(next_model)
+                expect(effort).to_have_value(next_effort)
+            else:
+                next_effort = "low"
+                expect(page.get_by_text(MESSAGE["content"], exact=True)).to_be_visible()
+                expect(page.locator(".research-bubble-meta").first).to_contain_text("openai/gpt-5.4-mini \u00b7 default")
+                if cold_case == "incomplete":
+                    expect(submit).to_be_disabled()
+                    captions()
+                    shot("restored-effort-required")
+                    effort.select_option(next_effort)
+            captions(next_provider)
+            expect(page.locator("textarea")).to_have_value(draft)
+            expect(submit).to_be_enabled()
+            assert not runs()
+            submit.click()
+            expect(page.get_by_text("Synthetic completed answer: " + draft, exact=True)).to_be_visible()
+            assert len(runs()) == 1
+            expected_id = runs()[0]["thread_id"] if cold_case == "new" else "history-a"
+            if cold_case == "new":
+                assert expected_id not in {"history-a", "history-b"}
+            assert {key: runs()[0][key] for key in ("thread_id", "question", "provider", "model", "effort")} == dict(
+                thread_id=expected_id, question=draft, provider=next_provider, model=next_model, effort=next_effort,
+            )
+            shot("completed-exact-context")
+            if cold_case == "new":
+                round_trip("Settings")
+                expect(page.get_by_text("Synthetic completed answer: " + draft, exact=True)).to_be_visible()
+                expect(page.get_by_text(MESSAGE["content"], exact=True)).to_have_count(0)
+                send("After new accepted ID")
+                assert len(runs()) == 2 and runs()[1]["thread_id"] == expected_id
+                assert (runs()[1]["provider"], runs()[1]["model"], runs()[1]["effort"]) == (next_provider, next_model, next_effort)
+                shot("new-first-id-retained")
+            assert not cold_pending and not errors, (cold_pending, errors)
+            context.close()
+            return dict(locale=locale, width=width, shell_provider=shell_provider, cold_case=cold_case,
+                        screenshots=screenshots, layouts=layouts, requests=requests, errors=errors)
 
         page.goto(BASE + "/__task3?view=shell&locale=" + locale)
         shell_nav("Research")
@@ -566,9 +708,11 @@ def main():
             with sync_playwright() as pw:
                 browser = pw.chromium.launch(args=["--disable-extensions"])
                 try:
-                    providers = ["openai", "anthropic"] if os.environ.get("ARKSCOPE_SHELL_NAVIGATION_ONLY") == "1" else [None]
-                    results = [verify(browser, locale, width, height, provider) for provider in providers
-                               for locale in ["en", "zh-Hant"] for width, height in [(1280, 960), (390, 844)]]
+                    cold = os.environ.get("ARKSCOPE_COLD_RESTORATION_ONLY") == "1"
+                    providers = ["openai", "anthropic"] if cold or os.environ.get("ARKSCOPE_SHELL_NAVIGATION_ONLY") == "1" else [None]
+                    cases = ["complete", "incomplete", "new", "failed-list", "failed-detail", "failed-messages", "failed-missing"] if cold else [None]
+                    results = [verify(browser, locale, width, height, provider, case) for provider in providers
+                               for locale in ["en", "zh-Hant"] for width, height in [(1280, 960), (390, 844)] for case in cases]
                     (OUT / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
                     print(json.dumps(dict(status="passed", contexts=len(results), screenshots=sum(len(row["screenshots"]) for row in results), output=str(OUT))))
                 except Exception:

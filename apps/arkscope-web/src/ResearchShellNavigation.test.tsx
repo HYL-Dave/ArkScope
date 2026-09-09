@@ -608,8 +608,12 @@ describe("Research shell navigation", () => {
     window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "missing-thread");
     await mountResearch();
 
+    expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("新對話");
+    expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("missing-thread");
+    await click(Array.from(host!.querySelectorAll("button")).find(candidate => candidate.textContent?.trim() === "歷史")!);
+    await click(historyThreadButton("Thread A"));
+    await flush();
     expect(host!.querySelector(".research-conversation-title")?.textContent).toBe("Thread A");
-    expect(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("thread-a");
 
     expect(host!.textContent).not.toContain("無法確認此對話上次使用的模型");
     expect(host!.textContent).toContain("研究模型：openai · gpt-5.6-luna · high");

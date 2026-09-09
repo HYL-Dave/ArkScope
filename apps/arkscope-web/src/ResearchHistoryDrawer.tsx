@@ -73,6 +73,7 @@ export interface ResearchHistoryDrawerProps {
   activeThreadId: string | null;
   activeRunIds: ReadonlySet<string>;
   onInitialRowsReady: (rows: readonly ResearchThreadDTO[]) => void;
+  onInitialLoadFailed?: () => void;
   onSelect: (thread: ResearchThreadDTO) => void;
   onThreadUpdated: (thread: ResearchThreadDTO) => void;
   onThreadDeleted: (id: string) => void;
@@ -167,6 +168,7 @@ export function ResearchHistoryDrawer({
   activeThreadId,
   activeRunIds,
   onInitialRowsReady,
+  onInitialLoadFailed,
   onSelect,
   onThreadUpdated,
   onThreadDeleted,
@@ -202,6 +204,8 @@ export function ResearchHistoryDrawer({
   const initialRowsNotifiedRef = useRef(false);
   const initialRowsCallbackRef = useRef(onInitialRowsReady);
   initialRowsCallbackRef.current = onInitialRowsReady;
+  const initialFailureCallbackRef = useRef(onInitialLoadFailed);
+  initialFailureCallbackRef.current = onInitialLoadFailed;
   const deleteReturnFocusRef = useMemo(
     () => ({ current: deleteReturnFocus }),
     [deleteReturnFocus],
@@ -309,6 +313,9 @@ export function ResearchHistoryDrawer({
         setNextOffset(0);
       }
       setLoadError(true);
+      if (!initialRowsNotifiedRef.current && isInitialHistoryQuery(requestedFilters)) {
+        initialFailureCallbackRef.current?.();
+      }
       setStale(retainsAcceptedRows && rowsRef.current.length > 0);
       return "failed";
     } finally {

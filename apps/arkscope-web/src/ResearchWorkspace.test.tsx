@@ -514,6 +514,201 @@ describe("Research workspace contracts", () => {
     { provider: "anthropic" as const, model: "claude-sonnet-5", effort: "medium" },
   ];
 
+  const coldDirections = [
+    { from: "openai" as const, provider: "anthropic" as const, model: "claude-sonnet-5", label: "Anthropic" },
+    { from: "anthropic" as const, provider: "openai" as const, model: "gpt-5.6-sol", label: "OpenAI" },
+  ];
+  const runBodies = (fetchMock: ReturnType<typeof stubFetch>) => fetchMock.mock.calls
+    .filter(([input, init]) => new URL(String(input)).pathname === "/research/runs" && init?.method === "POST")
+    .map(([, init]) => JSON.parse(String(init?.body)));
+
+  it.each(coldDirections.flatMap(direction => ["none", "complete", "incomplete"].flatMap(edit =>
+    ["none", "Home", "Settings"].map(page => ({ ...direction, edit, page })),
+  )))("restores cold saved context from $from after $edit selection and $page navigation", async ({ from, provider, model, label, edit, page }) => {
+    const cat = catalog();
+    const original = settingsDefaults.find(tuple => tuple.provider === from)!;
+    cat.routes.ai_research = { ...route("ai_research"), ...original };
+    const chosenModel = edit === "incomplete" ? `${model}-custom` : model;
+    if (edit === "incomplete") {
+      const entries = cat.effective!.tasks.ai_research!.providers![provider]!.models;
+      entries.push({ ...entries.find(entry => entry.id === model)!, id: chosenModel });
+    }
+    const listGate = deferred<void>();
+    const messagesGate = deferred<void>();
+    const rows = [thread("same", "Saved context"), thread("other", "Other context")];
+    const source = message("PRIOR CONTEXT", { model: "gpt-5.4-mini", effort: "default" });
+    const fetchMock = stubFetch({ catalog: cat, threads: rows, messages: { same: [source] } });
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname;
+      if (path === "/research/threads") await listGate.promise;
+      if (path === "/research/threads/same/messages") await messagesGate.promise;
+      return fetchMock(input, init);
+    });
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
+    await mountShell();
+    await setTextarea("Keep this draft and context");
+    if (edit !== "none") {
+      await click(buttonContaining(label)!);
+      await setSelect(select("Model")!, chosenModel);
+      if (edit === "complete") await setSelect(select("effort")!, "low");
+    }
+    expect.soft(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("same");
+    expect.soft(button("Send")?.disabled).toBe(true);
+    if (page !== "none") {
+      const old = document.querySelector("textarea")!;
+      await shellNavigate(page);
+      expect(old.isConnected).toBe(false);
+      await shellNavigate("Research");
+      expect.soft(document.querySelector("textarea")?.value).toBe("Keep this draft and context");
+    }
+    listGate.resolve();
+    await flush();
+    expect.soft(button("Send")?.disabled).toBe(true);
+    expect(runBodies(fetchMock)).toEqual([]);
+    messagesGate.resolve();
+    await flush();
+    expect.soft(document.querySelector(".research-conversation-title")?.textContent).toBe("Saved context");
+    expect.soft(document.querySelector(".research-bubble-meta")?.textContent).toContain("gpt-5.4-mini · default");
+    expect.soft(host!.textContent).toContain("PRIOR CONTEXT");
+    expect.soft(document.querySelector("textarea")?.value).toBe("Keep this draft and context");
+    if (edit === "incomplete") {
+      expect(select("Model")?.value).toBe(chosenModel);
+      expect(select("effort")?.value).toBe("");
+      expect(button("Send")?.disabled).toBe(true);
+      await setSelect(select("effort")!, "low");
+    }
+    await click(button("Send")!);
+    expect(runBodies(fetchMock)).toEqual([expect.objectContaining({
+      thread_id: "same", question: "Keep this draft and context",
+      ...(edit === "none" ? original : { provider, model: chosenModel, effort: "low" }),
+    })]);
+  });
+
+  it.each(["list", "detail", "messages", "missing"].flatMap(failure =>
+    ["retry", "new", "other"].map(recovery => ({ failure, recovery })),
+  ))("blocks cold $failure restoration without losing input and supports explicit $recovery", async ({ failure, recovery }) => {
+    let failing = true;
+    const rows = [thread("same", "Saved context"), thread("other", "Other context")];
+    const fetchMock = stubFetch({ threads: rows, messages: { same: [message("PRIOR CONTEXT")] } });
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname;
+      if (path === "/research/threads") {
+        if (failure === "list" && failing) return json({ detail: "offline failure" }, 500);
+        if (failure === "detail" || failure === "missing") return json({ threads: [rows[1]], total: 1, limit: 50, offset: 0 });
+      }
+      if (failing && path === (failure === "messages" ? "/research/threads/same/messages" : "/research/threads/same")) {
+        return json({ detail: "offline failure" }, failure === "missing" ? 404 : 500);
+      }
+      return fetchMock(input, init);
+    });
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
+    await mountShell();
+    await setTextarea("Recover this input");
+    await setSelect(select("Model")!, "gpt-5.6-sol");
+    await setSelect(select("effort")!, "low");
+    expect.soft(document.querySelector(".research > .research-workspace .error-text, .research .error-text")?.textContent).toBeTruthy();
+    expect.soft(button("Send")?.disabled).toBe(true);
+    expect.soft(window.sessionStorage.getItem("arkscope.aiResearch.activeThreadId")).toBe("same");
+    expect(runBodies(fetchMock)).toEqual([]);
+    failing = false;
+    if (recovery === "retry") {
+      expect(button("Retry")).toBeDefined();
+      await click(button("Retry")!);
+    } else if (recovery === "new") await click(button("New Research")!);
+    else {
+      await click(button("History")!);
+      if (failure === "list") await click(button("Refresh history")!);
+      await click(button("Open conversation Other context")!);
+    }
+    await flush();
+    expect(document.querySelector("textarea")?.value).toBe("Recover this input");
+    expect(button("Send")?.disabled).toBe(false);
+    await click(button("Send")!);
+    const bodies = runBodies(fetchMock);
+    expect(bodies).toHaveLength(1);
+    if (recovery === "new") expect(bodies[0].thread_id).not.toMatch(/^(same|other)$/);
+    else expect(bodies[0].thread_id).toBe(recovery === "retry" ? "same" : "other");
+    expect(bodies[0]).toMatchObject({
+      model: recovery === "retry" ? "gpt-5.6-sol" : "gpt-5.6-luna",
+      effort: recovery === "retry" ? "low" : "xhigh",
+    });
+  });
+
+  it.each([false, true].flatMap(hasHistory => ["retry", "refresh"].map(recovery => ({ hasHistory, recovery }))))(
+    "recovers unresolved initial history with no saved ID (hasHistory=$hasHistory, $recovery)", async ({ hasHistory, recovery }) => {
+      let failing = true;
+      const fetchMock = stubFetch({ threads: hasHistory ? [thread("same", "Saved context")] : [] });
+      vi.stubGlobal("fetch", (input: string | URL | Request, init?: RequestInit) => {
+        if (failing && new URL(String(input)).pathname === "/research/threads") return Promise.resolve(json({}, 500));
+        return fetchMock(input, init);
+      });
+      await mountShell();
+      await setTextarea("Retain unresolved input");
+      await setSelect(select("Model")!, "gpt-5.6-sol");
+      await setSelect(select("effort")!, "low");
+      expect(button("Send")?.disabled).toBe(true);
+      expect(runBodies(fetchMock)).toEqual([]);
+      failing = false;
+      if (recovery === "retry") await click(button("Retry")!);
+      else {
+        await click(button("History")!);
+        await click(button("Refresh history")!);
+        await click(button("Close")!);
+      }
+      await flush();
+      expect(document.querySelector(".research .error-text")).toBeNull();
+      expect(document.querySelector("textarea")?.value).toBe("Retain unresolved input");
+      expect(button("Send")?.disabled).toBe(false);
+      await click(button("Send")!);
+      expect(runBodies(fetchMock)).toEqual([expect.objectContaining({
+        question: "Retain unresolved input", provider: "openai", model: "gpt-5.6-sol", effort: "low",
+      })]);
+      if (hasHistory) expect(runBodies(fetchMock)[0].thread_id).toBe("same");
+      else expect(runBodies(fetchMock)[0].thread_id).not.toBe("same");
+    },
+  );
+
+  it.each([
+    { phase: "list", action: "new" },
+    ...["new", "other"].map(action => ({ phase: "detail", action })),
+    ...["new", "other", "delete-current", "delete-other"].map(action => ({ phase: "messages", action })),
+  ])("does not let late cold $phase restoration undo $action", async ({ phase, action }) => {
+    const gate = deferred<void>();
+    const rows = [thread("same", "Saved context"), thread("other", "Other context")];
+    const fetchMock = stubFetch({ threads: rows, messages: { same: [message("OLD RESPONSE")] } });
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname;
+      if (phase === "detail" && path === "/research/threads") return json({ threads: [rows[1]], total: 1, limit: 50, offset: 0 });
+      if ((init?.method ?? "GET") === "GET" && path === (
+        phase === "list" ? "/research/threads" : phase === "detail" ? "/research/threads/same" : "/research/threads/same/messages"
+      )) await gate.promise;
+      return fetchMock(input, init);
+    });
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "same");
+    await mountShell();
+    await setSelect(select("Model")!, "gpt-5.6-sol");
+    await setSelect(select("effort")!, "low");
+    await setTextarea("Explicit destination");
+    if (action === "new") await click(button("New Research")!);
+    else {
+      await click(button("History")!);
+      if (action === "other") await click(button("Open conversation Other context")!);
+      else {
+        await click(button(action === "delete-current" ? "Permanently delete Saved context" : "Permanently delete Other context")!);
+        await click(button("Permanently delete")!);
+      }
+    }
+    gate.resolve();
+    await flush();
+    if (action !== "delete-other") expect(host!.textContent).not.toContain("OLD RESPONSE");
+    expect(select("Model")?.value).toBe(action === "delete-other" ? "gpt-5.6-sol" : "gpt-5.6-luna");
+    await click(button("Send")!);
+    const bodies = runBodies(fetchMock);
+    expect(bodies).toHaveLength(1);
+    if (action === "other" || action === "delete-other") expect(bodies[0].thread_id).toBe(action === "other" ? "other" : "same");
+    else expect(bodies[0].thread_id).not.toMatch(/^(same|other)$/);
+  });
+
   it.each([
     {
       from: "openai" as const, to: "anthropic" as const,
