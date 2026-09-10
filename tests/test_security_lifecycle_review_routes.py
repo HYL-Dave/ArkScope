@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 import pytest
 
+from src.security_lifecycle_review import _result
 from tests.test_security_lifecycle_review import context, deny_network, rows
 
 
@@ -42,7 +43,7 @@ def test_review_api_prepares_without_writes_and_confirms_with_one_post(tmp_path,
     assert result.json()["status"] == "applied"
     assert "database" in calls and "profile" in calls
     after = rows(c)
-    readback = c["service"].get_review_confirmation(result.json()["transition_id"])
+    readback = _result(c["service"], result.json()["transition_id"])
     assert readback["status"] == "applied"
     assert rows(c) == after
 
@@ -225,6 +226,6 @@ def test_legacy_retry_does_not_claim_an_incomplete_review_action_completed(tmp_p
     response = browser.post(f"/security-lifecycle/transitions/{transition_id}/retry", json={"preview_sha256": digest})
     assert response.status_code == 409, response.text
     assert response.json()["detail"]["code"] == "transition_preview_changed"
-    readback = c["service"].get_review_confirmation(transition_id)
+    readback = _result(c["service"], transition_id)
     assert readback["status"] == state
     assert rows(c) == before
