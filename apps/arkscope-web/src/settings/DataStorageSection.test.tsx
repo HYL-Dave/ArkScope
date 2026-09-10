@@ -161,6 +161,7 @@ vi.mock("../api", async (importOriginal) => {
 });
 
 import {
+  getMarketDataStatus,
   getSecurityLifecycleAutomationStatus,
   getTradingDayCoverage,
   listSecurityLifecycleCases,
@@ -256,6 +257,7 @@ async function expandAutomationSettings() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getMarketDataStatus).mockResolvedValue(EMPTY_MARKET_STATUS);
   controls.automationStatus = status();
   controls.automationStatusError = null;
 });
@@ -270,6 +272,19 @@ afterEach(() => {
 });
 
 describe("DataStorageSection lifecycle automation controls", () => {
+  it.each([
+    { language: "en" as const, summary: "48 cache entries (24 reusable · 24 refresh due)", timestamp: "latest cache timestamp" },
+    { language: "zh-Hant" as const, summary: "48 個快取項目（可重用 24 · 待重新取得 24）", timestamp: "最新快取時間" },
+  ])("reports cache freshness without claiming a newer financial report in $language", async ({ language, summary, timestamp }) => {
+    vi.mocked(getMarketDataStatus).mockResolvedValue({
+      ...EMPTY_MARKET_STATUS, exists: true,
+      financial_cache: { row_count: 48, valid_count: 24, expired_count: 24, latest_fetched_at: "2026-09-09T18:38:00Z" },
+    });
+    await renderSection(language);
+    expect(host!.textContent).toContain(summary);
+    expect(host!.textContent).toContain(timestamp);
+  });
+
   it.each([
     { language: "en" as const, label: "Automation mode", apply: true },
     { language: "en" as const, label: "Automation mode", apply: false },
@@ -342,8 +357,8 @@ describe("DataStorageSection lifecycle automation controls", () => {
   });
 
   it.each([
-    { language: "en" as const, label: "Automation mode", labels: ["Off", "Check only", "Automatic (verified delistings only)"], interval: "Check interval" },
-    { language: "zh-Hant" as const, label: "自動化模式", labels: ["關閉", "僅檢查", "自動（僅限已驗證下市）"], interval: "檢查間隔" },
+    { language: "en" as const, label: "Automation mode", labels: ["Off", "Check only", "Automatic (verified delistings / renames)"], interval: "Check interval" },
+    { language: "zh-Hant" as const, label: "自動化模式", labels: ["關閉", "僅檢查", "自動（已驗證下市／改名）"], interval: "檢查間隔" },
   ])("offers mutually exclusive native mode radios in $language and retains the interval select", async ({ language, label, labels, interval }) => {
     controls.automationStatus = status({ current_progress: [] });
     await renderSection(language);
@@ -880,7 +895,7 @@ describe("DataStorageSection lifecycle automation controls", () => {
 
     expect(host!.textContent).toContain("Automation mode");
     expect(host!.textContent).toContain("Run due cases now");
-    expect(host!.textContent).toContain("Automatic (verified delistings only)");
+    expect(host!.textContent).toContain("Automatic (verified delistings / renames)");
     expect(lifecyclePanel().textContent).not.toContain("SEC · Nasdaq / Massive · IBKR when needed");
   });
 });

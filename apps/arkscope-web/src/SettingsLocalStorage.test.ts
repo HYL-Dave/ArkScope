@@ -631,7 +631,7 @@ describe("local storage panels", () => {
       "2,324,487 rows · 149 tickers · latest 2026-07-03T20:00:00+0000",
     );
     expect(storage.textContent).toContain(
-      `24 rows (7 valid · 17 expired) · latest fetch ${formatSystemTimestamp("2026-07-01T00:00:00+00:00")}`,
+      `24 cache entries (7 reusable · 17 refresh due) · latest cache timestamp ${formatSystemTimestamp("2026-07-01T00:00:00+00:00")}`,
     );
     expect(storage.textContent).not.toContain("Latest Incremental Update");
     expect(storage.textContent).not.toContain("Prices +11");
