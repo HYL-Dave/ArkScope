@@ -231,14 +231,14 @@ dated evaluations and git history are context, not runnable integration assets.
 |-------|-------|
 | **provider** | SEC EDGAR (US government). |
 | **implementation_status** | **live**. |
-| **connected_via** | `data_sources/sec_edgar_financials.py`, `sec_edgar_source.py`, `sec_filings.py`, `sec_insider_trades.py`, `sec_earnings_releases.py` (public REST + `edgartools`). |
+| **connected_via** | `data_sources/sec_edgar_financials.py`, `sec_edgar_source.py`, `sec_insider_trades.py` (public REST). |
 | **asset_classes** | US equities (fundamentals + filings). |
-| **data_types** | **XBRL structured financials** (Company Facts JSON); filings (10-K / 10-Q / 8-K); insider trades (Form 4); earnings releases. Derives ROE/ROA/D-E/current ratio/margins/revenue+earnings growth/FCF. |
+| **data_types** | **XBRL structured financials** (Company Facts JSON); filings (10-K / 10-Q / 8-K); insider trades (Form 4). Derives ROE/ROA/D-E/current ratio/margins/revenue+earnings growth/FCF. |
 | **history_depth** | **Full filing history** (decades). Quarterly + annual both implemented. |
 | **latency** | Filing-driven (as companies file); not a quote feed. |
 | **streaming** | `none`. |
 | **cost** | **Free** (official SEC API; fair-use rate limits + a User-Agent header). |
-| **auth/config** | No key; requires a descriptive `User-Agent`. `edgartools` integration. |
+| **auth/config** | No key; requires a descriptive `User-Agent`. |
 | **limits** | SEC fair-access throttle (~10 req/s); be polite. |
 | **known_quirks** | Single-quarter vs cumulative-YTD detection (duration ≤105 days); **no Q4-from-10K** (10-K FY = annual total); scan all us-gaap concepts, not 3 hardcoded. |
 | **best_for** | **Authoritative free fundamentals** for all US stocks; the free primary in the fundamentals fallback chain; insider + 8-K event detection. |

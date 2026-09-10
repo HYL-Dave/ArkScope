@@ -321,7 +321,6 @@ def test_all_active_sec_http_callers_use_shared_transport_and_dormant_edgartools
     direct_owners = (
         Path("data_sources/sec_edgar_source.py"),
         Path("data_sources/sec_edgar_financials.py"),
-        Path("data_sources/sec_earnings_releases.py"),
         Path("data_sources/sec_insider_trades.py"),
         Path("src/symbol_catalog.py"),
     )
