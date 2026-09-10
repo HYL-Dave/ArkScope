@@ -4,6 +4,10 @@ Observed: 2026-09-10. Source tree: `fef26dcf` on
 `codex/listing-sec-macro-convergence`; main worktree remains separate.
 Status: source audit and revised scope, **not implemented cleanup**.
 
+Follow-up: the mechanical census below extends the original C01-C13 audit at
+`8ebdb8ba`. Its scanner is maintenance/test tooling, not product execution.
+Do not read the original dated test results as verification of later cleanup.
+
 ## User Decision
 
 ArkScope has no released compatibility population to support. Permanently
@@ -202,6 +206,165 @@ not a second backlog. For every removal, report deleted runtime surfaces and
 test-count changes with their source. Require positive controls for the live
 replacement, absence owners for removed entrypoints and retained-data checks.
 "No provider calls" or passing old tests is not evidence that cleanup happened.
+
+## Mechanical Census Follow-Up
+
+The review correctly identified a coverage gap in the original manual inventory.
+It did not establish that every additional candidate is abandoned. In particular,
+`korean-lunar-calendar==0.4.0` is **required indirectly**, not unused:
+installed `exchange-calendars 4.13.2` declares
+`korean_lunar_calendar>=0.3.1`. The live calendar imports exchange_calendars,
+and `tests/test_market_coverage_dependencies.py` owns that reviewed dependency
+set. Modern wheels can omit `top_level.txt`; the scanner also examines installed
+wheel RECORD metadata rather than incorrectly treating those packages as unused.
+No installed package code is imported for dependency discovery.
+
+### Reproducible Method
+
+- `tests/repository_inventory.py` enumerates **tracked working-tree files** with
+  `git ls-files -z`, records inclusion/exclusion/read status and SHA-256 per read
+  file, and parses Python using `ast`. It records relative imports, re-exports,
+  literal dynamic imports, unresolved loaders, test-only references and possible
+  CLI/module-launch witnesses. An import edge is not whole-program reachability.
+- `tests/repository_sql_inventory.py` creates only disposable `:memory:` SQLite
+  schemas, prepares literal queries with `EXPLAIN`, and records SQLite-authorizer
+  reads/writes, triggers and foreign keys. It never opens product databases.
+  SQLite-managed FTS shadow tables are not unused-table candidates. Dynamic SQL,
+  unpreparable queries and unresolved database ownership remain explicit gaps.
+- `apps/arkscope-web/scripts/maintenance/frontend-inventory.mjs` uses the existing
+  TypeScript parser on supplied source strings, not application execution. It
+  inventories all three package manifests (including the root workspace), script
+  and config references, both locales' leaf keys, translation references, HTTP
+  clients and CSS selectors. It does not resolve cross-file translator dataflow,
+  evaluate arbitrary shell scripts or fully implement CSS selector semantics.
+- Python settings accessors and FastAPI decorators are enumerated. Dynamic keys
+  remain unknown; raw SQL is covered separately. HTTP matching is method-aware
+  but router-local and syntactic: no frontend caller is **not** evidence that
+  Native Messaging, a job, an external client or a dynamic wrapper cannot use it.
+- Private config/data and dependency/build directories are excluded explicitly.
+  Historical evidence and design Markdown are not scanned as executable import
+  consumers. Otherwise, thousands of archived source-manifest strings would make
+  deleted/dead modules appear used. Current runbooks and documented deferred
+  capabilities are checked manually during candidate disposition.
+- Main-worktree untracked files are enumerated by **name only**, not read or
+  deleted. The observation contains 15 files, not two: directory-level
+  `git status` entries are not a file count. Ignored private files are not
+  enumerated. This does not authorize deleting the user's private work.
+
+### Rerun And Review
+
+Use the existing project Python environment (including `packaging`) and Node
+with the web workspace's existing `typescript` installed. No application server
+or provider credentials are required. Stage newly created scanner/source files
+before running: untracked contents are intentionally outside the census.
+
+```bash
+python -B -m tests.repository_inventory --root . --output /tmp/arkscope-inventory.json.gz
+python -B -m tests.repository_inventory --root . --output /tmp/arkscope-inventory-next.json.gz --compare /tmp/arkscope-inventory.json.gz
+python -B -m pytest -q tests/test_repository_inventory.py
+node --test apps/arkscope-web/scripts/maintenance/frontend-inventory.test.mjs
+```
+
+Reports are create-only. `--compare` exits 2 for new candidates, new uncertainty,
+narrowed source coverage, new untracked names or changed dependency metadata;
+it does not silently update a baseline. Exit 0
+means the observation/comparison completed, **not that the repository contains
+no dead code**. The checked-in census is an observation baseline, not an allowlist
+of approved deletion or a waiver for unresolved references. `--skip-frontend`
+records an explicit incomplete scan. Input/parse failures cannot become clean
+coverage. Changes in scanner scope or installed dependency metadata must be
+reviewed alongside candidate deltas.
+
+The full source manifest, evidence locations and unresolved sites are retained
+in `mechanical-census.json.gz`. `mechanical-summary.json` contains the compact
+counts and validation results. Counts describe **source observations**, not the
+shape or contents of the user's live databases.
+
+### Observed Coverage And Verification
+
+| Axis | Observed coverage | Interpretation |
+|---|---|---|
+| Python | 720/720 files parsed | Includes tests and operator/build entrypoints; not a call-graph proof. |
+| Frontend | 321 files: 293 source, 16 locale resources, 6 CSS, 3 manifests, 3 configs; zero parse errors | All supplied files and unsupported kinds are recorded. |
+| Dependencies | 25 Python declarations, 15 npm declarations | Import, transitive, tooling and unknown evidence stay distinct. |
+| i18n / CSS | 5,968 locale leaf keys, 1,260 selectors | Dynamic/reference gaps remain; these counts are not unused-code counts. |
+| Settings | 3 resolved literal accessor keys, 16 dynamic accessor sites | Does not claim that the application has only three settings. Raw SQL/generic access remains separately unresolved. |
+| SQL | 2,820 sites; 1,434/1,901 literal queries preparable against 140 unscoped table shapes | Not a live DB inventory; includes engine-managed and temporary schemas. |
+| HTTP | 224 decorators, 158 syntactic frontend matches | Remaining 66 need review, not deletion; mounted/dynamic/external consumers are not fully resolved. |
+| Untracked | 15 main-worktree file names | Contents untouched; two porcelain entries included a directory. |
+
+There are 4,350 candidate-or-unresolved rows (4,324 distinct IDs) and 3,471
+uncertainty sites, **not thousands of proven abandoned objects**. The 1,124 read
+files have content hashes. Three historical Markdown files outside `docs/`
+could not be decoded as UTF-8; those are retained explicit coverage gaps.
+
+Verification: **35 Python tests + 24 Node tests passed**. The fresh Python run
+uses `--noconftest`, no pytest plugin autoload and a socket-connect/name-resolution
+audit guard; it needs no product imports or database fixture. Node tests run the
+parser/CLI on synthetic supplied strings. The full census repeats identically
+apart from its additional comparison envelope; unchanged comparison exits 0.
+Comparing against the earlier deliberately incomplete Python-only observation
+exits 2 (4,103 new candidates and 2,203 new uncertainty sites). The CLI exit-code
+owner also fails under a reverse mutation that silently returns 0 for new
+candidates, then passes after restoration.
+
+An independent scanner review found nine issues involving private filename
+variants, metadata loss, Python constant/import scope, translator escapes/scopes,
+workspace ownership and SQLite trigger/statement-cache witnesses. Each original
+repro now has regression coverage; bounded independent recheck found no remaining
+required fix among those nine. This is not a new whole-product/security review.
+
+### Additional Candidate Disposition
+
+| ID | Mechanical evidence and source recheck | Disposition and regression boundary |
+|---|---|---|
+| C14 | Three `src/audit/` operator modules: article reconciliation has no inbound module reference; universe retirement and IBKR news catch-up are test-only. All three have real CLI main guards, so zero imports alone was insufficient. The priority map calls the historical IBKR catch-up audit closed/runbook-only. | Remove spent entrypoints and their obsolete CLI tests in the cleanup batch, retaining dated receipts. Keep the **different, live** `src/sa_article_reconciliation.py` and current SA backend reconciliation operations. No operator command is executed just to decide whether its source can be deleted. Owner: new `test_abandoned_surface_cleanup.py`, existing `test_universe_retirement_audit.py` and `test_ibkr_news_catchup_audit.py`. |
+| C15 | `massive_config_migration.py`, `security_lifecycle_migration.py`, `security_lifecycle_automation_migration.py`, `security_lifecycle_provider_migration.py`, `ticker_identity_migration.py`, `security_lifecycle_retirement.py` and the old `security_lifecycle_provider_census.py` are test-only at this module boundary. They are separate from the current listing-authority census/transport. | Remove obsolete version-conversion and old canary entrypoints after moving any still-needed canonical-schema, backup or retained-data regression owners. Do not delete current schema/transition modules, `lifecycle_provider_census_transport.py`, current lifecycle installation/disposal tooling needed for this rollout, or receipts. Each removal must identify which old-schema tests disappear and which current-schema tests remain. |
+| C16 | `src/monitor/scheduler.py::MonitorScheduler` has only test importers. Product monitoring calls `MonitorEngine` through `src/service/jobs.py` and `src/tools/monitor_tools.py`; the independent scheduler is not their owner. | Delete the unused scheduler and its scheduler-only tests, preserving monitor jobs, watchers, notifications and tool behavior. Owners: `test_monitor.py`, `test_legacy_agent_surface_retirement.py::test_monitor_engine_and_scheduler_remain_available` and new `test_abandoned_surface_cleanup.py`. The old preservation test must deliberately move to the live job/engine owner, not just disappear. |
+| C17 | `src/security_lifecycle_news_evidence.py` explicitly describes a retired publisher-acquisition adapter retained for history tests; only its own tests import it. | Physical removal is consistent with the user's decision. Replace its test-only retirement-status contract with absence of the old execution path. Preserve current investigation local-news search and captured finding/history readers, which do not need this acquisition adapter. Owner: `test_security_lifecycle_news_evidence.py` and current investigation-agent tests. |
+| C18 | `data_sources/sec_earnings_releases.py` has a module CLI and test-only references; the provider catalog still advertises it with dormant edgartools. No current tool/route imports its press-release function. | Coordinate removal of the obsolete parser/CLI/catalog claim with SEC cleanup. Preserve the active EDGAR source, financials and insider-trades consumers. The new SEC research service must not silently call this old parser as a fallback. Owner: `test_sec_transport.py`, `test_sec_user_agent.py`, new SEC service tests. |
+| C19 | `src/news_identity_repair.py` is test-only; actual market-data administration calls `src/news_identity.py` directly. | Remove the unused standalone repair facade while retaining the active identity planner/application logic and its data-preservation tests. Owners: `test_news_identity_repair.py`, `test_news_identity.py`, market-data administration tests. No historical news row is changed by deleting the facade. |
+| C20 | `AppRecordsLocalStore` still declares `agent_queries` and provides insert/count/migration helpers; found direct callers are tests. Literal SQL scan shows no reader, but generic `count/raw_rows` can read it dynamically. | Candidate schema/API cleanup, **not an approved DROP**. Inventory actual retained rows before disposition; keep `research_reports`, `agent_memories`, current Research conversation records, citations and usage. This is a concrete example where static no-reader does not prove no stored-data dependency. Owner: `test_app_records_store.py` and current query/history tests. |
+| C21 | `src/service/sa_market_news_density.py` is test-only, but `SA_EXTENSION_ROADMAP.md` explicitly retains it for future auto-sync tuning. | Deferred capability, not proven abandonment. Keep under that existing owner until the scope is deliberately cancelled or a real consumer replaces it. Do not silently broaden the user's abandoned-code decision into removal of every deferred capability. |
+
+### Protected Controls And Remaining Review Queues
+
+- Retain `src/api/__main__.py`, `src/api/app.py`, `src/sa_native_host.py`,
+  `extensions/sa_alpha_picks/build_firefox.py`, `src/daily_update.py` and the
+  active normalized IBKR worker. CLI/Native Messaging/build entrypoints need
+  not have a Python importer. `openai-codex` is the reviewed bundled executable
+  dependency; no Python-import match does not authorize its removal.
+- All declared npm dependencies have a current use after manual config/type
+  review. The scanner leaves `@types/react`, `@types/react-dom` and `jsdom`
+  unresolved rather than pretending ordinary imports cover implicit TypeScript
+  resolution and Vitest's jsdom environment. No npm removal is proposed.
+- i18n keys and CSS selectors without an observed reference remain unresolved
+  when translators/classes are dynamic. Scope these to removed UI components
+  and their current consumers during cleanup. Do not bulk-delete locale keys
+  from this scan or equate syntactic references in tests with runtime use.
+- Some current HTTP calls pass a local `path` variable; their concrete route
+  cannot be resolved by this scanner. For example, card-generation routes are
+  live despite appearing in the no-frontend-match queue. C03's empty `/sec`
+  route has an independent DAL/source proof; the scan alone is insufficient.
+- Generic database readers, schema markers, staging tables and immutable
+  receipts are not abandoned tables. In particular, membership tombstones and
+  `sa_tracking_events` are retained intent/provenance, while `*_new` and
+  `ticker_tags__v2` can be temporary conversion names. No production table or
+  column may be dropped based on this source-only table union.
+
+This completes the repeatable **enumeration phase**, not whole-program
+reachability proof or runtime cleanup. C01-C21 are reviewed groups; the detailed
+report also keeps unclassified mechanical candidates and uncertainty. The next
+bounded implementation is leaf cleanup, then coordinated SEC intake/web
+removal and canonical-schema/data disposition, then the new SEC research
+service. Unrelated news/provider convergence remains independently owned.
+
+The first bounded RED-first plan is
+`docs/superpowers/plans/2026-09-10-abandoned-leaf-cleanup.md`: four disconnected
+leaves (C02/C17-C19), then the inert auth factory placeholder (C07). It includes
+named absence owners, positive controls and reverse mutations. Other groups
+retain their separate disposition/rollout dependencies; no schema or product
+code was deleted in this census change.
 
 ## Offline Verification Performed
 

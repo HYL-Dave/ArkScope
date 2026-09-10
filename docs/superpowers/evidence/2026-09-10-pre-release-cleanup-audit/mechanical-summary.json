@@ -1,0 +1,117 @@
+{
+  "source_digest": "9a62d96de123df576611370abd1af571028850c5d21e71a70f7c8a7e7b410364",
+  "file_coverage": {
+    "decode_failed": 3,
+    "documentation": 190,
+    "excluded_evidence": 5675,
+    "excluded_non_source": 23,
+    "excluded_private": 6,
+    "read": 1124
+  },
+  "python_files": {
+    "parsed_python_files": 720,
+    "python_files": 720
+  },
+  "sql": {
+    "literal_queries": 1901,
+    "prepared_queries": 1434,
+    "schema_tables": 140,
+    "sql_sites": 2820
+  },
+  "sql_call_sites": {
+    "calls": 1438,
+    "dynamic": 232,
+    "literal": 1206
+  },
+  "frontend_file_kinds": {
+    "config": 3,
+    "css": 6,
+    "manifest": 3,
+    "resource": 16,
+    "source": 293
+  },
+  "frontend": {
+    "cssReferences": 1462,
+    "cssSelectors": 1260,
+    "dependencyCandidates": 15,
+    "dependencyReferences": 574,
+    "httpReferences": 180,
+    "i18nKeys": 5968,
+    "i18nReferences": 1286,
+    "parseErrors": 0
+  },
+  "literal_settings_accessor_keys": 3,
+  "settings_dynamic_accesses": 16,
+  "http_decorators": 224,
+  "http_syntactic_matches": 158,
+  "declared_python_dependencies": 25,
+  "candidate_or_unresolved_rows": 4350,
+  "unique_candidate_ids": 4324,
+  "uncertainty_sites": 3471,
+  "uncertainties_by_axis": [
+    {
+      "axis": "css",
+      "count": 181
+    },
+    {
+      "axis": "dependencies",
+      "count": 41
+    },
+    {
+      "axis": "http",
+      "count": 116
+    },
+    {
+      "axis": "i18n",
+      "count": 1861
+    },
+    {
+      "axis": "python",
+      "count": 8
+    },
+    {
+      "axis": "settings",
+      "count": 16
+    },
+    {
+      "axis": "source",
+      "count": 3
+    },
+    {
+      "axis": "sql",
+      "count": 1245
+    }
+  ],
+  "main_worktree_untracked_names": 15,
+  "schema_version": 1,
+  "observation_date": "2026-09-10",
+  "base_commit": "8ebdb8ba",
+  "status": "enumeration_complete_semantic_review_required",
+  "product_cleanup_performed": false,
+  "production_db_reads": 0,
+  "private_untracked_contents_read": false,
+  "provider_calls": 0,
+  "report_sha256": "04eeaaa241498901954ab43195918c92eeea1e0cfbd414717cf2067cffdb95bc",
+  "verification": {
+    "python_tests_passed": 35,
+    "node_tests_passed": 24,
+    "python_test_network_guard": true,
+    "identical_repeat_excluding_comparison": true,
+    "unchanged_comparison_exit_code": 0,
+    "changed_comparison_exit_code": 2,
+    "changed_comparison_new_candidates": 4103,
+    "changed_comparison_new_uncertainties": 2203,
+    "independent_review_original_findings": 9,
+    "independent_review_unresolved_original_findings": 0,
+    "cli_silent_acceptance_mutation_failed_tests": 1
+  },
+  "limitations": [
+    "Source-only observation; not a production schema/data inventory or proof of whole-program dead code.",
+    "All candidate/unresolved rows require disposition; no row authorizes deletion.",
+    "Only three literal settings keys resolve through recognized accessors; raw SQL and dynamic keys are separate incomplete observations.",
+    "Three non-UTF-8 historical Markdown files outside docs could not be decoded; listed in source manifest.",
+    "No complete cross-file TypeScript dataflow, dynamic Python import resolution, router mounting or database ownership resolution.",
+    "Historical evidence/config/data are excluded; untracked files are names-only.",
+    "Baseline is generated before its own report/summary are staged; newly tracked evidence remains excluded on reruns."
+  ]
+}
