@@ -463,7 +463,7 @@ def test_worker_applies_provider_config_before_gateway_construction(monkeypatch,
     assert order == ["apply", "run_worker"]
 
 
-def test_apply_provider_config_passes_a_store(monkeypatch):
+def test_apply_provider_config_passes_a_store(monkeypatch, tmp_path):
     import src.news_normalized.ibkr_cli as worker
     from src.data_provider_config import DataProviderConfigStore
 
@@ -472,7 +472,7 @@ def test_apply_provider_config_passes_a_store(monkeypatch):
         "src.data_provider_config.apply_env",
         lambda store: seen.setdefault("store", store) or frozenset(),
     )
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", "/tmp/claude-1001/nonexistent-profile.db")
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
 
     worker._apply_provider_config()
 

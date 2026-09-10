@@ -236,7 +236,7 @@ def test_prices_worker_bounds_sorts_and_sanitizes_ticker_lists():
             worker.sanitize_result(malformed)
 
 
-def test_apply_provider_config_passes_a_store(monkeypatch):
+def test_apply_provider_config_passes_a_store(monkeypatch, tmp_path):
     # Regression: the worker called apply_env() with no store and died at startup
     # with TypeError on every real run (tests had mocked _apply_provider_config away).
     import src.prices_runtime as worker
@@ -247,7 +247,7 @@ def test_apply_provider_config_passes_a_store(monkeypatch):
         "src.data_provider_config.apply_env",
         lambda store: seen.setdefault("store", store) or frozenset(),
     )
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", "/tmp/claude-1001/nonexistent-profile.db")
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile_state.db"))
 
     worker._apply_provider_config()
 
