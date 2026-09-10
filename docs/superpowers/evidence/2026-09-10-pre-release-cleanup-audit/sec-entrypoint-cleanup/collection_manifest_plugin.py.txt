@@ -1,0 +1,15 @@
+"""Temporary final-collection evidence, using pytest's own JUnit name mapping."""
+import json
+import os
+from pathlib import Path
+
+from _pytest.junitxml import mangle_test_address
+
+
+def pytest_collection_finish(session):
+    rows = []
+    for item in session.items:
+        names = mangle_test_address(item.nodeid)
+        rows.append({"nodeid": item.nodeid, "classname": ".".join(names[:-1]), "name": names[-1]})
+    output = Path(os.environ["ARKSCOPE_COLLECTION_MANIFEST"])
+    output.write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")

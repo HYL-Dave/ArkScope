@@ -1,0 +1,28 @@
+import ts from "../../../node_modules/typescript/lib/typescript.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+const root = resolve(import.meta.dirname, "../../..");
+const selections = JSON.parse(process.argv[2]);
+let patch = "*** Begin Patch\n";
+for (const [file, names] of Object.entries(selections)) {
+  const path = resolve(root, file), text = readFileSync(path, "utf8");
+  const sf = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
+  const found = new Map();
+  function visit(node) {
+    const name = node.name?.text ?? (ts.isVariableStatement(node) ? node.declarationList.declarations[0].name.getText(sf) : null);
+    const title = ts.isExpressionStatement(node) && ts.isCallExpression(node.expression)
+      && node.expression.arguments[0]?.kind === ts.SyntaxKind.StringLiteral ? node.expression.arguments[0].text : null;
+    if (names.includes(name ?? title)) found.set(name ?? title, node);
+    else ts.forEachChild(node, visit);
+  }
+  visit(sf);
+  if (found.size !== names.length) throw new Error(`Missing nodes: ${file} ${names.filter(n => !found.has(n))}`);
+  patch += `*** Update File: ${path}\n`;
+  for (const node of [...found.values()].sort((a, b) => a.pos - b.pos)) {
+    const start = text.lastIndexOf("\n", node.getStart(sf)) + 1;
+    const end = text.indexOf("\n", node.end);
+    const old = text.slice(start, end < 0 ? text.length : end);
+    patch += "@@\n" + old.split("\n").map(line => "-" + line).join("\n") + "\n";
+  }
+}
+console.log(patch + "*** End Patch");

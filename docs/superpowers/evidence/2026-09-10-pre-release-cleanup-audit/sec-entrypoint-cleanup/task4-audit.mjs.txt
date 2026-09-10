@@ -1,0 +1,54 @@
+import ts from "../../../node_modules/typescript/lib/typescript.js";
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve, relative } from "node:path";
+import { execFileSync } from "node:child_process";
+
+const root = resolve(import.meta.dirname, "../../..");
+const app = resolve(root, "apps/arkscope-web");
+const config = ts.readConfigFile(resolve(app, "tsconfig.json"), ts.sys.readFile);
+const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, app);
+const program = ts.createProgram(parsed.fileNames, parsed.options);
+const checker = program.getTypeChecker();
+const old = new Set(["CurrentLifecycleView.tsx", "CurrentLifecycleAudit.tsx", "LifecycleWebPanel.tsx", "useLifecycleSourceCheck.ts"]);
+const fields = new Map();
+function propertyPath(node) {
+  const names = [];
+  for (let n = node; n; n = n.parent) {
+    if (ts.isPropertyAssignment(n)) names.unshift(n.name.text);
+  }
+  return names.join(".");
+}
+function visit(node, sf) {
+  if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+    const name = ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression;
+    for (const d of checker.getSymbolAtLocation(name)?.declarations ?? []) {
+      if (!d.getSourceFile().fileName.endsWith("i18n/resources/en/explore.ts")) continue;
+      const key = propertyPath(d);
+      const item = fields.get(key) ?? { old: [], live: [], tests: [], accessors: [] };
+      const file = relative(root, sf.fileName), line = sf.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+      const group = file.includes(".test.") ? "tests" : old.has(file.split("/").at(-1)) ? "old"
+        : ts.isReturnStatement(node.parent) && ["lifecycle", "lifecycle.current", "lifecycle.web"].includes(key) ? "accessors" : "live";
+      item[group].push({ file, line, expression: node.getText(sf) });
+      fields.set(key, item);
+    }
+  }
+  ts.forEachChild(node, child => visit(child, sf));
+}
+for (const sf of program.getSourceFiles()) {
+  if (sf.fileName.startsWith(resolve(app, "src")) && !sf.fileName.includes("/resources/")) visit(sf, sf);
+}
+const sourceFiles = execFileSync("rg", ["--files", "--hidden", "-g", "!.git", "-g", "!node_modules", "-g", "!docs", "-g", "!config", "-g", "!.superpowers", "-g", "!dist", "-g", "*.ts", "-g", "*.tsx", "-g", "*.py", "-g", "*.mjs"], { cwd: root, encoding: "utf8" }).trim().split("\n");
+const contents = sourceFiles.map(file => [file, readFileSync(resolve(root, file), "utf8")]);
+const api = program.getSourceFile(resolve(app, "src/api.ts"));
+const dependencies = {};
+for (const node of api.statements) {
+  const name = node.name?.text;
+  if (!name || !/Lifecycle|TickerIdentity/.test(name)) continue;
+  const re = new RegExp(`\\b${name}\\b`);
+  dependencies[name] = contents.filter(([file, content]) => !file.endsWith("/api.ts") && re.test(content)).map(([file]) => file);
+}
+const report = { locale: Object.fromEntries([...fields].sort()), dependencies };
+const output = resolve(import.meta.dirname, process.argv[2] ?? "task4-consumers-before.json");
+writeFileSync(output, JSON.stringify(report, null, 2) + "\n");
+console.log(output);
+console.log(JSON.stringify(Object.fromEntries(Object.entries(report.locale).filter(([key]) => key.startsWith("lifecycle.current") || key.startsWith("lifecycle.web")).map(([key, value]) => [key, { old: value.old.length, live: value.live }]))));

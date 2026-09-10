@@ -1,0 +1,25 @@
+{
+  "source_head": "302106d2",
+  "partition_a_original": {
+    "passed": 5488,
+    "failed": 1,
+    "skipped": 12
+  },
+  "api_file_rerun": {
+    "passed": 25
+  },
+  "api_node_ids_identical": true,
+  "partition_b": {
+    "passed": 2452
+  },
+  "partition_overlap": 0,
+  "final_collected": 7953,
+  "covered_unique": 7953,
+  "missing": [],
+  "unexpected": [],
+  "final_outcomes": {
+    "passed": 7941,
+    "skipped": 12
+  },
+  "verification": "partitioned; failed A API file superseded by complete same-node-ID rerun"
+}

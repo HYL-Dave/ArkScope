@@ -2,22 +2,30 @@
 
 Observed: 2026-09-10. Source tree: `fef26dcf` on
 `codex/listing-sec-macro-convergence`; main worktree remains separate.
-Status: **first leaf batch implemented; wider cleanup remains open**.
+Status: **first leaf batch and bounded SEC intake/execution/UI cleanup
+implemented; remaining helpers/endpoints and data disposition stay open**.
 The original findings below are a dated source inventory, not all-complete
-status. Implementation and verification details: [leaf-cleanup.md](leaf-cleanup.md).
+status. Implementation and verification details: [leaf-cleanup.md](leaf-cleanup.md)
+and [SEC entrypoint cleanup](sec-entrypoint-cleanup/README.md).
 
 | Candidate | Current disposition | Commit |
 | --- | --- | --- |
+| C01 | Company-event collector, scheduler registration and Settings source removed; current admission is unconditional; actual stored settings/schema disposition remains open | `06511f44` |
 | C02 | Dormant edgartools module physically deleted; active SEC clients retained | `300b7400` |
+| C04 | Current execution owner extracted; old case-web router/controller/preflight and unmounted screens/clients removed. Current shared history/confirmation readers, five further HTTP candidates and schema disposition remain | `83eeb5ef`, `302106d2` |
 | C07 | Unreachable auth factory placeholder/export removed; six real modes retained | `263c21a5` |
 | C17 | Old publisher-acquisition adapter deleted; current investigation news retained | `300b7400` |
 | C18 | Disconnected SEC earnings parser/CLI and catalog claim removed | `300b7400` |
 | C19 | Unused repair facade deleted; current identity planner/admin retained | `300b7400` |
 
-These five dispositions passed the scoped RED/green/mutation checks, full
+The first five leaf dispositions passed the scoped RED/green/mutation checks, full
 backend selection with documented harness-correction follow-up, and independent
 review. Other candidates keep their existing retention/extraction/data-disposal
 boundaries. No production data, schema, provider call, merge or push was involved.
+The C01 checkpoint has its own scoped regression and independent review, recorded
+in the entrypoint cleanup evidence. `0ee801cd` also removes the current API
+specification's abandoned edgartools recommendation; the old inventory below is
+preserved as evidence of the original finding, not current guidance.
 
 Follow-up: the mechanical census below extends the original C01-C13 audit at
 `8ebdb8ba`. Its scanner is maintenance/test tooling, not product execution.

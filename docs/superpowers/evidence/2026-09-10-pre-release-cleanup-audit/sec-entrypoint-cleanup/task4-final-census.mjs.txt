@@ -1,0 +1,101 @@
+import ts from "../../../node_modules/typescript/lib/typescript.js";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { execFileSync, spawnSync } from "node:child_process";
+
+const root = resolve(import.meta.dirname, "../../..");
+const base = "66b53ee5";
+const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+const changed = git("diff", "--name-only", base, "--", "apps/arkscope-web/src").trim().split("\n");
+const production = changed.filter(file => !file.includes(".test.") && !file.includes("/resources/"));
+function declarations(file, source, exportedOnly) {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  return sf.statements.flatMap(node => {
+    if (exportedOnly && !node.modifiers?.some(x => x.kind === ts.SyntaxKind.ExportKeyword)) return [];
+    const names = ts.isVariableStatement(node) ? node.declarationList.declarations.map(d => d.name) : [node.name];
+    return names.filter(name => name && ts.isIdentifier(name)).map(name => name.text);
+  });
+}
+const removed = {};
+for (const file of production) {
+  const path = resolve(root, file), deleted = !existsSync(path);
+  const old = declarations(file, git("show", `${base}:${file}`), deleted);
+  const current = new Set(deleted ? [] : declarations(file, readFileSync(path, "utf8"), false));
+  for (const name of old.filter(name => !current.has(name))) removed[name] = { owner: file };
+  if (deleted) removed[file.split("/").at(-1).replace(/\.tsx?$/, "")] ??= { owner: file, moduleName: true };
+}
+const retainedNames = ["LifecycleView", "LifecycleActivityBand", "TrackingDecision", "TrackingHistory", "currentReviewCopy", "webCopy", "webReason",
+  "confirmLifecycleReview", "confirmInvestigation", "listSecurityLifecycleCases", "getSecurityLifecycleCase", "listSecurityLifecycleSecCandidates",
+  "getSecurityLifecycleInvestigation", "parseLifecycleReviewPacket", "parseLifecycleReviewConfirmation", "parseCurrentActivity", "parseCurrentActivityList",
+  "parseInvestigationStart", "parseReviewSourceGaps", "listTickerIdentityTransitionActivity", "acknowledgeTickerIdentityTransitionActivity", "reverseTickerIdentityTransition"];
+const sourceFiles = execFileSync("rg", ["--files", "--hidden", "-g", "!.git", "-g", "!node_modules", "-g", "!docs", "-g", "!config", "-g", "!data", "-g", "!.superpowers", "-g", "!dist",
+  "-g", "*.ts", "-g", "*.tsx", "-g", "*.py", "-g", "*.mjs", "-g", "*.js", "-g", "*.jsx", "-g", "*.cjs"], { cwd: root, encoding: "utf8" }).trim().split("\n").sort();
+const currentSources = sourceFiles.map(file => ({ file, lines: readFileSync(resolve(root, file), "utf8").split("\n") }));
+const baselineFiles = git("ls-tree", "-r", "--name-only", base).trim().split("\n").filter(file => /\.(tsx?|py|mjs|cjs|jsx?)$/.test(file)
+  && !/^(docs|config|data|\.superpowers)\//.test(file) && !/(^|\/)(node_modules|dist)\//.test(file));
+const baselineSources = baselineFiles.map(file => ({ file, lines: git("show", `${base}:${file}`).split("\n") }));
+function refs(name, sources) {
+  const re = new RegExp(`\\b${name}\\b`);
+  return sources.flatMap(({ file, lines }) => lines.flatMap((line, index) => re.test(line) ? [{ file, line: index + 1 }] : []));
+}
+for (const [name, item] of Object.entries(removed)) {
+  item.baselineSourceRefs = refs(name, baselineSources);
+  item.remainingSourceRefs = refs(name, currentSources);
+}
+const docs = spawnSync("rg", ["-l", "-w", Object.keys(removed).join("|"), "docs"], { cwd: root, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+if (![0, 1].includes(docs.status)) throw new Error(docs.stderr);
+const referenceReport = { base, sourceScope: "All rg-discovered TS/TSX/Python/JS/JSX/MJS/CJS, including cross-language tests; no config, data, docs, generated output, dependencies or ignored SDD files read as source.",
+  sourceFileCount: sourceFiles.length, baselineSourceFileCount: baselineFiles.length, removed,
+  retained: Object.fromEntries(retainedNames.map(name => [name, refs(name, currentSources)])),
+  documentaryFilesWithRemovedNames: docs.stdout.trim().split("\n").filter(Boolean) };
+writeFileSync(resolve(import.meta.dirname, "task4-whole-tree-refs.json"), JSON.stringify(referenceReport, null, 2) + "\n");
+const xmlReport = JSON.parse(execFileSync("/home/hyl/.virtualenvs/llm_app/bin/python", ["-c", `
+import ast, collections, json, subprocess, xml.etree.ElementTree as E
+from pathlib import Path
+p = Path('.superpowers/sdd/2026-09-10-sec-intake-entrypoint-cleanup')
+results = {}
+def node_ids(root):
+    return collections.Counter((t.get('classname', ''), t.get('name', '')) for t in root.findall('.//testcase'))
+def ids(counter):
+    return [dict(file=f, name=n, occurrences=c) for (f, n), c in sorted(counter.items())]
+for file in sorted(p.glob('task4-*.xml')):
+    root = E.parse(file).getroot()
+    cases = root.findall('.//testcase')
+    failed = [t for t in cases if t.find('failure') is not None]
+    results[file.name] = dict(tests=len(cases), suites=len(root.findall('.//testsuite')), failures=len(failed),
+        failure_elements=len(root.findall('.//failure')), errors=len(root.findall('.//error')), skipped=len(root.findall('.//skipped')),
+        failed_nodes=[dict(file=t.get('classname'), name=t.get('name')) for t in failed])
+before = E.parse(p/'task4-full-frontend-baseline.xml').getroot()
+after = E.parse(p/'task4-verified-frontend.xml').getroot()
+b, a = node_ids(before), node_ids(after)
+files = sorted(set(t.get('classname') for t in before.findall('.//testcase') + after.findall('.//testcase')))
+counts = [dict(file=f, before=sum(c for (file, _), c in b.items() if f == file), after=sum(c for (file, _), c in a.items() if f == file)) for f in files]
+backend = {}
+for file in ['tests/test_lifecycle_web_frontend_contract.py', 'tests/test_security_lifecycle_current.py']:
+    old = ast.parse(subprocess.check_output(['git', 'show', '66b53ee5:' + file], text=True))
+    new = ast.parse(Path(file).read_text()) if Path(file).exists() else ast.parse('')
+    names = lambda tree: {n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith('test_')}
+    backend[file] = dict(removed=sorted(names(old)-names(new)), added=sorted(names(new)-names(old)))
+backend['tests/test_lifecycle_web_frontend_contract.py']['removed_case_count'] = 4
+backend['tests/test_lifecycle_web_frontend_contract.py']['removed_parametrization'] = dict(
+    test_persisted_usage_projection_roundtrips_actual_typescript_reader=['None', 'sources', 'lost'])
+backend['tests/test_security_lifecycle_current.py']['removed_case_count'] = 1
+renames = [
+    ('src/lifecycle/currentReviewContract.test.ts', 'reads with GET, checks result identity and submits exactly one confirmation command', 'submits exactly one provider confirmation command'),
+    ('src/lifecycle/currentReviewContract.test.ts', 'rejects a different review or receipt instead of applying its result to the selected row', 'rejects a different provider confirmation receipt instead of applying its result'),
+    ('src/LifecycleAutomationApi.test.ts', 'security lifecycle automation API > dispatches due and case runs through their distinct attended endpoints', 'security lifecycle automation API > dispatches due runs through the attended endpoint'),
+    ('src/lifecycle/webPresentation.test.ts', 'covers every Web state in both languages without inventing a state label', 'keeps bilingual historical authentication and reason presentation'),
+]
+for file, old, new in renames:
+    assert b[(file, old)] == 1 and a[(file, new)] == 1, (file, old, new)
+print(json.dumps(dict(base='66b53ee5', runs=results, frontend=dict(before=sum(b.values()), after=sum(a.values()),
+    deleted_node_ids=ids(b-a), added_node_ids=ids(a-b), changed_file_counts=[c for c in counts if c['before'] != c['after']],
+    renames=[dict(file=f, before=old, after=new) for f, old, new in renames],
+    removed_cases=204, added_cases=46, removed_files=8, added_files=1), backend=backend)))
+`], { cwd: root, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 }));
+writeFileSync(resolve(import.meta.dirname, "task4-test-census.json"), JSON.stringify(xmlReport, null, 2) + "\n");
+console.log(JSON.stringify({ removedNames: Object.keys(removed).length, sourceFiles: sourceFiles.length,
+  removedNamesWithRemainingSourceRefs: Object.fromEntries(Object.entries(removed).filter(([, value]) => value.remainingSourceRefs.length).map(([name, value]) => [name, [...new Set(value.remainingSourceRefs.map(ref => ref.file))]])),
+  frontend: { before: xmlReport.frontend.before, after: xmlReport.frontend.after,
+    removedNodeIds: xmlReport.frontend.deleted_node_ids.reduce((sum, row) => sum + row.occurrences, 0),
+    addedNodeIds: xmlReport.frontend.added_node_ids.reduce((sum, row) => sum + row.occurrences, 0) }, backend: xmlReport.backend }, null, 2));

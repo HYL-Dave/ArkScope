@@ -1,0 +1,61 @@
+import ts from "../../../node_modules/typescript/lib/typescript.js";
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+const root = resolve(import.meta.dirname, "../../..");
+const before = JSON.parse(readFileSync(resolve(import.meta.dirname, "task4-consumers-before.json"), "utf8")).locale;
+const after = JSON.parse(readFileSync(resolve(import.meta.dirname, "task4-consumers-after-code.json"), "utf8")).locale;
+const candidates = new Set(Object.entries(before).filter(([key, refs]) => /^lifecycle\.(current|web)\.[^.]+$/.test(key)
+  && (refs.old.length || refs.live.some(ref => ref.expression === "currentReviewCopy(locale).checks" || ref.expression === "currentReviewCopy(locale).unconfirmed")))
+  .map(([key]) => key));
+const directProof = {};
+for (const name of ["CurrentLifecycleView", "CurrentLifecycleAudit", "LifecycleWebPanel"]) {
+  const file = `apps/arkscope-web/src/lifecycle/${name}.tsx`;
+  const content = execFileSync("git", ["show", `66b53ee5:${file}`], { cwd: root, encoding: "utf8" });
+  for (const match of content.matchAll(/\$\.lifecycle\.(current|web)\.([A-Za-z_]+)/g)) {
+    const key = `lifecycle.${match[1]}.${match[2]}`;
+    candidates.add(key);
+    (directProof[key] ??= []).push({ file, expression: match[0] });
+  }
+}
+const removed = [...candidates].filter(key => !(after[key]?.live.length)).sort();
+for (const key of removed) {
+  if (Object.entries(after).some(([child, refs]) => child.startsWith(key + ".") && refs.live.length)) throw new Error(`Live child of ${key}`);
+}
+let patch = "*** Begin Patch\n";
+const leaves = [];
+for (const locale of ["en", "zh-Hant"]) {
+  const file = resolve(root, `apps/arkscope-web/src/i18n/resources/${locale}/explore.ts`);
+  const text = readFileSync(file, "utf8");
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const ranges = [];
+  function visit(node, path = []) {
+    const next = ts.isPropertyAssignment(node) ? [...path, node.name.text] : path;
+    const key = next.join(".");
+    if (ts.isPropertyAssignment(node) && removed.includes(key)) {
+      let end = node.end;
+      if (text[end] === ",") end++;
+      while (text[end] === " ") end++;
+      ranges.push([node.getStart(sf), end]);
+      function count(n, parts) {
+        if (ts.isStringLiteral(n)) { if (locale === "en") leaves.push(parts.join(".")); return; }
+        if (ts.isObjectLiteralExpression(n)) for (const p of n.properties) count(p.initializer, [...parts, p.name.text]);
+      }
+      count(node.initializer, next);
+    } else ts.forEachChild(node, child => visit(child, next));
+  }
+  visit(sf);
+  if (ranges.length !== removed.length) throw new Error(`Missing locale nodes in ${locale}`);
+  let result = text;
+  for (const [start, end] of ranges.sort((a, b) => b[0] - a[0])) result = result.slice(0, start) + result.slice(end);
+  result = result.replace(/^ +$/gm, "").replace(/\n{3,}/g, "\n\n");
+  const a = text.split("\n"), b = result.split("\n");
+  let start = 0, endA = a.length, endB = b.length;
+  while (a[start] === b[start]) start++;
+  while (a[endA - 1] === b[endB - 1]) { endA--; endB--; }
+  patch += `*** Update File: ${file}\n@@\n` + a.slice(start, endA).map(line => "-" + line).join("\n")
+    + "\n" + b.slice(start, endB).map(line => "+" + line).join("\n") + "\n";
+}
+writeFileSync(resolve(import.meta.dirname, "task4-locale-removals.json"), JSON.stringify({ removed, leaves,
+  proof: Object.fromEntries(removed.map(key => [key, { before: before[key], direct: directProof[key], remaining: after[key] }])) }, null, 2) + "\n");
+console.log(patch + "*** End Patch");
