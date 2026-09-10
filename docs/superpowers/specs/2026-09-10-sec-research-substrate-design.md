@@ -1,6 +1,7 @@
 # SEC Research Data And Tools
 
-Status: proposed implementation contract, awaiting the user's written-spec review.
+Status: product direction and cleanup boundary approved; new research service
+not yet implemented. Its own RED-first implementation plan remains to be written.
 Base inspected: `30bb31c7`. The user approved the product direction on September
 10, including useful tool access rather than collection without consumers.
 Last implementation-tree review: `fef26dcf`. On September 10 the user selected
@@ -10,8 +11,14 @@ remove abandoned SEC company-event intake; financial research is a new feature,
 not a renamed collector. The project is pre-release with one operator installation;
 do not retain old execution paths or schema upgrade chains for hypothetical old
 installations. This is not authorization to erase the operator's accumulated data.
-This revision records that cleanup boundary and the verified review corrections;
-the revised removal/data-preservation scope needs review before its RED-first plan.
+This revision records that cleanup boundary and the verified review corrections.
+The separate `2026-09-10-sec-intake-entrypoint-cleanup` plan now implements that
+boundary: `0ee801cd` corrects current SEC guidance, `06511f44` deletes the old
+collector/source and `83eeb5ef` gives current investigation its own execution
+owner while deleting the obsolete case-web routes/controller/preflight. This
+does not complete retained-data conversion, old schema disposal or the research
+service below. The source ownership checkpoint is
+`../evidence/2026-09-10-pre-release-cleanup-audit/sec-schema-ownership.md`.
 This document is not evidence of implementation, migration, acquisition or live
 validation. Rename automation and the macro scheduler fix are independent work.
 

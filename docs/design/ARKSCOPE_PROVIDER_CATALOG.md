@@ -48,7 +48,7 @@ not through another research-everything-first sweep.
 
 | Tier | Providers | Why |
 |------|-----------|-----|
-| **Foundation (基本盤)** | **IBKR** (market/contract/account facts) · **SEC EDGAR** (issuer filings and authoritative lifecycle evidence) · **Seeking Alpha** (captured research/news/community context) | Structured and source-labelled evidence already used by core workflows |
+| **Foundation (基本盤)** | **IBKR** (market/contract/account facts) · **SEC EDGAR** (issuer filings and structured financial facts) · **Seeking Alpha** (captured research/news/community context) | Structured and source-labelled research evidence; listing/rename authority belongs to the current Massive/EODHD-led lifecycle checks, not SEC intake |
 | **Supporting** | Massive · Finnhub · Alpha Vantage · EODHD · Financial Datasets · FRED | Fallbacks, breadth, fundamentals, macro — valuable but admitted per proven gap |
 
 **Effort priority follows this**: strengthen structured internal/provider coverage
@@ -86,7 +86,7 @@ admitted separately as task capabilities, not presumed data foundations.
 | **Finnhub** | live | US equities | `realtime_quote` (no bars) | **news ~7 days** (claims 1yr) | free; paid Fundamental tiers | earnings/IPO/economic **calendar** | 2025-12 |
 | **Alpha Vantage** | live | equities, FX, commodities | `none` (delayed) | EOD; intraday ~7 days | free **25 req/day** | **commodity series** → IBKR futures | 2025-12 |
 | **EODHD** | optional-live (paid) | global equities, fundamentals | `none` (EOD) | long global EOD | paid $19.99–$99 | global EOD + fundamentals breadth | 2025-12 |
-| **SEC EDGAR** | live | US equities (fundamentals) | `none` | full filing history | **free** | authoritative **fundamentals** (XBRL), filings, insider | 2026-01 |
+| **SEC EDGAR** | live | US equities (fundamentals) | `none` | Company Facts history; current filing list uses recent submissions | **free** | authoritative **fundamentals** (XBRL), filings, insider | 2026-01 |
 | **Financial Datasets** | optional-live (paid, toggle) | US equities (fundamentals) | `none` | quarterly/annual/TTM | paid ≈$30/mo | fundamentals fallback; unique **Segmented Revenue** | 2026-01 |
 | **FRED** | live | macro series | `none` | decades | **free** | macro w/ **point-in-time** (anti-lookahead) | 2026-04 |
 | **Seeking Alpha** | **protected-pipeline** | US equities (curated) | `extension_capture` | per-capture | account + extension | **Alpha Picks**, **comment intelligence**, SA news | 2026-05 |
@@ -234,18 +234,22 @@ dated evaluations and git history are context, not runnable integration assets.
 | **connected_via** | `data_sources/sec_edgar_financials.py`, `sec_edgar_source.py`, `sec_insider_trades.py` (public REST). |
 | **asset_classes** | US equities (fundamentals + filings). |
 | **data_types** | **XBRL structured financials** (Company Facts JSON); filings (10-K / 10-Q / 8-K); insider trades (Form 4). Derives ROE/ROA/D-E/current ratio/margins/revenue+earnings growth/FCF. |
-| **history_depth** | **Full filing history** (decades). Quarterly + annual both implemented. |
+| **history_depth** | Current financial mapping supports quarterly and annual Company Facts. The filing-list implementation reads recent submissions; persisted historical catalog traversal remains part of the new SEC research service, not a current capability. |
 | **latency** | Filing-driven (as companies file); not a quote feed. |
 | **streaming** | `none`. |
 | **cost** | **Free** (official SEC API; fair-use rate limits + a User-Agent header). |
 | **auth/config** | No key; requires a descriptive `User-Agent`. |
-| **limits** | SEC fair-access throttle (~10 req/s); be polite. |
+| **limits** | Shared `SecTransport` response/retry bounds and cross-process `SecRequestGovernor` pacing; no package-provided edgartools limiter. |
 | **known_quirks** | Single-quarter vs cumulative-YTD detection (duration ≤105 days); **no Q4-from-10K** (10-K FY = annual total); scan all us-gaap concepts, not 3 hardcoded. |
-| **best_for** | **Authoritative free fundamentals** for all US stocks; the free primary in the fundamentals fallback chain; insider + 8-K event detection. |
-| **not_good_for** | Non-US companies; real-time/price data. |
+| **best_for** | Structured fundamentals in the existing fundamentals fallback chain; insider filings and filing metadata/source retrieval. |
+| **not_good_for** | Real-time/price data or independent automatic delisting/rename authority. The abandoned SEC company-event collector has been removed. |
 | **verified_at** | 2026-01. |
 | **source_links** | `data_sources/API_SPECIFICATIONS.md` §SEC EDGAR, `docs/analysis/FINANCIAL_METRICS_FORMULAS.md` (XBRL field mapping). |
-| **app_settings_fields** | `sec_edgar.enabled` (toggle), `sec_edgar.user_agent` (text — required by SEC). |
+| **app_settings_fields** | Provider configuration `sec_edgar.user_agent` (contact identity, stored in profile DB). There is no `sec_edgar.enabled` provider field or company-event schedule. A future SEC research schedule has independent scope and consent. |
+
+Implementation scope rechecked at `06511f44` on 2026-09-10. This updates the
+current code/configuration description, not the historical external pricing
+verification dates elsewhere in this catalog.
 
 ### 3.7 Financial Datasets
 
