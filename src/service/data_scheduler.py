@@ -634,19 +634,6 @@ def set_source_config(source: str, *, enabled: Optional[bool] = None,
 
 # --- execution ------------------------------------------------------------------
 
-def _run_subprocess(argv: List[str]) -> Dict[str, Any]:
-    """Run one child with captured output, repo-root cwd (collectors use
-    repo-relative paths), inherited env (config/.env keys via ensure_env_loaded)."""
-    proc = subprocess.run(
-        argv, cwd=str(_REPO_ROOT), capture_output=True, text=True,
-    )
-    out = {"returncode": proc.returncode}
-    if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "")[-_ERROR_TAIL:]
-        out["error_tail"] = tail
-    return out
-
-
 def _safe_int(value: Any) -> int:
     try:
         return int(value or 0)

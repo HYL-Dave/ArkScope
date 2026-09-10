@@ -40,7 +40,6 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
 import os
 import sys
 import json
-import subprocess
 import logging
 import argparse
 from datetime import datetime, date, timezone
@@ -64,56 +63,6 @@ CONFIG_DIR = REPO_ROOT / "config"
 # Repo root on sys.path so `--scope active-universe` can read the local
 # profile-state DB when this module is executed from outside the repo root.
 sys.path.insert(0, str(REPO_ROOT))
-
-
-def run_command(cmd: list, dry_run: bool = False, stream_output: bool = True) -> tuple:
-    """
-    Execute a command and return (success, output).
-
-    Args:
-        cmd: Command and arguments as list.
-        dry_run: If True, just print command without running.
-        stream_output: If True, stream output in real-time (default: True).
-
-    Returns:
-        Tuple of (success: bool, output: str)
-    """
-    cmd_str = ' '.join(cmd)
-
-    if dry_run:
-        logger.info(f"[DRY RUN] Would execute: {cmd_str}")
-        return True, "Dry run - no output"
-
-    logger.info(f"Executing: {cmd_str}")
-
-    try:
-        if stream_output:
-            # Stream output in real-time (user can see progress)
-            # No total timeout - individual scripts handle their own per-request timeouts
-            result = subprocess.run(cmd)
-            success = result.returncode == 0
-            if not success:
-                logger.error(f"Command failed with code {result.returncode}")
-            return success, ""
-        else:
-            # Capture output (for background/silent mode)
-            # No total timeout - individual scripts handle their own per-request timeouts
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-            )
-
-            if result.returncode == 0:
-                return True, result.stdout
-            else:
-                logger.error(f"Command failed with code {result.returncode}")
-                logger.error(f"stderr: {result.stderr[:500]}")
-                return False, result.stderr
-
-    except Exception as e:
-        logger.error(f"Error running command: {e}")
-        return False, str(e)
 
 
 class _RunTelemetry:
