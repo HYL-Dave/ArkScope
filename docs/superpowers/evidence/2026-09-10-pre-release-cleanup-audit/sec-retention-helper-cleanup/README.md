@@ -122,7 +122,8 @@ after the mutation check. The initial baseline command had 292 fixture setup
 errors because the nested scratch basetemp parent was missing; creating that
 parent gives the unchanged 292-pass baseline. That harness failure is archived
 separately and is not product RED. This later fix is not covered by the earlier
-whole-run result below. Scoped re-review is the final Task3 gate.
+whole-run result below. Scoped re-review passed both spec and quality, confirmed
+all six original test ASTs after only call substitutions, and found no new issue.
 
 ## Backend Verification And Census
 
