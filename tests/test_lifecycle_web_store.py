@@ -37,7 +37,7 @@ def start(store, *, auth="api_key", owner="worker-1", request_key="request-1"):
                        options=_options(auth), owner=owner, request_key=request_key)
 
 
-def completed(store):
+def completed(store, *, usage_report=None):
     run = start(store)
     control = store.control(run["run_id"], owner="worker-1")
     store.set_phase(run["run_id"], owner="worker-1", phase="searching")
@@ -51,7 +51,7 @@ def completed(store):
     control.bind_remote_id("analysis-1", "remote-analysis")
     control.observe_terminal("analysis-1", response_id="remote-analysis", status="completed", selection=control.selection)
     store.complete(run["run_id"], owner="worker-1", payload=finding_payload(), source_failures={},
-                   usage={"input_tokens": 20, "output_tokens": 40}, source_requests=1)
+                   usage={"input_tokens": 20, "output_tokens": 40}, source_requests=1, usage_report=usage_report)
     return run["run_id"]
 
 

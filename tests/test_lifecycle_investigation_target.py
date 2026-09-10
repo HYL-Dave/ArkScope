@@ -3,7 +3,18 @@ import sqlite3
 import pytest
 
 from tests.test_security_lifecycle_terminal_workflow import setup_workflow
-from tests.test_lifecycle_web_preflight import setup
+from tests.lifecycle_investigation_fixtures import CHANNELS, synthetic_credentials
+
+
+@pytest.fixture
+def preflight(tmp_path):
+    from src.lifecycle_investigation.target import TargetPreflight
+    from tests.test_lifecycle_investigation_store import running
+    c, _, _, _ = running(tmp_path)
+    credentials, rows, route = synthetic_credentials()
+    service = TargetPreflight(c["service"], credential_store=credentials, route_loader=lambda: route,
+        market_path=c["market"], sa_path=c["sa"])
+    return c, service, rows, route
 
 
 def test_investigation_can_start_without_legacy_cases_or_observations(tmp_path, monkeypatch):
@@ -11,12 +22,12 @@ def test_investigation_can_start_without_legacy_cases_or_observations(tmp_path, 
     from src.lifecycle_investigation.target import TargetPreflight
     from src.lifecycle_investigation.store import InvestigationStore
     c = setup_workflow(tmp_path, assess=False, event_available=False)
-    old, credentials, route = setup(c)
+    credentials, _, route = synthetic_credentials()
     with sqlite3.connect(c["profile"]) as conn:
         install_journal(conn, at=c["now"][0])
         conn.execute("DELETE FROM security_lifecycle_cases")
     monkeypatch.setattr(c["service"]._read_service, "get_case", lambda *a: pytest.fail("legacy lookup"))
-    preflight = TargetPreflight(c["service"], credential_store=old.credential_store, route_loader=lambda: route,
+    preflight = TargetPreflight(c["service"], credential_store=credentials, route_loader=lambda: route,
         market_path=c["market"], sa_path=c["sa"])
     public = preflight.prepare("OLD")
     assert public["available"], public
@@ -68,3 +79,59 @@ def test_different_historical_sa_company_labels_require_lookup_not_an_identity_v
     assert target.issuer_name is None
     assert target.identity_status == "needs_lookup"
     assert target.composite_figi is not None
+
+
+@pytest.mark.parametrize("provider,auth", CHANNELS)
+def test_current_preflight_keeps_four_channel_selection_and_independent_runtime(preflight, provider, auth):
+    from src.lifecycle_investigation.runtime import InvestigationRuntime, RuntimeStore
+    c, service, _, _ = preflight
+    credentials, _, route = synthetic_credentials(provider=provider, auth=auth)
+    service.credential_store, service.route_loader = credentials, lambda: route
+    runtime = InvestigationRuntime(model_submissions=32, web_actions=18)
+    RuntimeStore(c["profile"]).save(runtime)
+    packet = service.prepare("OLD")
+    assert packet["available"] and packet["reason"] is None
+    assert packet["execution"] == {"provider": provider, "auth_mode": auth, "model": route.model, "effort": "high"}
+    assert packet["credential_label"] == "Selected account"
+    assert packet["limits"]["model_submissions"] == 32 and packet["limits"]["web_actions"] == 18
+    assert packet["limits"]["search_enforcement"] == ("observed" if auth == "chatgpt_oauth" else "enforced")
+    assert packet["limits"]["output_control"] == ("configured" if auth == "api_key" else "provider")
+    assert "do-not-export" not in str(packet) and "local:7" not in str(packet)
+    bound = service.validate_start("OLD", preflight_sha256=packet["preflight_sha256"])["binding"]
+    assert bound["runtime"] == runtime.model_dump() and bound["selection"]["auth_mode"] == auth
+
+
+@pytest.mark.parametrize("changed", ["credential", "route", "runtime"])
+def test_current_preflight_reconfirmation_binds_credential_route_and_runtime(preflight, changed):
+    from src.lifecycle_investigation.runtime import InvestigationRuntime, RuntimeStore
+    c, service, rows, route = preflight
+    packet = service.prepare("OLD")
+    if changed == "credential":
+        rows[0].secret = "changed-synthetic-key"
+    elif changed == "route":
+        route.effort = "medium"
+    else:
+        RuntimeStore(c["profile"]).save(InvestigationRuntime(model_submissions=32))
+    with pytest.raises(ValueError, match="^investigation_preflight_changed$"):
+        service.validate_start("OLD", preflight_sha256=packet["preflight_sha256"])
+
+
+def test_current_preflight_never_uses_ambient_credentials_when_selection_is_inactive(preflight, monkeypatch):
+    _, service, rows, _ = preflight
+    rows[0].active = False
+    monkeypatch.setenv("OPENAI_API_KEY", "synthetic-must-not-use")
+    packet = service.prepare("OLD")
+    assert not packet["available"] and packet["reason"] == "selected_credential_unavailable"
+
+
+def test_current_preflight_reports_missing_journal_without_installing_it(tmp_path):
+    from src.lifecycle_investigation.target import TargetPreflight
+    c = setup_workflow(tmp_path, assess=False, event_available=False)
+    credentials, _, route = synthetic_credentials()
+    service = TargetPreflight(c["service"], credential_store=credentials, route_loader=lambda: route)
+    with sqlite3.connect(c["profile"]) as conn:
+        before = list(conn.execute("SELECT name,sql FROM sqlite_master"))
+    packet = service.prepare("OLD")
+    assert not packet["available"] and packet["reason"] == "investigation_not_installed"
+    with sqlite3.connect(c["profile"]) as conn:
+        assert before == list(conn.execute("SELECT name,sql FROM sqlite_master"))

@@ -8,16 +8,18 @@ import sqlite3
 import json
 from uuid import uuid4
 
+from src.auth_drivers.lifecycle_web_models import WebModelError
 from src.lifecycle_investigation.runtime import InvestigationRuntime
 from src.lifecycle_investigation.schema import verify_journal
-from src.lifecycle_web_store import _json, _sha
+from src.lifecycle_public_sources import SourceReadError
+from src.lifecycle_web_store import WebJournalError, _json, _sha
+from src.model_routing import ModelRouteUnavailable
 from src.security_lifecycle_provider_snapshot import instant
 from src.security_lifecycle_schema import assert_lifecycle_writes_available
-from src.security_lifecycle_web_contract import ExecutionSelection, RunControl, validate_selection
+from src.security_lifecycle_web_contract import ExecutionSelection, RunControl, WebContractError, validate_selection
 
 
 def safe_code(exc):
-    from src.lifecycle_web_controller import _failure_code
     known = {"target_not_tracked", "tracking_state_unavailable", "selected_credential_unavailable",
         "investigation_not_installed", "investigation_schema_mismatch", "investigation_runtime_version",
         "investigation_runtime_schema_mismatch", "investigation_preflight_changed", "investigation_running",
@@ -28,7 +30,12 @@ def safe_code(exc):
         "local_candidate_unknown", "local_body_unavailable", "local_query_invalid", "review_changed",
         "provider_review_ineligible", "provider_review_unavailable", "provider_snapshot_changed"}
     value = str(exc)
-    return value if value in known else _failure_code(exc)
+    if value in known:
+        return value
+    if isinstance(exc, (WebModelError, WebJournalError, WebContractError, SourceReadError, ModelRouteUnavailable)):
+        if value and len(value) <= 100 and all(character in "abcdefghijklmnopqrstuvwxyz_" for character in value):
+            return value
+    return "web_execution_failed"
 
 
 def _id(value):
@@ -204,9 +211,6 @@ class InvestigationStore:
                 (self._now(), run_id))
 
     request_cancel = cancel
-
-    def fail(self, run_id, *, owner, code, control):
-        self.finish(run_id, owner=owner, status="failed", failure_code=code)
 
     def recover(self):
         with self.connection(write=True) as conn:

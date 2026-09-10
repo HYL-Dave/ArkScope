@@ -105,3 +105,26 @@ def test_cancel_owner_and_immutable_call_guards_are_independent(tmp_path):
     assert store.read(identity)["status"] == "cancelled"
     with pytest.raises(ValueError, match="investigation_not_running"):
         store.step(identity, owner="worker", kind="searching", payload={})
+
+
+@pytest.mark.parametrize("kind", ["model", "journal", "contract", "source", "value", "unexpected"])
+@pytest.mark.parametrize("message", ["provider_call_failed", "secret=private-token", "x" * 101])
+def test_current_error_projection_keeps_typed_codes_but_never_raw_provider_errors(kind, message):
+    from src.auth_drivers.lifecycle_web_models import WebModelError
+    from src.lifecycle_investigation.store import safe_code
+    from src.lifecycle_public_sources import SourceReadError
+    from src.lifecycle_web_store import WebJournalError
+    from src.security_lifecycle_web_contract import WebContractError
+
+    classes = {"model": WebModelError, "journal": WebJournalError, "contract": WebContractError,
+        "source": SourceReadError, "value": ValueError, "unexpected": RuntimeError}
+    expected = "provider_call_failed" if kind not in {"value", "unexpected"} and message == "provider_call_failed" else "web_execution_failed"
+    assert safe_code(classes[kind](message)) == expected
+    assert safe_code(ValueError("investigation_recording_unavailable")) == "investigation_recording_unavailable"
+
+
+def test_current_error_projection_keeps_the_unavailable_route_code():
+    from src.lifecycle_investigation.store import safe_code
+    from src.model_routing import ModelRouteUnavailable
+
+    assert safe_code(ModelRouteUnavailable()) == "model_route_unavailable"

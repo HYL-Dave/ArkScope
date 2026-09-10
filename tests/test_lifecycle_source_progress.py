@@ -52,9 +52,7 @@ def test_web_journal_wait_preserves_owner_cancellation_and_failure(tmp_path, mon
     assert store.read(identity)["calls"] == {}
 
 
-@pytest.mark.parametrize("entrypoint", ["controller", "current_review"])
-def test_progress_poll_does_not_decode_running_source_bodies(tmp_path, monkeypatch, entrypoint):
-    from src.lifecycle_web_controller import LifecycleWebController
+def test_historical_projection_does_not_decode_running_source_bodies(tmp_path, monkeypatch):
     from src.lifecycle_web_projection import latest_web_runs
     from src.lifecycle_web_store import LifecycleWebStore
 
@@ -66,14 +64,10 @@ def test_progress_poll_does_not_decode_running_source_bodies(tmp_path, monkeypat
         raise AssertionError("progress must not decode uncompleted source bodies")
 
     monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(forbidden))
-    if entrypoint == "controller":
-        controller = LifecycleWebController(store, credential_loader=lambda _: pytest.fail("provider-free read"))
-        result = controller.read(identity)
-    else:
-        with sqlite3.connect(path) as conn:
-            rows = latest_web_runs(conn, ["case-1"], at=AT)
-        assert len(rows) == 1
-        result = rows[0]
+    with sqlite3.connect(path) as conn:
+        rows = latest_web_runs(conn, ["case-1"], at=AT)
+    assert len(rows) == 1
+    result = rows[0]
     assert result["status"] == "queued"
     assert result["finding"] is result["source_reading"] is result["source_requests"] is None
     assert result["model_submissions"] == 0
@@ -181,17 +175,17 @@ def test_source_read_keeps_snapshot_when_worker_adds_a_later_source(tmp_path, mo
     assert after["status"] == "reading_sources" and set(after["pages"]) == {"source-1", "source-2"}
 
 
-def test_terminal_progress_read_still_validates_source_integrity(tmp_path, monkeypatch):
-    from src.lifecycle_web_controller import LifecycleWebController
+def test_terminal_historical_projection_still_validates_source_integrity(tmp_path, monkeypatch):
+    from src.lifecycle_web_projection import latest_web_runs
     from src.lifecycle_web_store import LifecycleWebStore, WebJournalError
 
-    _, store = setup_store(tmp_path)
-    identity = completed(store)
+    path, store = setup_store(tmp_path)
+    completed(store)
 
     def corrupted(row):
         raise WebJournalError("web_journal_integrity")
 
     monkeypatch.setattr(LifecycleWebStore, "_decode_page", staticmethod(corrupted))
-    controller = LifecycleWebController(store, credential_loader=lambda _: pytest.fail("provider-free read"))
-    with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
-        controller.read(identity)
+    with sqlite3.connect(path) as conn:
+        with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
+            latest_web_runs(conn, ["case-1"], at=AT)

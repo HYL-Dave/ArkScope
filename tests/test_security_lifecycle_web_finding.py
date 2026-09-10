@@ -189,3 +189,15 @@ def test_tampered_document_metadata_cannot_supply_valid_passage():
     page = replace(source_page(NOTICE), url="https://www.sec.gov/not-the-original")
     result = validate_finding(public_input(), finding_payload(), {"source-1": page})
     assert result.action is None and "source_integrity" in result.block_reasons
+
+
+@pytest.mark.parametrize("missing", ["security_class", "venue"])
+def test_unknown_identity_detail_must_be_sourced_not_guessed_or_reentered_by_user(missing):
+    from src.security_lifecycle_web_contract import PublicInvestigationInput
+    from src.security_lifecycle_web_finding import validate_finding
+    request = PublicInvestigationInput.model_validate({**public_input().model_dump(), missing: None})
+    result = validate_finding(request, finding_payload(), {"source-1": source_page(NOTICE)})
+    assert result.action == "terminal_delisting"
+    payload = finding_payload(**{missing: "invented class or venue"})
+    result = validate_finding(request, payload, {"source-1": source_page(NOTICE)})
+    assert result.action is None and "security_identity_not_supported" in result.block_reasons

@@ -423,13 +423,6 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("GET", "/security-lifecycle/candidates"),
         ("GET", "/security-lifecycle/cases/{case_id}"),
         ("GET", "/security-lifecycle/cases/{case_id}/audit"),
-        ("GET", "/security-lifecycle/cases/{case_id}/web-preflight"),
-        ("GET", "/security-lifecycle/cases/{case_id}/web-runs/latest"),
-        ("POST", "/security-lifecycle/cases/{case_id}/web-runs"),
-        ("GET", "/security-lifecycle/web-runs/{run_id}"),
-        ("POST", "/security-lifecycle/web-runs/{run_id}/cancel"),
-        ("GET", "/security-lifecycle/web-runs/{run_id}/review"),
-        ("POST", "/security-lifecycle/web-runs/{run_id}/confirm"),
         ("POST", "/security-lifecycle/automation/run"),
         ("POST", "/security-lifecycle/cases/{case_id}/automation/run"),
         ("GET", "/security-lifecycle/investigations/{run_id}"),
@@ -458,7 +451,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 228
+    assert len(rows) == 221
     assert {row for row in rows if row[1].startswith("/security-lifecycle/investigations/")} == {
         ("GET", "/security-lifecycle/investigations/{run_id}"),  # Retained historical audit read.
         ("GET", "/security-lifecycle/investigations/targets"),
@@ -477,7 +470,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("GET", "/security-lifecycle/investigations/runs/{run_id}/review"),
         ("POST", "/security-lifecycle/investigations/runs/{run_id}/confirm"),
     }
-    assert {row for row in rows if "/web-" in row[1]} == {row for row in expected if "/web-" in row[1]}
+    assert not {row for row in rows if "/web-" in row[1]}
     assert (
         "POST",
         "/security-lifecycle/cases/{case_id}/investigations",

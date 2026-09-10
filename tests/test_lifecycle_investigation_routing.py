@@ -53,18 +53,17 @@ def test_investigation_catalog_does_not_offer_unimplemented_custom_models():
 
 
 def test_investigation_route_store_failure_projects_an_actionable_gap(tmp_path, monkeypatch):
-    from tests.test_lifecycle_web_preflight import setup
-    from tests.test_lifecycle_web_review import context
+    from tests.test_lifecycle_investigation_review import context
 
     c = context(tmp_path)
-    service, _, _ = setup(c)
+    service = c["preflight"]
 
     def unavailable():
         from src.model_routing import ModelRouteUnavailable
         raise ModelRouteUnavailable()
 
     monkeypatch.setattr(service, "route_loader", unavailable)
-    packet = service.prepare(c["case_id"], question="listing_status")
+    packet = service.prepare("OLD")
     assert packet["available"] is False
     assert packet["reason"] == "model_route_unavailable"
     assert packet["execution"] is None
@@ -217,14 +216,17 @@ def test_investigation_import_does_not_accept_models_save_would_reject(stores, m
     assert routes.get(TASK) is None
 
 
-def test_web_preflight_factory_uses_dedicated_profile_route(monkeypatch):
+def test_current_preflight_factory_uses_dedicated_profile_route(tmp_path, monkeypatch):
     from src.api import dependencies
-    from src.api.routes.lifecycle_web import get_web_preflight
+    from src.api.routes.lifecycle_investigation import get_preflight
+    from src import market_data_admin, sa_capture_store
 
     requested = []
     monkeypatch.setattr(config, "task_route", lambda task, **kwargs: requested.append(task))
     monkeypatch.setattr(dependencies, "get_credential_store", lambda: object())
-    preflight = get_web_preflight(service=object())
+    monkeypatch.setattr(market_data_admin, "resolve_market_db_path", lambda: tmp_path / "market.db")
+    monkeypatch.setattr(sa_capture_store, "resolve_sa_db_path", lambda: tmp_path / "sa.db")
+    preflight = get_preflight(service=object())
     preflight.route_loader()
     assert requested == [TASK]
 
