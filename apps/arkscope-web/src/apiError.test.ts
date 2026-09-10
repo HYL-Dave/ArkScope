@@ -6,7 +6,7 @@ import {
   getProvidersConfig,
   putProviderConfig,
   setUiLocale,
-  translateSecurityLifecycleEvidence,
+  translateCard,
 } from "./api";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -156,7 +156,7 @@ describe("typed API errors", () => {
 
     const errors = [
       await rejected(getProvidersConfig()),
-      await rejected(translateSecurityLifecycleEvidence("evidence-1", "zh-Hant")),
+      await rejected(translateCard(1, "zh-Hant")),
     ];
 
     for (const error of errors) {

@@ -1,15 +1,5 @@
-import { LISTING_CHECK_NAMES, LISTING_PROVIDER_ISSUES, LISTING_PROVIDER_NAMES } from "./listingContract";
 import type { TickerIdentityHistoryDecision, TickerIdentityTransitionBlockReason } from "../api";
-import { parseWebRun, parseWebSourceGaps } from "./webContract";
 
-export const CURRENT_REVIEW_REASONS = [
-  "provider_confirmation_missing", "source_missing", "active_confirmed", "continuation_requires_confirmation",
-  "removal_requires_confirmation", "provider_confirmation_incomplete", "regulator_event_pending", "regulator_identity_question",
-  "listing_identity_changed", "superseded_listing_identity", "prior_action_history", "action_needs_review", "action_scheduled",
-  "action_pending", "listing_reappeared_after_action", "listing_recheck_required", "removal_applied",
-  "continuation_followup_pending", "symbol_change_applied", "applied_state_changed",
-] as const;
-export const CURRENT_ACTION_STATES = ["not_prepared", "approved", "scheduled", "applied", "blocked", "cancelled", "reversed", "applied_state_changed"] as const;
 const SOURCES = ["manual_lists", "portfolio_open", "sa_alpha_picks_current", "sa_alpha_picks_former", "legacy_config_seed"] as const;
 const OUTCOMES = ["undetermined", "listing_ended", "venue_transfer", "symbol_changed", "symbol_or_venue_changed", "acquisition_cash",
   "acquisition_stock", "acquisition_mixed", "acquisition_terms_unknown", "issuer_security_change", "no_tracked_security_change", "other", "not_applicable"] as const;
@@ -62,77 +52,15 @@ function url(value: unknown): string {
 }
 function version(row: Record<string, unknown>) { if (row.version !== 1) invalidCurrentPayload(); }
 
-function parseCurrentReview(value: unknown) {
-  const row = object(value), collection = object(row.collection), listing = object(row.listing), continuation = object(row.continuation);
-  const action = object(row.next_action), diagnostic = object(row.diagnostics);
-  const result = {
-    review_id: text(row.review_id), case_ids: unique(row.case_ids), ticker: text(row.ticker), issuer_name: nullable(row.issuer_name, text),
-    bucket: choice(row.bucket, ["attention", "history"]), finding: choice(row.finding, ["unresolved", "active", "old_listing_inactive", "replacement_confirmed"]),
-    reason: choice(row.reason, CURRENT_REVIEW_REASONS),
-    collection: { state: choice(collection.state, ["tracking", "not_tracking", "unavailable", "historical"]), sources: sources(collection.sources) },
-    listing: { state: choice(listing.state, ["unresolved", "active", "inactive"]), basis: choice(listing.basis, ["observation", "applied_receipt"]), ended_on: nullable(listing.ended_on, day) },
-    continuation: { state: choice(continuation.state, ["unavailable", "confirmed", "not_observed", "candidate", "ambiguous"]),
-      successor_ticker: nullable(continuation.successor_ticker, text), candidate_tickers: unique(continuation.candidate_tickers) },
-    observed_at: nullable(row.observed_at, timestamp), next_check_at: nullable(row.next_check_at, timestamp),
-    diagnostics: { code: choice(diagnostic.code, ["listing_checks"]), missing_checks: array(diagnostic.missing_checks, (x) => choice(x, LISTING_CHECK_NAMES)),
-      provider_issues: array(diagnostic.provider_issues, (x) => { const r = object(x); return { provider: choice(r.provider, LISTING_PROVIDER_NAMES), reason: choice(r.reason, LISTING_PROVIDER_ISSUES) }; }),
-      manual_review_required: bool(diagnostic.manual_review_required) },
-    next_action: { kind: choice(action.kind, ["review_removal", "review_symbol_change", "recheck", "resume", "none"]), state: choice(action.state, CURRENT_ACTION_STATES),
-      case_id: text(action.case_id), assessment_id: nullable(action.assessment_id, text), transition_id: nullable(action.transition_id, text),
-      transition_kind: nullable(action.transition_kind, (x) => choice(x, ["terminal_delisting", "symbol_continuation"])),
-      preview_sha256: nullable(action.preview_sha256, digest), execute_on: nullable(action.execute_on, day),
-      current_effects_match: nullable(action.current_effects_match, bool), can_reverse: bool(action.can_reverse), block_reasons: unique(action.block_reasons) },
-    source_checks: array(row.source_checks, (x) => { const r = object(x); return {
-      provider: choice(r.provider, LISTING_PROVIDER_NAMES), check: choice(r.check, ["delisting", "stocks", "otc", "eodhd", "nasdaq", "continuation"]),
-      directory: nullable(r.directory, (x) => choice(x, ["nasdaq_listed", "other_listed"])),
-      status: choice(r.status, ["active", "inactive", "not_found", "observed", "not_observed"]),
-      ticker: text(r.ticker), observed_at: timestamp(r.observed_at), url: nullable(r.url, url),
-    }; }),
-    source_notices: array(row.source_notices, (x) => { const r = object(x); return {
-      form: text(r.form), filed_on: day(r.filed_on), text: nullable(r.text, text), url: nullable(r.url, url),
-    }; }),
-  };
-  const a = result.next_action;
-  if (!result.case_ids.length || !result.case_ids.includes(a.case_id)
-      || (result.collection.state === "tracking") !== (result.collection.sources.length > 0)
-      || (a.state === "applied" && a.current_effects_match !== true)
-      || (a.state === "applied_state_changed" && a.current_effects_match !== false)
-      || (a.can_reverse && a.state !== "applied")
-      || (a.state === "not_prepared" && [a.transition_id, a.preview_sha256, a.execute_on, a.transition_kind].some((value) => value !== null))
-      || (!["applied", "applied_state_changed"].includes(a.state) && a.current_effects_match !== null)
-      || (a.state !== "not_prepared" && (!a.transition_id || !a.preview_sha256 || !a.execute_on || !a.transition_kind))
-      || (a.kind === "resume" && a.state !== "approved")
-      || (["review_removal", "review_symbol_change"].includes(a.kind) && (!a.assessment_id || a.state !== "not_prepared"))
-      || result.source_checks.some((r) => (r.provider === "nasdaq") !== (r.directory !== null))
-      || (result.continuation.state === "confirmed" && !result.continuation.successor_ticker)) return invalidCurrentPayload();
-  return result;
-}
-
-export type CurrentLifecycleReview = ReturnType<typeof parseCurrentReview>;
-export function parseCurrentReviewList(value: unknown) {
-  const row = object(value); version(row);
-  const coverage = object(row.coverage), counts = object(row.counts), page = object(row.page);
-  const result = { version: 1 as const, as_of: timestamp(row.as_of), source_context: choice(row.source_context, ["available", "unavailable"]),
-    coverage: { tracked: nullable(coverage.tracked, integer), confirmed_active: nullable(coverage.confirmed_active, integer), unconfirmed: nullable(coverage.unconfirmed, integer) },
-    counts: { attention: integer(counts.attention), history: integer(counts.history) }, items: array(row.items, parseCurrentReview),
-    page: { offset: integer(page.offset), limit: integer(page.limit), total: integer(page.total) } };
-  const c = result.coverage, p = result.page;
-  if (result.source_context === "available" ? (c.tracked === null || c.confirmed_active === null || c.unconfirmed === null || c.tracked !== c.confirmed_active + c.unconfirmed)
-      : (c.tracked !== null || c.confirmed_active !== null || c.unconfirmed !== null)) return invalidCurrentPayload();
-  if (!p.limit || p.limit > 200 || result.items.length > p.limit || result.items.length !== Math.min(p.limit, Math.max(0, p.total - p.offset))
-      || new Set(result.items.map((item) => item.review_id)).size !== result.items.length
-      || p.total > result.counts.attention + result.counts.history) return invalidCurrentPayload();
-  return result;
-}
-export type CurrentLifecycleReviewList = ReturnType<typeof parseCurrentReviewList>;
-export function parseCurrentReviewDetail(value: unknown) {
-  const row = object(value); version(row);
-  const item = parseCurrentReview(row.item), web_runs = "web_runs" in row ? array(row.web_runs, (value) => {
-    const run = parseWebRun(value); if (!run) return invalidCurrentPayload(); return run;
-  }) : [];
-  if (web_runs.some((run) => !item.case_ids.includes(run.case_id) || run.ticker !== item.ticker)
-      || new Set(web_runs.map((run) => run.case_id)).size !== web_runs.length) return invalidCurrentPayload();
-  return { version: 1 as const, as_of: timestamp(row.as_of), item, web_runs };
+function parseReviewSourceGaps(value: unknown) {
+  return array(value, (value) => {
+    const row = object(value);
+    if (Object.keys(row).length !== 2 || !("url" in row) || !("reason" in row)) return invalidCurrentPayload();
+    const result = { url: nullable(row.url, url), reason: text(row.reason) };
+    if ((result.url !== null && new URL(result.url).protocol !== "https:")
+        || !/^[a-z_]{1,100}$/.test(result.reason)) return invalidCurrentPayload();
+    return result;
+  });
 }
 
 export function parseLifecycleReviewPacket(value: unknown) {
@@ -146,7 +74,7 @@ export function parseLifecycleReviewPacket(value: unknown) {
     source_ticker: text(row.source_ticker), action: nullable(row.action, (x) => choice(x, ["terminal_delisting", "symbol_continuation"])),
     execute_on: nullable(row.execute_on, day), provider_observed_at: nullable(row.provider_observed_at, timestamp),
     active_sources: sources(row.active_sources), caveats: unique(row.caveats), ready: bool(row.ready), block_reasons: unique(row.block_reasons),
-    source_gaps: row.source_gaps === undefined ? null : nullable(row.source_gaps, parseWebSourceGaps),
+    source_gaps: row.source_gaps === undefined ? null : nullable(row.source_gaps, parseReviewSourceGaps),
     effects: {
       watchlists: grouped(effects.watchlists, (x) => { const r = object(x); return { list_name: text(r.list_name), ticker: text(r.ticker) }; }),
       legacy_config_seed: grouped(effects.legacy_config_seed, (x) => { const r = object(x); return { source_key: text(r.source_key), ticker: text(r.ticker) }; }),

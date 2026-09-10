@@ -41,9 +41,7 @@ describe("card API timeouts", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        new Response(JSON.stringify({ evidence_id: "evidence-1", evidence_content_sha256: "a".repeat(64), locale: "zh-Hant",
-          translated_text: "Translated excerpt", provider: "openai", model: "gpt-5.3-codex-spark", harness: "codex-app-server",
-          translated_at: "2026-09-06T00:00:00Z" }), {
+        new Response(JSON.stringify({ card_id: 1 }), {
           status: 200,
           headers: { "content-type": "application/json" },
         }),
@@ -53,14 +51,12 @@ describe("card API timeouts", () => {
     const {
       generateCard,
       translateCard,
-      translateSecurityLifecycleEvidence,
     } = await import("./api");
     const runtime = runtimeWith(1200, 600);
     await generateCard("MU", { provider: "anthropic" }, runtime);
     await translateCard(1, "zh-Hant", runtime);
-    await translateSecurityLifecycleEvidence("evidence-1", "zh-Hant", runtime);
 
     const budgets = setTimeoutSpy.mock.calls.map((call) => call[1]);
-    expect(budgets).toEqual([1_260_000, 660_000, 660_000]);
+    expect(budgets).toEqual([1_260_000, 660_000]);
   });
 });

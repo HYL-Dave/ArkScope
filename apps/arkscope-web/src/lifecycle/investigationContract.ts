@@ -48,6 +48,10 @@ export function parseInvestigationPreflight(value: unknown) {
   return result;
 }
 export type InvestigationPreflight = ReturnType<typeof parseInvestigationPreflight>;
+export function parseInvestigationStart(value: unknown) {
+  const row = object(value);
+  return { run_id: text(row.run_id), created: bool(row.created) };
+}
 function finding(value: unknown) { const r = object(value); if (r.version !== 2) return invalid(); return {
   version: 2 as const, source_ticker: ticker(r.source_ticker), issuer_name: text(r.issuer_name), security_class: text(r.security_class), venue: text(r.venue),
   event_kind: one(r.event_kind, ["listing_ended", "symbol_continuation", "active_listing", "acquisition_announced", "trading_suspended", "unresolved"]),

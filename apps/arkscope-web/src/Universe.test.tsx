@@ -1,8 +1,6 @@
 /** @vitest-environment jsdom */
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,12 +11,7 @@ const apiMocks = vi.hoisted(() => ({
   getProfileLists: vi.fn(),
   getUniverse: vi.fn(),
   importUniverse: vi.fn(),
-  getCurrentLifecycleReview: vi.fn(),
-  getSecurityLifecycleAutomationStatus: vi.fn(),
-  getSecurityLifecycleCaseAudit: vi.fn(),
-  listCurrentLifecycleReviews: vi.fn(),
   setTickerHidden: vi.fn(),
-  translateSecurityLifecycleEvidence: vi.fn(),
   getInvestigationTargets: vi.fn(), getInvestigationPreflight: vi.fn(), latestInvestigation: vi.fn(), getInvestigationProviders: vi.fn(), getInvestigationActions: vi.fn(),
 }));
 
@@ -28,11 +21,6 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { UniverseView } from "./Universe";
-
-const currentFixture = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../../tests/fixtures/lifecycle_current_v1.json"), "utf8"));
-const currentReview = { ...currentFixture.attention.items[0], review_id: "slpr-qbts", case_ids: ["slc-qbts"], ticker: "QBTS",
-  issuer_name: "D-Wave Quantum Inc.", source_checks: [],
-  next_action: { ...currentFixture.attention.items[0].next_action, case_id: "slc-qbts" } };
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -311,39 +299,8 @@ beforeEach(async () => {
   document.documentElement.lang = "zh-Hant";
   apiMocks.getProfileLists.mockReset().mockResolvedValue({ lists: LISTS });
   apiMocks.getUniverse.mockReset().mockResolvedValue(UNIVERSE);
-  apiMocks.listCurrentLifecycleReviews.mockReset().mockResolvedValue({
-    ...currentFixture.attention, items: [currentReview], counts: { attention: 1, history: 0 }, page: { offset: 0, limit: 50, total: 1 },
-  });
-  apiMocks.getCurrentLifecycleReview.mockReset().mockResolvedValue({ version: 1, as_of: currentFixture.attention.as_of, item: currentReview });
-  apiMocks.getSecurityLifecycleAutomationStatus.mockReset().mockResolvedValue({
-    config_status: "valid", config: { enabled: false, interval_minutes: 5, batch_limit: 2, apply_profile_transitions: false },
-    schedule: { status: "disabled", last_attempt_at: null, next_scheduled_at: null }, telemetry_status: "absent",
-    last_status: null, last_result: null, active_incident: null, latest_failed_runs: [], current_progress: [],
-  });
-  apiMocks.getSecurityLifecycleCaseAudit.mockReset().mockResolvedValue({
-    case_id: "slc-qbts",
-    observation_fingerprint_sha256: "a".repeat(64),
-    investigation_runs: [],
-    automation_runs: [],
-    automation_facts: [],
-    evidence: [],
-    assessment_history: [],
-    acknowledgement_history: [],
-    truncation: {},
-  });
   apiMocks.importUniverse.mockReset().mockResolvedValue(IMPORT_RESULT);
   apiMocks.setTickerHidden.mockReset().mockResolvedValue({ ticker: SOURCE_TICKER, hidden: true });
-  apiMocks.translateSecurityLifecycleEvidence.mockReset().mockRejectedValue(
-    Object.assign(new Error("private provider failure"), {
-      code: "translation_auth_rejected",
-      metadata: {
-        provider: "anthropic",
-        model: "claude-sonnet-5",
-        harness: "claude_subscription_structured_output",
-        retryable: false,
-      },
-    }),
-  );
   confirmMock = vi.fn(() => true);
   window.confirm = confirmMock;
 });
@@ -665,7 +622,10 @@ describe("Universe localization", () => {
     const selected = host!.querySelector('[role="tab"][aria-selected="true"]');
     expect(selected?.textContent).toContain("標的事件調查");
     expect(host!.querySelector('.investigation-panel h3')?.textContent).toBe("QBTS");
-    expect(apiMocks.getCurrentLifecycleReview).not.toHaveBeenCalled();
+    expect(host!.querySelectorAll(".investigation-view > .investigation-heading")).toHaveLength(1);
+    expect(host!.querySelector(".investigation-targets select")?.getAttribute("aria-label")).toBeTruthy();
+    expect(host!.querySelector(".investigation-history summary")?.textContent).toBe("追蹤變更");
+    expect(host!.querySelector(".lifecycle-drawer-content")).toBeNull();
 
     await switchLocale("en");
     expect(host!.querySelector('.investigation-panel h3')?.textContent).toBe("QBTS");

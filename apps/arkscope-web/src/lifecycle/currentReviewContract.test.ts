@@ -3,13 +3,10 @@ import { afterEach, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import * as api from "../api";
-import { parseCurrentReviewDetail } from "./currentReviewContract";
-import { webRunFixture } from "./webFixtures";
 
 const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../../../tests/fixtures/lifecycle_current_v1.json"), "utf8"));
 const decisions = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../../../tests/fixtures/ticker_history_decisions_v1.json"), "utf8"));
 const page = fixture.attention;
-const row = page.items[0];
 afterEach(() => vi.unstubAllGlobals());
 
 it("keeps a legacy activity with absent decision metadata readable", async () => {
@@ -49,48 +46,9 @@ it.each([null, {}, { ...decisions.llm, sources: null }, { ...decisions.llm, mode
   await expect(api.listTickerIdentityTransitionActivity()).rejects.toThrow("lifecycle_current_payload_invalid");
 });
 
-it("keeps validated Web findings in current detail but rejects malformed or cross-case journals", () => {
-  const old = { version: 1, as_of: page.as_of, item: row };
-  const run = { ...webRunFixture, case_id: row.next_action.case_id, ticker: row.ticker,
-    finding: { ...webRunFixture.finding, source_ticker: row.ticker } };
-  expect(parseCurrentReviewDetail(old).web_runs).toEqual([]);
-  expect(parseCurrentReviewDetail({ ...old, web_runs: [run] }).web_runs).toEqual([{ ...run, source_gaps: null }]);
-  for (const web_runs of [null, {}, [null], [run, run], [{ ...run, case_id: "other-case" }], [{ ...run, ticker: "OTHER" }]]) {
-    expect(() => parseCurrentReviewDetail({ ...old, web_runs })).toThrow();
-  }
-});
-
-it.each(["attention", "applied"])("parses the backend-owned persisted current projection: %s", (state) => {
-  expect(api.parseCurrentReviewList(fixture[state])).toEqual(fixture[state]);
-});
 it("parses the public action packet and committed readback without internal material", () => {
   expect(api.parseLifecycleReviewPacket(fixture.packet)).toEqual({ ...fixture.packet, source_gaps: null });
   expect(api.parseLifecycleReviewConfirmation(fixture.confirmation)).toEqual(fixture.confirmation);
-  expect(api.parseCurrentReviewList({ ...page, private_column: "hidden", items: [{ ...row, raw_json: "hidden", collection: { ...row.collection, secret: "hidden" } }] })).toEqual(page);
-});
-it.each([
-  { items: undefined }, { items: null }, { items: {} }, { version: 2 },
-  { as_of: "2026-02-30T01:00:00Z" }, { coverage: { tracked: 2, confirmed_active: 3, unconfirmed: -1 } },
-  { counts: { attention: -1, history: 0 } }, { page: { offset: 0, limit: 50, total: 0 } },
-  { items: [{ ...row, case_ids: null }] }, { items: [{ ...row, case_ids: [] }] },
-  { items: [{ ...row, collection: { state: "tracking", sources: "manual_lists" } }] },
-  { items: [{ ...row, collection: { state: "not_tracking", sources: ["manual_lists"] } }] },
-  { items: [{ ...row, finding: "automatically_safe" }] }, { items: [{ ...row, reason: "future_reason" }] },
-  { items: [{ ...row, continuation: { ...row.continuation, candidate_tickers: {} } }] },
-  { items: [{ ...row, source_checks: [null] }] }, { items: [{ ...row, source_checks: undefined }] },
-  { items: [{ ...row, source_notices: null }] },
-  { items: [{ ...row, listing: { ...row.listing, ended_on: "2026-02-30" } }] },
-  { items: [{ ...row, next_action: { ...row.next_action, state: "applied" } }] },
-  { items: [{ ...row, next_action: { ...row.next_action, kind: "resume" } }] },
-  { items: [{ ...row, next_action: { ...row.next_action, state: "scheduled", transition_id: "slt_existing", execute_on: null } }] },
-  { items: [{ ...row, next_action: { ...row.next_action, can_reverse: true } }] },
-  { items: [{ ...row, next_action: { ...row.next_action, transition_id: "slt_unexpected" } }] },
-  { items: [{ ...row, next_action: { ...row.next_action, current_effects_match: true } }] },
-  { items: [{ ...row, source_checks: row.source_checks.map((r: object) => ({ ...r, directory: "unexpected" })) }] },
-  { items: [{ ...row, source_checks: row.source_checks.map((r: object) => ({ ...r, directory: null })) }] },
-  { items: [{ ...row, diagnostics: { ...row.diagnostics, missing_checks: null } }] },
-])("rejects malformed current data instead of displaying a healthy empty view (%j)", (change) => {
-  expect(() => api.parseCurrentReviewList({ ...page, ...change })).toThrow("lifecycle_current_payload_invalid");
 });
 it.each([
   { ready: "true" }, { action: "acquisition" }, { effects: null }, { block_reasons: null },
@@ -111,44 +69,22 @@ it("rejects false applied readbacks and preserves approved, scheduled and blocke
 it.each(["approved", "scheduled", "blocked", "cancelled", "reversed"])("does not attach checked applied effects to %s", (status) => {
   expect(() => api.parseLifecycleReviewConfirmation({ ...fixture.confirmation, status })).toThrow();
 });
-it("reads with GET, checks result identity and submits exactly one confirmation command", async () => {
-  const fetch = vi.fn().mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(page))))
-    .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify({ version: 1, as_of: page.as_of, item: row }))))
-    .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(fixture.packet))))
-    .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify(fixture.confirmation))));
+it("submits exactly one provider confirmation command", async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture.confirmation)));
   vi.stubGlobal("fetch", fetch);
-  await api.listCurrentLifecycleReviews({ view: "attention", limit: 50, offset: 0 });
-  await api.getCurrentLifecycleReview(row.review_id);
-  await api.getLifecycleReviewPacket(row.next_action.case_id, row.next_action.assessment_id);
   await api.confirmLifecycleReview(fixture.packet);
-  expect(fetch).toHaveBeenCalledTimes(4);
-  expect(fetch.mock.calls.slice(0, 3).map((call) => call[1]?.method ?? "GET")).toEqual(["GET", "GET", "GET"]);
-  const call = fetch.mock.calls[3];
+  expect(fetch).toHaveBeenCalledOnce();
+  const call = fetch.mock.calls[0];
   expect(String(call[0])).toContain("/confirm-review");
   expect(call[1].method).toBe("POST");
   expect(JSON.parse(call[1].body)).toEqual({ assessment_id: fixture.packet.assessment_id, packet_sha256: fixture.packet.packet_sha256,
     action: fixture.packet.action, ...fixture.packet.options });
 });
-it("rejects a different review or receipt instead of applying its result to the selected row", async () => {
-  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ version: 1, as_of: page.as_of, item: { ...row, review_id: "slpr_other" } })));
+it("rejects a different provider confirmation receipt instead of applying its result", async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...fixture.confirmation, case_id: "slc_other" })));
   vi.stubGlobal("fetch", fetch);
-  await expect(api.getCurrentLifecycleReview(row.review_id)).rejects.toThrow("lifecycle_current_payload_invalid");
-  fetch.mockResolvedValue(new Response(JSON.stringify({ ...fixture.confirmation, case_id: "slc_other" })));
   await expect(api.confirmLifecycleReview(fixture.packet)).rejects.toThrow("lifecycle_current_payload_invalid");
-});
-
-it("checks the case identity returned by a lazy audit request", async () => {
-  const collections = ["investigation_runs", "automation_runs", "automation_facts", "evidence", "assessment_history", "acknowledgement_history"];
-  const audit = { case_id: "other", observation_fingerprint_sha256: null, ...Object.fromEntries(collections.map((key) => [key, []])),
-    truncation: Object.fromEntries(collections.map((key) => [key, { total: 0, returned: 0 }])) };
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(audit))));
-  await expect(api.getSecurityLifecycleCaseAudit("slc_requested")).rejects.toThrow("security_lifecycle_case_contract");
-});
-it.each([{ evidence_id: "other" }, { locale: "zh-Hant" }, { translated_text: null }])("validates the explicit translation response (%j)", async (change) => {
-  const value = { evidence_id: "evidence_1", evidence_content_sha256: "a".repeat(64), locale: "en", translated_text: "Translation",
-    provider: "openai", model: "gpt-5.3-codex-spark", harness: "codex-app-server", translated_at: page.as_of, ...change };
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(value))));
-  await expect(api.translateSecurityLifecycleEvidence("evidence_1", "en")).rejects.toThrow("security_lifecycle_case_contract");
+  expect(fetch).toHaveBeenCalledOnce();
 });
 
 it.each([null, {}, { items: null, count: 0, unacknowledged_count: 0 },
@@ -181,8 +117,4 @@ it.each([{ user_owned_changes: null }, { provider_owned_retained: {} }, { effect
 it("does not claim an unacknowledged receipt has been acknowledged", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(fixture.activity.items[0]))));
   await expect(api.acknowledgeTickerIdentityTransitionActivity(fixture.activity.items[0].activity_id)).rejects.toThrow("lifecycle_current_payload_invalid");
-});
-it("does not bypass current-list parsing at the real API boundary", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...page, items: null }))));
-  await expect(api.listCurrentLifecycleReviews()).rejects.toThrow("lifecycle_current_payload_invalid");
 });

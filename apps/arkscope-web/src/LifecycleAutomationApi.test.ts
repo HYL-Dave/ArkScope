@@ -113,23 +113,16 @@ describe("security lifecycle automation API", () => {
     ]);
   });
 
-  it("dispatches due and case runs through their distinct attended endpoints", async () => {
+  it("dispatches due runs through the attended endpoint", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(response({
         scope: "due",
         status: "started",
         request_id: "slao_due",
-      }))
-      .mockResolvedValueOnce(response({
-        scope: "case",
-        status: "started",
-        request_id: "slao_case",
-        case_id: "slc/case 1",
       }));
     vi.stubGlobal("fetch", fetchMock);
     const typed = api as typeof api & {
       runDueSecurityLifecycleAutomation: () => Promise<unknown>;
-      runSecurityLifecycleCaseAutomation: (caseId: string) => Promise<unknown>;
     };
 
     await expect(typed.runDueSecurityLifecycleAutomation()).resolves.toEqual({
@@ -137,21 +130,12 @@ describe("security lifecycle automation API", () => {
       status: "started",
       request_id: "slao_due",
     });
-    await expect(typed.runSecurityLifecycleCaseAutomation("slc/case 1")).resolves.toEqual({
-      scope: "case",
-      status: "started",
-      request_id: "slao_case",
-      case_id: "slc/case 1",
-    });
 
     expect(String(fetchMock.mock.calls[0][0])).toBe(
       "http://127.0.0.1:8420/security-lifecycle/automation/run",
     );
-    expect(String(fetchMock.mock.calls[1][0])).toBe(
-      "http://127.0.0.1:8420/security-lifecycle/cases/slc%2Fcase%201/automation/run",
-    );
+    expect(fetchMock).toHaveBeenCalledOnce();
     expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe("POST");
-    expect((fetchMock.mock.calls[1][1] as RequestInit).method).toBe("POST");
   });
 
   it.each([

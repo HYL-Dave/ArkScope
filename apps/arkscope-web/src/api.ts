@@ -9,14 +9,13 @@ import type { UiLocale } from "./i18n/locale";
 import { LISTING_CHECK_NAMES, LISTING_PROVIDER_NAMES, LISTING_PROVIDER_ISSUES } from "./lifecycle/listingContract";
 export { LISTING_CHECK_NAMES, LISTING_PROVIDER_NAMES, LISTING_PROVIDER_ISSUES } from "./lifecycle/listingContract";
 import {
-  invalidCurrentPayload, parseCurrentReviewList, parseCurrentReviewDetail,
+  invalidCurrentPayload,
   parseLifecycleReviewPacket, parseLifecycleReviewConfirmation, parseCurrentActivity, parseCurrentActivityList,
   type LifecycleReviewPacket,
 } from "./lifecycle/currentReviewContract";
-export { parseCurrentReviewList, parseLifecycleReviewPacket, parseLifecycleReviewConfirmation } from "./lifecycle/currentReviewContract";
-export type { CurrentLifecycleReview, CurrentLifecycleReviewList, LifecycleReviewPacket, LifecycleReviewConfirmation } from "./lifecycle/currentReviewContract";
-import { parseWebPreflight, parseWebRun, parseWebStart, type WebQuestion } from "./lifecycle/webContract";
-import { parseInvestigationTargets, parseInvestigationRuntime, parseInvestigationRun, parseInvestigationPreflight, parseInvestigationProviders, parseInvestigationActions, type InvestigationRuntime } from "./lifecycle/investigationContract";
+export { parseLifecycleReviewPacket, parseLifecycleReviewConfirmation } from "./lifecycle/currentReviewContract";
+export type { LifecycleReviewPacket, LifecycleReviewConfirmation } from "./lifecycle/currentReviewContract";
+import { parseInvestigationTargets, parseInvestigationRuntime, parseInvestigationRun, parseInvestigationPreflight, parseInvestigationProviders, parseInvestigationActions, parseInvestigationStart, type InvestigationRuntime } from "./lifecycle/investigationContract";
 
 export interface ApiStatus {
   status: string;
@@ -885,8 +884,6 @@ export const apiBase: string =
 
 const apiToken: string | undefined = window.arkscope?.apiToken;
 const DEFAULT_TIMEOUT_MS = 15_000;
-// Local journal readback may revalidate four large retained sources.
-const LIFECYCLE_RECEIPT_TIMEOUT_MS = 180_000;
 
 function authHeaders(): Record<string, string> {
   return apiToken ? { "x-arkscope-token": apiToken } : {};
@@ -2938,88 +2935,6 @@ export interface SecurityLifecycleAutomationRun {
   };
 }
 
-export interface SecurityLifecycleAutomationFact {
-  fact_id: string;
-  automation_run_id: string;
-  evidence_id: string;
-  source_family: SecurityLifecycleEvidenceSourceFamily;
-  fact_type: SecurityLifecycleFactType;
-  normalized_value: unknown;
-  source_span_start: number;
-  source_span_end: number;
-  cited_text_sha256: string;
-  extractor_rule_id: string;
-  extractor_rule_version: string;
-  created_at: string;
-}
-
-export interface SecurityLifecycleEvidenceTranslation {
-  evidence_id: string;
-  evidence_content_sha256: string;
-  locale: "en" | "zh-Hant";
-  translated_text: string;
-  provider: string;
-  model: string;
-  harness: string;
-  translated_at: string;
-  cached?: boolean;
-}
-
-interface SecurityLifecycleEvidenceBase {
-  evidence_id: string;
-  source_url: string | null;
-  created_at: string;
-}
-
-export interface SecurityLifecycleListingSnapshot {
-  authority: SecurityLifecycleListingAuthority;
-  directory: "nasdaq_listed" | "other_listed" | null;
-  candidate_ticker: string;
-  listing_status: SecurityLifecycleListingStatus;
-  market: "stocks" | "otc";
-  primary_exchange: string | null;
-  source_as_of: string;
-  provider_last_updated_utc: string | null;
-}
-
-export interface SecurityLifecycleListingEvidence
-  extends SecurityLifecycleEvidenceBase {
-  source_family: "listing_authority";
-  kind: "listing_directory_snapshot";
-  listing: SecurityLifecycleListingSnapshot;
-}
-
-export interface SecurityLifecycleTickerEventEvidence extends SecurityLifecycleEvidenceBase {
-  source_family: "listing_authority";
-  kind: "ticker_event_snapshot";
-  ticker_event: {
-    candidate_ticker: string;
-    latest_ticker: string | null;
-    events: Array<{ source_ticker: string; successor_ticker: string; effective_date: string }>;
-  };
-}
-
-export interface SecurityLifecycleProseEvidence
-  extends SecurityLifecycleEvidenceBase {
-  source_family: Exclude<
-    SecurityLifecycleEvidenceSourceFamily,
-    "listing_authority"
-  >;
-  kind: string;
-  excerpt: string;
-  content_sha256?: string;
-  title?: string | null;
-  publisher?: string | null;
-  source_published_at?: string | null;
-  source_document_sha256?: string | null;
-  translations: SecurityLifecycleEvidenceTranslation[];
-}
-
-export type SecurityLifecycleEvidence =
-  | SecurityLifecycleListingEvidence
-  | SecurityLifecycleTickerEventEvidence
-  | SecurityLifecycleProseEvidence;
-
 export interface SecurityLifecycleActionProposal {
   proposal_id: string;
   action_type: SecurityLifecycleProposalType;
@@ -3361,18 +3276,6 @@ export interface SecurityLifecycleCaseDetail {
   current_blockers?: SecurityLifecycleAutomationRun["blockers"];
   proposals: SecurityLifecycleActionProposal[];
   ticker_transition: TickerIdentityTransitionState | null;
-}
-
-export interface SecurityLifecycleCaseAudit {
-  case_id: string;
-  observation_fingerprint_sha256: string | null;
-  investigation_runs: SecurityLifecycleInvestigationRun[];
-  automation_runs: SecurityLifecycleAutomationRun[];
-  automation_facts: SecurityLifecycleAutomationFact[];
-  evidence: SecurityLifecycleEvidence[];
-  assessment_history: SecurityLifecycleAssessment[];
-  acknowledgement_history: SecurityLifecycleAcknowledgement[];
-  truncation: Record<string, { total: number; returned: number }>;
 }
 
 export interface SecurityLifecycleCaseListResponse {
@@ -3802,15 +3705,6 @@ const LIFECYCLE_LISTING_STATUSES: readonly SecurityLifecycleListingStatus[] = [
   "not_found",
   "unverified",
 ];
-const LIFECYCLE_EVIDENCE_SOURCE_FAMILIES:
-readonly SecurityLifecycleEvidenceSourceFamily[] = [
-  "regulator",
-  "listing_authority",
-  "market_infrastructure",
-  "publisher",
-  "general_web",
-  "manual",
-];
 const LIFECYCLE_PRIMARY_SOURCE_FAMILIES:
 readonly SecurityLifecycleEvidenceSourceFamily[] = [
   "regulator",
@@ -3818,20 +3712,6 @@ readonly SecurityLifecycleEvidenceSourceFamily[] = [
   "market_infrastructure",
   "manual",
 ];
-const LIFECYCLE_LISTING_AUTHORITIES:
-readonly SecurityLifecycleListingAuthority[] = [
-  "nasdaq_trader",
-  "massive",
-  "eodhd",
-];
-const LIFECYCLE_AUDIT_COLLECTIONS = [
-  "investigation_runs",
-  "automation_runs",
-  "automation_facts",
-  "evidence",
-  "assessment_history",
-  "acknowledgement_history",
-] as const;
 
 function lifecycleCaseContractError(): never {
   throw new Error("security_lifecycle_case_contract");
@@ -4011,21 +3891,6 @@ function parseLifecycleAcknowledgement(
   };
 }
 
-function parseLifecycleInvestigationRun(
-  value: unknown,
-): SecurityLifecycleInvestigationRun {
-  const row = lifecycleCaseRecord(value);
-  return {
-    run_id: lifecycleCaseString(row.run_id),
-    status: lifecycleCaseString(row.status) as SecurityLifecycleInvestigationStatus,
-    result_count: lifecycleCaseCount(row.result_count),
-    failure_code: row.failure_code === null
-      ? null
-      : lifecycleCaseString(row.failure_code) as SecurityLifecycleInvestigationFailureCode,
-    created_at: lifecycleCaseString(row.created_at),
-  };
-}
-
 function parseLifecycleAutomationOperatorDetail(
   value: unknown,
 ): SecurityLifecycleAutomationOperatorDetail {
@@ -4064,174 +3929,6 @@ function parseLifecycleAutomationBlocker(value: unknown) {
     );
   }
   return blocker;
-}
-
-function parseLifecycleAutomationRun(value: unknown): SecurityLifecycleAutomationRun {
-  const row = lifecycleCaseRecord(value);
-  const run: SecurityLifecycleAutomationRun = {
-    run_id: lifecycleCaseString(row.run_id),
-    case_id: lifecycleCaseString(row.case_id),
-    mode: lifecycleCaseString(row.mode) as SecurityLifecycleAutomationMode,
-    status: lifecycleCaseString(row.status) as SecurityLifecycleAutomationRunStatus,
-    policy_version: lifecycleCaseString(row.policy_version),
-    decision_tier: row.decision_tier === null
-      ? null
-      : lifecycleCaseString(row.decision_tier) as SecurityLifecycleDecisionTier,
-    action_readiness: row.action_readiness === null
-      ? null
-      : lifecycleCaseString(row.action_readiness) as SecurityLifecycleActionReadiness,
-    failure_code: lifecycleCaseNullableString(row.failure_code),
-    blockers: lifecycleCaseArray(row.blockers).map(parseLifecycleAutomationBlocker),
-    created_at: lifecycleCaseString(row.created_at),
-  };
-  for (const field of ["retry_at", "started_at", "finished_at"] as const) {
-    if (row[field] !== undefined) run[field] = lifecycleCaseNullableString(row[field]);
-  }
-  if (row.updated_at !== undefined) run.updated_at = lifecycleCaseString(row.updated_at);
-  if (row.terminal_finalization_failure !== undefined) {
-    const failure = lifecycleCaseRecord(row.terminal_finalization_failure);
-    if (failure.code !== "finalization_failed") return lifecycleCaseContractError();
-    run.terminal_finalization_failure = {
-      attempt_count: lifecycleCaseCount(failure.attempt_count),
-      code: "finalization_failed",
-      failed_at: lifecycleCaseString(failure.failed_at),
-      retry_not_before: lifecycleCaseNullableString(failure.retry_not_before),
-    };
-  }
-  return run;
-}
-
-function parseLifecycleAutomationFact(value: unknown): SecurityLifecycleAutomationFact {
-  const row = lifecycleCaseRecord(value);
-  return {
-    fact_id: lifecycleCaseString(row.fact_id),
-    automation_run_id: lifecycleCaseString(row.automation_run_id),
-    evidence_id: lifecycleCaseString(row.evidence_id),
-    source_family: lifecycleCaseEnum(
-      row.source_family,
-      LIFECYCLE_EVIDENCE_SOURCE_FAMILIES,
-    ),
-    fact_type: lifecycleCaseString(row.fact_type) as SecurityLifecycleFactType,
-    normalized_value: row.normalized_value,
-    source_span_start: lifecycleCaseCount(row.source_span_start),
-    source_span_end: lifecycleCaseCount(row.source_span_end),
-    cited_text_sha256: lifecycleCaseString(row.cited_text_sha256),
-    extractor_rule_id: lifecycleCaseString(row.extractor_rule_id),
-    extractor_rule_version: lifecycleCaseString(row.extractor_rule_version),
-    created_at: lifecycleCaseString(row.created_at),
-  };
-}
-
-function parseLifecycleEvidenceTranslation(
-  value: unknown,
-): SecurityLifecycleEvidenceTranslation {
-  const row = lifecycleCaseRecord(value);
-  const translation: SecurityLifecycleEvidenceTranslation = {
-    evidence_id: lifecycleCaseString(row.evidence_id),
-    evidence_content_sha256: lifecycleCaseString(row.evidence_content_sha256),
-    locale: lifecycleCaseEnum(row.locale, ["en", "zh-Hant"] as const),
-    translated_text: lifecycleCaseString(row.translated_text),
-    provider: lifecycleCaseString(row.provider),
-    model: lifecycleCaseString(row.model),
-    harness: lifecycleCaseString(row.harness),
-    translated_at: lifecycleCaseString(row.translated_at),
-  };
-  if (row.cached !== undefined) translation.cached = lifecycleCaseBoolean(row.cached);
-  return translation;
-}
-
-function lifecycleCaseOptionalNullableString(
-  row: Record<string, unknown>,
-  field: string,
-): string | null | undefined {
-  return row[field] === undefined
-    ? undefined
-    : lifecycleCaseNullableString(row[field]);
-}
-
-function parseLifecycleEvidence(value: unknown): SecurityLifecycleEvidence {
-  const row = lifecycleCaseRecord(value);
-  const sourceFamily = lifecycleCaseEnum(
-    row.source_family,
-    LIFECYCLE_EVIDENCE_SOURCE_FAMILIES,
-  );
-  const evidenceId = lifecycleCaseString(row.evidence_id);
-  const sourceUrl = lifecycleCaseNullableString(row.source_url);
-  const createdAt = lifecycleCaseString(row.created_at);
-  if (sourceFamily === "listing_authority") {
-    if (row.kind === "ticker_event_snapshot") {
-      const event = lifecycleCaseRecord(row.ticker_event);
-      return {
-        evidence_id: evidenceId, source_family: "listing_authority", kind: "ticker_event_snapshot",
-        source_url: sourceUrl, created_at: createdAt,
-        ticker_event: {
-          candidate_ticker: lifecycleCaseString(event.candidate_ticker),
-          latest_ticker: lifecycleCaseNullableString(event.latest_ticker),
-          events: lifecycleCaseArray(event.events).map((raw) => {
-            const item = lifecycleCaseRecord(raw);
-            return { source_ticker: lifecycleCaseString(item.source_ticker),
-              successor_ticker: lifecycleCaseString(item.successor_ticker), effective_date: lifecycleCaseString(item.effective_date) };
-          }),
-        },
-      };
-    }
-    const listing = lifecycleCaseRecord(row.listing);
-    const directory = listing.directory === null
-      ? null
-      : lifecycleCaseEnum(
-        listing.directory,
-        ["nasdaq_listed", "other_listed"] as const,
-      );
-    return {
-      evidence_id: evidenceId,
-      source_family: "listing_authority",
-      kind: lifecycleCaseEnum(row.kind, ["listing_directory_snapshot"] as const),
-      source_url: sourceUrl,
-      created_at: createdAt,
-      listing: {
-        authority: lifecycleCaseEnum(
-          listing.authority,
-          LIFECYCLE_LISTING_AUTHORITIES,
-        ),
-        directory,
-        candidate_ticker: lifecycleCaseString(listing.candidate_ticker),
-        listing_status: lifecycleCaseEnum(
-          listing.listing_status,
-          LIFECYCLE_LISTING_STATUSES,
-        ),
-        market: lifecycleCaseEnum(listing.market, ["stocks", "otc"] as const),
-        primary_exchange: lifecycleCaseNullableString(listing.primary_exchange),
-        source_as_of: lifecycleCaseString(listing.source_as_of),
-        provider_last_updated_utc: lifecycleCaseNullableString(
-          listing.provider_last_updated_utc,
-        ),
-      },
-    };
-  }
-  const prose: SecurityLifecycleProseEvidence = {
-    evidence_id: evidenceId,
-    source_family: sourceFamily,
-    kind: lifecycleCaseString(row.kind),
-    excerpt: lifecycleCaseString(row.excerpt),
-    source_url: sourceUrl,
-    created_at: createdAt,
-    translations: lifecycleCaseArray(row.translations).map(
-      parseLifecycleEvidenceTranslation,
-    ),
-  };
-  if (row.content_sha256 !== undefined) {
-    prose.content_sha256 = lifecycleCaseString(row.content_sha256);
-  }
-  for (const field of [
-    "title",
-    "publisher",
-    "source_published_at",
-    "source_document_sha256",
-  ] as const) {
-    const fieldValue = lifecycleCaseOptionalNullableString(row, field);
-    if (fieldValue !== undefined) prose[field] = fieldValue;
-  }
-  return prose;
 }
 
 function parseLifecycleTransition(value: unknown): TickerIdentityTransitionState {
@@ -4394,49 +4091,6 @@ function parseLifecycleCaseDetail(value: unknown): SecurityLifecycleCaseDetail {
   };
 }
 
-function parseLifecycleCaseAudit(value: unknown): SecurityLifecycleCaseAudit {
-  const row = lifecycleCaseRecord(value);
-  const investigationRuns = lifecycleCaseArray(row.investigation_runs).map(
-    parseLifecycleInvestigationRun,
-  );
-  const automationRuns = lifecycleCaseArray(row.automation_runs).map(
-    parseLifecycleAutomationRun,
-  );
-  const automationFacts = lifecycleCaseArray(row.automation_facts).map(
-    parseLifecycleAutomationFact,
-  );
-  const evidenceRows = lifecycleCaseArray(row.evidence).map(parseLifecycleEvidence);
-  const assessments = lifecycleCaseArray(row.assessment_history).map((assessment) => (
-    parseLifecycleAssessment(assessment)
-  ));
-  const acknowledgements = lifecycleCaseArray(row.acknowledgement_history).map(
-    parseLifecycleAcknowledgement,
-  );
-  const rawTruncation = lifecycleCaseRecord(row.truncation);
-  const truncation = Object.fromEntries(LIFECYCLE_AUDIT_COLLECTIONS.map(
-    (name) => {
-      const counts = lifecycleCaseRecord(rawTruncation[name]);
-      return [name, {
-        total: lifecycleCaseCount(counts.total),
-        returned: lifecycleCaseCount(counts.returned),
-      }];
-    },
-  ));
-  return {
-    case_id: lifecycleCaseString(row.case_id),
-    observation_fingerprint_sha256: lifecycleCaseNullableString(
-      row.observation_fingerprint_sha256,
-    ),
-    investigation_runs: investigationRuns,
-    automation_runs: automationRuns,
-    automation_facts: automationFacts,
-    evidence: evidenceRows,
-    assessment_history: assessments,
-    acknowledgement_history: acknowledgements,
-    truncation,
-  };
-}
-
 export interface SecurityLifecycleCaseFilters {
   ticker?: string;
   workflow_state?: SecurityLifecycleWorkflowState | "";
@@ -4457,23 +4111,6 @@ function lifecycleQuery(filters: object): string {
   return query ? `?${query}` : "";
 }
 
-export async function listCurrentLifecycleReviews(filters: { view?: "attention" | "history"; ticker?: string; case_id?: string; limit?: number; offset?: number } = {}) {
-  return parseCurrentReviewList(await getJSON<unknown>(`/security-lifecycle/reviews${lifecycleQuery(filters)}`));
-}
-
-export async function getCurrentLifecycleReview(reviewId: string) {
-  const result = parseCurrentReviewDetail(await getJSON<unknown>(`/security-lifecycle/reviews/${encodeURIComponent(reviewId)}`, LIFECYCLE_RECEIPT_TIMEOUT_MS));
-  if (result.item.review_id !== reviewId) return invalidCurrentPayload();
-  return result;
-}
-
-export async function getLifecycleReviewPacket(caseId: string, assessmentId: string, options: TickerIdentityTransitionPreviewOptions = {}) {
-  const result = parseLifecycleReviewPacket(await getJSON<unknown>(
-    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/review${lifecycleQuery({ assessment_id: assessmentId, ...options })}`));
-  if (result.case_id !== caseId || result.assessment_id !== assessmentId) return invalidCurrentPayload();
-  return result;
-}
-
 export async function confirmLifecycleReview(value: LifecycleReviewPacket) {
   const packet = parseLifecycleReviewPacket(value);
   if (!packet.ready || !packet.action) return invalidCurrentPayload();
@@ -4482,12 +4119,6 @@ export async function confirmLifecycleReview(value: LifecycleReviewPacket) {
     { assessment_id: packet.assessment_id, packet_sha256: packet.packet_sha256, action: packet.action, ...packet.options }));
   if (result.case_id !== packet.case_id || result.packet_sha256 !== packet.packet_sha256 || result.action !== packet.action
       || result.source_ticker !== packet.source_ticker || result.execute_on !== packet.execute_on) return invalidCurrentPayload();
-  return result;
-}
-
-export async function getLifecycleReviewConfirmation(transitionId: string) {
-  const result = parseLifecycleReviewConfirmation(await getJSON<unknown>(`/security-lifecycle/review-confirmations/${encodeURIComponent(transitionId)}`));
-  if (result.transition_id !== transitionId) return invalidCurrentPayload();
   return result;
 }
 
@@ -4504,7 +4135,7 @@ export async function latestInvestigation(ticker: string) {
   if (result.ticker !== ticker) return invalidCurrentPayload(); return result;
 }
 export async function startInvestigation(ticker: string, body: { preflight_sha256: string; request_key: string; language: string }) {
-  return parseWebStart(await sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/runs`, "POST", body));
+  return parseInvestigationStart(await sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/runs`, "POST", body));
 }
 export async function getInvestigation(runId: string) {
   const result = parseInvestigationRun(await getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}`));
@@ -4545,49 +4176,6 @@ export async function prepareInvestigationProviders(ticker: string, checkSha256:
   if (result.source_ticker !== ticker) throw new Error("investigation_payload_invalid"); return result;
 }
 export async function getInvestigationActions() { return parseInvestigationActions(await getJSON<unknown>("/security-lifecycle/investigations/actions")); }
-
-export async function getLifecycleWebPreflight(caseId: string, question: WebQuestion) {
-  const result = parseWebPreflight(await getJSON<unknown>(`/security-lifecycle/cases/${encodeURIComponent(caseId)}/web-preflight${lifecycleQuery({ question })}`));
-  if (result.case_id !== caseId || (result.public_identity && result.public_identity.question !== question)) return invalidCurrentPayload();
-  return result;
-}
-
-export async function latestLifecycleWebRun(caseId: string) {
-  const result = parseWebRun(await getJSON<unknown>(`/security-lifecycle/cases/${encodeURIComponent(caseId)}/web-runs/latest`, LIFECYCLE_RECEIPT_TIMEOUT_MS));
-  if (result && result.case_id !== caseId) return invalidCurrentPayload();
-  return result;
-}
-
-export async function startLifecycleWebRun(caseId: string, body: { question: WebQuestion; preflight_sha256: string; request_key: string }) {
-  return parseWebStart(await sendJSON<unknown>(`/security-lifecycle/cases/${encodeURIComponent(caseId)}/web-runs`, "POST", body));
-}
-
-export async function getLifecycleWebRun(runId: string) {
-  const result = parseWebRun(await getJSON<unknown>(`/security-lifecycle/web-runs/${encodeURIComponent(runId)}`, LIFECYCLE_RECEIPT_TIMEOUT_MS));
-  if (!result || result.run_id !== runId) return invalidCurrentPayload();
-  return result;
-}
-
-export async function cancelLifecycleWebRun(runId: string) {
-  const result = parseWebRun(await sendJSON<unknown>(`/security-lifecycle/web-runs/${encodeURIComponent(runId)}/cancel`, "POST", undefined, LIFECYCLE_RECEIPT_TIMEOUT_MS));
-  if (!result || result.run_id !== runId) return invalidCurrentPayload();
-  return result;
-}
-
-export async function getLifecycleWebReview(runId: string, options: TickerIdentityTransitionPreviewOptions = {}) {
-  return parseLifecycleReviewPacket(await getJSON<unknown>(`/security-lifecycle/web-runs/${encodeURIComponent(runId)}/review${lifecycleQuery(options)}`, LIFECYCLE_RECEIPT_TIMEOUT_MS));
-}
-
-export async function confirmLifecycleWebReview(runId: string, value: LifecycleReviewPacket) {
-  const packet = parseLifecycleReviewPacket(value);
-  if (!packet.ready || !packet.action) return invalidCurrentPayload();
-  const result = parseLifecycleReviewConfirmation(await sendJSON<unknown>(`/security-lifecycle/web-runs/${encodeURIComponent(runId)}/confirm`, "POST",
-    { packet_sha256: packet.packet_sha256, action: packet.action, ...packet.options,
-      ...(packet.source_gaps?.length ? { acknowledge_source_gaps: true } : {}) }, LIFECYCLE_RECEIPT_TIMEOUT_MS));
-  if (result.case_id !== packet.case_id || result.packet_sha256 !== packet.packet_sha256 || result.action !== packet.action
-      || result.source_ticker !== packet.source_ticker || result.execute_on !== packet.execute_on) return invalidCurrentPayload();
-  return result;
-}
 
 export function listSecurityLifecycleCases(
   filters: SecurityLifecycleCaseFilters = {},
@@ -4635,15 +4223,6 @@ export async function runDueSecurityLifecycleAutomation(): Promise<
   ));
 }
 
-export async function runSecurityLifecycleCaseAutomation(
-  caseId: string,
-): Promise<SecurityLifecycleAutomationDispatchResponse> {
-  return parseAutomationDispatch(await sendJSON<unknown>(
-    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/automation/run`,
-    "POST",
-  ));
-}
-
 export async function getSecurityLifecycleCase(
   caseId: string,
 ): Promise<SecurityLifecycleCaseDetail> {
@@ -4652,18 +4231,6 @@ export async function getSecurityLifecycleCase(
       `/security-lifecycle/cases/${encodeURIComponent(caseId)}`,
     ),
   );
-}
-
-export async function getSecurityLifecycleCaseAudit(
-  caseId: string,
-): Promise<SecurityLifecycleCaseAudit> {
-  const result = parseLifecycleCaseAudit(
-    await getJSON<unknown>(
-      `/security-lifecycle/cases/${encodeURIComponent(caseId)}/audit`,
-    ),
-  );
-  if (result.case_id !== caseId) return lifecycleCaseContractError();
-  return result;
 }
 
 export function getSecurityLifecycleInvestigation(
@@ -4683,21 +4250,6 @@ export function addSecurityLifecycleEvidence(
     "POST",
     body,
   );
-}
-
-export async function translateSecurityLifecycleEvidence(
-  evidenceId: string,
-  locale: "en" | "zh-Hant",
-  runtime?: RuntimeConfig | null,
-): Promise<SecurityLifecycleEvidenceTranslation> {
-  const result = parseLifecycleEvidenceTranslation(await sendJSON<unknown>(
-    `/security-lifecycle/evidence/${encodeURIComponent(evidenceId)}/translations`,
-    "POST",
-    { locale },
-    fixedTaskRequestTimeoutMs(runtime, "card_translation"),
-  ));
-  if (result.evidence_id !== evidenceId || result.locale !== locale) return lifecycleCaseContractError();
-  return result;
 }
 
 export interface SecurityLifecycleCitationInput {
