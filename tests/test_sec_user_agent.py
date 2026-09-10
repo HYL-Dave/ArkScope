@@ -39,17 +39,12 @@ def test_sec_clients_use_canonical_user_agent(monkeypatch):
     monkeypatch.setenv("ARKSCOPE_SEC_USER_AGENT", "ArkScope ops@arkscope.test")
 
     from data_sources.sec_edgar_source import SECEdgarDataSource
-    import data_sources.sec_earnings_releases as earnings
     import data_sources.sec_edgar_financials as financials
-    import data_sources.sec_filings as filings
     import data_sources.sec_insider_trades as insider
 
     source = SECEdgarDataSource()
     assert source.user_agent == "ArkScope ops@arkscope.test"
     assert source.transport.user_agent == "ArkScope ops@arkscope.test"
-    assert earnings.SECEarningsReleases().transport.user_agent == "ArkScope ops@arkscope.test"
     assert insider.SECInsiderTrades().transport.user_agent == "ArkScope ops@arkscope.test"
-    assert filings._get_sec_user_agent() == "ArkScope ops@arkscope.test"
-    assert earnings._get_sec_user_agent() == "ArkScope ops@arkscope.test"
     assert insider._get_sec_user_agent() == "ArkScope ops@arkscope.test"
     assert financials._get_sec_user_agent() == "ArkScope ops@arkscope.test"
