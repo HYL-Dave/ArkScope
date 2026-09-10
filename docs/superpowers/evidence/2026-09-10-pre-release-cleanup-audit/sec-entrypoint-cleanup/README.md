@@ -1,8 +1,10 @@
 # SEC Intake And Entrypoint Cleanup
 
 The bounded implementation plan is complete on
-`codex/listing-sec-macro-convergence`, starting at `df97352b`; final broader
-review is pending. This record is separate from the completed first-leaf cleanup.
+`codex/listing-sec-macro-convergence`, starting at `df97352b`. The final broader
+review of `df97352b..6220ba27` found no actionable patch-introduced findings or
+integration blockers. [Final review](final-review.md) records its exact scope
+and evidence checks. This is separate from the completed first-leaf cleanup.
 No merge, push, App restart, provider call or production-store access is
 authorized by these source changes. No stored data or schema has been deleted.
 
@@ -18,7 +20,8 @@ authorized by these source changes. No stored data or schema has been deleted.
 
 These selections overlap and are not additive. They are not a repository-wide
 test result. Source implementation and final regression/census are recorded
-below; the final broader review remains pending. The Task3 review's
+below; the final broader review independently reconciled those artifacts and
+the integration boundaries, without re-running the suites. The Task3 review's
 sanitizer verdict is intentionally bounded: the
 trusted exception classes still accept short lowercase/underscore codes, as
 before. This is not a universal secret redactor or an exhaustive code allowlist.
@@ -144,3 +147,10 @@ are not retained executable maintenance entrypoints.
 The report files preserve their original reviewed commit and scope. Source
 links refer to that reviewed tree; XML artifacts are archived alongside this
 record rather than depending solely on the ignored execution workspace.
+
+Final closeout only changes documentation and archives the review/ledger; the
+tested runtime remains `302106d2`. The reviewer also matched the archived source
+hashes and reconstructed the seven removed HTTP routes. The execution scratch
+directory is disposable after archival; the named worktree and branch remain
+available for inspection. Integration, actual-store inventory/disposal and the
+remaining shared-helper/endpoint cleanup are not completed by this closeout.
