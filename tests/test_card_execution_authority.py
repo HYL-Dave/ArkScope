@@ -428,24 +428,6 @@ def test_output_and_receipt_commit_atomically(world, operation):
     assert len(reopened.translation_versions(run.id, "zh-Hant")) == 1
 
 
-def test_direct_evidence_translation_caller_keeps_captured_effort_and_auth(world, wire, monkeypatch):
-    from src.api.routes import security_lifecycle as lifecycle
-
-    cred = select(world, "card_translation", *CASES[0])
-    def runtime(task):
-        world.routes.set(task, "openai", "gpt-5.6-sol", "low")
-        world.credentials.update(f"local:{cred.id}", secret="mutated-card-secret")
-        return SimpleNamespace(model_timeout_s=900)
-    monkeypatch.setattr(lifecycle, "resolve_fixed_task_runtime", runtime)
-    result = lifecycle._translate_evidence_text("Original evidence", "zh-Hant")
-    assert result.translated_text == "first"
-    assert result.model == "gpt-5.6-luna"
-    assert len(wire.calls) == 1
-    _, request, sent = wire.calls[0]
-    assert sent["model"] == "gpt-5.6-luna" and sent["reasoning"] == {"effort": "xhigh"}
-    assert request.headers["authorization"] == "Bearer chosen-card-secret"
-
-
 @pytest.mark.parametrize("task,provider,model,effort,mode,code", [
     ("card_synthesis", "openai", "gpt-5.3-codex-spark", "high", "chatgpt_oauth", "model_task_unsupported"),
     ("card_translation", "openai", "gpt-5.3-codex-spark", "high", "api_key", "task_auth_mode_unsupported"),

@@ -956,11 +956,6 @@ def test_malformed_stored_listing_isolated_across_list_direct_and_provider_detai
 def test_case_detail_projects_original_evidence_with_derived_translations(
     tmp_path, monkeypatch
 ):
-    from src.security_lifecycle_translation import (
-        EvidenceTranslationResult,
-        translate_evidence,
-    )
-
     market_path, profile_path, profile, store, case_id = _databases(tmp_path)
     try:
         evidence_id = store.add_evidence(
@@ -979,18 +974,23 @@ def test_case_detail_projects_original_evidence_with_derived_translations(
             document_status=None,
             at=_AT,
         )
-        translate_evidence(
-            store,
-            evidence_id=evidence_id,
-            locale="zh-Hant",
-            translator=lambda _text, _locale: EvidenceTranslationResult(
-                translated_text="發行人將以 EA2 代號交易。",
-                provider="anthropic",
-                model="claude-sonnet-5",
-                harness="claude_subscription_structured_output",
-            ),
-            at=_AT,
-        )
+        # Historical translations remain readable after the writer is removed.
+        with profile:
+            profile.execute(
+                "INSERT INTO security_lifecycle_evidence_translations "
+                "(evidence_id,evidence_content_sha256,locale,translated_text,"
+                "provider,model,harness,translated_at) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    evidence_id,
+                    hashlib.sha256(b"The issuer will trade under symbol EA2.").hexdigest(),
+                    "zh-Hant",
+                    "發行人將以 EA2 代號交易。",
+                    "anthropic",
+                    "claude-sonnet-5",
+                    "claude_subscription_structured_output",
+                    _AT,
+                ),
+            )
         tools = _configure(monkeypatch, market_path, profile_path)
 
         payload = tools.get_security_lifecycle_case(case_id)

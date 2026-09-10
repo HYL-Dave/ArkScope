@@ -41,9 +41,10 @@ def test_review_api_prepares_without_writes_and_confirms_with_one_post(tmp_path,
     assert result.status_code == 200, result.text
     assert result.json()["status"] == "applied"
     assert "database" in calls and "profile" in calls
-    readback = browser.get(f"/security-lifecycle/review-confirmations/{result.json()['transition_id']}")
-    assert readback.status_code == 200
-    assert readback.json()["status"] == "applied"
+    after = rows(c)
+    readback = c["service"].get_review_confirmation(result.json()["transition_id"])
+    assert readback["status"] == "applied"
+    assert rows(c) == after
 
 
 @pytest.mark.parametrize("extra", ({"accepted": True}, {"effects": {}}, {"actor": "automation_policy"}, {"facts": {}}, {"execute_on": "tomorrow"}, {"unhide_successor": "false"}))
@@ -108,7 +109,7 @@ def test_review_projection_has_no_raw_membership_or_future_columns(tmp_path):
     assert public["packet_sha256"] == packet["packet_sha256"]
 
 
-@pytest.mark.parametrize("channel", ("case_api", "audit_api", "research"))
+@pytest.mark.parametrize("channel", ("case_api", "audit_local", "research"))
 def test_existing_case_readers_do_not_export_private_confirmation(tmp_path, monkeypatch, channel):
     from src.api.dependencies import get_security_lifecycle_read_service
     from src.api.routes import security_lifecycle as routes
@@ -123,18 +124,19 @@ def test_existing_case_readers_do_not_export_private_confirmation(tmp_path, monk
         result = tools.get_security_lifecycle_case(c["case_id"])
         assert result["status"] == "ok"
         payload = result["case"]
+    elif channel == "audit_local":
+        payload = c["service"]._read_service.get_case_audit(c["case_id"])
     else:
         app = FastAPI()
         app.include_router(routes.router)
         app.dependency_overrides[get_security_lifecycle_read_service] = lambda: c["service"]._read_service
-        suffix = "/audit" if channel == "audit_api" else ""
-        response = TestClient(app).get(f"/security-lifecycle/cases/{c['case_id']}{suffix}")
+        response = TestClient(app).get(f"/security-lifecycle/cases/{c['case_id']}")
         assert response.status_code == 200, response.text
         payload = response.json()
     assert payload["case_id"] == c["case_id"]
     assert "review_confirmation" not in str(payload)
     assert packet["packet_sha256"] not in str(payload)
-    if channel != "audit_api":
+    if channel != "audit_local":
         transition = payload["ticker_transition"]
         assert transition["transition_id"] == transition_id
         assert transition["status"] == "approved"
@@ -223,6 +225,6 @@ def test_legacy_retry_does_not_claim_an_incomplete_review_action_completed(tmp_p
     response = browser.post(f"/security-lifecycle/transitions/{transition_id}/retry", json={"preview_sha256": digest})
     assert response.status_code == 409, response.text
     assert response.json()["detail"]["code"] == "transition_preview_changed"
-    readback = browser.get(f"/security-lifecycle/review-confirmations/{transition_id}")
-    assert readback.status_code == 200 and readback.json()["status"] == state
+    readback = c["service"].get_review_confirmation(transition_id)
+    assert readback["status"] == state
     assert rows(c) == before

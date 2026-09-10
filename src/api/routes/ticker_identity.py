@@ -157,21 +157,6 @@ def confirm_review(
         raise _invalid(exc) from None
 
 
-@router.get("/review-confirmations/{transition_id}")
-def review_confirmation(
-    transition_id: str,
-    service: TickerIdentityService = Depends(get_ticker_identity_service),
-):
-    try:
-        return service.get_review_confirmation(transition_id)
-    except (TickerIdentityStoreUnavailable, LifecycleStoreUnavailable) as exc:
-        raise _store_error(exc) from None
-    except KeyError as exc:
-        raise _not_found(exc) from None
-    except ValueError as exc:
-        raise _invalid(exc) from None
-
-
 @router.get("/transition-activity")
 def list_transition_activity(
     limit: int = Query(default=50, ge=1, le=100),
