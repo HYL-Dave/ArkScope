@@ -73,7 +73,7 @@ reused as provenance-preserving exact fact observations.
 - Delete the dormant `data_sources/sec_filings.py` and its test-only import in
   `tests/test_sec_user_agent.py`. It still imports `edgar` at module scope despite
   having no admitted runtime consumer. The existing
-  `tests/test_sec_transport.py::test_all_active_sec_http_callers_use_shared_transport_and_dormant_edgartools_is_unreachable`
+  `tests/test_sec_transport.py::test_active_sec_http_callers_use_shared_transport_without_abandoned_module_imports`
   must evolve from dormant-module reachability protection into physical absence
   and import/dependency protection. Preserve active SEC identity/transport tests;
   do not keep the unused module merely because a test imports it. Git history
