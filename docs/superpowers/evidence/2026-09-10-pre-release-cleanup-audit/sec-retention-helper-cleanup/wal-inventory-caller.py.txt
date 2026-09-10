@@ -1,0 +1,129 @@
+"""One-time SQLite coordination caller; not a product or general sandbox API.
+
+The real parent directory must permit sidecar creation. Existing non-sidecar
+entries are read-only mounts; new basenames are NOT kernel-allowlisted. Only the
+fixed, hash-checked statistics query runs here. A payload-free syscall trace
+records actual file operations separately from this namespace limitation.
+"""
+import hashlib
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+import types
+
+
+QUERY_SHA256 = "f851057861c55980d4aeb114a8cf230ca7203ad1f3f2d86ca905004f833627c5"
+CLEAN_ENV = {"PATH": "/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE": "1"}
+
+
+def checked_path(value):
+    path = Path(value).absolute()
+    if path.resolve() != path or path.is_symlink():
+        raise ValueError("symlink_path_refused")
+    info = path.stat()
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError("regular_database_required")
+    if info.st_nlink != 1:
+        raise ValueError("hardlinked_file_refused")
+    return path
+
+
+def command(profile, market, child):
+    stores = tuple(checked_path(p) for p in (profile, market))
+    identities = {(p.stat().st_dev, p.stat().st_ino) for p in stores}
+    if len(identities) != 2:
+        raise ValueError("duplicate_database_identity")
+    parents = {p.parent for p in stores}
+    if len(parents) != 1:
+        raise ValueError("same_parent_required_for_this_inspection")
+    parent = stores[0].parent
+    sidecars = {Path(str(p) + suffix) for p in stores for suffix in ("-wal", "-shm")}
+    for path in sidecars:
+        if path.is_symlink():
+            raise ValueError("symlink_sidecar_refused")
+        if path.exists():
+            checked_path(path)
+            identity = (path.stat().st_dev, path.stat().st_ino)
+            if identity in identities:
+                raise ValueError("duplicate_sidecar_identity")
+            identities.add(identity)
+    # Keep shared real directory/inodes, never bind private copies of WAL/SHM.
+    argv = ["/usr/bin/bwrap", "--ro-bind", "/", "/", "--bind", str(parent), str(parent)]
+    for path in sorted(parent.iterdir()):
+        if path in sidecars:
+            continue
+        if path.is_symlink():
+            raise ValueError("symlink_parent_entry_refused")
+        argv.extend(["--ro-bind", str(path), str(path)])
+    argv.extend(["--unshare-net", "--unshare-pid", "--proc", "/proc", "--die-with-parent", "--cap-drop", "ALL"])
+    return argv + list(map(str, child))
+
+
+def file_metadata(path):
+    info = path.stat()
+    return dict(device=info.st_dev, inode=info.st_ino, size=info.st_size, mtime_ns=info.st_mtime_ns)
+
+
+def worker(profile, market, expected):
+    stores = [checked_path(p) for p in (profile, market)]
+    for path, before in zip(stores, expected):
+        if not os.statvfs(path).f_flag & os.ST_RDONLY:
+            raise RuntimeError("main_file_not_readonly")
+        info = file_metadata(path)
+        if (info["device"], info["inode"]) != (before["device"], before["inode"]):
+            raise RuntimeError("database_identity_changed_before_read")
+    query = Path(__file__).with_name("inventory.py")
+    source = query.read_bytes()
+    if hashlib.sha256(source).hexdigest() != QUERY_SHA256:
+        raise RuntimeError("reviewed_query_digest_mismatch")
+    module = types.ModuleType("inventory")
+    module.__file__ = str(query)
+    exec(compile(source, str(query), "exec"), module.__dict__)
+    result = module.inspect(*stores)
+    result["boundary"] = {
+        "main_files_readonly": True,
+        "enumerated_non_sidecar_entries_readonly": True,
+        "parent_allows_new_names": True,
+        "exact_filename_kernel_allowlist": False,
+        "private_sidecar_copies": False,
+        "network_isolated": True,
+        "query_sha256": QUERY_SHA256,
+        "sqlite_version": module.sqlite3.sqlite_version,
+    }
+    return result
+
+
+def run(profile, market, trace_path=None):
+    stores = tuple(checked_path(p) for p in (profile, market))
+    before = [file_metadata(p) for p in stores]
+    child = [sys.executable, "-I", "-S", "-B", str(Path(__file__).resolve()), "--worker",
+             *map(str, stores), json.dumps(before, separators=(",", ":"))]
+    argv = command(*stores, child)
+    if trace_path is not None:
+        # Reserve create-only; strace receives no database buffers to print.
+        with Path(trace_path).open("x"):
+            pass
+        argv = ["/usr/bin/strace", "-f", "-yy", "-s", "512", "-o", str(trace_path),
+                "-e", "trace=%file,close,dup,dup2,dup3,fcntl,ftruncate,mmap,mprotect,mremap,munmap,msync,fsync,fdatasync,write,writev,pwrite64,pwritev,copy_file_range,sendfile,splice",
+                "-e", "raw=write,writev,pwrite64,pwritev", *argv]
+    completed = subprocess.run(argv, env=CLEAN_ENV, capture_output=True, text=True, timeout=60)
+    if completed.returncode:
+        raise RuntimeError(f"inventory_worker_failed:{completed.returncode}:{completed.stderr}")
+    result = json.loads(completed.stdout)
+    after = [file_metadata(p) for p in stores]
+    if any((a["device"], a["inode"]) != (b["device"], b["inode"]) for a, b in zip(before, after)):
+        raise RuntimeError("database_identity_changed_during_read")
+    result["boundary"]["main_metadata_before"] = before
+    result["boundary"]["main_metadata_after"] = after
+    result["boundary"]["metadata_change_is_not_attribution"] = True
+    result["boundary"]["caller_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    return result
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 5 or sys.argv[1] != "--worker":
+        raise SystemExit("worker-only entrypoint")
+    print(json.dumps(worker(sys.argv[2], sys.argv[3], json.loads(sys.argv[4])), sort_keys=True))

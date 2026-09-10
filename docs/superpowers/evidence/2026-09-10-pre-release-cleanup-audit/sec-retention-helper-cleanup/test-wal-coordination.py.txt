@@ -1,0 +1,241 @@
+"""Synthetic-only checks for the renewed WAL coordination boundary."""
+import importlib.util
+import json
+import marshal
+import os
+from pathlib import Path
+import sqlite3
+import struct
+import subprocess
+import sys
+
+import pytest
+
+from test_inventory import databases, inspector
+
+
+def caller():
+    path = Path(__file__).with_name("wal_inventory_caller.py")
+    assert path.is_file(), "WAL coordination caller is not implemented"
+    spec = importlib.util.spec_from_file_location("wal_inventory_caller", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def snapshot(path):
+    info = path.stat()
+    return path.read_bytes(), info.st_size, info.st_mtime_ns
+
+
+def closed_wal(profile):
+    with sqlite3.connect(profile) as connection:
+        assert connection.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+    connection.close()
+    assert not Path(str(profile) + "-wal").exists()
+    assert not Path(str(profile) + "-shm").exists()
+
+
+def test_plain_readonly_close_does_not_reproduce_reported_main_file_change(tmp_path):
+    profile, market = databases(tmp_path)
+    closed_wal(profile)
+    before = snapshot(profile)
+    with inspector().open_inventory(profile, market) as connection:
+        assert connection.execute('SELECT count(*) FROM "main"."security_lifecycle_cases"').fetchone()[0] == 1
+        assert Path(str(profile) + "-wal").exists()
+        assert Path(str(profile) + "-shm").exists()
+    assert snapshot(profile) == before
+
+
+def test_readonly_inventory_sees_crash_retained_wal_without_checkpointing(tmp_path):
+    profile, market = databases(tmp_path)
+    closed_wal(profile)
+    before = snapshot(profile)
+    code = """import os,sqlite3,sys
+c=sqlite3.connect(sys.argv[1]); c.execute('PRAGMA wal_autocheckpoint=0')
+c.execute("INSERT INTO security_lifecycle_cases VALUES('new','sec_edgar','new-ref','NEW')")
+c.commit(); os._exit(0)
+"""
+    subprocess.run([sys.executable, "-I", "-S", "-B", "-c", code, str(profile)], check=True)
+    wal = Path(str(profile) + "-wal")
+    committed_wal = wal.read_bytes()
+    assert snapshot(profile) == before
+    result = inspector().inspect(profile, market)
+    assert result["stores"]["profile"]["tables"]["security_lifecycle_cases"]["rows"] == 2
+    assert snapshot(profile) == before
+    assert wal.read_bytes() == committed_wal
+
+
+def test_coordinated_inventory_initializes_missing_sidecars_and_preserves_main(tmp_path):
+    profile, market = databases(tmp_path)
+    closed_wal(profile)
+    before = {p: snapshot(p) for p in (profile, market)}
+    result = caller().run(profile, market)
+    assert result["stores"]["profile"]["tables"]["security_lifecycle_cases"]["rows"] == 1
+    assert result["source_membership"]["matched"] == 1
+    assert {p: snapshot(p) for p in before} == before
+    assert result["boundary"]["main_files_readonly"] is True
+
+
+def test_coordinated_inventory_reads_live_wal_and_does_not_precreate_sidecars(tmp_path):
+    profile, market = databases(tmp_path)
+    writer = sqlite3.connect(profile)
+    try:
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute("INSERT INTO security_lifecycle_cases VALUES('new','sec_edgar','new-ref','NEW')")
+        writer.commit()
+        wal = Path(str(profile) + "-wal")
+        shm = Path(str(profile) + "-shm")
+        before = {p: snapshot(p) for p in (profile, market, wal)}
+        inodes = {p: p.stat().st_ino for p in (wal, shm)}
+        result = caller().run(profile, market)
+        assert result["stores"]["profile"]["tables"]["security_lifecycle_cases"]["rows"] == 2
+        assert result["source_membership"]["cases_only"] == 1
+        assert {p: snapshot(p) for p in before} == before
+        assert {p: p.stat().st_ino for p in inodes} == inodes
+    finally:
+        writer.close()
+
+
+@pytest.mark.parametrize("victim_kind", ["profile", "market", "unrelated", "nested", "outside"])
+def test_boundary_denies_main_and_existing_unrelated_file_writes(tmp_path, victim_kind):
+    data = tmp_path / "data"
+    data.mkdir()
+    profile, market = databases(data)
+    unrelated = data / "unrelated.db"
+    unrelated.write_bytes(b"SYNTHETIC_UNRELATED")
+    nested = data / "nested"
+    nested.mkdir()
+    nested_file = nested / "state"
+    nested_file.write_bytes(b"SYNTHETIC_NESTED")
+    outside = tmp_path / "outside"
+    outside.write_bytes(b"SYNTHETIC_OUTSIDE")
+    victim = dict(profile=profile, market=market, unrelated=unrelated, nested=nested_file, outside=outside)[victim_kind]
+    before = snapshot(victim)
+    script = """import json,pathlib,sys
+try:
+    with pathlib.Path(sys.argv[1]).open('ab') as stream: stream.write(b'FORBIDDEN')
+except OSError as exc: print(json.dumps({'denied':True,'errno':exc.errno}))
+else: raise AssertionError('protected path became writable')
+"""
+    result = subprocess.run(caller().command(profile, market, [sys.executable, "-I", "-S", "-B", "-c", script, str(victim)]),
+        env={"PATH": "/usr/bin:/bin"}, capture_output=True, text=True, check=True)
+    assert json.loads(result.stdout)["denied"] is True
+    assert snapshot(victim) == before
+
+
+def test_boundary_does_not_accept_symlink_database_or_sidecar(tmp_path):
+    profile, market = databases(tmp_path)
+    alias = tmp_path / "alias.db"
+    alias.symlink_to(profile)
+    with pytest.raises(ValueError, match="symlink"):
+        caller().command(alias, market, ["/bin/true"])
+    Path(str(profile) + "-shm").symlink_to(market)
+    with pytest.raises(ValueError, match="symlink"):
+        caller().command(profile, market, ["/bin/true"])
+
+
+def test_worker_refuses_unprotected_main_files_before_any_query(tmp_path):
+    profile, market = databases(tmp_path)
+    module = caller()
+    with pytest.raises(RuntimeError, match="main_file_not_readonly"):
+        module.worker(profile, market, [module.file_metadata(p) for p in (profile, market)])
+
+
+def test_payload_free_trace_and_only_sidecar_names_created(tmp_path):
+    data = tmp_path / "data"
+    data.mkdir()
+    profile, market = databases(data)
+    closed_wal(profile)
+    names = {p.name for p in data.iterdir()}
+    trace = tmp_path / "coordination.trace"
+    result = caller().run(profile, market, trace_path=trace)
+    assert result["source_membership"]["matched"] == 1
+    created = {p.name for p in data.iterdir()} - names
+    assert created <= {"profile.db-wal", "profile.db-shm", "market.db-wal", "market.db-shm"}
+    observed = trace.read_text()
+    assert "PRIVATE_" not in observed
+    assert '"source_membership"' not in observed  # write buffers must be raw pointers
+    assert "profile.db-shm" in observed
+    assert "O_RDWR|O_CREAT" in observed
+    with pytest.raises(FileExistsError):
+        caller().run(profile, market, trace_path=trace)
+
+
+def test_concurrent_writer_commits_while_reader_keeps_its_snapshot(tmp_path):
+    profile, market = databases(tmp_path)
+    writer = sqlite3.connect(profile)
+    writer.execute("PRAGMA journal_mode=WAL")
+    writer.execute("PRAGMA wal_autocheckpoint=0")
+    writer.execute("INSERT INTO security_lifecycle_cases VALUES('two','sec_edgar','two','TWO')")
+    writer.commit()
+    code = """import importlib.util,json,sys
+s=importlib.util.spec_from_file_location('inventory',sys.argv[1])
+m=importlib.util.module_from_spec(s); s.loader.exec_module(m)
+with m.open_inventory(sys.argv[2],sys.argv[3]) as c:
+    sql='SELECT count(*) FROM "main"."security_lifecycle_cases"'
+    print(c.execute(sql).fetchone()[0],flush=True)
+    assert sys.stdin.readline().strip()=='continue'
+    print(c.execute(sql).fetchone()[0],flush=True)
+"""
+    argv = caller().command(profile, market, [sys.executable, "-I", "-S", "-B", "-c", code,
+        str(Path(__file__).with_name("inventory.py")), str(profile), str(market)])
+    child = subprocess.Popen(argv, env={"PATH": "/usr/bin:/bin"}, stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        assert child.stdout.readline().strip() == "2"
+        writer.execute("INSERT INTO security_lifecycle_cases VALUES('three','sec_edgar','three','THREE')")
+        writer.commit()
+        out, err = child.communicate("continue\n", timeout=10)
+        assert child.returncode == 0, err
+        assert out.strip() == "2"
+        assert caller().run(profile, market)["stores"]["profile"]["tables"]["security_lifecycle_cases"]["rows"] == 3
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.communicate()
+        writer.close()
+
+
+@pytest.mark.parametrize("target_kind", ["profile", "market", "unrelated"])
+def test_boundary_rejects_sidecar_hardlinks_before_sqlite(tmp_path, target_kind):
+    profile, market = databases(tmp_path)
+    unrelated = tmp_path / "unrelated"
+    unrelated.write_bytes(b"SYNTHETIC_UNRELATED")
+    target = dict(profile=profile, market=market, unrelated=unrelated)[target_kind]
+    os.link(target, Path(str(profile) + "-shm"))
+    before = snapshot(target)
+    with pytest.raises(ValueError, match="hardlink|duplicate"):
+        caller().command(profile, market, ["/bin/true"])
+    assert snapshot(target) == before
+
+
+def test_boundary_rejects_duplicate_database_identity(tmp_path):
+    profile, _ = databases(tmp_path)
+    with pytest.raises(ValueError, match="duplicate"):
+        caller().command(profile, profile, ["/bin/true"])
+
+
+def test_verified_source_bytes_execute_instead_of_matching_timestamp_pyc(tmp_path):
+    data = tmp_path / "data"
+    data.mkdir()
+    profile, market = databases(data)
+    harness = tmp_path / "harness"
+    harness.mkdir()
+    source = Path(__file__).with_name("inventory.py").read_bytes()
+    query = harness / "inventory.py"
+    query.write_bytes(source)
+    copied_caller = harness / "wal_inventory_caller.py"
+    copied_caller.write_bytes(Path(__file__).with_name("wal_inventory_caller.py").read_bytes())
+    cache = Path(importlib.util.cache_from_source(str(query)))
+    cache.parent.mkdir()
+    poison = compile("import sqlite3\ndef inspect(*args): return {'executed_unreviewed_bytecode': True}\n", str(query), "exec")
+    header = importlib.util.MAGIC_NUMBER + struct.pack("<III", 0, int(query.stat().st_mtime), len(source))
+    cache.write_bytes(header + marshal.dumps(poison))
+    spec = importlib.util.spec_from_file_location("copied_caller", copied_caller)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    result = module.run(profile, market)
+    assert result.get("executed_unreviewed_bytecode") is not True
+    assert result["source_membership"]["matched"] == 1

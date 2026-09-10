@@ -9,8 +9,11 @@ The original findings below are a dated source inventory, not all-complete
 status. Implementation and verification details: [leaf-cleanup.md](leaf-cleanup.md)
 and [SEC entrypoint cleanup](sec-entrypoint-cleanup/README.md). The current
 [helper cleanup checkpoint](sec-retention-helper-cleanup/README.md) records
-7,971 passed/12 skipped at `0c5896a5`, separate follow-up verification, and the
-unavailable actual-store read. Do not treat the failed read as empty data.
+7,971 passed/12 skipped at `0c5896a5`, separate follow-up verification, the first
+unavailable read and the subsequently authorized WAL/SHM-assisted inventory.
+The [actual retention manifest](sec-retention-helper-cleanup/retention-manifest.md)
+records seven absent old-web tables but populated shared cases/history. Do not
+treat the failed first read or an absent old journal as empty shared data.
 
 | Candidate | Current disposition | Commit |
 | --- | --- | --- |

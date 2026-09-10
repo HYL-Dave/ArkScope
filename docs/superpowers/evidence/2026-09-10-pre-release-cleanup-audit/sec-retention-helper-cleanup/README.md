@@ -4,15 +4,44 @@ Branch: `codex/listing-sec-macro-convergence`. Plan base: `6ba563d9`;
 plan commit: `8c8ac738`. This checkpoint is separate from the previously
 completed [entrypoint cleanup](../sec-entrypoint-cleanup/README.md).
 
-**Source checkpoint reviewed and complete; actual-store inventory still
-unavailable.** The whole-checkpoint review of `6ba563d9..46ec6f31` found no
+**Source checkpoint reviewed and complete; renewed actual-store statistics
+obtained under separately authorized WAL/SHM coordination.** The whole-checkpoint review of `6ba563d9..46ec6f31` found no
 Critical/Important or source integration issue. Its one documentation queue-ID
 finding was fixed in `c2d4dce9`; scoped re-review passed spec/quality with no new
 breakage. Source/tests remain byte-identical to verified `e61accaf`.
 See [final review](final-review.md) and [correction review](final-doc-rereview.md).
 No merge, push, App restart, provider call or production disposition occurred.
 
-## Authorized Inventory: Unavailable, Not Empty
+## Renewed Authorized Inventory
+
+After explicit WAL/SHM authorization, a single renewed invocation at
+`2026-09-10T18:05:28Z` obtained the bounded counts. Both main files remained
+read-only; their inode/size/mtime were identical before and after. The caller
+preserves the real shared sidecars, verifies the exact query bytes and records
+payload-free file operations. Its directory-creation limitation is explicit,
+not described as an exact-filename kernel sandbox.
+
+The [retention manifest](retention-manifest.md) records the measured distinction:
+36 SEC observations match 36 SEC cases, seven old-web tables are absent, four
+historical translations and three current transitions still exist. Current
+membership removals and shared accepted/provider history remain protected.
+All 32 inspected declared-FK groups had zero orphans; this does not establish
+every application-level dependency or authorize deletion.
+
+The [boundary review](wal-boundary-review.md) found and closed hardlink and
+cached-bytecode gaps before production. New synthetic verification is
+**38 passed**, with five review REDs and a four-failure read-only-mount mutation.
+These are query-harness tests, not additional product-backend nodes. The prior
+product source, test, frontend and census artifacts remain unchanged.
+
+Raw renewed result/attempt files and the compressed payload-free trace are
+archived beside this document. The create-only attempt receipt deliberately
+retains its original `pending_syscall_trace_review` status; the later independent
+post-run review is separate evidence, not an overwritten execution record.
+That [independent review](wal-post-run-review.md) accepted the scoped result and
+trace; its one stale priority-row finding was corrected without changing data.
+
+## First Inventory Attempt: Unavailable, Not Empty
 
 The user authorized one structure/count/reference-only inspection of the exact
 production profile and market databases. No credential, URL, source body, model
@@ -192,9 +221,10 @@ metadata conclusions above remain unchanged.
   receipt reader remains; a genuinely missed consumer would require restoring
   its interface, not undoing data changes.
 
-Next data work requires an authorized usable read, an exact retention manifest
-and separately approved backup/disposition. The WAL/SHM coordination question
-remains unanswered; the ignored plan workspace is retained for that handoff.
+The authorized renewed read now supplies a bounded retention manifest. Next
+data work still requires a precise retained-row projection and separately
+approved backup/disposition. WAL/SHM permission is not permission for logical
+data changes or copying credential-bearing files.
 Current shared journal/review/history guards and the other C01-C21 queues are
 still named in `sec-schema-ownership.md` and the main audit. No schema cleanup
 or new research capability is represented as completed here.

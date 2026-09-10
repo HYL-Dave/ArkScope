@@ -1,0 +1,61 @@
+"""Exact one-time invocation; archive as text after the authorized read."""
+from datetime import datetime, timezone
+import hashlib
+import json
+from pathlib import Path
+import types
+
+
+EXPECTED_CALLER_SHA256 = "8e11b37f1dd7d2d46242c3c5ef27ca93e1262eba8c2c1496299394f2fcbf7a90"
+root = Path("/mnt/md0/PycharmProjects/ArkScope/data")
+scratch = Path(__file__).resolve().parent
+output = scratch / "production-inventory-renewed.json"
+receipt = scratch / "production-attempt-renewed.json"
+trace = scratch / "production-inventory-renewed.trace"
+if any(path.exists() for path in (output, receipt, trace)):
+    raise SystemExit("create_only_output_already_exists")
+
+path = scratch / "wal_inventory_caller.py"
+source = path.read_bytes()
+if hashlib.sha256(source).hexdigest() != EXPECTED_CALLER_SHA256:
+    raise SystemExit("reviewed_caller_digest_mismatch")
+module = types.ModuleType("wal_inventory_caller")
+module.__file__ = str(path)
+exec(compile(source, str(path), "exec"), module.__dict__)
+
+record = {
+    "started_at": datetime.now(timezone.utc).isoformat(),
+    "caller_sha256": EXPECTED_CALLER_SHA256,
+    "query_sha256": module.QUERY_SHA256,
+    "attempts": 1,
+    "authorization": "statistics-only read plus necessary SQLite WAL/SHM creation/updates",
+    "main_file_write_permission": False,
+    "backup": False,
+    "explicit_checkpoint": False,
+    "provider_calls": 0,
+    "result_acceptance": "pending_syscall_trace_review",
+}
+try:
+    result = module.run(root / "profile_state.db", root / "market_data.db", trace_path=trace)
+    result["source_reference_revision"] = "8c8ac738"
+    with output.open("x", encoding="utf-8") as stream:
+        json.dump(result, stream, indent=2, sort_keys=True)
+        stream.write("\n")
+    record["status"] = "inventory_observed_pending_trace_review"
+    record["output_sha256"] = hashlib.sha256(output.read_bytes()).hexdigest()
+    print(json.dumps({"status": record["status"], "source_membership": result["source_membership"],
+        "classifications": result["classifications"], "old_schedule_key_counts": result["old_schedule_key_counts"],
+        "old_runtime_counts": result["old_runtime_counts"]}, sort_keys=True))
+except Exception as exc:
+    record["status"] = "inventory_unavailable"
+    record["error_type"] = type(exc).__name__
+    record["error"] = str(exc)
+    print(json.dumps({"status": record["status"], "error_type": record["error_type"]}))
+    raise
+finally:
+    record["finished_at"] = datetime.now(timezone.utc).isoformat()
+    if trace.exists():
+        record["trace_sha256"] = hashlib.sha256(trace.read_bytes()).hexdigest()
+    with receipt.open("x", encoding="utf-8") as stream:
+        json.dump(record, stream, indent=2, sort_keys=True)
+        stream.write("\n")

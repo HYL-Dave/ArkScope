@@ -1,0 +1,3786 @@
+{
+  "authorized_column_reads": [
+    [
+      "main",
+      "job_runs",
+      "job_name"
+    ],
+    [
+      "main",
+      "lifecycle_investigation_acceptances",
+      ""
+    ],
+    [
+      "main",
+      "lifecycle_investigation_acceptances",
+      "assessment_id"
+    ],
+    [
+      "main",
+      "lifecycle_investigation_acceptances",
+      "run_id"
+    ],
+    [
+      "main",
+      "lifecycle_investigation_calls",
+      ""
+    ],
+    [
+      "main",
+      "lifecycle_investigation_calls",
+      "run_id"
+    ],
+    [
+      "main",
+      "lifecycle_investigation_installation",
+      ""
+    ],
+    [
+      "main",
+      "lifecycle_investigation_jobs",
+      ""
+    ],
+    [
+      "main",
+      "lifecycle_investigation_jobs",
+      "run_id"
+    ],
+    [
+      "main",
+      "lifecycle_investigation_jobs",
+      "status"
+    ],
+    [
+      "main",
+      "lifecycle_investigation_results",
+      ""
+    ],
+    [
+      "main",
+      "lifecycle_investigation_results",
+      "run_id"
+    ],
+    [
+      "main",
+      "lifecycle_investigation_runtime",
+      ""
+    ],
+    [
+      "main",
+      "lifecycle_investigation_sources",
+      ""
+    ],
+    [
+      "main",
+      "lifecycle_investigation_sources",
+      "run_id"
+    ],
+    [
+      "main",
+      "lifecycle_investigation_steps",
+      ""
+    ],
+    [
+      "main",
+      "lifecycle_investigation_steps",
+      "run_id"
+    ],
+    [
+      "main",
+      "profile_settings",
+      "key"
+    ],
+    [
+      "main",
+      "sa_tracking_bindings",
+      ""
+    ],
+    [
+      "main",
+      "sa_tracking_bindings",
+      "membership_id"
+    ],
+    [
+      "main",
+      "sa_tracking_events",
+      ""
+    ],
+    [
+      "main",
+      "sa_tracking_events",
+      "membership_id"
+    ],
+    [
+      "main",
+      "sa_tracking_memberships",
+      ""
+    ],
+    [
+      "main",
+      "sa_tracking_memberships",
+      "membership_id"
+    ],
+    [
+      "main",
+      "sa_tracking_memberships",
+      "removed_at"
+    ],
+    [
+      "main",
+      "scheduler_state",
+      "source"
+    ],
+    [
+      "main",
+      "security_lifecycle_action_proposals",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_action_proposals",
+      "assessment_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_action_proposals",
+      "case_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_assessment_evidence",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_assessment_evidence",
+      "assessment_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_assessment_evidence",
+      "evidence_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_assessment_outcomes",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_assessment_outcomes",
+      "assessment_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_assessments",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_assessments",
+      "acceptance_authority"
+    ],
+    [
+      "main",
+      "security_lifecycle_assessments",
+      "accepted_at"
+    ],
+    [
+      "main",
+      "security_lifecycle_assessments",
+      "assessment_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_assessments",
+      "automation_run_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_assessments",
+      "case_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_automation_facts",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_automation_facts",
+      "automation_run_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_automation_facts",
+      "case_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_automation_facts",
+      "evidence_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_automation_run_blockers",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_automation_run_blockers",
+      "automation_run_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_automation_runs",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_automation_runs",
+      "case_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_automation_runs",
+      "run_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_case_acknowledgements",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_case_acknowledgements",
+      "case_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_cases",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_cases",
+      "case_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_cases",
+      "source"
+    ],
+    [
+      "main",
+      "security_lifecycle_cases",
+      "source_ref"
+    ],
+    [
+      "main",
+      "security_lifecycle_cases",
+      "ticker"
+    ],
+    [
+      "main",
+      "security_lifecycle_evidence",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_evidence",
+      "automation_run_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_evidence",
+      "case_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_evidence",
+      "content_sha256"
+    ],
+    [
+      "main",
+      "security_lifecycle_evidence",
+      "evidence_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_evidence",
+      "run_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_evidence_translations",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_evidence_translations",
+      "evidence_content_sha256"
+    ],
+    [
+      "main",
+      "security_lifecycle_evidence_translations",
+      "evidence_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_investigation_runs",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_investigation_runs",
+      "case_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_investigation_runs",
+      "run_id"
+    ],
+    [
+      "main",
+      "security_lifecycle_migration_receipts",
+      ""
+    ],
+    [
+      "main",
+      "security_lifecycle_provider_checks",
+      ""
+    ],
+    [
+      "main",
+      "sqlite_master",
+      "name"
+    ],
+    [
+      "main",
+      "sqlite_master",
+      "sql"
+    ],
+    [
+      "main",
+      "sqlite_master",
+      "tbl_name"
+    ],
+    [
+      "main",
+      "sqlite_master",
+      "type"
+    ],
+    [
+      "main",
+      "ticker_identity_links",
+      ""
+    ],
+    [
+      "main",
+      "ticker_identity_links",
+      "transition_id"
+    ],
+    [
+      "main",
+      "ticker_identity_transition_activity",
+      ""
+    ],
+    [
+      "main",
+      "ticker_identity_transition_activity",
+      "transition_id"
+    ],
+    [
+      "main",
+      "ticker_identity_transition_attempts",
+      ""
+    ],
+    [
+      "main",
+      "ticker_identity_transition_attempts",
+      "transition_id"
+    ],
+    [
+      "main",
+      "ticker_identity_transitions",
+      ""
+    ],
+    [
+      "main",
+      "ticker_identity_transitions",
+      "assessment_id"
+    ],
+    [
+      "main",
+      "ticker_identity_transitions",
+      "case_id"
+    ],
+    [
+      "main",
+      "ticker_identity_transitions",
+      "transition_id"
+    ],
+    [
+      "market",
+      "security_lifecycle_observation_kinds",
+      ""
+    ],
+    [
+      "market",
+      "security_lifecycle_observation_kinds",
+      "observation_id"
+    ],
+    [
+      "market",
+      "security_lifecycle_observations",
+      ""
+    ],
+    [
+      "market",
+      "security_lifecycle_observations",
+      "id"
+    ],
+    [
+      "market",
+      "security_lifecycle_observations",
+      "source"
+    ],
+    [
+      "market",
+      "security_lifecycle_observations",
+      "source_ref"
+    ],
+    [
+      "market",
+      "security_lifecycle_observations",
+      "ticker"
+    ],
+    [
+      "market",
+      "sqlite_master",
+      "name"
+    ],
+    [
+      "market",
+      "sqlite_master",
+      "sql"
+    ],
+    [
+      "market",
+      "sqlite_master",
+      "tbl_name"
+    ],
+    [
+      "market",
+      "sqlite_master",
+      "type"
+    ]
+  ],
+  "body_or_credential_reads": false,
+  "boundary": {
+    "caller_sha256": "8e11b37f1dd7d2d46242c3c5ef27ca93e1262eba8c2c1496299394f2fcbf7a90",
+    "enumerated_non_sidecar_entries_readonly": true,
+    "exact_filename_kernel_allowlist": false,
+    "main_files_readonly": true,
+    "main_metadata_after": [
+      {
+        "device": 2304,
+        "inode": 127284276,
+        "mtime_ns": 1789063479861296965,
+        "size": 65908736
+      },
+      {
+        "device": 2304,
+        "inode": 127284871,
+        "mtime_ns": 1789062575391191381,
+        "size": 3828281344
+      }
+    ],
+    "main_metadata_before": [
+      {
+        "device": 2304,
+        "inode": 127284276,
+        "mtime_ns": 1789063479861296965,
+        "size": 65908736
+      },
+      {
+        "device": 2304,
+        "inode": 127284871,
+        "mtime_ns": 1789062575391191381,
+        "size": 3828281344
+      }
+    ],
+    "metadata_change_is_not_attribution": true,
+    "network_isolated": true,
+    "parent_allows_new_names": true,
+    "private_sidecar_copies": false,
+    "query_sha256": "f851057861c55980d4aeb114a8cf230ca7203ad1f3f2d86ca905004f833627c5",
+    "sqlite_version": "3.37.2"
+  },
+  "classifications": {
+    "accepted_assessments": {
+      "rows": 9,
+      "status": "observed"
+    },
+    "current_unfinished": {
+      "rows": 0,
+      "status": "observed"
+    },
+    "human_assessments": {
+      "rows": 3,
+      "status": "observed"
+    },
+    "listing_cases": {
+      "rows": 3,
+      "status": "observed"
+    },
+    "old_web_unfinished": {
+      "reason": "schema_columns_missing",
+      "status": "unavailable"
+    },
+    "removed_memberships": {
+      "rows": 3,
+      "status": "observed"
+    },
+    "sec_cases": {
+      "rows": 36,
+      "status": "observed"
+    },
+    "sec_cases_with_assessments": {
+      "rows": 14,
+      "status": "observed"
+    },
+    "sec_cases_with_old_web_runs": {
+      "reason": "schema_columns_missing",
+      "status": "unavailable"
+    },
+    "sec_cases_with_transitions": {
+      "rows": 0,
+      "status": "observed"
+    },
+    "target_investigation_cases": {
+      "rows": 0,
+      "status": "observed"
+    }
+  },
+  "cross_database_atomicity": false,
+  "filesystem_boundary": "enforced by the recorded caller, not by SQLite read-only flags",
+  "finished_at": "2026-09-10T18:05:28.316162+00:00",
+  "format": 1,
+  "logical_database_writes": false,
+  "mode": "statistics_only_read_transactions",
+  "old_runtime_counts": {
+    "job_runs": 1,
+    "scheduler_state": 1
+  },
+  "old_schedule_key_counts": {
+    "schedule.sec_corporate_actions.enabled": 0,
+    "schedule.sec_corporate_actions.interval_minutes": 0
+  },
+  "source_membership": {
+    "cases_only": 0,
+    "matched": 36,
+    "observations_only": 0
+  },
+  "source_reference_revision": "8c8ac738",
+  "started_at": "2026-09-10T18:05:28.271470+00:00",
+  "stores": {
+    "market": {
+      "finished_at": "2026-09-10T18:05:28.314092+00:00",
+      "references": [
+        {
+          "child": "security_lifecycle_observation_kinds",
+          "columns": [
+            [
+              "observation_id",
+              "id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 37,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_observations",
+          "status": "observed"
+        }
+      ],
+      "schema_version": 80,
+      "started_at": "2026-09-10T18:05:28.313248+00:00",
+      "tables": {
+        "security_lifecycle_observation_kinds": {
+          "columns": [
+            {
+              "name": "observation_id",
+              "not_null": true,
+              "pk_order": 1,
+              "type": "INTEGER"
+            },
+            {
+              "name": "event_type",
+              "not_null": true,
+              "pk_order": 2,
+              "type": "TEXT"
+            },
+            {
+              "name": "effective_date",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_observation_kinds_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "2730ba4f095ef7f597a4ab80bdc541f1b6d1bef1293e5b693fed3a1c9df815ef",
+              "name": "security_lifecycle_observation_kinds",
+              "type": "table"
+            }
+          ],
+          "rows": 37,
+          "status": "observed"
+        },
+        "security_lifecycle_observations": {
+          "columns": [
+            {
+              "name": "id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "INTEGER"
+            },
+            {
+              "name": "ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "cik",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "issuer_name",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "filing_date",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_ref",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "filing_form",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "filing_items_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "evidence_url",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "description",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "first_observed_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "last_observed_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "937f31aeb9fe9bb814ae2cd77a9b8aae3716d2143b95f966a41e4763fc26b531",
+              "name": "idx_security_lifecycle_source_identity",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "e246fbfbf3f730e10f4ff9c8f3a97dbc681e4898edbaf253bbbe7ea35af8697e",
+              "name": "idx_security_lifecycle_ticker_date",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_observations_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "50355f61e6e9289fc39346ffc053faa908f33ed81b91aab5ad879563cc89b089",
+              "name": "security_lifecycle_observations",
+              "type": "table"
+            }
+          ],
+          "rows": 36,
+          "status": "observed"
+        }
+      }
+    },
+    "profile": {
+      "finished_at": "2026-09-10T18:05:28.313241+00:00",
+      "references": [
+        {
+          "child": "lifecycle_investigation_acceptances",
+          "columns": [
+            [
+              "run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 0,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "lifecycle_investigation_results",
+          "status": "observed"
+        },
+        {
+          "child": "lifecycle_investigation_acceptances",
+          "columns": [
+            [
+              "assessment_id",
+              "assessment_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 1,
+          "matched_rows": 0,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_assessments",
+          "status": "observed"
+        },
+        {
+          "child": "lifecycle_investigation_calls",
+          "columns": [
+            [
+              "run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 0,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "lifecycle_investigation_jobs",
+          "status": "observed"
+        },
+        {
+          "child": "lifecycle_investigation_results",
+          "columns": [
+            [
+              "run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 0,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "lifecycle_investigation_jobs",
+          "status": "observed"
+        },
+        {
+          "child": "lifecycle_investigation_sources",
+          "columns": [
+            [
+              "run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 0,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "lifecycle_investigation_jobs",
+          "status": "observed"
+        },
+        {
+          "child": "lifecycle_investigation_steps",
+          "columns": [
+            [
+              "run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 0,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "lifecycle_investigation_jobs",
+          "status": "observed"
+        },
+        {
+          "child": "sa_tracking_bindings",
+          "columns": [
+            [
+              "membership_id",
+              "membership_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 105,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "sa_tracking_memberships",
+          "status": "observed"
+        },
+        {
+          "child": "sa_tracking_events",
+          "columns": [
+            [
+              "membership_id",
+              "membership_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 108,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "sa_tracking_memberships",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_action_proposals",
+          "columns": [
+            [
+              "assessment_id",
+              "assessment_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 10,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_assessments",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_action_proposals",
+          "columns": [
+            [
+              "case_id",
+              "case_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 1,
+          "matched_rows": 10,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_cases",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_assessment_evidence",
+          "columns": [
+            [
+              "evidence_id",
+              "evidence_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 233,
+          "nullable_rows": 17,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_evidence",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_assessment_evidence",
+          "columns": [
+            [
+              "assessment_id",
+              "assessment_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 1,
+          "matched_rows": 250,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_assessments",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_assessment_outcomes",
+          "columns": [
+            [
+              "assessment_id",
+              "assessment_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 17,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_assessments",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_assessments",
+          "columns": [
+            [
+              "automation_run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 10,
+          "nullable_rows": 7,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_automation_runs",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_assessments",
+          "columns": [
+            [
+              "case_id",
+              "case_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 1,
+          "matched_rows": 17,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_cases",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_automation_facts",
+          "columns": [
+            [
+              "evidence_id",
+              "evidence_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 503,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_evidence",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_automation_facts",
+          "columns": [
+            [
+              "case_id",
+              "case_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 1,
+          "matched_rows": 503,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_cases",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_automation_facts",
+          "columns": [
+            [
+              "automation_run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 2,
+          "matched_rows": 503,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_automation_runs",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_automation_run_blockers",
+          "columns": [
+            [
+              "automation_run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 91,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_automation_runs",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_automation_runs",
+          "columns": [
+            [
+              "case_id",
+              "case_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 76,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_cases",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_case_acknowledgements",
+          "columns": [
+            [
+              "case_id",
+              "case_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 0,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_cases",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_evidence",
+          "columns": [
+            [
+              "automation_run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 1025,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_automation_runs",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_evidence",
+          "columns": [
+            [
+              "run_id",
+              "run_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 1,
+          "matched_rows": 0,
+          "nullable_rows": 1025,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_investigation_runs",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_evidence",
+          "columns": [
+            [
+              "case_id",
+              "case_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 2,
+          "matched_rows": 1025,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_cases",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_evidence_translations",
+          "columns": [
+            [
+              "evidence_id",
+              "evidence_id"
+            ],
+            [
+              "evidence_content_sha256",
+              "content_sha256"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 4,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_evidence",
+          "status": "observed"
+        },
+        {
+          "child": "security_lifecycle_investigation_runs",
+          "columns": [
+            [
+              "case_id",
+              "case_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 0,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_cases",
+          "status": "observed"
+        },
+        {
+          "child": "ticker_identity_links",
+          "columns": [
+            [
+              "transition_id",
+              "transition_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 0,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "ticker_identity_transitions",
+          "status": "observed"
+        },
+        {
+          "child": "ticker_identity_transition_activity",
+          "columns": [
+            [
+              "transition_id",
+              "transition_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 3,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "ticker_identity_transitions",
+          "status": "observed"
+        },
+        {
+          "child": "ticker_identity_transition_attempts",
+          "columns": [
+            [
+              "transition_id",
+              "transition_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 3,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "ticker_identity_transitions",
+          "status": "observed"
+        },
+        {
+          "child": "ticker_identity_transitions",
+          "columns": [
+            [
+              "assessment_id",
+              "assessment_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 0,
+          "matched_rows": 3,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_assessments",
+          "status": "observed"
+        },
+        {
+          "child": "ticker_identity_transitions",
+          "columns": [
+            [
+              "case_id",
+              "case_id"
+            ]
+          ],
+          "external_child": false,
+          "fk_id": 1,
+          "matched_rows": 3,
+          "nullable_rows": 0,
+          "orphan_rows": 0,
+          "parent": "security_lifecycle_cases",
+          "status": "observed"
+        }
+      ],
+      "schema_version": 269,
+      "started_at": "2026-09-10T18:05:28.277201+00:00",
+      "tables": {
+        "lifecycle_investigation_acceptances": {
+          "columns": [
+            {
+              "name": "assessment_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "run_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "packet_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "packet_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "actor",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "confirmed_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_lifecycle_investigation_acceptances_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_lifecycle_investigation_acceptances_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "58a82194a4d3277ff49bfa54c2f6e35144e47c2ca84484923be9c28906efe760",
+              "name": "lifecycle_investigation_acceptances",
+              "type": "table"
+            },
+            {
+              "definition_sha256": "ed6e09909537b7a767bd34b5975f944671654934031220ccbd71e1947160e1c4",
+              "name": "lifecycle_investigation_acceptances_delete_immutable",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "838f04386942f5ecc9703c5ec486ee018930914f01ae20d140f80f5f76670101",
+              "name": "lifecycle_investigation_acceptances_update_immutable",
+              "type": "trigger"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "lifecycle_investigation_calls": {
+          "columns": [
+            {
+              "name": "run_id",
+              "not_null": true,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "call_id",
+              "not_null": true,
+              "pk_order": 2,
+              "type": "TEXT"
+            },
+            {
+              "name": "remote_id",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "terminal",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_lifecycle_investigation_calls_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_lifecycle_investigation_calls_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "0f0c9be524342af7ab159ebe68f879b0445bb95a15adaa138620c836dcc8c8a7",
+              "name": "lifecycle_investigation_calls",
+              "type": "table"
+            },
+            {
+              "definition_sha256": "be12f16e2a73fb2c9245664b655b110fb023e945bf06c15278efac284173c911",
+              "name": "lifecycle_investigation_calls_delete_immutable",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "2755c9062a33d00ef697d485e941b77318c76915730bfa9bfb30ba772755014f",
+              "name": "lifecycle_investigation_calls_terminal_immutable",
+              "type": "trigger"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "lifecycle_investigation_installation": {
+          "columns": [
+            {
+              "name": "singleton",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "INTEGER"
+            },
+            {
+              "name": "version",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "schema_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "installed_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "89c64b6e2abbfc39832b65a5c61a62d8675ba5280e788278c6aa9bfb98727630",
+              "name": "lifecycle_investigation_installation",
+              "type": "table"
+            },
+            {
+              "definition_sha256": "cc7c633474669647a04c98fbf45539f69d50c1633851e7a7cbbf4f5c46952097",
+              "name": "lifecycle_investigation_installation_delete_immutable",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "44a565b4e4d250ef8270be081ac214cacef864d4d6bc613c5939a858d0f1bf19",
+              "name": "lifecycle_investigation_installation_update_immutable",
+              "type": "trigger"
+            }
+          ],
+          "rows": 1,
+          "status": "observed"
+        },
+        "lifecycle_investigation_jobs": {
+          "columns": [
+            {
+              "name": "run_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "request_key",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "header_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "header_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "owner",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "lease_until",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "status",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "phase",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "cancel_requested_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "finished_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "failure_code",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "3db7af3ee003835dc5bbf71afe2f5b0a95a9ce24712342547af7545062063980",
+              "name": "idx_lifecycle_investigation_running",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_lifecycle_investigation_jobs_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_lifecycle_investigation_jobs_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "aa11fab11f112d43338c610b0bc7d51c8a03c0328eccdfcbf90165b3875d6bf9",
+              "name": "lifecycle_investigation_jobs",
+              "type": "table"
+            },
+            {
+              "definition_sha256": "7d1fa758f97a1a4d54f7b3d46520c79943c1df5f0b854f6cede841b559c580eb",
+              "name": "lifecycle_investigation_jobs_delete_immutable",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "46836eb64bca4cb0b1d43cc673af26c0c05860d47a6e0b49172a8f40e5539db7",
+              "name": "lifecycle_investigation_jobs_identity_immutable",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "ccea21685ef76baa41677c712854d6279a13e2737a38bd6070638ce620f7f487",
+              "name": "lifecycle_investigation_jobs_terminal_immutable",
+              "type": "trigger"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "lifecycle_investigation_results": {
+          "columns": [
+            {
+              "name": "run_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "payload_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "payload_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "completed_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_lifecycle_investigation_results_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "0c0fc653d4f1e78441feecb9573abb412d096cee0bb661215153ea65d1faccbe",
+              "name": "lifecycle_investigation_results",
+              "type": "table"
+            },
+            {
+              "definition_sha256": "a7d2ba3cd17301eedf941081561bcdfc2a3950462ce496e7146e89849a33a020",
+              "name": "lifecycle_investigation_results_delete_immutable",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "19c64cd099ab1cf7e079855cb7a7787a6ae1064a37141261ec887a976d90c871",
+              "name": "lifecycle_investigation_results_update_immutable",
+              "type": "trigger"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "lifecycle_investigation_runtime": {
+          "columns": [
+            {
+              "name": "singleton",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "INTEGER"
+            },
+            {
+              "name": "version",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "config_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "updated_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "9aeceb292c96c160070ae9dc9a21d5578e09420a8d5961faec27797c579592a9",
+              "name": "lifecycle_investigation_runtime",
+              "type": "table"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "lifecycle_investigation_sources": {
+          "columns": [
+            {
+              "name": "run_id",
+              "not_null": true,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_id",
+              "not_null": true,
+              "pk_order": 2,
+              "type": "TEXT"
+            },
+            {
+              "name": "payload_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "payload_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_lifecycle_investigation_sources_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "da1ee78f1e513deee96cbac3c18d5d568db2e5a873b244f0dec4ed4618036758",
+              "name": "lifecycle_investigation_sources",
+              "type": "table"
+            },
+            {
+              "definition_sha256": "7ae8a1d649613ff801e83316080747c5fee210c25b8aa5e13efad5d6c8619d28",
+              "name": "lifecycle_investigation_sources_delete_immutable",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "4329b3eabbf90719ac117306f7a109999a5149bae785411cc2faa92f52b3c291",
+              "name": "lifecycle_investigation_sources_update_immutable",
+              "type": "trigger"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "lifecycle_investigation_steps": {
+          "columns": [
+            {
+              "name": "run_id",
+              "not_null": true,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "ordinal",
+              "not_null": true,
+              "pk_order": 2,
+              "type": "INTEGER"
+            },
+            {
+              "name": "kind",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "payload_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "payload_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_lifecycle_investigation_steps_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "dc29c1b2c8719a5f8530c446dcde12817daac0b42a9f975d2a6d631cefad37ae",
+              "name": "lifecycle_investigation_steps",
+              "type": "table"
+            },
+            {
+              "definition_sha256": "1d4c726838f224c19e96044038d1d245cfa40406c798ec7aad298965cd1d6538",
+              "name": "lifecycle_investigation_steps_delete_immutable",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "87b737265fb6a8aaec364570cc2a3b75258d70f88523187b8d1d0a68789645c2",
+              "name": "lifecycle_investigation_steps_update_immutable",
+              "type": "trigger"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "lifecycle_legacy_disposal_receipts": {
+          "status": "absent"
+        },
+        "lifecycle_web_acceptances": {
+          "status": "absent"
+        },
+        "lifecycle_web_actions": {
+          "status": "absent"
+        },
+        "lifecycle_web_calls": {
+          "status": "absent"
+        },
+        "lifecycle_web_installation": {
+          "status": "absent"
+        },
+        "lifecycle_web_pages": {
+          "status": "absent"
+        },
+        "lifecycle_web_results": {
+          "status": "absent"
+        },
+        "lifecycle_web_runs": {
+          "status": "absent"
+        },
+        "sa_tracking_bindings": {
+          "columns": [
+            {
+              "name": "lineage_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "INTEGER"
+            },
+            {
+              "name": "membership_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "picked_date",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "observation_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "observed_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "1c36251af430102fe5425d667bc427b16acd7f6fb5f6f7abcb97c910cd333fa2",
+              "name": "idx_sa_tracking_bindings_membership",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "afc258e6335267c87622e22f9f422bfb5d7ce60da2a5874656737639e79955fd",
+              "name": "sa_tracking_bindings",
+              "type": "table"
+            }
+          ],
+          "rows": 105,
+          "status": "observed"
+        },
+        "sa_tracking_events": {
+          "columns": [
+            {
+              "name": "event_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "INTEGER"
+            },
+            {
+              "name": "membership_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "action",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "actor",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "occurred_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "observation_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "receipt_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "4ef608fa65fe97e36e7bc0959397be4f4d8769e05574bed58f17141daa1dc05e",
+              "name": "sa_tracking_events",
+              "type": "table"
+            },
+            {
+              "definition_sha256": "772d4fe81f7716d4b2d36f39df6e7be54d9ba86d58d5570521e3cbb927f31714",
+              "name": "sa_tracking_events_no_delete",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "46b4a51da597defdf61c7fc16937afaabcf683f4ab18046ba093f5d4dfdb70d5",
+              "name": "sa_tracking_events_no_update",
+              "type": "trigger"
+            }
+          ],
+          "rows": 108,
+          "status": "observed"
+        },
+        "sa_tracking_memberships": {
+          "columns": [
+            {
+              "name": "membership_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "picked_date",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "portfolio_status",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "accepted_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "removed_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "current_tracking",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "reason",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "updated_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_sa_tracking_memberships_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_sa_tracking_memberships_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "b47a70b87948741bb127cb7cc8ad52c4eb5066be6e3f1e0b0081af6b00f12ea6",
+              "name": "sa_tracking_memberships",
+              "type": "table"
+            }
+          ],
+          "rows": 105,
+          "status": "observed"
+        },
+        "security_lifecycle_action_proposals": {
+          "columns": [
+            {
+              "name": "proposal_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "case_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "assessment_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "action_type",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "status",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "replacement_ticker",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_snapshot_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "reason",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "block_reason",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "assessment_fingerprint_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "proposal_dedupe_key",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "dismissed_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_action_proposals_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_action_proposals_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "38c084dffe625fa5b25d89292bb1ae9aaeea877c158317965cbd746dd418f96c",
+              "name": "security_lifecycle_action_proposals",
+              "type": "table"
+            }
+          ],
+          "rows": 10,
+          "status": "observed"
+        },
+        "security_lifecycle_assessment_evidence": {
+          "columns": [
+            {
+              "name": "id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "INTEGER"
+            },
+            {
+              "name": "assessment_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "reference_kind",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "evidence_id",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "cited_content_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "035705656792e24b01ce81a37af4fb62e52b98fdceda382880ee750e1a00db88",
+              "name": "security_lifecycle_assessment_evidence",
+              "type": "table"
+            }
+          ],
+          "rows": 250,
+          "status": "observed"
+        },
+        "security_lifecycle_assessment_outcomes": {
+          "columns": [
+            {
+              "name": "assessment_id",
+              "not_null": true,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "outcome",
+              "not_null": true,
+              "pk_order": 2,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_assessment_outcomes_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "07a11134045f0a1883f6c35d6d76e023de3231c5c96012e902eeedf63aa722a4",
+              "name": "security_lifecycle_assessment_outcomes",
+              "type": "table"
+            }
+          ],
+          "rows": 17,
+          "status": "observed"
+        },
+        "security_lifecycle_assessments": {
+          "columns": [
+            {
+              "name": "assessment_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "case_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "revision",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "status",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "relevance",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "confidence",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "author",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "conclusion",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "impact_summary",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "counterparty_name",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "counterparty_ticker",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "counterparty_cik",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "successor_ticker",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "destination_venue",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "effective_date",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "consideration_currency",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "cash_per_security_decimal",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "exchange_ratio_decimal",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "observation_fingerprint_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "evidence_set_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "accepted_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "superseded_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "automation_method",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "acceptance_authority",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "automation_run_id",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "rule_id",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "rule_version",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "decision_provenance_sha256",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "7fcb43e99708c3f065aa81f04637f20532390085cd62ce93bddc91549ad3d56e",
+              "name": "idx_security_lifecycle_assessments_case_revision",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_assessments_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_assessments_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "ecf8d73f8ee66d72c9707631b10a35e4eb7f3482cf049d073d2d1043aeddbb97",
+              "name": "security_lifecycle_assessments",
+              "type": "table"
+            }
+          ],
+          "rows": 17,
+          "status": "observed"
+        },
+        "security_lifecycle_automation_facts": {
+          "columns": [
+            {
+              "name": "fact_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "automation_run_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "case_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "evidence_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "fact_type",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "normalized_value_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_span_start",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "source_span_end",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "cited_text_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "extractor_rule_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "extractor_rule_version",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "fact_dedupe_key",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "d0ea5d41615cf2b9e5e9d85a61a35e97499376c4406e26eee333d4e324ec88e6",
+              "name": "idx_security_lifecycle_facts_run_type",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_automation_facts_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_automation_facts_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "bf843fb9b5e550d55f52a691e15da1e72ebbf7ac683c1705c4e659cb9f615fe8",
+              "name": "security_lifecycle_automation_facts",
+              "type": "table"
+            }
+          ],
+          "rows": 503,
+          "status": "observed"
+        },
+        "security_lifecycle_automation_run_blockers": {
+          "columns": [
+            {
+              "name": "automation_run_id",
+              "not_null": true,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "blocker_code",
+              "not_null": true,
+              "pk_order": 2,
+              "type": "TEXT"
+            },
+            {
+              "name": "retryable",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "context_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "373ac1b8c000d4c06c9c81bc4248092839655f6180f50936ab1e980fea11e91b",
+              "name": "idx_security_lifecycle_automation_blockers_run",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_automation_run_blockers_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "ccdc6176d935ad01192e0938df55c26e88a5fbadeee7baae4fdad3495ceb5618",
+              "name": "security_lifecycle_automation_run_blockers",
+              "type": "table"
+            }
+          ],
+          "rows": 91,
+          "status": "observed"
+        },
+        "security_lifecycle_automation_runs": {
+          "columns": [
+            {
+              "name": "run_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "case_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "mode",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "observation_fingerprint_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "policy_version",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "run_key",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "status",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "decision_tier",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "action_readiness",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "query_context_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "diagnostics_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "retry_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "failure_code",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "started_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "finished_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "updated_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "8ad1188e15c7d52c483dacd0e7c8d6c82804407e25c6d62a2503a8b03ec360f9",
+              "name": "idx_security_lifecycle_automation_runs_case_created",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_automation_runs_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_automation_runs_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "2a03beb646ce60d1e74197664c0c4f75d2d2e069596e14c40a1ebbf019719e06",
+              "name": "security_lifecycle_automation_runs",
+              "type": "table"
+            }
+          ],
+          "rows": 76,
+          "status": "observed"
+        },
+        "security_lifecycle_case_acknowledgements": {
+          "columns": [
+            {
+              "name": "acknowledgement_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "case_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "reason",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "note",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "author",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "observation_fingerprint_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "evidence_set_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "acknowledged_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "reopened_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "73e6566344c01573f4e8e20b70b4f04676db310e1e41bd3f524ed8703b876960",
+              "name": "idx_security_lifecycle_one_current_ack",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_case_acknowledgements_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "2e04c8a677b4ff71c81cb37bd1caf0b1d0c00820b6898b2e68aafdef9e5efab5",
+              "name": "security_lifecycle_case_acknowledgements",
+              "type": "table"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "security_lifecycle_cases": {
+          "columns": [
+            {
+              "name": "case_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "source",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_ref",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "updated_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "f0cad13859ae4e0fda42a14478393ca76865786b2015826f28e1b0c23ad4803e",
+              "name": "idx_security_lifecycle_cases_identity",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_cases_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_cases_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "dfcc072b8f9ae4ac9a61d2c7aacde32f331a9ab7d666799139330ceee53ea98c",
+              "name": "security_lifecycle_cases",
+              "type": "table"
+            }
+          ],
+          "rows": 39,
+          "status": "observed"
+        },
+        "security_lifecycle_evidence": {
+          "columns": [
+            {
+              "name": "evidence_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "case_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "run_id",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "automation_run_id",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_family",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "kind",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_url",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "title",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "publisher",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "domain",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_published_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "retrieved_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "adapter",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "excerpt",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "content_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_document_sha256",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_locator_json",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "evidence_dedupe_key",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "mime_type",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "document_status",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "c6ac3c81958a947152fe028487fa74ed382b173f1a528872a27b446f8a5881a3",
+              "name": "idx_security_lifecycle_evidence_automation_run",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "ca142b18d7909d556cd391ee573ff6ee326700620fb74d26ba10695bf6230582",
+              "name": "idx_security_lifecycle_evidence_case_created",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_evidence_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_evidence_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_evidence_3",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "8854c545190c0cfd8dabcc00cc5cd3f5c2e4f176d6361688c3fa6b5a9f737f14",
+              "name": "security_lifecycle_evidence",
+              "type": "table"
+            }
+          ],
+          "rows": 1025,
+          "status": "observed"
+        },
+        "security_lifecycle_evidence_translations": {
+          "columns": [
+            {
+              "name": "evidence_id",
+              "not_null": true,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "evidence_content_sha256",
+              "not_null": true,
+              "pk_order": 2,
+              "type": "TEXT"
+            },
+            {
+              "name": "locale",
+              "not_null": true,
+              "pk_order": 3,
+              "type": "TEXT"
+            },
+            {
+              "name": "translated_text",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "provider",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "model",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "harness",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "translated_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "c7b215e9232d6d8470244f18bceced9580f6be4cb2ea5712d7e6603b25f7c6f7",
+              "name": "idx_security_lifecycle_translations_evidence_locale",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_evidence_translations_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "f6c9a5de3edbe27303d89481c6b8e06ecef7b6e117f8a558943a7461b03432fd",
+              "name": "security_lifecycle_evidence_translations",
+              "type": "table"
+            }
+          ],
+          "rows": 4,
+          "status": "observed"
+        },
+        "security_lifecycle_investigation_runs": {
+          "columns": [
+            {
+              "name": "run_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "case_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "trigger",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "adapter",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "status",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "query_plan_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "query_count",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "result_count",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "fetch_count",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "usage_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "failure_code",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "started_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "finished_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "df7d0133f2d4018104049ab7131b5fd7bbd22ddd928059f26db809c974e40200",
+              "name": "idx_security_lifecycle_runs_case_created",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_investigation_runs_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "cf6e6e6cdaf0ce3b613b292eee2d7298bc8f25ed97676a1c41ea6812632a76b1",
+              "name": "security_lifecycle_investigation_runs",
+              "type": "table"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "security_lifecycle_migration_receipts": {
+          "columns": [
+            {
+              "name": "migration_key",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "market_snapshot_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "legacy_mapping_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "phase",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "expected_legacy_rows",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "expected_observations",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "expected_kinds",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "expected_legacy_assessments",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "started_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "updated_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "completed_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_migration_receipts_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "644c718770b2d552657be3b7470ec2703fccf2db4f1367c2130cc1fb7927831e",
+              "name": "security_lifecycle_migration_receipts",
+              "type": "table"
+            }
+          ],
+          "rows": 1,
+          "status": "observed"
+        },
+        "security_lifecycle_provider_checks": {
+          "columns": [
+            {
+              "name": "check_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "observed_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "observation_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "evidence_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "diagnostics_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "blockers_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "state",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "content_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "f0e56a520cd95adb15b2b4d11b760fb59f41b53d67651f45bdcd28ca263fb9ef",
+              "name": "idx_security_lifecycle_provider_checks_ticker",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_provider_checks_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_security_lifecycle_provider_checks_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "48d2713ba2532543678190cdb836c289686c3fc2230092b5dee2869950b734b2",
+              "name": "security_lifecycle_provider_checks",
+              "type": "table"
+            },
+            {
+              "definition_sha256": "270cd795306b7d28f55d30a6082e4f9d5a2d3525cecfe7c42a3058aed30922d0",
+              "name": "security_lifecycle_provider_checks_no_delete",
+              "type": "trigger"
+            },
+            {
+              "definition_sha256": "6d5f3063806617160dd2233dfd5a6edae87970964c1c0153cb1da36c0edc1249",
+              "name": "security_lifecycle_provider_checks_no_update",
+              "type": "trigger"
+            }
+          ],
+          "rows": 3,
+          "status": "observed"
+        },
+        "ticker_identity_links": {
+          "columns": [
+            {
+              "name": "link_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "transition_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "successor_ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "relationship",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "effective_date",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "reversed_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "8ebe3e7871b3ea8b44b55621f8142432682bc67d84caca7e003ebce28bf91f6d",
+              "name": "idx_ticker_identity_links_source",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "4d6eadfddf449698414436b4f3cb12f0a8db46abf40b08f677d9cec630bde6c0",
+              "name": "idx_ticker_identity_links_successor",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_ticker_identity_links_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_ticker_identity_links_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "e1caff7ec9acfbe17d421ef78adb71961203ea244be2387066f1a5dc711f8e76",
+              "name": "ticker_identity_links",
+              "type": "table"
+            }
+          ],
+          "rows": 0,
+          "status": "observed"
+        },
+        "ticker_identity_transition_activity": {
+          "columns": [
+            {
+              "name": "activity_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "transition_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "activity_type",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "successor_ticker",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "effective_date",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "user_owned_changes_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "provider_owned_retained_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "state_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "rule_id",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "rule_version",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "decision_provenance_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "occurred_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "acknowledged_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "created_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "601abf64f95e904a10874db18953b08ca93cee42d1a1add129f7a7bd7265331b",
+              "name": "idx_ticker_identity_activity_transition",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "dc1995c34573defa1a9fe49708d8df988b573379b2508f10e5cf95cde0d7636f",
+              "name": "idx_ticker_identity_activity_unacknowledged",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_ticker_identity_transition_activity_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "8499fe03261839c7b500291906c507f6375ee98f225bbe2c048ba01a51b885b7",
+              "name": "ticker_identity_transition_activity",
+              "type": "table"
+            }
+          ],
+          "rows": 3,
+          "status": "observed"
+        },
+        "ticker_identity_transition_attempts": {
+          "columns": [
+            {
+              "name": "attempt_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "transition_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "trigger",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "status",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "block_reasons_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "observed_preview_sha256",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "attempted_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "643e06204ee785e63b76455deb0ea55a03367a0b2f0dee503e14210c6fbe8cf6",
+              "name": "idx_ticker_identity_attempts_transition",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_ticker_identity_transition_attempts_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "ca7de2f1bb7d7dad446c15acdf57232a63e140210c8ec8a56196ac2d2f688254",
+              "name": "ticker_identity_transition_attempts",
+              "type": "table"
+            }
+          ],
+          "rows": 3,
+          "status": "observed"
+        },
+        "ticker_identity_transitions": {
+          "columns": [
+            {
+              "name": "transition_id",
+              "not_null": false,
+              "pk_order": 1,
+              "type": "TEXT"
+            },
+            {
+              "name": "case_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "assessment_id",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "proposal_ids_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "transition_dedupe_key",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "kind",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "status",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "source_ticker",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "successor_ticker",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "execute_on",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "priority_resolution",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "unhide_successor",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "INTEGER"
+            },
+            {
+              "name": "approved_observation_fingerprint_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "approved_assessment_fingerprint_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "approved_preview_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "approved_preview_json",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "before_snapshot_json",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "after_snapshot_sha256",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "approved_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "updated_at",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "applied_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "cancelled_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "reversed_at",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "approval_authority",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "automation_policy_version",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "rule_id",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "rule_version",
+              "not_null": false,
+              "pk_order": 0,
+              "type": "TEXT"
+            },
+            {
+              "name": "decision_provenance_sha256",
+              "not_null": true,
+              "pk_order": 0,
+              "type": "TEXT"
+            }
+          ],
+          "objects": [
+            {
+              "definition_sha256": "17f0d3bddc25c5dea904989941184788b1a2a7060aa7c8e200a1750746f81ee3",
+              "name": "idx_ticker_identity_transitions_due",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_ticker_identity_transitions_1",
+              "type": "index"
+            },
+            {
+              "definition_sha256": null,
+              "name": "sqlite_autoindex_ticker_identity_transitions_2",
+              "type": "index"
+            },
+            {
+              "definition_sha256": "7986bd1e223570421ad88cdf2cf41f7d376ec02ad7df7d6915163c62c285cb77",
+              "name": "ticker_identity_transitions",
+              "type": "table"
+            }
+          ],
+          "rows": 3,
+          "status": "observed"
+        }
+      }
+    }
+  }
+}

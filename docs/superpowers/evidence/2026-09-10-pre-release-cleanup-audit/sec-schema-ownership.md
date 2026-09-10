@@ -1,8 +1,9 @@
 # SEC Cleanup Schema Ownership Checkpoint
 
 Source ownership inspection started at `df97352b`; the September 11 helper
-checkpoint below updates completed source removals. No production counts are
-asserted here: the single authorized read failed before inventory queries.
+checkpoint below updates completed source removals. The first authorized read
+failed before inventory queries; the separately authorized September 11 renewed
+read now has a [bounded retention manifest](sec-retention-helper-cleanup/retention-manifest.md).
 Current-store read authorization and digest-bound disposal approval are separate
 from source-code removal.
 
@@ -109,21 +110,32 @@ The two old schedule keys are `schedule.sec_corporate_actions.enabled` and
 `schedule.sec_corporate_actions.interval_minutes`; source result/job history has
 separate owners and must not be deleted by a broad string-prefix match.
 
-## Next Actual-Store Manifest
+The renewed actual-store observation finds all seven old-web tables **absent**.
+There is therefore no old-web persisted journal to migrate in this observed
+installation. This narrows the data work, not the current function-extraction
+requirements above. Shared cases/evidence/assessments remain populated, including
+four historical translations. Three current transitions and three removed Former
+memberships must survive cleanup. No future/other installation is inferred from
+this one read, and no production DROP was authorized.
+
+## Actual-Store Manifest And Next Disposition
 
 The first authorized attempt used read-only SQLite URIs and a nonwritable
 filesystem view. It failed at ATTACH before any inventory query; absent WAL/SHM
 coordination files are a reproduced synthetic explanation, not a proven
 production diagnosis. No row counts, empty-table finding or reference closure
-were obtained. No second read or coordination-file write is authorized by that
-failure; the user was asked about this narrow SQLite coordination requirement.
+were obtained from that attempt. The user subsequently authorized necessary
+WAL/SHM coordination. The renewed unchanged query obtained 36 SEC tuple matches
+with zero one-sided members, 39 total cases, 32 measurable declared-FK groups
+without orphans, and the exact table presence/counts in the linked manifest.
+Neither attempt authorizes row/schema disposal or a broad private-data backup.
 
-1. Resolve only the named market/profile stores, open `mode=ro`, set `query_only`,
+1. Completed: resolve only the named market/profile stores, open `mode=ro`, set `query_only`,
    and capture consistent schema/row-count/reference bounds. No credentials,
    provider acquisition, source-body rendering or automatic retries.
-2. Enumerate owned tables, indexes, triggers and exact schedule keys; report
+2. Completed: enumerate owned tables, indexes, triggers and exact schedule keys; report
    counts and reference classes, not document text or token material.
-3. Distinguish retained current rows, accepted historical evidence, unreferenced
+3. Still required for disposition: distinguish retained current rows, accepted historical evidence, unreferenced
    abandoned rows and unknown dependencies. An empty result is an observation,
    not permission to remove unrelated tables.
 4. Construct the candidate canonical shape and explicit retention projection.
