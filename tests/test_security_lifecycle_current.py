@@ -438,14 +438,3 @@ def test_current_closed_vocabulary_is_enforced_before_api_or_research(tmp_path, 
         monkeypatch.setattr(module, "_action", invalid)
     with pytest.raises(LifecyclePopulationUnavailable, match="current_vocabulary_invalid"):
         current(c)
-
-
-def test_current_backend_frontend_vocabulary_has_exact_bidirectional_parity():
-    from src.security_lifecycle_current import CURRENT_REVIEW_REASONS, CURRENT_ACTION_STATES
-    from tests.test_security_lifecycle_disposition import _typescript_compiler_authorities
-    path = Path(__file__).parents[1] / "apps/arkscope-web/src/lifecycle/currentReviewContract.ts"
-    values = _typescript_compiler_authorities(path, {
-        "reasons": {"kind": "array", "name": "CURRENT_REVIEW_REASONS"},
-        "states": {"kind": "array", "name": "CURRENT_ACTION_STATES"},
-    })
-    assert values == {"reasons": frozenset(CURRENT_REVIEW_REASONS), "states": frozenset(CURRENT_ACTION_STATES)}

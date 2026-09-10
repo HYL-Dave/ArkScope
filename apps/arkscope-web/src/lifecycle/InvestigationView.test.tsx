@@ -5,10 +5,10 @@ import { beforeEach, afterEach, it, expect, vi } from "vitest";
 import i18n from "i18next";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { LifecycleView } from "./InvestigationView";
-import { webRunFixture } from "./webFixtures";
+import { LifecycleView } from "./LifecycleView";
+import * as lifecycleBarrel from "./LifecycleView";
 const mocks = vi.hoisted(() => ({ getInvestigationTargets: vi.fn(), getInvestigationPreflight: vi.fn(), latestInvestigation: vi.fn(),
-  startInvestigation: vi.fn(), getInvestigation: vi.fn(), cancelInvestigation: vi.fn(), listCurrentLifecycleReviews: vi.fn(),
+  startInvestigation: vi.fn(), getInvestigation: vi.fn(), cancelInvestigation: vi.fn(),
   getInvestigationProviders: vi.fn(), checkInvestigationProviders: vi.fn(), getInvestigationActions: vi.fn(), cancelTickerIdentityTransition: vi.fn(),
   listTickerIdentityTransitionActivity: vi.fn(), getInvestigationReview: vi.fn(), confirmInvestigation: vi.fn(),
   prepareInvestigationProviders: vi.fn(), confirmLifecycleReview: vi.fn(),
@@ -37,10 +37,17 @@ beforeEach(async () => {
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 function button(label: string) { const b = [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => (b.getAttribute("aria-label") || b.textContent) === label); expect(b, label).toBeTruthy(); return b!; }
+it("exposes only the current investigation view through the mounted barrel", async () => {
+  expect(Object.keys(lifecycleBarrel)).toEqual(["LifecycleView"]);
+  await act(async () => root.render(<LifecycleView initialTicker="TA" />));
+  expect(host.querySelector(".investigation-heading h2")?.textContent).toBe("Lifecycle Investigation");
+  expect(host.querySelector(".investigation-panel h3")?.textContent).toBe("TA");
+  expect(host.querySelector(".investigation-history summary")?.textContent).toBe("Tracking changes");
+  expect(host.querySelector(".lifecycle-drawer-content")).toBeNull();
+});
 it("opens by ticker without legacy cases or provider calls and keeps start behind consent", async () => {
   await act(async () => root.render(<LifecycleView initialTicker="TA" />));
   expect(host.textContent).toContain("TravelCenters of America");
-  expect(mocks.listCurrentLifecycleReviews).not.toHaveBeenCalled();
   expect(mocks.startInvestigation).not.toHaveBeenCalled();
   await act(async () => button("Investigate").click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain("No model or billing fallback");
@@ -95,12 +102,14 @@ it("scheduled actions can be cancelled without reading any old cases", async () 
   expect(mocks.cancelTickerIdentityTransition).not.toHaveBeenCalled();
   await act(async () => document.querySelector<HTMLButtonElement>(".ui-confirm-dialog button:last-child")!.click());
   expect(mocks.cancelTickerIdentityTransition).toHaveBeenCalledExactlyOnceWith("slt_pending");
-  expect(mocks.listCurrentLifecycleReviews).not.toHaveBeenCalled();
 });
 
 async function openReview(sourceGaps: { url: string; reason: string }[] = []) {
   mocks.latestInvestigation.mockResolvedValue({ ...(await mocks.getInvestigation()), status: "succeeded", phase: "finished",
-    action: "terminal_delisting", finding: { ...webRunFixture.finding, source_ticker: "TA", limitations: [] } });
+    action: "terminal_delisting", finding: { version: 2, source_ticker: "TA", issuer_name: "TravelCenters of America Inc.",
+      security_class: "common stock", venue: "NASDAQ", event_kind: "listing_ended", timing: "completed",
+      summary: "Trading has ended.", successor_ticker: null, effective_date: "2023-05-15",
+      contradictions: [], unresolved_conditions: [], limitations: [], citations: [{ passage_id: "passage-1", supports: ["event_kind"] }] } });
   const packet = { ...reviewFixture.packet, source_ticker: "TA", source_gaps: sourceGaps };
   mocks.getInvestigationReview.mockResolvedValue(packet);
   mocks.confirmInvestigation.mockResolvedValue({ ...reviewFixture.confirmation, source_ticker: "TA" });
