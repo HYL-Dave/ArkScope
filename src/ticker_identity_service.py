@@ -203,11 +203,6 @@ class TickerIdentityService:
         return confirm(self, case_id, assessment_id=assessment_id, packet_sha256=packet_sha256,
                        action=action, options=options, before_write=before_write)
 
-    def get_review_confirmation(self, transition_id: str) -> dict:
-        from src.security_lifecycle_review import _result
-
-        return _result(self, transition_id)
-
     def list_due_transitions(
         self,
         *,

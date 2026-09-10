@@ -12,6 +12,7 @@ import pytest
 
 from src.profile_state import ProfileStateStore
 from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore, observation_fingerprint
+from src.security_lifecycle_review import _result
 from src.ticker_identity_service import TickerIdentityConflict, TickerIdentityService
 from src.ticker_identity_transition import TransitionOptions
 from tests.test_security_lifecycle_terminal_workflow import setup_workflow
@@ -51,6 +52,10 @@ def confirm(c, packet, *, before_write=lambda: None):
 def rows(c):
     with sqlite3.connect(c["profile"]) as conn:
         return tuple(conn.iterdump())
+
+
+def test_identity_service_has_no_unused_review_confirmation_facade():
+    assert not hasattr(TickerIdentityService, "get_review_confirmation")
 
 
 def test_prepare_review_is_read_only_and_does_not_fake_acceptance(tmp_path):
@@ -506,7 +511,7 @@ def test_application_crash_rolls_back_all_effects_but_preserves_the_confirmation
         with pytest.raises(RuntimeError, match="apply_interrupted"):
             confirm(c, packet)
     assert rows(c) == before
-    assert c["service"].get_review_confirmation(transition_id)["status"] == "approved"
+    assert _result(c["service"], transition_id)["status"] == "approved"
     assert confirm(c, packet)["status"] == "applied"
 
 
@@ -529,7 +534,7 @@ def test_provider_revalidation_cannot_be_replaced_by_a_durable_human_confirmatio
     assert "OLD" in c["sources"]()
     with sqlite3.connect(c["profile"]) as conn:
         assert conn.execute("SELECT COUNT(*) FROM ticker_identity_transition_activity").fetchone()[0] == 0
-    assert c["service"].get_review_confirmation(transition_id)["status"] == "blocked"
+    assert _result(c["service"], transition_id)["status"] == "blocked"
 
 
 @pytest.mark.parametrize("end_state", ("cancelled", "reversed"))
@@ -572,7 +577,7 @@ def test_confirmation_readback_rejects_tampered_action_binding(tmp_path, monkeyp
                      (json.dumps(preview), preview["preview_sha256"]))
     before = rows(c)
     with pytest.raises(ValueError, match="review_confirmation_invalid"):
-        c["service"].get_review_confirmation(transition_id)
+        _result(c["service"], transition_id)
     assert rows(c) == before
 
 
@@ -715,7 +720,7 @@ def test_legacy_reapproval_cannot_discard_an_action_confirmation(tmp_path, monke
         with pytest.raises(ValueError, match="review_confirmation_command_required"):
             legacy_approval()
         assert rows(c) == before
-        result = c["service"].get_review_confirmation(transition_id)
+        result = _result(c["service"], transition_id)
         assert result["status"] == "scheduled" and result["packet_sha256"] == packet["packet_sha256"]
         assert result["execute_on"] == "2026-09-06"
     else:
