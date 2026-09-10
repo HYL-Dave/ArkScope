@@ -27,7 +27,7 @@
     "test_owner": "tests/test_security_lifecycle_tools.py::test_case_detail_projects_original_evidence_with_derived_translations",
     "privacy_boundary": "stored translation read retained; model-facing projection excludes translated_text",
     "scanner_code_changed": false,
-    "follow_up": "C21 SQL inventory union-schema completeness; preserve raw uncertainties and never interpret missing preparation as a DROP authorization"
+    "follow_up": "CENSUS-SQL-001 SQL inventory union-schema completeness; preserve raw uncertainties and never interpret missing preparation as a DROP authorization"
   },
   "limits": "New unique IDs differ from raw candidate row counts because some IDs repeat. Do not add overlapping selections or rewrite the baseline to green. Original CSS/i18n queues remain open."
 }

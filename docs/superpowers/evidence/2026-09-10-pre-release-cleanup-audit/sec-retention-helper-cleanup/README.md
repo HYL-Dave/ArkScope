@@ -151,7 +151,8 @@ and content digest. The scanner's synthetic union schema lacks
 A source-only in-memory probe reproduced this exact missing-table error. The
 retained tool test owns provenance and exclusion of translated text from the
 model-facing projection. Keep these records; queue scanner schema-completeness
-under C21, not a schema DROP. `census-interpretation.json` records this limit;
+under [CENSUS-SQL-001](../README.md#census-sql-001-sql-scanner-union-schema-completeness),
+not a schema DROP. `census-interpretation.json` records this limit;
 the raw report and original baseline remain unchanged.
 
 Final collection at `e61accaf`: **7,984 tests**, exactly one added absence owner,

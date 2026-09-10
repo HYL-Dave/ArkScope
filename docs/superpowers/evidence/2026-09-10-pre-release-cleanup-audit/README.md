@@ -354,6 +354,21 @@ required fix among those nine. This is not a new whole-product/security review.
 | C20 | `AppRecordsLocalStore` still declares `agent_queries` and provides insert/count/migration helpers; found direct callers are tests. Literal SQL scan shows no reader, but generic `count/raw_rows` can read it dynamically. | Candidate schema/API cleanup, **not an approved DROP**. Inventory actual retained rows before disposition; keep `research_reports`, `agent_memories`, current Research conversation records, citations and usage. This is a concrete example where static no-reader does not prove no stored-data dependency. Owner: `test_app_records_store.py` and current query/history tests. |
 | C21 | `src/service/sa_market_news_density.py` is test-only, but `SA_EXTENSION_ROADMAP.md` explicitly retains it for future auto-sync tuning. | Deferred capability, not proven abandonment. Keep under that existing owner until the scope is deliberately cancelled or a real consumer replaces it. Do not silently broaden the user's abandoned-code decision into removal of every deferred capability. |
 
+### CENSUS-SQL-001: SQL Scanner Union-Schema Completeness
+
+Status: **Queued maintenance, not implemented or a passing-test claim.**
+Owners: `tests/repository_inventory.py` and `tests/test_repository_inventory.py`.
+
+Complete the scanner's union schema before preparing SQL JOIN read observations.
+Acceptance: a dynamically declared joined table must not silently erase an
+actual translation-reader observation. If preparation cannot be established,
+retain an explicit uncertainty; missing preparation never authorizes deletion.
+
+This item corrects the scanner follow-up's mistaken C21 label. C21 remains the
+deferred SA news-density capability above; C01-C21 and all other candidate
+dispositions remain unchanged. Existing census measurements and raw
+uncertainties are preserved.
+
 ### Protected Controls And Remaining Review Queues
 
 - Retain `src/api/__main__.py`, `src/api/app.py`, `src/sa_native_host.py`,
