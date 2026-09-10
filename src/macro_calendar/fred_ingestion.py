@@ -202,6 +202,8 @@ def fetch_fred_release_dates(
             )
             if ok:
                 stats.release_dates_upserted += 1
+            else:
+                stats.errors.append(f"release_dates({rid}): write failed")
     return stats
 
 
@@ -295,7 +297,7 @@ def _ingest_one(
     if meta is None:
         stats.errors.append(f"{entry.series_id}: metadata missing")
         return
-    store.upsert_macro_series({
+    if not store.upsert_macro_series({
         "series_id": meta.series_id,
         "title": meta.title,
         "frequency": meta.frequency,
@@ -303,7 +305,8 @@ def _ingest_one(
         "seasonal_adjustment": meta.seasonal_adjustment,
         "last_updated": meta.last_updated,
         "revision_strategy": entry.revision_strategy,
-    })
+    }):
+        raise FREDError("metadata write failed")
 
     obs_start = entry.observation_start or catalog.observation_start
     if not full_refresh and entry.revision_strategy == "latest_only":
@@ -361,6 +364,8 @@ def _ingest_latest_only(
         )
         if ok:
             stats.observations_upserted += 1
+        else:
+            stats.errors.append(f"{entry.series_id}: observation write failed")
 
 
 def _ingest_full_vintages(
@@ -401,6 +406,8 @@ def _ingest_full_vintages(
         )
         if ok:
             stats.observations_upserted += 1
+        else:
+            stats.errors.append(f"{entry.series_id}: observation write failed")
 
 
 # ALFRED accepts the full history range when realtime_start='1776-07-04'

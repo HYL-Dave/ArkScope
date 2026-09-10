@@ -443,13 +443,71 @@ describe("Data schedule controls", () => {
     release.harness.unmount();
   });
 
-  it("failed skipped and busy macro runs do not invalidate stored data keys", async () => {
-    for (const status of ["failed", "skipped", "busy"]) {
+  it("skipped and busy macro runs do not invalidate stored data keys", async () => {
+    for (const status of ["skipped", "busy"]) {
       const result = await transitionFromRunning("fred_series", status);
       expect(result.cache.inspect("macro_status"), status).toMatchObject({ status: "fresh" });
       expect(result.cache.inspect("macro_snapshot"), status).toMatchObject({ status: "fresh" });
       result.harness.unmount();
     }
+  });
+
+  it.each([
+    ["fred_series", "missing"],
+    ["fred_release_dates", "fresh"],
+    ["finnhub_economic_calendar", "fresh"],
+    ["finnhub_earnings_calendar", "fresh"],
+    ["finnhub_ipo_calendar", "fresh"],
+  ])("failed macro attempts for %s invalidate possible committed writes", async (id, snapshotStatus) => {
+    const { cache, harness } = await transitionFromRunning(id, "failed");
+    expect(cache.inspect("macro_status")).toEqual({ status: "missing" });
+    expect(cache.inspect("macro_snapshot")).toMatchObject({ status: snapshotStatus });
+    expect(cache.inspect("news_status")).toMatchObject({ status: "fresh" });
+    harness.unmount();
+  });
+
+  it.each([
+    ["fred_series", "missing"],
+    ["fred_release_dates", "fresh"],
+    ["finnhub_economic_calendar", "fresh"],
+    ["finnhub_earnings_calendar", "fresh"],
+    ["finnhub_ipo_calendar", "fresh"],
+  ])("partial macro completion for %s invalidates only owned cache keys", async (id, snapshotStatus) => {
+    const { cache, harness } = await transitionFromRunning(id, "partial");
+    expect(cache.inspect("macro_status")).toEqual({ status: "missing" });
+    expect(cache.inspect("macro_snapshot")).toMatchObject({ status: snapshotStatus });
+    expect(cache.inspect("news_status")).toMatchObject({ status: "fresh" });
+    harness.unmount();
+  });
+
+  it.each(["partial", "failed"])("fast %s macro completions invalidate once without an observed running state", async (status) => {
+    const cache = createSettingsReadCache();
+    controls.schedule = response([["fred_series"]]);
+    const harness = await renderControls({ cache });
+    cache.replace("macro_status", { marker: "status" });
+    cache.replace("macro_snapshot", { marker: "snapshot" });
+    cache.replace("news_status", { marker: "news" });
+    controls.schedule = response([["fred_series", {
+      last_attempt_at: "2026-08-13T01:10:00Z",
+      last_result: { source: "fred_series", status, at: "2026-08-13T01:10:01Z" },
+      durable_state: {
+        last_status: status,
+        last_error: `macro_collection_${status}`,
+        continuation: null,
+        last_attempt: "2026-08-13T01:10:00Z",
+        updated_at: "2026-08-13T01:10:01Z",
+      },
+    }]]);
+    await act(async () => { await harness.current().pollSchedule(); });
+    expect(cache.inspect("macro_status")).toEqual({ status: "missing" });
+    expect(cache.inspect("macro_snapshot")).toEqual({ status: "missing" });
+    expect(cache.inspect("news_status")).toMatchObject({ status: "fresh" });
+    cache.replace("macro_status", { marker: "new status" });
+    cache.replace("macro_snapshot", { marker: "new snapshot" });
+    await act(async () => { await harness.current().pollSchedule(); });
+    expect(cache.inspect("macro_status")).toMatchObject({ status: "fresh" });
+    expect(cache.inspect("macro_snapshot")).toMatchObject({ status: "fresh" });
+    harness.unmount();
   });
 
   it("classifies future macro sources by write target and fails closed to both macro keys", async () => {

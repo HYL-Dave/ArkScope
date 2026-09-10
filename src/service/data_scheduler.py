@@ -1235,6 +1235,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         writer_partial = False
         price_partial = False
         adapter_partial = False
+        macro_partial = False
         price_audit_error: Optional[str] = None
         preserve_continuation_on_failure = None
         try:
@@ -1264,13 +1265,16 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
 
             if d.writes_macro_db and macro_preflight_failure is None:
                 from src.api.dependencies import get_dal
-                from src.macro_calendar.execution import execute_macro_job
+                from src.macro_calendar.execution import (
+                    execute_macro_job,
+                    normalize_macro_collection_result,
+                )
 
                 if d.backend_job_name is None or macro_writer_lease is None:
                     raise RuntimeError("macro source missing canonical execution authority")
                 if runtime_dal is None:
                     runtime_dal = get_dal()
-                result["collect"] = execute_macro_job(
+                macro_result = execute_macro_job(
                     d.backend_job_name,
                     runtime_dal,
                     (
@@ -1280,6 +1284,15 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     ),
                     writer_lease=macro_writer_lease,
                 )
+                result["collect"] = normalize_macro_collection_result(
+                    d.backend_job_name, macro_result,
+                )
+                macro_status = result["collect"]["status"]
+                ok = macro_status != "failed"
+                macro_partial = macro_status == "partial"
+                error = result["collect"].get("error_code")
+                if error is not None:
+                    result["error"] = error
             elif news_route is not None and news_route.mode == NewsWriteMode.NORMALIZED:
                 pending_writer_continuation = (
                     pending_cont if trigger_source != "scheduler" else None
@@ -1482,7 +1495,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 error = None
             else:
                 ok = False
-                error = str(e)[:_ERROR_TAIL]
+                error = "macro_collection_failed" if d.writes_macro_db else str(e)[:_ERROR_TAIL]
                 result["error"] = error
                 logger.warning(f"scheduler source {source} failed: {error}")
 
@@ -1491,7 +1504,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
         continuation = None
         if result.get("status") == "skipped":
             continuation = pending_cont if pending_cont is not None else None
-        elif ok and (writer_partial or price_partial or adapter_partial):
+        elif ok and (writer_partial or price_partial or adapter_partial or macro_partial):
             result["status"] = "partial"
             continuation = writer_continuation if writer_partial else None
             if continuation is not None:
@@ -1514,7 +1527,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             logger.debug("scheduler_state record_outcome failed for %s", source, exc_info=True)
         if store is not None and run_id is not None:
             try:
-                audit_failed = (not ok) or price_partial
+                audit_failed = (not ok) or price_partial or macro_partial
                 audit_error = price_audit_error if price_partial else error
                 store.finish_run(
                     run_id,

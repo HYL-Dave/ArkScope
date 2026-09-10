@@ -28,6 +28,54 @@ def is_macro_job(job_name: str) -> bool:
     return job_name in MACRO_JOB_NAMES
 
 
+def normalize_macro_collection_result(job: str, raw: Any) -> Dict[str, Any]:
+    """Validate ingestion stats and discard provider text before persistence."""
+    invalid = {"status": "failed", "error_code": "macro_result_invalid"}
+    if job in {"fetch_fred_series", "fetch_fred_release_dates"}:
+        counter_keys = (
+            "series_processed", "series_skipped", "observations_upserted",
+            "observations_skipped_no_release", "release_dates_upserted",
+        )
+        completed_keys = (
+            ("observations_upserted",) if job == "fetch_fred_series"
+            else ("release_dates_upserted",)
+        )
+    elif job in {
+        "fetch_economic_calendar_recent", "fetch_economic_calendar_backfill",
+        "fetch_earnings_calendar", "fetch_ipo_calendar",
+    }:
+        counter_keys = (
+            "events_inserted", "events_mutated", "events_unchanged", "events_skipped",
+        )
+        completed_keys = ("events_inserted", "events_mutated", "events_unchanged")
+    else:
+        return invalid
+    if not isinstance(raw, dict):
+        return invalid
+    counters = {key: raw.get(key) for key in counter_keys}
+    errors = raw.get("errors")
+    # Both ingestion dataclasses emit every counter and a list of strings.
+    if (any(isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for value in counters.values())
+            or not isinstance(errors, list)
+            or any(not isinstance(error, str) for error in errors)):
+        return invalid
+    # Empty provider responses and unchanged rows are legitimate completed runs.
+    completed = sum(counters[key] for key in completed_keys)
+    status = "succeeded" if not errors else ("partial" if completed else "failed")
+    result = {
+        **counters,
+        "status": status,
+        "error_count": len(errors),
+        "errors": ["macro_collection_error"] * len(errors),
+    }
+    if errors:
+        result["error_code"] = (
+            "macro_collection_partial" if status == "partial" else "macro_collection_failed"
+        )
+    return result
+
+
 def _watchlist_tickers(dal: Any) -> List[str]:
     watchlist = dal.get_watchlist(include_sectors=False)
     return list(getattr(watchlist, "tickers", []) or [])

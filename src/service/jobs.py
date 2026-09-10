@@ -400,6 +400,14 @@ def run_job(
     if params:
         payload.update(params)
 
+    from src.macro_calendar.execution import (
+        execute_macro_job,
+        is_macro_job,
+        normalize_macro_collection_result,
+    )
+    from src.macro_calendar.write_lock import MacroCalendarBusy
+
+    macro_job = is_macro_job(job.name)
     started_at = _mark_running(job.name)
     store = get_job_runs_store(dal)
     run_id = store.create_run(
@@ -407,10 +415,10 @@ def run_job(
     )
 
     try:
-        from src.macro_calendar.execution import execute_macro_job, is_macro_job
-
-        if is_macro_job(job.name):
-            result = execute_macro_job(job.name, dal, payload)
+        if macro_job:
+            result = normalize_macro_collection_result(
+                job.name, execute_macro_job(job.name, dal, payload),
+            )
         elif job.name == "monitor_watchlist_scan":
             result = _run_monitor_watchlist_scan(dal, payload)
         elif job.name == "extract_sa_comment_signals":
@@ -419,10 +427,16 @@ def run_job(
             raise UnknownJobError(job.name)
 
         finished_at = _utcnow_iso()
-        message = _summarize_result(job.name, result)
+        status: JobState = "succeeded"
+        error = None
+        if macro_job and result["status"] != "succeeded":
+            # job_runs has no partial state; keep that detail in the result.
+            status = "failed"
+            error = result["error_code"]
+        message = error or _summarize_result(job.name, result)
         _mark_finished(
             job.name,
-            status="succeeded",
+            status=status,
             message=message,
             result=result,
             finished_at=finished_at,
@@ -430,13 +444,14 @@ def run_job(
         if run_id is not None:
             store.finish_run(
                 run_id,
-                status="succeeded",
+                status=status,
                 message=message,
+                error=error,
                 result=result,
             )
         return JobRunResult(
             name=job.name,
-            status="succeeded",
+            status=status,
             message=message,
             started_at=started_at,
             finished_at=finished_at,
@@ -444,7 +459,10 @@ def run_job(
         )
     except Exception as exc:
         finished_at = _utcnow_iso()
-        error_str = str(exc)
+        error_str = (
+            ("macro_calendar_busy" if isinstance(exc, MacroCalendarBusy) else "macro_collection_failed")
+            if macro_job else str(exc)
+        )
         result = {"error": error_str}
         _mark_finished(
             job.name,
@@ -461,6 +479,14 @@ def run_job(
                 error=error_str,
                 result=result,
             )
+        if macro_job:
+            # Keep the API's validation/busy exception contracts without exposing
+            # provider text through the exception or its formatted traceback.
+            if isinstance(exc, MacroCalendarBusy):
+                raise MacroCalendarBusy() from None
+            if isinstance(exc, ValueError):
+                raise ValueError(error_str) from None
+            raise RuntimeError(error_str) from None
         raise
 
 

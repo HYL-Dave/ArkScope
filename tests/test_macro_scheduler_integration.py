@@ -111,7 +111,7 @@ def test_direct_job_failure_records_one_failed_canonical_row(monkeypatch):
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("provider failed")),
     )
 
-    with pytest.raises(RuntimeError, match="provider failed"):
+    with pytest.raises(RuntimeError, match="macro_collection_failed"):
         jobs.run_job(
             "fetch_fred_series",
             dal=object(),
@@ -121,7 +121,7 @@ def test_direct_job_failure_records_one_failed_canonical_row(monkeypatch):
     assert [name for name, _ in telemetry.created] == ["fetch_fred_series"]
     assert len(telemetry.finished) == 1
     assert telemetry.finished[0][1]["status"] == "failed"
-    assert telemetry.finished[0][1]["error"] == "provider failed"
+    assert telemetry.finished[0][1]["error"] == "macro_collection_failed"
 
 
 def test_direct_job_uses_shared_execution_and_records_one_canonical_row(monkeypatch):
@@ -132,8 +132,10 @@ def test_direct_job_uses_shared_execution_and_records_one_canonical_row(monkeypa
     calls: list[tuple[str, Any, dict[str, Any], Any]] = []
 
     def _execute(job_name, dal, params, *, writer_lease=None):
+        from src.macro_calendar.fred_ingestion import IngestionStats
+
         calls.append((job_name, dal, params, writer_lease))
-        return {"series_processed": 2, "observations_upserted": 4}
+        return IngestionStats(series_processed=2, observations_upserted=4).to_dict()
 
     monkeypatch.setattr(jobs, "get_job_runs_store", lambda dal: telemetry)
     monkeypatch.setattr(execution, "execute_macro_job", _execute)
@@ -361,7 +363,7 @@ def test_schedule_failure_records_one_failed_canonical_row(
     result = scheduler.run_source(source, trigger_source="scheduler")
 
     assert result["status"] == "failed"
-    assert result["error"] == "scheduled failure"
+    assert result["error"] == "macro_collection_failed"
     assert [name for name, _ in telemetry.created] == ["fetch_fred_series"]
     assert len(telemetry.finished) == 1
     assert telemetry.finished[0][1]["status"] == "failed"
@@ -380,8 +382,10 @@ def test_schedule_uses_shared_execution_and_records_one_canonical_row(
     calls: list[tuple[str, Any, dict[str, Any], Any]] = []
 
     def _execute(job_name, dal, params, *, writer_lease=None):
+        from src.macro_calendar.fred_ingestion import IngestionStats
+
         calls.append((job_name, dal, params, writer_lease))
-        return {"series_processed": 1, "observations_upserted": 3}
+        return IngestionStats(series_processed=1, observations_upserted=3).to_dict()
 
     dal = object()
     monkeypatch.setattr("src.api.dependencies.get_dal", lambda: dal)
@@ -456,8 +460,10 @@ def test_fred_series_schedule_is_incremental_and_cannot_request_full_refresh(
     )
 
     def _execute(job_name, dal, params, *, writer_lease=None):
+        from src.macro_calendar.fred_ingestion import IngestionStats
+
         params_seen.append(dict(params))
-        return {"series_processed": 1, "observations_upserted": 0}
+        return IngestionStats(series_processed=1).to_dict()
 
     monkeypatch.setattr(execution, "execute_macro_job", _execute)
     result = scheduler.run_source("fred_series", trigger_source="scheduler")
