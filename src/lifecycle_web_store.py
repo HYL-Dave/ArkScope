@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 import json
+import math
 from pathlib import Path
 import re
 import sqlite3
@@ -12,19 +13,43 @@ from uuid import uuid4
 from src.auth_drivers.lifecycle_web_models import WebModelError
 from src.auth_drivers.lifecycle_web_usage import project_usage_report, token_totals, validate_usage_report
 from src.lifecycle_journal_codec import canonical_json, digest_json
-from src.lifecycle_public_sources import PublicSourcePage, _capture_digest, _page_material_digest, canonical_source_url, validate_source_read_report
+from src.lifecycle_public_sources import PublicSourcePage, SourceReadLimits, _capture_digest, _page_material_digest, canonical_source_url, validate_source_read_report
 from src.lifecycle_web_schema import RUNNING, TERMINAL, WebJournalError, install_web_journal, verify_web_journal
 from src.security_lifecycle_provider_snapshot import instant
 from src.security_lifecycle_schema import assert_lifecycle_writes_available
 from src.security_lifecycle_web_contract import ExecutionSelection, PublicInvestigationInput, RunControl, validate_selection
 from src.security_lifecycle_web_finding import validate_finding
 from src.lifecycle_source_context import parse_source_context
-from src.security_lifecycle_web_pipeline import WebInvestigationOptions
 
 
 LEASE_SECONDS = 60
 JOURNAL_BUSY_SECONDS = 45
 _MISSING_SOURCE_URLS = object()
+
+
+@dataclass(frozen=True)
+class WebInvestigationOptions:
+    """Decode the existing journal header without importing an orchestrator."""
+
+    max_sources: int
+    max_source_requests: int
+    max_redirects: int
+    max_source_bytes: int
+    source_timeout_seconds: float
+    model_timeout_seconds: float
+    max_search_uses: int
+    output_token_limit: int | None
+    effort: str | None
+    max_decoded_source_bytes: int | None = None
+
+    def __post_init__(self):
+        if (type(self.max_sources) is not int or self.max_sources <= 0
+                or type(self.max_search_uses) is not int or self.max_search_uses <= 0
+                or type(self.model_timeout_seconds) not in (int, float)
+                or not math.isfinite(self.model_timeout_seconds) or self.model_timeout_seconds <= 0):
+            raise ValueError("web_investigation_limits")
+        SourceReadLimits(self.max_source_requests, self.max_redirects, self.max_source_bytes, self.source_timeout_seconds,
+                         self.max_decoded_source_bytes)
 
 
 def _identity(value):
