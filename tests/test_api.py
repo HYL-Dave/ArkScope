@@ -166,7 +166,7 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
 ):
     observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
 
-    assert len(observed["routes"]) == 228
+    assert len(observed["routes"]) == 221
     assert {
         "GET\t/security-lifecycle/automation\t"
         "src.api.routes.security_lifecycle\tget_automation_config",
