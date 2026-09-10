@@ -284,7 +284,7 @@ news = ticker.news
 | Finnhub | 無硬限制 | 建議每 30 天一次 |
 | Massive | 1000 條記錄 | 使用 pagination |
 | Tiingo | 無限制 | 可一次取多年 |
-| SEC EDGAR | 無限制 | 單次取完整歷史 |
+| SEC EDGAR | 受 `SecTransport` 回應大小上限約束 | 現有 filing 讀取以 recent 為主；完整歷史目錄尚待研究服務實作 |
 | yfinance | 無限制 | 可一次取完整歷史 |
 
 ---
@@ -325,115 +325,31 @@ revenue = facts['facts']['us-gaap']['Revenues']['units']['USD']
 
 ---
 
-## edgartools 套件 (推薦)
+## SEC EDGAR 現行整合
 
-### 安裝
-```bash
-pip install edgartools
-```
+目前使用專案內的 SEC client，不新增 edgartools 依賴或外部 CLI。
 
-### 為什麼使用 edgartools？
+| 現行 owner | 程式碼 | 責任 |
+|-----------|--------|------|
+| `SECEdgarDataSource` | `data_sources/sec_edgar_source.py` | CIK 解析、submissions、filing metadata、Company Facts 與受限的文件文字讀取 |
+| `SECEdgarFinancials` | `data_sources/sec_edgar_financials.py` | 使用 `SECEdgarDataSource` 將財務事實映射為損益表、資產負債表與現金流量表，並提供 filing 列表 |
+| `SecTransport` | `data_sources/sec_transport.py` | 共用 SEC HTTP 邊界，檢查身份、限制回應大小並執行有界重試 |
+| `SecRequestGovernor` | `data_sources/sec_transport.py` | 共用跨程序節流，協調 SEC 請求的起始間隔 |
 
-`edgartools` 是專門為 SEC EDGAR 設計的 Python 套件，優點：
+### 已有的讀取能力
 
-1. **直接解析 10-K 章節** - Business, Risk Factors, MD&A 等
-2. **XBRL 自動處理** - 不需要手動解析 XML
-3. **DataFrame 輸出** - 財務報表直接轉為 pandas
-4. **內建速率限制** - 自動遵守 SEC 的 10 req/sec 限制
+`SECEdgarDataSource.get_cik`、`fetch_submissions` 與 `fetch_company_facts`
+直接讀取 SEC 資料；`SECEdgarFinancials` 提供上層財報映射。
+`src/tools/sec_tools.py::get_sec_filings` 是目前可用的直接 EDGAR metadata 工具。
+現有 filing 讀取以 `filings.recent` 為主，不能視為完整歷史目錄；
+`fetch_filing_document_text` 的受限文字讀取也不等同持久化章節擷取與可重現引用。
 
-### 基本使用
+### 尚未實作的持久化研究服務
 
-```python
-from edgar import set_identity, Company
-
-# SEC 要求身份識別
-set_identity("your.name@example.com")
-
-# 取得公司
-company = Company("AAPL")
-
-# 取得 10-K 財報列表
-filings_10k = company.get_filings(form="10-K")
-print(f"10-K 數量: {len(filings_10k)}")  # 32 份
-
-# 取得最新 10-K 的內容物件
-ten_k = filings_10k[0].obj()
-```
-
-### 提取 10-K 章節內容
-
-```python
-# Item 1: Business 描述
-business = ten_k.business
-print(business[:500])
-
-# Item 1A: Risk Factors
-risk_factors = ten_k.risk_factors
-print(risk_factors[:500])
-
-# Item 7: Management's Discussion and Analysis
-mda = ten_k.management_discussion
-print(mda[:500])
-```
-
-### 實際輸出範例
-
-```
-Item 1.    Business
-
-Company Background
-
-The Company designs, manufactures and markets smartphones, personal
-computers, tablets, wearables and accessories, and sells a variety
-of related services...
-
-Products:
-- iPhone: iPhone 17 Pro, iPhone Air, iPhone 17, iPhone 16, iPhone 16e
-- Mac: MacBook Air, MacBook Pro, iMac, Mac mini, Mac Studio, Mac Pro
-- iPad: iPad Pro, iPad Air, iPad, iPad mini
-- Wearables: Apple Watch, AirPods, Vision Pro
-```
-
-### 10-K 可用屬性
-
-| 屬性 | 說明 |
-|-----|------|
-| `ten_k.business` | Item 1: 公司業務描述 |
-| `ten_k.risk_factors` | Item 1A: 風險因素 |
-| `ten_k.management_discussion` | Item 7: MD&A |
-| `ten_k.financials` | Item 8: 財務報表 (XBRL) |
-| `ten_k.balance_sheet` | 資產負債表 |
-| `ten_k.income_statement` | 損益表 |
-| `ten_k.cash_flow_statement` | 現金流量表 |
-| `ten_k.items` | 所有章節列表 |
-
-### Company Facts (XBRL 結構化數據)
-
-```python
-# 取得所有財務指標
-facts = company.get_facts()
-
-# 也可以直接用 SEC API
-# GET /api/xbrl/companyfacts/CIK0000320193.json
-```
-
-### 與我們現有程式碼的整合
-
-`edgartools` 可以作為 `sec_edgar_source.py` 的補充：
-
-```python
-# 現有: 取得 filing 列表和 XBRL facts
-from data_sources.sec_edgar_source import SECEdgarDataSource
-sec = SECEdgarDataSource()
-filings = sec.fetch_sec_filings(['AAPL'], filing_types=['10-K'])
-facts = sec.fetch_company_facts('AAPL')
-
-# 新增: 用 edgartools 解析 10-K 章節內容
-from edgar import Company
-company = Company("AAPL")
-ten_k = company.get_filings(form="10-K")[0].obj()
-business_text = ten_k.business  # 直接取得純文字
-```
+持久化 filing catalog、具來源追溯的財務事實、文件快照與引用，以及三個新研究工具，
+屬於 [SEC 研究規格](../docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md)
+中的獨立新功能，由規劃中的 `src/sec_research/` 負責，並非現有 client 已完成的能力。
+現有 `get_sec_filings` 在三工具原子替換完成前維持運作。
 
 ---
 
@@ -443,8 +359,8 @@ business_text = ten_k.business  # 直接取得純文字
 |---------|---------|---------|
 | 股價 | Tiingo | yfinance |
 | 新聞 | Finnhub | Alpha Vantage (需過濾) |
-| 財報數據 (結構化) | SEC EDGAR API | edgartools |
-| 財報內容 (文字) | **edgartools** | SEC HTML |
+| 財報數據 (結構化) | `SECEdgarFinancials` | `SECEdgarDataSource.fetch_company_facts` 原始 SEC facts |
+| 財報內容 (文字) | `SECEdgarDataSource.fetch_filing_document_text` 經 `SecTransport` 讀取 SEC HTML | 無獨立備用來源；持久化文件與引用尚待研究服務實作 |
 | 即時報價 | Finnhub | Alpha Vantage |
 | 公司資訊 | Massive | Finnhub |
 

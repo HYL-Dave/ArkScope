@@ -317,7 +317,7 @@ def test_diagnostics_are_bounded_integer_only_and_secret_safe(tmp_path):
     assert len(rendered) < 180
 
 
-def test_all_active_sec_http_callers_use_shared_transport_and_dormant_edgartools_is_unreachable():
+def test_active_sec_http_callers_use_shared_transport_without_abandoned_module_imports():
     direct_owners = (
         Path("data_sources/sec_edgar_source.py"),
         Path("data_sources/sec_edgar_financials.py"),

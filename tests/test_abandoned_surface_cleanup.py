@@ -24,3 +24,18 @@ def test_factory_has_no_placeholder_class_or_export():
     ), "obsolete auth factory placeholder remains"
     exported = (ROOT / "src/auth_drivers/__init__.py").read_text(encoding="utf-8")
     assert "NotImplementedDriver" not in exported
+
+
+def test_current_sec_api_documentation_uses_active_owners():
+    specification = (ROOT / "data_sources/API_SPECIFICATIONS.md").read_text(
+        encoding="utf-8"
+    )
+    for obsolete in ("pip install edgartools", "from edgar import"):
+        assert obsolete not in specification, f"obsolete SEC recommendation: {obsolete}"
+    for owner in (
+        "SECEdgarDataSource",
+        "SECEdgarFinancials",
+        "SecTransport",
+        "SecRequestGovernor",
+    ):
+        assert owner in specification, f"current SEC owner missing: {owner}"
