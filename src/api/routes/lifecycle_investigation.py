@@ -4,11 +4,10 @@ from functools import lru_cache
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from src.api.dependencies import get_ticker_identity_service
 from src.api.permissions import require_db_write, require_profile_state_write
-from src.api.routes.lifecycle_web import ConfirmWebRequest
 from src.api.routes.ticker_identity import _canonical_date
 from src.lifecycle_investigation.controller import InvestigationController
 from src.lifecycle_investigation.news import LocalNews
@@ -86,6 +85,21 @@ class StartRequest(BaseModel):
     preflight_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     request_key: str = Field(pattern=r"^[A-Za-z0-9_.:-]{1,180}$")
     language: Literal["en", "zh-Hant"] = "zh-Hant"
+
+
+class ConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    packet_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    action: Literal["terminal_delisting", "symbol_continuation"]
+    execute_on: str | None = None
+    priority_resolution: Literal["source", "successor"] | None = None
+    unhide_successor: StrictBool = False
+    acknowledge_source_gaps: StrictBool = False
+
+    @field_validator("execute_on")
+    @classmethod
+    def validate_date(cls, value):
+        return _canonical_date(value)
 
 
 @router.get("/targets")
@@ -214,7 +228,7 @@ def review(run_id: str, execute_on: str | None = None, priority_resolution: Lite
 
 
 @router.post("/runs/{run_id}/confirm")
-def adopt(run_id: str, body: ConfirmWebRequest, service=Depends(get_ticker_identity_service)):
+def adopt(run_id: str, body: ConfirmRequest, service=Depends(get_ticker_identity_service)):
     def before_write():
         require_db_write("lifecycle_investigation_confirm", {"run_id": run_id})
         require_profile_state_write("lifecycle_investigation_confirm", {"run_id": run_id})

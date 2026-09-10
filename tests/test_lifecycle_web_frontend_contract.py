@@ -25,10 +25,13 @@ def test_web_frontend_runtime_states_match_backend_in_both_directions():
 
 
 @pytest.mark.parametrize("failure", [None, "sources", "lost"])
-def test_persisted_usage_projection_roundtrips_actual_typescript_reader(tmp_path, monkeypatch, failure):
-    from tests.test_lifecycle_web_usage_journal import run_pipeline
+def test_persisted_usage_projection_roundtrips_actual_typescript_reader(tmp_path, failure):
+    from src.lifecycle_web_projection import project_web_run
+    from tests.test_lifecycle_web_usage_journal import saved_usage_receipt
+    from tests.test_lifecycle_web_store import AT
 
-    value, _, _, _, _ = run_pipeline(tmp_path, monkeypatch, failure=failure)
+    store, identity = saved_usage_receipt(tmp_path, failure=failure)
+    value = project_web_run(store.read(identity), at=AT)
     root = Path(__file__).resolve().parents[1]
     javascript = """
 const fs = require('node:fs'), ts = require('typescript');

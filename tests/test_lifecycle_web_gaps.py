@@ -1,6 +1,5 @@
 import json
 import sqlite3
-from dataclasses import replace
 
 import pytest
 from fastapi import FastAPI
@@ -65,7 +64,7 @@ def test_confirmation_rejects_a_different_gap_disclosure_without_any_write(tmp_p
 
 @pytest.mark.parametrize("acknowledgement", ["omitted", False, None, 1, "true"])
 def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monkeypatch, acknowledgement):
-    from src.api.routes import lifecycle_web as api
+    from src.api.routes import lifecycle_investigation as api
     c = context(tmp_path, completion=COMPLETION)
     app = FastAPI()
     app.include_router(api.router)
@@ -73,7 +72,7 @@ def test_old_or_malformed_confirmation_cannot_apply_unshown_gaps(tmp_path, monke
     monkeypatch.setattr(api, "require_db_write", lambda *args: None)
     monkeypatch.setattr(api, "require_profile_state_write", lambda *args: None)
     with TestClient(app) as client:
-        route = f"/security-lifecycle/web-runs/{c['run_id']}"
+        route = f"/security-lifecycle/investigations/runs/{c['run_id']}"
         packet = client.get(route + "/review").json()
         assert packet["ready"] and packet["source_gaps"] == GAPS
         body = {"packet_sha256": packet["packet_sha256"], "action": packet["action"], **packet["options"]}
@@ -213,33 +212,6 @@ def test_current_active_otc_evidence_still_vetoes_attended_adoption_with_read_ga
     packet = prepare(c)
     assert not packet["ready"] and "web_active_listing_conflict" in packet["block_reasons"]
     assert packet["source_gaps"] == GAPS and "OLD" in c["sources"]()
-
-
-@pytest.mark.parametrize("malformed", [False, True])
-def test_real_controller_persists_gap_urls_or_reports_a_typed_invalid_gap_record(tmp_path, monkeypatch, malformed):
-    from src import security_lifecycle_web_pipeline as mod
-    from tests.test_security_lifecycle_web_pipeline import Reader, _fake_model
-    from tests.test_lifecycle_web_controller import controller, launch, wait_done
-    calls, reader = [], Reader(fail=True)
-    monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls, sources=["https://ir.example.com/notice", URL]))
-
-    async def run(*args, **kwargs):
-        result = await mod.investigate(*args, **kwargs)
-        return replace(result, source_failure_urls=None) if malformed else result
-
-    service, store, credentials = controller(tmp_path, runner=run, reader_factory=lambda limits: reader)
-    try:
-        identity = launch(service)["run_id"]
-        result = wait_done(service, identity)
-        assert len(calls) == 2 and len(reader.urls) == 2 and len(credentials) == 1
-        if malformed:
-            assert result["status"] == "failed" and result["failure_code"] == "web_source_gaps_invalid"
-            assert result["finding"] is None
-        else:
-            assert result["status"] == "succeeded" and result["source_gaps"] == GAPS
-            assert store.read(identity)["source_failure_urls"] == COMPLETION["source_failure_urls"]
-    finally:
-        service.close()
 
 
 def test_legacy_read_gap_is_visible_without_inventing_a_source_url(tmp_path):

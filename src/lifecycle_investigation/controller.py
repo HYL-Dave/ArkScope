@@ -1,14 +1,16 @@
 """Background execution with a durable journal; reopening never redispatches."""
 
 import asyncio
-from threading import Event, Thread
+from dataclasses import dataclass
+import math
+from threading import Event, RLock, Thread
+from uuid import uuid4
 
 from src.auth_drivers.lifecycle_web_models import WebModelError
 from src.lifecycle_investigation.agent import AgentFailure, run_agent
 from src.lifecycle_investigation.runtime import InvestigationRuntime
 from src.lifecycle_investigation.store import safe_code
 from src.lifecycle_investigation.target import Target
-from src.lifecycle_web_controller import LifecycleWebController
 from src.security_lifecycle_provider_snapshot import instant
 from src.security_lifecycle_web_contract import ExecutionSelection
 
@@ -44,15 +46,60 @@ def project_job(row, *, at):
                   for step in row["steps"]]}
 
 
-class InvestigationController(LifecycleWebController):
+@dataclass
+class _Worker:
+    control: object
+    thread: Thread | None = None
+    failure: str | None = None
+
+
+class InvestigationController:
     def __init__(self, store, *, credential_loader, news_factory, before_dispatch=lambda: None,
                  runner=run_agent, reader_factory=None, heartbeat_seconds=2):
-        super().__init__(store, credential_loader=credential_loader, before_dispatch=before_dispatch,
-            runner=runner, reader_factory=reader_factory, heartbeat_seconds=heartbeat_seconds)
+        if not math.isfinite(heartbeat_seconds) or not 0 < heartbeat_seconds < 30:
+            raise ValueError("web_heartbeat_interval")
+        self.store = store
+        self.credential_loader = credential_loader
+        self.before_dispatch = before_dispatch
+        self.runner = runner
+        self.reader_factory = reader_factory
+        self.heartbeat_seconds = heartbeat_seconds
         self.news_factory = news_factory
+        self.owner = "worker-" + uuid4().hex
+        self._lock = RLock()
+        self._workers = {}
+        self._closed = False
 
     def reconcile(self):
         self.store.recover()
+
+    def start(self, **request):
+        with self._lock:
+            if self._closed:
+                raise WebModelError("web_worker_unavailable")
+            self.before_dispatch()
+            self.reconcile()
+            # No pending queue whose lease can expire before dispatch.
+            if len(self._workers) >= 2:
+                raise WebModelError("web_worker_busy")
+            result = self.store.start(**request, owner=self.owner)
+            if not result["created"]:
+                return result
+            identity = result["run_id"]
+            worker = _Worker(self.store.control(identity, owner=self.owner))
+            worker.thread = Thread(target=self._execute, args=(identity, worker), name="lifecycle-investigation", daemon=True)
+            self._workers[identity] = worker
+            try:
+                worker.thread.start()
+            except BaseException:
+                self._workers.pop(identity, None)
+                self.store.finish(identity, owner=self.owner, status="failed", failure_code="web_worker_unavailable")
+                raise
+            return result
+
+    def is_local_running(self, identity):
+        with self._lock:
+            return identity in self._workers
 
     def read(self, identity):
         return project_job(self.store.read(identity, include_sources=False), at=self.store._now())
@@ -60,6 +107,30 @@ class InvestigationController(LifecycleWebController):
     def latest(self, ticker):
         row = self.store.latest(ticker)
         return None if row is None else project_job(row, at=self.store._now())
+
+    def cancel(self, identity):
+        # Stop locally before any fallible cancellation acknowledgement write.
+        with self._lock:
+            worker = self._workers.get(identity)
+            if worker is not None:
+                worker.control.request_stop()
+        self.store.request_cancel(identity)
+        return self.read(identity)
+
+    def close(self):
+        with self._lock:
+            self._closed = True
+            workers = list(self._workers.items())
+            for _, worker in workers:
+                worker.control.request_stop()
+        for identity, _ in workers:
+            try:
+                self.store.request_cancel(identity)
+            except Exception:
+                # A failed journal write must not bypass remote cleanup joins.
+                pass
+        for _, worker in workers:
+            worker.thread.join()
 
     def _execute(self, identity, worker):
         heartbeat_done = Event()

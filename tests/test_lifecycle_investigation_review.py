@@ -16,7 +16,7 @@ from src.ticker_identity_transition import TransitionOptions
 from tests.test_lifecycle_investigation_agent import completed, choose
 from tests.test_lifecycle_investigation_findings import NOTICE, payload
 from tests.test_lifecycle_investigation_news import corpus
-from tests.test_lifecycle_web_preflight import setup
+from tests.lifecycle_investigation_fixtures import synthetic_credentials
 from tests.test_security_lifecycle_terminal_workflow import setup_workflow
 
 
@@ -24,11 +24,11 @@ def context(tmp_path, *, finding_edit=lambda value: value, provider="openai", au
     c = setup_workflow(tmp_path, assess=False, event_available=False)
     c["now"][0] = "2026-09-08T01:00:00Z"
     c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
-    old, _, route = setup(c, provider=provider, auth=auth)
+    credentials, _, route = synthetic_credentials(provider=provider, auth=auth)
     with sqlite3.connect(c["profile"]) as conn:
         install_journal(conn, at=c["now"][0])
         conn.execute("DELETE FROM security_lifecycle_cases")
-    preflight = TargetPreflight(c["service"], credential_store=old.credential_store, route_loader=lambda: route,
+    preflight = TargetPreflight(c["service"], credential_store=credentials, route_loader=lambda: route,
         market_path=c["market"], sa_path=c["sa"])
     binding, _ = preflight._material("OLD")
     store = InvestigationStore(c["profile"], clock=lambda: c["now"][0])

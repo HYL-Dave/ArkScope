@@ -199,23 +199,25 @@ async def test_claude_unowned_or_absent_terminal_still_leaves_remote_outcome_unk
     assert clients[0].closed and control.model_requests == 1
 
 
-def test_claude_mixed_model_result_is_durable_failure_without_analysis_or_fallback(monkeypatch, tmp_path):
-    from src.security_lifecycle_web_pipeline import investigate
-    from tests.test_lifecycle_web_controller import controller, launch, wait_done
+def test_claude_mixed_model_result_is_durable_current_failure_without_followup_or_fallback(monkeypatch, tmp_path):
+    from dataclasses import asdict
+    from src.lifecycle_investigation.agent import run_agent
+    from tests.lifecycle_investigation_fixtures import controller, wait_done
 
     mod, clients = _setup(monkeypatch, result={
         "model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}})
     selected = _request().selection
-    service, store, loads = controller(tmp_path, runner=investigate,
-        loader=lambda selected: WebCredential(selected, token_record=StoredTokenRecord("selected-token")))
+    service, store, loads, binding = controller(tmp_path, runner=run_agent,
+        loader=lambda selected: WebCredential(selected, generation="generation-1", token_record=StoredTokenRecord("selected-token")))
+    binding["selection"] = asdict(selected)
     try:
-        run = launch(service, selected=selected)
+        run = service.start(binding=binding, request_key="mixed-model")
         result = wait_done(service, run["run_id"])
         assert result["status"] == "failed"
         assert result["failure_code"] == "execution_identity_changed"
-        assert result["finding"] is None and result["model_submissions"] == 1
+        assert result["finding"] is None and result["stats"]["model_submissions"] == 1
         calls = store.read(run["run_id"])["calls"]
-        assert set(calls) == {"search-1"} and calls["search-1"]["terminal"] == "completed"
+        assert len(calls) == 1 and calls[0]["terminal"] == "completed"
         assert len(clients) == 1 and len(loads) == 1
     finally:
         service.close()
@@ -253,6 +255,25 @@ async def test_claude_web_requires_owned_terminal_and_exact_output(monkeypatch, 
     with pytest.raises(WebModelError, match=code):
         await mod.call_claude_web(request, credential, control)
     assert clients[0].closed and control.model_requests == 1
+
+
+@pytest.mark.anyio
+async def test_expanded_claude_search_allows_twelve_and_denies_the_thirteenth_before_execution():
+    from src.auth_drivers.lifecycle_web_claude import WebToolGate, _tool_round_trip_limit
+
+    selected = validate_selection("anthropic", "claude_code_oauth", "claude-sonnet-5", "local:7")
+    control = RunControl(selection=selected, max_model_requests=2)
+    call = ModelCall(selected, "search-1", "search", "Investigate this exact security.", {"type": "object"},
+        "medium", None, 12, 600)
+    gate = WebToolGate(call, control, "owned-session")
+    assert _tool_round_trip_limit(call) == 14
+    for index in range(1, 14):
+        identity = "query-" + str(index)
+        result = await gate.pre_tool({"hook_event_name": "PreToolUse", "session_id": "owned-session",
+            "tool_use_id": identity, "tool_name": "WebSearch", "tool_input": {"query": "public listing " + str(index)}}, identity, {})
+        assert result["hookSpecificOutput"]["permissionDecision"] == ("allow" if index <= 12 else "deny")
+    assert len(gate.search_reservations) == 12 and gate.failure == "search_budget_exhausted"
+    assert control.stop_state != "running" and control.model_requests == 0
 
 
 @pytest.mark.anyio

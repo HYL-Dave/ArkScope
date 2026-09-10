@@ -265,26 +265,35 @@ def test_adoption_prevalidation_never_releases_a_callers_transaction(tmp_path):
         assert conn.in_transaction
 
 
-def test_attended_confirmation_cannot_starve_another_real_web_worker(tmp_path, monkeypatch):
+def test_attended_confirmation_cannot_starve_a_real_current_worker(tmp_path, monkeypatch):
     from src import lifecycle_web_store as journal
     from src.auth_drivers.lifecycle_web_models import WebCredential
-    from src.lifecycle_web_controller import LifecycleWebController
-    from tests.test_lifecycle_web_controller import completed_runner, selection, wait_done
-    from tests.test_security_lifecycle_web_finding import public_input
-    from tests.test_security_lifecycle_web_pipeline import _options
+    from src.lifecycle_investigation.controller import InvestigationController
+    from src.lifecycle_investigation.news import LocalNews
+    from src.lifecycle_investigation.schema import install_journal
+    from src.lifecycle_investigation.store import InvestigationStore
+    from src.lifecycle_investigation.target import TargetPreflight
+    from src.auth_drivers.lifecycle_web_models import credential_generation
+    from tests.lifecycle_investigation_fixtures import completed_runner, synthetic_credentials, wait_done
+    from tests.test_lifecycle_investigation_findings import NOTICE
+    from tests.test_lifecycle_investigation_news import corpus
 
     c = context(tmp_path)
     packet = prepare(c)
     with sqlite3.connect(c["profile"]) as conn:
-        conn.execute("INSERT INTO security_lifecycle_cases VALUES (?,?,?,?,?,?)",
-                     ("other-case", "listing_authority", "other-source", "OLD", c["now"][0], c["now"][0]))
+        install_journal(conn, at=c["now"][0])
+    credentials, rows, route = synthetic_credentials()
+    preflight = TargetPreflight(c["service"], credential_store=credentials, route_loader=lambda: route)
+    binding, _ = preflight._material("OLD")
+    news_path = corpus(tmp_path, body=NOTICE)
+    store = InvestigationStore(c["profile"], clock=lambda: c["now"][0])
     started, validating, progress = Event(), Event(), []
     main_thread = current_thread()
     original = journal.validate_finding
     connect = sqlite3.connect
 
     def scaled_connection(*args, **kwargs):
-        if kwargs.get("timeout") == journal.JOURNAL_BUSY_SECONDS:
+        if kwargs.get("timeout") in {journal.JOURNAL_BUSY_SECONDS, 10}:
             kwargs["timeout"] = 0.05
         return connect(*args, **kwargs)
 
@@ -295,11 +304,11 @@ def test_attended_confirmation_cannot_starve_another_real_web_worker(tmp_path, m
         progress.append("model_and_source_terminal")
         return result
 
-    controller = LifecycleWebController(c["web"], credential_loader=lambda selected: WebCredential(selected, api_key="synthetic"),
-                                        runner=runner, heartbeat_seconds=0.02)
+    controller = InvestigationController(store,
+        credential_loader=lambda selected: WebCredential(selected, api_key="synthetic", generation=credential_generation(rows[0])),
+        news_factory=lambda: LocalNews(news_path, None), runner=runner, heartbeat_seconds=0.02)
     try:
-        run = controller.start(case_id="other-case", observation_sha256="a" * 64, request=public_input(),
-            selection=selection(), options=_options("api_key"), request_key="other-worker")
+        run = controller.start(binding=binding, request_key="other-worker")
         assert started.wait(3)
 
         def validate(*args, **kwargs):
@@ -310,7 +319,7 @@ def test_attended_confirmation_cannot_starve_another_real_web_worker(tmp_path, m
                     time.sleep(0.01)
                 assert not controller.is_local_running(run["run_id"])
                 with connect(c["profile"]) as conn:
-                    assert conn.execute("SELECT status,failure_code FROM lifecycle_web_runs WHERE run_id=?", (run["run_id"],)).fetchone() == ("succeeded", None)
+                    assert conn.execute("SELECT status,failure_code FROM lifecycle_investigation_jobs WHERE run_id=?", (run["run_id"],)).fetchone() == ("succeeded", None)
             return original(*args, **kwargs)
 
         monkeypatch.setattr(sqlite3, "connect", scaled_connection)

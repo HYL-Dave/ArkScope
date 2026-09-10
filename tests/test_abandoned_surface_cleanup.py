@@ -30,6 +30,19 @@ def test_sec_company_event_collector_is_physically_absent():
     assert not (ROOT / "src/collectors/sec_corporate_actions.py").exists()
 
 
+@pytest.mark.parametrize("relative", ["src/lifecycle_web_controller.py", "src/lifecycle_web_preflight.py",
+                                      "src/api/routes/lifecycle_web.py"])
+def test_case_scoped_web_execution_is_physically_absent(relative):
+    assert not (ROOT / relative).exists()
+
+
+def test_legacy_cutover_gate_is_absent_but_retained_action_reader_remains():
+    from src.lifecycle_investigation import retirement
+
+    assert not hasattr(retirement, "cutover_active")
+    assert callable(retirement.retained_action_cases)
+
+
 def test_current_sec_api_documentation_uses_active_owners():
     specification = (ROOT / "data_sources/API_SPECIFICATIONS.md").read_text(
         encoding="utf-8"

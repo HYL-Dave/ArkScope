@@ -1,30 +1,60 @@
 import json
 
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
 
 from tests.test_lifecycle_investigation_review import context
 
 
+def test_current_confirmation_dto_is_owned_by_the_current_route():
+    import ast
+    import inspect
+    from src.api.routes import lifecycle_investigation as api
+
+    assert inspect.signature(api.adopt).parameters["body"].annotation.__module__ == api.__name__
+    imports = [node.module for node in ast.walk(ast.parse(inspect.getsource(api)))
+               if isinstance(node, ast.ImportFrom)]
+    assert "src.api.routes.lifecycle_web" not in imports
+
+
+def test_real_app_mounts_current_target_routes_without_starting_its_lifespan():
+    from src.api.app import create_app
+
+    routes = {(method, route.path) for route in create_app().routes for method in route.methods}
+    base = "/security-lifecycle/investigations"
+    assert {("GET", base + "/targets"), ("GET", base + "/targets/{ticker}/preflight"),
+            ("POST", base + "/targets/{ticker}/runs"), ("GET", base + "/targets/{ticker}/latest"),
+            ("GET", base + "/runs/{run_id}"), ("POST", base + "/runs/{run_id}/cancel"),
+            ("GET", base + "/runs/{run_id}/review"), ("POST", base + "/runs/{run_id}/confirm")} <= routes
+
+
+def test_real_app_has_no_case_web_or_web_run_routes():
+    from src.api.app import create_app
+
+    paths = {route.path for route in create_app().routes}
+    assert not {path for path in paths if "/cases/{case_id}/web-" in path or "/web-runs/" in path}
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
+    from src.api.app import create_app
     from src.api.routes import lifecycle_investigation as api, ticker_identity as transitions
     from src.lifecycle_investigation.controller import InvestigationController
     c = context(tmp_path)
     calls = []
     controller = InvestigationController(c["investigation"], credential_loader=lambda selected: calls.append(selected), news_factory=lambda: None)
-    app = FastAPI()
-    app.include_router(api.router)
-    app.include_router(transitions.router)
+    app = create_app()
     app.dependency_overrides[api.get_ticker_identity_service] = lambda: c["service"]
     app.dependency_overrides[api.get_controller] = lambda: controller
     monkeypatch.setattr(api, "require_db_write", lambda *a: None)
     monkeypatch.setattr(api, "require_profile_state_write", lambda *a: None)
     monkeypatch.setattr(transitions, "require_profile_state_write", lambda *a: None)
-    with TestClient(app) as connection:
+    connection = TestClient(app)
+    try:
         yield {**c, "client": connection, "calls": calls}
-    controller.close()
+    finally:
+        connection.close()
+        controller.close()
 
 
 def test_target_routes_read_and_adopt_without_dispatch_or_legacy_queue(client):
@@ -157,3 +187,113 @@ def test_provider_preparation_api_is_bound_to_the_selected_snapshot_without_disp
     assert changed.status_code == 409 and changed.json()["detail"]["code"] == "provider_snapshot_changed"
     invalid = c["client"].post(url + "/prepare", json={"check_sha256": decision["check_sha256"], "execute_on": "September 8"})
     assert invalid.status_code == 422
+
+
+@pytest.mark.parametrize("invalid", [
+    {"api_key": "synthetic"}, {"packet_sha256": "invalid"}, {"action": "other"},
+    {"execute_on": "2026-02-30"}, {"execute_on": "20260908"}, {"priority_resolution": "other"},
+    {"unhide_successor": 1}, {"unhide_successor": "true"}, {"acknowledge_source_gaps": None},
+    {"acknowledge_source_gaps": 1}, {"acknowledge_source_gaps": "true"},
+])
+def test_current_confirmation_rejects_unknown_fields_dates_and_coerced_acknowledgements(client, invalid):
+    c = client
+    base = "/security-lifecycle/investigations/runs/" + c["run_id"]
+    packet = c["client"].get(base + "/review").json()
+    response = c["client"].post(base + "/confirm", json={"packet_sha256": packet["packet_sha256"],
+        "action": packet["action"], **packet["options"], **invalid})
+    assert response.status_code == 422
+    assert "OLD" in c["sources"]() and c["calls"] == []
+
+
+@pytest.mark.parametrize("extra", [{"api_key": "synthetic"}, {"model": "other-model"}, {"url": "https://private.example"}])
+def test_current_start_rejects_credential_model_and_source_overrides(client, extra):
+    from src.api.routes import lifecycle_investigation as api
+    client["client"].app.dependency_overrides[api.get_preflight] = lambda: client["preflight"]
+    response = client["client"].post("/security-lifecycle/investigations/targets/OLD/runs", json={
+        "request_key": "invalid-click", "preflight_sha256": "a" * 64, **extra})
+    assert response.status_code == 422 and client["calls"] == []
+
+
+def test_current_worker_factory_refreshes_only_the_selected_expired_synthetic_credential(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from src.api import dependencies
+    from src.api.routes import lifecycle_investigation as api
+    from src.auth_drivers import chatgpt_oauth_login
+    from src.auth_drivers.token_store import StoredTokenRecord
+    from tests.test_lifecycle_web_models import RecordStore, TokenStore, _selection
+    row = SimpleNamespace(id=7, provider="openai", auth_type="chatgpt_oauth", secret=None)
+    tokens = TokenStore(StoredTokenRecord(access_token="old", expires_at="2000-01-01T00:00:00Z"))
+    observation = object()
+    monkeypatch.setattr(dependencies, "_local_state_db_path", lambda: tmp_path / "not-installed.db")
+    monkeypatch.setattr(dependencies, "get_credential_store", lambda: RecordStore(row))
+    monkeypatch.setattr(dependencies, "get_oauth_token_store", lambda: tokens)
+    monkeypatch.setattr(dependencies, "get_oauth_observation_store", lambda: observation)
+    calls = []
+    fresh = StoredTokenRecord(access_token="fresh", expires_at="2099-01-01T00:00:00Z")
+    def refresh(**kwargs):
+        calls.append(kwargs)
+        return fresh
+    monkeypatch.setattr(chatgpt_oauth_login, "refresh_if_needed", refresh)
+    api.get_controller.cache_clear()
+    try:
+        service = api.get_controller()
+        assert calls == [] and tokens.calls == [] and not (tmp_path / "not-installed.db").exists()
+        result = service.credential_loader(_selection("openai", "chatgpt_oauth"))
+        assert result.token_record is fresh and result.api_key is None
+        assert calls == [{"credential_id": "local:7", "token_store": tokens, "observation_store": observation}]
+    finally:
+        api.shutdown_controller()
+    assert api.get_controller.cache_info().currsize == 0
+
+
+@pytest.mark.parametrize("provider,auth", [("openai", "api_key"), ("openai", "chatgpt_oauth"),
+                                          ("anthropic", "api_key"), ("anthropic", "claude_code_oauth")])
+def test_real_app_current_preflight_start_read_replay_and_adoption(client, tmp_path, provider, auth):
+    from src.api.routes import lifecycle_investigation as api
+    from src.auth_drivers.lifecycle_web_models import WebCredential, credential_generation
+    from src.lifecycle_investigation.controller import InvestigationController
+    from src.lifecycle_investigation.news import LocalNews
+    from src.lifecycle_investigation.target import TargetPreflight
+    from tests.lifecycle_investigation_fixtures import completed_runner, synthetic_credentials, wait_done
+
+    c = client
+    credentials, rows, route = synthetic_credentials(provider=provider, auth=auth)
+    preflight = TargetPreflight(c["service"], credential_store=credentials, route_loader=lambda: route,
+        market_path=c["market"], sa_path=c["sa"])
+    loads = []
+
+    def load(selected):
+        loads.append(selected)
+        return WebCredential(selected, api_key="synthetic-secret", generation=credential_generation(rows[0]))
+
+    controller = InvestigationController(c["investigation"], credential_loader=load, runner=completed_runner,
+        before_dispatch=api.dispatch_permission, news_factory=lambda: LocalNews(tmp_path / "news.db", None, clock=lambda: c["now"][0]))
+    c["client"].app.dependency_overrides[api.get_preflight] = lambda: preflight
+    c["client"].app.dependency_overrides[api.get_controller] = lambda: controller
+    base = "/security-lifecycle/investigations"
+    try:
+        preview = c["client"].get(base + "/targets/OLD/preflight?language=en").json()
+        assert preview["available"] and preview["limits"]["model_submissions"] == 24
+        assert loads == []
+        body = {"request_key": "real-app-click", "preflight_sha256": preview["preflight_sha256"], "language": "en"}
+        started = c["client"].post(base + "/targets/OLD/runs", json=body)
+        assert started.status_code == 202, started.text
+        identity = started.json()["run_id"]
+        assert wait_done(controller, identity)["status"] == "succeeded"
+        run_url = base + "/runs/" + identity
+        result = c["client"].get(run_url).json()
+        assert result["execution"] == {"provider": provider, "auth_mode": auth, "model": route.model, "effort": "high"}
+        assert result["action"] == "terminal_delisting" and result["stats"]["model_submissions"] == 1
+        assert "synthetic-secret" not in json.dumps(result) and "local:7" not in json.dumps(result)
+        assert c["client"].get(base + "/targets/OLD/latest").json() == result
+        assert c["client"].post(base + "/targets/OLD/runs", json=body).json() == {"run_id": identity, "created": False}
+        assert c["client"].post(run_url + "/cancel").json()["status"] == "succeeded"
+        packet = c["client"].get(run_url + "/review").json()
+        assert packet["ready"], packet
+        adopted = c["client"].post(run_url + "/confirm", json={"packet_sha256": packet["packet_sha256"],
+            "action": packet["action"], **packet["options"]})
+        assert adopted.status_code == 200 and adopted.json()["status"] == "applied", adopted.text
+        assert "OLD" not in c["sources"]() and "LIVE" in c["sources"]()
+        assert len(loads) == 1 and c["calls"] == []
+    finally:
+        controller.close()
