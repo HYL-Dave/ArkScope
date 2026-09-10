@@ -10,10 +10,16 @@ from src.security_lifecycle_schema import create_profile_schema, verify_profile_
 from src.security_lifecycle_web_contract import validate_selection
 from src.security_lifecycle_web_finding import WebFinding, strict_schema, validate_finding
 from tests.test_security_lifecycle_web_finding import NOTICE, finding_payload, public_input, source_page
-from tests.test_security_lifecycle_web_pipeline import _options
 
 
 AT = "2026-09-06T01:00:00+00:00"
+
+
+def _options(auth):
+    from src.lifecycle_web_store import WebInvestigationOptions
+    return WebInvestigationOptions(max_sources=2, max_source_requests=4, max_redirects=1, max_source_bytes=65536,
+                                    source_timeout_seconds=3, model_timeout_seconds=3, max_search_uses=2,
+                                    output_token_limit=4096 if auth == "api_key" else None, effort="high")
 
 
 def setup_store(tmp_path, *, install=True):

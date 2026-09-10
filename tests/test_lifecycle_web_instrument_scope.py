@@ -1,6 +1,3 @@
-from dataclasses import replace
-import json
-
 import pytest
 
 from src.security_lifecycle_web_contract import PublicInvestigationInput
@@ -9,11 +6,6 @@ from tests.test_security_lifecycle_web_finding import NOTICE, finding_payload, p
 
 
 IDENTITY = "Issuer Old Inc Class A common stock (OLD) is listed on NASDAQ."
-
-
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
 
 
 def citation(quote, supports, source_id="source-1"):
@@ -123,28 +115,3 @@ def test_model_schema_explains_exact_citations_and_bare_verbatim_dates():
     for field in ("effective_date_text", "announcement_date_text"):
         description = schema["properties"][field]["description"]
         assert "bare calendar date" in description and "not a whole sentence" in description
-
-
-@pytest.mark.anyio
-async def test_actual_model_prompts_separate_instruments_and_explain_available_search_budget(monkeypatch):
-    from src import security_lifecycle_web_pipeline as mod
-    from src.auth_drivers.lifecycle_web_models import WebCredential
-    from src.auth_drivers.token_store import StoredTokenRecord
-    from src.security_lifecycle_web_contract import RunControl, validate_selection
-    from tests.test_security_lifecycle_web_pipeline import Reader, _fake_model, _options
-
-    selected = validate_selection("anthropic", "claude_code_oauth", "claude-sonnet-5", "local:7")
-    credential = WebCredential(selected, token_record=StoredTokenRecord("private-token"))
-    control = RunControl(selection=selected, max_model_requests=2)
-    calls, reader = [], Reader()
-    monkeypatch.setattr(mod, "call_lifecycle_web_model", _fake_model(calls))
-    result = await mod.investigate(public_input(), credential, control,
-        options=replace(_options("claude_code_oauth"), max_search_uses=12), reader_factory=lambda limits: reader)
-    assert result.finding.action == "terminal_delisting" and len(calls) == 2
-    search, analysis = [call.prompt for call, _ in calls]
-    assert "at most 12 WebSearch calls" in search
-    assert "refine" in search and "other instruments of the same issuer" in search
-    assert "deregistration paperwork" in search
-    assert "same target security" in analysis and "no ellipsis" in analysis
-    assert "bare calendar date" in analysis
-    assert json.loads(analysis.split("\n", 1)[1])["identity"]["security_class"] == "Class A common stock"

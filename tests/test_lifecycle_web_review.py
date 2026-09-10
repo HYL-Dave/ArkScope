@@ -12,7 +12,7 @@ from src.security_lifecycle_web_contract import validate_selection
 from src.ticker_identity_transition import TransitionOptions, TickerIdentityTransitionStore
 from tests.test_security_lifecycle_terminal_workflow import setup_workflow
 from tests.test_security_lifecycle_web_finding import NOTICE, finding_payload, public_input, source_page
-from tests.test_security_lifecycle_web_pipeline import _options
+from tests.test_lifecycle_web_store import _options
 
 
 def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting", future=False, sec_case=False,

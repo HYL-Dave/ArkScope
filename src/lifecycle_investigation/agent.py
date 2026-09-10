@@ -22,7 +22,6 @@ from src.lifecycle_investigation.store import safe_code
 from src.lifecycle_public_sources import SourceReadError, SourceReadLimits, canonical_source_url
 from src.lifecycle_journal_codec import digest_json
 from src.security_lifecycle_web_finding import strict_schema
-from src.security_lifecycle_web_pipeline import _read_one
 
 
 ACTION_ARGUMENTS = {
@@ -142,6 +141,32 @@ class AgentFailure(WebModelError):
     def __init__(self, code, result):
         super().__init__(code)
         self.result = result
+
+
+def _running(control):
+    if control.stop_state != "running":
+        raise WebModelError("stop_requested")
+
+
+async def _read_one(reader, url, control, pool):
+    _running(control)
+    future = asyncio.get_running_loop().run_in_executor(pool, reader.read, url)
+    try:
+        while not future.done():
+            if control.stop_state != "running":
+                reader.request_stop()
+            await asyncio.wait({future}, timeout=0.05)
+        value = future.result()
+        _running(control)
+        return value
+    except asyncio.CancelledError:
+        control.request_stop()
+        reader.request_stop()
+        try:
+            await asyncio.shield(future)
+        except Exception:
+            pass
+        raise
 
 
 async def run_agent(target, credential, control, *, runtime, effort, news, provider_observations=None,

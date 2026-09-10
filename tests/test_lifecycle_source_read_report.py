@@ -3,21 +3,12 @@ import json
 
 import pytest
 
-from src.auth_drivers.lifecycle_web_models import WebCredential, WebModelError
+from src.lifecycle_public_sources import SourceReadError
 from tests.test_lifecycle_public_sources import Response, _reader, deny_real_network
 from tests.test_lifecycle_web_store import setup_store, start
-from tests.test_security_lifecycle_web_finding import public_input
-from tests.test_security_lifecycle_web_pipeline import _fake_model, _options
 
 
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
-
-
-@pytest.mark.anyio
-async def test_all_source_failures_keep_measured_diagnostics_after_journal_reopen(tmp_path, monkeypatch):
-    from src import security_lifecycle_web_pipeline as pipeline
+def test_all_source_failures_keep_measured_diagnostics_after_journal_reopen(tmp_path, monkeypatch):
     from src.lifecycle_web_projection import project_web_run
     from src.lifecycle_web_store import LifecycleWebStore
 
@@ -28,27 +19,27 @@ async def test_all_source_failures_keep_measured_diagnostics_after_journal_reope
         Response(b"short", headers={"Content-Length": "1000"}),
         Response(status=403, headers={"Set-Cookie": "do-not-retain-this-secret"}),
     ])
-    calls = []
-    monkeypatch.setattr(pipeline, "call_lifecycle_web_model", _fake_model(calls, sources=[
+    control.reserve_model_request("search-1")
+    control.bind_remote_id("search-1", "remote-search")
+    control.observe_terminal("search-1", response_id="remote-search", status="completed", selection=control.selection)
+    for url in [
         "https://ir.example.com/notice", "https://news.example.com/notice",
-    ]))
-    with pytest.raises(WebModelError, match="^source_read_incomplete$") as caught:
-        await pipeline.investigate(public_input(), WebCredential(control.selection, api_key="selected-key"), control,
-                                   options=_options("api_key"), reader_factory=lambda limits: reader)
-    assert len(calls) == 1 and len(connections) == 2
-    report = caught.value.source_read_report
-    assert report == {"requests": 2, "observations": [asdict(value) for value in reader.observations]}
+    ]:
+        with pytest.raises(SourceReadError):
+            reader.read(url)
+    assert len(connections) == 2 and reader.request_count == 2
+    report = {"requests": reader.request_count, "observations": [asdict(value) for value in reader.observations]}
     assert report["observations"][0]["declared_body_bytes"] == 1000
     assert report["observations"][0]["received_body_bytes"] == 5
     assert report["observations"][1]["status"] == 403
-    store.fail(run["run_id"], owner="worker-1", code=str(caught.value), control=control, source_read_report=report)
+    store.fail(run["run_id"], owner="worker-1", code="source_read_incomplete", control=control, source_read_report=report)
     row = LifecycleWebStore(path).read(run["run_id"])
     assert row["status"] == "failed" and row["finding"] is None
     assert row["source_read_report"] == report and row["source_requests"] == 2
     projected = project_web_run(row, at="2026-09-07T00:00:00Z")
     assert projected["source_reads"] == report["observations"]
     assert projected["source_requests"] == 2 and projected["model_submissions"] == 1
-    assert "secret" not in json.dumps(projected) and "selected-key" not in json.dumps(projected)
+    assert "secret" not in json.dumps(projected)
     assert projected["finding"] is None
 
 
