@@ -119,7 +119,7 @@ def page_private_data_absent(projected):
 @pytest.mark.parametrize("value", [None, [], {"source-1": None}, {}])
 def test_present_but_malformed_journal_context_is_not_treated_as_legacy_full_text(tmp_path, value):
     from tests.test_lifecycle_web_store import setup_store, completed
-    from src.lifecycle_web_store import _json, _sha
+    from src.lifecycle_journal_codec import canonical_json, digest_json
 
     _, store = setup_store(tmp_path)
     identity = completed(store)
@@ -131,7 +131,7 @@ def test_present_but_malformed_journal_context_is_not_treated_as_legacy_full_tex
         trigger = "lifecycle_web_results_update_immutable"
         conn.execute("DROP TRIGGER " + trigger)
         conn.execute("UPDATE lifecycle_web_results SET payload_json=?,result_sha256=? WHERE run_id=?",
-                     (_json(material), _sha(material), identity))
+                     (canonical_json(material), digest_json(material), identity))
         conn.execute(TRIGGERS[trigger])
     with pytest.raises(ValueError, match="^source_context_invalid$"):
         store.read(identity)

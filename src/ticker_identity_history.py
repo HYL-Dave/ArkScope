@@ -7,7 +7,7 @@ from urllib.parse import parse_qsl, urlsplit
 
 from src.lifecycle_public_sources import SourceReadError, canonical_source_url
 from src.lifecycle_web_schema import WebJournalError
-from src.lifecycle_web_store import _sha
+from src.lifecycle_journal_codec import digest_json
 from src.security_lifecycle_investigation import (
     SecurityLifecycleInvestigationStore, assessment_fingerprint, observation_fingerprint,
 )
@@ -118,7 +118,7 @@ def _provider_check(conn, transition, packet):
 
 def _bound_json(encoded, digest):
     value = json.loads(encoded)
-    if _sha(value) != digest or not isinstance(value, dict):
+    if digest_json(value) != digest or not isinstance(value, dict):
         raise ValueError("history_journal_binding")
     return value
 
@@ -157,7 +157,7 @@ def _web_passages(conn, web, citations):
         passages.append({key: page[key] for key in ("source_url", "source_document_sha256", "source_text_sha256", "retrieved_at", "start_byte")})
         passages[-1].update(end_byte=page["start_byte"] + len(quote.encode()), excerpt=quote,
                             cited_text_sha256=hashlib.sha256(quote.encode()).hexdigest())
-    return passages if _sha(passages) == web["passages_sha256"] else []
+    return passages if digest_json(passages) == web["passages_sha256"] else []
 
 
 def _llm(conn, transition, packet, result):
@@ -194,7 +194,7 @@ def _llm(conn, transition, packet, result):
                   observed_at=_time(run["finished_at"]), limitations=_strings(finding.get("limitations", [])))
     if target:
         passages = material["validated"]["passages"]
-        if _sha(passages) != web["passages_sha256"]:
+        if digest_json(passages) != web["passages_sha256"]:
             raise ValueError("history_passage_binding")
         for passage in passages:
             result["sources"].append(_source(gaps=result["gaps"], name=passage["publisher"], url=passage["url"], title=passage["title"],

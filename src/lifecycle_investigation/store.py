@@ -11,8 +11,9 @@ from uuid import uuid4
 from src.auth_drivers.lifecycle_web_models import WebModelError
 from src.lifecycle_investigation.runtime import InvestigationRuntime
 from src.lifecycle_investigation.schema import verify_journal
+from src.lifecycle_journal_codec import canonical_json, digest_json
 from src.lifecycle_public_sources import SourceReadError
-from src.lifecycle_web_store import WebJournalError, _json, _sha
+from src.lifecycle_web_store import WebJournalError
 from src.model_routing import ModelRouteUnavailable
 from src.security_lifecycle_provider_snapshot import instant
 from src.security_lifecycle_schema import assert_lifecycle_writes_available
@@ -47,7 +48,7 @@ def _id(value):
 def _decoded(raw, digest):
     try:
         value = json.loads(raw)
-        if _sha(value) != digest:
+        if digest_json(value) != digest:
             raise ValueError()
         return value
     except (ValueError, TypeError):
@@ -115,14 +116,14 @@ class InvestigationStore:
         with self.connection(write=True) as conn:
             prior = conn.execute("SELECT run_id,header_sha256 FROM lifecycle_investigation_jobs WHERE request_key=?", (request_key,)).fetchone()
             if prior:
-                if prior["header_sha256"] != _sha(binding):
+                if prior["header_sha256"] != digest_json(binding):
                     raise ValueError("investigation_request_changed")
                 return {"run_id": prior["run_id"], "created": False}
             if conn.execute("SELECT 1 FROM lifecycle_investigation_jobs WHERE ticker=? AND status='running'", (target.ticker,)).fetchone():
                 raise ValueError("investigation_running")
             identity = "li_" + uuid4().hex
             conn.execute("INSERT INTO lifecycle_investigation_jobs(run_id,ticker,request_key,header_json,header_sha256,owner,created_at,lease_until,status,phase) "
-                "VALUES(?,?,?,?,?,?,?,?,'running','queued')", (identity, target.ticker, request_key, _json(binding), _sha(binding), owner, at,
+                "VALUES(?,?,?,?,?,?,?,?,'running','queued')", (identity, target.ticker, request_key, canonical_json(binding), digest_json(binding), owner, at,
                     (instant(at) + timedelta(seconds=60)).isoformat()))
         return {"run_id": identity, "created": True}
 
@@ -139,13 +140,13 @@ class InvestigationStore:
         with self.connection(write=True) as conn:
             self._owned(conn, run_id, owner)
             ordinal = conn.execute("SELECT COALESCE(MAX(ordinal),0)+1 FROM lifecycle_investigation_steps WHERE run_id=?", (run_id,)).fetchone()[0]
-            conn.execute("INSERT INTO lifecycle_investigation_steps VALUES(?,?,?,?,?,?)", (run_id, ordinal, kind, _json(payload), _sha(payload), self._now()))
+            conn.execute("INSERT INTO lifecycle_investigation_steps VALUES(?,?,?,?,?,?)", (run_id, ordinal, kind, canonical_json(payload), digest_json(payload), self._now()))
             conn.execute("UPDATE lifecycle_investigation_jobs SET phase=? WHERE run_id=?", (kind, run_id))
 
     def source(self, run_id, *, owner, source_id, payload):
         with self.connection(write=True) as conn:
             self._owned(conn, run_id, owner)
-            conn.execute("INSERT INTO lifecycle_investigation_sources VALUES(?,?,?,?)", (run_id, _id(source_id), _json(payload), _sha(payload)))
+            conn.execute("INSERT INTO lifecycle_investigation_sources VALUES(?,?,?,?)", (run_id, _id(source_id), canonical_json(payload), digest_json(payload)))
 
     def reserve_call(self, run_id, *, owner, call_id):
         with self.connection(write=True) as conn:
@@ -178,7 +179,7 @@ class InvestigationStore:
             if status == "succeeded":
                 self._require_success(conn, run_id, payload)
             if payload is not None:
-                conn.execute("INSERT INTO lifecycle_investigation_results VALUES(?,?,?,?)", (run_id, _json(payload), _sha(payload), self._now()))
+                conn.execute("INSERT INTO lifecycle_investigation_results VALUES(?,?,?,?)", (run_id, canonical_json(payload), digest_json(payload), self._now()))
             conn.execute("UPDATE lifecycle_investigation_jobs SET status=?,finished_at=?,failure_code=? WHERE run_id=?",
                 (status, self._now(), failure_code, run_id))
 

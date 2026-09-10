@@ -53,7 +53,7 @@ def test_attended_web_source_validation_leaves_other_profile_writers_available(t
 def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path, change):
     from dataclasses import asdict
     from src.lifecycle_web_schema import TRIGGERS, WebJournalError
-    from src.lifecycle_web_store import _json, _sha
+    from src.lifecycle_journal_codec import canonical_json, digest_json
     from tests.test_security_lifecycle_web_finding import source_page
 
     c = context(tmp_path)
@@ -61,7 +61,7 @@ def test_validated_web_read_rechecks_its_binding_inside_the_transaction(tmp_path
     with c["web"].connection(write=True) as conn:
         if change == "source_added":
             material = asdict(source_page("A new source not covered by the verified read."))
-            conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", _json(material), _sha(material)))
+            conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (c["run_id"], "source-2", canonical_json(material), digest_json(material)))
         elif change == "terminal_state":
             conn.execute("UPDATE lifecycle_web_runs SET status='failed',failure_code='web_execution_failed' WHERE run_id=?", (c["run_id"],))
         elif change == "cancellation":

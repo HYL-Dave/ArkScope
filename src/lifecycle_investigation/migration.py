@@ -6,8 +6,8 @@ from pathlib import Path
 import sqlite3
 
 from src.lifecycle_investigation.schema import installed, schema_digest, verify_journal, _install_on_connection
+from src.lifecycle_journal_codec import digest_json
 from src.lifecycle_web_migration import _backup
-from src.lifecycle_web_store import _sha
 from src.security_lifecycle_listing_migration import _encode_cell, _quote_identifier as q, _sha_file
 from src.security_lifecycle_provider_snapshot import instant
 from src.security_lifecycle_schema import verify_profile_connection, assert_lifecycle_writes_available
@@ -28,7 +28,7 @@ def _snapshot(conn, names=None):
             for cell in row:
                 value = _encode_cell(cell)
                 rows.update(str(len(value)).encode() + b":" + value)
-    return {"schema_sha256": _sha(schema), "rows_sha256": rows.hexdigest()}
+    return {"schema_sha256": digest_json(schema), "rows_sha256": rows.hexdigest()}
 
 
 def _preview(conn):
@@ -39,7 +39,7 @@ def _preview(conn):
     if present:
         verify_journal(conn)
     value = {"version": 2, "installed": present, "target_schema_sha256": schema_digest(), **_snapshot(conn)}
-    return {**value, "approval_sha256": _sha(value)}
+    return {**value, "approval_sha256": digest_json(value)}
 
 
 def preview_installation(path):

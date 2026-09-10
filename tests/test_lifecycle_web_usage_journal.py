@@ -86,14 +86,14 @@ def test_usage_only_failure_receipt_is_readable_and_does_not_create_a_finding(tm
 
 def rewrite_result(store, mutate):
     from src.lifecycle_web_schema import TRIGGERS
-    from src.lifecycle_web_store import _json, _sha
+    from src.lifecycle_journal_codec import canonical_json, digest_json
 
     with store.connection(write=True) as conn:
         value = json.loads(conn.execute("SELECT payload_json FROM lifecycle_web_results").fetchone()[0])
         mutate(value)
         trigger = "lifecycle_web_results_update_immutable"
         conn.execute("DROP TRIGGER " + trigger)
-        conn.execute("UPDATE lifecycle_web_results SET payload_json=?,result_sha256=?", (_json(value), _sha(value)))
+        conn.execute("UPDATE lifecycle_web_results SET payload_json=?,result_sha256=?", (canonical_json(value), digest_json(value)))
         conn.execute(TRIGGERS[trigger])
 
 

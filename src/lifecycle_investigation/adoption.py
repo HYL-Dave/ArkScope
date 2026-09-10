@@ -13,7 +13,7 @@ from src.lifecycle_investigation.findings import Finding, validate_finding
 from src.lifecycle_investigation.schema import verify_journal
 from src.lifecycle_investigation.store import InvestigationStore
 from src.lifecycle_investigation.target import Target, target_snapshot
-from src.lifecycle_web_store import _sha
+from src.lifecycle_journal_codec import digest_json
 from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore, case_id_for
 from src.security_lifecycle_review import _FINDING_FIELDS, _proposal_vetoes, now, packet_digest
 from src.security_lifecycle_web_contract import ExecutionSelection
@@ -54,7 +54,7 @@ def as_adoption(row):
     if checked != result["validated"]:
         raise ValueError("investigation_integrity")
     source = {"source": "lifecycle_investigation", "source_ref": row["run_id"], "ticker": target.ticker}
-    observation_sha = _sha({**source, "target": target.model_dump()})
+    observation_sha = digest_json({**source, "target": target.model_dump()})
     case = {"case_id": case_id_for(**source), **source}
     return {**row, "case_id": case["case_id"], "target_case": case,
         "observation_sha256": observation_sha, "request": target, "selection": ExecutionSelection(**row["binding"]["selection"]),
@@ -155,6 +155,6 @@ def prepare_on_connection(service, conn, *, run_id, options, web_read=None):
         "profile_state_sha256": effects["profile_state_sha256"], "caveats": effects["caveats"],
         "web": {"run_id": run_id, "result_sha256": run["result_sha256"], "header_sha256": run["header_sha256"],
             "execution": {key: getattr(run["selection"], key) for key in ("provider", "auth_mode", "model")},
-            "passages_sha256": _sha(run["finding"].passages)}, "ready": not blockers, "block_reasons": sorted(set(blockers))}
+            "passages_sha256": digest_json(run["finding"].passages)}, "ready": not blockers, "block_reasons": sorted(set(blockers))}
     packet["packet_sha256"] = packet_digest(packet)
     return packet, case, assessment

@@ -14,7 +14,7 @@ import sqlite3
 from src.lifecycle_investigation.schema import verify_journal
 from src.lifecycle_web_migration import _backup
 from src.lifecycle_web_schema import TABLES as WEB_TABLES, TRIGGERS as WEB_TRIGGERS
-from src.lifecycle_web_store import _sha, _json
+from src.lifecycle_journal_codec import canonical_json, digest_json
 from src.security_lifecycle_listing_migration import _quote_identifier as q, _sha_file
 from src.security_lifecycle_schema import PROFILE_TABLE_SQL, verify_profile_connection, verify_market_connection, _normalize_sql
 
@@ -42,7 +42,7 @@ def _receipt(conn, approval, stage):
         return None
     try:
         value = json.loads(row[1])
-        if (row[0] != stage or _sha(value) != row[2] or value["stage"] != stage or value["approval_sha256"] != approval
+        if (row[0] != stage or digest_json(value) != row[2] or value["stage"] != stage or value["approval_sha256"] != approval
                 or value["status"] != "completed" or len(value["backup_sha256"]) != 64):
             raise ValueError("disposal_receipt_invalid")
     except (KeyError, TypeError, ValueError):
@@ -125,7 +125,7 @@ def profile_scope(conn, roots):
             raise ValueError("disposal_changed")
         for table, values in selected.items():
             rows[table].update(values)
-    return {table: {"rowids": sorted(values), "sha256": _sha([values[key] for key in sorted(values)])} for table, values in sorted(rows.items())}
+    return {table: {"rowids": sorted(values), "sha256": digest_json([values[key] for key in sorted(values)])} for table, values in sorted(rows.items())}
 
 
 def market_scope(conn, ids):
@@ -138,7 +138,7 @@ def market_scope(conn, ids):
             raise ValueError("disposal_changed")
         rows.append(dict(row))
         kinds.extend(dict(row) for row in conn.execute("SELECT * FROM security_lifecycle_observation_kinds WHERE observation_id=? ORDER BY event_type", (identity,)))
-    return {"observation_ids": ids, "sha256": _sha({"observations": rows, "kinds": kinds})}
+    return {"observation_ids": ids, "sha256": digest_json({"observations": rows, "kinds": kinds})}
 
 
 def market_dependency(conn, observation):
@@ -185,7 +185,7 @@ def preview_disposal(market_path, profile_path):
             "counts": {"cases": len(cases), "observations": len(observations), "discard_cases": len(discarded), "retained_cases": len(retained),
                 "discard_observations": len(ids), "observation_only": len(observed_keys - case_keys), "case_only": len(case_keys - observed_keys)},
             "stages": {"profile": profile_scope(profile, discarded), "market": market_scope(market, ids)}}
-        return {**unsigned, "approval_sha256": _sha(unsigned)}
+        return {**unsigned, "approval_sha256": digest_json(unsigned)}
 
 
 def _delete_order(conn, names):
@@ -204,7 +204,7 @@ def apply_disposal_stage(path, plan, *, stage, approval_sha256, backup_path, app
     if stage not in {"profile", "market"} or app_stopped is not True:
         raise ValueError("disposal_app_stop_required")
     unsigned = {key: value for key, value in plan.items() if key != "approval_sha256"}
-    if _sha(unsigned) != approval_sha256 or plan.get("approval_sha256") != approval_sha256:
+    if digest_json(unsigned) != approval_sha256 or plan.get("approval_sha256") != approval_sha256:
         raise ValueError("disposal_approval_invalid")
     if stage == "market":
         if profile_path is None:
@@ -268,7 +268,7 @@ def apply_disposal_stage(path, plan, *, stage, approval_sha256, backup_path, app
                 "backup_sha256": _sha_file(backup),
                 "counts": {table: len(value["rowids"]) for table, value in expected.items()} if stage == "profile" else {"observations": len(expected["observation_ids"])}}
             conn.execute("INSERT INTO lifecycle_legacy_disposal_receipts VALUES(?,?,?,?,?)",
-                (approval_sha256, stage, datetime.now(timezone.utc).isoformat(), _json(receipt), _sha(receipt)))
+                (approval_sha256, stage, datetime.now(timezone.utc).isoformat(), canonical_json(receipt), digest_json(receipt)))
             conn.commit()
             return receipt
         except BaseException:

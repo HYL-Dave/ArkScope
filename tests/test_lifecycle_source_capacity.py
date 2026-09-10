@@ -45,7 +45,7 @@ def test_large_page_hash_never_serializes_the_whole_source_at_once(monkeypatch):
 
 
 def test_unicode_source_journal_avoids_escape_expansion_without_changing_old_digests(tmp_path):
-    from src.lifecycle_web_store import _json, _sha
+    from src.lifecycle_journal_codec import canonical_json, digest_json
     from tests.test_lifecycle_web_store import setup_store, start
 
     _, store = setup_store(tmp_path)
@@ -57,17 +57,17 @@ def test_unicode_source_journal_avoids_escape_expansion_without_changing_old_dig
     with store.connection(write=True) as conn:
         row = conn.execute("SELECT page_json,page_sha256 FROM lifecycle_web_pages WHERE run_id=?", (identity,)).fetchone()
         assert len(row["page_json"].encode()) < len(text.encode()) * 1.2
-        assert row["page_sha256"] == _sha(material)
+        assert row["page_sha256"] == digest_json(material)
         assert json.loads(row["page_json"])["text"] == text
         # Both encodings use the same canonical digest; no migration or rewriting.
-        conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (identity, "source-2", _json(material), _sha(material)))
+        conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (identity, "source-2", canonical_json(material), digest_json(material)))
     pages = store.read(identity)["pages"]
     assert pages["source-1"] == pages["source-2"] == page
 
 
 @pytest.mark.parametrize("field", ["page_sha256", "capture_sha256"])
 def test_source_journal_still_rejects_changed_page_and_capture_fingerprints(tmp_path, field):
-    from src.lifecycle_web_store import _json, _sha
+    from src.lifecycle_journal_codec import canonical_json, digest_json
     from src.lifecycle_web_schema import WebJournalError
     from tests.test_lifecycle_web_store import setup_store, start
 
@@ -76,9 +76,9 @@ def test_source_journal_still_rejects_changed_page_and_capture_fingerprints(tmp_
     material = asdict(source_page("\u4e0b\u5e02 \U00020000"))
     if field == "capture_sha256":
         material[field] = "0" * 64
-    digest = "0" * 64 if field == "page_sha256" else _sha(material)
+    digest = "0" * 64 if field == "page_sha256" else digest_json(material)
     with store.connection(write=True) as conn:
-        conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (identity, "source-1", _json(material), digest))
+        conn.execute("INSERT INTO lifecycle_web_pages VALUES (?,?,?,?)", (identity, "source-1", canonical_json(material), digest))
     with pytest.raises(WebJournalError, match="^web_journal_integrity$"):
         store.read(identity)
 
