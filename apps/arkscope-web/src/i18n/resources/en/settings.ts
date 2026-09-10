@@ -698,10 +698,6 @@ const settings = {
           label: "IBKR Prices",
           description: "Collect 15-minute prices for the current Universe directly into the local market database.",
         },
-        secCorporateActions: {
-          label: "SEC Company Events",
-          description: "Check official SEC filings for listing status, delisting notices, and M&A relationship candidates; never removes a ticker automatically.",
-        },
       },
       unknownSourceDescription: "Data source {{sourceId}} has no reviewed description.",
       history: {

@@ -291,7 +291,7 @@ describe("Settings read cache", () => {
     expect(cache.inspect("macro_status")).toMatchObject({ status: "fresh" });
   });
 
-  it("invalidates_all_data_sync_reads_for_an_unknown_source", async () => {
+  it.each(["future_source_v9", "sec_corporate_actions"])("invalidates_all_data_sync_reads_for_unknown_source_%s", async (source) => {
     const {
       createSettingsReadCache,
       oauthAccountUsageKey,
@@ -314,7 +314,7 @@ describe("Settings read cache", () => {
     cache.replace("model_catalog", { models: [] });
     cache.replace(accountKey, { account: "a" });
 
-    cache.invalidateDataSource("future_source_v9");
+    cache.invalidateDataSource(source);
 
     for (const key of dataKeys) expect(cache.inspect(key)).toEqual({ status: "missing" });
     expect(cache.inspect("model_catalog")).toMatchObject({ status: "fresh" });

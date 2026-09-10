@@ -697,10 +697,6 @@ const settings = {
           label: "IBKR 股價",
           description: "為目前全部標的擷取 15 分鐘價格並直接寫入本機市場資料庫。",
         },
-        secCorporateActions: {
-          label: "SEC 公司事件",
-          description: "檢查 SEC 官方申報，記錄上市狀態、下市通知與併購關係候選；不會自動移除標的。",
-        },
       },
       unknownSourceDescription: "資料來源 {{sourceId}} 沒有已審核的說明。",
       history: {

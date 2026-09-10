@@ -332,10 +332,6 @@ class MemorySettingsReadCache implements SettingsReadCache {
       for (const key of this.coverageKeys()) this.invalidate(key);
       return;
     }
-    if (source === "sec_corporate_actions") {
-      this.invalidate("security_lifecycle");
-      return;
-    }
     if (source === "fred_series") {
       this.invalidate("macro_status");
       this.invalidate("macro_snapshot");

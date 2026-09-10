@@ -1531,16 +1531,20 @@ def test_scheduler_identity_context_uses_bounded_local_aliases_and_ibkr_conids(
     monkeypatch,
 ):
     from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.security_lifecycle_provider_store import ProviderCheckStore
+    from src.security_lifecycle_schema import create_market_schema, create_profile_schema
 
     market_path = tmp_path / "market.db"
     profile_path = tmp_path / "profile.db"
     with sqlite3.connect(market_path) as conn:
+        create_market_schema(conn)
         conn.execute("CREATE TABLE ticker_aliases(alias TEXT, canonical TEXT)")
         conn.executemany(
             "INSERT INTO ticker_aliases VALUES (?,?)",
             (("LC", "HAPN"), ("HAPN.PRE", "LC"), ("OLD", "OTHER")),
         )
     with sqlite3.connect(profile_path) as conn:
+        create_profile_schema(conn)
         conn.execute(
             "CREATE TABLE portfolio_positions("
             "broker TEXT,broker_con_id TEXT,symbol TEXT)"
@@ -1554,6 +1558,7 @@ def test_scheduler_identity_context_uses_bounded_local_aliases_and_ibkr_conids(
                 ("manual", "ignored", "HAPN"),
             ),
         )
+    ProviderCheckStore(profile_path).record(ticker="HAPN", at="2026-08-20T00:00:00Z", evidence=(), diagnostics={})
     before = {
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (market_path, profile_path)
@@ -1598,16 +1603,12 @@ def test_scheduler_identity_context_uses_bounded_local_aliases_and_ibkr_conids(
     }
     monkeypatch.setattr(scheduler, "_market_path", lambda: market_path)
     monkeypatch.setattr(scheduler, "_profile_path", lambda: profile_path)
-    monkeypatch.setattr(scheduler, "_automation_schema_state", lambda _conn: None)
-    monkeypatch.setattr(
-        scheduler,
-        "compose_security_lifecycle",
-        lambda _market, _profile: {"cases": [case]},
-    )
-
     loaded = scheduler._load_cases()
     assert len(loaded) == 1
-    context = scheduler._identity_context(loaded[0])
+    assert loaded[0]["source"] == "listing_authority"
+    assert loaded[0]["ticker_aliases"] == ("HAPN", "HAPN.PRE", "LC")
+    assert loaded[0]["ibkr_conids"] == ()
+    context = scheduler._identity_context(case)
     assert context.ticker_aliases == ("HAPN", "HAPN.PRE", "LC")
     assert context.ibkr_conids == ()
     assert loaded[0]["ibkr_identity_blockers"] == ("ibkr_contract_ambiguous",)
@@ -2255,7 +2256,7 @@ def test_ibkr_identity_ambiguity_blocks_one_case_and_the_later_case_runs(tmp_pat
     conn.close()
 
 
-def test_real_identity_hint_overflow_reaches_load_evidence_and_worker_continues(
+def test_historical_sec_identity_hint_overflow_reaches_load_evidence_and_worker_continues(
     tmp_path,
     monkeypatch,
 ):
@@ -2321,11 +2322,16 @@ def test_real_identity_hint_overflow_reaches_load_evidence_and_worker_continues(
 
     monkeypatch.setattr(scheduler, "_market_path", lambda: market_path)
     monkeypatch.setattr(scheduler, "_profile_path", lambda: profile_path)
-    monkeypatch.setattr(
-        scheduler,
-        "compose_security_lifecycle",
-        lambda _market, _profile: {"cases": (first, later)},
-    )
+    def historical_cases():
+        from src.security_lifecycle_investigation import observation_fingerprint
+
+        hints = scheduler._load_local_identity_hints(
+            market_path=market_path, profile_path=profile_path,
+            tickers=(first["ticker"], later["ticker"]),
+        )
+        return tuple({**case, **hints[case["ticker"]],
+                      "observation_fingerprint_sha256": observation_fingerprint(case["observation"])}
+                     for case in (first, later))
 
     class Transport:
         def diagnostics(self, _budget):
@@ -2419,7 +2425,7 @@ def test_real_identity_hint_overflow_reaches_load_evidence_and_worker_continues(
             conn.close()
 
     worker = LifecycleAutomationWorker(
-        case_loader=scheduler._load_cases,
+        case_loader=historical_cases,
         profile_connection=profile_connection,
         evidence_loader=lambda current, *, mode, at, prior_material: scheduler._load_evidence(
             current,

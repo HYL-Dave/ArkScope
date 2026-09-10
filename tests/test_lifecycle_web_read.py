@@ -29,7 +29,7 @@ def current(c):
 def test_research_and_current_detail_share_readonly_web_findings_for_every_auth(tmp_path, monkeypatch, provider, auth, with_gap):
     from src.tools import security_lifecycle_tools as tools
     from tests.test_lifecycle_web_gaps import COMPLETION, GAPS
-    c = context(tmp_path, provider=provider, auth=auth, sec_case=True, completion=COMPLETION if with_gap else None)
+    c = context(tmp_path, provider=provider, auth=auth, completion=COMPLETION if with_gap else None)
     before = rows(c)
     detail = current(c)
     result = detail["web_runs"][0]

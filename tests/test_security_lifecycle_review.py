@@ -395,7 +395,7 @@ def test_old_accepted_assessment_is_not_new_web_action_consent(tmp_path):
     from src.sa_tracking_memberships import SaTrackingMembershipStore
     from tests.test_ticker_identity_routes import _build_context
 
-    old = _build_context(tmp_path, outcomes=("listing_ended",), successor=None)
+    old = _build_context(tmp_path, outcomes=("listing_ended",), successor=None, source="sec_edgar")
     with sqlite3.connect(old["profile_path"]) as conn:
         SaTrackingMembershipStore.install(conn)
         assessment_id = conn.execute("SELECT assessment_id FROM security_lifecycle_assessments").fetchone()[0]

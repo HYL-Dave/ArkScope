@@ -1154,7 +1154,7 @@ def test_run_lifecycle_is_attended_and_uses_the_closed_status_vocabulary(tmp_pat
 
 
 def test_stale_assessment_blocks_existing_and_new_proposals(tmp_path):
-    from src.security_lifecycle_investigation import compose_security_lifecycle
+    from src.security_lifecycle_investigation import compose_security_lifecycle_audit
 
     conn, store, case_id, market_path, profile_path, fingerprint = (
         _composed_context(tmp_path)
@@ -1181,14 +1181,14 @@ def test_stale_assessment_blocks_existing_and_new_proposals(tmp_path):
         assert "remap_symbol" in {
             proposal["action_type"] for proposal in created["proposals"]
         }
-        current = compose_security_lifecycle(str(market_path), str(profile_path))[
+        current = compose_security_lifecycle_audit(str(market_path), str(profile_path))[
             "cases"
         ][0]
         assert current["workflow_state"] == "resolved"
         assert current["proposals"][0]["projected_block_reason"] is None
 
         _manual_evidence(store, case_id, excerpt="Later evidence changed the set.")
-        stale = compose_security_lifecycle(str(market_path), str(profile_path))[
+        stale = compose_security_lifecycle_audit(str(market_path), str(profile_path))[
             "cases"
         ][0]
         assert stale["workflow_state"] == "evidence_ready"
@@ -1220,7 +1220,7 @@ def test_operator_detail_is_a_closed_dto_and_rejects_unknown_codes(tmp_path):
         SecurityLifecycleFactKernel,
     )
     from src.security_lifecycle_investigation import (
-        compose_security_lifecycle,
+        compose_security_lifecycle_audit,
         project_automation_blocker,
     )
     from src.tools.security_lifecycle_tools import (
@@ -1279,7 +1279,7 @@ def test_operator_detail_is_a_closed_dto_and_rejects_unknown_codes(tmp_path):
             at=_LATER,
         )
 
-        internal_case = compose_security_lifecycle(
+        internal_case = compose_security_lifecycle_audit(
             str(market_path),
             str(profile_path),
         )["cases"][0]
@@ -1318,7 +1318,7 @@ def test_operator_detail_is_a_closed_dto_and_rejects_unknown_codes(tmp_path):
         conn.commit()
 
         rejected = project_active_security_lifecycle_case(
-            compose_security_lifecycle(str(market_path), str(profile_path))["cases"][0]
+            compose_security_lifecycle_audit(str(market_path), str(profile_path))["cases"][0]
         )["automation_runs"][0]["blockers"][0]
         assert rejected == {
             "blocker_code": "market_confirmation_missing",
@@ -1345,7 +1345,7 @@ def test_operator_detail_is_a_closed_dto_and_rejects_unknown_codes(tmp_path):
             )
             conn.commit()
             rejected = project_active_security_lifecycle_case(
-                compose_security_lifecycle(
+                compose_security_lifecycle_audit(
                     str(market_path),
                     str(profile_path),
                 )["cases"][0]

@@ -16,7 +16,7 @@ import sqlite3
 from src.lifecycle_web_schema import INVENTORY_FIELDS, TERMINAL as WEB_TERMINAL, WebJournalError, read_web_inventory
 from src.security_lifecycle import read_market_observations
 from src.security_lifecycle_investigation import (
-    LifecycleStoreUnavailable, case_id_for, compose_security_lifecycle, observation_fingerprint,
+    LifecycleStoreUnavailable, case_id_for, compose_security_lifecycle_audit, observation_fingerprint,
 )
 from src.security_lifecycle_provider_authority import classify_provider_listing, evidence_dict, validate_provider_material
 from src.security_lifecycle_provider_snapshot import canonical_json, decode_snapshot, instant
@@ -74,7 +74,7 @@ def _capture(market, profile, market_conn, profile_conn):
         "profile_tables": _rows(profile_conn, PROFILE_TABLE_SQL),
         "identity_tables": identity_tables,
         "web_journal_inventory": read_web_inventory(profile_conn),
-        "composed_cases": compose_security_lifecycle(str(market), str(profile))["cases"],
+        "composed_cases": compose_security_lifecycle_audit(str(market), str(profile))["cases"],
         "schemas": {
             "market": _schema(market_conn, MARKET_TABLE_SQL),
             "profile": _schema(profile_conn, (*PROFILE_TABLE_SQL, *identity_tables)),

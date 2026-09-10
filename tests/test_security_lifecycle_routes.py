@@ -12,7 +12,7 @@ import pytest
 
 
 _AT = "2026-08-20T00:00:00Z"
-_SOURCE_REF = "0000712515-26-000042"
+_SOURCE_REF = "listing:EA"
 
 
 def _listing_locator(**overrides):
@@ -92,11 +92,8 @@ def _build_context(
     with_observation=True,
     materialize_profile_case=True,
 ):
-    from src.security_lifecycle import (
-        LifecycleObservation,
-        ObservationKind,
-        SecurityLifecycleStore,
-    )
+    from src.security_lifecycle import SecurityLifecycleStore
+    from src.security_lifecycle_provider_store import ProviderCheckStore
     from src.security_lifecycle_investigation import (
         SecurityLifecycleInvestigationStore,
         case_id_for,
@@ -109,28 +106,6 @@ def _build_context(
     profile_path = tmp_path / "profile_state.db"
     market_conn = sqlite3.connect(market_path)
     market_store = SecurityLifecycleStore(market_conn)
-    observation = None
-    if with_observation:
-        market_store.upsert_observation(
-            LifecycleObservation(
-                ticker="EA",
-                cik="0000712515",
-                issuer_name="Electronic Arts Inc.",
-                filing_date="2026-08-04",
-                source="sec_edgar",
-                source_ref=_SOURCE_REF,
-                filing_form="8-K",
-                filing_items=("2.01", "3.01"),
-                evidence_url="https://www.sec.gov/Archives/example/ea-8k.htm",
-                description="Completion of acquisition and listing review.",
-                observed_at=_AT,
-                kinds=(
-                    ObservationKind("acquisition_completed", "2026-08-04"),
-                    ObservationKind("listing_status_review", None),
-                ),
-            )
-        )
-        observation = market_store.get_observation("sec_edgar", _SOURCE_REF, "EA")
     market_conn.close()
 
     profile_conn = sqlite3.connect(profile_path, check_same_thread=False)
@@ -138,15 +113,20 @@ def _build_context(
         profile_conn,
         id_factory=lambda prefix, ordinal: f"{prefix}_{ordinal:04d}",
     )
+    observation = None
+    if with_observation:
+        checks = ProviderCheckStore(profile_path)
+        checks.record(ticker="EA", at="2026-08-04T00:00:00Z", evidence=(), diagnostics={})
+        observation = checks.latest()["EA"]["observation"]
     if materialize_profile_case:
         case_id = profile_store.ensure_case(
-            source="sec_edgar",
+            source="listing_authority",
             source_ref=_SOURCE_REF,
             ticker="EA",
             at=_AT,
         )
     else:
-        case_id = case_id_for("sec_edgar", _SOURCE_REF, "EA")
+        case_id = case_id_for("listing_authority", _SOURCE_REF, "EA")
     fingerprint = observation_fingerprint(observation) if observation else ""
     service = SecurityLifecycleReadService(
         market_db_path=str(market_path),
@@ -1487,7 +1467,7 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
             f"/security-lifecycle/cases/{context['case_id']}/audit"
         ).json()
         assert "source_ref" not in primary["observation"]
-        assert primary["observation"]["filing_form"] == "8-K"
+        assert primary["observation"]["filing_form"] == "LISTING_STATUS"
         assert "observation_fingerprint_sha256" not in primary
         assert primary["active_sources"] == ["manual_lists"]
         for historical in (

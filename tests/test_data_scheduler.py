@@ -27,7 +27,6 @@ ACTIVE_SOURCE_IDS = {
     "finnhub_news",
     "ibkr_news",
     "ibkr_prices",
-    "sec_corporate_actions",
     "fred_series",
     "fred_release_dates",
     "finnhub_economic_calendar",
@@ -118,22 +117,10 @@ def hermetic(tmp_path, monkeypatch):
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
     import src.collectors.finnhub_news as cfn
     import src.collectors.polygon_news as cpn
-    import src.collectors.sec_corporate_actions as sca
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
     monkeypatch.setattr(cfn, "run_incremental",
                         lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
-    monkeypatch.setattr(
-        sca,
-        "run_incremental",
-        lambda *a, **k: {
-            "status": "succeeded",
-            "tickers_scanned": 2,
-            "observations_observed": 0,
-            "kinds_observed": 0,
-            "errors": {},
-        },
-    )
     monkeypatch.setattr("src.news_providers.make_news_provider",
                         lambda source, **k: object())
     monkeypatch.setattr(
@@ -176,6 +163,44 @@ def test_defaults_everything_disabled():
         cfg = ds.source_config(source)
         assert cfg["enabled"] is False  # nothing fetches until the user opts in
         assert cfg["interval_minutes"] == ds.SOURCES[source].default_interval_min
+
+
+@pytest.mark.parametrize("journal_installed", (False, True))
+def test_deleted_sec_source_is_absent_from_configuration(hermetic, journal_installed):
+    from src.api.routes.schedule import get_schedule
+    from src.lifecycle_investigation.schema import install_journal
+    from src.security_lifecycle_schema import create_profile_schema
+
+    if journal_installed:
+        with sqlite3.connect(hermetic.db_path) as conn:
+            create_profile_schema(conn)
+            install_journal(conn, at="2026-09-08T00:00:00Z")
+    hermetic.set_setting("schedule.sec_corporate_actions.enabled", "true")
+    assert "sec_corporate_actions" not in ds.SOURCES
+    assert "sec_corporate_actions" not in get_schedule()["sources"]
+    with pytest.raises(KeyError):
+        ds.source_config("sec_corporate_actions")
+
+
+@pytest.mark.parametrize("journal_installed", (False, True))
+def test_deleted_sec_source_is_ordinary_unknown_without_dispatch(hermetic, monkeypatch, journal_installed):
+    from src.lifecycle_investigation.schema import install_journal
+    from src.security_lifecycle_schema import create_profile_schema
+
+    if journal_installed:
+        with sqlite3.connect(hermetic.db_path) as conn:
+            create_profile_schema(conn)
+            install_journal(conn, at="2026-09-08T00:00:00Z")
+
+    def denied(*args, **kwargs):
+        pytest.fail("unknown source reached execution or state persistence")
+
+    monkeypatch.setattr(ds, "_resolve_price_scope", denied)
+    monkeypatch.setattr(ds, "_record_result", denied)
+    monkeypatch.setattr(ds, "_run_subprocess", denied)
+    for source in ("sec_corporate_actions", "nonexistent_source"):
+        assert ds.run_source(source) == {"source": source, "status": "unknown_source"}
+    assert ds._LAST_ATTEMPT == ds._LAST_RESULT == {}
 
 
 def test_no_active_runtime_source_uses_migrate_to_supabase_sync():
@@ -2413,10 +2438,6 @@ def test_get_schedule_snapshot_shape():
         assert "normalized local records" in out[name]["description"]
         assert "compatibility projection" in out[name]["description"]
     assert out["ibkr_prices"]["ibkr"] is True
-    assert out["sec_corporate_actions"]["job_name"] == (
-        "collect.sec_corporate_actions"
-    )
-    assert out["sec_corporate_actions"]["provider_fetch"] is True
     for source in MACRO_SOURCE_IDS:
         assert out[source]["provider_fetch"] is True
         assert out[source]["job_name"] == ds.SOURCES[source].backend_job_name
@@ -2440,7 +2461,6 @@ def test_schedule_status_exposes_current_news_route_metadata():
     assert snap["polygon_news"]["source_badges"] == ["Massive", "直寫本地"]
     assert snap["finnhub_news"]["source_badges"] == ["Finnhub", "直寫本地"]
     assert snap["ibkr_news"]["source_badges"] == ["IBKR", "直寫本地"]
-    assert snap["sec_corporate_actions"]["source_badges"] == ["SEC", "官方申報"]
     for source in MACRO_SOURCE_IDS:
         assert snap[source]["source_mode"] == "provider_fetch"
         assert snap[source]["write_target"] == "macro_calendar.db"

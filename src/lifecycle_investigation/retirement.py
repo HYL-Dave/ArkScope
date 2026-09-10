@@ -1,4 +1,4 @@
-"""Cutover gates, scoped to the old SEC lifecycle intake, never SEC financials."""
+"""Retained action-case reads and the remaining legacy web-router cutover gate."""
 
 from pathlib import Path
 import sqlite3

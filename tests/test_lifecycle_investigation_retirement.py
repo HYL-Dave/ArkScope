@@ -1,3 +1,4 @@
+import json
 import sqlite3
 
 import pytest
@@ -47,21 +48,56 @@ def test_disposal_stops_for_new_dependency_and_never_requires_quiescing_unrelate
     assert preview_disposal(market, profile)["counts"]["retained_cases"] == 1
 
 
-def test_installed_cutover_disables_legacy_ingress_before_network_and_queue_projection(tmp_path, monkeypatch):
+@pytest.mark.parametrize("journal_installed", (False, True))
+def test_current_composition_excludes_unretained_sec_without_a_cutover(tmp_path, journal_installed):
     from src.lifecycle_investigation.schema import install_journal
-    from src.collectors.sec_corporate_actions import run_incremental
     from src.security_lifecycle_investigation import compose_security_lifecycle
+    from src.security_lifecycle_provider_store import ProviderCheckStore
     market, profile = stores(tmp_path)
     event = observe(market, ticker="OLD", ref="old")
     persist(profile, event)
-    with sqlite3.connect(profile) as conn:
-        install_journal(conn, at="2026-09-08T00:00:00Z")
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile))
-    class NoProvider:
-        def get_cik(self, ticker):
-            pytest.fail("retired intake contacted SEC")
-    assert run_incremental(tickers_arg="OLD", client=NoProvider(), db_path=str(market))["reason"] == "legacy_lifecycle_intake_retired"
-    assert compose_security_lifecycle(str(market), str(profile))["cases"] == []
+    observe(market, ticker="UNSAVED", ref="unsaved")
+    persist(profile, {"source": "sec_edgar", "source_ref": "missing", "ticker": "MISSING"})
+    ProviderCheckStore(profile).record(ticker="LISTED", at="2026-09-08T00:00:00Z", evidence=(), diagnostics={})
+    if journal_installed:
+        with sqlite3.connect(profile) as conn:
+            install_journal(conn, at="2026-09-08T00:00:00Z")
+    cases = compose_security_lifecycle(str(market), str(profile))["cases"]
+    assert [(case["source"], case["ticker"]) for case in cases] == [("listing_authority", "LISTED")]
+
+
+@pytest.mark.parametrize("journal_installed", (False, True))
+def test_retained_sec_action_history_is_readable_but_not_background_intake(tmp_path, monkeypatch, journal_installed):
+    from src.lifecycle_investigation.schema import install_journal
+    from src.security_lifecycle_investigation import compose_security_lifecycle
+    from src.security_lifecycle_provider_store import ProviderCheckStore
+    from src.service import security_lifecycle_automation_scheduler as scheduler
+    from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+    from src.ticker_identity_transition import profile_snapshot_sha256
+    from tests.test_ticker_identity_transition import _transition_connection, _insert_due_transition
+
+    market, _ = stores(tmp_path)
+    profile = tmp_path / "profile_state.db"
+    with _transition_connection(tmp_path) as conn:
+        _insert_due_transition(conn, transition_id="slt_retained", approval_authority="attended_user", approved_at="2026-09-08T00:00:00Z")
+        preview = {"source_ticker": "OLD", "successor_ticker": "NEW"}
+        preview["preview_sha256"] = profile_snapshot_sha256(preview)
+        conn.execute("UPDATE ticker_identity_transitions SET approved_preview_json=?,approved_preview_sha256=?",
+                     (json.dumps(preview), preview["preview_sha256"]))
+        conn.commit()
+        if journal_installed:
+            install_journal(conn, at="2026-09-08T00:00:00Z")
+    persist(profile, observe(market, ticker="DISCARD", ref="discard"))
+    ProviderCheckStore(profile).record(ticker="LISTED", at="2026-09-08T00:00:00Z", evidence=(), diagnostics={})
+    cases = compose_security_lifecycle(str(market), str(profile))["cases"]
+    assert {"OLD", "LISTED"} <= {case["ticker"] for case in cases}
+    service = SecurityLifecycleReadService(market_db_path=str(market), profile_db_path=str(profile), source_loader=lambda: {})
+    retained = next(case for case in service._cases() if case["ticker"] == "OLD")
+    assert retained["ticker_transition"]["transition_id"] == "slt_retained"
+    assert retained["assessment_history"][0]["assessment_id"] == "sla_1"
+    monkeypatch.setattr(scheduler, "_market_path", lambda: market)
+    monkeypatch.setattr(scheduler, "_profile_path", lambda: profile)
+    assert [case["ticker"] for case in scheduler._load_cases()] == ["LISTED"]
 
 
 def test_market_dependencies_are_retained_before_profile_disposal(tmp_path):
