@@ -402,15 +402,34 @@ def test_acknowledge_and_reopen_routes_preserve_distinct_workflow_commands(tmp_p
         context["profile_conn"].close()
 
 
-def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes():
+@pytest.fixture
+def actual_app_route_rows():
     from src.api.app import create_app
 
-    rows = {
+    return {
         (method, route.path)
         for route in create_app().routes
         for method in sorted(route.methods or ())
         if method not in {"HEAD", "OPTIONS"}
     }
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    (
+        pytest.param("GET", "/security-lifecycle/cases/{case_id}/audit", id="case-audit"),
+        pytest.param("GET", "/security-lifecycle/reviews/{review_id}", id="current-review-detail"),
+        pytest.param("POST", "/security-lifecycle/evidence/{evidence_id}/translations", id="evidence-translation"),
+        pytest.param("POST", "/security-lifecycle/cases/{case_id}/automation/run", id="case-automation"),
+        pytest.param("GET", "/security-lifecycle/review-confirmations/{transition_id}", id="review-confirmation"),
+    ),
+)
+def test_actual_app_excludes_unused_lifecycle_http_entry(actual_app_route_rows, method, path):
+    assert (method, path) not in actual_app_route_rows
+
+
+def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes(actual_app_route_rows):
+    rows = actual_app_route_rows
     expected = {
         ("GET", "/security-lifecycle/automation"),
         ("GET", "/market-data/price-repair/operations"),
@@ -419,12 +438,9 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("PUT", "/security-lifecycle/automation"),
         ("GET", "/security-lifecycle/cases"),
         ("GET", "/security-lifecycle/reviews"),
-        ("GET", "/security-lifecycle/reviews/{review_id}"),
         ("GET", "/security-lifecycle/candidates"),
         ("GET", "/security-lifecycle/cases/{case_id}"),
-        ("GET", "/security-lifecycle/cases/{case_id}/audit"),
         ("POST", "/security-lifecycle/automation/run"),
-        ("POST", "/security-lifecycle/cases/{case_id}/automation/run"),
         ("GET", "/security-lifecycle/investigations/{run_id}"),
         ("POST", "/security-lifecycle/acknowledgements/{acknowledgement_id}/reopen"),
         ("POST", "/security-lifecycle/action-proposals/{proposal_id}/dismiss"),
@@ -436,7 +452,6 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("POST", "/security-lifecycle/cases/{case_id}/approve-transition"),
         ("GET", "/security-lifecycle/cases/{case_id}/review"),
         ("POST", "/security-lifecycle/cases/{case_id}/confirm-review"),
-        ("GET", "/security-lifecycle/review-confirmations/{transition_id}"),
         ("POST", "/security-lifecycle/transitions/{transition_id}/cancel"),
         ("POST", "/security-lifecycle/transitions/{transition_id}/retry"),
         ("POST", "/security-lifecycle/transitions/{transition_id}/reverse"),
@@ -445,13 +460,9 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
             "POST",
             "/security-lifecycle/transition-activity/{activity_id}/acknowledge",
         ),
-        (
-            "POST",
-            "/security-lifecycle/evidence/{evidence_id}/translations",
-        ),
     }
     assert expected <= rows
-    assert len(rows) == 221
+    assert len(rows) == 216
     assert {row for row in rows if row[1].startswith("/security-lifecycle/investigations/")} == {
         ("GET", "/security-lifecycle/investigations/{run_id}"),  # Retained historical audit read.
         ("GET", "/security-lifecycle/investigations/targets"),
@@ -845,7 +856,6 @@ def test_invalid_stored_automation_config_is_visible_and_blocks_manual_run(
     "endpoint",
     (
         "/security-lifecycle/automation/run",
-        "/security-lifecycle/cases/{case_id}/automation/run",
     ),
 )
 def test_manual_run_reports_profile_config_store_failure_as_typed_503(
@@ -1013,76 +1023,6 @@ def test_global_automation_run_dispatches_the_recorded_due_boundary(
         context["profile_conn"].close()
 
 
-def test_case_automation_run_dispatches_exact_attended_authority(
-    tmp_path,
-    monkeypatch,
-):
-    from src.api.routes import security_lifecycle as routes
-
-    context = _build_context(tmp_path)
-    dispatch_calls = []
-
-    try:
-        monkeypatch.setattr(
-            routes,
-            "dispatch_and_record_security_lifecycle_automation",
-            lambda **kwargs: dispatch_calls.append(kwargs) or {"status": "started"},
-        )
-        client = _client(context, monkeypatch, permissions=lambda *_args: None)
-
-        response = client.post(
-            f"/security-lifecycle/cases/{context['case_id']}/automation/run"
-        )
-
-        assert response.status_code == 200
-        assert response.json() == {
-            "case_id": context["case_id"],
-            "scope": "case",
-            "status": "started",
-        }
-        mutation_allowed = dispatch_calls[0].pop("transition_mutation_allowed")
-        assert mutation_allowed() is False
-        assert dispatch_calls == [
-            {
-                "allow_new_attempt": True,
-                "limit": 1,
-                "target_case_id": context["case_id"],
-                "trigger": "manual_case",
-            }
-        ]
-    finally:
-        context["profile_conn"].close()
-
-
-def test_case_automation_run_materializes_a_source_only_case_in_the_worker(
-    tmp_path,
-    monkeypatch,
-):
-    from src.api.routes import security_lifecycle as routes
-
-    context = _build_context(tmp_path, materialize_profile_case=False)
-
-    try:
-        monkeypatch.setattr(
-            routes,
-            "dispatch_and_record_security_lifecycle_automation",
-            lambda **_kwargs: {"status": "started"},
-        )
-        client = _client(context, monkeypatch, permissions=lambda *_args: None)
-
-        response = client.post(
-            f"/security-lifecycle/cases/{context['case_id']}/automation/run"
-        )
-
-        assert response.status_code == 200
-        assert response.json()["status"] == "started"
-        assert context["profile_conn"].execute(
-            "SELECT COUNT(*) FROM security_lifecycle_cases"
-        ).fetchone()[0] == 0
-    finally:
-        context["profile_conn"].close()
-
-
 def test_global_automation_run_returns_typed_skip_on_real_flock_collision(
     tmp_path,
     monkeypatch,
@@ -1117,41 +1057,7 @@ def test_global_automation_run_returns_typed_skip_on_real_flock_collision(
         context["profile_conn"].close()
 
 
-def test_case_automation_run_returns_409_on_real_flock_collision(
-    tmp_path,
-    monkeypatch,
-):
-    from src.service import security_lifecycle_automation_scheduler as scheduler
-    from src.service.security_lifecycle_automation_runtime import (
-        lifecycle_automation_execution_lock,
-    )
-
-    context = _build_context(tmp_path)
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(context["profile_path"]))
-    monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
-    try:
-        monkeypatch.setattr(
-            scheduler.threading,
-            "Thread",
-            lambda **_kwargs: pytest.fail("collision must not start a thread"),
-        )
-        client = _client(context, monkeypatch, permissions=lambda *_args: None)
-
-        with lifecycle_automation_execution_lock():
-            response = client.post(
-                f"/security-lifecycle/cases/{context['case_id']}/automation/run"
-            )
-
-        assert response.status_code == 409
-        assert response.json()["detail"] == {
-            "case_id": context["case_id"],
-            "code": "automation_case_running",
-        }
-    finally:
-        context["profile_conn"].close()
-
-
-def test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisition(
+def test_global_automation_run_reconciles_a_stale_running_row_after_lock_acquisition(
     tmp_path,
     monkeypatch,
 ):
@@ -1208,17 +1114,14 @@ def test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisiti
         monkeypatch.setattr(scheduler, "_run_owned_automation_batch", run_batch)
         client = _client(context, monkeypatch, permissions=lambda *_args: None)
 
-        response = client.post(
-            f"/security-lifecycle/cases/{context['case_id']}/automation/run"
-        )
+        response = client.post("/security-lifecycle/automation/run")
 
         assert response.status_code == 200
         payload = response.json()
         request_id = payload.pop("request_id")
         assert request_id.startswith("slao_")
         assert payload == {
-            "case_id": context["case_id"],
-            "scope": "case",
+            "scope": "due",
             "status": "started",
         }
         assert len(worker_calls) == 1
@@ -1231,13 +1134,13 @@ def test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisiti
         )
         assert worker_calls == [
             {
-                "limit": 1,
+                "limit": 2,
                 "at": worker_calls[0]["at"],
                 "execution_owner_id": worker_calls[0]["execution_owner_id"],
-                "target_case_id": context["case_id"],
-                "allow_new_attempt": True,
+                "target_case_id": None,
+                "allow_new_attempt": False,
                 "request_id": request_id,
-                "trigger": "manual_case",
+                "trigger": "manual_due",
             }
         ]
         assert context["store"].get_automation_run(running.run_id)["status"] == (
@@ -1247,7 +1150,7 @@ def test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisiti
         context["profile_conn"].close()
 
 
-def test_operator_detail_reaches_http_ai_tool_and_ui_identically(
+def test_operator_detail_reaches_local_audit_and_ai_tool_identically(
     tmp_path,
     monkeypatch,
 ):
@@ -1265,10 +1168,7 @@ def test_operator_detail_reaches_http_ai_tool_and_ui_identically(
                 "provider_contacted": False,
             },
         )
-        client = _client(context, monkeypatch)
-        http_case = client.get(
-            f"/security-lifecycle/cases/{context['case_id']}/audit"
-        ).json()
+        local_case = context["service"].get_case_audit(context["case_id"])
 
         monkeypatch.setattr(
             security_lifecycle_tools,
@@ -1289,18 +1189,16 @@ def test_operator_detail_reaches_http_ai_tool_and_ui_identically(
                 "provider_contacted": False,
             },
         }
-        assert http_case["automation_runs"][0]["blockers"] == [expected]
+        assert local_case["automation_runs"][0]["blockers"] == [expected]
         assert ai_case["automation_runs"][0]["blockers"] == [expected]
     finally:
         context["profile_conn"].close()
 
 
-def test_http_and_ai_share_one_exact_closed_automation_run_projection(
+def test_local_audit_and_ai_share_one_exact_closed_automation_run_projection(
     tmp_path,
     monkeypatch,
 ):
-    from types import SimpleNamespace
-
     from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
     from src.tools import security_lifecycle_tools
 
@@ -1351,20 +1249,17 @@ def test_http_and_ai_share_one_exact_closed_automation_run_projection(
         )
         context["profile_conn"].commit()
 
-        real_service = context["service"]
+        real_get_case = context["service"].get_case
 
         def get_case_with_future_field(case_id):
-            case = real_service.get_case(case_id)
+            case = real_get_case(case_id)
             case["automation_runs"][0]["future_run_field"] = (
                 "private-run-future-sentinel"
             )
             return case
 
-        context["service"] = SimpleNamespace(get_case=get_case_with_future_field)
-        client = _client(context, monkeypatch)
-        http_case = client.get(
-            f"/security-lifecycle/cases/{context['case_id']}/audit"
-        ).json()
+        monkeypatch.setattr(context["service"], "get_case", get_case_with_future_field)
+        local_case = context["service"].get_case_audit(context["case_id"])
 
         monkeypatch.setattr(
             security_lifecycle_tools,
@@ -1398,11 +1293,11 @@ def test_http_and_ai_share_one_exact_closed_automation_run_projection(
             "terminal_finalization_failure": failure,
         }
         assert [
-            http_case["automation_runs"][0],
+            local_case["automation_runs"][0],
             ai_case["automation_runs"][0],
         ] == [expected_run, expected_run]
 
-        for payload in (http_case, ai_case):
+        for payload in (local_case, ai_case):
             encoded = json.dumps(payload, sort_keys=True)
             for sentinel in (
                 "private-run-key-sentinel",
@@ -1456,9 +1351,7 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
         primary = client.get(
             f"/security-lifecycle/cases/{context['case_id']}"
         ).json()
-        audit = client.get(
-            f"/security-lifecycle/cases/{context['case_id']}/audit"
-        ).json()
+        audit = context["service"].get_case_audit(context["case_id"])
         assert "source_ref" not in primary["observation"]
         assert primary["observation"]["filing_form"] == "LISTING_STATUS"
         assert "observation_fingerprint_sha256" not in primary
@@ -1512,7 +1405,7 @@ def test_case_detail_separates_source_evidence_assessment_acknowledgement_and_pr
         context["profile_conn"].close()
 
 
-def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
+def test_active_case_readers_share_closed_projection_and_compact_listing_dto(
     tmp_path,
     monkeypatch,
 ):
@@ -1560,11 +1453,7 @@ def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
         primary = client.get(
             f"/security-lifecycle/cases/{context['case_id']}"
         ).json()
-        detail_response = client.get(
-            f"/security-lifecycle/cases/{context['case_id']}/audit"
-        )
-        assert detail_response.status_code == 200
-        detail = detail_response.json()
+        detail = context["service"].get_case_audit(context["case_id"])
         assert {row["source_family"] for row in detail["evidence"]} == {
             "regulator",
             "listing_authority",
@@ -1594,7 +1483,7 @@ def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
                 "provider_last_updated_utc": None,
             },
         }
-        assert "canonical-only" not in detail_response.text
+        assert "canonical-only" not in json.dumps(detail)
         assert next(
             row for row in detail["evidence"] if row["source_family"] == "regulator"
         )["excerpt"] == "The tracked security may continue under ticker EA2."
@@ -1620,7 +1509,7 @@ def test_active_case_routes_share_closed_projection_and_compact_listing_dto(
         context["profile_conn"].close()
 
 
-def test_routes_omit_one_malformed_listing_without_losing_the_case_or_other_evidence(
+def test_case_readers_omit_one_malformed_listing_without_losing_the_case_or_other_evidence(
     tmp_path,
     monkeypatch,
 ):
@@ -1653,18 +1542,14 @@ def test_routes_omit_one_malformed_listing_without_losing_the_case_or_other_evid
         primary = client.get(
             f"/security-lifecycle/cases/{context['case_id']}"
         ).json()
-        detail_response = client.get(
-            f"/security-lifecycle/cases/{context['case_id']}/audit"
-        )
-        assert detail_response.status_code == 200
-        detail = detail_response.json()
+        detail = context["service"].get_case_audit(context["case_id"])
         assert {row["source_family"] for row in detail["evidence"]} == {
             "regulator",
             "market_infrastructure",
             "manual",
         }
         assert primary["corroboration"]["massive"] is None
-        assert "canonical-only" not in detail_response.text
+        assert "canonical-only" not in json.dumps(detail)
         assert client.get("/security-lifecycle/cases").json()["cases"][0][
             "evidence_count"
         ] == 3
@@ -1675,245 +1560,6 @@ def test_routes_omit_one_malformed_listing_without_losing_the_case_or_other_evid
             and "canonical-only" in row["excerpt"]
             for row in raw["evidence"]
         )
-    finally:
-        context["profile_conn"].close()
-
-
-def test_evidence_translation_route_caches_and_returns_typed_provenance(
-    tmp_path, monkeypatch
-):
-    from src.api.routes import security_lifecycle as routes
-    from src.security_lifecycle_translation import EvidenceTranslationResult
-
-    context = _build_context(tmp_path)
-    permission_calls: list[str] = []
-    translator_calls: list[tuple[str, str]] = []
-
-    def permission(action, _detail):
-        permission_calls.append(action)
-
-    def translator(text: str, locale: str):
-        translator_calls.append((text, locale))
-        return EvidenceTranslationResult(
-            translated_text="官方發行人證據。",
-            provider="anthropic",
-            model="claude-sonnet-5",
-            harness="claude_subscription_structured_output",
-        )
-
-    try:
-        client = _client(context, monkeypatch, permissions=permission)
-        monkeypatch.setattr(routes, "_translate_evidence_text", translator)
-        evidence_id = _add_manual(client, context["case_id"])
-
-        first = client.post(
-            f"/security-lifecycle/evidence/{evidence_id}/translations",
-            json={"locale": "zh-Hant"},
-        )
-        monkeypatch.setattr(
-            routes,
-            "_translate_evidence_text",
-            lambda *_args: (_ for _ in ()).throw(
-                AssertionError("cached translation called provider")
-            ),
-        )
-        second = client.post(
-            f"/security-lifecycle/evidence/{evidence_id}/translations",
-            json={"locale": "zh-Hant"},
-        )
-
-        assert first.status_code == 200
-        assert first.json() == {
-            "evidence_id": evidence_id,
-            "evidence_content_sha256": hashlib.sha256(
-                b"Official issuer evidence."
-            ).hexdigest(),
-            "locale": "zh-Hant",
-            "translated_text": "官方發行人證據。",
-            "provider": "anthropic",
-            "model": "claude-sonnet-5",
-            "harness": "claude_subscription_structured_output",
-            "translated_at": _AT,
-            "cached": False,
-        }
-        assert second.json() == {**first.json(), "cached": True}
-        assert permission_calls.count("security_lifecycle_add_evidence") == 1
-        assert permission_calls.count("security_lifecycle_translate_evidence") == 1
-        assert translator_calls == [("Official issuer evidence.", "zh-Hant")]
-    finally:
-        context["profile_conn"].close()
-
-
-def test_evidence_translation_route_validates_before_permission_and_masks_failures(
-    tmp_path, monkeypatch
-):
-    from src.api.routes import security_lifecycle as routes
-
-    context = _build_context(tmp_path)
-    permission_calls: list[str] = []
-    translator_calls: list[str] = []
-
-    def permission(action, _detail):
-        permission_calls.append(action)
-
-    def failed_translator(_text: str, _locale: str):
-        translator_calls.append("called")
-        raise RuntimeError("credential-secret-must-not-escape")
-
-    try:
-        client = _client(context, monkeypatch, permissions=permission)
-        monkeypatch.setattr(routes, "_translate_evidence_text", failed_translator)
-        evidence_id = _add_manual(client, context["case_id"])
-        permission_calls.clear()
-
-        invalid_locale = client.post(
-            f"/security-lifecycle/evidence/{evidence_id}/translations",
-            json={"locale": "fr"},
-        )
-        missing = client.post(
-            "/security-lifecycle/evidence/missing/translations",
-            json={"locale": "zh-Hant"},
-        )
-        failed = client.post(
-            f"/security-lifecycle/evidence/{evidence_id}/translations",
-            json={"locale": "zh-Hant"},
-        )
-
-        assert invalid_locale.status_code == 422
-        assert missing.status_code == 404
-        assert failed.status_code == 502
-        assert failed.json() == {
-            "detail": {
-                "code": "translation_provider_error",
-                "provider": None,
-                "model": None,
-                "harness": None,
-                "retryable": True,
-            }
-        }
-        assert "credential-secret" not in failed.text
-        assert permission_calls == ["security_lifecycle_translate_evidence"]
-        assert translator_calls == ["called"]
-        assert context["profile_conn"].execute(
-            "SELECT COUNT(*) FROM security_lifecycle_evidence_translations"
-        ).fetchone()[0] == 0
-    finally:
-        context["profile_conn"].close()
-
-
-def test_evidence_translation_route_reports_selected_route_without_fallback(
-    tmp_path, monkeypatch
-):
-    from types import SimpleNamespace
-
-    from src import card_synthesis
-    from src.api.routes import security_lifecycle as routes
-    from src.auth_drivers.subscription_structured_output import (
-        SubscriptionStructuredOutputError,
-    )
-
-    context = _build_context(tmp_path)
-    selected = SimpleNamespace(
-        provider="anthropic",
-        model="claude-sonnet-5",
-        effort="medium",
-    )
-    anthropic_calls: list[str] = []
-    openai_calls: list[str] = []
-
-    def fail_anthropic(*_args, **_kwargs):
-        anthropic_calls.append("called")
-        raise SubscriptionStructuredOutputError(
-            "reauth_required", "secret-value"
-        )
-
-    try:
-        client = _client(context, monkeypatch)
-        evidence_id = _add_manual(client, context["case_id"])
-        monkeypatch.setattr(routes, "task_route", lambda _task: selected)
-        monkeypatch.setattr(card_synthesis, "task_route", lambda _task: selected)
-        monkeypatch.setattr(
-            routes,
-            "resolve_fixed_task_runtime",
-            lambda _task: SimpleNamespace(model_timeout_s=600),
-        )
-        monkeypatch.setattr(
-            "src.auth_drivers.live_resolver.resolve_live_auth",
-            lambda _provider: SimpleNamespace(source="oauth_driver_unwired"),
-        )
-        monkeypatch.setattr(card_synthesis, "_translate_anthropic", fail_anthropic)
-        monkeypatch.setattr(
-            card_synthesis,
-            "_translate_openai",
-            lambda *_args, **_kwargs: openai_calls.append("called"),
-        )
-
-        response = client.post(
-            f"/security-lifecycle/evidence/{evidence_id}/translations",
-            json={"locale": "zh-Hant"},
-        )
-
-        assert response.status_code == 502
-        assert response.json() == {
-            "detail": {
-                "code": "translation_auth_rejected",
-                "provider": "anthropic",
-                "model": "claude-sonnet-5",
-                "harness": "claude_subscription_structured_output",
-                "retryable": False,
-            }
-        }
-        assert "secret-value" not in response.text
-        assert anthropic_calls == ["called"]
-        assert openai_calls == []
-    finally:
-        context["profile_conn"].close()
-
-
-def test_evidence_translation_route_reports_unresolvable_route_without_provider_call(
-    tmp_path, monkeypatch
-):
-    from types import SimpleNamespace
-
-    from src.api.routes import security_lifecycle as routes
-
-    context = _build_context(tmp_path)
-    provider_calls: list[str] = []
-
-    try:
-        client = _client(context, monkeypatch)
-        evidence_id = _add_manual(client, context["case_id"])
-        monkeypatch.setattr(
-            routes,
-            "task_route",
-            lambda _task: SimpleNamespace(
-                provider="unsupported-provider",
-                model="secret-value",
-            ),
-        )
-        monkeypatch.setattr(
-            routes,
-            "translate_text",
-            lambda *_args, **_kwargs: provider_calls.append("called"),
-        )
-
-        response = client.post(
-            f"/security-lifecycle/evidence/{evidence_id}/translations",
-            json={"locale": "zh-Hant"},
-        )
-
-        assert response.status_code == 502
-        assert response.json() == {
-            "detail": {
-                "code": "translation_route_unavailable",
-                "provider": None,
-                "model": None,
-                "harness": None,
-                "retryable": False,
-            }
-        }
-        assert "secret-value" not in response.text
-        assert provider_calls == []
     finally:
         context["profile_conn"].close()
 

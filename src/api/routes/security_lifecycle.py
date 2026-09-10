@@ -24,12 +24,6 @@ from src.api.dependencies import (
     get_profile_store,
 )
 from src.api.permissions import require_db_write, require_profile_state_write
-from src.agents.config import task_route
-from src.card_synthesis import translate_text, translation_harness
-from src.card_execution import capture_card_execution
-from src.auth_drivers.runtime_binding import activate_runtime_auth
-from src.content_translation_failures import classify_content_translation_failure
-from src.fixed_task_runtime_config import resolve_fixed_task_runtime
 from src.security_lifecycle_disposition import LIFECYCLE_QUEUE_BUCKETS
 from src.security_lifecycle_population import LifecyclePopulationUnavailable
 from src.security_lifecycle_sec_admission import SEC_ADMISSION_STATES
@@ -57,13 +51,6 @@ from src.service.security_lifecycle_automation_config import (
 from src.service.security_lifecycle_automation_runtime import (
     lifecycle_automation_progress_registry,
 )
-from src.security_lifecycle_translation import (
-    EvidenceTranslationConflict,
-    EvidenceTranslationFailure,
-    EvidenceTranslationResult,
-    prepare_evidence_translation,
-    translate_evidence,
-)
 from src.service.security_lifecycle_automation_scheduler import (
     dispatch_and_record_security_lifecycle_automation,
     read_security_lifecycle_automation_durable_status,
@@ -73,7 +60,6 @@ from src.service.ticker_identity_scheduler import (
 )
 from src.tools.security_lifecycle_tools import (
     SecurityLifecycleReadService,
-    project_security_lifecycle_case_audit,
     project_security_lifecycle_case_detail,
 )
 
@@ -287,12 +273,6 @@ class AcknowledgementRequest(BaseModel):
         return _request_text(value, name="note", required=False)
 
 
-class EvidenceTranslationRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    locale: Literal["en", "zh-Hant"]
-
-
 class LifecycleAutomationConfigRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -307,61 +287,6 @@ class LifecycleAutomationConfigRequest(BaseModel):
         if value not in {1, 2}:
             raise ValueError("batch_limit")
         return value
-
-
-def _translate_evidence_text(text: str, locale: str) -> EvidenceTranslationResult:
-    try:
-        route = task_route("card_translation")
-        provider = route.provider
-        model = route.model
-        if provider not in {"anthropic", "openai"}:
-            raise ValueError("translation_route_provider")
-        if not model or len(model) > 160 or "\0" in model:
-            raise ValueError("translation_route_model")
-        execution = capture_card_execution("card_translation", route)
-        with activate_runtime_auth(execution.auth):
-            harness = translation_harness(provider, model)
-        runtime = resolve_fixed_task_runtime("card_translation")
-    except Exception:
-        raise EvidenceTranslationFailure(
-            "translation_route_unavailable",
-            retryable=False,
-            provider=None,
-            model=None,
-            harness=None,
-        ) from None
-
-    try:
-        result = translate_text(
-            text,
-            lang=locale,
-            model_timeout_s=runtime.model_timeout_s,
-            provider=provider,
-            model=model,
-            execution=execution,
-        )
-    except EvidenceTranslationFailure:
-        raise
-    except Exception as exc:
-        failure = classify_content_translation_failure(exc)
-        raise EvidenceTranslationFailure(
-            failure.code,
-            retryable=failure.retryable,
-            provider=provider,
-            model=model,
-            harness=harness,
-        ) from None
-
-    try:
-        return EvidenceTranslationResult(**result)
-    except (TypeError, ValueError):
-        raise EvidenceTranslationFailure(
-            "translation_output_invalid",
-            retryable=False,
-            provider=provider,
-            model=model,
-            harness=harness,
-        ) from None
 
 
 def _store_error(exc: LifecycleStoreUnavailable) -> HTTPException:
@@ -521,9 +446,7 @@ def _live_transition_mutation_authority(
 
 def _dispatch_automation(
     *,
-    scope: Literal["due", "case"],
     config_store: ProfileStateStore,
-    case_id: str | None = None,
 ) -> dict[str, object]:
     config = _valid_automation_config(config_store)
     run_kwargs: dict[str, object] = {
@@ -531,19 +454,11 @@ def _dispatch_automation(
         "transition_mutation_allowed": _live_transition_mutation_authority(
             config_store
         ),
+        "trigger": "manual_due",
     }
-    if case_id is not None:
-        run_kwargs.update(
-            {
-                "allow_new_attempt": True,
-                "limit": 1,
-                "target_case_id": case_id,
-            }
-        )
-    run_kwargs["trigger"] = "manual_case" if case_id is not None else "manual_due"
     dispatched = dispatch_and_record_security_lifecycle_automation(**run_kwargs)
     result: dict[str, object] = {
-        "scope": scope,
+        "scope": "due",
         "status": dispatched["status"],
     }
     reason = dispatched.get("reason")
@@ -552,8 +467,6 @@ def _dispatch_automation(
     request_id = dispatched.get("request_id")
     if request_id is not None:
         result["request_id"] = request_id
-    if case_id is not None:
-        result["case_id"] = case_id
     return result
 
 
@@ -606,42 +519,7 @@ def run_due_automation(
     config_store: ProfileStateStore = Depends(get_profile_store),
 ):
     require_db_write("security_lifecycle_run_automation", {"scope": "due"})
-    return _dispatch_automation(scope="due", config_store=config_store)
-
-
-@router.post("/cases/{case_id}/automation/run")
-def run_case_automation(
-    case_id: str,
-    service: SecurityLifecycleReadService = Depends(
-        get_security_lifecycle_read_service
-    ),
-    config_store: ProfileStateStore = Depends(get_profile_store),
-):
-    try:
-        service.get_case(case_id)
-        require_db_write(
-            "security_lifecycle_run_automation",
-            {"case_id": case_id, "scope": "case"},
-        )
-        result = _dispatch_automation(
-            scope="case",
-            case_id=case_id,
-            config_store=config_store,
-        )
-        if result.get("reason") == "already_running":
-            raise HTTPException(
-                status_code=409,
-                detail={"case_id": case_id, "code": "automation_case_running"},
-            )
-        return result
-    except HTTPException:
-        raise
-    except LifecycleStoreUnavailable as exc:
-        raise _store_error(exc) from None
-    except KeyError as exc:
-        raise _not_found(exc) from None
-    except (LifecycleWritesUnavailable, ValueError) as exc:
-        raise _invalid(exc) from None
+    return _dispatch_automation(config_store=config_store)
 
 
 @router.get("/reviews")
@@ -659,19 +537,6 @@ def list_current_reviews(
         raise HTTPException(status_code=503, detail={"code": "lifecycle_current_unavailable"}) from None
     except ValueError:
         raise HTTPException(status_code=422, detail={"code": "current_review_filter"}) from None
-
-
-@router.get("/reviews/{review_id}")
-def get_current_review(
-    review_id: str,
-    service: SecurityLifecycleReadService = Depends(get_security_lifecycle_read_service),
-):
-    try:
-        return service.get_current_review(review_id, at=_utc_now())
-    except KeyError:
-        raise HTTPException(status_code=404, detail={"code": "current_review_not_found"}) from None
-    except LifecyclePopulationUnavailable:
-        raise HTTPException(status_code=503, detail={"code": "lifecycle_current_unavailable"}) from None
 
 
 @router.get("/cases")
@@ -753,23 +618,6 @@ def get_case(
         raise _invalid(exc) from None
 
 
-@router.get("/cases/{case_id}/audit")
-def get_case_audit(
-    case_id: str,
-    service: SecurityLifecycleReadService = Depends(
-        get_security_lifecycle_read_service
-    ),
-):
-    try:
-        return project_security_lifecycle_case_audit(service.get_case(case_id))
-    except LifecycleStoreUnavailable as exc:
-        raise _store_error(exc) from None
-    except KeyError as exc:
-        raise _not_found(exc) from None
-    except ValueError as exc:
-        raise _invalid(exc) from None
-
-
 @router.get("/investigations/{run_id}")
 def get_investigation(
     run_id: str,
@@ -810,43 +658,6 @@ def create_manual_evidence(
         raise _store_error(exc) from None
     except KeyError as exc:
         raise _not_found(exc) from None
-    except (LifecycleWritesUnavailable, ValueError) as exc:
-        raise _invalid(exc) from None
-
-
-@router.post("/evidence/{evidence_id}/translations")
-def translate_evidence_route(
-    evidence_id: str,
-    body: EvidenceTranslationRequest,
-    store: SecurityLifecycleInvestigationStore = Depends(
-        get_security_lifecycle_store
-    ),
-):
-    try:
-        _, cached = prepare_evidence_translation(
-            store,
-            evidence_id=evidence_id,
-            locale=body.locale,
-        )
-        if cached is not None:
-            return {**cached, "cached": True}
-        require_db_write(
-            "security_lifecycle_translate_evidence",
-            {"evidence_id": evidence_id, "locale": body.locale},
-        )
-        return translate_evidence(
-            store,
-            evidence_id=evidence_id,
-            locale=body.locale,
-            translator=_translate_evidence_text,
-            at=_utc_now(),
-        )
-    except KeyError as exc:
-        raise _not_found(exc) from None
-    except EvidenceTranslationConflict as exc:
-        raise HTTPException(status_code=409, detail={"code": exc.code}) from None
-    except EvidenceTranslationFailure as exc:
-        raise HTTPException(status_code=502, detail=exc.detail()) from None
     except (LifecycleWritesUnavailable, ValueError) as exc:
         raise _invalid(exc) from None
 
