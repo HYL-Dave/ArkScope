@@ -1,0 +1,216 @@
+[
+  {
+    "mode": "baseline",
+    "exit_code": 0,
+    "count": "71 passed in 12.91s",
+    "details": {
+      "mutation": "baseline",
+      "observed": 0,
+      "expected": 0,
+      "named_owners_failed": true,
+      "failed": []
+    }
+  },
+  {
+    "mode": "review_only",
+    "exit_code": 0,
+    "count": "35 failed, 36 passed in 13.73s",
+    "details": {
+      "mutation": "review_only",
+      "observed": 1,
+      "expected": 1,
+      "named_owners_failed": true,
+      "failed": [
+        "tests/test_security_lifecycle_automatic_rename.py::test_exact_current_rename_requests_the_existing_transition_with_event_date",
+        "tests/test_security_lifecycle_automatic_rename.py::test_automatic_rename_moves_collection_without_resurrecting_removed_former[False]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_automatic_rename_moves_collection_without_resurrecting_removed_former[True]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_check_only_does_not_approve_or_apply_an_automatic_rename",
+        "tests/test_security_lifecycle_automatic_rename.py::test_v6_review_is_reassessed_once_without_rewriting_its_receipt",
+        "tests/test_security_lifecycle_automatic_rename.py::test_automatic_rename_uses_existing_reversal_without_erasing_a_tombstone",
+        "tests/test_security_lifecycle_automatic_rename.py::test_no_source_or_open_position_never_requests_unattended_rename[sources1]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_no_source_or_open_position_never_requests_unattended_rename[sources2]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_exact_current_rename_passes_transaction_guard_without_human_acceptance",
+        "tests/test_security_lifecycle_automatic_rename.py::test_historical_rename_guard_distinguishes_human_and_automatic_authority",
+        "tests/test_security_lifecycle_automatic_rename.py::test_approved_rename_is_rechecked_before_writing[elapsed]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_approved_rename_is_rechecked_before_writing[active_otc]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_approved_rename_is_rechecked_before_writing[identity]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_approved_rename_is_rechecked_before_writing[portfolio]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_observation_is_rechecked_inside_the_apply_transaction",
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_evidence_merge_does_not_invent_conflicts[duplicate]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_evidence_merge_does_not_invent_conflicts[newer_active]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_evidence_merge_does_not_invent_conflicts[stale_negative]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_evidence_merge_does_not_invent_conflicts[unrelated]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_newer_successor_snapshot_can_resolve_a_previously_captured_conflict",
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_recovery_clears_derived_error_without_rewriting_old_receipt",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automation_preflight_blocks_archived_successor_membership[manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automation_preflight_blocks_archived_successor_membership[legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automatic_approval_rechecks_archived_successor_membership[manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automatic_approval_rechecks_archived_successor_membership[legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_preexisting_automatic_approval_cannot_reactivate_successor[scheduler-manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_preexisting_automatic_approval_cannot_reactivate_successor[scheduler-legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_preexisting_automatic_approval_cannot_reactivate_successor[attended_user-manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_preexisting_automatic_approval_cannot_reactivate_successor[attended_user-legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automatic_apply_rereads_membership_not_replayed_effects[manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automatic_apply_rereads_membership_not_replayed_effects[legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_attended_review_can_explicitly_reactivate_successor_membership[manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_attended_review_can_explicitly_reactivate_successor_membership[legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_unrelated_archived_membership_does_not_block_automatic_rename[manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_unrelated_archived_membership_does_not_block_automatic_rename[legacy_config_seed]"
+      ]
+    }
+  },
+  {
+    "mode": "ignore_readiness",
+    "exit_code": 0,
+    "count": "12 failed, 59 passed in 12.83s",
+    "details": {
+      "mutation": "ignore_readiness",
+      "observed": 1,
+      "expected": 1,
+      "named_owners_failed": true,
+      "failed": [
+        "tests/test_security_lifecycle_automatic_rename.py::test_historical_rename_stays_available_for_attended_review_only",
+        "tests/test_security_lifecycle_automatic_rename.py::test_incomplete_old_listing_checks_do_not_authorize_unattended_rename[1]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_incomplete_old_listing_checks_do_not_authorize_unattended_rename[2]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_incomplete_old_listing_checks_do_not_authorize_unattended_rename[3]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_incomplete_old_listing_checks_do_not_authorize_unattended_rename[4]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_incomplete_old_listing_checks_do_not_authorize_unattended_rename[5]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[1]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[2]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[3]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[4]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[5]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_historical_rename_guard_distinguishes_human_and_automatic_authority"
+      ]
+    }
+  },
+  {
+    "mode": "ignore_successor_conflict",
+    "exit_code": 0,
+    "count": "5 failed, 66 passed in 12.64s",
+    "details": {
+      "mutation": "ignore_successor_conflict",
+      "observed": 1,
+      "expected": 1,
+      "named_owners_failed": true,
+      "failed": [
+        "tests/test_security_lifecycle_automatic_rename.py::test_successor_active_inactive_conflict_cannot_establish_continuity",
+        "tests/test_security_lifecycle_successor_evidence.py::test_real_scan_carries_the_successor_directory_observation_without_extra_requests[False]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_independently_stored_successor_conflict_blocks_automatic_rename[inactive]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_observation_is_rechecked_inside_the_apply_transaction",
+        "tests/test_security_lifecycle_successor_evidence.py::test_newer_successor_snapshot_can_resolve_a_previously_captured_conflict"
+      ]
+    }
+  },
+  {
+    "mode": "skip_transaction_gate",
+    "exit_code": 0,
+    "count": "6 failed, 65 passed in 12.85s",
+    "details": {
+      "mutation": "skip_transaction_gate",
+      "observed": 1,
+      "expected": 1,
+      "named_owners_failed": true,
+      "failed": [
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[1]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[2]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[3]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[4]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_transaction_guard_independently_rejects_incomplete_automatic_rename[5]",
+        "tests/test_security_lifecycle_automatic_rename.py::test_historical_rename_guard_distinguishes_human_and_automatic_authority"
+      ]
+    }
+  },
+  {
+    "mode": "skip_successor_material",
+    "exit_code": 0,
+    "count": "11 failed, 60 passed in 12.53s",
+    "details": {
+      "mutation": "skip_successor_material",
+      "observed": 1,
+      "expected": 1,
+      "named_owners_failed": true,
+      "failed": [
+        "tests/test_security_lifecycle_successor_evidence.py::test_real_scan_carries_the_successor_directory_observation_without_extra_requests[True]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_real_scan_carries_the_successor_directory_observation_without_extra_requests[False]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_independently_stored_successor_conflict_blocks_automatic_rename[inactive]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_independently_stored_successor_conflict_blocks_automatic_rename[identity]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_independently_stored_successor_conflict_blocks_automatic_rename[provider_error]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_observation_is_rechecked_inside_the_apply_transaction",
+        "tests/test_security_lifecycle_successor_evidence.py::test_newer_successor_snapshot_can_resolve_a_previously_captured_conflict",
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_recovery_clears_derived_error_without_rewriting_old_receipt",
+        "tests/test_security_lifecycle_successor_evidence.py::test_derived_successor_error_needs_a_fresh_observation_to_clear[still_failed]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_derived_successor_error_needs_a_fresh_observation_to_clear[unobserved]",
+        "tests/test_security_lifecycle_successor_evidence.py::test_derived_successor_error_needs_a_fresh_observation_to_clear[stale]"
+      ]
+    }
+  },
+  {
+    "mode": "drop_provider_codes",
+    "exit_code": 0,
+    "count": "1 failed, 70 passed in 12.79s",
+    "details": {
+      "mutation": "drop_provider_codes",
+      "observed": 1,
+      "expected": 1,
+      "named_owners_failed": true,
+      "failed": [
+        "tests/test_security_lifecycle_successor_evidence.py::test_independently_stored_successor_conflict_blocks_automatic_rename[provider_error]"
+      ]
+    }
+  },
+  {
+    "mode": "reactivate_membership",
+    "exit_code": 0,
+    "count": "12 failed, 59 passed in 12.86s",
+    "details": {
+      "mutation": "reactivate_membership",
+      "observed": 1,
+      "expected": 1,
+      "named_owners_failed": true,
+      "failed": [
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automation_preflight_blocks_archived_successor_membership[manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automation_preflight_blocks_archived_successor_membership[legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_worker_cannot_reactivate_archived_successor_membership[manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_worker_cannot_reactivate_archived_successor_membership[legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automatic_approval_rechecks_archived_successor_membership[manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automatic_approval_rechecks_archived_successor_membership[legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_preexisting_automatic_approval_cannot_reactivate_successor[scheduler-manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_preexisting_automatic_approval_cannot_reactivate_successor[scheduler-legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_preexisting_automatic_approval_cannot_reactivate_successor[attended_user-manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_preexisting_automatic_approval_cannot_reactivate_successor[attended_user-legacy_config_seed]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automatic_apply_rereads_membership_not_replayed_effects[manual_lists]",
+        "tests/test_security_lifecycle_automatic_rename_suppression.py::test_automatic_apply_rereads_membership_not_replayed_effects[legacy_config_seed]"
+      ]
+    }
+  },
+  {
+    "mode": "prefer_obsolete_pending",
+    "exit_code": 0,
+    "count": "2 failed, 69 passed in 12.86s",
+    "details": {
+      "mutation": "prefer_obsolete_pending",
+      "observed": 1,
+      "expected": 1,
+      "named_owners_failed": true,
+      "failed": [
+        "tests/test_security_lifecycle_policy_rollover.py::test_applied_rollover_replaces_obsolete_pending_projection_without_losing_receipts[True]",
+        "tests/test_security_lifecycle_policy_rollover.py::test_applied_rollover_replaces_obsolete_pending_projection_without_losing_receipts[False]"
+      ]
+    }
+  },
+  {
+    "mode": "keep_recovered_error",
+    "exit_code": 0,
+    "count": "1 failed, 70 passed in 14.84s",
+    "details": {
+      "mutation": "keep_recovered_error",
+      "observed": 1,
+      "expected": 1,
+      "named_owners_failed": true,
+      "failed": [
+        "tests/test_security_lifecycle_successor_evidence.py::test_successor_recovery_clears_derived_error_without_rewriting_old_receipt"
+      ]
+    }
+  }
+]
