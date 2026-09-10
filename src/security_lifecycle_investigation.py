@@ -2032,16 +2032,31 @@ def _read_profile(
 
 
 def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dict:
-    from src.lifecycle_investigation.retirement import cutover_active, retained_action_cases
-    retired = cutover_active(profile_db_path)
+    """Current cases, excluding abandoned SEC intake but retaining action history."""
+    from src.lifecycle_investigation.retirement import retained_action_cases
+
+    composed = compose_security_lifecycle_audit(market_db_path, profile_db_path)
     retained = set()
-    if retired:
-        with sqlite3.connect(Path(profile_db_path).resolve().as_uri() + "?mode=ro", uri=True) as conn:
-            retained = retained_action_cases(conn)
+    try:
+        if Path(profile_db_path).is_file():
+            with sqlite3.connect(
+                Path(profile_db_path).resolve().as_uri() + "?mode=ro", uri=True
+            ) as conn:
+                retained = retained_action_cases(conn)
+    except (OSError, sqlite3.Error):
+        raise LifecycleStoreUnavailable("profile") from None
+    return {
+        "cases": [
+            case for case in composed["cases"]
+            if case["source"] != "sec_edgar" or case["case_id"] in retained
+        ]
+    }
+
+
+def compose_security_lifecycle_audit(market_db_path: str, profile_db_path: str) -> dict:
+    """Read all original cases for operator accounting, never queue admission."""
     try:
         observations = read_market_observations(market_db_path, limit=None)
-        if retired:
-            observations = [row for row in observations if row["source"] != "sec_edgar" or case_id_for(row["source"], row["source_ref"], row["ticker"]) in retained]
     except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
         raise LifecycleStoreUnavailable("market") from None
     try:
@@ -2080,8 +2095,6 @@ def compose_security_lifecycle(market_db_path: str, profile_db_path: str) -> dic
     except (OSError, sqlite3.Error, LifecycleSchemaMismatch):
         raise LifecycleStoreUnavailable("profile") from None
     for case in profile_cases:
-        if retired and case["source"] == "sec_edgar" and case["case_id"] not in retained:
-            continue
         by_case.setdefault(
             case["case_id"],
             {
@@ -2141,6 +2154,7 @@ __all__ = [
     "canonical_assessment_decimal",
     "case_id_for",
     "compose_security_lifecycle",
+    "compose_security_lifecycle_audit",
     "observation_fingerprint",
     "project_action_proposal",
 ]

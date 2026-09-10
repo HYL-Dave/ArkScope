@@ -31,7 +31,9 @@ def _build_due_context(tmp_path, *, with_portfolio_schema: bool = False):
     )
     from src.ticker_identity_schema import create_ticker_identity_schema
     from src.ticker_identity_service import TickerIdentityService
-    from src.ticker_identity_transition import TransitionOptions
+    from src.ticker_identity_transition import (
+        TransitionOptions, TickerIdentityTransitionStore, build_transition_preview,
+    )
 
     market_path = tmp_path / "market_data.db"
     profile_path = tmp_path / "profile_state.db"
@@ -113,13 +115,20 @@ def _build_due_context(tmp_path, *, with_portfolio_schema: bool = False):
         clock=lambda: "2026-08-25T13:00:00Z",
     )
     options = TransitionOptions(execute_on="2026-08-25")
-    preview = service.preview_case(case_id, options=options)
-    transition = service.approve_case(
-        case_id,
-        options=options,
-        preview_sha256=preview["preview_sha256"],
-        before_write=lambda: None,
-    )
+    # Seed an already-approved legacy receipt through its retained schema owner.
+    # Fresh SEC cases no longer enter the service's current-case read path.
+    with sqlite3.connect(profile_path) as conn:
+        store = SecurityLifecycleInvestigationStore(conn)
+        preview = build_transition_preview(
+            conn, case={"case_id": case_id, "source": "sec_edgar", "ticker": "OLD"},
+            assessment=store.get_assessment(assessment_id),
+            proposals=store.project_proposals(case_id, observation_fingerprint_sha256=fingerprint),
+            observation_fingerprint_sha256=fingerprint, sources=("manual_lists",),
+            options=options, at="2026-08-25T13:00:00Z",
+        )
+        transition = TickerIdentityTransitionStore(conn, clock=lambda: "2026-08-25T13:00:00Z").approve(
+            preview=preview, approved_preview_sha256=preview["preview_sha256"],
+        )
     return service, profile_path, transition["transition_id"]
 
 

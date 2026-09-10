@@ -150,12 +150,12 @@ def test_observation_upsert_reconciles_many_kinds_without_changing_case_identity
         conn.close()
 
 
-def test_read_composition_keeps_profile_history_visible_when_source_is_missing(
+def test_audit_composition_keeps_profile_history_visible_when_source_is_missing(
     tmp_path,
 ):
     from src.security_lifecycle_investigation import (
         SecurityLifecycleInvestigationStore,
-        compose_security_lifecycle,
+        compose_security_lifecycle_audit,
     )
 
     market_path = tmp_path / "market_data.db"
@@ -174,7 +174,7 @@ def test_read_composition_keeps_profile_history_visible_when_source_is_missing(
     finally:
         profile.close()
 
-    result = compose_security_lifecycle(str(market_path), str(profile_path))
+    result = compose_security_lifecycle_audit(str(market_path), str(profile_path))
     assert result["cases"] == [
         {
             "case_id": case_id,
@@ -190,9 +190,9 @@ def test_read_composition_keeps_profile_history_visible_when_source_is_missing(
     ]
 
 
-def test_read_composition_projects_untouched_observation_without_profile_write(tmp_path):
+def test_audit_composition_projects_untouched_observation_without_profile_write(tmp_path):
     from src.security_lifecycle import SecurityLifecycleStore
-    from src.security_lifecycle_investigation import compose_security_lifecycle
+    from src.security_lifecycle_investigation import compose_security_lifecycle_audit
 
     market_path = tmp_path / "market_data.db"
     profile_path = tmp_path / "profile_state.db"
@@ -202,7 +202,7 @@ def test_read_composition_projects_untouched_observation_without_profile_write(t
     finally:
         conn.close()
 
-    result = compose_security_lifecycle(str(market_path), str(profile_path))
+    result = compose_security_lifecycle_audit(str(market_path), str(profile_path))
     assert len(result["cases"]) == 1
     assert result["cases"][0]["source_presence"] == "present"
     assert result["cases"][0]["workflow_state"] == "unresolved"
@@ -219,7 +219,7 @@ def test_source_reattachment_restores_identical_fingerprint_and_revalidates_chan
     from src.security_lifecycle import SecurityLifecycleStore
     from src.security_lifecycle_investigation import (
         SecurityLifecycleInvestigationStore,
-        compose_security_lifecycle,
+        compose_security_lifecycle_audit,
         observation_fingerprint,
     )
 
@@ -270,7 +270,7 @@ def test_source_reattachment_restores_identical_fingerprint_and_revalidates_chan
     finally:
         profile.close()
 
-    assert compose_security_lifecycle(str(market_path), str(profile_path))["cases"][0][
+    assert compose_security_lifecycle_audit(str(market_path), str(profile_path))["cases"][0][
         "source_presence"
     ] == "source_missing"
 
@@ -283,7 +283,7 @@ def test_source_reattachment_restores_identical_fingerprint_and_revalidates_chan
         )
     finally:
         market.close()
-    identical = compose_security_lifecycle(str(market_path), str(profile_path))["cases"][0]
+    identical = compose_security_lifecycle_audit(str(market_path), str(profile_path))["cases"][0]
     assert identical["workflow_state"] == "resolved"
     assert identical["current_assessment"]["stale"] is False
 
@@ -296,7 +296,7 @@ def test_source_reattachment_restores_identical_fingerprint_and_revalidates_chan
         )
     finally:
         market.close()
-    changed = compose_security_lifecycle(str(market_path), str(profile_path))["cases"][0]
+    changed = compose_security_lifecycle_audit(str(market_path), str(profile_path))["cases"][0]
     assert changed["workflow_state"] == "unresolved"
     assert changed["current_assessment"] is None
     assert changed["assessment_history"][0]["stale"] is True

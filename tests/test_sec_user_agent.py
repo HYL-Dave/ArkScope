@@ -1,6 +1,29 @@
 from __future__ import annotations
 
 
+def test_sec_cik_lookup_loads_the_official_ticker_map_once(monkeypatch):
+    from data_sources.sec_edgar_source import SECEdgarDataSource
+
+    source = SECEdgarDataSource(user_agent="ArkScope test@example.com")
+    source._cik_cache = {}
+    calls = []
+    monkeypatch.setattr(
+        source,
+        "_make_request",
+        lambda url: calls.append(url) or {
+            "0": {"cik_str": 712515, "ticker": "EA", "title": "Electronic Arts Inc."},
+            "1": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."},
+        },
+    )
+    try:
+        assert source.get_cik("ea") == "0000712515"
+        assert source.get_cik("AAPL") == "0000320193"
+        assert source.get_cik("MISSING") is None
+        assert calls == ["https://www.sec.gov/files/company_tickers.json"]
+    finally:
+        source.close()
+
+
 def _clear_sec_env(monkeypatch):
     for name in ("ARKSCOPE_SEC_USER_AGENT", "SEC_CONTACT_EMAIL", "SEC_USER_AGENT"):
         monkeypatch.delenv(name, raising=False)

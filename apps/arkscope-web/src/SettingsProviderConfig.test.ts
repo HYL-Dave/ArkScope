@@ -410,24 +410,6 @@ vi.mock("./api", async (importOriginal) => {
           } : null,
           job_name: "collect.ibkr_prices",
         },
-        sec_corporate_actions: {
-          label: "PLANTED_SCHEDULE_SEC_LABEL",
-          description: "PLANTED_SCHEDULE_SEC_DESCRIPTION",
-          ibkr: false,
-          provider_fetch: true,
-          source_mode: "direct_local",
-          write_target: "security_lifecycle.db",
-          source_badges: [],
-          enabled: false,
-          interval_minutes: 1440,
-          default_interval_minutes: 1440,
-          running: false,
-          progress: null,
-          last_attempt_at: null,
-          last_result: null,
-          durable_state: null,
-          job_name: "collect.sec_corporate_actions",
-        },
         ...Object.fromEntries([
           ["fred_series", "fetch_fred_series", 1440],
           ["fred_release_dates", "fetch_fred_release_dates", 10080],
@@ -1180,11 +1162,12 @@ describe("Settings provider config authority", () => {
     );
     const zhDataRows = rowsAt("source_schedules");
     const zhMacroRows = rowsAt("macro_storage");
-    expect(zhDataRows).toHaveLength(5);
+    expect(zhDataRows).toHaveLength(4);
     expect(zhMacroRows).toHaveLength(5);
     const allZhIds = [...zhDataRows, ...zhMacroRows]
       .map((row) => row.getAttribute("data-source-id"));
-    expect(new Set(allZhIds).size).toBe(10);
+    expect(new Set(allZhIds).size).toBe(9);
+    expect(allZhIds).not.toContain("sec_corporate_actions");
     for (const row of [...zhDataRows, ...zhMacroRows]) {
       expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
       expect(row.querySelector("input[type='number']")).not.toBeNull();
@@ -1201,7 +1184,7 @@ describe("Settings provider config authority", () => {
     await act(async () => { await i18n.changeLanguage("en"); });
     const enDataRows = rowsAt("source_schedules");
     const enMacroRows = rowsAt("macro_storage");
-    expect(enDataRows).toHaveLength(5);
+    expect(enDataRows).toHaveLength(4);
     expect(enMacroRows).toHaveLength(5);
     for (const row of [...enDataRows, ...enMacroRows]) {
       expect(row.querySelector("input[type='checkbox']")).not.toBeNull();

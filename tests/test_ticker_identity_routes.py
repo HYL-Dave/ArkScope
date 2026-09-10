@@ -17,6 +17,7 @@ def _build_context(
     identity_schema: str = "exact",
     outcomes=("symbol_changed",),
     successor: str | None = "NEW",
+    source="listing_authority",
 ):
     from src.profile_state import ProfileStateStore
     from src.security_lifecycle import (
@@ -57,7 +58,6 @@ def _build_context(
         )
     )
     observation = market_store.get_observation("sec_edgar", _SOURCE_REF, "OLD")
-    fingerprint = observation_fingerprint(observation)
     market_conn.close()
 
     profile_conn = sqlite3.connect(profile_path)
@@ -65,9 +65,16 @@ def _build_context(
         profile_conn,
         id_factory=lambda prefix, ordinal: f"{prefix}_{ordinal}",
     )
+    if source == "listing_authority":
+        from src.security_lifecycle_provider_store import ProviderCheckStore
+
+        checks = ProviderCheckStore(profile_path)
+        checks.record(ticker="OLD", at=_AT, evidence=(), diagnostics={})
+        observation = checks.latest()["OLD"]["observation"]
+    fingerprint = observation_fingerprint(observation)
     case_id = investigation.ensure_case(
-        source="sec_edgar",
-        source_ref=_SOURCE_REF,
+        source=source,
+        source_ref=observation["source_ref"],
         ticker="OLD",
         at=_AT,
     )

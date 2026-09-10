@@ -735,7 +735,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 919,
+      settings: 917,
       research: 207,
       explore: 1341,
       portfolio: 374,
@@ -821,11 +821,11 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2984);
+      expect(total, `${locale}.total`).toBe(2982);
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
-        [...settings.keys()].filter((path) => /dataSources\.schedule\.(?:labels\.(?:readOnly|retired)|sources\.(?:ivHistory|localIncremental|priceBackfill))/u.test(path)),
+        [...settings.keys()].filter((path) => /dataSources\.schedule\.(?:labels\.(?:readOnly|retired)|sources\.(?:ivHistory|localIncremental|priceBackfill|secCorporateActions))/u.test(path)),
         `${locale}.settings.retiredScheduleCopy`,
       ).toEqual([]);
       expect(settings.has("dataStorage.labels.iv"), `${locale}.settings.dataStorage.labels.iv`)
@@ -1304,8 +1304,6 @@ describe("bundled i18n resources", () => {
       "macroStorage.schedule.enabledCount_other",
       "macroStorage.schedule.unknown",
       "macroStorage.schedule.title",
-      "dataSources.schedule.sources.secCorporateActions.label",
-      "dataSources.schedule.sources.secCorporateActions.description",
       "dataStorage.lifecycle.title",
       "dataStorage.lifecycle.openWorkflow",
       "dataStorage.lifecycle.summary.activeCases",

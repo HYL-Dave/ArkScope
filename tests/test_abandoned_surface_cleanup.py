@@ -26,6 +26,10 @@ def test_factory_has_no_placeholder_class_or_export():
     assert "NotImplementedDriver" not in exported
 
 
+def test_sec_company_event_collector_is_physically_absent():
+    assert not (ROOT / "src/collectors/sec_corporate_actions.py").exists()
+
+
 def test_current_sec_api_documentation_uses_active_owners():
     specification = (ROOT / "data_sources/API_SPECIFICATIONS.md").read_text(
         encoding="utf-8"

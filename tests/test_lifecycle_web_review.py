@@ -30,9 +30,9 @@ def context(tmp_path, *, auth="api_key", provider=None, kind="terminal_delisting
                 filing_date="2026-09-01", source="sec_edgar", source_ref="0000012345-26-000042", filing_form="8-K", filing_items=("3.01",),
                 evidence_url="https://www.sec.gov/Archives/example/old.htm", description="Listing status under review.", observed_at=c["now"][0],
                 kinds=(ObservationKind("listing_removal_notice", "2026-09-01"),)))
+            observation = SecurityLifecycleStore(conn).get_observation("sec_edgar", "0000012345-26-000042", "OLD")
         with sqlite3.connect(c["profile"]) as conn:
             c["case_id"] = SecurityLifecycleInvestigationStore(conn).ensure_case(source="sec_edgar", source_ref="0000012345-26-000042", ticker="OLD", at=c["now"][0])
-        observation = c["service"]._read_service.get_case(c["case_id"])["observation"]
     fingerprint = observation_fingerprint(observation)
     with sqlite3.connect(c["profile"]) as conn:
         install_web_journal(conn, at=c["now"][0])
@@ -186,12 +186,16 @@ def test_unrelated_sa_refresh_and_other_ticker_edits_do_not_block_web_review(tmp
 
 
 @pytest.mark.parametrize("kind", ["terminal_delisting", "symbol_continuation"])
-def test_sec_case_needs_new_web_adoption_not_a_relaxed_legacy_source_allowlist(tmp_path, kind):
+def test_unretained_sec_case_cannot_start_new_adoption_but_keeps_audit_material(tmp_path, kind):
+    from src.security_lifecycle_investigation import compose_security_lifecycle_audit
+
     c = context(tmp_path, sec_case=True, kind=kind)
-    packet = prepare(c)
-    assert packet["ready"], packet["block_reasons"]
-    assert confirm(c, packet)["status"] == "applied"
-    assert "OLD" not in c["sources"]()
+    before = rows(c)
+    with pytest.raises(KeyError, match="case_not_found"):
+        prepare(c)
+    assert rows(c) == before and "OLD" in c["sources"]()
+    assert c["web"].read(c["run_id"])["status"] == "succeeded"
+    assert c["case_id"] in {case["case_id"] for case in compose_security_lifecycle_audit(str(c["market"]), str(c["profile"]))["cases"]}
 
 
 @pytest.mark.parametrize("mutation", ["strip_confirmation", "edit_finding", "automation"])

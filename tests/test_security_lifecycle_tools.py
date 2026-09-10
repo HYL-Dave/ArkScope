@@ -170,34 +170,14 @@ def _seed_all_evidence_families(store, case_id, fingerprint):
 
 
 def _databases(tmp_path, *, include_observation=True):
-    from src.security_lifecycle import (
-        LifecycleObservation,
-        ObservationKind,
-        SecurityLifecycleStore,
-    )
+    from src.security_lifecycle import SecurityLifecycleStore
     from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
+    from src.security_lifecycle_provider_store import ProviderCheckStore
 
     market_path = tmp_path / "market_data.db"
     profile_path = tmp_path / "profile_state.db"
     market = sqlite3.connect(market_path)
-    market_store = SecurityLifecycleStore(market)
-    if include_observation:
-        market_store.upsert_observation(
-            LifecycleObservation(
-                ticker="EA",
-                cik="0000712515",
-                issuer_name="Electronic Arts Inc.",
-                filing_date="2026-08-04",
-                source="sec_edgar",
-                source_ref="0000712515-26-000042",
-                filing_form="8-K",
-                filing_items=("2.01",),
-                evidence_url="https://www.sec.gov/Archives/example/ea.htm",
-                description="Acquisition completed.",
-                observed_at=_AT,
-                kinds=(ObservationKind("acquisition_completed", "2026-08-04"),),
-            )
-        )
+    SecurityLifecycleStore(market)
     market.close()
 
     profile = sqlite3.connect(profile_path)
@@ -205,9 +185,11 @@ def _databases(tmp_path, *, include_observation=True):
         profile,
         id_factory=lambda prefix, ordinal: f"{prefix}_{ordinal:04d}",
     )
+    if include_observation:
+        ProviderCheckStore(profile_path).record(ticker="EA", at="2026-08-04T00:00:00Z", evidence=(), diagnostics={})
     case_id = profile_store.ensure_case(
-        source="sec_edgar",
-        source_ref="0000712515-26-000042",
+        source="listing_authority",
+        source_ref="listing:EA",
         ticker="EA",
         at=_AT,
     )
@@ -309,10 +291,10 @@ def _admission_case(
     }
 
 
-def test_sec_admission_separates_operational_queue_from_closed_candidate_audit(
-    monkeypatch,
-):
-    from src.tools import security_lifecycle_tools
+def test_archived_sec_candidates_keep_closed_audit_classification():
+    from collections import Counter
+    from src.security_lifecycle_investigation import observation_fingerprint
+    from src.security_lifecycle_sec_admission import classify_sec_admission, project_sec_candidate
 
     admitted = _admission_case(
         "case-admitted",
@@ -331,44 +313,29 @@ def test_sec_admission_separates_operational_queue_from_closed_candidate_audit(
         form="S-4",
         items=(),
     )
-    monkeypatch.setattr(security_lifecycle_tools, "_store_exists", lambda *_: None)
-    monkeypatch.setattr(
-        security_lifecycle_tools,
-        "_ticker_transitions_by_case",
-        lambda _: {},
-    )
-    monkeypatch.setattr(
-        security_lifecycle_tools,
-        "compose_security_lifecycle",
-        lambda *_: {"cases": [admitted, screened, unknown]},
-    )
-    service = security_lifecycle_tools.SecurityLifecycleReadService(
-        market_db_path="unused-market.db",
-        profile_db_path="unused-profile.db",
-        source_loader=lambda: {"LIVE": (), "QUIET": (), "ODD": ()},
-    )
-
-    operational = service.list_cases()
-    audit = service.list_sec_candidates()
-    screened_only = service.list_sec_candidates(admission_state="screened_out")
-
-    assert {row["case_id"] for row in operational["cases"]} == {
+    audit = []
+    for case in (admitted, screened, unknown):
+        decision = classify_sec_admission(
+            observation=case["observation"],
+            observation_fingerprint_sha256=observation_fingerprint(case["observation"]),
+            automation_runs=case["automation_runs"], automation_facts=case["automation_facts"],
+        )
+        audit.append(project_sec_candidate(case_id=case["case_id"], observation=case["observation"], decision=decision))
+    assert {row["case_id"] for row in audit if row["admission_state"] != "screened_out"} == {
         "case-admitted",
         "case-unknown",
     }
-    assert operational["count"] == 2
-    assert operational["admission_counts"] == {
+    assert Counter(row["admission_state"] for row in audit) == {
         "admitted": 1,
         "needs_review": 1,
-        "pending": 0,
         "screened_out": 1,
     }
-    assert audit["count"] == 3
-    assert audit["state_counts"] == operational["admission_counts"]
-    assert [row["case_id"] for row in screened_only["candidates"]] == [
+    assert len(audit) == 3
+    screened_only = [row for row in audit if row["admission_state"] == "screened_out"]
+    assert [row["case_id"] for row in screened_only] == [
         "case-screened"
     ]
-    assert set(screened_only["candidates"][0]) == {
+    assert set(screened_only[0]) == {
         "case_id",
         "ticker",
         "issuer_name",
@@ -390,17 +357,28 @@ def test_real_profile_run_diagnostics_drive_screening_without_truncated_fact_his
         AutomationFact,
         SecurityLifecycleFactKernel,
     )
-    from src.security_lifecycle_investigation import observation_fingerprint
+    from src.security_lifecycle import SecurityLifecycleStore
+    from src.security_lifecycle_investigation import (
+        SecurityLifecycleInvestigationStore, compose_security_lifecycle_audit, observation_fingerprint,
+    )
     from src.tools.security_lifecycle_tools import SecurityLifecycleReadService
+    from tests.test_security_lifecycle import _observation
+    from tests.test_security_lifecycle_population import stores, persist
 
-    market_path, profile_path, profile, store, case_id = _databases(tmp_path)
+    market_path, profile_path = stores(tmp_path)
+    with sqlite3.connect(market_path) as market:
+        market_store = SecurityLifecycleStore(market)
+        market_store.upsert_observation(_observation(filing_items=("2.01",)))
+        observation = market_store.get_observation("sec_edgar", "0000712515-26-000042", "EA")
+    case_id = persist(profile_path, observation)
+    profile = sqlite3.connect(profile_path)
+    store = SecurityLifecycleInvestigationStore(profile)
     try:
         service = SecurityLifecycleReadService(
             market_db_path=str(market_path),
             profile_db_path=str(profile_path),
             source_loader=lambda: {"EA": ()},
         )
-        observation = service.get_case(case_id)["observation"]
         fingerprint = observation_fingerprint(observation)
         kernel = SecurityLifecycleFactKernel(store)
         claim = kernel.reserve_run(
@@ -466,11 +444,11 @@ def test_real_profile_run_diagnostics_drive_screening_without_truncated_fact_his
         )
 
         assert service.list_cases()["count"] == 0
-        candidate = service.list_sec_candidates()["candidates"][0]
-        assert (candidate["admission_state"], candidate["admission_reason"]) == (
-            "screened_out",
-            "no_material_tracked_security_fact",
-        )
+        assert service.list_sec_candidates()["count"] == 0
+        audited = compose_security_lifecycle_audit(str(market_path), str(profile_path))["cases"][0]
+        assert audited["sec_admission"] == {
+            "state": "screened_out", "reason": "no_material_tracked_security_fact",
+        }
     finally:
         profile.close()
 
@@ -1060,7 +1038,7 @@ def test_read_service_exposes_derived_final_check_date_in_list_and_detail(
 
     case = {
         "case_id": "case-final-check",
-        "source": "sec_edgar",
+        "source": "listing_authority",
         "source_ref": "final-check-ref",
         "ticker": "EA",
         "source_presence": "present",
@@ -1141,7 +1119,7 @@ def test_new_observation_keeps_old_terminal_run_and_transition_as_activity_only(
     def case(case_id, ticker):
         return {
             "case_id": case_id,
-            "source": "sec_edgar",
+            "source": "listing_authority",
             "source_ref": f"{case_id}-current-observation",
             "ticker": ticker,
             "source_presence": "present",
@@ -1151,7 +1129,7 @@ def test_new_observation_keeps_old_terminal_run_and_transition_as_activity_only(
                 "cik": "0000712515",
                 "issuer_name": f"{ticker} Current Issuer",
                 "filing_date": "2026-08-20",
-                "source": "sec_edgar",
+                "source": "listing_authority",
                 "source_ref": f"{case_id}-current-observation",
                 "filing_form": "8-K",
                 "filing_items": ["2.01"],
@@ -1243,51 +1221,19 @@ def test_new_observation_keeps_old_terminal_run_and_transition_as_activity_only(
 def test_list_tool_is_local_read_only_stably_sorted_and_filters_ticker_prefixes(
     tmp_path, monkeypatch
 ):
-    from src.security_lifecycle import LifecycleObservation, ObservationKind, SecurityLifecycleStore
     from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
+    from src.security_lifecycle_provider_store import ProviderCheckStore
 
     market_path, profile_path, profile, _, _ = _databases(tmp_path)
-    market = sqlite3.connect(market_path)
-    market_store = SecurityLifecycleStore(market)
-    market_store.upsert_observation(
-        LifecycleObservation(
-            ticker="OLD",
-            cik=None,
-            issuer_name="Older Issuer",
-            filing_date="2026-07-01",
-            source="sec_edgar",
-            source_ref="older-ref",
-            filing_form="25-NSE",
-            filing_items=(),
-            evidence_url="https://www.sec.gov/Archives/example/old.htm",
-            description="Listing notice.",
-            observed_at=_AT,
-            kinds=(ObservationKind("listing_removal_notice", None),),
-        )
-    )
-    market_store.upsert_observation(
-        LifecycleObservation(
-            ticker="ZETA",
-            cik="0001851003",
-            issuer_name="Zeta Global Holdings Corp.",
-            filing_date="2026-07-15",
-            source="sec_edgar",
-            source_ref="zeta-ref",
-            filing_form="25-NSE",
-            filing_items=(),
-            evidence_url="https://www.sec.gov/Archives/example/zeta.htm",
-            description="Listing notice.",
-            observed_at=_AT,
-            kinds=(ObservationKind("listing_removal_notice", None),),
-        )
-    )
-    market.close()
+    checks = ProviderCheckStore(profile_path)
+    checks.record(ticker="OLD", at="2026-07-01T00:00:00Z", evidence=(), diagnostics={})
+    checks.record(ticker="ZETA", at="2026-07-15T00:00:00Z", evidence=(), diagnostics={})
     second = SecurityLifecycleInvestigationStore(profile)
     second.ensure_case(
-        source="sec_edgar", source_ref="older-ref", ticker="OLD", at=_AT
+        source="listing_authority", source_ref="listing:OLD", ticker="OLD", at=_AT
     )
     second.ensure_case(
-        source="sec_edgar", source_ref="zeta-ref", ticker="ZETA", at=_AT
+        source="listing_authority", source_ref="listing:ZETA", ticker="ZETA", at=_AT
     )
     try:
         tools = _configure(
@@ -1633,10 +1579,10 @@ def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_
         tools = _configure(monkeypatch, market_path, profile_path)
         payload = tools.get_security_lifecycle_case(case_id)
         rendered = json.dumps(payload, sort_keys=True)
-        assert payload["case"]["issuer_name"] == "Electronic Arts Inc."
+        assert payload["case"]["issuer_name"] == "EA"
         assert payload["case"]["filing_date"] == "2026-08-04"
         assert payload["case"]["kinds"] == [
-            {"event_type": "acquisition_completed", "effective_date": "2026-08-04"}
+            {"event_type": "listing_status_review", "effective_date": None}
         ]
         assert payload["case"]["investigation_run_count"] == 1
         assert payload["case"]["evidence_count"] == 25
@@ -1713,7 +1659,7 @@ def test_tools_return_observation_and_profile_facts_without_provider_fields(tmp_
 
 
 def test_ai_tool_uses_closed_operator_detail_projection(tmp_path, monkeypatch):
-    from src.security_lifecycle import read_market_observations
+    from src.security_lifecycle_provider_store import ProviderCheckStore
     from src.security_lifecycle_fact_kernel import (
         AutomationBlocker,
         SecurityLifecycleFactKernel,
@@ -1723,7 +1669,7 @@ def test_ai_tool_uses_closed_operator_detail_projection(tmp_path, monkeypatch):
     market_path, profile_path, profile, store, case_id = _databases(tmp_path)
     try:
         fingerprint = observation_fingerprint(
-            read_market_observations(str(market_path), limit=None)[0]
+            ProviderCheckStore(profile_path).latest()["EA"]["observation"]
         )
         kernel = SecurityLifecycleFactKernel(store)
         claim = kernel.reserve_run(
@@ -1830,10 +1776,10 @@ def test_case_detail_projects_automation_runs_facts_and_typed_blockers(
 
     try:
         from src.security_lifecycle_investigation import observation_fingerprint
-        from src.security_lifecycle import read_market_observations
+        from src.security_lifecycle_provider_store import ProviderCheckStore
 
         fingerprint = observation_fingerprint(
-            read_market_observations(str(market_path), limit=None)[0]
+            ProviderCheckStore(profile_path).latest()["EA"]["observation"]
         )
         kernel = SecurityLifecycleFactKernel(store)
         blocked = kernel.reserve_run(

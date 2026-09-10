@@ -73,7 +73,10 @@ def review_for(result, case_id):
     return next(row for row in result["reviews"] if case_id in row["case_ids"])
 
 
-def test_population_manifest_accounts_for_all_three_input_populations(tmp_path):
+@pytest.mark.parametrize("journal_installed", (False, True))
+def test_population_manifest_accounts_for_all_three_input_populations(tmp_path, journal_installed):
+    from src.lifecycle_investigation.schema import install_journal
+
     market, profile = stores(tmp_path)
     matched = persist(profile, sec(market, "MIX", "matched"))
     observation_only = sec(market, "NEW", "not-persisted")
@@ -84,6 +87,9 @@ def test_population_manifest_accounts_for_all_three_input_populations(tmp_path):
     checks.record(ticker="RECOVER", at=later, evidence=(active("RECOVER", at=later),), diagnostics={})
     checks.record(ticker="LIVE", at=NOW, evidence=(active("LIVE"),), diagnostics={})
     checks.record(ticker="MIX", at=NOW, evidence=terminal("MIX"), diagnostics={})
+    if journal_installed:
+        with sqlite3.connect(profile) as conn:
+            install_journal(conn, at=NOW)
     result = manifest(market, profile, at=later)
     provider_id = case_id_for("listing_authority", "listing:MIX", "MIX")
     recovered_id = case_id_for("listing_authority", "listing:RECOVER", "RECOVER")
@@ -110,6 +116,36 @@ def test_population_manifest_accounts_for_all_three_input_populations(tmp_path):
     assert result["coverage_only"] == ["LIVE"]
     assert result["automatic_actions"] == []
     assert result["deletion_authorized"] is False
+
+
+@pytest.mark.parametrize("journal_installed", (False, True))
+def test_raw_audit_composition_is_complete_and_read_only(tmp_path, monkeypatch, journal_installed):
+    import src.security_lifecycle_investigation as investigation
+    from src.lifecycle_investigation.schema import install_journal
+
+    market, profile = stores(tmp_path)
+    matched = persist(profile, sec(market, "MATCHED", "matched"))
+    sec(market, "UNSAVED", "unsaved")
+    missing = persist(profile, {"source": "sec_edgar", "source_ref": "gone", "ticker": "GONE"})
+    if journal_installed:
+        with sqlite3.connect(profile) as conn:
+            install_journal(conn, at=NOW)
+    before = {path: hashlib.sha256(path.read_bytes()).hexdigest() for path in (market, profile)}
+    original = sqlite3.connect
+
+    def connect(path, *args, **kwargs):
+        assert "mode=ro" in str(path)
+        conn = original(path, *args, **kwargs)
+        conn.execute("PRAGMA query_only=ON")
+        return conn
+
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    audit = getattr(investigation, "compose_security_lifecycle_audit", None)
+    assert callable(audit), "raw accounting needs its own explicit read-only composition"
+    cases = audit(str(market), str(profile))["cases"]
+    assert {case["case_id"] for case in cases} == {matched, missing, case_id_for("sec_edgar", "unsaved", "UNSAVED")}
+    assert investigation.compose_security_lifecycle(str(market), str(profile))["cases"] == []
+    assert {path: hashlib.sha256(path.read_bytes()).hexdigest() for path in (market, profile)} == before
 
 
 def test_equal_population_counts_do_not_prove_equal_case_keys(tmp_path):

@@ -14,8 +14,6 @@ Sources v1:
     subprocess, serialized behind ONE shared IBKR lock (one Gateway session;
     client-id hygiene + the ib_insync asyncio loop is safer in its own process)
   - ibkr_prices                       — direct-local adapter into market_data.db
-  - sec_corporate_actions             — SEC filing metadata and bounded filing
-    evidence → local lifecycle/M&A review observations
 
 Active writers write local stores directly. Provider fetches write normalized
 records and project the compatibility read surface where required.
@@ -166,18 +164,6 @@ SOURCES: Dict[str, SourceDef] = {
             description="IBKR/Massive 15min bars for the active universe → market_data.db",
         ),
         SourceDef(
-            "sec_corporate_actions", "SEC 公司事件",
-            adapter=("src.collectors.sec_corporate_actions", "run_incremental"),
-            universe_tickers=True, default_interval_min=1440,
-            writes_market_db=True,
-            source_mode="direct_local",
-            source_badges=("SEC", "官方申報"),
-            description=(
-                "SEC filings → local delisting/listing-status and M&A review observations; "
-                "never removes an active-universe ticker automatically"
-            ),
-        ),
-        SourceDef(
             "fred_series", "FRED 序列",
             default_interval_min=1440,
             backend_job_name="fetch_fred_series",
@@ -286,7 +272,6 @@ _SOURCE_PROVIDER_CONFIG = {
     "finnhub_news": "finnhub",
     "ibkr_news": "ibkr",
     "ibkr_prices": "ibkr",
-    "sec_corporate_actions": "sec_edgar",
     "fred_series": "fred",
     "fred_release_dates": "fred",
     "finnhub_economic_calendar": "finnhub",

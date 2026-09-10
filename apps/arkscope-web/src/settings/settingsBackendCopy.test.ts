@@ -190,22 +190,21 @@ describe("Settings backend copy boundary", () => {
     expect(source).not.toContain("$.dataSources.providers.config.testUnavailable");
   });
 
-  it("maps exactly five active schedule source ids without backend labels", () => {
+  it("maps exactly four active schedule source ids without backend labels", () => {
     const ids = [
       "polygon_news",
       "finnhub_news",
       "ibkr_news",
       "ibkr_prices",
-      "sec_corporate_actions",
     ];
     const cases = [
       {
         locale: "zh-Hant" as const,
-        labels: ["Massive 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價", "SEC 公司事件"],
+        labels: ["Massive 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價"],
       },
       {
         locale: "en" as const,
-        labels: ["Massive News", "Finnhub News", "IBKR News", "IBKR Prices", "SEC Company Events"],
+        labels: ["Massive News", "Finnhub News", "IBKR News", "IBKR Prices"],
       },
     ];
 
@@ -215,6 +214,9 @@ describe("Settings backend copy boundary", () => {
       expect(copies.map(({ label }) => label)).toEqual(expected.labels);
       expect(copies.every(({ description }) => description.length > 0)).toBe(true);
       expect(copies.map(({ description }) => description).join(" ")).not.toContain("PLANTED_BACKEND_LABEL");
+      const unknown = scheduleSourceCopy("sec_corporate_actions", t);
+      expect(unknown.label).toBe("sec_corporate_actions");
+      expect(unknown.description).toBe(scheduleSourceCopy("future_source", t).description.replace("future_source", "sec_corporate_actions"));
     }
   });
 
