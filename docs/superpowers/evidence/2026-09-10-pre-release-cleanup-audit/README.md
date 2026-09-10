@@ -1,0 +1,236 @@
+# Pre-Release Abandoned-Surface Audit
+
+Observed: 2026-09-10. Source tree: `fef26dcf` on
+`codex/listing-sec-macro-convergence`; main worktree remains separate.
+Status: source audit and revised scope, **not implemented cleanup**.
+
+## User Decision
+
+ArkScope has no released compatibility population to support. Permanently
+abandoned functionality should be deleted from runtime code, tools, routes,
+schedules, Settings and current schema, not retained as a disabled/retired shell.
+Old SEC company-event intake is abandoned. SEC financial research is a new
+feature, not its renamed successor and not another lifecycle authority.
+
+This decision does not authorize wiping existing prices, news, SA captures,
+credentials, routes, research conversations or membership removals. Nor does
+it make domain states such as retired models or Former-pick tombstones obsolete
+code. Current consumers and retained-data dependencies decide the removal order.
+
+## Method And Limits
+
+Repository-wide name/import/call-site searches covered application Python,
+`data_sources/`, frontend code, current skills, tests, dependencies and relevant
+design/entrypoint documentation, with a residual-name sweep of extension and
+desktop sources and the remaining tracked code roots. An independent backend audit cross-checked
+non-SEC candidates. Findings below distinguish a leaf with no current caller
+found from a coordinated retirement and a still-required component. Static
+search is not proof against every possible dynamic/plugin import; each removal
+must verify its actual current entrypoints and regression owners first.
+
+No production database, private `.env`, token store or provider was read. No
+App was started/restarted and no collector/schedule was executed. The historical
+36-case count is not a fresh production measurement. This is not a full security
+audit or a claim that every unreachable symbol in the repository has been found.
+
+## Review Corrections
+
+- The three category assertions really exist: `test_sec_tools.py:156`,
+  `test_tools.py:227`, `test_analyst_tools.py:293`, all `analysis == 15`.
+  The three new tools belong to `analysis`, giving 15 -> 17. Together with
+  17 total-count assertions there are 20 sites across eight files.
+- `ProfileStateStore.get_setting/set_setting` use string key/value storage.
+  `PortfolioObservationStore.set_settings` does **not** wrap that storage: it
+  writes the dedicated `portfolio_capture_settings` table. The new SEC config
+  module will own a typed accessor over `profile_settings`; no generic typed
+  configuration framework currently exists.
+- `CREATE TABLE IF NOT EXISTS` leaves an incompatible existing definition alone.
+  An in-memory SQLite probe created `(id, value)`, then executed a definition
+  containing `new_field`; `PRAGMA table_info` still returned only `id, value`
+  and the existing row remained. Canonical schema creation is not schema repair.
+- An installation-table name alone does not prove valid lifecycle installation;
+  `cutover_active` verifies the schema/journal. This audit did not inspect the
+  user's installed state.
+- `compose_security_lifecycle` adds provider-check observations independently of
+  that flag. The flag still affects SEC filtering and the automation filter.
+  Therefore "no cutover means no listing-authority path at all" is too broad.
+  No old-SEC compatibility fallback is required by the user's current decision.
+
+## SEC And Lifecycle Removal Boundary
+
+### C01: Old Company-Event Intake Is Still Product-Exposed
+
+Evidence: `src/collectors/sec_corporate_actions.py:274` remains callable;
+`src/service/data_scheduler.py:169` still registers its SourceDef, adapter and
+universe scope. The collector returns retired only after the lifecycle gate.
+The source also remains in `settingsBackendCopy.ts`, `settingsReadCache.ts` and
+the English/Traditional Chinese Settings dictionaries.
+
+Remove the collector, SourceDef/provider mapping, old source settings, direct
+dispatch and UI descriptions. No permanent retired/no-op wrapper or copied
+schedule-enabled flag. Current listing-authority checks and financial consumers
+must continue unchanged. Existing owners to replace or preserve include
+`test_sec_corporate_actions.py`, `test_data_scheduler.py`,
+`test_lifecycle_investigation_retirement.py`, `SettingsProviderConfig.test.ts`
+and `settingsBackendCopy.test.ts`. Journal-absent fixtures must prove the old
+feature cannot return, not exercise an unreleased compatibility edition.
+
+### C02: Dormant Edgartools File Has Only A Test Import
+
+`data_sources/sec_filings.py:34` imports `edgar` and defines the unused
+`SECFilingsClient`. `tests/test_sec_user_agent.py:44` still imports the file
+solely to test its identity helper. Current `src/` consumers are forbidden by
+`test_sec_transport.py`'s existing guard; edgartools is not in requirements.
+
+Delete the module and the obsolete test-only dependency. Preserve active contact
+identity/HTTP-governor tests and add an absence/import guard rather than keeping
+dead code for a test. Do not uninstall development-environment packages as a side
+effect of source cleanup.
+
+### C03: Two Catalog Paths Have Different Behavior
+
+`src/tools/sec_tools.py::get_sec_filings` is a functioning registered direct
+EDGAR tool. In contrast, `src/api/routes/fundamentals.py:55` ->
+`analysis_tools.get_sec_filings` -> DAL -> LocalMarketBackend ->
+`FileBackend.query_sec_filings` ends in an empty DataFrame. No current frontend
+caller of that old HTTP metadata route was found.
+
+The new three-tool integration removes the empty route/DAL forwarding chain
+and replaces the functioning catalog tool atomically. Seven current skills
+still mention `get_sec_filings`: dcf-model, competitive-analysis, comps-analysis,
+earnings-analysis, catalyst-calendar, full-analysis and earnings-prep. Their
+metadata and prose, both API bridges, both OAuth allowlists, deep_researcher,
+tool catalog and all 20 count assertions belong to that same change.
+
+### C04: Old Web Investigation Cannot Be Deleted By Filename
+
+The old router remains included by `src/api/app.py` and its launch route uses a
+cutover-dependent 410 response. The new implementation still depends on it:
+
+| Current consumer | Still imports/uses |
+|---|---|
+| `src/lifecycle_investigation/controller.py:47` | Inherits `LifecycleWebController` |
+| `src/api/routes/lifecycle_investigation.py:11` | Old router's `ConfirmWebRequest` |
+| Investigation agent/store/findings | Web dispatch/model/usage, digest helpers, finding schema and guarded source reads |
+| Investigation adoption and current transition/review | `lifecycle_web_review` acceptance/freshness/provenance helpers |
+| `src/ticker_identity_history.py` | Old web journal/page/run data for historical provenance |
+| Investigation acceptances schema | FK to `security_lifecycle_assessments` |
+
+Extract the current primitives into their real owners first, then remove the old
+router/App hooks/launch implementation. `CurrentLifecycleView.tsx` has no current
+non-test importer found; it alone mounts `LifecycleWebPanel.tsx` and
+`CurrentLifecycleAudit.tsx`. All three are removal candidates. The barrel re-export
+of `translationFailurePresentation` only serves tests outside the old UI; that
+does not establish live audit rendering. Preserve `InvestigationView`'s actual
+`TrackingHistory`/decision view, confirmation, cancellation, adoption and reversal
+flows with behavior tests after extraction.
+
+`src/lifecycle_investigation/disposal.py` already supplies FK-aware disposition,
+immutable digest-bound receipts, WAL backups and resumable profile/market stages.
+It can discard unneeded intake rows while retaining human acceptance/dependencies;
+it does not remove all old table definitions. Reuse its useful operator primitives
+for the actual-store cleanup, then remove spent conversion entrypoints after
+verified rollout. Do not add a second generic migration framework or drop every
+`security_lifecycle_*` table: listing assessments and current investigation use
+that shared schema today. Move required historical references before deleting
+obsolete tables; do not preserve an executable old feature to keep history readable.
+
+## Non-SEC Candidates
+
+These are scoped follow-ups, not part of SEC research acquisition. No runtime
+code in this table was changed by this audit.
+
+| ID | Evidence and current status | Removal boundary and regression owner |
+|---|---|---|
+| C05 | Six `_run_fetch_*` delegates in `src/service/jobs.py:515` onward are used by tests; product job dispatch and recurring macro sources call `execute_macro_job` directly. These wrappers were retained in the current convergence branch, not just old debt. | Remove delegates and move existing ingestion/argument tests to the current job entrypoint. Keep all six named jobs and truthful partial/failed behavior. Owners: `test_fred_ingestion.py`, `test_finnhub_ingestion.py`, `test_macro_scheduler_integration.py`. |
+| C06 | `data_scheduler._run_subprocess` and `daily_update.run_command` have no current production call sites found. Scheduler tests still monkeypatch the former. | Remove unused generic subprocess helpers and obsolete patch sites. Preserve current sanitized workers and test their actual dispatch, timeout and environment boundary. Owners: `test_data_scheduler.py`, `test_daily_update_wrapper.py`. |
+| C07 | `auth_drivers.factory.NotImplementedDriver`, `_MODE_SLICE` prose and the return annotation still describe an inert skeleton. Every allowed provider/auth pair now returns a real driver; invalid pairs reject. | Delete the placeholder/export/unreachable fallback and stale prose, use the current driver protocol, preserve exact provider/auth validation. Owners: `test_auth_factory.py`, `test_api_key_drivers.py`; don't remove OAuth or API-key paths. |
+| C08 | OpenAI `run_query_sync` is exported but only used by tests in the scanned repo; current API uses async/streaming paths. | Candidate for removal with exports and synchronous-only test branches. Preserve runtime model/auth binding tests on actual routes. Anthropic's synchronous `run_query` has real callers and is not the same candidate. Owners: `test_task_runtime_binding.py`, `test_legacy_agent_surface_retirement.py`. |
+| C09 | Old `EODHDDataSource`, `AlphaVantageDataSource`, `FinnhubDataSource` and factory/package exports form a mostly disconnected cluster; the factory's found test consumer builds Polygon. | Remove only obsolete classes/factory paths after validating imports and intended module CLI entrypoints. Preserve `PolygonDataSource`, current EDGAR classes and the current EODHD lifecycle transport in `data_sources/lifecycle_provider_census_transport.py`. This does not remove EODHD Settings/key support. Owners: `test_data_provider_config.py`, `test_ibkr_source_import_safety.py`, `test_lifecycle_provider_census_transport.py`. |
+| C10 | `FileBackend` retains empty price/fundamentals methods. LocalMarketBackend has live SQLite prices and financial-cache access, but its `query_fundamentals` also returns `{}` unconditionally; useful financial analysis is the separate SEC/cache path in `analysis_tools`. The old SEC catalog chain still delegates to FileBackend. | Coordinate empty-method/protocol/backend deletion with C03; preserve the actual price DAL and independent financial analysis/cache. `test_eir006_retired_data_boundaries.py` currently protects compatibility wording, so change that obsolete contract explicitly while preserving truthful real reads. Owner also `test_data_access.py`. |
+| C11 | `news_providers.use_local_news_enabled` promises `false` restores collector storage. `resolve_news_write_route` validates the flag but falls through to direct-local even when it is false; status consumers still use the separate boolean. | A real routing/diagnostic contract mismatch, not just an unused symbol. Converge current writer selection and status/Settings, then delete rollback semantics. Do not disable news or remove currently required normalized-to-news projection. Owners: `test_news_settings_route.py`, `test_news_providers.py`, `test_provider_health.py`, `test_news_sync_status.py`. No live UI claim from this static finding. |
+| C12 | Polygon/Finnhub `run_incremental` still have module CLI consumers writing the old collector storage; the App uses normalized/direct-local branches. | They are not unreachable leaves. Remove or reroute old collector CLI/writer paths together, preserving provider fetch/parse reused by `src/news_providers.py`. Never delete already-collected files as a consequence of code deletion. Owners: `test_collector_adapters.py`, `test_data_scheduler.py`, `test_news_normalized_provider_adapters.py`. |
+| C13 | `.page-head` rules in `styles.css:950` and responsive rules have no matching current TSX consumer found; current `.ui-page-header` and `.detailpage-head` are different live selectors. | Already owned by `ENGINEERING_ISSUE_REGISTER.md` EIR-001. Revalidate and remove in that maintenance batch with layout checks, not another duplicate issue. |
+
+The current priority-map premises also retained an August 17 queued-model
+description saying Opus 5 was absent and Spark was only a candidate. That text
+no longer describes the current registry/workstream; replace it with current
+authority pointers rather than maintaining a second stale model roster.
+
+## Required Retention Is Not Abandoned Compatibility
+
+- `news_normalized/legacy_projection.py` still feeds `news`/`news_fts`, which
+  `SQLiteBackend.query_news/search_news` currently reads. Deleting it alone
+  would hide new news from current consumers. Finish the reader transition and
+  preserve IDs/links before removing that projection.
+- `security_lifecycle_*` assessments, applied transitions, reversal receipts and
+  Former membership tombstones have current consumers. They are not disposable
+  because their name contains an old subsystem prefix.
+- Model lifecycle rows marked retired preserve provenance and reject obsolete
+  routes. This is a domain policy, not an unused collector left callable.
+- Explicitly deferred capabilities such as sandboxed Python re-admission are
+  not permanently abandoned simply because they are unavailable to agents today.
+- `env_keys.py` still has live consumers. Its removal requires the separately
+  owned profile-credential-authority transition, not a blind deletion or reading
+  private `.env` contents during this audit.
+- Current provider SDKs and Native Messaging host/addon identifiers remain real
+  integration contracts. No package or external identifier is removed based on
+  a legacy-name search alone. `compat_firefox.js` is loaded by the current Firefox
+  manifest/build, and `attachExtensionRunProtocol` still wraps live extension runs;
+  their compatibility/legacy names do not establish abandonment.
+  Archived documentation/evidence is provenance,
+  while current entrypoints/specs must stop advertising abandoned functionality.
+
+## Implementation Order And Completion Gate
+
+1. Delete verified leaf residue in a bounded maintenance batch (C02, C05-C08,
+   and C13 under its existing EIR owner); retain behavioral tests at live owners.
+   C09 needs its import/CLI boundary checked before joining that batch.
+2. Remove the old company-event source/settings/UI and disentangle old web
+   investigation from current execution/history (C01/C04). Inventory current
+   schema and authorize a digest-bound actual-store disposition, then remove
+   old structures. No new research feature is needed to justify the old intake.
+3. Build the new SEC research service with the C03/C10 catalog replacement;
+   all three tools, seven skills, four transports and data/citation owners must
+   land together. The revised SEC spec owns that implementation plan.
+4. Converge remaining news rollback/CLI/reader boundaries (C11/C12 and the live
+   projection), independently of SEC. Do not make this a prerequisite to all
+   other work or delete current news reads to obtain a clean grep.
+
+The priority map owns these workstreams; this audit is their dated evidence,
+not a second backlog. For every removal, report deleted runtime surfaces and
+test-count changes with their source. Require positive controls for the live
+replacement, absence owners for removed entrypoints and retained-data checks.
+"No provider calls" or passing old tests is not evidence that cleanup happened.
+
+## Offline Verification Performed
+
+Executed on isolated temporary DB/HOME/lock paths with `.env` loading disabled,
+pytest plugin autoload disabled and a Python socket audit hook rejecting network
+connect/name-resolution attempts. No provider/production credentials were injected.
+
+```text
+tests/test_lifecycle_investigation_retirement.py                          7 passed
+tests/test_lifecycle_investigation_cli.py                                 2 passed
+tests/test_subagent.py::TestSubagentRegistry::
+  test_code_analyst_uses_existing_data_tools_without_python_execution     1 passed
+```
+
+Result: **10 passed**, exit 0. The initial run emitted eight unknown-`anyio`-mark
+warnings because plugin autoload was disabled. A fresh repeat explicitly loaded
+only the AnyIO pytest plugin, used the same temporary-path/no-network boundary
+plus a private-file/production-path audit guard, and returned **10 passed in 1.99s**
+without warnings. Runner flags: `-q -p no:cacheprovider -p anyio.pytest_plugin
+--tb=short`; test selectors are listed above. A source-AST recheck also counted
+exactly 17 total plus three analysis assertions and found the seven skill files.
+These tests establish the current
+disposal/data-preservation and subagent-membership baseline only. They do not
+validate future schema dropping, new tools, whole-project cleanup or production
+data disposition. No full-suite result is newly claimed for this documentation
+revision; the earlier branch verification remains separately dated evidence.
+
+An independent documentation/source review found two scope-description errors:
+the old audit component was test/old-view-only, and `query_fundamentals` was still
+an empty stub rather than the actual financial-cache path. Both were rechecked
+against imports/callers and corrected above and in the spec. No additional
+architectural blocker was reported; this is not runtime cleanup acceptance.
