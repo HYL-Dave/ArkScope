@@ -18,7 +18,7 @@ from src.security_lifecycle_listing_evidence import ListingEvidence
 PROVIDER_OBSERVATION_SOURCE = "listing_authority"
 _AUTHORITIES = {"massive_reference": "massive", "nasdaq_symbol_directory": "nasdaq_trader", "eodhd_symbol_directory": "eodhd"}
 _TICKER = re.compile(r"[A-Z][A-Z0-9.-]{0,15}")
-_CONTINUATION_ERROR_PREFIXES = ("massive_timeline_", "massive_successor_")
+_CONTINUATION_ERROR_PREFIXES = ("massive_timeline_", "massive_successor_", "successor_listing_")
 
 
 @dataclass(frozen=True)
@@ -179,6 +179,8 @@ def _continuation(base, *, ticker, figi, rows, events, issues, today):
         return result("ambiguous", "successor_date_future")
     if timeline.get("latest_ticker") != successor:
         return result("ambiguous", "successor_ambiguous")
+    if any(row.get("candidate_ticker") == successor and row.get("listing_status") == "inactive" for row in rows):
+        return result("ambiguous", "successor_ambiguous")
     active = [row for row in rows if row.get("candidate_ticker") == successor and row.get("adapter") == "massive_reference"
               and row.get("market") == "stocks" and row.get("expected_active_state") is True and row.get("listing_status") == "active"]
     if any(row.get("composite_figi") != figi for row in active):
@@ -277,6 +279,14 @@ def classify_provider_listing(*, ticker: str, evidence: Iterable[object], today:
     return _continuation(base, ticker=ticker, figi=figi, rows=rows, events=events, issues=continuation_issues, today=today)
 
 
+def _automatic_continuation_issues(decision: ProviderListingDecision) -> tuple[str, ...]:
+    if decision.continuation_state != "confirmed" or decision.listing_state != "inactive":
+        return decision.listing_reasons or ("provider_continuation_review",)
+    if decision.continuation_effective_date is None or decision.continuation_effective_date < "2025-01-01":
+        return ("provider_legacy_event_review",)
+    return ()
+
+
 def provider_transition_guard(conn, *, ticker, observation_fingerprint_sha256, transition_kind,
                               successor_ticker, effective_date, at, human_accepted):
     """Recheck local provider authority inside the profile write transaction."""
@@ -291,7 +301,8 @@ def provider_transition_guard(conn, *, ticker, observation_fingerprint_sha256, t
         return ("provider_listing_check_stale",)
     if observation_fingerprint(row["observation"]) != observation_fingerprint_sha256:
         return ("provider_listing_check_changed",)
-    decision = classify_provider_listing(ticker=ticker, evidence=row["evidence"], today=now.date(), provider_codes=row["blockers"])
+    material, codes = ProviderCheckStore.current_material(conn, row, at=at)
+    decision = classify_provider_listing(ticker=ticker, evidence=material, today=now.date(), provider_codes=codes)
     if transition_kind == "terminal_delisting":
         if decision.listing_state != "inactive" or successor_ticker is not None:
             return ("provider_terminal_not_confirmed",)
@@ -301,19 +312,21 @@ def provider_transition_guard(conn, *, ticker, observation_fingerprint_sha256, t
             return ("provider_legacy_event_review",)
     elif transition_kind == "symbol_continuation":
         if (decision.continuation_state != "confirmed" or decision.successor_ticker != successor_ticker
-                or decision.continuation_effective_date != effective_date or human_accepted is not True):
+                or decision.continuation_effective_date != effective_date):
             return ("provider_continuation_review",)
+        if human_accepted is not True:
+            return _automatic_continuation_issues(decision)
     else:
         return ("provider_transition_kind_invalid",)
     return ()
 
 
-def evaluate_provider_decision(*, case, evidence, current_date, active_sources, transition_preview):
+def evaluate_provider_decision(*, case, evidence, current_date, active_sources, transition_preview, provider_codes=()):
     from src.security_lifecycle_decision_policy import _decision, _preview
 
     active_sources = tuple(active_sources)
     today = date.fromisoformat(current_date) if isinstance(current_date, str) else current_date
-    result = classify_provider_listing(ticker=str(case["ticker"]), evidence=evidence, today=today)
+    result = classify_provider_listing(ticker=str(case["ticker"]), evidence=evidence, today=today, provider_codes=provider_codes)
     common = {"relevance": "direct_tracked_security", "effective_date": result.effective_date,
               "rule_id": "lifecycle.provider_listing_status"}
     if result.state == "active":
@@ -321,10 +334,26 @@ def evaluate_provider_decision(*, case, evidence, current_date, active_sources, 
                          outcomes=("no_tracked_security_change",), conclusion="Current listing authorities confirm active trading.",
                          impact_summary="Continue collecting prices and news.")
     if result.state == "continuation":
-        return _decision(**common, decision_tier="review_suggested", action_readiness="not_applicable", confidence="high",
-                         outcomes=("symbol_changed",), successor_ticker=result.successor_ticker,
-                         conclusion="An exact ticker event and matching security identifier establish continuity.",
-                         impact_summary="A reviewed identity transition is required before changing the tracking symbol.")
+        continuation = {**common, "confidence": "high", "outcomes": ("symbol_changed",),
+                        "successor_ticker": result.successor_ticker,
+                        "conclusion": "An exact ticker event and matching security identifier establish continuity."}
+        issues = _automatic_continuation_issues(result)
+        if issues:
+            return _decision(**continuation, decision_tier="review_suggested", action_readiness="not_applicable",
+                             decision_issues=issues,
+                             impact_summary="Review the historical event or incomplete listing checks before changing tracking.")
+        if not active_sources:
+            return _decision(**continuation, decision_tier="verified_automatic", action_readiness="not_applicable",
+                             impact_summary="No active tracking source needs a symbol change; preserve removal intent.")
+        if "portfolio_open" in active_sources:
+            eligible, issues = False, ("portfolio_position_open",)
+        else:
+            eligible, issues = _preview(transition_preview, {"transition_kind": "symbol_continuation", "source_ticker": case["ticker"],
+                "successor_ticker": result.successor_ticker, "effective_date": result.continuation_effective_date, "outcomes": ("symbol_changed",)})
+        return _decision(**continuation, decision_tier="verified_automatic",
+                         action_readiness="transition_eligible" if eligible else "action_blocked",
+                         decision_issues=issues, transition_requested=eligible,
+                         impact_summary="Continue price and news collection under the confirmed symbol; preserve history and source removals.")
     if result.state != "terminal":
         return _decision(**common, decision_tier="review_suggested", action_readiness="action_blocked", confidence="low",
                          outcomes=("undetermined",), decision_issues=result.reasons,

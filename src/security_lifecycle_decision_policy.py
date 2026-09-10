@@ -11,9 +11,9 @@ from typing import Any, Literal
 from src.security_lifecycle_fact_kernel import normalize_automation_fact_value
 
 
-AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v6"
+AUTOMATION_POLICY_VERSION = "trusted-lifecycle-automation-v7"
 RULE_VERSIONS = {
-    "lifecycle.provider_listing_status": "2",
+    "lifecycle.provider_listing_status": "3",
     "lifecycle.insufficient_identity_facts": "1",
     "lifecycle.ma_review": "1",
     "lifecycle.no_identity_change": "1",
@@ -839,6 +839,7 @@ def evaluate_automation_decision(
     current_date: date | str,
     active_sources: Iterable[str],
     transition_preview: Callable[[Mapping[str, object]], Mapping[str, object] | None],
+    provider_codes: Iterable[str] = (),
 ) -> AutomationDecision:
     """Evaluate cited facts without opening a database, provider, or model."""
 
@@ -848,7 +849,8 @@ def evaluate_automation_decision(
         from src.security_lifecycle_provider_authority import evaluate_provider_decision
 
         return evaluate_provider_decision(case=case, evidence=raw_evidence, current_date=current_date,
-                                          active_sources=active_sources, transition_preview=transition_preview)
+                                          active_sources=active_sources, transition_preview=transition_preview,
+                                          provider_codes=provider_codes)
     listing_issues = listing_authority_conflict_codes(
         case=case,
         evidence=raw_evidence,

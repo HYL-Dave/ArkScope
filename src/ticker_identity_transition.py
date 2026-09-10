@@ -281,6 +281,27 @@ def _legacy_effects(
     return effects
 
 
+def _automatic_membership_guard(
+    conn: sqlite3.Connection,
+    *,
+    source_ticker: str,
+    successor_ticker: str | None,
+    transition_kind: str | None,
+) -> tuple[str, ...]:
+    """Reactivation of archived tracking intent requires an attended review."""
+    if transition_kind != "symbol_continuation" or successor_ticker is None:
+        return ()
+    watchlists = _watchlist_effects(
+        conn, source_ticker=source_ticker, successor_ticker=successor_ticker,
+    )
+    legacy = _legacy_effects(
+        conn, source_ticker=source_ticker, successor_ticker=successor_ticker,
+    )
+    if watchlists["reactivate"] or legacy["reactivate"]:
+        return ("provider_continuation_review",)
+    return ()
+
+
 def _editable_tags_to_copy(
     conn: sqlite3.Connection,
     *,
@@ -1025,7 +1046,12 @@ def build_automation_transition_preflight(
         options=TransitionOptions(execute_on=effective_date),
         at=at,
     )
-    mismatches = []
+    mismatches = list(_automatic_membership_guard(
+        conn,
+        source_ticker=preview["source_ticker"],
+        successor_ticker=preview["successor_ticker"],
+        transition_kind=preview["transition_kind"],
+    ))
     if case_ticker != source_ticker:
         mismatches.append("source_ticker_mismatch")
     if preview.get("transition_kind") != transition_kind:
@@ -1446,6 +1472,15 @@ class TickerIdentityTransitionStore:
         self.conn.execute("BEGIN IMMEDIATE")
 
     def _provider_guard(self, preview, *, at, automation, web_read=None):
+        if automation:
+            membership_blockers = _automatic_membership_guard(
+                self.conn,
+                source_ticker=preview["source_ticker"],
+                successor_ticker=preview.get("successor_ticker"),
+                transition_kind=preview["transition_kind"],
+            )
+            if membership_blockers:
+                return membership_blockers
         from src.sa_tracking_memberships import SaTrackingMembershipStore
         from src.security_lifecycle_provider_authority import provider_transition_guard
         from src.lifecycle_web_review import acceptance_for, web_transition_guard

@@ -177,7 +177,7 @@ def test_human_acceptance_cannot_bypass_real_listing_vetoes(tmp_path, change):
     assert "OLD" in c["sources"]()
 
 
-def test_confirmed_continuation_keeps_dates_distinct_and_stays_attended():
+def test_confirmed_continuation_keeps_listing_and_event_dates_distinct():
     from src.security_lifecycle_decision_policy import evaluate_automation_decision
     material = tuple(_evidence(row) for row in (*terminal_records(), record("massive_reference", "active", ticker="NEW", figi=FIGI)))
     material += (events((("OLD", "NEW", "2026-06-22"),)),)
@@ -187,11 +187,12 @@ def test_confirmed_continuation_keeps_dates_distinct_and_stays_attended():
     assert result.successor_ticker == "NEW"
     assert result.candidate_tickers == ()
     decision = evaluate_automation_decision(case={"source": "listing_authority", "ticker": "OLD"}, evidence=material, facts=(),
-        current_date="2026-09-05", active_sources=("manual_lists",), transition_preview=lambda request: pytest.fail("rename_must_stay_attended"))
-    assert decision.decision_tier == "review_suggested"
+        current_date="2026-09-05", active_sources=("manual_lists",),
+        transition_preview=lambda request: {"eligible": True, "block_reasons": [], "transition_kind": request["transition_kind"]})
+    assert decision.decision_tier == "verified_automatic"
     assert decision.outcomes == ("symbol_changed",)
     assert decision.effective_date == "2026-06-22"
-    assert not decision.transition_requested
+    assert decision.transition_requested
 
 
 def test_old_reason_string_cannot_substitute_for_listing_authority(tmp_path, monkeypatch):
@@ -246,7 +247,7 @@ def test_new_policy_reenters_old_blocked_snapshot_once_without_rewriting_it(tmp_
         investigation = SecurityLifecycleInvestigationStore(conn)
         runs = investigation.list_automation_runs(c["case_id"])
         assert len(runs) == 2
-        assert {row["policy_version"] for row in runs} == {"trusted-lifecycle-automation-v5", "trusted-lifecycle-automation-v6"}
+        assert {row["policy_version"] for row in runs} == {"trusted-lifecycle-automation-v5", "trusted-lifecycle-automation-v7"}
         assert investigation.get_automation_run(claim.run_id) == old_run
         conn.row_factory = sqlite3.Row
         assert dict(conn.execute("SELECT * FROM security_lifecycle_provider_checks WHERE check_id=?", (frozen["check_id"],)).fetchone()) == frozen

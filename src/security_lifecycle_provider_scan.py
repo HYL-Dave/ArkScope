@@ -66,7 +66,9 @@ def refresh_provider_checks(store, *, tickers, at, provider, target_ticker=None)
         directory_rows = tuple(item for item in row["evidence"] if item["adapter"] in {"nasdaq_symbol_directory", "eodhd_symbol_directory"})
         material, codes = provider.exact(chosen)
         directory_codes = tuple(code for code in row["blockers"] if not code.startswith("massive_"))
-        store.record(ticker=chosen, at=at, evidence=directory_rows + tuple(material), blockers=directory_codes + tuple(codes),
+        material, codes = store.material(ticker=chosen, evidence=directory_rows + tuple(material),
+                                        blockers=directory_codes + tuple(codes), at=at)
+        store.record(ticker=chosen, at=at, evidence=material, blockers=codes,
                      diagnostics={**row["diagnostics"], **provider.diagnostics(), "exact_checked_epoch_s": epoch})
     return {"exact_ticker": chosen, "directory_refreshed": refresh, "diagnostics": provider.diagnostics()}
 
