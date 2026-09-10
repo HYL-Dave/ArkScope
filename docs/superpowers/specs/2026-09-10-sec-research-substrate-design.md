@@ -3,10 +3,15 @@
 Status: proposed implementation contract, awaiting the user's written-spec review.
 Base inspected: `30bb31c7`. The user approved the product direction on September
 10, including useful tool access rather than collection without consumers.
-Last implementation-tree review: `28e67e33`. On September 10 the user selected
+Last implementation-tree review: `fef26dcf`. On September 10 the user selected
 a **100 GiB adjustable capture budget**, replacing the proposed 20 GiB default.
-This revision records that capacity decision and the verified review corrections;
-the complete revised spec still needs review before an implementation plan.
+The subsequent user decision supersedes the retired-wrapper design: physically
+remove abandoned SEC company-event intake; financial research is a new feature,
+not a renamed collector. The project is pre-release with one operator installation;
+do not retain old execution paths or schema upgrade chains for hypothetical old
+installations. This is not authorization to erase the operator's accumulated data.
+This revision records that cleanup boundary and the verified review corrections;
+the revised removal/data-preservation scope needs review before its RED-first plan.
 This document is not evidence of implementation, migration, acquisition or live
 validation. Rename automation and the macro scheduler fix are independent work.
 
@@ -24,6 +29,10 @@ event job is not completion.
 
 This is research data. It does not create lifecycle cases, judge delisting,
 modify ticker identities, change memberships or invoke an LLM in the collector.
+Removing abandoned company-event intake is independent work and need not wait for
+this new research feature to become its supposed lifecycle successor. Current
+listing-authority checks and the target-first investigation remain the lifecycle
+owners. Do not invent a compatibility population or make old SEC intake a fallback.
 
 ## 2. Alternatives And Selected Shape
 
@@ -46,31 +55,47 @@ reused as provenance-preserving exact fact observations.
 
 ## 3. Boundaries And Existing Gaps
 
-- New owner: `src/sec_research/`, split into schema/store, catalog, facts,
-  documents and service modules. API and tool modules are thin adapters.
+- New owner: `src/sec_research/`, split into config, schema/store, catalog,
+  facts, documents and service modules. API and tool modules are thin adapters.
 - There is no general durable filing catalog today. Lifecycle observations
-  are not a substitute and remain untouched.
+  are not a substitute. The research service never rewrites lifecycle records;
+  disposal of unused old intake rows is owned by the separate cleanup below.
 - The existing local `/sec/{ticker}` path can return the empty FileBackend
   metadata stub, while registered `sec_tools.get_sec_filings` calls EDGAR
-  directly. Retained Python/HTTP compatibility surfaces must delegate to the
-  new service after compatibility tests. Remove `get_sec_filings` from all
-  model-facing surfaces in the same change that admits the three new tools;
-  do not expose two overlapping catalog tools with different truth envelopes.
+  directly. Replace the functioning catalog tool atomically with the three new
+  contracts, moving current consumers rather than keeping a compatibility alias.
+  Remove the unused old HTTP route, DAL/backend metadata stub and obsolete Python
+  forwarding functions after checking their references. Do not leave an empty
+  success, redirect, retired wrapper or second catalog envelope as the old API.
 - The old parser reads only `filings.recent`, filters after `limit * 3`, uses
   filing date as report date, and guesses XML filenames. None becomes a new
   contract. Use actual `primaryDocument` and directory entries instead.
-- `data_sources/sec_filings.py` remains a dormant file with a module-level
-  `edgar` import; it is not physically removed. The existing
+- Delete the dormant `data_sources/sec_filings.py` and its test-only import in
+  `tests/test_sec_user_agent.py`. It still imports `edgar` at module scope despite
+  having no admitted runtime consumer. The existing
   `tests/test_sec_transport.py::test_all_active_sec_http_callers_use_shared_transport_and_dormant_edgartools_is_unreachable`
-  scans all `src/**/*.py`, including the new owner, to prohibit imports of that
-  module. Keep that guard; do not reactivate `SECFilingsClient`, add edgartools
-  to requirements or introduce an external CLI.
+  must evolve from dormant-module reachability protection into physical absence
+  and import/dependency protection. Preserve active SEC identity/transport tests;
+  do not keep the unused module merely because a test imports it. Git history
+  retains the implementation; no edgartools dependency or external CLI is added.
 
-## 4. Storage And Migration
+## 4. Canonical Storage And Data Preservation
 
-Use separately owned, versioned `sec_research_*` tables in `market_data.db`.
-Keep `financial_cache`, lifecycle observations and historical assessments
-unchanged. Rechecked through `28e67e33`: `ce17e9e7` changed cache UI copy and
+Use separately owned `sec_research_*` tables in `market_data.db`, with one
+canonical current schema, not an unreleased v1-to-v2 upgrade chain. A fresh store
+and an existing store without these new tables receive the same definitions.
+`CREATE TABLE IF NOT EXISTS` is only a creation primitive: it does not update an
+incompatible existing table. Validate the owned schema explicitly and report a
+mismatch rather than silently accepting it or dropping populated tables at App
+startup. A future schema replacement for the actual installation must protect
+retained data through an explicit backup/rebuild operation, not preserve abandoned
+runtime paths. Content/extraction versions, receipt digests and export-format
+versions remain necessary provenance; they are not schema compatibility chains.
+
+Keep `financial_cache`, prices, news, SA captures and existing research history
+unchanged by this new service. Current lifecycle assessments and action/reversal
+history remain available; unused old SEC intake has a separate disposition owner
+in section 9. Rechecked through `fef26dcf`: `ce17e9e7` changed cache UI copy and
 frontend tests only, not financial-cache storage or backend reads/writes.
 The new tables contain:
 
@@ -98,22 +123,39 @@ bind a snapshot, not the mutable latest pointer. Never take an arbitrary local
 path from an LLM. Relocation moves the DB and its capture directory together;
 export restoration resolves the destination root through the same owner.
 
-The market-store schema change must be explicit and idempotent, tested on a
-fresh store and an existing populated store. Acquisition occurs outside write
-locks. Publish immutable files atomically before a short database transaction;
+Canonical table creation must be explicit and idempotent, tested on a fresh store
+and a store already populated with unrelated current data. This is data-protection
+coverage, not an obligation to upgrade old SEC research schemas. Acquisition
+occurs outside write locks. Publish immutable files atomically before a short database transaction;
 an interrupted publication may leave a removable orphan, never a database row
 pointing at an incomplete file. Parallel refreshes deduplicate by content hash.
 
 Research's durable tool trace currently retains only an input and short preview.
 Add optional closed SEC citation references to the existing result/event/trace
-contract, with backward-compatible reads and tests for old conversations. A
+contract, with tests preserving the operator's existing conversations that lack
+the field. This read behavior protects current data, not an abandoned writer. A
 truncated preview must never be the sole surviving citation.
 
-Any required production migration, backup and activation has a separate rollout
-checkpoint. Implementing migrations is not authorization to run them on the
-user's stores. The capture-budget setting is persisted in the profile DB using
-the existing typed-configuration patterns, with explicit migration if required;
-the new SEC tables have their separate market-store migration.
+Actual-store cleanup/rebuild, backup and activation have a separate rollout
+checkpoint. A spec or an offline implementation does not authorize destructive
+operations on the user's stores. Do not recreate the profile DB or infer that its
+credentials, routes, settings and membership removals are disposable.
+
+`src/sec_research/config.py` owns a SEC-specific typed getter/setter over
+`ProfileStateStore`'s existing string `profile_settings` storage, using key
+`sec_research.capture_budget_bytes`. There is no general typed-config framework
+to invoke. `portfolio_observations.set_settings` illustrates domain ownership,
+but actually uses a dedicated SQL settings table, not this string-key pattern.
+The SEC accessor owns parsing, validation, exact GiB-to-byte conversion and range
+checks before writes; Settings, API and workers all use it. An absent key means
+the 100 GiB default; a present malformed/NULL value is an explicit configuration
+error, not absence. Use `get_settings_snapshot` to retain that distinction.
+Accept positive whole-byte integers representable exactly by the numeric JSON/UI
+contract (at most `2**53 - 1`); reject booleans, non-finite/fractional-byte values and
+overflow without rounding or clamping. Persist canonical decimal integer text.
+This technical representation bound is not a 100 GiB policy maximum. The setting
+needs no new profile table or legacy-key migration; new research tables have
+their separate canonical market-store installation.
 
 Portable SEC export and validated restoration are new work, not an existing
 exporter to configure. Reuse `src/market_data_direct.py::backup_market_db` with
@@ -226,6 +268,9 @@ reader or Python executor is introduced.
 All tools return a closed envelope with `status` (`ok`, `empty`, `partial`,
 `unavailable`), data, typed gaps, observation time, coverage and `next_cursor`.
 Empty means the requested covered range contains no matches; unobserved does not.
+Register all three tools in the existing `analysis` category. They replace one
+`analysis` tool, so that category's reviewed fixture count changes from 15 to 17;
+do not introduce a separate `sec` category for this change.
 
 ```text
 list_sec_filings(issuer, forms, filed_from, filed_to,
@@ -253,10 +298,9 @@ read_sec_filing(filing_id, document_id="primary", section_id, query,
   Pages contain whole fact/filing records and complete citation envelopes.
   Cursors bind filter and snapshot identity and expose continuation explicitly.
 - Read-only HTTP views use stored mode; explicit refresh commands perform
-  acquisition. Compatibility endpoints keep old response shapes where required,
-  while new endpoints provide the full closed envelope. A legacy shape that
-  cannot represent partial/unavailable must fail explicitly rather than return
-  a misleading empty list; only complete covered emptiness maps to an empty list.
+  acquisition. New endpoints provide the full closed envelope. Remove the old
+  empty-list metadata endpoint and its forwarding chain instead of preserving a
+  response shape that cannot express coverage, partial results or unavailability.
 
 Do not widen general bridge budgets just to fit a filing. Add citation-aware
 per-tool result sizing that emits smaller whole pages before generic reducers.
@@ -278,7 +322,13 @@ The same implementation commit must replace the old catalog tool at all of:
 - `src/auth_drivers/chatgpt_oauth_driver.py`: explicit read-only allowlist;
 - `src/auth_drivers/claude_code_sdk_driver.py`: its independent reviewed allowlist;
 - `src/agents/shared/subagent.py`: `deep_researcher.tool_names`, admitting all
-  three new SEC tools and removing `get_sec_filings`.
+  three new SEC tools and removing `get_sec_filings`;
+- current skill metadata and prose under `resources/skills/`: seven skills still
+  refer to the old name (dcf-model, competitive-analysis, comps-analysis,
+  earnings-analysis, catalyst-calendar, full-analysis and earnings-prep). Replace
+  each reference with the relevant new contract(s) in the same change; do not
+  silence a missing required capability by merely deleting its declaration;
+- `docs/design/ARKSCOPE_TOOL_CATALOG.md`: current names and `analysis` category.
 
 Both subagent filters silently discard unavailable names. There is already a
 registry-membership owner inside
@@ -306,22 +356,65 @@ Also expose capture budget, stored bytes, in-flight reservations and a distinct
 capacity/disk-space block. Changing the budget does not enable the schedule or
 start a download. Do not call the 100 GiB budget a token or memory limit.
 
-Old company-event acquisition must be uncallable through recurring scheduling,
-Run Now or direct legacy entrypoints after retirement, with typed retired status.
-Keep historical job records, lifecycle evidence and independent SEC financial
-tools. Do not silently repurpose the old job ID.
+### Remove Abandoned Company-Event Intake
 
-Today `src/lifecycle_investigation/retirement.py::cutover_active` checks the
-installed profile schema/journal, and the legacy collector already returns
-`status="retired", reason="legacy_lifecycle_intake_retired"` when that gate is
-active. The scheduler and legacy API also consume that lifecycle gate. Do not
-add a competing SEC-retired setting or redefine that shared function as the
-new research schedule's enabled flag. Once this complete replacement ships,
-make the old collector permanently return the existing typed retired result
-before creating a client or issuing a request, even for profiles without the
-lifecycle journal. Recurring/Run Now entrypoints must respect that retirement.
-Keep the shared lifecycle gate's other case/API semantics unchanged and test
-both journal-present and journal-absent profiles.
+Supersedes the earlier permanent-`retired` wrapper proposal. Delete
+`src/collectors/sec_corporate_actions.py`, its scheduler SourceDef/provider mapping,
+direct/Run Now wiring, old UI controls, source-specific cache invalidation and
+obsolete current descriptions. Remove `schedule.sec_corporate_actions.*` settings
+through the controlled current-store cleanup. Never copy their enabled value to
+the new schedule. Old source/job identifiers have no special handler: use ordinary
+unknown-source validation, not a no-op success or a retained `retired` endpoint.
+Tests prove absence with and without the lifecycle installation journal, so no
+gate change or fresh profile can revive the old intake. Fresh current profiles
+must use current lifecycle setup, not an old-SEC fallback; an incomplete actual
+installation is reported for repair, not treated as a supported legacy edition.
+
+Do not equate removing SEC-derived intake with removing present listing-authority
+checks, independent SEC financial tools or investigation. At reviewed HEAD,
+`compose_security_lifecycle` already incorporates provider observations independently
+of the cutover flag, although SEC filtering and the automation filter still depend
+on that flag. Make current listing-first selection unconditional at the relevant
+boundaries; do not replace one compatibility gate with another.
+
+The old case-scoped web-investigation path also needs a coordinated extraction,
+not wholesale module deletion. Today `InvestigationController` subclasses the old
+`LifecycleWebController`; the new route imports its confirmation DTO from the old
+router. Current adoption, review, transition and history readers also import
+`lifecycle_web_*` helpers/tables. Move required execution, confirmation and audit
+primitives into their current owners before deleting the old launch/router/App
+lifecycle hooks and the unreachable `CurrentLifecycleView`, `LifecycleWebPanel`
+and `CurrentLifecycleAudit`. The barrel's translation-helper re-export has only
+test consumers outside that old UI; it is not a reason to retain the component.
+Preserve the current `InvestigationView` tracking-history/decision rendering and
+confirmation/reversal behavior, not the abandoned audit screen.
+There must be no final dependency from new investigation onto an abandoned router
+or executable feature just to reuse a helper. The RED-first cleanup plan must
+enumerate those consumers and prove the actual current routes still dispatch.
+
+### Current-Store Cleanup
+
+Inventory legacy-owned tables, indexes, triggers, settings and row references
+from schema definitions and a separately authorized actual-store manifest. Never
+infer the current production count from historical documents or a 36-row fixture.
+Unused SEC intake and unreachable supporting structures are removed, not merely
+hidden from the queue. Reuse the existing digest-bound preview, WAL backup and
+resumable profile/market-stage primitives in
+`src/lifecycle_investigation/disposal.py`; that tool currently deletes eligible
+rows, not the obsolete schemas, so it is a foundation rather than completed cleanup.
+
+Preserve human decisions, treatment/reversal receipts, citations and their required
+evidence, moving them to a current readable representation before removing any old
+table on which they depend. Do not retain an obsolete writer/launch path merely to
+read history. Conversely, shared `security_lifecycle_*` tables still serving
+listing assessments and current investigation are current data structures, not
+garbage selected by prefix. Verify foreign keys, reference closure, retained-data
+counts/digests and interrupted-stage recovery before and after rebuilding owned
+structures. Acquisition never runs during this cleanup. The outcome is one current
+schema with no legacy execution branch; the one-time operator operation is not a
+permanent public backwards-compatibility API. Delete spent conversion entrypoints
+after verified rollout; keep the resulting audit receipt and useful regression
+owners, not a growing chain of obsolete installers.
 
 ## 10. Retention And Cost
 
@@ -401,10 +494,13 @@ before executing the tests. Required offline owners:
 5. Four real adapter-to-tool invocation paths with mocked transports only;
    no missing allowlist entry, reducer-damaged JSON or silent fallback.
 6. Research reload retains source references; old conversations still load.
-7. Fresh/existing schema, interruption, duplicate refresh, short write locks,
-   consistent export and moved-root capture reopening.
-8. New schedule off by default, old-enabled flags not inherited, retired old
-   entrypoints, empty clean refresh success and truthful partial/failure status.
+7. Canonical creation in fresh and already-populated unrelated stores, repeated
+   initialization, explicit owned-schema mismatch, interruption, duplicate refresh,
+   short write locks, consistent export and moved-root capture reopening. Do not
+   reinterpret this as support for unreleased old SEC research schemas.
+8. New schedule off by default, old-enabled flags not inherited, physical absence
+   of old intake/registrations in journal-present and journal-absent fixtures,
+   empty clean refresh success and truthful partial/failure status.
 9. Settings desktop/mobile en/zh-Hant, counters and on-demand document views.
 10. Capture quota default/conversion/profile persistence, increases/decreases,
     existing-object deduplication, concurrent reservations, restart recovery,
@@ -412,24 +508,33 @@ before executing the tests. Required offline owners:
     and injected capacity counters; tests must not allocate 100 GiB.
 11. Independent subagent registry-membership protection plus actual required SEC
     tool inventory/invocation, with intentionally optional tool omissions as a
-    separate control. Preserve the dormant-edgartools import guard.
+    separate control. Check all seven skills and evolve the edgartools guard to
+    physical absence, no active import and no reintroduced dependency.
+12. Cleanup has named owners for current investigation dispatch/cancellation,
+    extracted confirmation/reversal/history reads, legacy UI/router absence,
+    obsolete settings/schema removal, FK closure, backup and interrupted recovery.
+    Fixtures retain prices, news, SA captures, financial cache, credentials,
+    research history and membership tombstones. Deleting the old tests is not
+    sufficient: preserve their still-current behavior at the new owner.
 
-At reviewed HEAD there are **17 tool-count assertions across eight test files**.
+At reviewed HEAD there are **17 total-count assertions plus three `analysis`
+category assertions across eight test files** (20 assertions altogether).
 Replacing one registered tool with three gives registry/schema/status 54 -> 56
-and the current bridge fixture 55 -> 57, not 58. These numbers apply to the
-reviewed fixture configuration, not every optional-tool runtime configuration.
+and the current bridge fixture 55 -> 57, not 58; `analysis` changes 15 -> 17.
+These numbers apply to the reviewed fixture configuration, not every optional-tool
+runtime configuration.
 The plan must cover every site in the same integration change:
 
 | Test file | Assertions at reviewed HEAD |
 |---|---|
 | `tests/test_agents.py` | lines 115, 409 (55); 705, 719 (54) |
-| `tests/test_analyst_tools.py` | line 286 (54) |
+| `tests/test_analyst_tools.py` | line 286 (54); line 293 (`analysis`, 15) |
 | `tests/test_api.py` | line 417 (`tools_registered`, 54) |
 | `tests/test_memory_tools.py` | line 340 (54) |
 | `tests/test_portfolio_tools.py` | line 195 (54) |
 | `tests/test_sa_tools.py` | lines 755, 766, 772, 2347 (54); 788 (55) |
-| `tests/test_sec_tools.py` | line 150 (54) |
-| `tests/test_tools.py` | lines 196, 234, 245 (54) |
+| `tests/test_sec_tools.py` | line 150 (54); line 156 (`analysis`, 15) |
+| `tests/test_tools.py` | lines 196, 234, 245 (54); line 227 (`analysis`, 15) |
 
 `GET /status` computes `tools_registered` from the actual registry; keep that
 truthful rather than treating 54 as an immutable API value. Count assertions
@@ -441,7 +546,7 @@ these paths and obtain authorization before acquisition. A separate representati
 Research live check can verify cited use through one permitted low-cost channel;
 do not claim all four channels live-tested from that observation.
 
-Then review merge, production backup/migration and user activation separately.
+Then review merge, production backup/canonical cleanup and user activation separately.
 No phase is reported complete while tools, provenance or portability remain stubs.
 
 ## 12. Primary References
