@@ -142,6 +142,7 @@ class LifecycleAutomationEvidenceBundle:
     preserved_evidence: tuple[object, ...] = ()
     preserved_facts: tuple[object, ...] = ()
     refreshed_source_families: tuple[str, ...] | None = None
+    provider_codes: tuple[str, ...] = ()
 
 
 def _instant(value: str) -> datetime:
@@ -473,6 +474,7 @@ class LifecycleAutomationWorker:
         facts: Iterable[object],
         current_date: date,
         sources: tuple[str, ...],
+        provider_codes: tuple[str, ...] = (),
     ) -> AutomationDecision:
         def preview(request: Mapping[str, object]) -> Mapping[str, object]:
             return self._transition_preview(
@@ -488,6 +490,7 @@ class LifecycleAutomationWorker:
             current_date=current_date,
             active_sources=sources,
             transition_preview=preview,
+            provider_codes=provider_codes,
         )
 
     def _process_claim(
@@ -579,6 +582,7 @@ class LifecycleAutomationWorker:
                         facts=all_facts,
                         current_date=now.date(),
                         sources=sources,
+                        provider_codes=bundle.provider_codes,
                     )
                     if (
                         "source_conflict" in blocker_codes
@@ -592,6 +596,7 @@ class LifecycleAutomationWorker:
                             facts=all_facts,
                             current_date=now.date(),
                             sources=sources,
+                            provider_codes=bundle.provider_codes,
                         )
 
                 if blockers and not blocker_codes.issubset(policy_blocker_codes):

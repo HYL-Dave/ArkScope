@@ -15,7 +15,7 @@ from src.active_universe import SOURCE_KEYS
 from src.security_lifecycle_disposition import current_automation_run, next_lifecycle_recheck_at
 from src.security_lifecycle_investigation import observation_fingerprint
 from src.security_lifecycle_population import (
-    LifecyclePopulationUnavailable, build_population_manifest, read_population_snapshot,
+    LifecyclePopulationUnavailable, _dispositions, build_population_manifest, read_population_snapshot,
 )
 from src.security_lifecycle_provider_authority import classify_provider_listing, evidence_dict
 from src.security_lifecycle_provider_diagnostics import listing_operator_detail
@@ -117,6 +117,33 @@ def _assessment(case):
     return latest
 
 
+def _current_action_transitions(transitions, material):
+    from src.security_lifecycle_decision_policy import AUTOMATION_POLICY_VERSION
+
+    applied = [row for row in transitions if row["status"] == "applied"]
+    if not applied:
+        return transitions
+    receipts = {row["transition_id"]: row for row in material["identity_tables"]["ticker_identity_transitions"]}
+    assessments = {row["assessment_id"]: row for row in material["profile_tables"]["security_lifecycle_assessments"]}
+    event_fields = ("review_id", "case_id", "kind", "source_ticker", "successor_ticker", "execute_on")
+
+    def superseded(row):
+        if (row["status"] not in {"approved", "needs_review"} or row["approval_authority"] != "automation_policy"
+                or receipts[row["transition_id"]]["automation_policy_version"] == AUTOMATION_POLICY_VERSION):
+            return False
+        assessment = assessments[row["assessment_id"]]
+        # Assessment revision orders decisions even when a stale attempt updates
+        # its receipt after the replacement applied. Keep both receipts in history.
+        return any(
+            all(replacement[key] == row[key] for key in event_fields)
+            and assessments[replacement["assessment_id"]]["effective_date"] == assessment["effective_date"]
+            and assessments[replacement["assessment_id"]]["revision"] > assessment["revision"]
+            for replacement in applied
+        )
+
+    return [row for row in transitions if not superseded(row)]
+
+
 def _action(review, cases, transitions, store, *, today):
     candidates = [row for row in cases if row["source"] == "listing_authority" and row["source_presence"] == "present"]
     case = candidates[0] if len(candidates) == 1 else (cases[0] if cases else None)
@@ -186,15 +213,20 @@ def _project(snapshot, manifest, sources, conn):
     store = TickerIdentityTransitionStore(conn) if transitions else None
     enabled = _enabled(conn)
     today = instant(snapshot["at"]).astimezone(ZoneInfo("America/New_York")).date().isoformat()
+    current_transitions = _current_action_transitions(transitions, material)
+    reviews = manifest["reviews"]
+    if len(current_transitions) != len(transitions):
+        reviews = [dict(review) for review in reviews]
+        _dispositions(reviews, current_transitions, latest, today=today)
     items = []
-    for review in manifest["reviews"]:
+    for review in reviews:
         if len(review["tickers"]) != 1:
             raise LifecyclePopulationUnavailable("current_review_identity_invalid")
         ticker = review["tickers"][0]
         members = [cases[key] for key in review["case_ids"] if key in cases]
         names = {case["observation"]["issuer_name"] for case in members if case.get("observation") and case["source"] == "sec_edgar"}
         check = by_review.get(review["review_id"])
-        action, action_case, assessment = _action(review, members, transitions, store, today=today)
+        action, action_case, assessment = _action(review, members, current_transitions, store, today=today)
         reason = review["reason"]
         bucket = "attention" if review["bucket"] == "current" else "history"
         if action["state"] == "applied_state_changed" and not review.get("historical"):
