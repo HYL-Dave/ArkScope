@@ -20,7 +20,7 @@ from src.lifecycle_investigation.runtime import InvestigationRuntime
 from src.lifecycle_investigation.sources import InvestigationSourceReader, capture_text, same_source, select_passages, select_references
 from src.lifecycle_investigation.store import safe_code
 from src.lifecycle_public_sources import SourceReadError, SourceReadLimits, canonical_source_url
-from src.lifecycle_web_store import _sha
+from src.lifecycle_journal_codec import digest_json
 from src.security_lifecycle_web_finding import strict_schema
 from src.security_lifecycle_web_pipeline import _read_one
 
@@ -250,7 +250,7 @@ async def run_agent(target, credential, control, *, runtime, effort, news, provi
         call = ModelCall(credential.selection, identity, phase, prompt, schema, effort,
             runtime.api_output_tokens if credential.selection.auth_mode == "api_key" else None,
             search_limit or 1, min(runtime.model_timeout_seconds, max(0.01, deadline - monotonic())), retain_rejected_output=True)
-        record("model_request", {"call_id": identity, "phase": phase, "prompt_sha256": _sha(prompt),
+        record("model_request", {"call_id": identity, "phase": phase, "prompt_sha256": digest_json(prompt),
             "supplied_passages": sorted(supplied), "remaining_seconds": max(0, deadline - monotonic())})
         reply = await model(call, credential, control)
         if control.terminal_statuses.get(identity) != "completed":
@@ -333,7 +333,7 @@ async def run_agent(target, credential, control, *, runtime, effort, news, provi
                 if repeats["invalid_format"] >= 3:
                     return result("incomplete", "investigation_no_progress")
                 continue
-            key = _sha({name: value for name, value in step.model_dump().items() if name != "reason"})
+            key = digest_json({name: value for name, value in step.model_dump().items() if name != "reason"})
             repeats[key] += 1
             if repeats[key] >= 3:
                 return result("incomplete", "investigation_no_progress")

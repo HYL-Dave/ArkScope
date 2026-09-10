@@ -145,14 +145,14 @@ def test_present_malformed_gap_metadata_is_not_treated_as_legacy_absence(tmp_pat
 @pytest.mark.parametrize("value", [None, [], {}, {"source-2": "http://plain.example.com/notice"}])
 def test_reopened_journal_rejects_malformed_gap_urls_even_with_a_valid_payload_hash(tmp_path, value):
     from src.lifecycle_web_schema import TRIGGERS
-    from src.lifecycle_web_store import _json, _sha
+    from src.lifecycle_journal_codec import canonical_json, digest_json
     c = context(tmp_path, completion=COMPLETION)
     with c["web"].connection(write=True) as conn:
         saved = json.loads(conn.execute("SELECT payload_json FROM lifecycle_web_results").fetchone()[0])
         saved["source_failure_urls"] = value
         trigger = "lifecycle_web_results_update_immutable"
         conn.execute("DROP TRIGGER " + trigger)
-        conn.execute("UPDATE lifecycle_web_results SET payload_json=?,result_sha256=?", (_json(saved), _sha(saved)))
+        conn.execute("UPDATE lifecycle_web_results SET payload_json=?,result_sha256=?", (canonical_json(saved), digest_json(saved)))
         conn.execute(TRIGGERS[trigger])
     with pytest.raises(WebJournalError, match="web_source_gaps_invalid"):
         c["web"].read(c["run_id"])

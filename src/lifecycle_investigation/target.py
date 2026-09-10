@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from src.auth_drivers.lifecycle_web_models import ModelCall, credential_generation
 from src.lifecycle_investigation.runtime import RuntimeStore
 from src.lifecycle_investigation.schema import verify_journal
-from src.lifecycle_web_store import _sha
+from src.lifecycle_journal_codec import digest_json
 from src.model_capabilities import capability_for
 from src.security_lifecycle_listing_evidence import _FACT_SECURITY_CLASSES, _FACT_VENUES
 from src.security_lifecycle_provider_store import ProviderCheckStore
@@ -120,7 +120,7 @@ class TargetPreflight:
                     "preflight_sha256": None, "target": None, "execution": None, "credential_label": None, "limits": None}
         selection = binding["selection"]
         return {"version": 2, "ticker": ticker, "available": True, "reason": None,
-            "preflight_sha256": _sha(binding), "target": binding["target"],
+            "preflight_sha256": digest_json(binding), "target": binding["target"],
             "execution": {key: selection[key] for key in ("provider", "auth_mode", "model")} | {"effort": binding["effort"]},
             "credential_label": label, "limits": binding["runtime"] | {
                 "output_control": "configured" if selection["auth_mode"] == "api_key" else "provider",
@@ -128,6 +128,6 @@ class TargetPreflight:
 
     def validate_start(self, ticker, *, preflight_sha256, language="zh-Hant"):
         binding, _ = self._material(ticker, language=language)
-        if _sha(binding) != preflight_sha256:
+        if digest_json(binding) != preflight_sha256:
             raise ValueError("investigation_preflight_changed")
         return {"binding": binding}

@@ -11,7 +11,8 @@ import json
 import sqlite3
 
 from src.lifecycle_web_schema import WebJournalError, verify_web_journal
-from src.lifecycle_web_store import LifecycleWebStore, _json, _sha
+from src.lifecycle_journal_codec import canonical_json, digest_json
+from src.lifecycle_web_store import LifecycleWebStore
 from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore, observation_fingerprint
 from src.security_lifecycle_provider_authority import evidence_dict, validate_provider_material
 from src.security_lifecycle_provider_snapshot import instant
@@ -159,7 +160,7 @@ def prepare_on_connection(service, conn, *, run_id, options, web_read=None):
         "profile_state_sha256": effects["profile_state_sha256"], "caveats": effects["caveats"],
         "web": {"run_id": run_id, "result_sha256": run["result_sha256"], "header_sha256": run["header_sha256"],
                 "execution": {key: getattr(run["selection"], key) for key in ("provider", "auth_mode", "model")},
-                "passages_sha256": _sha([asdict(passage) for passage in run["finding"].passages])},
+                "passages_sha256": digest_json([asdict(passage) for passage in run["finding"].passages])},
         "ready": not blockers, "block_reasons": sorted(set(blockers)),
     }
     packet["packet_sha256"] = packet_digest(packet)
@@ -271,7 +272,7 @@ def confirm(service, run_id, *, packet_sha256, action, options, before_write, ac
                     acceptance_authority="human", at=at, _caller_transaction=True)
                 acceptance_table = "lifecycle_investigation_acceptances" if packet["lane"] == "investigation" else "lifecycle_web_acceptances"
                 conn.execute(f"INSERT INTO {acceptance_table} VALUES (?,?,?,?,?,?)",
-                             (identity, run_id, _json(packet), packet_sha256, "attended_user", at))
+                             (identity, run_id, canonical_json(packet), packet_sha256, "attended_user", at))
                 investigation.generate_action_proposals(case_id=case["case_id"], observation_fingerprint_sha256=packet["observation_fingerprint_sha256"],
                     sources_by_ticker={case["ticker"]: packet["active_sources"]}, at=at, _caller_transaction=True)
                 confirmation = {"version": 1, "packet_sha256": packet_sha256, "actor": "attended_user", "action": action, "confirmed_at": at, "packet": packet}

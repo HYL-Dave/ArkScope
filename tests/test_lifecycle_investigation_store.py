@@ -11,14 +11,14 @@ def running(tmp_path, *, ticker="OLD"):
     from src.lifecycle_investigation.schema import install_journal
     from src.lifecycle_investigation.store import InvestigationStore
     from src.lifecycle_investigation.target import Target
-    from src.lifecycle_web_store import _sha
+    from src.lifecycle_journal_codec import digest_json
     c = setup_workflow(tmp_path, assess=False, event_available=False)
     with sqlite3.connect(c["profile"]) as conn:
         install_journal(conn, at=c["now"][0])
     binding = {"version": 2, "language": "en", "target": Target(ticker=ticker, as_of="2026-09-08").model_dump(),
         "selection": {"provider": "anthropic", "model": "claude-sonnet-5", "auth_mode": "claude_code_oauth", "credential_id": "local:7"},
         "runtime": InvestigationRuntime().model_dump(), "effort": "high", "credential_generation": "generation-1",
-        "provider_observations": [], "provider_sha256": _sha([])}
+        "provider_observations": [], "provider_sha256": digest_json([])}
     store = InvestigationStore(c["profile"], clock=lambda: c["now"][0])
     identity = store.start(binding=binding, owner="worker", request_key="explicit-click")["run_id"]
     return c, store, identity, binding

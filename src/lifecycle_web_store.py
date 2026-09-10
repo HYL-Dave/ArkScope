@@ -3,7 +3,6 @@
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
-import hashlib
 import json
 from pathlib import Path
 import re
@@ -12,6 +11,7 @@ from uuid import uuid4
 
 from src.auth_drivers.lifecycle_web_models import WebModelError
 from src.auth_drivers.lifecycle_web_usage import project_usage_report, token_totals, validate_usage_report
+from src.lifecycle_journal_codec import canonical_json, digest_json
 from src.lifecycle_public_sources import PublicSourcePage, _capture_digest, _page_material_digest, canonical_source_url, validate_source_read_report
 from src.lifecycle_web_schema import RUNNING, TERMINAL, WebJournalError, install_web_journal, verify_web_journal
 from src.security_lifecycle_provider_snapshot import instant
@@ -25,14 +25,6 @@ from src.security_lifecycle_web_pipeline import WebInvestigationOptions
 LEASE_SECONDS = 60
 JOURNAL_BUSY_SECONDS = 45
 _MISSING_SOURCE_URLS = object()
-
-
-def _json(value, *, ensure_ascii=True):
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=ensure_ascii, allow_nan=False)
-
-
-def _sha(value):
-    return hashlib.sha256(_json(value).encode()).hexdigest()
 
 
 def _identity(value):
@@ -115,7 +107,7 @@ class LifecycleWebStore:
             raise KeyError(run_id)
         try:
             header = json.loads(row["header_json"])
-            if _sha(header) != row["header_sha256"] or header["case_id"] != row["case_id"] or header["version"] != 1:
+            if digest_json(header) != row["header_sha256"] or header["case_id"] != row["case_id"] or header["version"] != 1:
                 raise ValueError("binding")
         except (ValueError, KeyError, TypeError):
             raise WebJournalError("web_journal_integrity") from None
@@ -147,7 +139,7 @@ class LifecycleWebStore:
         with self.connection(write=True) as conn:
             existing = conn.execute("SELECT run_id,header_sha256 FROM lifecycle_web_runs WHERE request_key=?", (request_key,)).fetchone()
             if existing is not None:
-                if existing["header_sha256"] != _sha(header):
+                if existing["header_sha256"] != digest_json(header):
                     raise WebJournalError("web_request_identity_changed")
                 return {"run_id": existing["run_id"], "created": False}
             case = conn.execute("SELECT ticker FROM security_lifecycle_cases WHERE case_id=?", (case_id,)).fetchone()
@@ -157,7 +149,7 @@ class LifecycleWebStore:
                 raise WebJournalError("web_investigation_running")
             run_id = "lwr_" + uuid4().hex
             conn.execute("INSERT INTO lifecycle_web_runs (run_id,case_id,request_key,header_json,header_sha256,owner,created_at,lease_until,status) VALUES (?,?,?,?,?,?,?,?,'queued')",
-                         (run_id, case_id, request_key, _json(header), _sha(header), owner, at, (instant(at) + timedelta(seconds=LEASE_SECONDS)).isoformat()))
+                         (run_id, case_id, request_key, canonical_json(header), digest_json(header), owner, at, (instant(at) + timedelta(seconds=LEASE_SECONDS)).isoformat()))
         return {"run_id": run_id, "created": True}
 
     def heartbeat(self, run_id, *, owner):
@@ -221,7 +213,7 @@ class LifecycleWebStore:
         if not re.fullmatch(r"source-[1-9][0-9]*", source_id) or not isinstance(page, PublicSourcePage) or _capture_digest(page) != page.capture_sha256:
             raise WebJournalError("web_source_integrity")
         material = asdict(page)
-        encoded, digest = _json(material, ensure_ascii=False), _page_material_digest(material)
+        encoded, digest = canonical_json(material, ensure_ascii=False), _page_material_digest(material)
         with self.connection(write=True) as conn:
             row, _ = self._owned(conn, run_id, owner)
             if row["cancel_requested_at"] is not None:
@@ -309,7 +301,7 @@ class LifecycleWebStore:
             if current_index != source_index or current["header_sha256"] != before["header_sha256"] or current_calls != calls:
                 raise WebJournalError("web_journal_integrity")
             at = self._now()
-            conn.execute("INSERT INTO lifecycle_web_results VALUES (?,?,?,?)", (run_id, _json(material), _sha(material), at))
+            conn.execute("INSERT INTO lifecycle_web_results VALUES (?,?,?,?)", (run_id, canonical_json(material), digest_json(material), at))
             conn.execute("UPDATE lifecycle_web_runs SET status='succeeded',finished_at=? WHERE run_id=?", (at, run_id))
 
     def fail(self, run_id, *, owner, code, control, source_read_report=None, usage_report=None):
@@ -326,7 +318,7 @@ class LifecycleWebStore:
                 material["failure_source_read_report"] = validate_source_read_report(source_read_report,
                              max_requests=header["options"]["max_source_requests"])
             if material:
-                conn.execute("INSERT INTO lifecycle_web_results VALUES (?,?,?,?)", (run_id, _json(material), _sha(material), self._now()))
+                conn.execute("INSERT INTO lifecycle_web_results VALUES (?,?,?,?)", (run_id, canonical_json(material), digest_json(material), self._now()))
             conn.execute("UPDATE lifecycle_web_runs SET status=?,failure_code=?,finished_at=? WHERE run_id=?", (status, code, self._now(), run_id))
 
     def recover_expired(self, *, at):
@@ -420,7 +412,7 @@ class LifecycleWebStore:
                   "calls": calls, "pages": pages}
         if saved is not None:
             value = json.loads(saved["payload_json"])
-            if type(value) is not dict or _sha(value) != saved["result_sha256"]:
+            if type(value) is not dict or digest_json(value) != saved["result_sha256"]:
                 raise WebJournalError("web_journal_integrity")
             if "usage_report" in value:
                 _, report = LifecycleWebStore._usage_report(value["usage_report"], calls, "web_journal_integrity")
