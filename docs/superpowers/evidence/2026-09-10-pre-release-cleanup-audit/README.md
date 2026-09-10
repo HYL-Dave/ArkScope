@@ -2,7 +2,22 @@
 
 Observed: 2026-09-10. Source tree: `fef26dcf` on
 `codex/listing-sec-macro-convergence`; main worktree remains separate.
-Status: source audit and revised scope, **not implemented cleanup**.
+Status: **first leaf batch implemented; wider cleanup remains open**.
+The original findings below are a dated source inventory, not all-complete
+status. Implementation and verification details: [leaf-cleanup.md](leaf-cleanup.md).
+
+| Candidate | Current disposition | Commit |
+| --- | --- | --- |
+| C02 | Dormant edgartools module physically deleted; active SEC clients retained | `300b7400` |
+| C07 | Unreachable auth factory placeholder/export removed; six real modes retained | `263c21a5` |
+| C17 | Old publisher-acquisition adapter deleted; current investigation news retained | `300b7400` |
+| C18 | Disconnected SEC earnings parser/CLI and catalog claim removed | `300b7400` |
+| C19 | Unused repair facade deleted; current identity planner/admin retained | `300b7400` |
+
+These five dispositions passed the scoped RED/green/mutation checks, full
+backend selection with documented harness-correction follow-up, and independent
+review. Other candidates keep their existing retention/extraction/data-disposal
+boundaries. No production data, schema, provider call, merge or push was involved.
 
 Follow-up: the mechanical census below extends the original C01-C13 audit at
 `8ebdb8ba`. Its scanner is maintenance/test tooling, not product execution.
