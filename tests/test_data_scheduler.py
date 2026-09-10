@@ -110,8 +110,6 @@ def hermetic(tmp_path, monkeypatch):
     # cross-process file locks go to a per-test dir — NEVER the repo data/locks/
     # (a live sidecar's flocks would make these tests skip spuriously, and vice versa)
     monkeypatch.setenv("ARKSCOPE_LOCK_DIR", str(tmp_path / "locks"))
-    # default stubs: no real subprocess or telemetry
-    monkeypatch.setattr(ds, "_run_subprocess", lambda argv: {"returncode": 0})
     # active-universe scope: stub a non-empty default so price/universe sources are
     # hermetic (no real profile DB). Tests asserting the empty-scope path override this.
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
@@ -197,7 +195,7 @@ def test_deleted_sec_source_is_ordinary_unknown_without_dispatch(hermetic, monke
 
     monkeypatch.setattr(ds, "_resolve_price_scope", denied)
     monkeypatch.setattr(ds, "_record_result", denied)
-    monkeypatch.setattr(ds, "_run_subprocess", denied)
+    monkeypatch.setattr(ds.subprocess, "run", denied)
     for source in ("sec_corporate_actions", "nonexistent_source"):
         assert ds.run_source(source) == {"source": source, "status": "unknown_source"}
     assert ds._LAST_ATTEMPT == ds._LAST_RESULT == {}
@@ -1120,15 +1118,14 @@ def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     # S3.2 default ON: polygon_news routes to the DIRECT-LOCAL writer — NO run_incremental (Parquet),
     import src.collectors.polygon_news as cpn
     hermetic.set_setting("use_local_news", None)  # unset resolves to the production default ON
-    calls = {"run_incremental": 0, "sync": 0, "direct": 0, "provider": None}
+    calls = {"run_incremental": 0, "subprocess": 0, "direct": 0, "provider": None}
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: calls.__setitem__("run_incremental", calls["run_incremental"] + 1))
 
-    def _subproc(argv):
-        if "--news" in argv:
-            calls["sync"] += 1
-        return {"returncode": 0}
-    monkeypatch.setattr(ds, "_run_subprocess", _subproc)
+    def _subproc(argv, **kwargs):
+        calls["subprocess"] += 1
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    monkeypatch.setattr(ds.subprocess, "run", _subproc)
     monkeypatch.setattr("src.news_providers.make_news_provider",
                         lambda source, **k: (calls.__setitem__("provider", source), object())[1])
 
@@ -1141,7 +1138,7 @@ def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
     assert res["status"] == "succeeded"
     assert calls["direct"] == 1 and calls["provider"] == "polygon"   # direct writer + provider used
     assert calls["run_incremental"] == 0                             # NOT the Parquet adapter
-    assert calls["sync"] == 0
+    assert calls["subprocess"] == 0
     assert "local_refresh" not in res
     assert res["collect"]["source"] == "polygon" and res["ticker_count"] == 2
 
@@ -1185,7 +1182,6 @@ def test_unknown_news_write_mode_fails_before_provider_adapter_worker_and_teleme
         "writer": 0,
         "json_worker": 0,
         "prices_worker": 0,
-        "subprocess": 0,
         "telemetry": 0,
     }
 
@@ -1264,11 +1260,6 @@ def test_unknown_news_write_mode_fails_before_provider_adapter_worker_and_teleme
         "_run_sanitized_prices_worker_subprocess",
         _called("prices_worker", {"returncode": 0, "payload": {}}),
     )
-    monkeypatch.setattr(
-        ds,
-        "_run_subprocess",
-        _called("subprocess", {"returncode": 0}),
-    )
 
     result = ds.run_source("polygon_news", trigger_source="manual")
 
@@ -1318,9 +1309,8 @@ def test_normalized_news_route_calls_writer_under_market_lock(
     monkeypatch.setattr("src.news_direct.backfill_news_direct",
                         lambda *a, **k: (_ for _ in ()).throw(
                             AssertionError("legacy direct writer must not run")))
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (_ for _ in ()).throw(
-                            AssertionError("unexpected synchronization subprocess")))
+    monkeypatch.setattr(ds.subprocess, "run",
+                        lambda *a, **k: pytest.fail("unexpected subprocess"))
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
 
     events = []
@@ -1437,9 +1427,8 @@ def test_normalized_news_route_preserves_writer_partial_continuation(monkeypatch
 
     _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
                             "normalized test route")
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (_ for _ in ()).throw(
-                            AssertionError("unexpected synchronization subprocess")))
+    monkeypatch.setattr(ds.subprocess, "run",
+                        lambda *a, **k: pytest.fail("unexpected subprocess"))
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
 
     class FakeConn:
@@ -1560,9 +1549,8 @@ def test_legacy_local_news_route_runs_despite_stale_normalized_continuation(monk
     monkeypatch.setattr(ds, "_run_normalized_news_writer",
                         lambda *a, **k: (_ for _ in ()).throw(
                             AssertionError("normalized writer must not run")))
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (_ for _ in ()).throw(
-                            AssertionError("unexpected synchronization subprocess")))
+    monkeypatch.setattr(ds.subprocess, "run",
+                        lambda *a, **k: pytest.fail("unexpected subprocess"))
     monkeypatch.setattr("src.news_providers.make_news_provider", lambda source, **k: object())
     direct_calls = []
 
@@ -1601,7 +1589,7 @@ def test_blocked_news_route_fails_despite_stale_normalized_continuation(monkeypa
     )
     _patch_news_write_route(monkeypatch, routing.NewsWriteMode.BLOCKED,
                             "blocked rollback route")
-    calls = {"normalized": 0, "adapter": 0, "direct": 0, "sync": 0}
+    calls = {"normalized": 0, "adapter": 0, "direct": 0, "subprocess": 0}
     monkeypatch.setattr(ds, "_run_normalized_news_writer",
                         lambda *a, **k: calls.__setitem__(
                             "normalized", calls["normalized"] + 1))
@@ -1611,15 +1599,15 @@ def test_blocked_news_route_fails_despite_stale_normalized_continuation(monkeypa
     monkeypatch.setattr("src.news_direct.backfill_news_direct",
                         lambda *a, **k: calls.__setitem__(
                             "direct", calls["direct"] + 1))
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (calls.__setitem__(
-                            "sync", calls["sync"] + 1), {"returncode": 0})[1])
+    monkeypatch.setattr(ds.subprocess, "run",
+                        lambda *a, **k: calls.__setitem__(
+                            "subprocess", calls["subprocess"] + 1))
 
     res = ds.run_source("polygon_news", trigger_source="scheduler")
 
     assert res["status"] == "failed"
     assert "blocked rollback route" in res["error"]
-    assert calls == {"normalized": 0, "adapter": 0, "direct": 0, "sync": 0}
+    assert calls == {"normalized": 0, "adapter": 0, "direct": 0, "subprocess": 0}
 
 
 def test_normalized_news_manual_trigger_passes_pending_continuation_and_clears_it(
@@ -1784,9 +1772,8 @@ def test_normalized_news_partial_without_continuation_stays_partial(monkeypatch)
 
     _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
                             "normalized test route")
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (_ for _ in ()).throw(
-                            AssertionError("unexpected synchronization subprocess")))
+    monkeypatch.setattr(ds.subprocess, "run",
+                        lambda *a, **k: pytest.fail("unexpected subprocess"))
     monkeypatch.setattr(mda, "resolve_market_db_path", lambda: "/tmp/test-market-data.db")
 
     class FakeConn:
@@ -1845,17 +1832,16 @@ def test_local_news_route_keeps_single_direct_writer(monkeypatch):
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL,
                                           "legacy local test route")
     monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
-    calls = {"run_incremental": 0, "sync": 0, "direct": 0, "provider": None}
+    calls = {"run_incremental": 0, "subprocess": 0, "direct": 0, "provider": None}
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: calls.__setitem__("run_incremental",
                                                           calls["run_incremental"] + 1))
 
-    def _subproc(argv):
-        if "--news" in argv:
-            calls["sync"] += 1
-        return {"returncode": 0}
+    def _subproc(argv, **kwargs):
+        calls["subprocess"] += 1
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(ds, "_run_subprocess", _subproc)
+    monkeypatch.setattr(ds.subprocess, "run", _subproc)
     monkeypatch.setattr("src.news_providers.make_news_provider",
                         lambda source, **k: (calls.__setitem__("provider", source), object())[1])
 
@@ -1870,7 +1856,7 @@ def test_local_news_route_keeps_single_direct_writer(monkeypatch):
 
     assert res["status"] == "succeeded"
     assert len(route_calls) == 1
-    assert calls == {"run_incremental": 0, "sync": 0, "direct": 1,
+    assert calls == {"run_incremental": 0, "subprocess": 0, "direct": 1,
                      "provider": "polygon"}
     assert res["collect"]["source"] == "polygon"
     assert "local_refresh" not in res
@@ -2018,16 +2004,12 @@ def test_ibkr_news_fails_closed_when_local_route_state_cannot_be_read(
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile_db))
     calls = []
     monkeypatch.setattr(
-        ds,
-        "_run_subprocess",
-        lambda argv: (calls.append(argv), {"returncode": 0})[1],
-    )
-    monkeypatch.setattr(
         ds.subprocess,
         "run",
-        lambda *a, **k: (_ for _ in ()).throw(
-            AssertionError("normalized worker should not run with unreadable route state")
-        ),
+        lambda argv, **kwargs: (
+            calls.append(argv),
+            pytest.fail("normalized worker should not run with unreadable route state"),
+        )[1],
     )
     res = ds.run_source("ibkr_news", trigger_source="api")
 
@@ -2169,7 +2151,8 @@ def test_ibkr_legacy_local_route_is_retired_before_collector_sync_and_mirror(
     )
     calls = []
     monkeypatch.setattr(
-        ds, "_run_subprocess", lambda argv: (calls.append(argv), {"returncode": 0})[1]
+        ds, "_run_sanitized_json_subprocess",
+        lambda argv: (calls.append(argv), {"returncode": 0, "payload": {}})[1],
     )
     res = ds.run_source("ibkr_news", trigger_source="api")
 
@@ -2186,22 +2169,22 @@ def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypat
 
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.BLOCKED,
                                           "blocked test route")
-    provider_calls = {"adapter": 0, "direct": 0, "sync": 0}
+    provider_calls = {"adapter": 0, "direct": 0, "subprocess": 0}
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: provider_calls.__setitem__(
                             "adapter", provider_calls["adapter"] + 1))
     monkeypatch.setattr("src.news_direct.backfill_news_direct",
                         lambda *a, **k: provider_calls.__setitem__(
                             "direct", provider_calls["direct"] + 1))
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (provider_calls.__setitem__(
-                            "sync", provider_calls["sync"] + 1), {"returncode": 0})[1])
+    monkeypatch.setattr(ds.subprocess, "run",
+                        lambda *a, **k: provider_calls.__setitem__(
+                            "subprocess", provider_calls["subprocess"] + 1))
     res = ds.run_source("polygon_news", trigger_source="api")
 
     assert res["status"] == "failed"
     assert len(route_calls) == 1
     assert "blocked test route" in res["error"]
-    assert provider_calls == {"adapter": 0, "direct": 0, "sync": 0}
+    assert provider_calls == {"adapter": 0, "direct": 0, "subprocess": 0}
     row = ds._state_store().get("polygon_news")
     assert row["last_status"] == "failed"
     assert "blocked test route" in row["last_error"]
@@ -2213,8 +2196,8 @@ def test_run_source_adapter_failure_short_circuits(monkeypatch):
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("FINNHUB_API_KEY not found")),
     )
     calls = []
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (calls.append(argv), {"returncode": 0})[1])
+    monkeypatch.setattr(ds.subprocess, "run",
+                        lambda argv, **kwargs: calls.append(argv))
     res = ds.run_source("finnhub_news")
     assert res["status"] == "failed" and "FINNHUB_API_KEY" in res["error"]
     assert calls == []
@@ -2310,8 +2293,6 @@ def test_price_scope_required(monkeypatch):
 
     seen = {}
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
-    monkeypatch.setattr(ds, "_run_subprocess",
-                        lambda argv: (_ for _ in ()).throw(AssertionError("prices subprocess retired")))
     monkeypatch.setattr(
         ds,
         "_run_sanitized_prices_worker_subprocess",
@@ -3274,9 +3255,8 @@ def test_run_source_refuses_provider_work_when_provider_config_setup_required(mo
     runtime.mark_provider_config_setup_required("profile DB unavailable")
     try:
         monkeypatch.setattr(
-            ds,
-            "_run_subprocess",
-            lambda argv: (_ for _ in ()).throw(AssertionError("subprocess used")),
+            "src.news_providers.make_news_provider",
+            lambda *args, **kwargs: pytest.fail("provider used before setup"),
         )
         res = ds.run_source("polygon_news", trigger_source="api")
         assert res["status"] == "failed"

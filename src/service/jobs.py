@@ -512,66 +512,6 @@ def _run_extract_sa_comment_signals(
     )
 
 
-def _run_fetch_fred_release_dates(
-    dal: Any,
-    params: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Compatibility delegate to the shared macro execution authority."""
-    from src.macro_calendar.execution import execute_macro_job
-
-    return execute_macro_job("fetch_fred_release_dates", dal, params)
-
-
-def _run_fetch_fred_series(
-    dal: Any,
-    params: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Compatibility delegate to the shared macro execution authority."""
-    from src.macro_calendar.execution import execute_macro_job
-
-    return execute_macro_job("fetch_fred_series", dal, params)
-
-
-def _run_fetch_economic_calendar_recent(
-    dal: Any,
-    params: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Compatibility delegate to the shared macro execution authority."""
-    from src.macro_calendar.execution import execute_macro_job
-
-    return execute_macro_job("fetch_economic_calendar_recent", dal, params)
-
-
-def _run_fetch_economic_calendar_backfill(
-    dal: Any,
-    params: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Compatibility delegate to the shared macro execution authority."""
-    from src.macro_calendar.execution import execute_macro_job
-
-    return execute_macro_job("fetch_economic_calendar_backfill", dal, params)
-
-
-def _run_fetch_earnings_calendar(
-    dal: Any,
-    params: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Compatibility delegate to the shared macro execution authority."""
-    from src.macro_calendar.execution import execute_macro_job
-
-    return execute_macro_job("fetch_earnings_calendar", dal, params)
-
-
-def _run_fetch_ipo_calendar(
-    dal: Any,
-    params: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Compatibility delegate to the shared macro execution authority."""
-    from src.macro_calendar.execution import execute_macro_job
-
-    return execute_macro_job("fetch_ipo_calendar", dal, params)
-
-
 def _summarize_result(job_name: str, result: Dict[str, Any]) -> str:
     """Compose a short success message suitable for ``last_message`` UI fields.
 

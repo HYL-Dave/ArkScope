@@ -692,9 +692,9 @@ class TestJobDefinitions:
             cfg.macro_calendar_enabled = original
 
 
-class TestJobDispatchers:
-    def test_run_fetch_fred_release_dates_calls_ingestion(self, monkeypatch):
-        from src.service.jobs import _run_fetch_fred_release_dates
+class TestMacroJobExecution:
+    def test_fetch_fred_release_dates_calls_ingestion(self, monkeypatch):
+        from src.macro_calendar.execution import execute_macro_job
 
         captured = {}
 
@@ -708,7 +708,8 @@ class TestJobDispatchers:
             "src.macro_calendar.fred_ingestion.fetch_fred_release_dates",
             fake_ingest,
         )
-        result = _run_fetch_fred_release_dates(
+        result = execute_macro_job(
+            "fetch_fred_release_dates",
             dal="dal-sentinel",
             params={"release_ids": [10]},
         )
@@ -717,11 +718,11 @@ class TestJobDispatchers:
         # limit defaults to None (catalog-derived page size).
         assert captured["limit"] is None
 
-    def test_run_fetch_fred_release_dates_threads_limit(self, monkeypatch):
+    def test_fetch_fred_release_dates_threads_limit(self, monkeypatch):
         """Spec §4 lists `limit` as an override; lock the dispatcher actually
         forwards it. Pre-fix the dispatcher silently dropped the field.
         """
-        from src.service.jobs import _run_fetch_fred_release_dates
+        from src.macro_calendar.execution import execute_macro_job
 
         captured = {}
 
@@ -734,25 +735,27 @@ class TestJobDispatchers:
             "src.macro_calendar.fred_ingestion.fetch_fred_release_dates",
             fake_ingest,
         )
-        _run_fetch_fred_release_dates(
+        execute_macro_job(
+            "fetch_fred_release_dates",
             dal="dal-sentinel",
             params={"release_ids": [10], "limit": 42},
         )
         assert captured["limit"] == 42
 
-    def test_run_fetch_fred_release_dates_rejects_zero_limit(self):
+    def test_fetch_fred_release_dates_rejects_zero_limit(self):
         """Tightens the dispatcher contract — 0 limit must fail-fast rather
         than reach FRED and return an empty page silently."""
-        from src.service.jobs import _run_fetch_fred_release_dates
+        from src.macro_calendar.execution import execute_macro_job
 
         with pytest.raises(ValueError, match="limit"):
-            _run_fetch_fred_release_dates(
+            execute_macro_job(
+                "fetch_fred_release_dates",
                 dal="dal-sentinel",
                 params={"release_ids": [10], "limit": 0},
             )
 
-    def test_run_fetch_fred_series_threads_full_refresh(self, monkeypatch):
-        from src.service.jobs import _run_fetch_fred_series
+    def test_fetch_fred_series_threads_full_refresh(self, monkeypatch):
+        from src.macro_calendar.execution import execute_macro_job
 
         captured = {}
 
@@ -765,7 +768,8 @@ class TestJobDispatchers:
             "src.macro_calendar.fred_ingestion.fetch_fred_series",
             fake_ingest,
         )
-        result = _run_fetch_fred_series(
+        result = execute_macro_job(
+            "fetch_fred_series",
             dal="dal-sentinel",
             params={"full_refresh": True, "series_ids": ["CPIAUCNS"]},
         )
