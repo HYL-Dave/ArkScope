@@ -1,4 +1,4 @@
-"""LLM auth drivers (S0 — interface only). See docs/design/LLM_AUTH_DRIVER_PLAN.md."""
+"""LLM auth driver contracts, concrete API-key drivers and factory."""
 
 from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTestResult
 
@@ -16,7 +16,7 @@ from .api_key_drivers import (
     MissingCredentialError,
     OpenAIApiKeyDriver,
 )
-from .factory import NotImplementedDriver, build_driver
+from .factory import build_driver
 from .token_store import (
     KeyringTokenStore,
     PlaintextTokenStore,
@@ -31,7 +31,6 @@ __all__ = [
     "DiscoveredModel",
     "KeyringTokenStore",
     "MissingCredentialError",
-    "NotImplementedDriver",
     "OpenAIApiKeyDriver",
     "build_driver",
     "LLMRequest",
