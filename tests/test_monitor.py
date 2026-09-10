@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from src.monitor.notifiers import (
     Alert,
@@ -370,38 +371,32 @@ class TestMonitorToolRegistration:
         assert tool is not None
         assert tool.category == "monitor"
 
+    def test_scan_alerts_formats_current_engine_results_without_notifying(self, monkeypatch):
+        from src.tools.monitor_tools import scan_alerts
 
-# ── Scheduler (Phase 2) ──────────────────────────────────────
+        dal = MagicMock()
+        dal.get_prices.return_value = SimpleNamespace(
+            bars=[SimpleNamespace(close=100), SimpleNamespace(close=106)],
+        )
+        engine = MonitorEngine(dal=dal, config={
+            "alerts": {
+                "price_alerts": {"enabled": True},
+                "news_volume_alerts": {"enabled": False},
+                "sector_alerts": {"enabled": False},
+                "notification_channels": [{"type": "log", "enabled": True}],
+            },
+            "watchlists": {"core_holdings": {"tickers": ["AMD"]}},
+        })
+        monkeypatch.setattr("src.monitor.engine.MonitorEngine", lambda *, dal: engine)
 
+        summary = scan_alerts(dal, tickers=" nvda, ")
 
-class TestMonitorScheduler:
-    def test_scheduler_run_once(self):
-        from src.monitor.scheduler import MonitorScheduler
-
-        engine = MagicMock()
-        engine.scan_once = AsyncMock(return_value=[])
-
-        scheduler = MonitorScheduler(engine=engine, interval_minutes=1)
-        asyncio.run(scheduler.run_once())
-        engine.scan_once.assert_called_once()
-
-    def test_scheduler_start_stop(self):
-        from src.monitor.scheduler import MonitorScheduler
-
-        engine = MagicMock()
-        engine.scan_once = AsyncMock(return_value=[])
-
-        scheduler = MonitorScheduler(engine=engine, interval_minutes=1)
-
-        async def _test():
-            await scheduler.start()
-            assert scheduler.is_running
-            # Let it do one scan
-            await asyncio.sleep(0.1)
-            await scheduler.stop()
-            assert not scheduler.is_running
-
-        asyncio.run(_test())
+        assert "1 alert(s)" in summary
+        assert "[NVDA]" in summary
+        assert "Price up 6.0%" in summary
+        dal.get_prices.assert_called_once_with(ticker="NVDA", interval="daily", days=7)
+        assert engine.last_scan_metrics["notified"] is False
+        assert engine.last_scan_metrics["notifications_sent"] == 0
 
 
 # ===================================================================
@@ -574,59 +569,3 @@ class TestAlertDeduplicator:
         assert dedup.should_send(alert) is False
         dedup.reset()
         assert dedup.should_send(alert) is True
-
-
-# ===================================================================
-# Batch A: Scheduler thread safety tests
-# ===================================================================
-
-class TestSchedulerThreadSafety:
-    """Test scheduler's _scan_and_notify pattern."""
-
-    def test_scan_blocking_creates_new_loop(self):
-        """_scan_blocking should work in a thread (new event loop)."""
-        from src.monitor.scheduler import MonitorScheduler
-
-        mock_engine = MagicMock()
-        mock_engine.scan_once = AsyncMock(return_value=[])
-        scheduler = MonitorScheduler(engine=mock_engine, interval_minutes=5)
-        scheduler._tickers = ["NVDA"]
-
-        # _scan_blocking runs asyncio.run() → should succeed
-        result = scheduler._scan_blocking()
-        assert result == []
-        mock_engine.scan_once.assert_called_once_with(
-            tickers=["NVDA"], notify=False,
-        )
-
-    def test_scan_and_notify_calls_engine_notify(self):
-        """_scan_and_notify should dispatch alerts on main loop."""
-        from src.monitor.scheduler import MonitorScheduler
-
-        fake_alert = Alert(
-            alert_type="price", severity="warning",
-            title="Test", message="Test",
-        )
-        mock_engine = MagicMock()
-        mock_engine.scan_once = AsyncMock(return_value=[fake_alert])
-        mock_engine.notify = AsyncMock(return_value=1)
-
-        scheduler = MonitorScheduler(engine=mock_engine, interval_minutes=5)
-        scheduler._tickers = ["NVDA"]
-
-        asyncio.run(scheduler._scan_and_notify())
-        mock_engine.notify.assert_called_once_with([fake_alert])
-
-    def test_scan_and_notify_no_alerts_skips_notify(self):
-        """No alerts → don't call engine.notify()."""
-        from src.monitor.scheduler import MonitorScheduler
-
-        mock_engine = MagicMock()
-        mock_engine.scan_once = AsyncMock(return_value=[])
-        mock_engine.notify = AsyncMock()
-
-        scheduler = MonitorScheduler(engine=mock_engine, interval_minutes=5)
-        scheduler._tickers = ["NVDA"]
-
-        asyncio.run(scheduler._scan_and_notify())
-        mock_engine.notify.assert_not_called()

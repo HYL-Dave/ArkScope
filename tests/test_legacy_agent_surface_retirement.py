@@ -3,6 +3,9 @@ from __future__ import annotations
 import ast
 import re
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -321,33 +324,80 @@ def test_discord_runtime_config_and_dependency_are_absent():
     assert "entrypoint: str  # api | test" in replay_source
 
 
-def test_monitor_engine_and_scheduler_remain_available():
-    engine = _class(_tree("src/monitor/engine.py"), "MonitorEngine")
-    assert {
-        "notify",
-        "run_loop",
-        "scan_once",
-    } <= {
-        node.name
-        for node in engine.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-
-    scheduler = _class(_tree("src/monitor/scheduler.py"), "MonitorScheduler")
-    assert {
-        "_scan_and_notify",
-        "_scan_blocking",
-        "run_once",
-        "start",
-        "stop",
-    } <= {
-        node.name
-        for node in scheduler.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-
+@pytest.mark.parametrize(
+    ("tickers", "notify", "close", "requested_count", "alert_count"),
+    [
+        pytest.param(" nvda, NVDA ", True, 106, 1, 1, id="explicit-alert"),
+        pytest.param(None, False, 100, 2, 0, id="watchlist-no-alerts"),
+    ],
+)
+def test_monitor_engine_and_current_job_report_actual_scan(
+    tmp_path, monkeypatch, tickers, notify, close, requested_count, alert_count,
+):
+    from src.agents.config import AgentConfig
+    from src.monitor import engine as engine_module
+    from src.service import jobs
+    from src.service.job_runs_store import get_job_runs_store
     from src.tools.registry import create_default_registry
 
+    class FixtureDAL:
+        def get_prices(self, *, ticker, interval, days):
+            assert ticker in {"NVDA", "AMD"}
+            assert (interval, days) == ("daily", 7)
+            return SimpleNamespace(
+                bars=[SimpleNamespace(close=100), SimpleNamespace(close=close)],
+            )
+
+    config = {
+        "alerts": {
+            "price_alerts": {"enabled": True, "daily_change_threshold_pct": 5},
+            "news_volume_alerts": {"enabled": False},
+            "sector_alerts": {"enabled": False},
+            "notification_channels": [{"type": "log", "enabled": True}],
+        },
+        "watchlists": {"core_holdings": {"tickers": ["NVDA", "AMD"]}},
+    }
+    monkeypatch.setattr(engine_module, "_load_config", lambda: config)
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "profile.db"))
+    monkeypatch.setitem(
+        jobs._JOB_STATE, "monitor_watchlist_scan", jobs.JobExecutionState(),
+    )
+    dal = FixtureDAL()
+    result = jobs.run_job(
+        "monitor_watchlist_scan", dal=dal, config=AgentConfig(),
+        params={"tickers": tickers, "notify": notify},
+    )
+
+    assert result.status == "succeeded"
+    assert result.result["requested_count"] == requested_count
+    assert result.result["alert_count"] == alert_count
+    assert result.result["notified"] is notify
+    assert result.result["by_type"] == ({"price": 1} if alert_count else {})
+    assert result.result["by_severity"] == ({"warning": 1} if alert_count else {})
+    if alert_count:
+        alert = result.result["alerts"][0]
+        assert alert["ticker"] == "NVDA"
+        assert alert["title"] == "Price up 6.0%"
+        assert alert["data"] == {"daily_change_pct": 6.0, "close": 106}
+        assert alert["timestamp"]
+    else:
+        assert result.result["alerts"] == []
+    metrics = result.result["scan_metrics"]
+    assert metrics["tickers_scanned"] == requested_count
+    assert metrics["alerts_before_dedup"] == alert_count
+    assert metrics["alerts_after_dedup"] == alert_count
+    assert metrics["notified"] is notify
+    assert metrics["notifications_sent"] == alert_count
+    assert [(row["watcher"], row["status"], row["alert_count"])
+            for row in metrics["watchers"]] == [
+        ("PriceWatcher", "ok", alert_count),
+        ("NewsVolumeWatcher", "ok", 0),
+        ("SectorWatcher", "ok", 0),
+    ]
+    runs = get_job_runs_store(dal).list_runs(job_name="monitor_watchlist_scan")
+    assert len(runs) == 1
+    assert runs[0]["status"] == "succeeded"
+    assert runs[0]["result"] == result.result
     assert create_default_registry().get("scan_alerts") is not None
 
 
