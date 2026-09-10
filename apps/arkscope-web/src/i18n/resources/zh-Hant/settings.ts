@@ -754,7 +754,7 @@ const settings = {
       prices: "{{value}} 列 · {{count}} 檔 · 最新 {{timestamp}}",
       news: "{{value}} 篇 · {{count}} 來源 · 最新 {{timestamp}}",
       fundamentals: "{{value}} 列 · {{count}} 檔 · 最新 {{timestamp}}",
-      financialCache: "{{value}} 列（有效 {{count}} · 過期 {{expiredCount}}）· 最新抓取 {{timestamp}}",
+      financialCache: "{{value}} 個快取項目（可重用 {{count}} · 待重新取得 {{expiredCount}}）· 最新快取時間 {{timestamp}}",
     },
     lifecycle: {
       title: "標的事件調查",
@@ -778,7 +778,7 @@ const settings = {
         modes: {
           off: "關閉",
           check_only: "僅檢查",
-          automatic: "自動（僅限已驗證下市）",
+          automatic: "自動（已驗證下市／改名）",
         },
         legacyConflict: "舊設定衝突：背景檢查已關閉，但自動套用仍為開啟。自動變更已阻擋，儲存的設定維持不變。",
         interval: "檢查間隔",

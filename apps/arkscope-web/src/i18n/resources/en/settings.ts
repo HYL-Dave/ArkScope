@@ -755,7 +755,7 @@ const settings = {
       prices: "{{value}} rows · {{count}} tickers · latest {{timestamp}}",
       news: "{{value}} articles · {{count}} sources · latest {{timestamp}}",
       fundamentals: "{{value}} rows · {{count}} tickers · latest {{timestamp}}",
-      financialCache: "{{value}} rows ({{count}} valid · {{expiredCount}} expired) · latest fetch {{timestamp}}",
+      financialCache: "{{value}} cache entries ({{count}} reusable · {{expiredCount}} refresh due) · latest cache timestamp {{timestamp}}",
     },
     lifecycle: {
       title: "Security Event Investigation",
@@ -779,7 +779,7 @@ const settings = {
         modes: {
           off: "Off",
           check_only: "Check only",
-          automatic: "Automatic (verified delistings only)",
+          automatic: "Automatic (verified delistings / renames)",
         },
         legacyConflict: "Legacy settings conflict: background checks are off but automatic changes were enabled. Automatic changes are blocked; saved settings are unchanged.",
         interval: "Check interval",
