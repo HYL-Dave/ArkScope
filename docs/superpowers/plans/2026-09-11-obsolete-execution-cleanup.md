@@ -30,8 +30,8 @@
 
 **Interfaces:** `run_agent(...)` remains unchanged. Move `_read_one(reader, url, control, pool)` byte-for-byte into its only current consumer, preserving stop propagation and worker join. The retained journal's `WebInvestigationOptions` decoding dataclass moves into `lifecycle_web_store`, with identical fields and validation; no default-execution factory survives.
 
-- [ ] Baseline: run pipeline, current-agent, source-report, instrument-scope and retained-journal tests. Collect full node IDs before deletion.
-- [ ] RED: add the negative owner below and an AST import owner prohibiting the old pipeline from current source:
+- [x] Baseline: run pipeline, current-agent, source-report, instrument-scope and retained-journal tests. Collect full node IDs before deletion.
+- [x] RED: add the negative owner below and an AST import owner prohibiting the old pipeline from current source:
 
 ```python
 def test_fixed_investigation_pipeline_is_physically_absent():
@@ -39,10 +39,10 @@ def test_fixed_investigation_pipeline_is_physically_absent():
 ```
 
   Expected RED: the file exists and the current agent/store still import it.
-- [ ] Add current-agent controls using injected synthetic models/readers: all four transports keep exact selection/credential/effort; a failed source produces a typed gap and measured diagnostics without retry; a pending source read stops and joins on cancellation; large/Unicode captures remain whole with traceable passages; context-limit rejection neither clips nor retries. Keep per-instrument grounding checks on current finding validation. Use actual `run_agent`, not a copied old orchestrator.
-- [ ] Move only the two retained primitives and delete the old pipeline/result/error/defaults. Replace test fixture imports with the retained journal owner. Keep journal report/acceptance tests that have real retained readers, creating their measured report through the actual source reader rather than the removed pipeline. Delete only exclusively abandoned orchestration assertions; name replacement/current owners in evidence.
-- [ ] Run focused tests, then complete lifecycle/current approval/identity/provider suites. Mutation: restoring the pipeline fails absence; reintroducing its import fails import ownership; bypassing read stop/join must fail a named behavior test. No mutation is committed.
-- [ ] Review and commit the self-contained source change.
+- [x] Add current-agent controls using injected synthetic models/readers: all four transports keep exact selection/credential/effort; a failed source produces a typed gap and measured diagnostics without retry; a pending source read stops and joins on cancellation; large/Unicode captures remain whole with traceable passages; context-limit rejection neither clips nor retries. Keep per-instrument grounding checks on current finding validation. Use actual `run_agent`, not a copied old orchestrator. Review added two missing transfers: real-agent pending cancellation and successful finding with unread supplement.
+- [x] Move only the two retained primitives and delete the old pipeline/result/error/defaults. Replace test fixture imports with the retained journal owner. Keep journal report/acceptance tests that have real retained readers, creating their measured report through the actual source reader rather than the removed pipeline. Delete only exclusively abandoned orchestration assertions; name replacement/current owners in evidence.
+- [x] Run focused tests, then complete lifecycle/current approval/identity/provider suites. Baseline105P; corrected RED5F/9P; final focused102P. Broad2611P/7missing-Node failures; corrected complete disposition/agent/report files71P. Join/gap/synchronous-read mutants kill1/4/2 named cases; initial real-file/import RED protects removal. No mutation is committed. Whole backend integration remains below.
+- [x] Review and commit the self-contained source change: `38319f16`, scoped re-review9P and no remaining findings.
 
 ## Task 2: Remove Test-Only Macro And Subprocess Wrappers
 
@@ -50,7 +50,7 @@ def test_fixed_investigation_pipeline_is_physically_absent():
 
 **Interfaces:** Existing `execute_macro_job(job_name, dal, params, *, writer_lease=None)` and `jobs.run_job` remain current; all six macro job names and their truthful failed/partial outcomes survive. Current daily update and sanitized worker dispatch are unchanged.
 
-- [ ] Recheck callers and collect baseline nodes. Add RED absence owners for six `_run_fetch_*` delegates, scheduler `_run_subprocess` and daily `run_command`:
+- [x] Recheck callers and collect baseline nodes. Add RED absence owners for six `_run_fetch_*` delegates, scheduler `_run_subprocess` and daily `run_command`:
 
 ```python
 @pytest.mark.parametrize("name", MACRO_DELEGATES)
@@ -59,15 +59,15 @@ def test_macro_delegate_is_absent(name):
 ```
 
   Expected RED: each named symbol exists.
-- [ ] Delete only those definitions and newly unused imports. Move old ingestion parameter/validation tests to the real shared entrypoint:
+- [x] Delete only those definitions and newly unused imports. Move old ingestion parameter/validation tests to the real shared entrypoint:
 
 ```python
 result = execute_macro_job("fetch_fred_release_dates", dal="dal-x", params=params)
 ```
 
   Keep all existing expected ingestion arguments and errors. Remove obsolete monkeypatches of `_run_subprocess`; patch real workers only where the test's behavior needs it.
-- [ ] Verify six real job entrypoints, partial/error telemetry, argument validation, worker environment and timeout tests. Reintroducing a deleted symbol must fail its absence owner. Report exact modified/deleted/new node IDs and current documentation references.
-- [ ] Review and commit only this task's files.
+- [x] Verify six real job entrypoints, partial/error telemetry, argument validation, worker environment and timeout tests. Baseline612P, RED8F, final620P; restore-symbol mutation1F/7P, restored620P. Eighteen node renames preserve assertions; eight new absence nodes; no deleted behavior case.
+- [x] Review and commit only this task's files: `36dac28d`; independent review518P, no findings.
 
 ## Task 3: Remove Spent Operators And Duplicate Monitoring Scheduler
 
@@ -75,8 +75,8 @@ result = execute_macro_job("fetch_fred_release_dates", dal="dal-x", params=param
 
 **Interfaces:** Preserve the different, live `src/sa_article_reconciliation.py`, monitor engine/tools, `src/service/jobs.py` monitor branch, current universe/Former membership and IBKR news catch-up behavior. Task 3 must not edit Task 2's production files.
 
-- [ ] Verify module/CLI entrypoints and collect baseline node IDs without executing any operator against real stores.
-- [ ] RED: four physical absence tests below; change the old engine-and-scheduler preservation owner to engine-and-current-job behavior before deletion:
+- [x] Verify module/CLI entrypoints and collect baseline node IDs without executing any operator against real stores.
+- [x] RED: four physical absence tests below; change the old engine-and-scheduler preservation owner to engine-and-current-job behavior before deletion:
 
 ```python
 @pytest.mark.parametrize("relative", SPENT_MODULES)
@@ -85,14 +85,14 @@ def test_spent_module_is_absent(relative):
 ```
 
   Expected RED: four files still exist. Positive control: monitor job runs an injected engine and reports its actual result; real SA reconciliation imports/runs on fixtures.
-- [ ] Delete only the four modules and their exclusive tests. Keep all non-scheduler monitor tests, current history/evidence and runbooks explicitly marked historical. Search current docs/config/package exports for stale commands and remove those live recommendations.
-- [ ] Run monitor/tools/jobs, SA reconciliation, active universe/Former and IBKR news controls. Restore-file mutations fail absence owners. Provide exact node accounting and reviewable diff.
-- [ ] Review and commit only this task's files.
+- [x] Delete only the four modules and their exclusive tests. Keep all non-scheduler monitor tests, current history/evidence and runbooks explicitly marked historical. Current component list in DESKTOP_APP_VISION_DRAFT is updated; no current command recipe found. No private configuration read.
+- [x] Run monitor/tools/jobs, SA reconciliation, active universe/Former and IBKR news controls. Baseline281P/final270P, one unchanged config fixture explicitly left to parent full run; four restored-original-file mutations fail four absence owners. Eighteen removed/seven new nodes; all36non-scheduler monitor nodes retained.
+- [x] Review and commit only this task's files: `2f80f452`; independent review270P/one explicit deselection, no findings.
 
 ## Integration And Evidence
 
-- [ ] Parent reviews disjoint patches and all named collateral; record any rulings and test count changes.
-- [ ] Fresh full backend run with isolated temp stores, clean environment and provider/production access rejection; inspect any failure before changing an expectation.
-- [ ] Re-run mechanical census against the prior reviewed baseline. Classify new candidates/uncertainties and reductions; no automatic baseline acceptance or data deletion from a candidate.
-- [ ] Independent whole-slice spec/quality review; fix concrete findings and re-run affected tests.
-- [ ] Update audit dispositions and priority-map checkpoint, accurately retaining unresolved shared-reader/schema cleanup. Archive evidence, clean only this plan's scratch, leave branch local and App untouched.
+- [x] Parent reviews disjoint patches and all named collateral; record any rulings and test count changes. Task accounting is -3/+8/-11; verify the resulting -6 against complete collection/execution below.
+- [x] Fresh full backend run with isolated temp stores, clean environment and provider/production access rejection: 7,966 passed / 12 skipped in745.20s. Exact7,978 collection/execution IDs; baseline7,984 minus59removed plus53added. Original12skips unchanged; tested runtime/test diff unchanged since run start.
+- [x] Re-run mechanical census against the prior reviewed baseline. No new candidates, dependency metadata or untracked-name changes. Nine exact file reductions; twelve relocated uncertainty IDs each matched unchanged source lines and prior uncertainty records. Raw exit2/review_required remains; no baseline rewrite or data deletion.
+- [x] Independent whole-slice spec/quality review: no findings, independently reconciled full identities/accounting and retained entrypoints. Archive publication/hash verification remains parent-owned below.
+- [x] Update audit dispositions and priority-map checkpoint, accurately retaining unresolved shared-reader/schema cleanup. Archived112 indexed artifacts with full source/archive hash readback; independent integration review is clean. Only this plan's scratch was removed after verification. Branch remains local; App and master untouched. Evidence: `docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/obsolete-execution-cleanup/README.md`.

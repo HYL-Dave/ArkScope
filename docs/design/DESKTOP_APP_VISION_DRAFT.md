@@ -243,8 +243,9 @@ review 對照 canonical docs 找出的衝突，**已逐條對 SPEC 驗證屬實*
 - `src/agents/shared/replay.py` + `tests/replay_fixtures/` — **重構安全網**：把 tool dispatch 重切進 5 層時防行為漂移
 
 **Service / Signals / Analysis**
-- `src/monitor/`（engine/scheduler/notifiers/watchers）— Alert Center +
-  背景監控核心；目前只有本地 console/log routing，外部通知 transport 尚未設計
+- `src/monitor/`（engine/notifiers/watchers）與 `src/service/jobs.py` 的
+  `monitor_watchlist_scan` — Alert Center 與監控工作入口；目前只有本地
+  console/log routing，外部通知 transport 尚未設計
 - `src/service/job_runs_store.py` — 對應 S3 live-ops feed + last-sync 指示
 - `src/signals/`（anomaly/event_chain/event_tagger/sector_aggregator/synthesizer）— 餵 S6 gauges + strategy 訊號欄
 - `src/analysis/`（context_builder/factory/pipeline/renderer/...）— 對應結構化卡輸出 + scheduler spine（設計見 `PHASE_D_ANALYSIS_PIPELINE_SKETCH.md`）
