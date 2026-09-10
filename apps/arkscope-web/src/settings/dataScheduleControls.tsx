@@ -104,7 +104,8 @@ function invalidationCandidates(
     const after = next[source];
     if (!after || after.running) continue;
     const isMacro = after.write_target === "macro_calendar.db";
-    if (isMacro && terminalStatus(after) !== "succeeded") continue;
+    // Macro ingestion commits incrementally; a failed attempt can still write data.
+    if (isMacro && !["succeeded", "partial", "failed"].includes(terminalStatus(after) ?? "")) continue;
     if (!before.running && terminalRevision(before) === terminalRevision(after)) continue;
     completed.push({ source, writeTarget: after.write_target });
   }
