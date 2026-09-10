@@ -1,0 +1,42 @@
+"""Explain observed scanner deltas without changing its baseline or decisions."""
+import difflib
+import gzip
+import json
+from pathlib import Path
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[3]
+WORK = Path(__file__).resolve().parent
+before_path = ROOT / "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/sec-retention-helper-cleanup/post-facade-census.json.gz"
+with gzip.open(before_path, "rt") as handle:
+    before = json.load(handle)
+with gzip.open(WORK / "census.json.gz", "rt") as handle:
+    after = json.load(handle)
+old_ids = {row["id"]: row for row in before["uncertainties"]}
+line_maps = {}
+explanations = []
+for row in after["uncertainties"]:
+    if row["id"] not in after["comparison"]["new_uncertainties"]:
+        continue
+    path = row["path"]
+    if path not in line_maps:
+        old = subprocess.check_output(["git", "show", "f25b10ca:" + path], cwd=ROOT, text=True).splitlines()
+        new = (ROOT / path).read_text().splitlines()
+        line_maps[path] = {block.b + i + 1: block.a + i + 1
+                          for block in difflib.SequenceMatcher(None, old, new, autojunk=False).get_matching_blocks()
+                          for i in range(block.size)}
+    old_line = line_maps[path].get(row["line"])
+    comparable = {key: value for key, value in row.items() if key not in ("id", "line")}
+    matches = [old["id"] for old in old_ids.values()
+               if old.get("line") == old_line and
+               {key: value for key, value in old.items() if key not in ("id", "line")} == comparable]
+    explanations.append({**row, "previous_line": old_line, "previous_ids": matches,
+                         "classification": "unchanged_source_line_relocated" if matches else "requires_investigation"})
+old_candidates = {r["id"]: r for r in before["candidates"]}
+new_candidates = {r["id"]: r for r in after["candidates"]}
+result = {"baseline": str(before_path.relative_to(ROOT)), "comparison": after["comparison"],
+          "coverage": after["coverage"], "candidate_rows": len(after["candidates"]),
+          "uncertainty_rows": len(after["uncertainties"]), "uncertainty_explanations": explanations,
+          "removed_candidates": [old_candidates[key] for key in sorted(old_candidates.keys() - new_candidates.keys())]}
+(WORK / "census-account.json").write_text(json.dumps(result, indent=2) + "\n")
+print(json.dumps({"explanations": explanations, "removed_candidates": result["removed_candidates"]}, indent=2))

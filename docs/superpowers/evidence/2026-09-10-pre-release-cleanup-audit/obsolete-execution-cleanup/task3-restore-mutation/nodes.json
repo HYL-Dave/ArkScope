@@ -1,0 +1,6 @@
+[
+  "tests/test_spent_operator_cleanup.py::test_spent_module_is_absent[src/audit/sa_article_reconciliation.py]",
+  "tests/test_spent_operator_cleanup.py::test_spent_module_is_absent[src/audit/universe_retirement.py]",
+  "tests/test_spent_operator_cleanup.py::test_spent_module_is_absent[src/audit/ibkr_news_catchup_audit.py]",
+  "tests/test_spent_operator_cleanup.py::test_spent_module_is_absent[src/monitor/scheduler.py]"
+]

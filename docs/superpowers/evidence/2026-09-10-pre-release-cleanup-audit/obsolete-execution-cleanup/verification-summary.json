@@ -1,0 +1,477 @@
+{
+  "backend": {
+    "added_by_file": {
+      "tests/test_execution_wrapper_cleanup.py": 8,
+      "tests/test_finnhub_ingestion.py": 14,
+      "tests/test_fred_ingestion.py": 4,
+      "tests/test_legacy_agent_surface_retirement.py": 2,
+      "tests/test_lifecycle_investigation_execution_cleanup.py": 20,
+      "tests/test_monitor.py": 1,
+      "tests/test_spent_operator_cleanup.py": 4
+    },
+    "added_count": 53,
+    "added_nodeids": [
+      "tests/test_execution_wrapper_cleanup.py::test_daily_update_command_wrapper_is_absent",
+      "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_earnings_calendar]",
+      "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_economic_calendar_backfill]",
+      "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_economic_calendar_recent]",
+      "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_fred_release_dates]",
+      "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_fred_series]",
+      "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_ipo_calendar]",
+      "tests/test_execution_wrapper_cleanup.py::test_scheduler_subprocess_wrapper_is_absent",
+      "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_default_window_today_to_plus30",
+      "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_empty_watchlist_falls_back_to_unfiltered",
+      "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_explicit_symbols_override_watchlist",
+      "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_uses_watchlist_when_no_symbols_param",
+      "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_default_years_back_is_one",
+      "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_explicit_from_date_overrides_years_back",
+      "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_years_back_param_widens_window",
+      "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_zero_years_back_raises",
+      "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_default_window_is_minus7_plus14",
+      "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_explicit_dates_override_defaults",
+      "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_invalid_iso_date_raises",
+      "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_to_before_from_raises",
+      "tests/test_finnhub_ingestion.py::TestIpoExecution::test_default_window_minus30_plus90",
+      "tests/test_finnhub_ingestion.py::TestIpoExecution::test_explicit_dates_threaded",
+      "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_release_dates_calls_ingestion",
+      "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_release_dates_rejects_zero_limit",
+      "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_release_dates_threads_limit",
+      "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_series_threads_full_refresh",
+      "tests/test_legacy_agent_surface_retirement.py::test_monitor_engine_and_current_job_report_actual_scan[explicit-alert]",
+      "tests/test_legacy_agent_surface_retirement.py::test_monitor_engine_and_current_job_report_actual_scan[watchlist-no-alerts]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_agent_owned_read_stops_and_awaits_worker[before_read]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_agent_owned_read_stops_and_awaits_worker[cooperative]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_agent_owned_read_stops_and_awaits_worker[task_cancel]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_can_conclude_with_disclosed_unread_supplement[anthropic-api_key]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_can_conclude_with_disclosed_unread_supplement[anthropic-claude_code_oauth]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_can_conclude_with_disclosed_unread_supplement[openai-api_key]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_can_conclude_with_disclosed_unread_supplement[openai-chatgpt_oauth]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_context_rejection_never_clips_or_retries[anthropic-api_key]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_context_rejection_never_clips_or_retries[anthropic-claude_code_oauth]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_context_rejection_never_clips_or_retries[openai-api_key]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_context_rejection_never_clips_or_retries[openai-chatgpt_oauth]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_pending_read_stops_before_any_further_dispatch[cooperative]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_pending_read_stops_before_any_further_dispatch[task_cancel]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_source_failures_keep_measured_gaps_without_retry",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_web_path_keeps_selected_channel_and_full_capture[anthropic-api_key]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_web_path_keeps_selected_channel_and_full_capture[anthropic-claude_code_oauth]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_web_path_keeps_selected_channel_and_full_capture[openai-api_key]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_web_path_keeps_selected_channel_and_full_capture[openai-chatgpt_oauth]",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_current_source_never_imports_fixed_investigation_pipeline",
+      "tests/test_lifecycle_investigation_execution_cleanup.py::test_fixed_investigation_pipeline_is_physically_absent",
+      "tests/test_monitor.py::TestMonitorToolRegistration::test_scan_alerts_formats_current_engine_results_without_notifying",
+      "tests/test_spent_operator_cleanup.py::test_spent_module_is_absent[src/audit/ibkr_news_catchup_audit.py]",
+      "tests/test_spent_operator_cleanup.py::test_spent_module_is_absent[src/audit/sa_article_reconciliation.py]",
+      "tests/test_spent_operator_cleanup.py::test_spent_module_is_absent[src/audit/universe_retirement.py]",
+      "tests/test_spent_operator_cleanup.py::test_spent_module_is_absent[src/monitor/scheduler.py]"
+    ],
+    "baseline_nodes": 7984,
+    "collected": 7978,
+    "executed_unique": 7978,
+    "removed_by_file": {
+      "tests/test_finnhub_ingestion.py": 14,
+      "tests/test_fred_ingestion.py": 4,
+      "tests/test_ibkr_news_catchup_audit.py": 5,
+      "tests/test_legacy_agent_surface_retirement.py": 1,
+      "tests/test_lifecycle_web_instrument_scope.py": 1,
+      "tests/test_monitor.py": 5,
+      "tests/test_security_lifecycle_web_pipeline.py": 22,
+      "tests/test_universe_retirement_audit.py": 7
+    },
+    "removed_count": 59,
+    "removed_nodeids": [
+      "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_default_window_today_to_plus30",
+      "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_empty_watchlist_falls_back_to_unfiltered",
+      "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_explicit_symbols_override_watchlist",
+      "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_uses_watchlist_when_no_symbols_param",
+      "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_default_years_back_is_one",
+      "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_explicit_from_date_overrides_years_back",
+      "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_years_back_param_widens_window",
+      "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_zero_years_back_raises",
+      "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_default_window_is_minus7_plus14",
+      "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_explicit_dates_override_defaults",
+      "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_invalid_iso_date_raises",
+      "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_to_before_from_raises",
+      "tests/test_finnhub_ingestion.py::TestIpoDispatcher::test_default_window_minus30_plus90",
+      "tests/test_finnhub_ingestion.py::TestIpoDispatcher::test_explicit_dates_threaded",
+      "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_release_dates_calls_ingestion",
+      "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_release_dates_rejects_zero_limit",
+      "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_release_dates_threads_limit",
+      "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_series_threads_full_refresh",
+      "tests/test_ibkr_news_catchup_audit.py::test_audit_source_has_no_gateway_access_or_write_sql",
+      "tests/test_ibkr_news_catchup_audit.py::test_build_report_shape_and_caveats",
+      "tests/test_ibkr_news_catchup_audit.py::test_missing_db_does_not_create_file",
+      "tests/test_ibkr_news_catchup_audit.py::test_report_includes_observed_quiet_window_gap_check",
+      "tests/test_ibkr_news_catchup_audit.py::test_report_records_writer_budget_is_not_bottleneck",
+      "tests/test_legacy_agent_surface_retirement.py::test_monitor_engine_and_scheduler_remain_available",
+      "tests/test_lifecycle_web_instrument_scope.py::test_actual_model_prompts_separate_instruments_and_explain_available_search_budget",
+      "tests/test_monitor.py::TestMonitorScheduler::test_scheduler_run_once",
+      "tests/test_monitor.py::TestMonitorScheduler::test_scheduler_start_stop",
+      "tests/test_monitor.py::TestSchedulerThreadSafety::test_scan_and_notify_calls_engine_notify",
+      "tests/test_monitor.py::TestSchedulerThreadSafety::test_scan_and_notify_no_alerts_skips_notify",
+      "tests/test_monitor.py::TestSchedulerThreadSafety::test_scan_blocking_creates_new_loop",
+      "tests/test_security_lifecycle_web_pipeline.py::test_all_four_channels_share_source_reading_and_finding_validation[anthropic-api_key]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_all_four_channels_share_source_reading_and_finding_validation[anthropic-claude_code_oauth]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_all_four_channels_share_source_reading_and_finding_validation[openai-api_key]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_all_four_channels_share_source_reading_and_finding_validation[openai-chatgpt_oauth]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_failed_search_or_stop_never_dispatches_more_work",
+      "tests/test_security_lifecycle_web_pipeline.py::test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources0-search_no_sources]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources1-unsafe_source_url]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_invalid_or_empty_search_does_not_fetch_or_submit_analysis[sources2-search_output_invalid]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_large_source_is_saved_whole_but_analysis_receives_traceable_passages",
+      "tests/test_security_lifecycle_web_pipeline.py::test_model_context_rejection_never_clips_relevant_input_or_retries[anthropic-api_key]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_model_context_rejection_never_clips_relevant_input_or_retries[anthropic-claude_code_oauth]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_model_context_rejection_never_clips_relevant_input_or_retries[openai-api_key]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_model_context_rejection_never_clips_relevant_input_or_retries[openai-chatgpt_oauth]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[anthropic-api_key]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[anthropic-claude_code_oauth]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[openai-api_key]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_source_read_failure_remains_visible_and_never_retries[openai-chatgpt_oauth]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_stop_during_source_read_joins_worker_and_never_dispatches_analysis",
+      "tests/test_security_lifecycle_web_pipeline.py::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-api_key]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[anthropic-claude_code_oauth]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-api_key]",
+      "tests/test_security_lifecycle_web_pipeline.py::test_unicode_analysis_keeps_exact_text_without_ascii_escape_expansion[openai-chatgpt_oauth]",
+      "tests/test_universe_retirement_audit.py::test_apply_and_transition_export_are_exact_and_idempotent_after_fresh_preview",
+      "tests/test_universe_retirement_audit.py::test_apply_rejects_changed_json_or_database_fingerprint_before_write",
+      "tests/test_universe_retirement_audit.py::test_apply_requires_explicit_approval_for_every_visible_json_only_symbol",
+      "tests/test_universe_retirement_audit.py::test_audit_never_opens_or_replaces_the_source_json_for_write",
+      "tests/test_universe_retirement_audit.py::test_preview_accounts_for_former_alpha_picks_as_a_distinct_source",
+      "tests/test_universe_retirement_audit.py::test_preview_is_read_only_and_emits_semantic_source_fingerprints",
+      "tests/test_universe_retirement_audit.py::test_preview_proves_legacy_overview_subset_or_stops"
+    ],
+    "seconds": 744.709,
+    "skips": [
+      {
+        "nodeid": "tests/test_detailed_financials.py::TestLiveTechMetrics::test_nvda_tech_metrics",
+        "reason": "Live SEC EDGAR test \u2014 run manually"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_basic_stock_scan",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_connection",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_iv_scan",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_option_filter",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_option_quote",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_option_volume_scan",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_put_call_ratio_scan",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_scanner_parameters",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_unusual_activity",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_option_chain_tools.py::TestLiveOptionChain::test_spy_option_chain",
+        "reason": "Live IBKR test \u2014 run manually"
+      },
+      {
+        "nodeid": "tests/test_peer_comparison.py::TestLivePeerComparison::test_nvda_peer_comparison",
+        "reason": "Live SEC EDGAR test \u2014 run manually"
+      }
+    ],
+    "skips_unchanged": true,
+    "states": {
+      "passed": 7966,
+      "skipped": 12
+    }
+  },
+  "base": "f25b10ca2ce55401460c6296205c9b2c42a18e31",
+  "baseline_provenance": {
+    "archived_collection": "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/sec-retention-helper-cleanup/backend-nodeids.json.gz",
+    "archived_count": 7983,
+    "e61accaf_to_base_runtime_and_tests_unchanged": true,
+    "note": "Reconstructed from archived collection plus the one reviewed owner, not a fresh full baseline run.",
+    "subsequent_e61accaf_added_owner": "tests/test_security_lifecycle_review.py::test_identity_service_has_no_unused_review_confirmation_facade"
+  },
+  "frontend": {
+    "rerun_this_slice": false,
+    "source_test_package_changes_this_slice": false
+  },
+  "production_inventory_or_disposition_this_slice": false,
+  "provider_calls": 0,
+  "source_head": "38319f16da50500813fa4ef1f4f3f27f7fd5f587",
+  "source_patch_unchanged_since_full_run_start": true,
+  "task_runs_including_failed_attempts": [
+    {
+      "path": "task1-baseline.xml",
+      "reported_errors": 0,
+      "reported_tests": 105,
+      "unique_states": {
+        "passed": 105
+      }
+    },
+    {
+      "path": "task1-broad-invalid-glob.xml",
+      "reported_errors": 0,
+      "reported_tests": 0,
+      "unique_states": {}
+    },
+    {
+      "path": "task1-broad.xml",
+      "reported_errors": 0,
+      "reported_tests": 2618,
+      "unique_states": {
+        "failure": 7,
+        "passed": 2611
+      }
+    },
+    {
+      "path": "task1-final.xml",
+      "reported_errors": 0,
+      "reported_tests": 102,
+      "unique_states": {
+        "passed": 102
+      }
+    },
+    {
+      "path": "task1-green.xml",
+      "reported_errors": 0,
+      "reported_tests": 96,
+      "unique_states": {
+        "passed": 96
+      }
+    },
+    {
+      "path": "task1-mutation-gap.xml",
+      "reported_errors": 0,
+      "reported_tests": 4,
+      "unique_states": {
+        "failure": 4
+      }
+    },
+    {
+      "path": "task1-mutation-join.xml",
+      "reported_errors": 0,
+      "reported_tests": 3,
+      "unique_states": {
+        "failure": 1,
+        "passed": 2
+      }
+    },
+    {
+      "path": "task1-mutation-sync.xml",
+      "reported_errors": 0,
+      "reported_tests": 2,
+      "unique_states": {
+        "failure": 2
+      }
+    },
+    {
+      "path": "task1-node-corrected.xml",
+      "reported_errors": 0,
+      "reported_tests": 71,
+      "unique_states": {
+        "passed": 71
+      }
+    },
+    {
+      "path": "task1-red-corrected.xml",
+      "reported_errors": 0,
+      "reported_tests": 14,
+      "unique_states": {
+        "failure": 5,
+        "passed": 9
+      }
+    },
+    {
+      "path": "task1-red.xml",
+      "reported_errors": 0,
+      "reported_tests": 14,
+      "unique_states": {
+        "failure": 10,
+        "passed": 4
+      }
+    },
+    {
+      "path": "task1-review-fix-corrected.xml",
+      "reported_errors": 0,
+      "reported_tests": 20,
+      "unique_states": {
+        "passed": 20
+      }
+    },
+    {
+      "path": "task1-review-fix.xml",
+      "reported_errors": 0,
+      "reported_tests": 20,
+      "unique_states": {
+        "failure": 4,
+        "passed": 16
+      }
+    },
+    {
+      "path": "task3-baseline-collect.xml",
+      "reported_errors": 0,
+      "reported_tests": 0,
+      "unique_states": {}
+    },
+    {
+      "path": "task3-baseline-r2.xml",
+      "reported_errors": 0,
+      "reported_tests": 281,
+      "unique_states": {
+        "passed": 281
+      }
+    },
+    {
+      "path": "task3-baseline.xml",
+      "reported_errors": 0,
+      "reported_tests": 281,
+      "unique_states": {
+        "failure": 8,
+        "passed": 273
+      }
+    },
+    {
+      "path": "task3-final-collect.xml",
+      "reported_errors": 0,
+      "reported_tests": 0,
+      "unique_states": {}
+    },
+    {
+      "path": "task3-final-green.xml",
+      "reported_errors": 0,
+      "reported_tests": 270,
+      "unique_states": {
+        "passed": 270
+      }
+    },
+    {
+      "path": "task3-green.xml",
+      "reported_errors": 0,
+      "reported_tests": 270,
+      "unique_states": {
+        "passed": 270
+      }
+    },
+    {
+      "path": "task3-red.xml",
+      "reported_errors": 0,
+      "reported_tests": 23,
+      "unique_states": {
+        "failure": 4,
+        "passed": 19
+      }
+    },
+    {
+      "path": "task3-restore-mutation.xml",
+      "reported_errors": 0,
+      "reported_tests": 4,
+      "unique_states": {
+        "failure": 4
+      }
+    },
+    {
+      "path": "task3-review.xml",
+      "reported_errors": 0,
+      "reported_tests": 270,
+      "unique_states": {
+        "passed": 270
+      }
+    },
+    {
+      "path": "task2-baseline-20260911-01/junit.xml",
+      "reported_errors": 0,
+      "reported_tests": 612,
+      "unique_states": {
+        "passed": 612
+      }
+    },
+    {
+      "path": "task2-green-20260911-01/junit.xml",
+      "reported_errors": 0,
+      "reported_tests": 620,
+      "unique_states": {
+        "passed": 620
+      }
+    },
+    {
+      "path": "task2-mutation-20260911-01/junit.xml",
+      "reported_errors": 0,
+      "reported_tests": 8,
+      "unique_states": {
+        "failure": 1,
+        "passed": 7
+      }
+    },
+    {
+      "path": "task2-red-20260911-01/junit.xml",
+      "reported_errors": 0,
+      "reported_tests": 8,
+      "unique_states": {
+        "failure": 8
+      }
+    },
+    {
+      "path": "task2-restored-green-20260911-01/junit.xml",
+      "reported_errors": 0,
+      "reported_tests": 620,
+      "unique_states": {
+        "passed": 620
+      }
+    },
+    {
+      "path": "task1-review/focused.xml",
+      "reported_errors": 0,
+      "reported_tests": 96,
+      "unique_states": {
+        "passed": 96
+      }
+    },
+    {
+      "path": "task1-review/re-review.xml",
+      "reported_errors": 0,
+      "reported_tests": 9,
+      "unique_states": {
+        "passed": 9
+      }
+    },
+    {
+      "path": "task1-review/refinements.xml",
+      "reported_errors": 0,
+      "reported_tests": 2,
+      "unique_states": {
+        "passed": 2
+      }
+    },
+    {
+      "path": "task2-review/focused.xml",
+      "reported_errors": 0,
+      "reported_tests": 504,
+      "unique_states": {
+        "passed": 504
+      }
+    },
+    {
+      "path": "task2-review/worker-controls.xml",
+      "reported_errors": 0,
+      "reported_tests": 14,
+      "unique_states": {
+        "passed": 14
+      }
+    }
+  ],
+  "tested_source_patch_sha256": "4b57bb5d66959f50fbfa51594a3aceacd500b405a61c80eadb1ed9f1f708ed1b"
+}

@@ -1,0 +1,17 @@
+"""Record exact collected identities without changing tests or fixtures."""
+import json
+import os
+from pathlib import Path
+
+from _pytest.junitxml import mangle_test_address
+
+
+def pytest_collection_finish(session):
+    rows = []
+    for item in session.items:
+        names = mangle_test_address(item.nodeid)
+        rows.append({"nodeid": item.nodeid, "classname": ".".join(names[:-1]), "name": names[-1]})
+    path = Path(os.environ["ARKSCOPE_OFFLINE_TEST_WORKSPACE"]) / "backend-nodeids.json"
+    with path.open("x", encoding="utf-8") as output:
+        json.dump(rows, output, indent=2)
+        output.write("\n")

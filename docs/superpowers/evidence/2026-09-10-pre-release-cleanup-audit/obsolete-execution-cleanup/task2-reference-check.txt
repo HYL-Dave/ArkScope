@@ -1,0 +1,155 @@
+BASELINE: git grep -n -w -E '_run_fetch_[[:alnum:]_]+|_run_subprocess|run_command|execute_macro_job' f25b10ca -- src tests data_sources
+f25b10ca:src/daily_update.py:69:def run_command(cmd: list, dry_run: bool = False, stream_output: bool = True) -> tuple:
+f25b10ca:src/macro_calendar/execution.py:235:def execute_macro_job(
+f25b10ca:src/service/data_scheduler.py:637:def _run_subprocess(argv: List[str]) -> Dict[str, Any]:
+f25b10ca:src/service/data_scheduler.py:1254:                    execute_macro_job,
+f25b10ca:src/service/data_scheduler.py:1262:                macro_result = execute_macro_job(
+f25b10ca:src/service/jobs.py:404:        execute_macro_job,
+f25b10ca:src/service/jobs.py:420:                job.name, execute_macro_job(job.name, dal, payload),
+f25b10ca:src/service/jobs.py:515:def _run_fetch_fred_release_dates(
+f25b10ca:src/service/jobs.py:520:    from src.macro_calendar.execution import execute_macro_job
+f25b10ca:src/service/jobs.py:522:    return execute_macro_job("fetch_fred_release_dates", dal, params)
+f25b10ca:src/service/jobs.py:525:def _run_fetch_fred_series(
+f25b10ca:src/service/jobs.py:530:    from src.macro_calendar.execution import execute_macro_job
+f25b10ca:src/service/jobs.py:532:    return execute_macro_job("fetch_fred_series", dal, params)
+f25b10ca:src/service/jobs.py:535:def _run_fetch_economic_calendar_recent(
+f25b10ca:src/service/jobs.py:540:    from src.macro_calendar.execution import execute_macro_job
+f25b10ca:src/service/jobs.py:542:    return execute_macro_job("fetch_economic_calendar_recent", dal, params)
+f25b10ca:src/service/jobs.py:545:def _run_fetch_economic_calendar_backfill(
+f25b10ca:src/service/jobs.py:550:    from src.macro_calendar.execution import execute_macro_job
+f25b10ca:src/service/jobs.py:552:    return execute_macro_job("fetch_economic_calendar_backfill", dal, params)
+f25b10ca:src/service/jobs.py:555:def _run_fetch_earnings_calendar(
+f25b10ca:src/service/jobs.py:560:    from src.macro_calendar.execution import execute_macro_job
+f25b10ca:src/service/jobs.py:562:    return execute_macro_job("fetch_earnings_calendar", dal, params)
+f25b10ca:src/service/jobs.py:565:def _run_fetch_ipo_calendar(
+f25b10ca:src/service/jobs.py:570:    from src.macro_calendar.execution import execute_macro_job
+f25b10ca:src/service/jobs.py:572:    return execute_macro_job("fetch_ipo_calendar", dal, params)
+f25b10ca:tests/test_data_scheduler.py:114:    monkeypatch.setattr(ds, "_run_subprocess", lambda argv: {"returncode": 0})
+f25b10ca:tests/test_data_scheduler.py:200:    monkeypatch.setattr(ds, "_run_subprocess", denied)
+f25b10ca:tests/test_data_scheduler.py:1131:    monkeypatch.setattr(ds, "_run_subprocess", _subproc)
+f25b10ca:tests/test_data_scheduler.py:1269:        "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:1321:    monkeypatch.setattr(ds, "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:1440:    monkeypatch.setattr(ds, "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:1563:    monkeypatch.setattr(ds, "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:1614:    monkeypatch.setattr(ds, "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:1787:    monkeypatch.setattr(ds, "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:1858:    monkeypatch.setattr(ds, "_run_subprocess", _subproc)
+f25b10ca:tests/test_data_scheduler.py:2022:        "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:2172:        ds, "_run_subprocess", lambda argv: (calls.append(argv), {"returncode": 0})[1]
+f25b10ca:tests/test_data_scheduler.py:2196:    monkeypatch.setattr(ds, "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:2216:    monkeypatch.setattr(ds, "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:2313:    monkeypatch.setattr(ds, "_run_subprocess",
+f25b10ca:tests/test_data_scheduler.py:3278:            "_run_subprocess",
+f25b10ca:tests/test_finnhub_ingestion.py:792:        from src.service.jobs import _run_fetch_economic_calendar_recent
+f25b10ca:tests/test_finnhub_ingestion.py:795:        result = _run_fetch_economic_calendar_recent(dal="dal-x", params={})
+f25b10ca:tests/test_finnhub_ingestion.py:802:        from src.service.jobs import _run_fetch_economic_calendar_recent
+f25b10ca:tests/test_finnhub_ingestion.py:805:        _run_fetch_economic_calendar_recent(
+f25b10ca:tests/test_finnhub_ingestion.py:813:        from src.service.jobs import _run_fetch_economic_calendar_recent
+f25b10ca:tests/test_finnhub_ingestion.py:816:            _run_fetch_economic_calendar_recent(
+f25b10ca:tests/test_finnhub_ingestion.py:821:        from src.service.jobs import _run_fetch_economic_calendar_recent
+f25b10ca:tests/test_finnhub_ingestion.py:824:            _run_fetch_economic_calendar_recent(
+f25b10ca:tests/test_finnhub_ingestion.py:834:        from src.service.jobs import _run_fetch_economic_calendar_backfill
+f25b10ca:tests/test_finnhub_ingestion.py:837:        _run_fetch_economic_calendar_backfill(dal="dal-x", params={})
+f25b10ca:tests/test_finnhub_ingestion.py:845:        from src.service.jobs import _run_fetch_economic_calendar_backfill
+f25b10ca:tests/test_finnhub_ingestion.py:848:        _run_fetch_economic_calendar_backfill(
+f25b10ca:tests/test_finnhub_ingestion.py:855:        from src.service.jobs import _run_fetch_economic_calendar_backfill
+f25b10ca:tests/test_finnhub_ingestion.py:858:        _run_fetch_economic_calendar_backfill(
+f25b10ca:tests/test_finnhub_ingestion.py:865:        from src.service.jobs import _run_fetch_economic_calendar_backfill
+f25b10ca:tests/test_finnhub_ingestion.py:868:            _run_fetch_economic_calendar_backfill(
+f25b10ca:tests/test_finnhub_ingestion.py:882:        from src.service.jobs import _run_fetch_earnings_calendar
+f25b10ca:tests/test_finnhub_ingestion.py:886:        _run_fetch_earnings_calendar(dal=dal, params={})
+f25b10ca:tests/test_finnhub_ingestion.py:890:        from src.service.jobs import _run_fetch_earnings_calendar
+f25b10ca:tests/test_finnhub_ingestion.py:894:        _run_fetch_earnings_calendar(
+f25b10ca:tests/test_finnhub_ingestion.py:902:        from src.service.jobs import _run_fetch_earnings_calendar
+f25b10ca:tests/test_finnhub_ingestion.py:906:        _run_fetch_earnings_calendar(dal=dal, params={})
+f25b10ca:tests/test_finnhub_ingestion.py:911:        from src.service.jobs import _run_fetch_earnings_calendar
+f25b10ca:tests/test_finnhub_ingestion.py:915:        _run_fetch_earnings_calendar(dal=dal, params={})
+f25b10ca:tests/test_finnhub_ingestion.py:925:        from src.service.jobs import _run_fetch_ipo_calendar
+f25b10ca:tests/test_finnhub_ingestion.py:928:        _run_fetch_ipo_calendar(dal="dal-x", params={})
+f25b10ca:tests/test_finnhub_ingestion.py:934:        from src.service.jobs import _run_fetch_ipo_calendar
+f25b10ca:tests/test_finnhub_ingestion.py:937:        _run_fetch_ipo_calendar(
+f25b10ca:tests/test_fred_ingestion.py:697:        from src.service.jobs import _run_fetch_fred_release_dates
+f25b10ca:tests/test_fred_ingestion.py:711:        result = _run_fetch_fred_release_dates(
+f25b10ca:tests/test_fred_ingestion.py:724:        from src.service.jobs import _run_fetch_fred_release_dates
+f25b10ca:tests/test_fred_ingestion.py:737:        _run_fetch_fred_release_dates(
+f25b10ca:tests/test_fred_ingestion.py:746:        from src.service.jobs import _run_fetch_fred_release_dates
+f25b10ca:tests/test_fred_ingestion.py:749:            _run_fetch_fred_release_dates(
+f25b10ca:tests/test_fred_ingestion.py:755:        from src.service.jobs import _run_fetch_fred_series
+f25b10ca:tests/test_fred_ingestion.py:768:        result = _run_fetch_fred_series(
+f25b10ca:tests/test_macro_scheduler_integration.py:93:    from src.macro_calendar.execution import execute_macro_job
+f25b10ca:tests/test_macro_scheduler_integration.py:99:                execute_macro_job(job_name, object(), {})
+f25b10ca:tests/test_macro_scheduler_integration.py:110:        "execute_macro_job",
+f25b10ca:tests/test_macro_scheduler_integration.py:141:    monkeypatch.setattr(execution, "execute_macro_job", _execute)
+f25b10ca:tests/test_macro_scheduler_integration.py:352:        "execute_macro_job",
+f25b10ca:tests/test_macro_scheduler_integration.py:395:    monkeypatch.setattr(execution, "execute_macro_job", _execute)
+f25b10ca:tests/test_macro_scheduler_integration.py:468:    monkeypatch.setattr(execution, "execute_macro_job", _execute)
+f25b10ca:tests/test_macro_scheduler_integration.py:612:        "execute_macro_job",
+f25b10ca:tests/test_macro_scheduler_outcomes.py:96:        monkeypatch.setattr(execution, "execute_macro_job", executor)
+
+CURRENT: rg -n '\b_run_fetch_[A-Za-z_]+\b|\b_run_subprocess\b|\brun_command\b|\bexecute_macro_job\b' src tests data_sources -g '*.py'
+tests/test_macro_scheduler_outcomes.py:96:        monkeypatch.setattr(execution, "execute_macro_job", executor)
+tests/test_macro_scheduler_integration.py:93:    from src.macro_calendar.execution import execute_macro_job
+tests/test_macro_scheduler_integration.py:99:                execute_macro_job(job_name, object(), {})
+tests/test_macro_scheduler_integration.py:110:        "execute_macro_job",
+tests/test_macro_scheduler_integration.py:141:    monkeypatch.setattr(execution, "execute_macro_job", _execute)
+tests/test_macro_scheduler_integration.py:352:        "execute_macro_job",
+tests/test_macro_scheduler_integration.py:395:    monkeypatch.setattr(execution, "execute_macro_job", _execute)
+tests/test_macro_scheduler_integration.py:468:    monkeypatch.setattr(execution, "execute_macro_job", _execute)
+tests/test_macro_scheduler_integration.py:612:        "execute_macro_job",
+src/service/data_scheduler.py:1241:                    execute_macro_job,
+src/service/data_scheduler.py:1249:                macro_result = execute_macro_job(
+tests/test_execution_wrapper_cleanup.py:10:    "_run_fetch_fred_release_dates",
+tests/test_execution_wrapper_cleanup.py:11:    "_run_fetch_fred_series",
+tests/test_execution_wrapper_cleanup.py:12:    "_run_fetch_economic_calendar_recent",
+tests/test_execution_wrapper_cleanup.py:13:    "_run_fetch_economic_calendar_backfill",
+tests/test_execution_wrapper_cleanup.py:14:    "_run_fetch_earnings_calendar",
+tests/test_execution_wrapper_cleanup.py:15:    "_run_fetch_ipo_calendar",
+tests/test_execution_wrapper_cleanup.py:25:    assert not hasattr(data_scheduler, "_run_subprocess")
+tests/test_execution_wrapper_cleanup.py:29:    assert not hasattr(daily_update, "run_command")
+src/service/jobs.py:404:        execute_macro_job,
+src/service/jobs.py:420:                job.name, execute_macro_job(job.name, dal, payload),
+tests/test_finnhub_ingestion.py:792:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:795:        result = execute_macro_job("fetch_economic_calendar_recent", dal="dal-x", params={})
+tests/test_finnhub_ingestion.py:802:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:805:        execute_macro_job(
+tests/test_finnhub_ingestion.py:814:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:817:            execute_macro_job(
+tests/test_finnhub_ingestion.py:823:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:826:            execute_macro_job(
+tests/test_finnhub_ingestion.py:837:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:840:        execute_macro_job("fetch_economic_calendar_backfill", dal="dal-x", params={})
+tests/test_finnhub_ingestion.py:848:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:851:        execute_macro_job(
+tests/test_finnhub_ingestion.py:859:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:862:        execute_macro_job(
+tests/test_finnhub_ingestion.py:870:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:873:            execute_macro_job(
+tests/test_finnhub_ingestion.py:888:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:892:        execute_macro_job("fetch_earnings_calendar", dal=dal, params={})
+tests/test_finnhub_ingestion.py:896:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:900:        execute_macro_job(
+tests/test_finnhub_ingestion.py:909:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:913:        execute_macro_job("fetch_earnings_calendar", dal=dal, params={})
+tests/test_finnhub_ingestion.py:918:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:922:        execute_macro_job("fetch_earnings_calendar", dal=dal, params={})
+tests/test_finnhub_ingestion.py:932:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:935:        execute_macro_job("fetch_ipo_calendar", dal="dal-x", params={})
+tests/test_finnhub_ingestion.py:941:        from src.macro_calendar.execution import execute_macro_job
+tests/test_finnhub_ingestion.py:944:        execute_macro_job(
+tests/test_fred_ingestion.py:697:        from src.macro_calendar.execution import execute_macro_job
+tests/test_fred_ingestion.py:711:        result = execute_macro_job(
+tests/test_fred_ingestion.py:725:        from src.macro_calendar.execution import execute_macro_job
+tests/test_fred_ingestion.py:738:        execute_macro_job(
+tests/test_fred_ingestion.py:748:        from src.macro_calendar.execution import execute_macro_job
+tests/test_fred_ingestion.py:751:            execute_macro_job(
+tests/test_fred_ingestion.py:758:        from src.macro_calendar.execution import execute_macro_job
+tests/test_fred_ingestion.py:771:        result = execute_macro_job(
+src/macro_calendar/execution.py:235:def execute_macro_job(
+
+DOCS: rg -n '\b_run_fetch_[A-Za-z_]+\b|\b_run_subprocess\b|\brun_command\b|\bexecute_macro_job\b' docs -g '*.md'
+docs/superpowers/plans/2026-09-11-obsolete-execution-cleanup.md:51:**Interfaces:** Existing `execute_macro_job(job_name, dal, params, *, writer_lease=None)` and `jobs.run_job` remain current; all six macro job names and their truthful failed/partial outcomes survive. Current daily update and sanitized worker dispatch are unchanged.
+docs/superpowers/plans/2026-09-11-obsolete-execution-cleanup.md:53:- [ ] Recheck callers and collect baseline nodes. Add RED absence owners for six `_run_fetch_*` delegates, scheduler `_run_subprocess` and daily `run_command`:
+docs/superpowers/plans/2026-09-11-obsolete-execution-cleanup.md:65:result = execute_macro_job("fetch_fred_release_dates", dal="dal-x", params=params)
+docs/superpowers/plans/2026-09-11-obsolete-execution-cleanup.md:68:  Keep all existing expected ingestion arguments and errors. Remove obsolete monkeypatches of `_run_subprocess`; patch real workers only where the test's behavior needs it.
+docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/README.md:179:| C05 | Six `_run_fetch_*` delegates in `src/service/jobs.py:515` onward are used by tests; product job dispatch and recurring macro sources call `execute_macro_job` directly. These wrappers were retained in the current convergence branch, not just old debt. | Remove delegates and move existing ingestion/argument tests to the current job entrypoint. Keep all six named jobs and truthful partial/failed behavior. Owners: `test_fred_ingestion.py`, `test_finnhub_ingestion.py`, `test_macro_scheduler_integration.py`. |
+docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/README.md:180:| C06 | `data_scheduler._run_subprocess` and `daily_update.run_command` have no current production call sites found. Scheduler tests still monkeypatch the former. | Remove unused generic subprocess helpers and obsolete patch sites. Preserve current sanitized workers and test their actual dispatch, timeout and environment boundary. Owners: `test_data_scheduler.py`, `test_daily_update_wrapper.py`. |

@@ -3,23 +3,31 @@
 Observed: 2026-09-10. Source tree: `fef26dcf` on
 `codex/listing-sec-macro-convergence`; main worktree remains separate.
 Status updated September 11: **first leaf batch, bounded SEC intake/execution/UI,
-neutral journal codec and five further unused HTTP entries implemented;
+neutral journal codec, five further unused HTTP entries, obsolete fixed
+orchestrator, test-only wrappers and spent operators/scheduler cleaned up;
 remaining shared readers/helpers and data disposition stay open**.
 The original findings below are a dated source inventory, not all-complete
 status. Implementation and verification details: [leaf-cleanup.md](leaf-cleanup.md)
-and [SEC entrypoint cleanup](sec-entrypoint-cleanup/README.md). The current
+and [SEC entrypoint cleanup](sec-entrypoint-cleanup/README.md). The preceding
 [helper cleanup checkpoint](sec-retention-helper-cleanup/README.md) records
 7,971 passed/12 skipped at `0c5896a5`, separate follow-up verification, the first
 unavailable read and the subsequently authorized WAL/SHM-assisted inventory.
 The [actual retention manifest](sec-retention-helper-cleanup/retention-manifest.md)
 records seven absent old-web tables but populated shared cases/history. Do not
 treat the failed first read or an absent old journal as empty shared data.
+The latest [obsolete execution cleanup](obsolete-execution-cleanup/README.md)
+records the source-only continuation through `38319f16`: fresh full backend
+7,966P/12S, exact7,978-node accounting, no new census candidates and explained
+remaining review-required deltas. It performs no renewed production inventory.
 
 | Candidate | Current disposition | Commit |
 | --- | --- | --- |
 | C01 | Company-event collector, scheduler registration and Settings source removed; current admission is unconditional; actual stored settings/schema disposition remains open | `06511f44` |
 | C02 | Dormant edgartools module physically deleted; active SEC clients retained | `300b7400` |
 | C04 | Current execution owner and neutral codec extracted; old case-web execution/UI and five individually reviewed HTTP entries removed. Current shared history/confirmation readers and schema disposition remain | `83eeb5ef`, `302106d2`, `5d41f570`, `0c5896a5` |
+| C04 follow-up | Fixed two-call orchestrator physically deleted; current agent owns cancellable source reads and retains four-channel behavior. Shared journal readers/writers and disposition remain separate | `38319f16` |
+| C05/C06 | Six test-only macro delegates and two unused subprocess wrappers removed; current macro execution, sanitized workers and daily CLI retained | `36dac28d` |
+| C14/C16 | Three spent audit CLIs, empty audit package and independent monitor scheduler removed; live SA reconciliation and monitor engine/job/tools retained | `2f80f452` |
 | C07 | Unreachable auth factory placeholder/export removed; six real modes retained | `263c21a5` |
 | C17 | Old publisher-acquisition adapter deleted; current investigation news retained | `300b7400` |
 | C18 | Disconnected SEC earnings parser/CLI and catalog claim removed | `300b7400` |

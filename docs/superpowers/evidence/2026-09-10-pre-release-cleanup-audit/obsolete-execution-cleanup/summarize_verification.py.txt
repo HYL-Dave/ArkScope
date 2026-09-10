@@ -1,0 +1,133 @@
+"""Reconcile full verification with collection and each task's exact node delta."""
+from collections import Counter
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import xml.etree.ElementTree as ET
+
+
+WORK = Path(__file__).resolve().parent
+ROOT = WORK.parents[2]
+PRIOR = ROOT / "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/sec-retention-helper-cleanup"
+BASE = "f25b10ca2ce55401460c6296205c9b2c42a18e31"
+FACADE_OWNER = "tests/test_security_lifecycle_review.py::test_identity_service_has_no_unused_review_confirmation_facade"
+SOURCE_PATHS = ["src", "tests", "data_sources", "apps/arkscope-web", "package.json", "requirements.txt"]
+
+
+def read_json(path):
+    content = path.read_bytes()
+    return json.loads(gzip.decompress(content) if path.suffix == ".gz" else content)
+
+
+def read_xml(path):
+    content = path.read_bytes()
+    return ET.fromstring(gzip.decompress(content) if path.suffix == ".gz" else content)
+
+
+def cases(root):
+    result = {}
+    for case in root.iter("testcase"):
+        key = (case.get("classname"), case.get("name"))
+        assert key not in result, ("duplicate_test_identity", key)
+        result[key] = case
+    return result
+
+
+def outcome(case):
+    return next((name for name in ("error", "failure", "skipped") if case.find(name) is not None), "passed")
+
+
+def node_key(nodeid):
+    from _pytest.junitxml import mangle_test_address
+    names = mangle_test_address(nodeid)
+    return ".".join(names[:-1]), names[-1]
+
+
+def main():
+    collected = read_json(WORK / "backend-collection/backend-nodeids.json")
+    keyed = {(row["classname"], row["name"]): row["nodeid"] for row in collected}
+    assert len(keyed) == len(collected), "duplicate_collection_identity"
+    executed = cases(read_xml(WORK / "backend-full.xml"))
+    assert executed.keys() == keyed.keys(), {
+        "missing": sorted(keyed.keys() - executed.keys()),
+        "unexpected": sorted(executed.keys() - keyed.keys()),
+    }
+    states = Counter(outcome(case) for case in executed.values())
+    assert not states["failure"] and not states["error"], states
+
+    previous = read_json(PRIOR / "backend-nodeids.json.gz")
+    baseline = {row["nodeid"] for row in previous}
+    assert len(baseline) == len(previous) == 7983
+    assert FACADE_OWNER not in baseline
+    baseline.add(FACADE_OWNER)
+    subprocess.run(["git", "diff", "--exit-code", "e61accaf", BASE, "--", *SOURCE_PATHS],
+                   cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+    current = set(keyed.values())
+    removed, added = sorted(baseline - current), sorted(current - baseline)
+
+    task1 = read_json(WORK / "task1-account.json")
+    task2 = read_json(WORK / "task2-node-accounting.json")
+    task3 = read_json(WORK / "task3-node-accounting.json")
+    baseline_keys = {node_key(node): node for node in baseline}
+    task1_removed = {baseline_keys[tuple(value.split("::", 1))] for value in task1["removed_nodes"]}
+    task1_added = {keyed[tuple(value.split("::", 1))] for value in task1["added_nodes"]}
+    expected_removed = task1_removed | set(task2["removed_node_ids"]) | set(task3["removed_node_ids"])
+    expected_added = task1_added | set(task2["new_node_ids"]) | set(task3["new_node_ids"])
+    assert set(removed) == expected_removed, ("unaccounted_removed", sorted(set(removed) ^ expected_removed))
+    assert set(added) == expected_added, ("unaccounted_added", sorted(set(added) ^ expected_added))
+    prior_cases = cases(read_xml(PRIOR / "backend-final.xml.gz"))
+    before_skips = {key for key, case in prior_cases.items() if outcome(case) == "skipped"}
+    after_skips = {key for key, case in executed.items() if outcome(case) == "skipped"}
+    assert before_skips == after_skips, "skipped_identity_drift"
+    source_patch = subprocess.check_output(["git", "diff", "--binary", BASE, "--", *SOURCE_PATHS], cwd=ROOT)
+    assert source_patch == (WORK / "full-tested.patch").read_bytes(), "tested_source_patch_changed"
+
+    run_paths = sorted(WORK.glob("task*.xml"))
+    run_paths += sorted(WORK.glob("task2-*/junit.xml"))
+    run_paths += sorted(WORK.glob("task1-review/*.xml"))
+    run_paths += sorted(WORK.glob("task2-review/*.xml"))
+    runs = []
+    for path in run_paths:
+        root = read_xml(path)
+        suites = list(root.iter("testsuite"))
+        runs.append({"path": path.relative_to(WORK).as_posix(),
+                     "unique_states": dict(Counter(outcome(c) for c in cases(root).values())),
+                     "reported_tests": sum(int(s.get("tests", "0")) for s in suites),
+                     "reported_errors": sum(int(s.get("errors", "0")) for s in suites)})
+    result = {
+        "base": BASE,
+        "source_head": subprocess.check_output(["git", "rev-parse", "38319f16"], cwd=ROOT, text=True).strip(),
+        "tested_source_patch_sha256": hashlib.sha256(source_patch).hexdigest(),
+        "source_patch_unchanged_since_full_run_start": True,
+        "baseline_provenance": {
+            "archived_collection": (PRIOR / "backend-nodeids.json.gz").relative_to(ROOT).as_posix(),
+            "archived_count": len(previous), "subsequent_e61accaf_added_owner": FACADE_OWNER,
+            "e61accaf_to_base_runtime_and_tests_unchanged": True,
+            "note": "Reconstructed from archived collection plus the one reviewed owner, not a fresh full baseline run.",
+        },
+        "backend": {
+            "baseline_nodes": len(baseline), "collected": len(collected), "executed_unique": len(executed),
+            "states": dict(states), "removed_count": len(removed), "added_count": len(added),
+            "removed_nodeids": removed, "added_nodeids": added,
+            "removed_by_file": dict(Counter(n.split("::", 1)[0] for n in removed)),
+            "added_by_file": dict(Counter(n.split("::", 1)[0] for n in added)),
+            "skips_unchanged": True,
+            "skips": [{"nodeid": keyed[key], "reason": executed[key].find("skipped").get("message")}
+                      for key in sorted(after_skips)],
+            "seconds": sum(float(s.get("time", "0")) for s in read_xml(WORK / "backend-full.xml").iter("testsuite")),
+        },
+        "task_runs_including_failed_attempts": runs,
+        "frontend": {"rerun_this_slice": False, "source_test_package_changes_this_slice": False},
+        "provider_calls": 0, "production_inventory_or_disposition_this_slice": False,
+    }
+    with (WORK / "verification-summary.json").open("x", encoding="utf-8") as output:
+        json.dump(result, output, indent=2, sort_keys=True)
+        output.write("\n")
+    print(json.dumps({"states": dict(states), "collection": len(collected),
+                      "added": len(added), "removed": len(removed), "skips_unchanged": True}, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,37 @@
+"""Source AST equivalence and pytest-node accounting for this cleanup only."""
+import ast
+import json
+from pathlib import Path
+import subprocess
+import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parents[3]
+WORK = Path(__file__).resolve().parent
+
+
+def definition(source, name):
+    node = next(n for n in ast.parse(source).body if getattr(n, "name", None) == name)
+    if isinstance(node, ast.ClassDef) and isinstance(node.body[0], ast.Expr):
+        node.body = node.body[1:]
+    return ast.dump(node, include_attributes=False)
+
+
+def nodes(path):
+    return sorted((n.attrib["classname"] + "::" + n.attrib["name"])
+                  for n in ET.parse(path).iter("testcase"))
+
+
+old = subprocess.check_output(["git", "show", "f25b10ca:src/security_lifecycle_web_pipeline.py"], cwd=ROOT, text=True)
+checks = {}
+for name, relative in [("_running", "src/lifecycle_investigation/agent.py"),
+                       ("_read_one", "src/lifecycle_investigation/agent.py"),
+                       ("WebInvestigationOptions", "src/lifecycle_web_store.py")]:
+    checks[name] = definition(old, name) == definition((ROOT / relative).read_text(), name)
+before = set(nodes(WORK / "task1-baseline.xml"))
+after = set(nodes(WORK / "task1-final.xml"))
+result = {"base": "f25b10ca", "ast_equal_ignoring_locations_and_added_class_docstring": checks,
+          "baseline_nodes": len(before), "green_nodes": len(after),
+          "removed_nodes": sorted(before - after), "added_nodes": sorted(after - before)}
+assert all(checks.values())
+(WORK / "task1-account.json").write_text(json.dumps(result, indent=2) + "\n")
+print(json.dumps({**result, "removed_nodes": len(before - after), "added_nodes": len(after - before)}, indent=2))

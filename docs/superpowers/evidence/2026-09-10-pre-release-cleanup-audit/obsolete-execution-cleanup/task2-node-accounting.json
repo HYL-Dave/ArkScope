@@ -1,0 +1,256 @@
+{
+  "baseline_commit": "f25b10ca2ce55401460c6296205c9b2c42a18e31",
+  "baseline_count": 612,
+  "green_count": 620,
+  "restored_green_count": 620,
+  "net_new_count": 8,
+  "removed_node_ids": [
+    "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_default_window_today_to_plus30",
+    "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_empty_watchlist_falls_back_to_unfiltered",
+    "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_explicit_symbols_override_watchlist",
+    "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_uses_watchlist_when_no_symbols_param",
+    "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_default_years_back_is_one",
+    "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_explicit_from_date_overrides_years_back",
+    "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_years_back_param_widens_window",
+    "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_zero_years_back_raises",
+    "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_default_window_is_minus7_plus14",
+    "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_explicit_dates_override_defaults",
+    "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_invalid_iso_date_raises",
+    "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_to_before_from_raises",
+    "tests/test_finnhub_ingestion.py::TestIpoDispatcher::test_default_window_minus30_plus90",
+    "tests/test_finnhub_ingestion.py::TestIpoDispatcher::test_explicit_dates_threaded",
+    "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_release_dates_calls_ingestion",
+    "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_release_dates_rejects_zero_limit",
+    "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_release_dates_threads_limit",
+    "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_series_threads_full_refresh"
+  ],
+  "new_node_ids": [
+    "tests/test_execution_wrapper_cleanup.py::test_daily_update_command_wrapper_is_absent",
+    "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_earnings_calendar]",
+    "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_economic_calendar_backfill]",
+    "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_economic_calendar_recent]",
+    "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_fred_release_dates]",
+    "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_fred_series]",
+    "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_ipo_calendar]",
+    "tests/test_execution_wrapper_cleanup.py::test_scheduler_subprocess_wrapper_is_absent",
+    "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_default_window_today_to_plus30",
+    "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_empty_watchlist_falls_back_to_unfiltered",
+    "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_explicit_symbols_override_watchlist",
+    "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_uses_watchlist_when_no_symbols_param",
+    "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_default_years_back_is_one",
+    "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_explicit_from_date_overrides_years_back",
+    "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_years_back_param_widens_window",
+    "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_zero_years_back_raises",
+    "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_default_window_is_minus7_plus14",
+    "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_explicit_dates_override_defaults",
+    "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_invalid_iso_date_raises",
+    "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_to_before_from_raises",
+    "tests/test_finnhub_ingestion.py::TestIpoExecution::test_default_window_minus30_plus90",
+    "tests/test_finnhub_ingestion.py::TestIpoExecution::test_explicit_dates_threaded",
+    "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_release_dates_calls_ingestion",
+    "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_release_dates_rejects_zero_limit",
+    "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_release_dates_threads_limit",
+    "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_series_threads_full_refresh"
+  ],
+  "transferred_behavior_owners": [
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_default_window_today_to_plus30",
+      "to": "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_default_window_today_to_plus30",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_empty_watchlist_falls_back_to_unfiltered",
+      "to": "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_empty_watchlist_falls_back_to_unfiltered",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_explicit_symbols_override_watchlist",
+      "to": "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_explicit_symbols_override_watchlist",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEarningsDispatcher::test_uses_watchlist_when_no_symbols_param",
+      "to": "tests/test_finnhub_ingestion.py::TestEarningsExecution::test_uses_watchlist_when_no_symbols_param",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_default_years_back_is_one",
+      "to": "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_default_years_back_is_one",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_explicit_from_date_overrides_years_back",
+      "to": "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_explicit_from_date_overrides_years_back",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_years_back_param_widens_window",
+      "to": "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_years_back_param_widens_window",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEconomicBackfillDispatcher::test_zero_years_back_raises",
+      "to": "tests/test_finnhub_ingestion.py::TestEconomicBackfillExecution::test_zero_years_back_raises",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_default_window_is_minus7_plus14",
+      "to": "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_default_window_is_minus7_plus14",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_explicit_dates_override_defaults",
+      "to": "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_explicit_dates_override_defaults",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_invalid_iso_date_raises",
+      "to": "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_invalid_iso_date_raises",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestEconomicRecentDispatcher::test_to_before_from_raises",
+      "to": "tests/test_finnhub_ingestion.py::TestEconomicRecentExecution::test_to_before_from_raises",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestIpoDispatcher::test_default_window_minus30_plus90",
+      "to": "tests/test_finnhub_ingestion.py::TestIpoExecution::test_default_window_minus30_plus90",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_finnhub_ingestion.py::TestIpoDispatcher::test_explicit_dates_threaded",
+      "to": "tests/test_finnhub_ingestion.py::TestIpoExecution::test_explicit_dates_threaded",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_release_dates_calls_ingestion",
+      "to": "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_release_dates_calls_ingestion",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_release_dates_rejects_zero_limit",
+      "to": "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_release_dates_rejects_zero_limit",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_release_dates_threads_limit",
+      "to": "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_release_dates_threads_limit",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    },
+    {
+      "from": "tests/test_fred_ingestion.py::TestJobDispatchers::test_run_fetch_fred_series_threads_full_refresh",
+      "to": "tests/test_fred_ingestion.py::TestMacroJobExecution::test_fetch_fred_series_threads_full_refresh",
+      "entrypoint": "src.macro_calendar.execution.execute_macro_job"
+    }
+  ],
+  "deleted_behavior_cases": [],
+  "modified_existing_node_ids": [
+    "tests/test_data_scheduler.py::test_blocked_news_route_fails_despite_stale_normalized_continuation",
+    "tests/test_data_scheduler.py::test_deleted_sec_source_is_ordinary_unknown_without_dispatch[False]",
+    "tests/test_data_scheduler.py::test_deleted_sec_source_is_ordinary_unknown_without_dispatch[True]",
+    "tests/test_data_scheduler.py::test_ibkr_legacy_local_route_is_retired_before_collector_sync_and_mirror",
+    "tests/test_data_scheduler.py::test_ibkr_news_fails_closed_when_local_route_state_cannot_be_read",
+    "tests/test_data_scheduler.py::test_legacy_local_news_route_runs_despite_stale_normalized_continuation",
+    "tests/test_data_scheduler.py::test_local_news_route_keeps_single_direct_writer",
+    "tests/test_data_scheduler.py::test_normalized_news_partial_without_continuation_stays_partial",
+    "tests/test_data_scheduler.py::test_normalized_news_route_calls_writer_under_market_lock[finnhub_news-finnhub-src.collectors.finnhub_news-FinnhubConfig-FinnhubNewsCollector-FinnhubNormalizedProvider]",
+    "tests/test_data_scheduler.py::test_normalized_news_route_calls_writer_under_market_lock[polygon_news-polygon-src.collectors.polygon_news-CollectionConfig-PolygonNewsCollector-PolygonNormalizedProvider]",
+    "tests/test_data_scheduler.py::test_normalized_news_route_preserves_writer_partial_continuation",
+    "tests/test_data_scheduler.py::test_post_exit_blocked_news_route_fails_closed_and_records_failure",
+    "tests/test_data_scheduler.py::test_price_scope_required",
+    "tests/test_data_scheduler.py::test_run_source_adapter_failure_short_circuits",
+    "tests/test_data_scheduler.py::test_run_source_news_direct_when_use_local_news_on",
+    "tests/test_data_scheduler.py::test_run_source_refuses_provider_work_when_provider_config_setup_required",
+    "tests/test_data_scheduler.py::test_unknown_news_write_mode_fails_before_provider_adapter_worker_and_telemetry"
+  ],
+  "scheduler_autouse_fixture_change": {
+    "fixture": "tests/test_data_scheduler.py::hermetic",
+    "change": "Removed an inert _run_subprocess monkeypatch; real worker guards remain test-specific.",
+    "affected_node_count": 136
+  },
+  "unchanged_daily_update_nodes": [
+    "tests/test_daily_update_wrapper.py::test_help_exits_zero_with_full_flag_set",
+    "tests/test_daily_update_wrapper.py::test_massive_flag_and_hidden_legacy_alias_select_the_same_source[--massive]",
+    "tests/test_daily_update_wrapper.py::test_massive_flag_and_hidden_legacy_alias_select_the_same_source[--polygon]",
+    "tests/test_daily_update_wrapper.py::test_protected_command_dry_run_plan",
+    "tests/test_daily_update_wrapper.py::test_dry_run_reports_direct_local_collection_without_mirror_controls",
+    "tests/test_daily_update_wrapper.py::test_no_scope_errors",
+    "tests/test_daily_update_wrapper.py::test_daily_update_unavailable_scope_exits_before_any_source",
+    "tests/test_daily_update_wrapper.py::test_price_status_uses_sqlite_stats_without_scanning_repository_files"
+  ],
+  "red": [
+    {
+      "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_fred_release_dates]",
+      "status": "FAILED"
+    },
+    {
+      "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_fred_series]",
+      "status": "FAILED"
+    },
+    {
+      "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_economic_calendar_recent]",
+      "status": "FAILED"
+    },
+    {
+      "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_economic_calendar_backfill]",
+      "status": "FAILED"
+    },
+    {
+      "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_earnings_calendar]",
+      "status": "FAILED"
+    },
+    {
+      "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_ipo_calendar]",
+      "status": "FAILED"
+    },
+    {
+      "id": "tests/test_execution_wrapper_cleanup.py::test_scheduler_subprocess_wrapper_is_absent",
+      "status": "FAILED"
+    },
+    {
+      "id": "tests/test_execution_wrapper_cleanup.py::test_daily_update_command_wrapper_is_absent",
+      "status": "FAILED"
+    }
+  ],
+  "restore_symbol_mutation": {
+    "file": "src/service/jobs.py",
+    "symbol": "_run_fetch_fred_series",
+    "change": "Temporarily restored the original definition before _summarize_result; removed after mutation run.",
+    "outcomes": [
+      {
+        "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_fred_release_dates]",
+        "status": "PASSED"
+      },
+      {
+        "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_fred_series]",
+        "status": "FAILED"
+      },
+      {
+        "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_economic_calendar_recent]",
+        "status": "PASSED"
+      },
+      {
+        "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_economic_calendar_backfill]",
+        "status": "PASSED"
+      },
+      {
+        "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_earnings_calendar]",
+        "status": "PASSED"
+      },
+      {
+        "id": "tests/test_execution_wrapper_cleanup.py::test_macro_delegate_is_absent[_run_fetch_ipo_calendar]",
+        "status": "PASSED"
+      },
+      {
+        "id": "tests/test_execution_wrapper_cleanup.py::test_scheduler_subprocess_wrapper_is_absent",
+        "status": "PASSED"
+      },
+      {
+        "id": "tests/test_execution_wrapper_cleanup.py::test_daily_update_command_wrapper_is_absent",
+        "status": "PASSED"
+      }
+    ],
+    "reverted": true
+  }
+}

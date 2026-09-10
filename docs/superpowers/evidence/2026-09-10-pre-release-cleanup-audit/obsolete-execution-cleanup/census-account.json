@@ -1,0 +1,222 @@
+{
+  "baseline": "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/sec-retention-helper-cleanup/post-facade-census.json.gz",
+  "comparison": {
+    "coverage_reductions": [
+      "src/audit/__init__.py",
+      "src/audit/ibkr_news_catchup_audit.py",
+      "src/audit/sa_article_reconciliation.py",
+      "src/audit/universe_retirement.py",
+      "src/monitor/scheduler.py",
+      "src/security_lifecycle_web_pipeline.py",
+      "tests/test_ibkr_news_catchup_audit.py",
+      "tests/test_security_lifecycle_web_pipeline.py",
+      "tests/test_universe_retirement_audit.py"
+    ],
+    "dependency_metadata_changed": [],
+    "new_candidates": [],
+    "new_uncertainties": [
+      "python:341db1e48bf14e3d",
+      "python:96eb21a92454328e",
+      "sql:1ce3e43694a6c010",
+      "sql:1f114caa13bf99cc",
+      "sql:2a9d307fb174e0b6",
+      "sql:3bb507472849642a",
+      "sql:3d62627a2d5ba7e9",
+      "sql:66834c9569c24f7d",
+      "sql:a532611f74b070c7",
+      "sql:d1589dcee02e675a",
+      "sql:e0a70987dd96e67d",
+      "sql:e6c4e226abc93c9c"
+    ],
+    "new_untracked_paths": [],
+    "review_required": true
+  },
+  "coverage": {
+    "decode_failed": 3,
+    "documentation": 193,
+    "excluded_evidence": 5878,
+    "excluded_non_source": 23,
+    "excluded_private": 6,
+    "read": 1091
+  },
+  "candidate_rows": 4320,
+  "uncertainty_rows": 3379,
+  "uncertainty_explanations": [
+    {
+      "axis": "python",
+      "id": "python:341db1e48bf14e3d",
+      "kind": "dynamic_import",
+      "line": 1430,
+      "path": "src/service/data_scheduler.py",
+      "previous_line": 1443,
+      "previous_ids": [
+        "python:c0706615712394c2"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "python",
+      "id": "python:96eb21a92454328e",
+      "kind": "dynamic_import",
+      "line": 1305,
+      "path": "tests/test_data_scheduler.py",
+      "previous_line": 1314,
+      "previous_ids": [
+        "python:00301992585eb36c"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:1ce3e43694a6c010",
+      "kind": "unmodeled_sql_statement",
+      "line": 380,
+      "path": "src/lifecycle_web_store.py",
+      "previous_line": 355,
+      "previous_ids": [
+        "sql:2be1988282d9dd47"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:1f114caa13bf99cc",
+      "kind": "sql_prepare_failed",
+      "line": 365,
+      "path": "src/daily_update.py",
+      "previous_line": 416,
+      "previous_ids": [
+        "sql:b8796697df0e574c"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:2a9d307fb174e0b6",
+      "kind": "sql_prepare_failed",
+      "line": 363,
+      "path": "src/daily_update.py",
+      "previous_line": 414,
+      "previous_ids": [
+        "sql:88859e7f1c3b3c9c"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:3bb507472849642a",
+      "kind": "dynamic_sql",
+      "line": 118,
+      "path": "src/lifecycle_web_store.py",
+      "previous_line": 93,
+      "previous_ids": [
+        "sql:b9c2aa1a20b02e30"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:3d62627a2d5ba7e9",
+      "kind": "sql_prepare_failed",
+      "line": 371,
+      "path": "src/daily_update.py",
+      "previous_line": 422,
+      "previous_ids": [
+        "sql:7f3929cbcff40c4b"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:66834c9569c24f7d",
+      "kind": "unmodeled_sql_statement",
+      "line": 114,
+      "path": "src/lifecycle_web_store.py",
+      "previous_line": 89,
+      "previous_ids": [
+        "sql:8e212d8f9324daef"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:a532611f74b070c7",
+      "kind": "sql_prepare_failed",
+      "line": 369,
+      "path": "src/daily_update.py",
+      "previous_line": 420,
+      "previous_ids": [
+        "sql:17d7b313b5b76aa4"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:d1589dcee02e675a",
+      "kind": "sql_prepare_failed",
+      "line": 373,
+      "path": "src/daily_update.py",
+      "previous_line": 424,
+      "previous_ids": [
+        "sql:756d93ab3acd43dd"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:e0a70987dd96e67d",
+      "kind": "unmodeled_sql_statement",
+      "line": 91,
+      "path": "src/lifecycle_web_store.py",
+      "previous_line": 66,
+      "previous_ids": [
+        "sql:e2babba48812a125"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:e6c4e226abc93c9c",
+      "kind": "sql_prepare_failed",
+      "line": 361,
+      "path": "src/daily_update.py",
+      "previous_line": 412,
+      "previous_ids": [
+        "sql:2af518ec4e689e23"
+      ],
+      "classification": "unchanged_source_line_relocated"
+    }
+  ],
+  "removed_candidates": [
+    {
+      "entrypoint_kind": "main_guard",
+      "id": "python:src.audit.ibkr_news_catchup_audit",
+      "kind": "test_only",
+      "path": "src/audit/ibkr_news_catchup_audit.py"
+    },
+    {
+      "entrypoint_kind": "main_guard",
+      "id": "python:src.audit.sa_article_reconciliation",
+      "kind": "no_inbound_reference",
+      "path": "src/audit/sa_article_reconciliation.py"
+    },
+    {
+      "entrypoint_kind": "main_guard",
+      "id": "python:src.audit.universe_retirement",
+      "kind": "test_only",
+      "path": "src/audit/universe_retirement.py"
+    },
+    {
+      "entrypoint_kind": null,
+      "id": "python:src.monitor.scheduler",
+      "kind": "test_only",
+      "path": "src/monitor/scheduler.py"
+    }
+  ]
+}

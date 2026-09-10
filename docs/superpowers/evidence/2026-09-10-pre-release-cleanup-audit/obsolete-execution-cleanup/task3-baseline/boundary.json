@@ -1,0 +1,37 @@
+{
+  "exitstatus": 1,
+  "denied": [
+    {
+      "event": "open",
+      "path": "/tmp/arkscope-listing-sec-macro-convergence/config/user_profile.yaml"
+    },
+    {
+      "event": "open",
+      "path": "/tmp/arkscope-listing-sec-macro-convergence/config/user_profile.yaml"
+    },
+    {
+      "event": "open",
+      "path": "/tmp/arkscope-listing-sec-macro-convergence/config/user_profile.yaml"
+    },
+    {
+      "event": "open",
+      "path": "/tmp/arkscope-listing-sec-macro-convergence/config/user_profile.yaml"
+    },
+    {
+      "event": "open",
+      "path": "/tmp/arkscope-listing-sec-macro-convergence/config/user_profile.yaml"
+    },
+    {
+      "event": "open",
+      "path": "/tmp/arkscope-listing-sec-macro-convergence/config/user_profile.yaml"
+    },
+    {
+      "event": "open",
+      "path": "/tmp/arkscope-listing-sec-macro-convergence/config/user_profile.yaml"
+    },
+    {
+      "event": "open",
+      "path": "/tmp/arkscope-listing-sec-macro-convergence/config/user_profile.yaml"
+    }
+  ]
+}

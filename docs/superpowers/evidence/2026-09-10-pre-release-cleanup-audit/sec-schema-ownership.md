@@ -68,9 +68,14 @@ This is an actionable remainder, not a reason to preserve dead execution forever
   `security_lifecycle_review` and `ticker_identity_transition`. Move current
   freshness, provider veto, adoption and acceptance/transition guards together.
   Deleting only its old route leaves these real dependencies to resolve.
-- `security_lifecycle_web_pipeline._read_one` is still consumed by the current
-  investigation agent. Its old fixed two-call orchestrator and the useful
-  source-read primitive have separate ownership; do not delete by filename.
+- The fixed two-call `security_lifecycle_web_pipeline` was physically removed
+  in `38319f16`. `_running` and `_read_one` now belong directly to the adaptive
+  investigation agent; AST comparison verifies unchanged behavior. Journal
+  header options decoding is beside its retained reader, with identical fields,
+  defaults and validation, not a forwarding module or execution-default factory.
+  Current agent tests cover four channels, complete captures, disclosed failed
+  supplements, context rejection and pending-read cancellation. This resolves
+  the orchestrator dependency, not the remaining store writers/review ownership.
 - `security_lifecycle_current` still uses `lifecycle_web_projection` for its
   old review-detail projection. Current Settings status and provider packet
   confirmation also use some case-based services. Removing unmounted UI does

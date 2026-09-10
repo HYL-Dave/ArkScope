@@ -1,0 +1,140 @@
+[
+  {
+    "name": "baseline-collect",
+    "selectors": [
+      "tests/test_monitor.py",
+      "tests/test_legacy_agent_surface_retirement.py",
+      "tests/test_universe_retirement_audit.py",
+      "tests/test_ibkr_news_catchup_audit.py"
+    ],
+    "flags": "--collect-only -q",
+    "exit_code": 0,
+    "result": "68 tests collected",
+    "command": "env -i PATH=/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-baseline-collect /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/offline_pytest.py .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3_support tests/test_monitor.py tests/test_legacy_agent_surface_retirement.py tests/test_universe_retirement_audit.py tests/test_ibkr_news_catchup_audit.py --collect-only -q --junitxml=.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-baseline-collect.xml > .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-baseline-collect.log 2>&1"
+  },
+  {
+    "name": "baseline",
+    "selectors": [
+      "tests/test_monitor.py",
+      "tests/test_legacy_agent_surface_retirement.py",
+      "tests/test_universe_retirement_audit.py",
+      "tests/test_ibkr_news_catchup_audit.py",
+      "tests/test_sa_article_reconciliation.py",
+      "tests/test_sa_article_reconciliation_backend.py",
+      "tests/test_sa_article_reconciliation_schema.py",
+      "tests/test_active_universe.py",
+      "tests/test_active_universe_profile_store.py",
+      "tests/test_sa_tracking_memberships.py",
+      "tests/test_news_normalized_ibkr_adapter.py",
+      "tests/test_news_normalized_retry_queue.py",
+      "tests/test_service_api_slice.py",
+      "tests/test_job_runs.py"
+    ],
+    "flags": "-k 'not test_discord_runtime_config_and_dependency_are_absent' -q",
+    "exit_code": 1,
+    "result": "273 passed, 8 failed, 1 deselected; scratch config binding corrected before product edits",
+    "command": "env -i PATH=/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-baseline /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/offline_pytest.py .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3_support tests/test_monitor.py tests/test_legacy_agent_surface_retirement.py tests/test_universe_retirement_audit.py tests/test_ibkr_news_catchup_audit.py tests/test_sa_article_reconciliation.py tests/test_sa_article_reconciliation_backend.py tests/test_sa_article_reconciliation_schema.py tests/test_active_universe.py tests/test_active_universe_profile_store.py tests/test_sa_tracking_memberships.py tests/test_news_normalized_ibkr_adapter.py tests/test_news_normalized_retry_queue.py tests/test_service_api_slice.py tests/test_job_runs.py -k 'not test_discord_runtime_config_and_dependency_are_absent' -q --junitxml=.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-baseline.xml > .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-baseline.log 2>&1"
+  },
+  {
+    "name": "baseline-r2",
+    "selectors": [
+      "tests/test_monitor.py",
+      "tests/test_legacy_agent_surface_retirement.py",
+      "tests/test_universe_retirement_audit.py",
+      "tests/test_ibkr_news_catchup_audit.py",
+      "tests/test_sa_article_reconciliation.py",
+      "tests/test_sa_article_reconciliation_backend.py",
+      "tests/test_sa_article_reconciliation_schema.py",
+      "tests/test_active_universe.py",
+      "tests/test_active_universe_profile_store.py",
+      "tests/test_sa_tracking_memberships.py",
+      "tests/test_news_normalized_ibkr_adapter.py",
+      "tests/test_news_normalized_retry_queue.py",
+      "tests/test_service_api_slice.py",
+      "tests/test_job_runs.py"
+    ],
+    "flags": "-k 'not test_discord_runtime_config_and_dependency_are_absent' -q",
+    "exit_code": 0,
+    "result": "281 passed, 1 deselected; no denied access",
+    "command": "env -i PATH=/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-baseline-r2 /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/offline_pytest.py .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3_support tests/test_monitor.py tests/test_legacy_agent_surface_retirement.py tests/test_universe_retirement_audit.py tests/test_ibkr_news_catchup_audit.py tests/test_sa_article_reconciliation.py tests/test_sa_article_reconciliation_backend.py tests/test_sa_article_reconciliation_schema.py tests/test_active_universe.py tests/test_active_universe_profile_store.py tests/test_sa_tracking_memberships.py tests/test_news_normalized_ibkr_adapter.py tests/test_news_normalized_retry_queue.py tests/test_service_api_slice.py tests/test_job_runs.py -k 'not test_discord_runtime_config_and_dependency_are_absent' -q --junitxml=.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-baseline-r2.xml > .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-baseline-r2.log 2>&1"
+  },
+  {
+    "name": "red",
+    "selectors": [
+      "tests/test_spent_operator_cleanup.py",
+      "tests/test_legacy_agent_surface_retirement.py::test_monitor_engine_and_current_job_report_actual_scan",
+      "tests/test_monitor.py::TestMonitorToolRegistration",
+      "tests/test_sa_article_reconciliation.py"
+    ],
+    "flags": "-q",
+    "exit_code": 1,
+    "result": "4 physical-absence failures, 19 passed; no denied access",
+    "command": "env -i PATH=/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-red /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/offline_pytest.py .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3_support tests/test_spent_operator_cleanup.py tests/test_legacy_agent_surface_retirement.py::test_monitor_engine_and_current_job_report_actual_scan tests/test_monitor.py::TestMonitorToolRegistration tests/test_sa_article_reconciliation.py -q --junitxml=.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-red.xml > .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-red.log 2>&1"
+  },
+  {
+    "name": "green",
+    "selectors": [
+      "tests/test_spent_operator_cleanup.py",
+      "tests/test_monitor.py",
+      "tests/test_legacy_agent_surface_retirement.py",
+      "tests/test_sa_article_reconciliation.py",
+      "tests/test_sa_article_reconciliation_backend.py",
+      "tests/test_sa_article_reconciliation_schema.py",
+      "tests/test_active_universe.py",
+      "tests/test_active_universe_profile_store.py",
+      "tests/test_sa_tracking_memberships.py",
+      "tests/test_news_normalized_ibkr_adapter.py",
+      "tests/test_news_normalized_retry_queue.py",
+      "tests/test_service_api_slice.py",
+      "tests/test_job_runs.py"
+    ],
+    "flags": "-k 'not test_discord_runtime_config_and_dependency_are_absent' -q",
+    "exit_code": 0,
+    "result": "270 passed, 1 deselected; no denied access",
+    "command": "env -i PATH=/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-green /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/offline_pytest.py .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3_support tests/test_spent_operator_cleanup.py tests/test_monitor.py tests/test_legacy_agent_surface_retirement.py tests/test_sa_article_reconciliation.py tests/test_sa_article_reconciliation_backend.py tests/test_sa_article_reconciliation_schema.py tests/test_active_universe.py tests/test_active_universe_profile_store.py tests/test_sa_tracking_memberships.py tests/test_news_normalized_ibkr_adapter.py tests/test_news_normalized_retry_queue.py tests/test_service_api_slice.py tests/test_job_runs.py -k 'not test_discord_runtime_config_and_dependency_are_absent' -q --junitxml=.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-green.xml > .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-green.log 2>&1"
+  },
+  {
+    "name": "restore-mutation",
+    "selectors": [
+      "tests/test_spent_operator_cleanup.py"
+    ],
+    "flags": "-q",
+    "exit_code": 1,
+    "result": "4 physical-absence failures; exact original files temporarily restored; no denied access",
+    "command": "env -i PATH=/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-restore-mutation /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/offline_pytest.py .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3_support tests/test_spent_operator_cleanup.py -q --junitxml=.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-restore-mutation.xml > .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-restore-mutation.log 2>&1"
+  },
+  {
+    "name": "final-green",
+    "selectors": [
+      "tests/test_spent_operator_cleanup.py",
+      "tests/test_monitor.py",
+      "tests/test_legacy_agent_surface_retirement.py",
+      "tests/test_sa_article_reconciliation.py",
+      "tests/test_sa_article_reconciliation_backend.py",
+      "tests/test_sa_article_reconciliation_schema.py",
+      "tests/test_active_universe.py",
+      "tests/test_active_universe_profile_store.py",
+      "tests/test_sa_tracking_memberships.py",
+      "tests/test_news_normalized_ibkr_adapter.py",
+      "tests/test_news_normalized_retry_queue.py",
+      "tests/test_service_api_slice.py",
+      "tests/test_job_runs.py"
+    ],
+    "flags": "-k 'not test_discord_runtime_config_and_dependency_are_absent' -q",
+    "exit_code": 0,
+    "result": "270 passed, 1 deselected; mutations removed; no denied access",
+    "command": "env -i PATH=/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-final-green /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/offline_pytest.py .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3_support tests/test_spent_operator_cleanup.py tests/test_monitor.py tests/test_legacy_agent_surface_retirement.py tests/test_sa_article_reconciliation.py tests/test_sa_article_reconciliation_backend.py tests/test_sa_article_reconciliation_schema.py tests/test_active_universe.py tests/test_active_universe_profile_store.py tests/test_sa_tracking_memberships.py tests/test_news_normalized_ibkr_adapter.py tests/test_news_normalized_retry_queue.py tests/test_service_api_slice.py tests/test_job_runs.py -k 'not test_discord_runtime_config_and_dependency_are_absent' -q --junitxml=.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-final-green.xml > .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-final-green.log 2>&1"
+  },
+  {
+    "name": "final-collect",
+    "selectors": [
+      "tests/test_spent_operator_cleanup.py",
+      "tests/test_monitor.py",
+      "tests/test_legacy_agent_surface_retirement.py"
+    ],
+    "flags": "--collect-only -q",
+    "exit_code": 0,
+    "result": "57 tests collected",
+    "command": "env -i PATH=/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-final-collect /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/offline_pytest.py .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3_support tests/test_spent_operator_cleanup.py tests/test_monitor.py tests/test_legacy_agent_surface_retirement.py --collect-only -q --junitxml=.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-final-collect.xml > .superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task3-final-collect.log 2>&1"
+  }
+]

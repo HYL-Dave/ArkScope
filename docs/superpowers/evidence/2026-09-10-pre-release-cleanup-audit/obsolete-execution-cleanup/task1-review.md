@@ -1,0 +1,31 @@
+# Task 1 Sidecar Review
+
+Scope: approved Task 1 working-tree patch against `f25b10ca`, named files and exact current consumers only. Jobs, monitor, operators, integration/documentation changes and historical branch scanning are excluded.
+
+## Findings
+
+1. **P2: Add the required pending-read cancellation owner through `run_agent`.** At `tests/test_lifecycle_investigation_execution_cleanup.py:217`, the replacement schedules `_read_one` directly. This is a useful asynchronous-join unit test, but it does not replace the deleted `test_stop_during_source_read_joins_worker_and_never_dispatches_analysis`: no model is involved, so it cannot assert that the actual agent exits without another submission. Current controller cancellation tests inject replacement runners, not a pending source read through the agent. Keep this unit owner and add a synthetic-model/blocking-reader `run_agent` test asserting stop delivery, worker exit before agent completion, and no subsequent model/read dispatch for cooperative stop and task cancellation. Task 1 explicitly requires this current-entrypoint control; the reported shield mutation only establishes the helper-level property.
+
+2. **P2: Restore the successful-finding-with-an-unread-supplement coverage.** At `tests/test_lifecycle_investigation_execution_cleanup.py:136`, both reads fail and the synthetic model explicitly concludes unresolved. The refinement now correctly asserts exact `source_body_incomplete`/`source_unavailable` URL/reason pairs at line 153; the earlier typed-gap criticism is resolved. The deleted `test_source_read_failure_remains_visible_and_never_retries` also protected a distinct retained property: sufficient readable evidence can still support an actionable finding while an unavailable optional source remains disclosed, uncited and unretried. The inspected current-agent consumers do not exercise that mixed outcome. Add a real `run_agent` case with one valid notice and one failing supplement, asserting a successful grounded action, the exact URL/reason in subsequent model material and final gaps, no citation to the failed source, and one read attempt per URL. Keep the measured all-failure test as well.
+
+These are test/spec-completeness findings, not demonstrated runtime regressions in the extraction.
+
+## Spec And Quality
+
+- **Spec: not fully satisfied until the two coverage transfers above have current-agent owners.** Absence/import ownership, four-channel credential/model/effort preservation, whole large/Unicode capture, passage-grounded conclusion, context-error propagation without retry, measured read failures and retained journal/review tests are present.
+- **Product-code quality: no regression found in the scoped diff.** Direct textual comparisons to the base returned identical `_running`/`_read_one` bodies and identical options fields/defaults/validation, excluding only the new dataclass docstring. The frozen dataclass and optional decoded-byte default remain intact; no execution defaults factory survives.
+- Actual call graph: `InvestigationController` defaults to `run_agent`; its nested `read_url` awaits the agent-owned helper (`src/lifecycle_investigation/agent.py:312`). Cancellation still signals control and reader, shields the worker join, and re-raises; the existing caller still performs stopping and executor shutdown. No runtime caller of the deleted orchestrator was found in the bounded identifier census.
+- Retained decoding remains in `LifecycleWebStore._read_material` (`src/lifecycle_web_store.py:434`), reached by retained projection/review readers. Journal header serialization, decoding validation and readback behavior are unchanged. The report fixture now obtains observations from the actual source reader and retains its reopen/projection assertions; instrument-validation tests remain, with only the obsolete orchestrator-prompt test removed.
+- Reviewed node accounting is consistent with 105 baseline nodes minus 23 deleted nodes plus 14 new nodes = 96. The mixed-failure and agent-level cancellation properties above cannot be counted as fully transferred merely from those totals.
+
+## Verification Actually Run
+
+Initial focused pytest run, before the two assertion refinements: **96 passed in 15.41s**, exit 0. Files: `tests/test_lifecycle_investigation_execution_cleanup.py`, `tests/test_lifecycle_investigation_agent.py`, `tests/test_lifecycle_source_read_report.py`, `tests/test_lifecycle_web_store.py`, `tests/test_lifecycle_web_review.py`, `tests/test_lifecycle_web_instrument_scope.py`.
+
+Invocation used `env -i`, `PATH=/home/hyl/.virtualenvs/llm_app/bin:/usr/bin:/bin`, `LANG=C.UTF-8`, `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, `PYTHONDONTWRITEBYTECODE=1`, and `ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-obsolete-execution-cleanup/task1-review`; interpreter `/home/hyl/.virtualenvs/llm_app/bin/python` ran only this plan's `offline_pytest.py` with `-q` and the six explicit files. Fresh node-level results: `task1-review/focused.xml` beside this report.
+
+Refinement rerun: **2 passed in 0.79s**, exit 0, for `tests/test_lifecycle_investigation_execution_cleanup.py::test_current_agent_source_failures_keep_measured_gaps_without_retry` and `tests/test_lifecycle_source_read_report.py::test_all_source_failures_keep_measured_diagnostics_after_journal_reopen`. Same isolated runner/workspace/environment, with `/home/hyl/.nvm/versions/node/v22.14.0/bin` added to `PATH`; results in `task1-review/refinements.xml`. Confirmed the obsolete selected-key assertion is gone and the exercised cookie-secret assertion remains.
+
+Also ran scoped `git diff --check` (exit 0) and the two textual extraction comparisons (both exit 0). Baseline/RED/mutation runs were not rerun; their reported outcomes are not independent reviewer results. No product edits, production/data/config/.env/token-store access, or provider sessions were performed.
+
+Parent-reported broad result: **2611 passed / 7 failed**; all seven failures are `FileNotFoundError: node` in unchanged `tests/test_security_lifecycle_disposition.py`, attributed to the clean PATH omitting NVM. The parent reports a corrected-PATH focused rerun in progress, with no product fix. This diagnosis/result was not independently rerun by this sidecar and does not resolve either coverage-transfer finding.

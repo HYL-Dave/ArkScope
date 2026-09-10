@@ -1,0 +1,68 @@
+"""Archive explicit verification artifacts only, never synthetic stores or homes."""
+import gzip
+import hashlib
+import json
+from pathlib import Path
+
+
+WORK = Path(__file__).resolve().parent
+ROOT = WORK.parents[2]
+DEST = ROOT / "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/obsolete-execution-cleanup"
+
+
+def main():
+    selected = set()
+    for pattern in ("task*.xml", "task*.log", "task*.md", "task*-account*.json",
+                    "task*-node-accounting.json", "task*-nodes.txt", "task*-commands.txt",
+                    "task*-check.txt", "task3-runs.json", "task3-mutation-restored.sha256",
+                    "task3-mutation-restored.diff", "task3-preserved-source.diff"):
+        selected.update(WORK.glob(pattern))
+    for pattern in ("task2-*/junit.xml", "task1-review/*.xml", "task2-review/*.xml"):
+        selected.update(WORK.glob(pattern))
+    for directory in WORK.glob("task3-*"):
+        if directory.is_dir():
+            for name in ("boundary.json", "nodes.json", "deselected.json"):
+                path = directory / name
+                if path.is_file():
+                    selected.add(path)
+    for name in ("backend-full.xml", "backend-collection.log", "backend-collection/backend-nodeids.json",
+                 "census.json.gz", "census-account.json", "task1-account.json", "verification-summary.json",
+                 "progress.md", "full-tested.patch", "offline_pytest.py", "collect_support/conftest.py",
+                 "task3_support/conftest.py", "task1_account.py", "census_account.py",
+                 "summarize_verification.py", "archive_evidence.py", "final-review.md"):
+        path = WORK / name
+        assert path.is_file(), ("missing_expected_artifact", name)
+        selected.add(path)
+    DEST.mkdir(exist_ok=True)
+    index = []
+    for path in sorted(selected):
+        assert path.is_file() and not path.is_symlink(), path
+        relative = path.relative_to(WORK)
+        assert "pytest" not in relative.parts and "state" not in relative.parts and "home" not in relative.parts
+        original = path.read_bytes()
+        target = relative.as_posix()
+        archived = original
+        if path.suffix == ".py":
+            target += ".txt"
+        elif path.suffix in {".xml", ".log", ".patch"} or path.name.endswith("nodes.txt"):
+            target += ".gz"
+            archived = gzip.compress(original, mtime=0)
+        elif path.name == "backend-nodeids.json":
+            target += ".gz"
+            archived = gzip.compress(original, mtime=0)
+        destination = DEST / target
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("xb") as output:
+            output.write(archived)
+        index.append({"source": relative.as_posix(), "archive": target,
+                      "source_bytes": len(original), "archive_bytes": len(archived),
+                      "source_sha256": hashlib.sha256(original).hexdigest(),
+                      "archive_sha256": hashlib.sha256(archived).hexdigest()})
+    with (DEST / "artifact-index.json").open("x", encoding="utf-8") as output:
+        json.dump(index, output, indent=2, sort_keys=True)
+        output.write("\n")
+    print(json.dumps({"archived_files": len(index), "archive_bytes": sum(r["archive_bytes"] for r in index)}))
+
+
+if __name__ == "__main__":
+    main()
