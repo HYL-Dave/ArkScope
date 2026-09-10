@@ -1,17 +1,14 @@
-"""S1 piece-3: build_driver factory SKELETON.
-
-Strict scope: routing + explicit errors + optional token_store injection. No real
-driver bodies (S2 builds api_key; S3/S4 the OAuth ones behind probes), no
-main-agent wiring, no Settings UI, no live provider calls.
-"""
+"""Auth factory routing, explicit errors and dependency injection, without live calls."""
 
 from __future__ import annotations
 
 import pytest
 
 from src.auth_drivers import PlaintextTokenStore
-from src.auth_drivers.api_key_drivers import MissingCredentialError
-from src.auth_drivers.factory import NotImplementedDriver, build_driver
+from src.auth_drivers.api_key_drivers import AnthropicApiKeyDriver, OpenAIApiKeyDriver
+from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
+from src.auth_drivers.claude_code_sdk_driver import AnthropicClaudeCodeSdkDriver
+from src.auth_drivers.factory import build_driver
 
 
 def _cred(provider="openai", auth_type="api_key", cid="local:1"):
@@ -36,12 +33,14 @@ _INVALID_COMBOS = [
 ]
 
 
-# Every product combo now resolves to a REAL driver: api_key/api_key_pool (S2),
-# anthropic+claude_code_oauth (7B SDK driver), openai+chatgpt_oauth (S3 step 1 —
-# real for discovery; its EXECUTION stays gated inside the driver until step 4).
-# No (provider, auth_mode) in the valid matrix is a NotImplementedDriver anymore.
-_REAL_COMBOS = [("openai", "api_key"), ("openai", "api_key_pool"), ("openai", "chatgpt_oauth"),
-                ("anthropic", "api_key"), ("anthropic", "api_key_pool"), ("anthropic", "claude_code_oauth")]
+_REAL_COMBOS = [
+    ("openai", "api_key", OpenAIApiKeyDriver),
+    ("openai", "api_key_pool", OpenAIApiKeyDriver),
+    ("openai", "chatgpt_oauth", OpenAIChatGPTOAuthDriver),
+    ("anthropic", "api_key", AnthropicApiKeyDriver),
+    ("anthropic", "api_key_pool", AnthropicApiKeyDriver),
+    ("anthropic", "claude_code_oauth", AnthropicClaudeCodeSdkDriver),
+]
 
 
 # --- routing: every VALID (provider, auth_mode) yields a driver carrying identity
@@ -51,12 +50,10 @@ def test_build_driver_carries_identity(provider, auth_mode):
     assert d.provider == provider and d.auth_mode == auth_mode
 
 
-@pytest.mark.parametrize("provider,auth_mode", _REAL_COMBOS)
-def test_all_product_modes_are_real_drivers_not_placeholders(provider, auth_mode):
-    # Every valid product combo resolves to a REAL driver now (incl. chatgpt_oauth,
-    # S3 step 1). NotImplementedDriver is no longer returned for any valid combo.
+@pytest.mark.parametrize("provider,auth_mode,expected_type", _REAL_COMBOS)
+def test_all_product_modes_resolve_expected_driver(provider, auth_mode, expected_type):
     d = build_driver(provider=provider, auth_mode=auth_mode, credential=_cred(provider, auth_mode))
-    assert not isinstance(d, NotImplementedDriver)
+    assert type(d) is expected_type
 
 
 @pytest.mark.parametrize("provider,auth_mode", _INVALID_COMBOS)
@@ -86,13 +83,10 @@ def test_chatgpt_oauth_execution_driver_is_wired():
     assert callable(d.stream_llm)
 
 
-def test_claude_code_oauth_is_the_sdk_driver_not_placeholder():
-    # 7B-5: the factory returns the Agent-SDK driver. The experimental 7A
-    # `claude -p --bare` driver is superseded and no longer wired here.
-    from src.auth_drivers.claude_code_sdk_driver import AnthropicClaudeCodeSdkDriver
+def test_claude_code_oauth_is_the_sdk_driver():
     from src.auth_drivers.oauth_status import OAuthObservationStore
     d = build_driver(provider="anthropic", auth_mode="claude_code_oauth", credential=_cred(auth_type="claude_code_oauth"))
-    assert isinstance(d, AnthropicClaudeCodeSdkDriver) and not isinstance(d, NotImplementedDriver)
+    assert type(d) is AnthropicClaudeCodeSdkDriver
     assert isinstance(d._observation_store, OAuthObservationStore)
 
 
@@ -139,6 +133,14 @@ def test_unknown_auth_mode_raises_valueerror():
     assert "psychic" in str(ei.value)
 
 
+def test_unhandled_admitted_mode_fails_closed(monkeypatch):
+    from src.auth_drivers import factory
+
+    monkeypatch.setitem(factory._ALLOWED_MODES, "openai", frozenset({"future_mode"}))
+    with pytest.raises(RuntimeError, match="unhandled admitted driver: openai/future_mode"):
+        build_driver(provider="openai", auth_mode="future_mode", credential=_cred())
+
+
 # --- OAuth modes must NOT be silently treated as api_key --------------------
 def test_oauth_mode_is_not_api_key_path():
     d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
@@ -162,13 +164,13 @@ def test_token_store_optional_and_injected(tmp_path):
     assert d1._token_store is ts
 
 
-# --- the OAuth placeholder conforms to BOTH contracts -----------------------
-def test_placeholder_conforms_to_authdriver_and_research_driver():
+# --- the concrete OAuth driver conforms to BOTH contracts -------------------
+def test_chatgpt_oauth_driver_conforms_to_authdriver_and_research_driver():
     from src.auth_drivers import AuthDriver, ResearchProviderDriver
 
     d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=_cred(auth_type="chatgpt_oauth"))
     assert isinstance(d, AuthDriver)
-    assert isinstance(d, ResearchProviderDriver)  # placeholder has discover_models() + test()
+    assert isinstance(d, ResearchProviderDriver)
 
 
 def test_chatgpt_oauth_discovery_is_real_not_gated():

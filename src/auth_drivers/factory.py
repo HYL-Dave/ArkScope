@@ -1,31 +1,10 @@
-"""Driver factory — S1 piece-3 (SKELETON).
-
-`build_driver(provider, auth_mode, credential, token_store=None)` resolves the
-concrete driver for a (provider, auth_mode). In this slice every mode returns an
-inert `NotImplementedDriver` that carries identity + the injected token store but
-raises `NotImplementedError` (naming the gating slice) when actually called:
-
-- api_key / api_key_pool  → built for real in S2 (standard drivers, parity).
-- chatgpt_oauth           → S3, gated on probe P2 (ChatGPT-backend compatibility).
-- claude_code_oauth       → S4, gated on probe P3 (Claude Agent SDK / claude -p).
-
-Unknown provider / auth_mode → explicit ValueError. NOT wired to the main agent
-loop, no Settings UI, no live provider calls. Design: LLM_AUTH_DRIVER_PLAN.md §7.3.
-"""
+"""Resolve concrete auth drivers without changing provider or credential mode."""
 
 from __future__ import annotations
 
 from typing import Any, Optional
 
-from .protocol import LLMRequest, LLMResponse
-
-# auth_mode → the slice that builds the real driver + the message hint.
-_MODE_SLICE = {
-    "api_key": "S2 (standard api_key drivers, parity)",
-    "api_key_pool": "S2 (standard api_key drivers, parity)",
-    "chatgpt_oauth": "S3 — requires probe P2 (ChatGPT-backend compatibility)",
-    "claude_code_oauth": "S4 — requires probe P3 (Claude Agent SDK / claude -p)",
-}
+from .protocol import AuthDriver
 
 # Provider-specific allowed modes — NOT a cartesian product. The product matrix
 # is api_key + the provider's OWN OAuth mode; api_key_pool stays as an
@@ -36,53 +15,6 @@ _ALLOWED_MODES = {
     "openai": frozenset({"api_key", "api_key_pool", "chatgpt_oauth"}),
     "anthropic": frozenset({"api_key", "api_key_pool", "claude_code_oauth"}),
 }
-
-
-class NotImplementedDriver:
-    """Inert placeholder conforming to the AuthDriver contract. Carries identity +
-    token store; every operation raises NotImplementedError naming its slice."""
-
-    def __init__(self, *, provider: str, auth_mode: str, credential: Any = None, token_store: Any = None):
-        self.provider = provider
-        self.auth_mode = auth_mode
-        self.credential = credential
-        self.token_store = token_store
-
-    def _todo(self) -> NotImplementedError:
-        return NotImplementedError(
-            f"auth driver for ({self.provider}, {self.auth_mode}) is not built yet — "
-            f"see {_MODE_SLICE[self.auth_mode]}."
-        )
-
-    @property
-    def is_authenticated(self) -> bool:
-        return False
-
-    async def authenticate(self) -> None:
-        raise self._todo()
-
-    async def refresh_if_needed(self) -> None:
-        raise self._todo()
-
-    async def call_llm(self, request: LLMRequest) -> LLMResponse:
-        raise self._todo()
-
-    def stream_llm(self, request: LLMRequest):
-        raise self._todo()
-
-    async def get_quota_status(self) -> dict[str, Any]:
-        raise self._todo()
-
-    async def logout(self) -> None:
-        raise self._todo()
-
-    # ResearchProviderDriver surface (so Settings discovery/test wires onto the
-    # same contract in S2/S3/S4 without another contract change).
-    async def discover_models(self):
-        raise self._todo()
-
-    async def test(self):
-        raise self._todo()
 
 
 def build_driver(
@@ -97,20 +29,18 @@ def build_driver(
     timeout_s: Optional[float] = None,
     per_tool_timeout_s: Optional[float] = None,
     observation_store: Optional[Any] = None,
-) -> NotImplementedDriver:
-    """Resolve the driver for a (provider, auth_mode). Skeleton: returns an inert
-    placeholder; unknown provider/mode raise ValueError (never silently coerced)."""
+) -> AuthDriver:
+    """Build the selected driver; reject unknown modes and cross-provider OAuth."""
     if provider not in _ALLOWED_MODES:
         raise ValueError(f"unknown provider: {provider!r} (expected one of {sorted(_ALLOWED_MODES)})")
-    if auth_mode not in _MODE_SLICE:
-        raise ValueError(f"unknown auth_mode: {auth_mode!r} (expected one of {sorted(_MODE_SLICE)})")
+    known_modes = frozenset().union(*_ALLOWED_MODES.values())
+    if auth_mode not in known_modes:
+        raise ValueError(f"unknown auth_mode: {auth_mode!r} (expected one of {sorted(known_modes)})")
     if auth_mode not in _ALLOWED_MODES[provider]:
         raise ValueError(
             f"auth_mode {auth_mode!r} is not valid for provider {provider!r} "
             f"(allowed: {sorted(_ALLOWED_MODES[provider])})"
         )
-    # S2: api_key / api_key_pool resolve to a real driver. OAuth modes stay the
-    # gated placeholder until S3 (chatgpt_oauth) / S4 (claude_code_oauth).
     if auth_mode in ("api_key", "api_key_pool"):
         from .api_key_drivers import AnthropicApiKeyDriver, OpenAIApiKeyDriver
 
@@ -118,14 +48,8 @@ def build_driver(
         cid = f"local:{credential.id}" if credential is not None and getattr(credential, "id", None) is not None else None
         cls = OpenAIApiKeyDriver if provider == "openai" else AnthropicApiKeyDriver
         return cls(api_key=secret, auth_mode=auth_mode, credential_id=cid)
-    # S4/7B: the Claude-subscription Research driver = the Agent-SDK driver
-    # (7B-4/7B-5), per LLM_AUTH_DRIVER_PLAN.md §7B-3. chatgpt_oauth (S3) stays the
-    # gated placeholder. NOTE: registry+dal feed the in-process tool bridge; callers
-    # without them (e.g. live_resolver, which only builds api_key drivers) never
-    # reach this branch — the Research-stream consumer (7B-6) passes the real
-    # registry+dal. The superseded experimental `claude -p --bare` driver was
-    # removed: it could not read CLAUDE_CODE_OAUTH_TOKEN and external PATH CLIs
-    # are not an admitted product transport.
+    # Research injects registry/dal for the in-process bridge. This SDK driver
+    # owns bundled-binary admission; external PATH CLIs are not a transport.
     if provider == "anthropic" and auth_mode == "claude_code_oauth":
         from .claude_code_sdk_driver import AnthropicClaudeCodeSdkDriver
         from .oauth_status import default_oauth_observation_store
@@ -141,8 +65,7 @@ def build_driver(
             **({"timeout_s": timeout_s} if timeout_s is not None else {}),
             **({"per_tool_timeout_s": per_tool_timeout_s} if per_tool_timeout_s is not None else {}),
         )
-    # S3: chatgpt_oauth resolves to the ChatGPT-backend driver. Discovery is live;
-    # Research execution is a raw Responses stream loop (not the API-key Agents SDK).
+    # ChatGPT Research uses its Responses stream, independently of the API-key SDK.
     if provider == "openai" and auth_mode == "chatgpt_oauth":
         from .chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
 
@@ -155,6 +78,4 @@ def build_driver(
             **({"timeout_s": timeout_s} if timeout_s is not None else {}),
             **({"per_tool_timeout_s": per_tool_timeout_s} if per_tool_timeout_s is not None else {}),
         )
-    return NotImplementedDriver(
-        provider=provider, auth_mode=auth_mode, credential=credential, token_store=token_store,
-    )
+    raise RuntimeError(f"unhandled admitted driver: {provider}/{auth_mode}")

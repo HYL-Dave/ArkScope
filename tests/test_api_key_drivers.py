@@ -157,26 +157,23 @@ def test_conforms_to_both_contracts():
     assert isinstance(d, AuthDriver) and isinstance(d, ResearchProviderDriver)
 
 
-# --- build_driver wires api_key → the REAL driver (OAuth still placeholder) -
+# --- build_driver preserves the selected provider and auth transport --------
 def test_build_driver_api_key_returns_real_driver():
-    from src.auth_drivers.factory import NotImplementedDriver
     from src.model_credentials import StoredCredential
 
     cred = StoredCredential(id=1, provider="openai", auth_type="api_key", alias="k",
                             secret="sk-real", active=True, created_at="t", updated_at="t")
     d = build_driver(provider="openai", auth_mode="api_key", credential=cred)
-    assert isinstance(d, OpenAIApiKeyDriver) and not isinstance(d, NotImplementedDriver)
+    assert type(d) is OpenAIApiKeyDriver
     assert d.is_authenticated is True  # secret carried from the credential
 
     acred = StoredCredential(id=2, provider="anthropic", auth_type="api_key", alias="k",
                              secret="sk-real", active=True, created_at="t", updated_at="t")
-    assert isinstance(build_driver(provider="anthropic", auth_mode="api_key", credential=acred), AnthropicApiKeyDriver)
+    assert type(build_driver(provider="anthropic", auth_mode="api_key", credential=acred)) is AnthropicApiKeyDriver
 
 
-def test_build_driver_chatgpt_oauth_is_the_discovery_driver_not_placeholder():
-    from src.auth_drivers.factory import NotImplementedDriver
+def test_build_driver_chatgpt_oauth_is_the_discovery_driver():
     from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
 
     d = build_driver(provider="openai", auth_mode="chatgpt_oauth", credential=None)
-    # S3 step 1: chatgpt_oauth resolves to a real (discovery) driver, not a placeholder.
-    assert isinstance(d, OpenAIChatGPTOAuthDriver) and not isinstance(d, NotImplementedDriver)
+    assert type(d) is OpenAIChatGPTOAuthDriver
