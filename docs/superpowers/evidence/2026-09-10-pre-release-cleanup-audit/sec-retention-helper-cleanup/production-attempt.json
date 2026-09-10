@@ -1,0 +1,24 @@
+{
+  "status": "unavailable_before_inventory",
+  "attempts": 1,
+  "query_sha256": "f851057861c55980d4aeb114a8cf230ca7203ad1f3f2d86ca905004f833627c5",
+  "phase": "attach_market_before_begin_and_aggregate_reads",
+  "error_type": "sqlite3.OperationalError",
+  "error_message": "unable to open database file",
+  "exit_code": 1,
+  "duration_seconds": 0.059626763,
+  "aggregate_result_created": false,
+  "production_writes": false,
+  "provider_calls": 0,
+  "credentials_or_body_queries": false,
+  "filesystem_boundary": "bwrap read-only root; only the plan scratch output directory writable; network namespace isolated",
+  "after_failure_metadata_only": {
+    "profile_db": "regular file, 65847296 bytes, mode 600",
+    "profile_wal": "absent",
+    "profile_shm": "absent",
+    "market_db": "regular file, 3828281344 bytes, mode 644",
+    "market_wal": "regular file, 0 bytes, mode 644",
+    "market_shm": "regular file, 32768 bytes, mode 644"
+  },
+  "interpretation": "No row counts or schema/reference conclusions were obtained. WAL coordination initialization is a hypothesis, not an identified production file failure. No retry, immutable read, checkpoint, backup or write-mode fallback was attempted."
+}

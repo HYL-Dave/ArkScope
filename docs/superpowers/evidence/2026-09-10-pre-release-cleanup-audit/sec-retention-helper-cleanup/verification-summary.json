@@ -1,0 +1,167 @@
+{
+  "backend": {
+    "added": 54,
+    "added_by_file": {
+      "tests/test_lifecycle_journal_codec.py": 43,
+      "tests/test_security_lifecycle_review_routes.py": 1,
+      "tests/test_security_lifecycle_routes.py": 10
+    },
+    "added_nodeids": [
+      "tests/test_lifecycle_journal_codec.py::test_canonical_json_can_preserve_utf8_without_ascii_expansion",
+      "tests/test_lifecycle_journal_codec.py::test_canonical_json_matches_literal_journal_bytes[ascii-escaping]",
+      "tests/test_lifecycle_journal_codec.py::test_canonical_json_matches_literal_journal_bytes[control-escaping]",
+      "tests/test_lifecycle_journal_codec.py::test_canonical_json_matches_literal_journal_bytes[nested-key-sort-compact]",
+      "tests/test_lifecycle_journal_codec.py::test_canonical_json_matches_literal_journal_bytes[null]",
+      "tests/test_lifecycle_journal_codec.py::test_canonical_json_matches_literal_journal_bytes[scalar-array]",
+      "tests/test_lifecycle_journal_codec.py::test_canonical_json_matches_literal_journal_bytes[unicode-key-sort]",
+      "tests/test_lifecycle_journal_codec.py::test_digest_json_matches_literal_utf8_sha256[ascii-escaping]",
+      "tests/test_lifecycle_journal_codec.py::test_digest_json_matches_literal_utf8_sha256[control-escaping]",
+      "tests/test_lifecycle_journal_codec.py::test_digest_json_matches_literal_utf8_sha256[nested-key-sort-compact]",
+      "tests/test_lifecycle_journal_codec.py::test_digest_json_matches_literal_utf8_sha256[null]",
+      "tests/test_lifecycle_journal_codec.py::test_digest_json_matches_literal_utf8_sha256[scalar-array]",
+      "tests/test_lifecycle_journal_codec.py::test_digest_json_matches_literal_utf8_sha256[unicode-key-sort]",
+      "tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.adoption-names1]",
+      "tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.agent-names2]",
+      "tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.disposal-names5]",
+      "tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.migration-names4]",
+      "tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.store-names0]",
+      "tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.target-names3]",
+      "tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_review-names7]",
+      "tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]",
+      "tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[ticker_identity_history-names8]",
+      "tests/test_lifecycle_journal_codec.py::test_neutral_journal_codec_owns_public_functions",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[canonical-nested-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[canonical-nested-nan]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[canonical-nested-negative-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[canonical-scalar-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[canonical-scalar-nan]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[canonical-scalar-negative-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[digest-nested-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[digest-nested-nan]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[digest-nested-negative-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[digest-scalar-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[digest-scalar-nan]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[digest-scalar-negative-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[utf8-nested-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[utf8-nested-nan]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[utf8-nested-negative-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[utf8-scalar-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[utf8-scalar-nan]",
+      "tests/test_lifecycle_journal_codec.py::test_nonfinite_numbers_are_rejected_before_journaling[utf8-scalar-negative-infinity]",
+      "tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_json]",
+      "tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_sha]",
+      "tests/test_security_lifecycle_review_routes.py::test_existing_case_readers_do_not_export_private_confirmation[audit_local]",
+      "tests/test_security_lifecycle_routes.py::test_active_case_readers_share_closed_projection_and_compact_listing_dto",
+      "tests/test_security_lifecycle_routes.py::test_actual_app_excludes_unused_lifecycle_http_entry[case-audit]",
+      "tests/test_security_lifecycle_routes.py::test_actual_app_excludes_unused_lifecycle_http_entry[case-automation]",
+      "tests/test_security_lifecycle_routes.py::test_actual_app_excludes_unused_lifecycle_http_entry[current-review-detail]",
+      "tests/test_security_lifecycle_routes.py::test_actual_app_excludes_unused_lifecycle_http_entry[evidence-translation]",
+      "tests/test_security_lifecycle_routes.py::test_actual_app_excludes_unused_lifecycle_http_entry[review-confirmation]",
+      "tests/test_security_lifecycle_routes.py::test_case_readers_omit_one_malformed_listing_without_losing_the_case_or_other_evidence",
+      "tests/test_security_lifecycle_routes.py::test_global_automation_run_reconciles_a_stale_running_row_after_lock_acquisition",
+      "tests/test_security_lifecycle_routes.py::test_local_audit_and_ai_share_one_exact_closed_automation_run_projection",
+      "tests/test_security_lifecycle_routes.py::test_operator_detail_reaches_local_audit_and_ai_tool_identically"
+    ],
+    "baseline": 7953,
+    "collected": 7983,
+    "executed_unique": 7983,
+    "removed": 24,
+    "removed_by_file": {
+      "tests/test_card_execution_authority.py": 1,
+      "tests/test_security_lifecycle_current_routes.py": 1,
+      "tests/test_security_lifecycle_review_routes.py": 1,
+      "tests/test_security_lifecycle_routes.py": 13,
+      "tests/test_security_lifecycle_translation.py": 8
+    },
+    "removed_nodeids": [
+      "tests/test_card_execution_authority.py::test_direct_evidence_translation_caller_keeps_captured_effort_and_auth",
+      "tests/test_security_lifecycle_current_routes.py::test_unknown_current_review_is_not_found",
+      "tests/test_security_lifecycle_review_routes.py::test_existing_case_readers_do_not_export_private_confirmation[audit_api]",
+      "tests/test_security_lifecycle_routes.py::test_active_case_routes_share_closed_projection_and_compact_listing_dto",
+      "tests/test_security_lifecycle_routes.py::test_case_automation_run_dispatches_exact_attended_authority",
+      "tests/test_security_lifecycle_routes.py::test_case_automation_run_materializes_a_source_only_case_in_the_worker",
+      "tests/test_security_lifecycle_routes.py::test_case_automation_run_reconciles_a_stale_running_row_after_lock_acquisition",
+      "tests/test_security_lifecycle_routes.py::test_case_automation_run_returns_409_on_real_flock_collision",
+      "tests/test_security_lifecycle_routes.py::test_evidence_translation_route_caches_and_returns_typed_provenance",
+      "tests/test_security_lifecycle_routes.py::test_evidence_translation_route_reports_selected_route_without_fallback",
+      "tests/test_security_lifecycle_routes.py::test_evidence_translation_route_reports_unresolvable_route_without_provider_call",
+      "tests/test_security_lifecycle_routes.py::test_evidence_translation_route_validates_before_permission_and_masks_failures",
+      "tests/test_security_lifecycle_routes.py::test_http_and_ai_share_one_exact_closed_automation_run_projection",
+      "tests/test_security_lifecycle_routes.py::test_manual_run_reports_profile_config_store_failure_as_typed_503[/security-lifecycle/cases/{case_id}/automation/run]",
+      "tests/test_security_lifecycle_routes.py::test_operator_detail_reaches_http_ai_tool_and_ui_identically",
+      "tests/test_security_lifecycle_routes.py::test_routes_omit_one_malformed_listing_without_losing_the_case_or_other_evidence",
+      "tests/test_security_lifecycle_translation.py::test_lifecycle_persistence_keeps_its_16000_character_boundary",
+      "tests/test_security_lifecycle_translation.py::test_listing_snapshot_translation_rejects_before_every_downstream_boundary",
+      "tests/test_security_lifecycle_translation.py::test_translation_cache_is_bound_to_evidence_hash_and_locale",
+      "tests/test_security_lifecycle_translation.py::test_translation_failure_detail_is_closed_bounded_and_message_free",
+      "tests/test_security_lifecycle_translation.py::test_translation_failure_leaves_authoritative_evidence_and_case_unchanged",
+      "tests/test_security_lifecycle_translation.py::test_translation_preserves_safe_typed_provider_failure",
+      "tests/test_security_lifecycle_translation.py::test_translation_rejects_unsupported_locale_and_malformed_output",
+      "tests/test_security_lifecycle_translation.py::test_translation_runs_without_write_transaction_and_rechecks_evidence"
+    ],
+    "skips": [
+      {
+        "nodeid": "tests/test_detailed_financials.py::TestLiveTechMetrics::test_nvda_tech_metrics",
+        "reason": "Live SEC EDGAR test \u2014 run manually"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_connection",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_scanner_parameters",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_basic_stock_scan",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_option_volume_scan",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_iv_scan",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_put_call_ratio_scan",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_unusual_activity",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_option_filter",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_ibkr_scanner.py::test_option_quote",
+        "reason": "manual test script \u2014 requires IBKR TWS"
+      },
+      {
+        "nodeid": "tests/test_option_chain_tools.py::TestLiveOptionChain::test_spy_option_chain",
+        "reason": "Live IBKR test \u2014 run manually"
+      },
+      {
+        "nodeid": "tests/test_peer_comparison.py::TestLivePeerComparison::test_nvda_peer_comparison",
+        "reason": "Live SEC EDGAR test \u2014 run manually"
+      }
+    ],
+    "states": {
+      "passed": 7971,
+      "skipped": 12
+    }
+  },
+  "frontend": {
+    "errors": 0,
+    "failures": 0,
+    "same_final_baseline_ids": true,
+    "stderr_changed": [],
+    "tests": 1692
+  },
+  "production_disposition_performed": false,
+  "provider_calls": 0,
+  "source_head": "0c5896a561fb8397daa79e60d4f1c80cb299463b"
+}

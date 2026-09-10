@@ -1,8 +1,10 @@
 # SEC Cleanup Schema Ownership Checkpoint
 
-Source-only inspection for the entrypoint cleanup plan, starting at `df97352b`.
-No production counts are asserted here. Current-store read authorization and a
-digest-bound disposal approval are separate from source-code removal.
+Source ownership inspection started at `df97352b`; the September 11 helper
+checkpoint below updates completed source removals. No production counts are
+asserted here: the single authorized read failed before inventory queries.
+Current-store read authorization and digest-bound disposal approval are separate
+from source-code removal.
 
 ## What Can Disappear Without A Data Conversion
 
@@ -56,9 +58,11 @@ This is an actionable remainder, not a reason to preserve dead execution forever
   `complete`/`fail`, recovery and `JournalControl` need a separate exact-caller
   disposition after removing the old controller. A live reader does not make
   every writer in the same module live.
-- `_json`/`_sha` from that old store are imported by current agent, target,
-  store, adoption, disposal and history. Move the shared canonical encoding and
-  digest primitive without changing bytes before removing the old module.
+- Shared canonical encoding/digests were extracted to
+  `src.lifecycle_journal_codec` in `5d41f570`, with exact bytes preserved.
+  `58e1929b` additionally guards against reintroducing the old `_json`/`_sha`
+  exports or imports. This dependency is resolved; it does not resolve the
+  old store's live validated readers or `WebJournalError` ownership.
 - `lifecycle_web_review` is still used by current investigation confirmation,
   `security_lifecycle_review` and `ticker_identity_transition`. Move current
   freshness, provider veto, adoption and acceptance/transition guards together.
@@ -71,8 +75,8 @@ This is an actionable remainder, not a reason to preserve dead execution forever
   confirmation also use some case-based services. Removing unmounted UI does
   not authorize removing all case APIs or their shared assessment schema.
 
-After the old UI/client deletion at `302106d2`, the repeatable census adds five
-HTTP no-frontend-match candidates to this same C04 extraction queue:
+After the old UI/client deletion at `302106d2`, five HTTP candidates were
+individually checked and removed in `0c5896a5`:
 
 - `GET /security-lifecycle/cases/{case_id}/audit`
 - `GET /security-lifecycle/reviews/{review_id}`
@@ -80,13 +84,21 @@ HTTP no-frontend-match candidates to this same C04 extraction queue:
 - `POST /security-lifecycle/cases/{case_id}/automation/run`
 - `GET /security-lifecycle/review-confirmations/{transition_id}`
 
-These endpoints still exist; their lost frontend match is not a claim that their
-underlying services, schemas or history readers are disposable. The next source
-step must check actual tool/operator consumers, delete unused endpoint handlers,
-and transfer any current reader/confirmation tests before removing supporting
-services. Do not describe these five as already removed, or preserve them forever
-merely because tests exercise them. This is distinct from approval to delete
-production rows or tables.
+The measured App inventory changed from 221 to 216 entries, with no other route
+change. Current tool review, provider confirmation, history, global automation,
+acknowledgement and reversal remain. Six integrity test owners were moved to
+their actual service/tool/global route, not weakened to assert a missing route.
+The old translation orchestrator and its exclusive store methods were also
+deleted after losing their final runtime caller. AI-card/content translation
+and the historical `list_evidence` translation JOIN remain. The current census
+cannot prepare that JOIN because its synthetic union schema lacks the joined
+evidence table; its nine table/column candidates are not deletion evidence.
+
+The unused confirmation-service forwarding method left by the route removal was
+removed in `e61accaf`, with six existing test readbacks transferred. The real `_result`
+and `confirmation_for` receipt readers remain current. See
+[helper cleanup evidence](sec-retention-helper-cleanup/README.md) for checkpoint
+heads, exact test accounting and the remaining production read boundary.
 
 Current old-web declarations name seven tables (`installation`, `runs`, `calls`,
 `actions`, `pages`, `results`, `acceptances`), an active-case unique index and
@@ -98,6 +110,13 @@ The two old schedule keys are `schedule.sec_corporate_actions.enabled` and
 separate owners and must not be deleted by a broad string-prefix match.
 
 ## Next Actual-Store Manifest
+
+The first authorized attempt used read-only SQLite URIs and a nonwritable
+filesystem view. It failed at ATTACH before any inventory query; absent WAL/SHM
+coordination files are a reproduced synthetic explanation, not a proven
+production diagnosis. No row counts, empty-table finding or reference closure
+were obtained. No second read or coordination-file write is authorized by that
+failure; the user was asked about this narrow SQLite coordination requirement.
 
 1. Resolve only the named market/profile stores, open `mode=ro`, set `query_only`,
    and capture consistent schema/row-count/reference bounds. No credentials,

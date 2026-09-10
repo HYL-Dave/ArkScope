@@ -1,0 +1,24 @@
+# Task 3: Remove Five Unused HTTP Entries
+
+Read these exact requirements first. Parent plan: docs/superpowers/plans/2026-09-10-sec-retention-inventory-and-helper-cleanup.md, Task3. Worktree /tmp/arkscope-listing-sec-macro-convergence. Base will be supplied at dispatch after codec commit/review. No subagents.
+
+Remove exactly:
+GET /security-lifecycle/cases/{case_id}/audit
+GET /security-lifecycle/reviews/{review_id}
+POST /security-lifecycle/evidence/{evidence_id}/translations
+POST /security-lifecycle/cases/{case_id}/automation/run
+GET /security-lifecycle/review-confirmations/{transition_id}
+
+Files: src/api/routes/security_lifecycle.py, src/api/routes/ticker_identity.py, route-exclusive DTO/imports/helpers; src/security_lifecycle_translation.py (delete); src/security_lifecycle_investigation.py exclusive translation methods (get_evidence_translation/assert_translation_write_available/save_evidence_translation). Exact source search confirmed the route is the translation module's sole runtime caller. Delete _translate_evidence_text and EvidenceTranslationRequest. Do not leave retired/no-op/forwarding wrappers. No DB schema/data change; retain translation table until disposition.
+
+Preserve actual consumers: registry/tool get_security_lifecycle_review -> service.get_current_review; tool/local case readers; current provider prepare/confirm-review; target investigation/confirm/history; transition-activity/ack/reverse/retry; global /automation/run; all underlying confirmation integrity. Same-name services are not automatically dead because an HTTP entry disappears. No other route removal in this task. Do not delete unrelated helpers just because local grep misses dynamically registered users.
+
+TDD: baseline exact affected suites and node IDs. Add named actual-App absence owner for five method/path pairs, plus positive current routes. RED before implementation. Both exact App route counts should become216 from221 only after actual inventory proves exactlyfive removals. Restoring one old registration must fail its named owner. Do not use test fixtures that need provider/config/production.
+
+Test collateral: tests/test_api.py includes exact case-automation inventory; test_security_lifecycle_routes.py has counts, old audit/translation/automation route calls; test_security_lifecycle_current_routes.py list+detail case must retain list/no-write controls while removing old detail; do not preserve its unknown-ID check as a vacuous404 of an absent route. test_security_lifecycle_review_routes.py retry test must preserve action/state/no-write assertions and use existing real service/history read for the receipt instead of deleting that coverage. Remove obsolete tests/test_security_lifecycle_translation.py with full node accounting; preserve shared content_translation_failures/active card translation tests. test_security_lifecycle_tools.py has one old translation caller near959; test_card_execution_authority.py has one old _translate_evidence_text adapter case near440. Shared model/auth routing owners must stay unchanged. Move unique coverage only if it protects a still-live behavior; don't retain dead code for tests.
+
+Important parent source clarification: SecurityLifecycleInvestigationStore.list_evidence still directly reads stored translations via SQL JOIN, and the active case tool projects their provenance WITHOUT translated_text. Preserve that reader and the test_case_detail_projects_original_evidence_with_derived_translations assertions. Replace only its fixture setup via the deleted orchestrator with a synthetic direct INSERT of the historical translation row. It is a live read/privacy owner, NOT an old-only test to delete. Row/schema disposal remains future work, even if production inventory reports no translations.
+
+Baseline/final through this plan's offline_pytest.py using env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state and /home/hyl/.virtualenvs/llm_app/bin/python -B. XML inside plan scratch, include whole API and affected lifecycle/identity/tool/routing suites. No provider, production DB/config/credential reads, App startup/lifespan with real state, installs, schema writes outside fixtures, merge/push. Real App route construction through isolated existing fixtures is allowed.
+
+Use apply_patch, commit only scoped product/test files, do not stage parent plan/docs/evidence. Report task3-report.md: immutable base/head, exact files, removed/added node identities, intermediate/RED/GREEN/mutation/restored outputs, residual concerns. Parent independently handles authorized statistics inventory and final evidence. Return concise status/commit/report path.

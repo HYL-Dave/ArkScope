@@ -1,0 +1,169 @@
+{
+  "base": "0c5896a561fb8397daa79e60d4f1c80cb299463b",
+  "head": "e61accaf4d5e85e7e313160b090db4f9b61f2275",
+  "worktree": "/tmp/arkscope-listing-sec-macro-convergence",
+  "files": [
+    "src/ticker_identity_service.py",
+    "tests/test_security_lifecycle_review.py",
+    "tests/test_security_lifecycle_review_routes.py"
+  ],
+  "completed_full_suites": {
+    "tests/test_lifecycle_investigation_review.py": 6,
+    "tests/test_lifecycle_investigation_routes.py": 31,
+    "tests/test_security_lifecycle_current.py": 44,
+    "tests/test_security_lifecycle_current_routes.py": 7,
+    "tests/test_security_lifecycle_review.py": 65,
+    "tests/test_security_lifecycle_review_routes.py": 22,
+    "tests/test_security_lifecycle_routes.py": 38,
+    "tests/test_ticker_identity_history.py": 25,
+    "tests/test_ticker_identity_routes.py": 9,
+    "tests/test_ticker_identity_transition.py": 46
+  },
+  "final_restored_xml": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-restored.xml",
+  "final_restored_log": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-restored.log",
+  "accounting": {
+    "baseline": 292,
+    "restored": 293,
+    "added": [
+      "tests/test_security_lifecycle_review.py::test_identity_service_has_no_unused_review_confirmation_facade"
+    ],
+    "removed": [],
+    "renamed": [],
+    "existing_test_call_sites_retargeted": 6
+  },
+  "runs": [
+    {
+      "name": "baseline",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv --basetemp=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state/pytest/baseline $(< .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-suites.txt) --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-baseline.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-baseline.log 2>&1",
+      "exit_code": 1,
+      "classification": "harness_setup_failure",
+      "result": {
+        "tests": 292,
+        "failures": 0,
+        "errors": 292,
+        "skipped": 0,
+        "passed": 0,
+        "seconds": "5.166"
+      },
+      "log": "task3-facade-baseline.log",
+      "xml": "task3-facade-baseline.xml"
+    },
+    {
+      "name": "baseline-retry",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv --basetemp=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state/pytest/baseline-retry $(< .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-suites.txt) --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-baseline-retry.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-baseline-retry.log 2>&1",
+      "exit_code": 0,
+      "classification": "scoped_test_run",
+      "result": {
+        "tests": 292,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 292,
+        "seconds": "62.138"
+      },
+      "log": "task3-facade-baseline-retry.log",
+      "xml": "task3-facade-baseline-retry.xml"
+    },
+    {
+      "name": "red",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv --basetemp=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state/pytest/red tests/test_security_lifecycle_review.py::test_identity_service_has_no_unused_review_confirmation_facade --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-red.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-red.log 2>&1",
+      "exit_code": 1,
+      "classification": "product_RED",
+      "result": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0,
+        "seconds": "0.506"
+      },
+      "log": "task3-facade-red.log",
+      "xml": "task3-facade-red.xml"
+    },
+    {
+      "name": "green",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv --basetemp=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state/pytest/green $(< .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-suites.txt) --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-green.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-green.log 2>&1",
+      "exit_code": 0,
+      "classification": "scoped_test_run",
+      "result": {
+        "tests": 293,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 293,
+        "seconds": "62.605"
+      },
+      "log": "task3-facade-green.log",
+      "xml": "task3-facade-green.xml"
+    },
+    {
+      "name": "mutation",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv --basetemp=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state/pytest/mutation tests/test_security_lifecycle_review.py::test_identity_service_has_no_unused_review_confirmation_facade --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-mutation.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-mutation.log 2>&1",
+      "exit_code": 1,
+      "classification": "mutation_killed",
+      "result": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0,
+        "seconds": "0.499"
+      },
+      "log": "task3-facade-mutation.log",
+      "xml": "task3-facade-mutation.xml"
+    },
+    {
+      "name": "restored",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv --basetemp=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state/pytest/restored $(< .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-suites.txt) --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-restored.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-facade-restored.log 2>&1",
+      "exit_code": 0,
+      "classification": "scoped_test_run",
+      "result": {
+        "tests": 293,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 293,
+        "seconds": "62.055"
+      },
+      "log": "task3-facade-restored.log",
+      "xml": "task3-facade-restored.xml"
+    }
+  ],
+  "initial_harness_failure": {
+    "product_RED": false,
+    "cause": "The custom nested basetemp's parent facade-state/pytest did not exist. tests/conftest.py::_isolate_agent_local_config called tmp_path_factory.mktemp, whose basetemp Path.mkdir() does not create missing parents; it raised FileNotFoundError for facade-state/pytest/baseline before any test body.",
+    "error_path": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state/pytest/baseline",
+    "recovery_command": "mkdir -p .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/facade-state/pytest",
+    "evidence_preserved": [
+      "task3-facade-baseline.log",
+      "task3-facade-baseline.xml"
+    ],
+    "successful_retry": [
+      "task3-facade-baseline-retry.log",
+      "task3-facade-baseline-retry.xml"
+    ]
+  },
+  "mutation": {
+    "change": "Temporarily restored the original get_review_confirmation method, including its import and _result(self, transition_id) forwarding body.",
+    "killed_by": "tests/test_security_lifecycle_review.py::test_identity_service_has_no_unused_review_confirmation_facade",
+    "pre_mutation_service_blob": "266db245dd54398f0ed73eaf3e7df90b9d88f6ff",
+    "restored_service_blob": "266db245dd54398f0ed73eaf3e7df90b9d88f6ff",
+    "byte_identical": true
+  },
+  "preservation": {
+    "unchanged_owners": [
+      "src.security_lifecycle_review._result",
+      "src.security_lifecycle_review.confirmation_for"
+    ],
+    "scope": "Only the facade deletion, two direct imports, six call-site replacements, and one absence owner. All pre-existing test names and assertions retained.",
+    "no_changes": "No HTTP, schema, codec, data, unrelated helper or configuration changes.",
+    "post_commit": "Head announced immediately after commit; only scratch report/evidence writes afterward."
+  },
+  "commands": {
+    "commit": "git -c core.hooksPath=/dev/null commit --only --no-gpg-sign -m \"Remove unused review confirmation facade\" -- src/ticker_identity_service.py tests/test_security_lifecycle_review.py tests/test_security_lifecycle_review_routes.py",
+    "whitespace": "git diff --check -- src/ticker_identity_service.py tests/test_security_lifecycle_review.py tests/test_security_lifecycle_review_routes.py",
+    "unchanged_live_owners": "git diff --exit-code 0c5896a561fb8397daa79e60d4f1c80cb299463b -- src/security_lifecycle_review.py src/security_lifecycle_current.py src/ticker_identity_history.py src/ticker_identity_transition.py src/api/routes/security_lifecycle.py src/api/routes/ticker_identity.py src/security_lifecycle_schema.py src/lifecycle_journal_codec.py",
+    "post_commit_source_identity": "git diff --exit-code e61accaf4d5e85e7e313160b090db4f9b61f2275 -- src/ticker_identity_service.py tests/test_security_lifecycle_review.py tests/test_security_lifecycle_review_routes.py"
+  },
+  "boundaries": "Fixture-only offline tests, unique basetemp per run under facade-state/pytest. No live provider calls or production DB/config/.env/credential access; no App startup with real state, installs, subagents, merge/push, whole-backend duplicate, or parent collection/census work. Parent documentation/evidence edits left untouched."
+}

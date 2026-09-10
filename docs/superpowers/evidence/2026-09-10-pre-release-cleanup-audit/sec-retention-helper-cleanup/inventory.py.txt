@@ -1,0 +1,246 @@
+"""One-time, statistics-only SEC retention inspection. Not a product CLI."""
+from collections import defaultdict
+from contextlib import contextmanager
+from datetime import datetime, timezone
+import hashlib
+import json
+from pathlib import Path
+import sqlite3
+import time
+
+
+PROFILE = frozenset({
+    "security_lifecycle_cases", "security_lifecycle_investigation_runs",
+    "security_lifecycle_evidence", "security_lifecycle_assessments",
+    "security_lifecycle_assessment_outcomes", "security_lifecycle_assessment_evidence",
+    "security_lifecycle_case_acknowledgements", "security_lifecycle_action_proposals",
+    "security_lifecycle_migration_receipts", "security_lifecycle_automation_runs",
+    "security_lifecycle_automation_run_blockers", "security_lifecycle_automation_facts",
+    "security_lifecycle_evidence_translations", "security_lifecycle_provider_checks",
+    "lifecycle_web_installation", "lifecycle_web_runs", "lifecycle_web_calls",
+    "lifecycle_web_actions", "lifecycle_web_pages", "lifecycle_web_results", "lifecycle_web_acceptances",
+    "lifecycle_investigation_installation", "lifecycle_investigation_jobs",
+    "lifecycle_investigation_calls", "lifecycle_investigation_steps",
+    "lifecycle_investigation_sources", "lifecycle_investigation_results",
+    "lifecycle_investigation_acceptances", "lifecycle_investigation_runtime",
+    "lifecycle_legacy_disposal_receipts", "ticker_identity_transitions",
+    "ticker_identity_transition_attempts", "ticker_identity_links", "ticker_identity_transition_activity",
+    "sa_tracking_memberships", "sa_tracking_bindings", "sa_tracking_events",
+})
+MARKET = frozenset({"security_lifecycle_observations", "security_lifecycle_observation_kinds"})
+OWNED = {"main": PROFILE, "market": MARKET}
+FIELDS = frozenset({
+    "case_id", "assessment_id", "evidence_id", "run_id", "call_id", "automation_run_id",
+    "transition_id", "observation_id", "id", "membership_id", "source", "source_ref", "ticker",
+    "status", "accepted_at", "acceptance_authority", "removed_at", "current_tracking",
+    "content_sha256", "evidence_content_sha256",
+})
+SCHEDULE_KEYS = ("schedule.sec_corporate_actions.enabled", "schedule.sec_corporate_actions.interval_minutes")
+
+
+def q(name):
+    return '"' + name.replace('"', '""') + '"'
+
+
+def at():
+    return datetime.now(timezone.utc).isoformat()
+
+
+class Policy:
+    def __init__(self):
+        self.references = set()
+        self.reads = set()
+
+    def __call__(self, action, arg1, arg2, database, origin):
+        allowed = False
+        if action == sqlite3.SQLITE_SELECT:
+            allowed = True
+        elif action == sqlite3.SQLITE_TRANSACTION:
+            allowed = arg1 in {"BEGIN", "ROLLBACK"}
+        elif action == sqlite3.SQLITE_FUNCTION:
+            allowed = arg2 in {"count", "sum", "coalesce"}
+        elif action == sqlite3.SQLITE_PRAGMA:
+            allowed = arg1 in {"table_info", "foreign_key_list", "index_list", "index_info"} or (
+                arg1 in {"schema_version", "data_version", "query_only"} and arg2 is None)
+        elif action == sqlite3.SQLITE_READ:
+            allowed = (
+                arg1 in {"sqlite_master", "sqlite_schema"} and arg2 in {"name", "type", "tbl_name", "sql", ""}
+            ) or (
+                arg1 in OWNED.get(database, ()) and arg2 in FIELDS | {""}
+            ) or (
+                database == "main" and arg1 == "profile_settings" and arg2 in {"key", ""}
+            ) or (
+                database == "main" and arg1 == "scheduler_state" and arg2 in {"source", ""}
+            ) or (
+                database == "main" and arg1 == "job_runs" and arg2 in {"job_name", ""}
+            ) or (database, arg1, arg2) in self.references
+            if allowed:
+                self.reads.add((database or "", arg1 or "", arg2 or ""))
+        return sqlite3.SQLITE_OK if allowed else sqlite3.SQLITE_DENY
+
+
+@contextmanager
+def open_inventory(profile, market, policy=None):
+    # No application imports, environment resolution or immutable=1/WAL bypass.
+    conn = sqlite3.connect(Path(profile).resolve().as_uri() + "?mode=ro", uri=True, timeout=5)
+    try:
+        conn.execute("PRAGMA query_only=ON")
+        conn.execute("ATTACH DATABASE ? AS market", (Path(market).resolve().as_uri() + "?mode=ro",))
+        conn.set_authorizer(policy or Policy())
+        deadline = time.monotonic() + 30
+        conn.set_progress_handler(lambda: int(time.monotonic() > deadline), 10000)
+        conn.execute("BEGIN")
+        yield conn
+    finally:
+        conn.close()
+
+
+def columns(conn, db, table):
+    return [{"name": row[1], "type": row[2], "not_null": bool(row[3]), "pk_order": row[5]}
+            for row in conn.execute(f"PRAGMA {q(db)}.table_info({q(table)})")]
+
+
+def names(conn, db):
+    return {row[0] for row in conn.execute(f"SELECT name FROM {q(db)}.sqlite_master WHERE type='table'")}
+
+
+def scalar(conn, sql, params=()):
+    result = conn.execute(sql, params).fetchone()[0]
+    if type(result) is not int or result < 0:
+        raise ValueError("invalid_aggregate")
+    return result
+
+
+def available(conn, db, table, fields):
+    return set(fields) <= {column["name"] for column in columns(conn, db, table)}
+
+
+def reference_inventory(conn, db, present, policy):
+    result = []
+    for child in sorted(present):
+        groups = defaultdict(list)
+        for row in conn.execute(f"PRAGMA {q(db)}.foreign_key_list({q(child)})"):
+            groups[row[0]].append(row)
+        for fk_id, group in sorted(groups.items()):
+            group.sort(key=lambda row: row[1])
+            parent = group[0][2]
+            if child not in OWNED[db] and parent not in OWNED[db]:
+                continue
+            pairs = [(row[3], row[4]) for row in group]
+            edge = {"child": child, "parent": parent, "fk_id": fk_id, "columns": pairs,
+                    "external_child": child not in OWNED[db]}
+            result.append(edge)
+            if parent not in present:
+                edge.update(status="unavailable", reason="parent_table_absent")
+                continue
+            if any(not a or not b or a not in FIELDS or b not in FIELDS for a, b in pairs):
+                edge.update(status="unavailable", reason="reference_columns_out_of_scope")
+                continue
+            for a, b in pairs:
+                policy.references.add((db, child, a))
+                policy.references.add((db, parent, b))
+            policy.references.update({(db, child, ""), (db, parent, "")})
+            # Unary + drops child expression affinity; FK matching uses the parent.
+            join = " AND ".join(f"p.{q(b)}=+c.{q(a)}" for a, b in pairs)
+            nonnull = " AND ".join(f"c.{q(a)} IS NOT NULL" for a, _ in pairs)
+            exists = f"EXISTS(SELECT 1 FROM {q(db)}.{q(parent)} p WHERE {join})"
+            base = f"SELECT count(*) FROM {q(db)}.{q(child)} c WHERE "
+            edge.update(status="observed",
+                matched_rows=scalar(conn, base + f"({nonnull}) AND {exists}"),
+                orphan_rows=scalar(conn, base + f"({nonnull}) AND NOT {exists}"),
+                nullable_rows=scalar(conn, base + f"NOT ({nonnull})"))
+    return result
+
+
+def store_inventory(conn, db, policy):
+    started = at()
+    present = names(conn, db)
+    tables = {}
+    for table in sorted(OWNED[db]):
+        if table not in present:
+            tables[table] = {"status": "absent"}
+            continue
+        objects = list(conn.execute(f"SELECT type,name,sql FROM {q(db)}.sqlite_master WHERE tbl_name=? ORDER BY type,name", (table,)))
+        tables[table] = {"status": "observed", "rows": scalar(conn, f"SELECT count(*) FROM {q(db)}.{q(table)}"),
+            "columns": columns(conn, db, table),
+            "objects": [{"type": kind, "name": name, "definition_sha256": None if sql is None else hashlib.sha256(sql.encode()).hexdigest()}
+                        for kind, name, sql in objects]}
+    result = {"started_at": started, "tables": tables,
+            "schema_version": scalar(conn, f"PRAGMA {q(db)}.schema_version"),
+            "references": reference_inventory(conn, db, present, policy)}
+    result["finished_at"] = at()
+    return result
+
+
+def source_membership(conn):
+    fields = {"source", "source_ref", "ticker"}
+    if not available(conn, "main", "security_lifecycle_cases", fields) or not available(conn, "market", "security_lifecycle_observations", fields):
+        return {"status": "unavailable", "reason": "schema_columns_missing"}
+    match = "c.source=o.source AND c.source_ref=o.source_ref AND c.ticker=o.ticker"
+    observations = "market.security_lifecycle_observations o"
+    cases = "main.security_lifecycle_cases c"
+    return {
+        "matched": scalar(conn, f"SELECT count(*) FROM {observations} WHERE o.source='sec_edgar' AND EXISTS(SELECT 1 FROM {cases} WHERE {match})"),
+        "observations_only": scalar(conn, f"SELECT count(*) FROM {observations} WHERE o.source='sec_edgar' AND NOT EXISTS(SELECT 1 FROM {cases} WHERE {match})"),
+        "cases_only": scalar(conn, f"SELECT count(*) FROM {cases} WHERE c.source='sec_edgar' AND NOT EXISTS(SELECT 1 FROM {observations} WHERE {match})"),
+    }
+
+
+def classifications(conn):
+    specs = {
+        "sec_cases": ("security_lifecycle_cases", {"source"}, "source='sec_edgar'"),
+        "listing_cases": ("security_lifecycle_cases", {"source"}, "source='listing_authority'"),
+        "target_investigation_cases": ("security_lifecycle_cases", {"source"}, "source='lifecycle_investigation'"),
+        "old_web_unfinished": ("lifecycle_web_runs", {"status"}, "status IN ('queued','searching','reading_sources','analyzing','remote_outcome_unknown')"),
+        "current_unfinished": ("lifecycle_investigation_jobs", {"status"}, "status IN ('running','remote_outcome_unknown')"),
+        "human_assessments": ("security_lifecycle_assessments", {"acceptance_authority"}, "acceptance_authority='human'"),
+        "accepted_assessments": ("security_lifecycle_assessments", {"accepted_at"}, "accepted_at IS NOT NULL"),
+        "removed_memberships": ("sa_tracking_memberships", {"removed_at"}, "removed_at IS NOT NULL"),
+    }
+    result = {}
+    for key, (table, required, where) in specs.items():
+        result[key] = ({"status": "observed", "rows": scalar(conn, f"SELECT count(*) FROM {q(table)} WHERE {where}")}
+                       if available(conn, "main", table, required) else {"status": "unavailable", "reason": "schema_columns_missing"})
+    for key, table in (("sec_cases_with_transitions", "ticker_identity_transitions"),
+                       ("sec_cases_with_assessments", "security_lifecycle_assessments"),
+                       ("sec_cases_with_old_web_runs", "lifecycle_web_runs")):
+        result[key] = ({"status": "observed", "rows": scalar(conn,
+            f"SELECT count(*) FROM security_lifecycle_cases c WHERE c.source='sec_edgar' AND EXISTS(SELECT 1 FROM {q(table)} d WHERE d.case_id=c.case_id)")}
+            if available(conn, "main", table, {"case_id"}) and available(conn, "main", "security_lifecycle_cases", {"case_id", "source"})
+            else {"status": "unavailable", "reason": "schema_columns_missing"})
+    return result
+
+
+def inspect(profile, market):
+    policy = Policy()
+    result = {"format": 1, "started_at": at(), "mode": "statistics_only_read_transactions",
+        "cross_database_atomicity": False, "logical_database_writes": False, "body_or_credential_reads": False,
+        "filesystem_boundary": "enforced by the recorded caller, not by SQLite read-only flags"}
+    with open_inventory(profile, market, policy) as conn:
+        result["stores"] = {label: store_inventory(conn, db, policy) for label, db in (("profile", "main"), ("market", "market"))}
+        result["source_membership"] = source_membership(conn)
+        result["classifications"] = classifications(conn)
+        result["old_schedule_key_counts"] = {
+            key: scalar(conn, "SELECT count(*) FROM profile_settings WHERE key=?", (key,))
+            for key in SCHEDULE_KEYS} if available(conn, "main", "profile_settings", {"key"}) else {"status": "table_or_key_column_absent"}
+        result["old_runtime_counts"] = {}
+        for table, field, value in (("scheduler_state", "source", "sec_corporate_actions"),
+                                    ("job_runs", "job_name", "collect.sec_corporate_actions")):
+            result["old_runtime_counts"][table] = (scalar(conn, f"SELECT count(*) FROM {q(table)} WHERE {q(field)}=?", (value,))
+                if available(conn, "main", table, {field}) else {"status": "unavailable", "reason": "schema_columns_missing"})
+        result["authorized_column_reads"] = sorted(policy.reads)
+    result["finished_at"] = at()
+    return result
+
+
+if __name__ == "__main__":
+    import sys
+    root = Path("/mnt/md0/PycharmProjects/ArkScope/data")
+    result = inspect(root / "profile_state.db", root / "market_data.db")
+    result["source_reference_revision"] = "8c8ac738"
+    result["query_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    with Path(sys.argv[1]).open("x", encoding="utf-8") as output:
+        json.dump(result, output, indent=2, sort_keys=True)
+        output.write("\n")
+    print(json.dumps({"finished_at": result["finished_at"], "source_membership": result["source_membership"],
+        "classifications": result["classifications"], "query_sha256": result["query_sha256"]}, sort_keys=True))

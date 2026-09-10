@@ -1,0 +1,7 @@
+diff --git a/src/lifecycle_journal_codec.py b/src/lifecycle_journal_codec.py
+--- a/src/lifecycle_journal_codec.py
++++ b/src/lifecycle_journal_codec.py
+@@ -7,2 +7,2 @@
+-def canonical_json(value, *, ensure_ascii=True):
++def canonical_json(value, *, ensure_ascii=False):
+     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=ensure_ascii, allow_nan=False)

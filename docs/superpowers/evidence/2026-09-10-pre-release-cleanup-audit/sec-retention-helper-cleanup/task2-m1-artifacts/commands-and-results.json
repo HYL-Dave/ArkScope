@@ -1,0 +1,159 @@
+{
+  "pytest_runs": [
+    {
+      "label": "baseline",
+      "command": "undefined -q tests/test_lifecycle_journal_codec.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-baseline --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/baseline.xml",
+      "exit_code": 127,
+      "stdout": "/bin/bash: line 1: undefined: command not found\n"
+    },
+    {
+      "label": "baseline-copy",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state TMPDIR=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/tmp /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -q .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/baseline/tests/test_lifecycle_journal_codec.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-baseline-copy --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/baseline-copy.xml",
+      "exit_code": 0,
+      "stdout": ".........................................                                [100%]\n- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/baseline-copy.xml -\n41 passed in 0.07s\n"
+    },
+    {
+      "label": "aliases-before-m1",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state TMPDIR=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/tmp /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -q .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/tests/test_lifecycle_journal_codec_before_m1.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-aliases-before-m1 --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/aliases-before-m1.xml",
+      "exit_code": 0,
+      "stdout": ".........................................                                [100%]\n- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/aliases-before-m1.xml -\n41 passed in 0.07s\n"
+    },
+    {
+      "label": "legacy-import-use-before-m1",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state TMPDIR=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/tmp /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -q .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec_before_m1.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-legacy-import-use-before-m1 --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/legacy-import-use-before-m1.xml",
+      "exit_code": 0,
+      "stdout": ".........................................                                [100%]\n- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/legacy-import-use-before-m1.xml -\n41 passed in 0.07s\n"
+    },
+    {
+      "label": "aliases-red",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state TMPDIR=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/tmp /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -q .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/tests/test_lifecycle_journal_codec.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-aliases-red --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/aliases-red.xml",
+      "exit_code": 1,
+      "stdout": ".FF.....................................F..                              [100%]\n=================================== FAILURES ===================================\n______ test_retained_journal_does_not_export_legacy_codec_helpers[_json] _______\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/tests/test_lifecycle_journal_codec.py:60: in test_retained_journal_does_not_export_legacy_codec_helpers\n    assert not hasattr(journal, name)\nE   AssertionError: assert not True\nE    +  where True = hasattr(<module 'src.lifecycle_web_store' from '/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/src/lifecycle_web_store.py'>, '_json')\n_______ test_retained_journal_does_not_export_legacy_codec_helpers[_sha] _______\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/tests/test_lifecycle_journal_codec.py:60: in test_retained_journal_does_not_export_legacy_codec_helpers\n    assert not hasattr(journal, name)\nE   AssertionError: assert not True\nE    +  where True = hasattr(<module 'src.lifecycle_web_store' from '/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/src/lifecycle_web_store.py'>, '_sha')\n_ test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6] _\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/tests/test_lifecycle_journal_codec.py:139: in test_journal_consumers_import_the_neutral_codec_directly\n    assert not legacy_references, legacy_references\nE   AssertionError: [(483, '_json'), (484, '_sha')]\nE   assert not [(483, '_json'), (484, '_sha')]\n- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/aliases-red.xml -\n=========================== short test summary info ============================\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_json]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_sha]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/aliases/tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]\n3 failed, 40 passed in 0.35s\n"
+    },
+    {
+      "label": "definitions-red",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state TMPDIR=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/tmp /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -q .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/definitions/tests/test_lifecycle_journal_codec.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-definitions-red --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/definitions-red.xml",
+      "exit_code": 1,
+      "stdout": ".FF.....................................F..                              [100%]\n=================================== FAILURES ===================================\n______ test_retained_journal_does_not_export_legacy_codec_helpers[_json] _______\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/definitions/tests/test_lifecycle_journal_codec.py:60: in test_retained_journal_does_not_export_legacy_codec_helpers\n    assert not hasattr(journal, name)\nE   AssertionError: assert not True\nE    +  where True = hasattr(<module 'src.lifecycle_web_store' from '/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/definitions/src/lifecycle_web_store.py'>, '_json')\n_______ test_retained_journal_does_not_export_legacy_codec_helpers[_sha] _______\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/definitions/tests/test_lifecycle_journal_codec.py:60: in test_retained_journal_does_not_export_legacy_codec_helpers\n    assert not hasattr(journal, name)\nE   AssertionError: assert not True\nE    +  where True = hasattr(<module 'src.lifecycle_web_store' from '/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/definitions/src/lifecycle_web_store.py'>, '_sha')\n_ test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6] _\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/definitions/tests/test_lifecycle_journal_codec.py:132: in test_journal_consumers_import_the_neutral_codec_directly\n    assert not legacy_definitions, legacy_definitions\nE   AssertionError: [(483, '_json'), (487, '_sha')]\nE   assert not [(483, '_json'), (487, '_sha')]\n- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/definitions-red.xml -\n=========================== short test summary info ============================\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/definitions/tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_json]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/definitions/tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_sha]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/definitions/tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]\n3 failed, 40 passed in 0.40s\n"
+    },
+    {
+      "label": "legacy-import-use-red",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state TMPDIR=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/tmp /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -q .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-legacy-import-use-red --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/legacy-import-use-red.xml",
+      "exit_code": 1,
+      "stdout": ".FF...............................F.....F..                              [100%]\n=================================== FAILURES ===================================\n______ test_retained_journal_does_not_export_legacy_codec_helpers[_json] _______\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec.py:60: in test_retained_journal_does_not_export_legacy_codec_helpers\n    assert not hasattr(journal, name)\nE   AssertionError: assert not True\nE    +  where True = hasattr(<module 'src.lifecycle_web_store' from '/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/src/lifecycle_web_store.py'>, '_json')\n_______ test_retained_journal_does_not_export_legacy_codec_helpers[_sha] _______\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec.py:60: in test_retained_journal_does_not_export_legacy_codec_helpers\n    assert not hasattr(journal, name)\nE   AssertionError: assert not True\nE    +  where True = hasattr(<module 'src.lifecycle_web_store' from '/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/src/lifecycle_web_store.py'>, '_sha')\n_ test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.store-names0] _\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec.py:126: in test_journal_consumers_import_the_neutral_codec_directly\n    assert not legacy_imports, legacy_imports\nE   AssertionError: [(16, '_json', None), (16, '_sha', None)]\nE   assert not [(16, '_json', None), (16, '_sha', None)]\n_ test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6] _\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec.py:139: in test_journal_consumers_import_the_neutral_codec_directly\n    assert not legacy_references, legacy_references\nE   AssertionError: [(483, '_json'), (484, '_sha')]\nE   assert not [(483, '_json'), (484, '_sha')]\n- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/legacy-import-use-red.xml -\n=========================== short test summary info ============================\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_json]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_sha]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.store-names0]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-import-use/tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]\n4 failed, 39 passed in 0.35s\n"
+    },
+    {
+      "label": "legacy-attribute-use-red",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state TMPDIR=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/tmp /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -q .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/tests/test_lifecycle_journal_codec.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-legacy-attribute-use-red --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/legacy-attribute-use-red.xml",
+      "exit_code": 1,
+      "stdout": ".FF...............................F.....F..                              [100%]\n=================================== FAILURES ===================================\n______ test_retained_journal_does_not_export_legacy_codec_helpers[_json] _______\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/tests/test_lifecycle_journal_codec.py:60: in test_retained_journal_does_not_export_legacy_codec_helpers\n    assert not hasattr(journal, name)\nE   AssertionError: assert not True\nE    +  where True = hasattr(<module 'src.lifecycle_web_store' from '/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/src/lifecycle_web_store.py'>, '_json')\n_______ test_retained_journal_does_not_export_legacy_codec_helpers[_sha] _______\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/tests/test_lifecycle_journal_codec.py:60: in test_retained_journal_does_not_export_legacy_codec_helpers\n    assert not hasattr(journal, name)\nE   AssertionError: assert not True\nE    +  where True = hasattr(<module 'src.lifecycle_web_store' from '/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/src/lifecycle_web_store.py'>, '_sha')\n_ test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.store-names0] _\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/tests/test_lifecycle_journal_codec.py:139: in test_journal_consumers_import_the_neutral_codec_directly\n    assert not legacy_references, legacy_references\nE   AssertionError: [(52, '_sha'), (127, '_json')]\nE   assert not [(52, '_sha'), (127, '_json')]\n_ test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6] _\n.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/tests/test_lifecycle_journal_codec.py:139: in test_journal_consumers_import_the_neutral_codec_directly\n    assert not legacy_references, legacy_references\nE   AssertionError: [(483, '_json'), (484, '_sha')]\nE   assert not [(483, '_json'), (484, '_sha')]\n- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/legacy-attribute-use-red.xml -\n=========================== short test summary info ============================\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_json]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/tests/test_lifecycle_journal_codec.py::test_retained_journal_does_not_export_legacy_codec_helpers[_sha]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.store-names0]\nFAILED .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/legacy-attribute-use/tests/test_lifecycle_journal_codec.py::test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]\n4 failed, 39 passed in 0.35s\n"
+    },
+    {
+      "label": "restored-copy",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state TMPDIR=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/tmp /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -q .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/restored/tests/test_lifecycle_journal_codec.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-restored-copy --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/restored-copy.xml",
+      "exit_code": 0,
+      "stdout": "...........................................                              [100%]\n- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/restored-copy.xml -\n43 passed in 0.31s\n"
+    },
+    {
+      "label": "final",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state TMPDIR=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/tmp /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -q tests/test_lifecycle_journal_codec.py --basetemp=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/pytest/m1-final --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/final.xml",
+      "exit_code": 0,
+      "stdout": "...........................................                              [100%]\n- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts/final.xml -\n43 passed in 0.41s\n"
+    }
+  ],
+  "accounting_command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /home/hyl/.virtualenvs/llm_app/bin/python -B -c 'import json\nfrom pathlib import Path\nimport xml.etree.ElementTree as ET\n\nroot = Path(\".superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task2-state/m1/artifacts\")\nresults = {}\nnodes = {}\nfor path in sorted(root.glob(\"*.xml\")):\n    document = ET.parse(path).getroot()\n    suites = document.findall(\"testsuite\")\n    cases = document.findall(\".//testcase\")\n    assert len({case.get(\"classname\") for case in cases}) == 1\n    nodes[path.stem] = {case.get(\"name\") for case in cases}\n    assert len(nodes[path.stem]) == len(cases)\n    results[path.stem] = {\n        **{key: sum(int(suite.get(key, \"0\")) for suite in suites) for key in (\"tests\", \"failures\", \"errors\", \"skipped\")},\n        \"failed_nodes\": [case.get(\"name\") for case in cases if case.find(\"failure\") is not None],\n    }\nadded = nodes[\"final\"] - nodes[\"baseline-copy\"]\nremoved = nodes[\"baseline-copy\"] - nodes[\"final\"]\nassert not removed\nassert added == {\n    \"test_retained_journal_does_not_export_legacy_codec_helpers[_json]\",\n    \"test_retained_journal_does_not_export_legacy_codec_helpers[_sha]\",\n}\nowner_failures = added | {\n    \"test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]\",\n}\nconsumer_failure = \"test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.store-names0]\"\nfor label in (\"aliases-red\", \"definitions-red\"):\n    assert set(results[label][\"failed_nodes\"]) == owner_failures\nfor label in (\"legacy-import-use-red\", \"legacy-attribute-use-red\"):\n    assert set(results[label][\"failed_nodes\"]) == owner_failures | {consumer_failure}\nfor label, result in results.items():\n    assert result[\"errors\"] == result[\"skipped\"] == 0\n    if not label.endswith(\"-red\"):\n        assert result[\"failures\"] == 0\nassert nodes[\"restored-copy\"] == nodes[\"final\"]\nprint(json.dumps({\"results\": results, \"accounting\": {\"baseline\": len(nodes[\"baseline-copy\"]), \"final\": len(nodes[\"final\"]), \"added\": sorted(added), \"removed\": sorted(removed)}}, indent=2))\n'",
+  "accounting": {
+    "results": {
+      "aliases-before-m1": {
+        "tests": 41,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "failed_nodes": []
+      },
+      "aliases-red": {
+        "tests": 43,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "failed_nodes": [
+          "test_retained_journal_does_not_export_legacy_codec_helpers[_json]",
+          "test_retained_journal_does_not_export_legacy_codec_helpers[_sha]",
+          "test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]"
+        ]
+      },
+      "baseline-copy": {
+        "tests": 41,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "failed_nodes": []
+      },
+      "definitions-red": {
+        "tests": 43,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "failed_nodes": [
+          "test_retained_journal_does_not_export_legacy_codec_helpers[_json]",
+          "test_retained_journal_does_not_export_legacy_codec_helpers[_sha]",
+          "test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]"
+        ]
+      },
+      "final": {
+        "tests": 43,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "failed_nodes": []
+      },
+      "legacy-attribute-use-red": {
+        "tests": 43,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "failed_nodes": [
+          "test_retained_journal_does_not_export_legacy_codec_helpers[_json]",
+          "test_retained_journal_does_not_export_legacy_codec_helpers[_sha]",
+          "test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.store-names0]",
+          "test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]"
+        ]
+      },
+      "legacy-import-use-before-m1": {
+        "tests": 41,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "failed_nodes": []
+      },
+      "legacy-import-use-red": {
+        "tests": 43,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "failed_nodes": [
+          "test_retained_journal_does_not_export_legacy_codec_helpers[_json]",
+          "test_retained_journal_does_not_export_legacy_codec_helpers[_sha]",
+          "test_journal_consumers_import_the_neutral_codec_directly[lifecycle_investigation.store-names0]",
+          "test_journal_consumers_import_the_neutral_codec_directly[lifecycle_web_store-names6]"
+        ]
+      },
+      "restored-copy": {
+        "tests": 43,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "failed_nodes": []
+      }
+    },
+    "accounting": {
+      "baseline": 41,
+      "final": 43,
+      "added": [
+        "test_retained_journal_does_not_export_legacy_codec_helpers[_json]",
+        "test_retained_journal_does_not_export_legacy_codec_helpers[_sha]"
+      ],
+      "removed": []
+    }
+  }
+}

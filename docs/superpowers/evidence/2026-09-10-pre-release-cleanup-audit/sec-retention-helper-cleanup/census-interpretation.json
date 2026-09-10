@@ -1,0 +1,33 @@
+{
+  "source_head": "0c5896a5",
+  "exit_code": 2,
+  "status": "review_required_not_a_deletion_list",
+  "source_files_read": 1097,
+  "candidate_rows": 4324,
+  "uncertainty_rows": 3387,
+  "vs_original_baseline": {
+    "new_unique_candidate_ids": 197,
+    "new_unique_uncertainty_ids": 264,
+    "coverage_reductions": 32,
+    "dependency_metadata_changed": [],
+    "new_untracked_paths": [],
+    "candidate_classes": {"css": 88, "i18n": 100, "table": 1, "column": 8}
+  },
+  "vs_previous_cleanup": {
+    "five_removed_http_candidates_disappeared": true,
+    "new_candidate_ids": 9,
+    "new_data_candidate_disposition": "retain: live list_evidence reader; not authorized for deletion"
+  },
+  "source_verified_scanner_gap": {
+    "table": "security_lifecycle_evidence_translations",
+    "reader": "src/security_lifecycle_investigation.py::SecurityLifecycleInvestigationStore.list_evidence",
+    "shape": "SELECT t.* FROM translations t JOIN evidence e by evidence ID and content digest",
+    "actual_reason": "the scanner's union schema has no security_lifecycle_evidence declaration, so its in-memory EXPLAIN fails before observing the retained join read",
+    "source_only_reproduction": "OperationalError: no such table: security_lifecycle_evidence",
+    "test_owner": "tests/test_security_lifecycle_tools.py::test_case_detail_projects_original_evidence_with_derived_translations",
+    "privacy_boundary": "stored translation read retained; model-facing projection excludes translated_text",
+    "scanner_code_changed": false,
+    "follow_up": "C21 SQL inventory union-schema completeness; preserve raw uncertainties and never interpret missing preparation as a DROP authorization"
+  },
+  "limits": "New unique IDs differ from raw candidate row counts because some IDs repeat. Do not add overlapping selections or rewrite the baseline to green. Original CSS/i18n queues remain open."
+}

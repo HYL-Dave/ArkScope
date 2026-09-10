@@ -1,0 +1,200 @@
+"""Synthetic contract checks for the one-time statistics-only query."""
+import importlib.util
+import json
+from pathlib import Path
+import sqlite3
+import subprocess
+import sys
+
+import pytest
+
+
+def inspector():
+    path = Path(__file__).with_name("inventory.py")
+    assert path.is_file(), "statistics-only inspector is not implemented"
+    spec = importlib.util.spec_from_file_location("inventory", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def databases(tmp_path):
+    profile, market = tmp_path / "profile.db", tmp_path / "market.db"
+    with sqlite3.connect(profile) as conn:
+        conn.executescript("""
+        CREATE TABLE security_lifecycle_cases(case_id TEXT PRIMARY KEY,source TEXT,source_ref TEXT,ticker TEXT);
+        INSERT INTO security_lifecycle_cases VALUES('c','sec_edgar','ref','XYZ');
+        CREATE TABLE security_lifecycle_assessments(assessment_id TEXT PRIMARY KEY,case_id TEXT REFERENCES security_lifecycle_cases(case_id),accepted_at TEXT,acceptance_authority TEXT,conclusion TEXT);
+        INSERT INTO security_lifecycle_assessments VALUES('a','c',NULL,'human','PRIVATE_BODY');
+        CREATE TABLE lifecycle_web_runs(run_id TEXT PRIMARY KEY,case_id TEXT REFERENCES security_lifecycle_cases(case_id),status TEXT,header_json TEXT);
+        INSERT INTO lifecycle_web_runs VALUES('r','c','succeeded','PRIVATE_BODY');
+        CREATE TABLE lifecycle_web_calls(run_id TEXT REFERENCES lifecycle_web_runs(run_id),call_id TEXT,PRIMARY KEY(run_id,call_id));
+        INSERT INTO lifecycle_web_calls VALUES('r','search-1');
+        CREATE TABLE lifecycle_web_actions(run_id TEXT,call_id TEXT,FOREIGN KEY(run_id,call_id) REFERENCES lifecycle_web_calls(run_id,call_id));
+        INSERT INTO lifecycle_web_actions VALUES('r','search-1'),('r','missing'),(NULL,'search-1');
+        CREATE TABLE external_retention(case_id TEXT REFERENCES security_lifecycle_cases(case_id),body TEXT);
+        INSERT INTO external_retention VALUES('c','PRIVATE_BODY');
+        CREATE TABLE profile_settings(key TEXT PRIMARY KEY,value TEXT);
+        INSERT INTO profile_settings VALUES('schedule.sec_corporate_actions.enabled','PRIVATE_SETTING');
+        CREATE TABLE model_credentials(credential TEXT);
+        INSERT INTO model_credentials VALUES('PRIVATE_TOKEN');
+        CREATE TABLE scheduler_state(source TEXT PRIMARY KEY,last_result TEXT);
+        INSERT INTO scheduler_state VALUES('sec_corporate_actions','PRIVATE_RUNTIME'),('ibkr_prices','PRIVATE_RUNTIME');
+        CREATE TABLE job_runs(job_name TEXT,payload TEXT);
+        INSERT INTO job_runs VALUES('collect.sec_corporate_actions','PRIVATE_JOB'),('ibkr_prices','PRIVATE_JOB');
+        """)
+    with sqlite3.connect(market) as conn:
+        conn.executescript("""
+        CREATE TABLE security_lifecycle_observations(id INTEGER PRIMARY KEY,source TEXT,source_ref TEXT,ticker TEXT,description TEXT);
+        INSERT INTO security_lifecycle_observations VALUES(1,'sec_edgar','ref','XYZ','PRIVATE_BODY');
+        CREATE TABLE security_lifecycle_observation_kinds(observation_id INTEGER REFERENCES security_lifecycle_observations(id),event_type TEXT);
+        """)
+    return profile, market
+
+
+def test_inspector_reads_counts_not_payload_and_distinguishes_absence(tmp_path):
+    module = inspector()
+    result = module.inspect(*databases(tmp_path))
+    assert result["stores"]["profile"]["tables"]["lifecycle_web_runs"]["rows"] == 1
+    assert result["stores"]["profile"]["tables"]["lifecycle_web_results"]["status"] == "absent"
+    assert result["stores"]["market"]["tables"]["security_lifecycle_observation_kinds"]["rows"] == 0
+    assert result["source_membership"] == {"matched": 1, "observations_only": 0, "cases_only": 0}
+    assert "PRIVATE_" not in json.dumps(result)
+    assert result["old_schedule_key_counts"]["schedule.sec_corporate_actions.enabled"] == 1
+    assert result["old_runtime_counts"] == {"scheduler_state": 1, "job_runs": 1}
+
+
+def test_composite_nullable_and_external_references_are_counted(tmp_path):
+    result = inspector().inspect(*databases(tmp_path))
+    edges = result["stores"]["profile"]["references"]
+    composite = next(edge for edge in edges if edge["child"] == "lifecycle_web_actions")
+    assert composite["matched_rows"] == 1
+    assert composite["orphan_rows"] == 1
+    assert composite["nullable_rows"] == 1
+    external = next(edge for edge in edges if edge["child"] == "external_retention")
+    assert external["external_child"] is True and external["matched_rows"] == 1
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT credential FROM model_credentials",
+    "SELECT header_json FROM lifecycle_web_runs",
+    "SELECT conclusion FROM security_lifecycle_assessments",
+    "SELECT value FROM profile_settings",
+    "SELECT last_result FROM scheduler_state",
+    "SELECT payload FROM job_runs",
+    "UPDATE lifecycle_web_runs SET status='failed'",
+    "DROP TABLE lifecycle_web_runs",
+    "PRAGMA query_only=OFF",
+    "ATTACH DATABASE ':memory:' AS escape",
+])
+def test_boundary_rejects_private_columns_and_writes(tmp_path, sql):
+    module = inspector()
+    with module.open_inventory(*databases(tmp_path)) as conn:
+        with pytest.raises(sqlite3.DatabaseError):
+            conn.execute(sql).fetchall()
+
+
+def test_missing_required_columns_are_gaps_not_zero(tmp_path):
+    module = inspector()
+    profile, market = databases(tmp_path)
+    with sqlite3.connect(market) as conn:
+        conn.execute("ALTER TABLE security_lifecycle_observations RENAME COLUMN source_ref TO unknown_ref")
+    result = module.inspect(profile, market)
+    assert result["source_membership"] == {"status": "unavailable", "reason": "schema_columns_missing"}
+
+
+def test_missing_database_is_not_created(tmp_path):
+    module = inspector()
+    profile, market = databases(tmp_path)
+    missing = tmp_path / "missing.db"
+    with pytest.raises(sqlite3.OperationalError):
+        module.inspect(missing, market)
+    assert not missing.exists()
+
+
+@pytest.mark.parametrize("parent_type,parent,child_type,child,expected", [
+    ("TEXT", "01", "INTEGER", 1, 0),
+    ("INTEGER", 1, "TEXT", "01", 1),
+    ("TEXT COLLATE NOCASE", "abc", "TEXT", "ABC", 1),
+])
+def test_fk_aggregate_uses_parent_affinity_and_collation(tmp_path, parent_type, parent, child_type, child, expected):
+    module = inspector()
+    profile, market = databases(tmp_path)
+    with sqlite3.connect(profile) as conn:
+        conn.execute(f"CREATE TABLE security_lifecycle_provider_checks(id {parent_type} PRIMARY KEY)")
+        conn.execute("INSERT INTO security_lifecycle_provider_checks VALUES(?)", (parent,))
+        conn.execute(f"CREATE TABLE external_check(id {child_type} REFERENCES security_lifecycle_provider_checks(id))")
+        conn.execute("INSERT INTO external_check VALUES(?)", (child,))
+        oracle = len(conn.execute("PRAGMA foreign_key_check(external_check)").fetchall())
+    edges = module.inspect(profile, market)["stores"]["profile"]["references"]
+    edge = next(x for x in edges if x["child"] == "external_check")
+    assert edge["matched_rows"] == expected
+    assert edge["orphan_rows"] == oracle == 1 - expected
+
+
+def test_digest_composite_reference_is_measured_without_reading_translation(tmp_path):
+    module = inspector()
+    profile, market = databases(tmp_path)
+    with sqlite3.connect(profile) as conn:
+        conn.executescript("""
+        CREATE TABLE security_lifecycle_evidence(evidence_id TEXT,content_sha256 TEXT,UNIQUE(evidence_id,content_sha256));
+        INSERT INTO security_lifecycle_evidence VALUES('e','h');
+        CREATE TABLE security_lifecycle_evidence_translations(evidence_id TEXT,evidence_content_sha256 TEXT,translated_text TEXT,
+            FOREIGN KEY(evidence_id,evidence_content_sha256) REFERENCES security_lifecycle_evidence(evidence_id,content_sha256));
+        INSERT INTO security_lifecycle_evidence_translations VALUES('e','h','PRIVATE_TRANSLATION');
+        """)
+    result = module.inspect(profile, market)
+    edge = next(x for x in result["stores"]["profile"]["references"] if x["child"] == "security_lifecycle_evidence_translations")
+    assert edge["matched_rows"] == 1 and edge["orphan_rows"] == 0
+    assert "PRIVATE_TRANSLATION" not in json.dumps(result)
+
+
+def test_live_wal_snapshot_is_readable_through_nonwritable_filesystem_view(tmp_path):
+    module = inspector()
+    profile, market = databases(tmp_path)
+    writer = sqlite3.connect(profile)
+    try:
+        assert writer.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute("INSERT INTO security_lifecycle_cases VALUES('new','sec_edgar','new-ref','NEW')")
+        writer.commit()
+        paths = [profile, Path(str(profile) + "-wal"), Path(str(profile) + "-shm"), market]
+        before = {str(path): path.read_bytes() for path in paths}
+        code = '''import importlib.util,json,pathlib,sys
+spec=importlib.util.spec_from_file_location("inventory",sys.argv[1]); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+try: pathlib.Path(sys.argv[2]).open("ab")
+except OSError: pass
+else: raise AssertionError("filesystem is writable")
+print(json.dumps(m.inspect(sys.argv[2],sys.argv[3])))'''
+        result = subprocess.run(["/usr/bin/bwrap", "--ro-bind", "/", "/", "--unshare-net", "--die-with-parent",
+            sys.executable, "-B", "-c", code, str(Path(module.__file__).resolve()), str(profile), str(market)],
+            env={"PATH": "/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE": "1"}, capture_output=True, text=True, check=True)
+        observed = json.loads(result.stdout)
+        assert observed["stores"]["profile"]["tables"]["security_lifecycle_cases"]["rows"] == 2
+        assert observed["source_membership"]["cases_only"] == 1
+        assert {str(path): path.read_bytes() for path in paths} == before
+    finally:
+        writer.close()
+
+
+def test_closed_wal_without_sidecars_cannot_silently_become_empty_inventory(tmp_path):
+    module = inspector()
+    profile, market = databases(tmp_path)
+    writer = sqlite3.connect(profile)
+    assert writer.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+    writer.close()
+    assert not Path(str(profile) + "-wal").exists()
+    assert not Path(str(profile) + "-shm").exists()
+    before = {str(path): path.read_bytes() for path in (profile, market)}
+    code = '''import importlib.util,json,sqlite3,sys
+spec=importlib.util.spec_from_file_location("inventory",sys.argv[1]); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+try: m.inspect(sys.argv[2],sys.argv[3])
+except sqlite3.OperationalError as exc: print(json.dumps({"status":"unavailable","error":str(exc)}))
+else: raise AssertionError("expected readonly WAL initialization refusal")'''
+    result = subprocess.run(["/usr/bin/bwrap", "--ro-bind", "/", "/", "--unshare-net", "--die-with-parent",
+        sys.executable, "-B", "-c", code, str(Path(module.__file__).resolve()), str(profile), str(market)],
+        env={"PATH": "/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE": "1"}, capture_output=True, text=True, check=True)
+    assert json.loads(result.stdout) == {"status": "unavailable", "error": "unable to open database file"}
+    assert not Path(str(profile) + "-wal").exists()
+    assert not Path(str(profile) + "-shm").exists()
+    assert {str(path): path.read_bytes() for path in (profile, market)} == before

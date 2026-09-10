@@ -1,0 +1,80 @@
+"""Create-only accounting for this cleanup's complete offline verification."""
+from collections import Counter
+import gzip
+import json
+from pathlib import Path
+import subprocess
+import xml.etree.ElementTree as ET
+
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
+PRIOR = ROOT / "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/sec-entrypoint-cleanup"
+
+
+def xml(path):
+    content = path.read_bytes()
+    return ET.fromstring(gzip.decompress(content) if path.suffix == ".gz" else content)
+
+
+def cases(root):
+    result = {}
+    for case in root.findall(".//testcase"):
+        key = (case.get("classname"), case.get("name"))
+        assert key not in result, ("duplicate_test_identity", key)
+        result[key] = case
+    return result
+
+
+def main():
+    collected = json.loads((HERE / "backend-nodeids.json").read_text())
+    before = json.loads(gzip.decompress((PRIOR / "final-backend-nodeids.json.gz").read_bytes()))
+    keyed = {(row["classname"], row["name"]): row["nodeid"] for row in collected}
+    assert len(keyed) == len(collected), "duplicate_collection_identity"
+    ran = cases(xml(HERE / "backend-final.xml"))
+    assert ran.keys() == keyed.keys(), {
+        "missing": sorted(keyed.keys() - ran.keys()),
+        "unexpected": sorted(ran.keys() - keyed.keys()),
+    }
+    states = Counter()
+    skipped = []
+    for key, case in ran.items():
+        state = "passed"
+        for kind in ("skipped", "failure", "error"):
+            item = case.find(kind)
+            if item is not None:
+                state = kind
+                if kind == "skipped":
+                    skipped.append({"nodeid": keyed[key], "reason": item.get("message")})
+        states[state] += 1
+    old_ids, new_ids = {row["nodeid"] for row in before}, set(keyed.values())
+    removed, added = sorted(old_ids - new_ids), sorted(new_ids - old_ids)
+    old_front = cases(xml(PRIOR / "task4-verified-frontend.xml.gz"))
+    new_front = cases(xml(HERE / "frontend-final.xml"))
+    assert old_front.keys() == new_front.keys(), "frontend_test_identity_drift"
+    stderr_changed = [key for key in new_front
+                      if (new_front[key].findtext("system-err") or "") != (old_front[key].findtext("system-err") or "")]
+    source_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    result = {
+        "source_head": source_head,
+        "backend": {"collected": len(collected), "executed_unique": len(ran), "states": dict(states),
+                    "baseline": len(old_ids), "added": len(added), "removed": len(removed),
+                    "added_by_file": dict(Counter(node.split("::", 1)[0] for node in added)),
+                    "removed_by_file": dict(Counter(node.split("::", 1)[0] for node in removed)),
+                    "added_nodeids": added, "removed_nodeids": removed, "skips": skipped},
+        "frontend": {"tests": len(new_front), "same_final_baseline_ids": True,
+                     "stderr_changed": stderr_changed,
+                     "failures": sum(case.find("failure") is not None for case in new_front.values()),
+                     "errors": sum(case.find("error") is not None for case in new_front.values())},
+        "provider_calls": 0, "production_disposition_performed": False,
+    }
+    with (HERE / "verification-summary.json").open("x", encoding="utf-8") as output:
+        json.dump(result, output, indent=2, sort_keys=True)
+        output.write("\n")
+    print(json.dumps({"source_head": source_head, "backend_states": dict(states),
+                      "collected": len(collected), "added": len(added), "removed": len(removed),
+                      "frontend": result["frontend"]}, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,28 @@
+{
+  "source_head": "5d41f570",
+  "frontend_source_delta_from_plan_base": false,
+  "test_files": 119,
+  "tests": 1692,
+  "failed": 0,
+  "errors": 0,
+  "skipped": 0,
+  "baseline_artifact": "sec-entrypoint-cleanup/task4-verified-frontend.xml.gz",
+  "node_id_additions": 0,
+  "node_id_removals": 0,
+  "stderr_bearing_cases": 112,
+  "changed_stderr_cases": 0,
+  "typecheck_exit": 0,
+  "build_exit": 0,
+  "main_js_kb": 1155.31,
+  "build_warning": "main chunk exceeds 500 kB; unchanged threshold; no bundle refactor",
+  "commands": [
+    "node ../../node_modules/vitest/vitest.mjs run --reporter=junit --outputFile=<plan-scratch>/frontend-final.xml",
+    "node ../../node_modules/typescript/bin/tsc --noEmit",
+    "node ../../node_modules/vite/bin/vite.js build"
+  ],
+  "environment": "env -i; explicit Node22.14.0 PATH/interpreter; HOME=<plan-scratch>/frontend-state/home",
+  "cwd": "apps/arkscope-web",
+  "app_restart": false,
+  "provider_calls": 0,
+  "earlier_artifact_comparison": "task4-final-frontend.xml.gz had nine pre-final fixture-label differences; task4-verified-frontend.xml.gz is the matching final baseline. No test source changed in this plan."
+}

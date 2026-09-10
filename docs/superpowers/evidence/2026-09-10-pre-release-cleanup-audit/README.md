@@ -2,17 +2,21 @@
 
 Observed: 2026-09-10. Source tree: `fef26dcf` on
 `codex/listing-sec-macro-convergence`; main worktree remains separate.
-Status: **first leaf batch and bounded SEC intake/execution/UI cleanup
-implemented; remaining helpers/endpoints and data disposition stay open**.
+Status updated September 11: **first leaf batch, bounded SEC intake/execution/UI,
+neutral journal codec and five further unused HTTP entries implemented;
+remaining shared readers/helpers and data disposition stay open**.
 The original findings below are a dated source inventory, not all-complete
 status. Implementation and verification details: [leaf-cleanup.md](leaf-cleanup.md)
-and [SEC entrypoint cleanup](sec-entrypoint-cleanup/README.md).
+and [SEC entrypoint cleanup](sec-entrypoint-cleanup/README.md). The current
+[helper cleanup checkpoint](sec-retention-helper-cleanup/README.md) records
+7,971 passed/12 skipped at `0c5896a5`, separate follow-up verification, and the
+unavailable actual-store read. Do not treat the failed read as empty data.
 
 | Candidate | Current disposition | Commit |
 | --- | --- | --- |
 | C01 | Company-event collector, scheduler registration and Settings source removed; current admission is unconditional; actual stored settings/schema disposition remains open | `06511f44` |
 | C02 | Dormant edgartools module physically deleted; active SEC clients retained | `300b7400` |
-| C04 | Current execution owner extracted; old case-web router/controller/preflight and unmounted screens/clients removed. Current shared history/confirmation readers, five further HTTP candidates and schema disposition remain | `83eeb5ef`, `302106d2` |
+| C04 | Current execution owner and neutral codec extracted; old case-web execution/UI and five individually reviewed HTTP entries removed. Current shared history/confirmation readers and schema disposition remain | `83eeb5ef`, `302106d2`, `5d41f570`, `0c5896a5` |
 | C07 | Unreachable auth factory placeholder/export removed; six real modes retained | `263c21a5` |
 | C17 | Old publisher-acquisition adapter deleted; current investigation news retained | `300b7400` |
 | C18 | Disconnected SEC earnings parser/CLI and catalog claim removed | `300b7400` |

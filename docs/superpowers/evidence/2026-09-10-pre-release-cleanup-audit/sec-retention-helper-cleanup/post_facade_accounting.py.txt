@@ -1,0 +1,82 @@
+"""Account for frozen full-suite evidence plus a later bounded fix rerun."""
+import argparse
+from collections import Counter
+import json
+from pathlib import Path
+import subprocess
+import xml.etree.ElementTree as ET
+
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[2]
+FULL_HEAD = "0c5896a561fb8397daa79e60d4f1c80cb299463b"
+CHANGED = {
+    "src/ticker_identity_service.py",
+    "tests/test_security_lifecycle_review.py",
+    "tests/test_security_lifecycle_review_routes.py",
+}
+
+
+def collection(path):
+    rows = json.loads(path.read_text())
+    result = {(row["classname"], row["name"]): row["nodeid"] for row in rows}
+    assert len(result) == len(rows), "duplicate_collection_identity"
+    return result
+
+
+def outcomes(path):
+    result = {}
+    for item in ET.parse(path).getroot().findall(".//testcase"):
+        key = (item.get("classname"), item.get("name"))
+        assert key not in result, ("duplicate_result_identity", key)
+        state = next((kind for kind in ("failure", "error", "skipped")
+                      if item.find(kind) is not None), "passed")
+        result[key] = state
+    assert not any(value in {"failure", "error"} for value in result.values())
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--head", required=True)
+    parser.add_argument("--rerun", type=Path, required=True)
+    args = parser.parse_args()
+    git = lambda *values: subprocess.check_output(["git", *values], cwd=ROOT, text=True).strip()
+    assert git("rev-parse", "HEAD") == args.head, "source_head_changed"
+    changed = set(git("diff", "--name-only", FULL_HEAD, args.head, "--", "src", "tests").splitlines())
+    assert changed == CHANGED, ("unexpected_fix_scope", changed)
+    before = collection(HERE / "backend-nodeids.json")
+    after = collection(HERE / "post-facade-nodeids.json")
+    full = outcomes(HERE / "backend-final.xml")
+    rerun = outcomes(args.rerun)
+    assert before.keys() == full.keys(), "full_run_coverage_mismatch"
+    assert rerun.keys() <= after.keys(), "unknown_rerun_identity"
+    changed_test_files = CHANGED - {"src/ticker_identity_service.py"}
+    required = {key for key, node in after.items() if node.split("::", 1)[0] in changed_test_files}
+    assert required <= rerun.keys(), "changed_test_file_not_completely_rerun"
+    old_ids, new_ids = set(before.values()), set(after.values())
+    added, removed = sorted(new_ids - old_ids), sorted(old_ids - new_ids)
+    assert not removed and len(added) == 1, ("unexpected_test_delta", added, removed)
+    assert set(after) - set(before) <= rerun.keys(), "new_test_not_executed"
+    combined = {key: rerun[key] if key in rerun else full[key] for key in after}
+    payload = {
+        "full_run_head": FULL_HEAD, "fix_head": args.head,
+        "statement": "Exact combined coverage, not a second whole-suite run on the fix commit.",
+        "changed_source_and_test_files": sorted(changed),
+        "final_collected": len(after), "added": added, "removed": removed,
+        "full_run_states": dict(Counter(full.values())),
+        "rerun_states": dict(Counter(rerun.values())),
+        "rerun_result": args.rerun.name,
+        "changed_test_files_completely_rerun": sorted(changed_test_files),
+        "rerun_nodeids": sorted(after[key] for key in rerun),
+        "covered_by_rerun": len(rerun), "covered_by_unchanged_full_run": len(after) - len(rerun),
+        "combined_unique_states": dict(Counter(combined.values())),
+    }
+    with (HERE / "post-facade-accounting.json").open("x", encoding="utf-8") as stream:
+        json.dump(payload, stream, indent=2, sort_keys=True)
+        stream.write("\n")
+    print(json.dumps({key: value for key, value in payload.items() if key != "rerun_nodeids"}, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,224 @@
+{
+  "cwd": "/tmp/arkscope-listing-sec-macro-convergence",
+  "base": "58e1929b61905b905fc0e12bdc5daf1ad116b84b",
+  "environment": {
+    "PATH": "/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state"
+  },
+  "runs": [
+    {
+      "name": "baseline-collection",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py --collect-only -q $(< .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-suites.txt) > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-baseline-collection.log 2>&1",
+      "exit_code": 0,
+      "log": "task3-baseline-collection.log"
+    },
+    {
+      "name": "baseline",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv $(< .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-suites.txt) --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-baseline.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-baseline.log 2>&1",
+      "exit_code": 0,
+      "log": "task3-baseline.log",
+      "xml": "task3-baseline.xml",
+      "result": {
+        "passed": 975,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "inventory-before",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv -s -o junit_family=legacy .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3_inventory.py --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-inventory-before.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-inventory-before.log 2>&1",
+      "exit_code": 0,
+      "log": "task3-inventory-before.log",
+      "xml": "task3-inventory-before.xml",
+      "result": {
+        "passed": 1,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "red",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv tests/test_security_lifecycle_routes.py::test_actual_app_excludes_unused_lifecycle_http_entry tests/test_security_lifecycle_routes.py::test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-red.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-red.log 2>&1",
+      "exit_code": 1,
+      "log": "task3-red.log",
+      "xml": "task3-red.xml",
+      "result": {
+        "passed": 1,
+        "failed": 5,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "intermediate",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv -s -o junit_family=legacy .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3_inventory.py tests/test_security_lifecycle_routes.py::test_actual_app_excludes_unused_lifecycle_http_entry tests/test_security_lifecycle_routes.py::test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes tests/test_api.py::test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-intermediate.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-intermediate.log 2>&1",
+      "exit_code": 1,
+      "log": "task3-intermediate.log",
+      "xml": "task3-intermediate.xml",
+      "result": {
+        "passed": 6,
+        "failed": 2,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "green",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv $(< .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-final-suites.txt) --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-green.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-green.log 2>&1",
+      "exit_code": 0,
+      "log": "task3-green.log",
+      "xml": "task3-green.xml",
+      "result": {
+        "passed": 962,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "mutation",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv 'tests/test_security_lifecycle_routes.py::test_actual_app_excludes_unused_lifecycle_http_entry[review-confirmation]' --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-mutation.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-mutation.log 2>&1",
+      "exit_code": 1,
+      "log": "task3-mutation.log",
+      "xml": "task3-mutation.xml",
+      "result": {
+        "passed": 0,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "restored",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py -vv $(< .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-final-suites.txt) --junitxml=.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-restored.xml > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-restored.log 2>&1",
+      "exit_code": 0,
+      "log": "task3-restored.log",
+      "xml": "task3-restored.xml",
+      "result": {
+        "passed": 962,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "final-collection",
+      "command": "env -i PATH=/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ARKSCOPE_OFFLINE_TEST_WORKSPACE=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-state /home/hyl/.virtualenvs/llm_app/bin/python -B .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/offline_pytest.py --collect-only -q $(< .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-final-suites.txt) > .superpowers/sdd/2026-09-10-sec-retention-inventory-and-helper-cleanup/task3-final-collection.log 2>&1",
+      "exit_code": 0,
+      "log": "task3-final-collection.log"
+    }
+  ],
+  "head": "0c5896a561fb8397daa79e60d4f1c80cb299463b",
+  "files": [
+    {
+      "status": "M",
+      "path": "src/api/routes/security_lifecycle.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/routes/ticker_identity.py"
+    },
+    {
+      "status": "M",
+      "path": "src/security_lifecycle_investigation.py"
+    },
+    {
+      "status": "D",
+      "path": "src/security_lifecycle_translation.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/test_api.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/test_card_execution_authority.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/test_security_lifecycle_current_routes.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/test_security_lifecycle_review_routes.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/test_security_lifecycle_routes.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/test_security_lifecycle_tools.py"
+    },
+    {
+      "status": "D",
+      "path": "tests/test_security_lifecycle_translation.py"
+    }
+  ],
+  "route_inventory": {
+    "before_count": 221,
+    "after_count": 216,
+    "removed": [
+      [
+        "GET",
+        "/security-lifecycle/cases/{case_id}/audit",
+        "src.api.routes.security_lifecycle",
+        "get_case_audit"
+      ],
+      [
+        "GET",
+        "/security-lifecycle/review-confirmations/{transition_id}",
+        "src.api.routes.ticker_identity",
+        "review_confirmation"
+      ],
+      [
+        "GET",
+        "/security-lifecycle/reviews/{review_id}",
+        "src.api.routes.security_lifecycle",
+        "get_current_review"
+      ],
+      [
+        "POST",
+        "/security-lifecycle/cases/{case_id}/automation/run",
+        "src.api.routes.security_lifecycle",
+        "run_case_automation"
+      ],
+      [
+        "POST",
+        "/security-lifecycle/evidence/{evidence_id}/translations",
+        "src.api.routes.security_lifecycle",
+        "translate_evidence_route"
+      ]
+    ],
+    "added": []
+  },
+  "collected": {
+    "baseline": 975,
+    "final": 962
+  },
+  "mutation": {
+    "method": "GET",
+    "path": "/security-lifecycle/review-confirmations/{transition_id}",
+    "restored_original_handler": "@router.get(\"/review-confirmations/{transition_id}\")\ndef review_confirmation(\n    transition_id: str,\n    service: TickerIdentityService = Depends(get_ticker_identity_service),\n):\n    try:\n        return service.get_review_confirmation(transition_id)\n    except (TickerIdentityStoreUnavailable, LifecycleStoreUnavailable) as exc:\n        raise _store_error(exc) from None\n    except KeyError as exc:\n        raise _not_found(exc) from None\n    except ValueError as exc:\n        raise _invalid(exc) from None\n\n\n",
+    "named_owner": "tests/test_security_lifecycle_routes.py::test_actual_app_excludes_unused_lifecycle_http_entry[review-confirmation]",
+    "outcome": "Killed by exact route-absence assertion, not an import/setup error.",
+    "restored_byte_for_byte": true,
+    "restoration_verification": "Compared the complete ticker_identity.py text to its pre-mutation content before the 962-test restored run."
+  },
+  "commit_command": "git -c core.hooksPath=/dev/null commit --no-gpg-sign -m \"Remove five unused lifecycle HTTP entries\"",
+  "preservation_checks": [
+    {
+      "command": "git diff --check -- src tests",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --exit-code 58e1929b61905b905fc0e12bdc5daf1ad116b84b -- src/lifecycle_journal_codec.py tests/test_lifecycle_journal_codec.py src/security_lifecycle_schema.py src/tools/security_lifecycle_tools.py src/ticker_identity_service.py tests/test_content_translation_failures.py tests/test_model_routing.py tests/test_model_route_store.py tests/test_auth_drivers.py tests/test_card_synthesis.py tests/test_analysis_cards_api.py tests/test_codex_translation_adapter.py",
+      "exit_code": 0
+    }
+  ],
+  "constraints": "Specified offline runner only; no provider/production/.env access, real-state App startup, installs, subagents, merge, push, or parent whole-branch work. Parent-owned docs/evidence not staged. Source/test writes stopped at head announcement."
+}

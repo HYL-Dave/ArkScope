@@ -1,0 +1,10 @@
+tests/test_security_lifecycle_review.py
+tests/test_security_lifecycle_review_routes.py
+tests/test_security_lifecycle_current.py
+tests/test_security_lifecycle_current_routes.py
+tests/test_ticker_identity_history.py
+tests/test_ticker_identity_routes.py
+tests/test_ticker_identity_transition.py
+tests/test_security_lifecycle_routes.py
+tests/test_lifecycle_investigation_review.py
+tests/test_lifecycle_investigation_routes.py
