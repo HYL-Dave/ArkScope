@@ -54,6 +54,13 @@ def test_neutral_journal_codec_owns_public_functions():
     assert codec.digest_json.__module__ == _OWNER
 
 
+@pytest.mark.parametrize("name", ["_json", "_sha"])
+def test_retained_journal_does_not_export_legacy_codec_helpers(name):
+    journal = import_module("src.lifecycle_web_store")
+    assert not hasattr(journal, name)
+    assert name not in getattr(journal, "__all__", ())
+
+
 @pytest.mark.parametrize("value,expected_bytes,_digest", _CASES)
 def test_canonical_json_matches_literal_journal_bytes(value, expected_bytes, _digest):
     codec = import_module(_OWNER)
@@ -110,3 +117,23 @@ def test_journal_consumers_import_the_neutral_codec_directly(module, names):
         if alias.asname is None
     }
     assert names <= imported
+    legacy = {"_json", "_sha"}
+    legacy_imports = [
+        (node.lineno, node.name, node.asname)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.alias) and legacy.intersection((node.name, node.asname))
+    ]
+    assert not legacy_imports, legacy_imports
+    legacy_definitions = [
+        (node.lineno, node.name)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in legacy
+    ]
+    assert not legacy_definitions, legacy_definitions
+    legacy_references = [
+        (node.lineno, node.id if isinstance(node, ast.Name) else node.attr)
+        for node in ast.walk(tree)
+        if (isinstance(node, ast.Name) and node.id in legacy)
+        or (isinstance(node, ast.Attribute) and node.attr in legacy)
+    ]
+    assert not legacy_references, legacy_references
