@@ -4,6 +4,14 @@ Branch: `codex/listing-sec-macro-convergence`. Plan base: `6ba563d9`;
 plan commit: `8c8ac738`. This checkpoint is separate from the previously
 completed [entrypoint cleanup](../sec-entrypoint-cleanup/README.md).
 
+**Source checkpoint reviewed and complete; actual-store inventory still
+unavailable.** The whole-checkpoint review of `6ba563d9..46ec6f31` found no
+Critical/Important or source integration issue. Its one documentation queue-ID
+finding was fixed in `c2d4dce9`; scoped re-review passed spec/quality with no new
+breakage. Source/tests remain byte-identical to verified `e61accaf`.
+See [final review](final-review.md) and [correction review](final-doc-rereview.md).
+No merge, push, App restart, provider call or production disposition occurred.
+
 ## Authorized Inventory: Unavailable, Not Empty
 
 The user authorized one structure/count/reference-only inspection of the exact

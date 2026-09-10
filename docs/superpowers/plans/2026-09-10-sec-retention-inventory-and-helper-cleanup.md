@@ -72,7 +72,7 @@ GET /security-lifecycle/review-confirmations/{transition_id}
 
 - [x] Run relevant whole-backend regression and final collection accounting, frontend tests/typecheck for preserved clients, plus mechanical census against the original baseline. Frozen `0c5896a5` whole backend: 7,971 passed/12 skipped, 7,983 unique IDs. Frontend 1,692 passed/typecheck/build passed. Post-facade `e61accaf`: 293 passed in ten complete affected files; exact final collection 7,984, no uncovered IDs in the version-labelled combined accounting. Census stays exit2. Initial failures/coverage reductions remain distinct; no baseline rewrite to green.
 - [x] Update ownership/audit/priority map with actual measurement limitations, source verification counts, remaining source/schema dependencies and the next disposal approval boundary. No claim of complete repo cleanup or implemented SEC research.
-- [ ] Final independent review, archive reports, preserve branch without integration. Keep this plan's pending-read handoff while actual-store inventory is unavailable; remove its scratch only after the remaining task is completed or explicitly transferred, never sibling workspaces.
+- [x] Final independent review of `6ba563d9..46ec6f31` passed completed source scope with no Critical/Important issue. Its minor scanner queue-ID correction landed in docs-only `c2d4dce9`; scoped re-review passed spec/quality. Reports archived; branch preserved without integration. **Task1's actual-store inventory is still incomplete**, so keep this plan's pending-read handoff; remove its scratch only after the remaining task is completed or explicitly transferred, never sibling workspaces.
 
 ## Preflight
 
