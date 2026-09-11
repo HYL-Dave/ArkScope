@@ -13,7 +13,7 @@ const settings = {
     errorDetail: "{{message}}：{{detail}}", loading: "讀取中", unknown: "未知",
     ok: "可用", empty: "已觀測且無符合資料", partial: "部分資料", unavailable: "無法使用",
     objects: "已儲存物件", reservations: "預留容量", orphans: "孤立物件",
-    charged: "計費總容量", remaining: "剩餘容量", overBudget: "超出容量上限",
+    charged: "已計入容量", remaining: "剩餘容量", overBudget: "超出容量上限",
     byteCount: "{{value}} 位元組", confirmedBudget: "已確認容量上限",
     storedStatus: "儲存狀態", receipt: "更新收據", observed: "收據檢查點時間",
     coverage: "涵蓋範圍", gaps: "資料缺口", snapshots: "快照",
