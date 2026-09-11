@@ -5,6 +5,17 @@ import * as api from "./api";
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("SEC stored API contracts", () => {
+  it("admits and preserves unavailable null-data envelopes for both stored queries", async () => {
+    const filings: Awaited<ReturnType<typeof api.getSecResearchFilings>> = {
+      status: "unavailable", data: null, gaps: [{ code: "sec_research_not_installed" }],
+      observed_at: null, coverage: {}, next_cursor: null,
+    };
+    const facts: Awaited<ReturnType<typeof api.getSecResearchFacts>> = { ...filings, data: null };
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response(JSON.stringify(filings))));
+    expect(await api.getSecResearchFilings("123")).toEqual(filings);
+    expect(await api.getSecResearchFacts("123")).toEqual(facts);
+  });
+
   it("encodes issuer, repeatable filters and opaque cursors without changing them", async () => {
     const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ data: [] })));
     vi.stubGlobal("fetch", fetch);

@@ -13,7 +13,7 @@ const settings = {
     errorDetail: "{{message}}: {{detail}}", loading: "Loading", unknown: "Unknown",
     ok: "Available", empty: "Observed empty", partial: "Partial", unavailable: "Unavailable",
     objects: "Stored objects", reservations: "Reservations", orphans: "Orphans",
-    charged: "Total charged", remaining: "Remaining", overBudget: "Over budget",
+    charged: "Accounted usage", remaining: "Remaining", overBudget: "Over budget",
     byteCount: "{{value}} bytes", confirmedBudget: "Confirmed budget",
     storedStatus: "Stored status", receipt: "Refresh receipt", observed: "Receipt checkpoint",
     coverage: "Coverage", gaps: "Gaps", snapshots: "Snapshots",

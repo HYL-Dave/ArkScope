@@ -16,7 +16,7 @@ import "./secResearch.css";
 
 type Unit = "bytes" | "gib";
 type View = "filings" | "facts";
-type Page = SecResearchEnvelope<(SecResearchFiling | SecResearchFact)[]>;
+type Page = SecResearchEnvelope<(SecResearchFiling | SecResearchFact)[] | null>;
 const GIB = 1073741824n;
 
 function wholeBytes(text: string, unit: Unit): number | null {
@@ -82,16 +82,16 @@ function safeCatalogUrl(value: unknown): string | null {
 function Records({ page, view, t }: { page: Page | null; view: View; t: SettingsT }) {
   const rows = page?.data ?? [];
   const columns: [string, string][] = view === "filings" ? [
-    ["filing_id", t(($) => $.secResearch.filingId)], ["accession", t(($) => $.secResearch.accession)],
     ["form", t(($) => $.secResearch.form)], ["filed_date", t(($) => $.secResearch.filedDate)],
     ["report_date", t(($) => $.secResearch.reportDate)], ["accepted_at", t(($) => $.secResearch.acceptedAt)],
     ["primary_document", t(($) => $.secResearch.document)], ["primary_url", t(($) => $.secResearch.catalogUrl)],
+    ["accession", t(($) => $.secResearch.accession)], ["filing_id", t(($) => $.secResearch.filingId)],
   ] : [
-    ["fact_id", t(($) => $.secResearch.factId)], ["namespace", t(($) => $.secResearch.namespace)],
     ["concept", t(($) => $.secResearch.concept)], ["value", t(($) => $.secResearch.value)],
-    ["unit", t(($) => $.secResearch.factUnit)], ["start", t(($) => $.secResearch.start)],
-    ["end", t(($) => $.secResearch.end)], ["filed_date", t(($) => $.secResearch.filedDate)],
-    ["accession", t(($) => $.secResearch.accession)],
+    ["unit", t(($) => $.secResearch.factUnit)], ["end", t(($) => $.secResearch.end)],
+    ["start", t(($) => $.secResearch.start)], ["namespace", t(($) => $.secResearch.namespace)],
+    ["filed_date", t(($) => $.secResearch.filedDate)], ["accession", t(($) => $.secResearch.accession)],
+    ["fact_id", t(($) => $.secResearch.factId)],
   ];
   const present = columns.filter(([key]) => rows.some((row) => row[key] != null && row[key] !== ""));
   return <>

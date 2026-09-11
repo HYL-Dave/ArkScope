@@ -1206,10 +1206,10 @@ export function setSecResearchBudget(capture_budget_bytes: number): Promise<{ ca
 export function getSecResearchStatus(cik: string): Promise<SecResearchStoredStatus> {
   return getJSON(`/sec-research/${encodeURIComponent(cik)}`);
 }
-export function getSecResearchFilings(cik: string, query: SecResearchFilingsQuery = {}): Promise<SecResearchEnvelope<SecResearchFiling[]>> {
+export function getSecResearchFilings(cik: string, query: SecResearchFilingsQuery = {}): Promise<SecResearchEnvelope<SecResearchFiling[] | null>> {
   return getJSON(secResearchQueryPath(cik, "filings", query));
 }
-export function getSecResearchFacts(cik: string, query: SecResearchFactsQuery = {}): Promise<SecResearchEnvelope<SecResearchFact[]>> {
+export function getSecResearchFacts(cik: string, query: SecResearchFactsQuery = {}): Promise<SecResearchEnvelope<SecResearchFact[] | null>> {
   return getJSON(secResearchQueryPath(cik, "facts", query));
 }
 export function refreshSecResearch(cik: string, resume = false): Promise<SecResearchReceipt> {

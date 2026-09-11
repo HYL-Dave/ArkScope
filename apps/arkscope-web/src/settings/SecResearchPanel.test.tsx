@@ -2,6 +2,8 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import i18n from "i18next";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -19,6 +21,13 @@ let requests: { url: URL; init: RequestInit }[];
 let budget: number;
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot> | undefined;
+let stylesheet: HTMLStyleElement | undefined;
+
+function applyPanelStyles() {
+  stylesheet = document.createElement("style");
+  stylesheet.textContent = readFileSync(resolve(import.meta.dirname, "secResearch.css"), "utf8");
+  document.head.append(stylesheet);
+}
 
 function fallback(url: URL) {
   if (url.pathname === "/sec-research/config") return { capture_budget_bytes: budget, capacity };
@@ -43,6 +52,8 @@ afterEach(async () => {
   if (root) await act(async () => root!.unmount());
   root = undefined;
   host?.remove();
+  stylesheet?.remove();
+  stylesheet = undefined;
   vi.unstubAllGlobals();
 });
 async function render(language = "en") {
@@ -85,12 +96,87 @@ function deferred<T>() {
 }
 
 describe("SEC structured storage", () => {
+  it("limits pagination counter sizing to the counter, excluding button icon wrappers", async () => {
+    applyPanelStyles();
+    await render(); await load();
+    const counter = host.querySelector<HTMLElement>(".sec-pagination > span")!;
+    expect(getComputedStyle(counter).minWidth).toBe("64px");
+    const icons = host.querySelectorAll<HTMLElement>(".sec-pagination button .ui-button-icon");
+    expect(icons).toHaveLength(2);
+    for (const icon of icons) expect(getComputedStyle(icon).minWidth).not.toBe("64px");
+  });
+
+  it("puts readable catalog fields before complete opaque filing IDs", async () => {
+    const id = "secfiling_" + "a".repeat(64);
+    handler = (url) => url.pathname.endsWith("/filings") ? envelope("ok", [{
+      ...filing(id), accession: "0000000123-26-000001", primary_document: "annual-report.htm",
+    }]) : fallback(url);
+    await render(); await load();
+    expect([...host.querySelectorAll(".sec-record-scroll th")].map((cell) => cell.textContent)).toEqual([
+      "Form", "Filed date", "Report date", "Accepted at", "Primary document", "Catalog URL", "Accession", "Filing ID",
+    ]);
+    const cells = [...host.querySelectorAll(".sec-record-scroll tbody td")];
+    expect(cells.map((cell) => cell.textContent)).toEqual([
+      "10-K", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", "annual-report.htm", "", "0000000123-26-000001", id,
+    ]);
+    expect(cells[5].querySelector("a")?.href).toBe("https://www.sec.gov/Archives/edgar/data/123/report.htm");
+  });
+
+  it("leads facts with concept value unit and end while retaining every field and full ID", async () => {
+    const id = "secfact_" + "b".repeat(64);
+    const fact = {
+      fact_id: id, namespace: "us-gaap", concept: "Assets", value: "1234567890123456789.123",
+      unit: "EUR", start: "2025-01-01", end: "2025-12-31", filed_date: "2026-02-01", accession: "0000000123-26-000001",
+    };
+    handler = (url) => url.pathname.endsWith("/facts") ? envelope("ok", [fact]) : fallback(url);
+    await render(); await load(); await click("Facts");
+    expect([...host.querySelectorAll(".sec-record-scroll th")].map((cell) => cell.textContent)).toEqual([
+      "Concept", "Reported value", "Unit", "End", "Start", "Namespace", "Filed date", "Accession", "Fact ID",
+    ]);
+    expect([...host.querySelectorAll(".sec-record-scroll tbody td")].map((cell) => cell.textContent)).toEqual([
+      "Assets", "1234567890123456789.123", "EUR", "2025-12-31", "2025-01-01", "us-gaap", "2026-02-01", "0000000123-26-000001", id,
+    ]);
+  });
+
+  it.each(["Catalog", "Facts"])("bounds the %s table viewport with both scroll axes and pagination outside", async (view) => {
+    applyPanelStyles();
+    const records = Array.from({ length: view === "Catalog" ? 20 : 40 }, (_, index) => view === "Catalog"
+      ? filing("secfiling_" + "a".repeat(64) + index)
+      : { fact_id: "secfact_" + "b".repeat(64) + index, namespace: "us-gaap", concept: "Assets", value: "1234567890123456789.123", unit: "EUR", end: "2025-12-31" });
+    handler = (url) => /\/(filings|facts)$/.test(url.pathname) ? envelope("ok", records, "next") : fallback(url);
+    await render(); await load();
+    if (view === "Facts") await click(view);
+    const scroll = host.querySelector<HTMLElement>(".sec-record-scroll")!;
+    const style = getComputedStyle(scroll);
+    expect(style.maxHeight).toBe("clamp(360px, 60vh, 480px)");
+    expect(style.overflowX).toBe("auto");
+    expect(style.overflowY).toBe("auto");
+    expect(scroll.querySelectorAll("tbody tr")).toHaveLength(records.length);
+    expect(scroll.contains(button("Next page"))).toBe(false);
+    expect(scroll.compareDocumentPosition(button("Next page")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it.each(["Catalog", "Facts"])("shows an actual unavailable-null %s response without observed-empty rows", async (view) => {
+    handler = (url) => /\/(filings|facts)$/.test(url.pathname) ? {
+      status: "unavailable", data: null, gaps: [{ code: "sec_research_not_installed" }],
+      observed_at: null, coverage: {}, next_cursor: null,
+    } : fallback(url);
+    await render(); await load();
+    if (view === "Facts") await click(view);
+    const panel = host.querySelector('[role="tabpanel"]')!;
+    expect(panel.textContent).toContain("Unavailable");
+    expect(panel.textContent).toContain("sec_research_not_installed");
+    expect(panel.textContent).not.toContain("Observed empty");
+    expect(panel.querySelector("table")).toBeNull();
+    expect(button("Next page").disabled).toBe(true);
+  });
+
   it("mounts with only config GET, actual accounting, and no issuer guessing", async () => {
     await render();
     expect(requests.map(({ url, init }) => [url.pathname, init.method ?? "GET"])).toEqual([["/sec-research/config", "GET"]]);
     expect(input("CIK").value).toBe("");
     expect(input("Capture budget").value).toBe("100");
-    for (const [label, value] of [["Stored objects", "120"], ["Reservations", "30"], ["Orphans", "7"], ["Total charged", "157"]]) {
+    for (const [label, value] of [["Stored objects", "120"], ["Reservations", "30"], ["Orphans", "7"], ["Accounted usage", "157"]]) {
       const term = [...host.querySelectorAll("dt")].find((el) => el.textContent === label);
       expect(term?.nextElementSibling?.textContent).toContain(value);
     }
@@ -347,6 +433,8 @@ describe("SEC structured storage", () => {
   it("renders Traditional Chinese commands and state labels", async () => {
     await render("zh-Hant");
     expect(host.textContent).toContain("SEC 結構化資料");
+    expect(host.textContent).toContain("已計入容量");
+    expect(host.textContent).not.toContain("計費總容量");
     expect(button("讀取本機")).toBeDefined();
     expect(button("儲存容量上限")).toBeDefined();
     expect(host.textContent).not.toContain("Load local");

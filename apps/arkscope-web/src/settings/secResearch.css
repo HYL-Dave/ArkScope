@@ -31,13 +31,13 @@
 .sec-storage [data-state="unavailable"], .sec-storage [role="alert"] { color: var(--danger, #f18c95); }
 .sec-storage [data-state="ok"] { color: var(--success, #7dc6ad); }
 .sec-storage .ui-tabs, .sec-storage .ui-tab-panel { min-width: 0; max-width: 100%; }
-.sec-record-scroll { min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+.sec-record-scroll { min-width: 0; max-width: 100%; max-height: clamp(360px, 60vh, 480px); overflow-x: auto; overflow-y: auto; overscroll-behavior-inline: contain; }
 .sec-record-scroll table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 12px; }
 .sec-record-scroll th, .sec-record-scroll td { padding: 7px 9px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .sec-record-scroll td { font-variant-numeric: tabular-nums; }
 .sec-record-scroll a { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
 .sec-pagination { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
-.sec-pagination span { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+.sec-pagination > span { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
 @media (max-width: 480px) {
   .sec-fields label { flex-basis: 100%; }
 }
