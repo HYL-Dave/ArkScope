@@ -12,15 +12,28 @@ immutable storage, capacity-accounted captures, governed structured traversal,
 durable continuation and explicit GET/POST application commands. Task and whole
 change and collateral reviews approved; a fresh complete run passed **8434 tests
 with 12 unchanged skips**, with exact node/source reconciliation after route-count
-test collateral and an offline-runner path correction. This is not the complete
-end-to-end workflow: issuer resolution, authoritative snapshot/query selection,
-documents/citations, export, three tools/four transports, schedule and UI remain
-open. No unfinished replacement tool is registered; the four earlier foundation
-modules now have real consumers rather than remaining test-only candidates.
+test collateral and an offline-runner path correction. The next plan,
+`docs/superpowers/plans/2026-09-11-sec-query-settings.md`, now implements immutable
+receipt/source bindings, snapshot-bound catalog/facts pagination, retained fact-id
+reopening and an explicit CIK Settings management surface with adjustable capacity,
+stored queries, refresh and resume. Full backend **8811 passed / 12 unchanged
+skips** reconciles exactly8823 nodes,377added/zero removed. Final frontend-only
+catalog rendering correction preserves conflicting variants without stale rows;
+fresh frontend **1738 passed**, typecheck/i18n and four desktop/mobile fixture
+workflows pass. Backend source/tests remain byte-identical across that correction.
+Task reviews and the final scoped correction review are approved, with no
+remaining findings in this batch.
+This is still not the complete end-to-end workflow: issuer resolution,
+documents/citations, export, three tools/four transports and subagents, persisted
+Research citations and the default-disabled schedule remain open. Settings here
+is structured-storage administration, not complete Research admission. No
+unfinished replacement tool is registered; earlier foundations and all six SEC
+management/query routes have real consumers. No production activation occurred.
 Base inspected: `30bb31c7`. The user approved the product direction on September
 10, including useful tool access rather than collection without consumers.
-Original specification-tree review: `fef26dcf`; current implementation evidence
-is `../evidence/2026-09-11-sec-durable-acquisition/README.md` at source `0f8298fa`.
+Original specification-tree review: `fef26dcf`; current query/Settings evidence
+is `../evidence/2026-09-11-sec-query-settings/README.md` at source `5d03c57e`.
+The prior durable-acquisition checkpoint remains independently archived.
 On September 10 the user selected
 a **100 GiB adjustable capture budget**, replacing the proposed 20 GiB default.
 The subsequent user decision supersedes the retired-wrapper design: physically
