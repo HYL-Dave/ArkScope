@@ -11,6 +11,7 @@ import re
 import sqlite3
 
 from .common import normalize_cik
+from . import schema
 from .store import MAX_SNAPSHOT_ROWS
 
 
@@ -44,7 +45,7 @@ def _decode(token):
                 or type(value["v"]) is not int or value["v"] != 1
                 or type(value["receipt_id"]) is not int or not 1 <= value["receipt_id"] <= 2**63 - 1
                 or type(value["offset"]) is not int or not 1 <= value["offset"] <= 2**63 - 1
-                or value["kind"] not in ("filings", "facts")
+                or value["kind"] not in ("filings", "facts", "fact_ids")
                 or not isinstance(value["cik"], str) or normalize_cik(value["cik"]) != value["cik"]
                 or any(not isinstance(value[key], str) or re.fullmatch(r"[0-9a-f]{64}", value[key]) is None
                        for key in ("filters_hash", "bindings_digest"))
@@ -75,6 +76,8 @@ class QueryContext:
     receipt: dict | None
     bindings_digest: str
     offset: int = 0
+    anchor_id: int | None = None
+    observed_at: str | None = None
 
 
 def open_query(store, cik, *, kind, filters, cursor=None):
@@ -103,6 +106,76 @@ class BoundSources:
     gaps: list
     row_count: int
     encoded_bytes: int
+
+
+def open_fact_ids_query(store, cik, *, filters, cursor=None):
+    """Pin retained IDs to a snapshot insertion watermark, not a receipt.
+
+    The shared v1 receipt_id token slot is the snapshot rowid watermark for the
+    distinct fact_ids kind. It is never exposed as a receipt in coverage. The
+    digest binds actual admitted immutable snapshots; new rows cannot enter a
+    continuation, including IDs that were missing on its first page.
+    Caller validates/normalizes fact_ids and limit before entering storage.
+    """
+    cik = normalize_cik(cik)
+    filters_hash = _digest(filters)
+    token = _decode(cursor) if cursor is not None else None
+    if token and (token["cik"] != cik or token["kind"] != "fact_ids"
+                  or token["filters_hash"] != filters_hash):
+        raise ValueError("sec_research_cursor_mismatch")
+    sources, gaps = {}, []
+    row_count = encoded_bytes = 0
+    with store.connect(readonly=True) as conn:
+        schema.verify(conn)
+        anchor = token["receipt_id"] if token else conn.execute(
+            "SELECT COALESCE(MAX(rowid), 0) FROM sec_research_snapshots WHERE cik=? AND kind='facts'",
+            (cik,)).fetchone()[0]
+        if token and not conn.execute(
+                "SELECT 1 FROM sec_research_snapshots WHERE rowid=? AND cik=? AND kind='facts'",
+                (anchor, cik)).fetchone():
+            raise ValueError("sec_research_cursor_mismatch")
+        placeholders = ",".join("?" for _ in filters["fact_ids"])
+        records = conn.execute(f"""
+            SELECT o.*, s.observed_at, s.source_url, s.object_sha256
+            FROM sec_research_facts o JOIN sec_research_snapshots s USING(snapshot_id)
+            WHERE o.cik=? AND s.cik=? AND s.kind='facts' AND s.rowid<=?
+                AND o.fact_id IN ({placeholders})
+            ORDER BY s.rowid, o.ordinal""", (cik, cik, anchor, *filters["fact_ids"]))
+        for record in records:
+            row = dict(record)
+            row.pop("ordinal")
+            row["source"] = {"sha256": row.pop("source_sha256"), "pointer": row.pop("source_pointer")}
+            sid = row["snapshot_id"]
+            if sid not in sources:
+                if len(sources) >= MAX_QUERY_SOURCES:
+                    gaps.append({"code": "query_budget_exceeded", "bound": "sources"})
+                    break
+                metadata = store.snapshot(cik, sid)
+                if metadata is None or not 0 <= metadata["row_count"] <= MAX_SNAPSHOT_ROWS:
+                    raise ValueError("sec_research_receipt_binding_invalid")
+                size = len(_canonical(metadata).encode("ascii"))
+                if encoded_bytes + size > MAX_QUERY_BYTES:
+                    gaps.append({"code": "query_budget_exceeded", "bound": "bytes"})
+                    break
+                encoded_bytes += size
+                sources[sid] = (metadata, [])
+            if row_count >= MAX_QUERY_ROWS:
+                gaps.append({"code": "query_budget_exceeded", "bound": "rows"})
+                break
+            size = len(_canonical(row).encode("ascii"))
+            if encoded_bytes + size > MAX_QUERY_BYTES:
+                gaps.append({"code": "query_budget_exceeded", "bound": "bytes"})
+                break
+            sources[sid][1].append(row)
+            row_count += 1
+            encoded_bytes += size
+    digest = _digest({sid: metadata for sid, (metadata, _) in sources.items()})
+    if token and token["bindings_digest"] != digest:
+        raise ValueError("sec_research_cursor_mismatch")
+    observed_at = max((metadata["observed_at"] for metadata, _ in sources.values()), default=None)
+    context = QueryContext(cik, "fact_ids", filters_hash, None, digest,
+                           token["offset"] if token else 0, anchor, observed_at)
+    return context, BoundSources(sources, gaps, row_count, encoded_bytes)
 
 
 def read_bound_sources(store, context, *, kind, row_filter=None):
@@ -167,7 +240,8 @@ def read_bound_sources(store, context, *, kind, row_filter=None):
 
 def _cursor(context, offset):
     return _encode({"v": 1, "cik": context.cik, "kind": context.kind,
-                    "filters_hash": context.filters_hash, "receipt_id": context.receipt["receipt_id"],
+                    "filters_hash": context.filters_hash,
+                    "receipt_id": context.anchor_id if context.anchor_id is not None else context.receipt["receipt_id"],
                     "bindings_digest": context.bindings_digest, "offset": offset})
 
 
@@ -196,7 +270,7 @@ def page_envelope(context, rows, *, limit, gaps, available, coverage=None):
         status = ("unavailable" if not available else "partial" if page_gaps
                   else "ok" if data else "empty")
         return {"status": status, "data": data, "gaps": page_gaps,
-                "observed_at": receipt["observed_at"] if receipt else None,
+                "observed_at": receipt["observed_at"] if receipt else context.observed_at,
                 "coverage": {**base_coverage, "complete": complete},
                 "next_cursor": _cursor(context, offset) if offset < len(rows) else None}
 
@@ -231,6 +305,15 @@ def page_envelope(context, rows, *, limit, gaps, available, coverage=None):
 class StoredQueries:
     def __init__(self, store):
         self.store = store
+
+    def facts(self, cik, *, metrics=None, concepts=None, fact_ids=None, accession=None,
+              as_of=None, period="all", start=None, end=None, revisions="latest",
+              cursor=None, limit=40):
+        from .fact_queries import query_facts
+
+        return query_facts(self.store, cik, metrics=metrics, concepts=concepts, fact_ids=fact_ids,
+                           accession=accession, as_of=as_of, period=period, start=start, end=end,
+                           revisions=revisions, cursor=cursor, limit=limit)
 
     def filings(self, cik, *, forms=None, filed_from=None, filed_to=None,
                 include_amendments=True, cursor=None, limit=20):
