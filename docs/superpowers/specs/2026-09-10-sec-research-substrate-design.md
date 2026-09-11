@@ -1,7 +1,10 @@
 # SEC Research Data And Tools
 
-Status: product direction and cleanup boundary approved; new research service
-not yet implemented. Its own RED-first implementation plan remains to be written.
+Status: product direction and cleanup boundary approved; implementation has
+started with SEC typed capacity configuration and portable paths under
+`docs/superpowers/plans/2026-09-11-current-journal-and-sec-foundation.md`.
+The end-to-end research service, three tools and user-facing workflow are not
+implemented. Subsequent acquisition/storage/tool slices still need RED-first plans.
 Base inspected: `30bb31c7`. The user approved the product direction on September
 10, including useful tool access rather than collection without consumers.
 Last implementation-tree review: `fef26dcf`. On September 10 the user selected
