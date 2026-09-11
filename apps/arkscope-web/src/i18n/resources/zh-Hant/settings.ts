@@ -1,5 +1,31 @@
 // Translation authority: docs/design/ARKSCOPE_TERMINOLOGY.md
 const settings = {
+  secResearch: {
+    title: "SEC 結構化資料", cik: "CIK", load: "讀取本機",
+    refresh: "更新結構化資料", resume: "接續更新", reread: "重新讀取儲存狀態",
+    budget: "擷取容量上限", unit: "容量單位", bytes: "位元組", gib: "GiB",
+    save: "儲存容量上限", saved: "容量上限已儲存", reloadConfig: "重新讀取設定",
+    invalidBudget: "請輸入正整數位元組，最多 9007199254740991。",
+    configError: "設定無法使用", saveError: "容量上限儲存尚未確認",
+    confirmationMismatch: "已確認容量上限與要求值不同",
+    readError: "無法讀取儲存資料", refreshError: "更新要求遭拒",
+    unconfirmed: "結果尚未確認。伺服器可能仍在執行。",
+    errorDetail: "{{message}}：{{detail}}", loading: "讀取中", unknown: "未知",
+    ok: "可用", empty: "已觀測且無符合資料", partial: "部分資料", unavailable: "無法使用",
+    objects: "已儲存物件", reservations: "預留容量", orphans: "孤立物件",
+    charged: "計費總容量", remaining: "剩餘容量", overBudget: "超出容量上限",
+    byteCount: "{{value}} 位元組", confirmedBudget: "已確認容量上限",
+    storedStatus: "儲存狀態", receipt: "更新收據", observed: "收據檢查點時間",
+    coverage: "涵蓋範圍", gaps: "資料缺口", snapshots: "快照",
+    catalog: "申報目錄", facts: "財務事實", views: "已儲存觀測資料",
+    forms: "申報類型", filedFrom: "申報起日", filedTo: "申報迄日", amendments: "包含修訂申報",
+    concepts: "財務概念", asOf: "可取得資料截止日", revisions: "修訂版本", latest: "最新", all: "全部",
+    previous: "上一頁", next: "下一頁", page: "第 {{page}} 頁",
+    filingId: "申報 ID", factId: "事實 ID", accession: "申報編號", form: "申報類型",
+    filedDate: "申報日期", reportDate: "報告日期", acceptedAt: "受理時間",
+    document: "主要文件", catalogUrl: "目錄網址", namespace: "命名空間",
+    concept: "財務概念", value: "申報數值", factUnit: "單位", start: "起日", end: "迄日",
+  },
   locale: {
     label: "介面語言",
     selfName: "繁體中文",
@@ -116,7 +142,7 @@ const settings = {
       dataStorage: {
         title: "市場資料",
         description: "查看已儲存價格、SEC 基本面、財務快取與交易日資料覆蓋。",
-        searchAliases: "market data|市場資料|price|價格|已儲存價格|基本面|SEC 基本面|財務快取|coverage|sqlite|trading-day coverage|查看價格、基本面與交易日資料覆蓋。",
+        searchAliases: "market data|市場資料|price|價格|已儲存價格|基本面|SEC 基本面|財務快取|coverage|sqlite|trading-day coverage|查看價格、基本面與交易日資料覆蓋。|SEC 結構化資料|CIK|擷取容量上限|申報目錄|財務事實",
       },
       newsStorage: {
         title: "新聞資料",
@@ -736,7 +762,7 @@ const settings = {
   },
   dataStorage: {
     title: "市場資料",
-    description: "查看已儲存的價格、新聞、SEC 基本面與獨立財務快取。價格與新聞的抓取工作由「資料來源與排程」管理；基本面資料尚未接入 App 排程，本頁只會重新讀取狀態。",
+    description: "查看已儲存的價格、新聞、SEC 基本面與獨立財務快取。價格與新聞的抓取工作由「資料來源與排程」管理；基本面資料尚未接入 App 排程，基本面摘要只會重新讀取狀態。",
     loading: "載入中…",
     available: "可用",
     empty: "尚無資料",

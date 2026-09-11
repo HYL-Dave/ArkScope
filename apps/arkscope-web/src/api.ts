@@ -1107,6 +1107,116 @@ async function sendJSON<T>(
   return (await r.json()) as T;
 }
 
+export type SecResearchState = "ok" | "empty" | "partial" | "unavailable";
+export interface SecResearchGap { code: string; [key: string]: unknown }
+export interface SecResearchEnvelope<T> {
+  status: SecResearchState;
+  data: T;
+  gaps: SecResearchGap[];
+  observed_at: string | null;
+  coverage: Record<string, unknown>;
+  next_cursor: string | null;
+}
+export interface SecResearchCapacity {
+  persisted_bytes: number;
+  reserved_bytes: number;
+  orphan_bytes: number;
+  charged_bytes: number;
+  budget_bytes: number;
+  remaining_bytes: number;
+  over_budget: boolean;
+}
+export interface SecResearchConfig {
+  capture_budget_bytes: number;
+  capacity: SecResearchCapacity | null;
+}
+export interface SecResearchFiling {
+  filing_id: string;
+  accession: string;
+  form?: string | null;
+  filed_date?: string | null;
+  report_date?: string | null;
+  accepted_at?: string | null;
+  primary_document?: string | null;
+  primary_url?: string | null;
+  [key: string]: unknown;
+}
+export interface SecResearchFact {
+  fact_id: string;
+  namespace: string;
+  concept: string;
+  value: string;
+  unit: string;
+  start?: string | null;
+  end?: string | null;
+  filed_date?: string | null;
+  accession?: string | null;
+  [key: string]: unknown;
+}
+export type SecResearchStoredStatus = SecResearchEnvelope<{
+  cik: string;
+  snapshots: Record<string, number>;
+} | null>;
+export interface SecResearchReceipt {
+  receipt_id: number;
+  cik: string;
+  status: SecResearchState;
+  completed: string[];
+  pending: string[];
+  gaps: SecResearchGap[];
+  observed_at: string | null;
+  [key: string]: unknown;
+}
+export interface SecResearchFilingsQuery {
+  forms?: string[];
+  filed_from?: string;
+  filed_to?: string;
+  include_amendments?: boolean;
+  cursor?: string;
+  limit?: number;
+}
+export interface SecResearchFactsQuery {
+  metrics?: string[];
+  concepts?: string[];
+  fact_ids?: string[];
+  accession?: string;
+  as_of?: string;
+  period?: "all" | "instant" | "annual" | "quarterly" | "ytd";
+  start?: string;
+  end?: string;
+  revisions?: "latest" | "all";
+  cursor?: string;
+  limit?: number;
+}
+function secResearchQueryPath(cik: string, kind: "filings" | "facts", query: SecResearchFilingsQuery | SecResearchFactsQuery) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined) continue;
+    for (const entry of Array.isArray(value) ? value : [value]) params.append(key, String(entry));
+  }
+  const suffix = params.size ? `?${params}` : "";
+  return `/sec-research/${encodeURIComponent(cik)}/${kind}${suffix}`;
+}
+export function getSecResearchConfig(): Promise<SecResearchConfig> {
+  return getJSON("/sec-research/config");
+}
+export function setSecResearchBudget(capture_budget_bytes: number): Promise<{ capture_budget_bytes: number }> {
+  return sendJSON("/sec-research/config", "PUT", { capture_budget_bytes });
+}
+export function getSecResearchStatus(cik: string): Promise<SecResearchStoredStatus> {
+  return getJSON(`/sec-research/${encodeURIComponent(cik)}`);
+}
+export function getSecResearchFilings(cik: string, query: SecResearchFilingsQuery = {}): Promise<SecResearchEnvelope<SecResearchFiling[]>> {
+  return getJSON(secResearchQueryPath(cik, "filings", query));
+}
+export function getSecResearchFacts(cik: string, query: SecResearchFactsQuery = {}): Promise<SecResearchEnvelope<SecResearchFact[]>> {
+  return getJSON(secResearchQueryPath(cik, "facts", query));
+}
+export function refreshSecResearch(cik: string, resume = false): Promise<SecResearchReceipt> {
+  // A client wait allowance, not a server cancellation or wall-clock guarantee.
+  return sendJSON(`/sec-research/${encodeURIComponent(cik)}/refresh`, "POST", { resume }, 600_000);
+}
+
 export async function getHealthz(): Promise<boolean> {
   try {
     const r = await fetchWithTimeout("/healthz", 3_000);

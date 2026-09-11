@@ -6,6 +6,17 @@ import { describe, expect, it } from "vitest";
 
 import { initializeI18n, resourceNamespaces, resources } from "./resources";
 type ResourceTree = Record<string, unknown>;
+const secResearchKeys = [
+  "title", "cik", "load", "refresh", "resume", "reread", "budget", "unit", "bytes", "gib",
+  "save", "saved", "reloadConfig", "invalidBudget", "configError", "saveError", "readError", "confirmationMismatch",
+  "refreshError", "unconfirmed", "errorDetail", "loading", "unknown", "ok", "empty", "partial",
+  "unavailable", "objects", "reservations", "orphans", "charged", "remaining", "overBudget",
+  "byteCount", "confirmedBudget", "storedStatus", "receipt", "observed", "coverage", "gaps",
+  "snapshots", "catalog", "facts", "views", "forms", "filedFrom", "filedTo", "amendments",
+  "concepts", "asOf", "revisions", "latest", "all", "previous", "next", "page", "filingId",
+  "factId", "accession", "form", "filedDate", "reportDate", "acceptedAt", "document",
+  "catalogUrl", "namespace", "concept", "value", "factUnit", "start", "end",
+] as const;
 
 interface PortfolioSourceClaim {
   signature: string;
@@ -735,7 +746,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 917,
+      settings: 988,
       research: 207,
       explore: 1219,
       portfolio: 374,
@@ -821,7 +832,8 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2860);
+      expect(total, `${locale}.total`).toBe(2931);
+      expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys].sort());
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1195,6 +1207,7 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      ...secResearchKeys.map((key) => `secResearch.${key}`),
       "workspace.routes.savedRefreshFailed",
       "workspace.routes.saveUnknown",
       "workspace.routes.saveSuperseded",

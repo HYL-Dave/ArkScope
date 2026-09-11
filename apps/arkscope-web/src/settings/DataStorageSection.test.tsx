@@ -130,6 +130,7 @@ vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
   return {
     ...actual,
+    getSecResearchConfig: vi.fn(async () => ({ capture_budget_bytes: 107374182400, capacity: null })),
     getMarketDataStatus: vi.fn(async () => EMPTY_MARKET_STATUS),
     listSecurityLifecycleCases: vi.fn(async () => CASES),
     getTradingDayCoverage: vi.fn(async () => COVERAGE),
@@ -272,6 +273,12 @@ afterEach(() => {
 });
 
 describe("DataStorageSection lifecycle automation controls", () => {
+  it("mounts the real SEC storage subsection without issuer acquisition", async () => {
+    await renderSection("en");
+    const section = host!.querySelector('[data-settings-location="sec_structured_storage"]');
+    expect(section?.textContent).toContain("SEC structured data");
+    expect(section?.querySelector('input[aria-label="CIK"]')).not.toBeNull();
+  });
   it.each([
     { language: "en" as const, summary: "48 cache entries (24 reusable · 24 refresh due)", timestamp: "latest cache timestamp" },
     { language: "zh-Hant" as const, summary: "48 個快取項目（可重用 24 · 待重新取得 24）", timestamp: "最新快取時間" },

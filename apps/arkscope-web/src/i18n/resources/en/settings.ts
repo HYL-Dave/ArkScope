@@ -1,5 +1,31 @@
 // Translation authority: docs/design/ARKSCOPE_TERMINOLOGY.md
 const settings = {
+  secResearch: {
+    title: "SEC structured data", cik: "CIK", load: "Load local",
+    refresh: "Refresh structured data", resume: "Resume refresh", reread: "Reread stored status",
+    budget: "Capture budget", unit: "Budget unit", bytes: "Bytes", gib: "GiB",
+    save: "Save budget", saved: "Budget saved", reloadConfig: "Reload configuration",
+    invalidBudget: "Enter positive whole bytes, at most 9007199254740991.",
+    configError: "Configuration unavailable", saveError: "Budget save not confirmed",
+    confirmationMismatch: "Confirmed budget differs from the requested value",
+    readError: "Stored read unavailable", refreshError: "Refresh request rejected",
+    unconfirmed: "Outcome unconfirmed. The server may still be running.",
+    errorDetail: "{{message}}: {{detail}}", loading: "Loading", unknown: "Unknown",
+    ok: "Available", empty: "Observed empty", partial: "Partial", unavailable: "Unavailable",
+    objects: "Stored objects", reservations: "Reservations", orphans: "Orphans",
+    charged: "Total charged", remaining: "Remaining", overBudget: "Over budget",
+    byteCount: "{{value}} bytes", confirmedBudget: "Confirmed budget",
+    storedStatus: "Stored status", receipt: "Refresh receipt", observed: "Receipt checkpoint",
+    coverage: "Coverage", gaps: "Gaps", snapshots: "Snapshots",
+    catalog: "Catalog", facts: "Facts", views: "Stored observations",
+    forms: "Forms", filedFrom: "Filed from", filedTo: "Filed to", amendments: "Include amendments",
+    concepts: "Concepts", asOf: "Available as of", revisions: "Revisions", latest: "Latest", all: "All",
+    previous: "Previous page", next: "Next page", page: "Page {{page}}",
+    filingId: "Filing ID", factId: "Fact ID", accession: "Accession", form: "Form",
+    filedDate: "Filed date", reportDate: "Report date", acceptedAt: "Accepted at",
+    document: "Primary document", catalogUrl: "Catalog URL", namespace: "Namespace",
+    concept: "Concept", value: "Reported value", factUnit: "Unit", start: "Start", end: "End",
+  },
   locale: {
     label: "Interface language",
     selfName: "English",
@@ -117,7 +143,7 @@ const settings = {
       dataStorage: {
         title: "Market Data",
         description: "Review stored prices, SEC fundamentals, financial-cache storage, and trading-day coverage.",
-        searchAliases: "market data|price|stored prices|fundamentals|SEC fundamentals|stored SEC fundamentals|financial cache|coverage|sqlite|trading-day coverage",
+        searchAliases: "market data|price|stored prices|fundamentals|SEC fundamentals|stored SEC fundamentals|financial cache|coverage|sqlite|trading-day coverage|SEC structured data|CIK|capture budget|filing catalog|company facts",
       },
       newsStorage: {
         title: "News Data",
@@ -737,7 +763,7 @@ const settings = {
   },
   dataStorage: {
     title: "Market Data",
-    description: "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals data is not connected to an App schedule, and this page only reloads status.",
+    description: "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals data is not connected to an App schedule, and the fundamentals summary only reloads status.",
     loading: "Loading...",
     available: "Available",
     empty: "No data yet",
