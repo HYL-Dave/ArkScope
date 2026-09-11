@@ -345,6 +345,7 @@ duplicate entries:
 
 | Observation | Canonical disposition |
 |---|---|
+| September 11 removed-UI census adds 100 locale-leaf candidates | Owned by P1 cleanup as `CENSUS-I18N-001` in `docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/README.md`. This register does not duplicate the active workstream or treat a missing static reference as proof of dead code. Exact candidate IDs and dynamic-consumer revalidation are required before removal. |
 | jsdom popup contrast gate must remain paired with real Chrome computed styles | Permanent release rule; textual-only CSS evidence is insufficient. |
 | Partial-status `#b45309` on `#fff3e0` measured `4.58:1` | Dated accepted boundary already recorded in the same spec at lines 98-99; changing either color must rerun its gate. |
 | Identical zh/en resource values | Not admitted. A fresh recursive resource comparison reproduces `160` identical leaves. The review additionally reported `24` multi-word non-CJK leaves and proposed `2` aria, `6` routing, and `5` runtime candidates, but that exact key ledger and its classification rule are not persisted in the repo and therefore are not independently reproducible yet. Equal identifiers and professional terms may be deliberate. Persist and review the exact candidate keys before opening an issue; none of these counts is an acceptance constant. |

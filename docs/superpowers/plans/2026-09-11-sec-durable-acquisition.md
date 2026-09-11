@@ -71,7 +71,7 @@ NOT NULL CHECK(size_bytes>=0))`;
 CHECK(size_bytes>=0))`. Other owned structures retain source snapshots, filing
 and fact rows, and receipts with reference constraints/immutable triggers.
 
-- [ ] Add RED owners for fresh/populated installation, repeated initialization,
+- [x] Add RED owners for fresh/populated installation, repeated initialization,
   explicit shape mismatch, exact fact TEXT and amendments, retained snapshots,
   hash mismatch and interruption rollback. Initial RED is missing schema/store.
 
@@ -85,15 +85,15 @@ def test_install_preserves_populated_unrelated_tables(tmp_path):
     assert sentinel_rows(store) == ORIGINAL_ROWS
 ```
 
-- [ ] Implement exact owned DDL verification using sqlite_master; validate all
+- [x] Implement exact owned DDL verification using sqlite_master; validate all
   owned objects before installing any, reject unexpected sec_research_* objects.
   Use exact Decimal string values from the parser, source pointers and SHA256.
-- [ ] Limit normalized payload/row count before acquiring the writer transaction;
+- [x] Limit normalized payload/row count before acquiring the writer transaction;
   idempotent snapshot identities preserve observation time through receipts.
-- [ ] Run `tests/test_sec_research_store.py` plus all existing SEC parser/config/
+- [x] Run `tests/test_sec_research_store.py` plus all existing SEC parser/config/
   path tests. Inverse mutations: bypass shape check, store value as float,
   overwrite an old source snapshot. Each must kill a named owner.
-- [ ] Review and commit the independently testable store.
+- [x] Review and commit the independently testable store.
 
 ## Task 2: Create-Only Captures, Capacity And Crash Recovery
 
@@ -109,7 +109,7 @@ free_bytes: Callable[[Path], int] | None = None)`;
 `.recover() -> dict` reconciles interrupted captures under exclusive root lease.
 `capture_writer(root: Path)` is a context manager; no silent unlocked fallback.
 
-- [ ] Add RED tests for exact byte reopening, duplicate quota charge, reduced
+- [x] Add RED tests for exact byte reopening, duplicate quota charge, reduced
   budget readable captures, quota/disk rejection, interrupted stage/publication,
   orphan charging, two-process reservation contention and symlink rejection.
 
@@ -122,21 +122,26 @@ def test_reduced_budget_blocks_growth_not_pinned_reads(captures):
         captures.put(b'new')
 ```
 
-- [ ] Serialize capture writes/reconciliation with a per-root OS file lease
-  (fcntl on POSIX, explicit Windows locking branch or typed unsupported failure;
-  never a no-op). Root/children are non-symlink regular structures; POSIX
+- [x] Serialize capture writes/reconciliation with a per-root OS file lease
+  (fcntl on POSIX, typed unsupported failure elsewhere; never a no-op).
+  Synchronization files live in the existing trusted `ARKSCOPE_LOCK_DIR`, keyed
+  by the absolute capture root hash, outside mutable content. Operators must not
+  replace this coordination namespace while live, as with market/governor locks.
+  A distinct issuer lease serializes same-CIK refresh receipts without holding
+  the capture writer or market DB lock across provider waits.
+  Root/children are non-symlink regular structures; POSIX
   descriptor-relative opens protect writes against path replacement.
-- [ ] Reserve the exact already-buffered body length in a short transaction
+- [x] Reserve the exact already-buffered body length in a short transaction
   before disk writes. Source acquisition and parsing occur before this lease.
   Staged bytes plus unused reservation equal the reservation, not twice it.
-- [ ] Fsync a private create-only stage; publish via no-replace hard link; verify
+- [x] Fsync a private create-only stage; publish via no-replace hard link; verify
   any existing target's length/hash. Commit the object row, then remove only this
   operation's stage. No referenced object is overwritten or automatically pruned.
-- [ ] Recovery can release prior reservation ownership only while the exclusive
+- [x] Recovery can release prior reservation ownership only while the exclusive
   writer lease proves no active writer remains. Enumerate actual stage/unpublished
   object sizes as charged orphans before releasing reservations. No TTL/PID guess
   can reclaim live work. Detect missing/corrupt registered captures on read.
-- [ ] Test ENOSPC after preflight, fault injection before/after link and metadata
+- [x] Test ENOSPC after preflight, fault injection before/after link and metadata
   commit, moved-root reopening and process death. Inverse quota subtraction and
   overwrite publication mutations must fail named tests. Review and commit.
 
@@ -150,56 +155,59 @@ def test_reduced_budget_blocks_growth_not_pinned_reads(captures):
 receipt; `.stored(cik)` returns catalog/fact snapshot coverage with no transport.
 Input is an explicit CIK in this stage, not guessed ticker resolution.
 
-- [ ] RED fixtures use original JSON bytes through a fake transport exposing
+- [x] RED fixtures use original JSON bytes through a fake transport exposing
   `get(url, **kwargs)` and SecResponse. Named owners prove acquisition occurs
   outside write locks; recent/historical traversal; incomplete vs empty;
   malformed source retention without successful smaller data; provider failure
   receipt; original precision; preflight before transport; and persisted resume.
-- [ ] Request submissions then companyfacts and declared historical files only;
+- [x] Request submissions then companyfacts and declared historical files only;
   deduplicate pointer names and bound each invocation's sources to max_sources.
   Persist pending/completed source locators, gaps and observation time. Resume
   consumes that pending set, never assumes omitted pointers are empty history.
   Fresh refresh starts a new observation; old successful snapshots stay readable.
-- [ ] Preflight before every request; transport `.body` feeds parsers directly.
+- [x] Preflight before every request; transport `.body` feeds parsers directly.
   Persist valid complete source body before its parsed snapshot. Failed parses
   may preserve their original body but do not publish valid observation rows.
   Closed failure codes, not body/URL/token exception strings. Cancellation keeps
   pending work; partial results never imply complete coverage.
-- [ ] Inverse skip-preflight and force-complete mutations fail their owners.
+- [x] Inverse skip-preflight and force-complete mutations fail their owners.
   Run parser/store/capture/service suite. Review and commit.
 
 ## Task 4: Explicit Application Commands And Review Follow-Ups
 
 **Files:** create `src/api/routes/sec_research.py`,
 `tests/test_sec_research_routes.py`; modify `src/api/app.py`,
-`docs/design/PROJECT_PRIORITY_MAP.md`, `docs/design/ENGINEERING_ISSUE_REGISTER.md`.
+`tests/test_api.py`, `tests/test_security_lifecycle_routes.py` (the two exact
+application route-count owners: 216 to 218, naming the two SEC routes),
+`docs/design/PROJECT_PRIORITY_MAP.md`, `docs/design/ENGINEERING_ISSUE_REGISTER.md`
+and the existing cleanup audit `README.md` (canonical CENSUS-I18N-001 owner).
 
-- [ ] RED tests prove `GET /sec-research/{cik}` creates no schema/files and makes
+- [x] RED tests prove `GET /sec-research/{cik}` creates no schema/files and makes
   no provider request; absent store is unavailable, not empty success.
   `POST /sec-research/{cik}/refresh` calls existing `require_db_write` before
   service construction, explicit installation and provider dispatch. Validate
   CIK, max_sources 1..16 and boolean resume before side effects.
-- [ ] Build the service from the existing profile accessor, market path and
+- [x] Build the service from the existing profile accessor, market path and
   SecTransport identity; always close transport. No startup schema installation,
   job, new tool registration or UI control. This endpoint is the current
   structured service's application consumer; Settings will reuse it.
-- [ ] Name the 100 i18n candidates' cleanup owner; preserve EIR-001 CSS and
+- [x] Name the 100 i18n candidates' cleanup owner; preserve EIR-001 CSS and
   CENSUS-SQL-001. Mark foundations consumed by service and remaining tool/UI
   wiring pending. Do not relabel candidate counts as confirmed dead code.
-- [ ] Review permission/read-only tests and unchanged tool inventory. Commit.
+- [x] Review permission/read-only tests and unchanged tool inventory. Commit.
 
 ## Task 5: Integration Evidence
 
-- [ ] Run focused store/capture/service/routes and existing SEC/tool/API owners.
+- [x] Run focused store/capture/service/routes and existing SEC/tool/API owners.
   Record exact RED, GREEN and inverse mutation results, not predicted counts.
-- [ ] Run a fresh complete offline backend suite, capture collected/executed node
+- [x] Run a fresh complete offline backend suite, capture collected/executed node
   accounting and source hash stability; do not modify existing expectations to
   hide runner failures. Rerun mechanical census against the preceding sealed
   result; classify all new candidates/uncertainties explicitly.
-- [ ] Independent whole-change review; fix substantive findings and verify again.
-  Archive source/evidence hashes and final counts in
+- [x] Independent whole-change review; fix substantive findings and verify again.
+- [x] Archive source/evidence hashes and final counts in
   `docs/superpowers/evidence/2026-09-11-sec-durable-acquisition/`.
-- [ ] Report this completed structured-service boundary and still-open document
+- [x] Report this completed structured-service boundary and still-open document
   reader, query policy/cursors, issuer resolution, three tools/four transports,
   citations/export, schedule/UI, C11/C12 and old actual-schema disposition.
   No claim that the complete SEC first release is ready for hand testing.
