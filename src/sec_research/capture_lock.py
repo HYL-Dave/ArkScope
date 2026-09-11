@@ -184,3 +184,8 @@ def capture_writer(root: Path):
 def issuer_refresh(root: Path, cik: str):
     from src.sec_research.common import normalize_cik
     return _lease(root, ".refresh-" + normalize_cik(cik) + ".lock", "sec_research_refresh_busy")
+
+
+def document_acquisition(root: Path):
+    """One explicit acquisition per capture root, without holding the writer lease."""
+    return _lease(root, ".document.lock", "document_acquisition_busy")
