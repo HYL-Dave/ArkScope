@@ -98,7 +98,8 @@ function Records({ page, view, t }: { page: Page | null; view: View; t: Settings
     <Observation value={page} t={t} />
     {rows.length > 0 && <div className="sec-record-scroll" tabIndex={0} role="region" aria-label={t(($) => $.secResearch.views)}>
       <table><thead><tr>{present.map(([key, label]) => <th scope="col" key={key}>{label}</th>)}</tr></thead>
-        <tbody>{rows.map((row, index) => <tr key={String(row.filing_id ?? row.fact_id ?? index)}>{present.map(([key]) => {
+        {/* Catalog variants share filing IDs; stateless rows can use page-local positions. */}
+        <tbody>{rows.map((row, index) => <tr key={view === "filings" ? index : String(row.filing_id ?? row.fact_id ?? index)}>{present.map(([key]) => {
           const url = key === "primary_url" ? safeCatalogUrl(row[key]) : null;
           return <td key={key}>{key === "primary_url"
             ? url && <a href={url} target="_blank" rel="noopener noreferrer" title={t(($) => $.secResearch.catalogUrl)} aria-label={t(($) => $.secResearch.catalogUrl)}><ExternalLink size={16} aria-hidden="true" /></a>

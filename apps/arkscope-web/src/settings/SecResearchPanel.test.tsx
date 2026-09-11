@@ -277,6 +277,57 @@ describe("SEC structured storage", () => {
     expect(button("Previous page").disabled).toBe(true);
   });
 
+  it("preserves conflicting catalog variants across cached forward and back pages without key warnings", async () => {
+    const first = [
+      filing("conflict"), { ...filing("conflict"), form: "10-Q" },
+      ...Array.from({ length: 18 }, (_, index) => filing(`first-${index}`)),
+    ];
+    const expectedFirst = [
+      ["10-K", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", "conflict.htm", "", "accession-conflict", "conflict"],
+      ["10-Q", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", "conflict.htm", "", "accession-conflict", "conflict"],
+      ...Array.from({ length: 18 }, (_, index) => [
+        "10-K", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", `first-${index}.htm`, "", `accession-first-${index}`, `first-${index}`,
+      ]),
+    ];
+    const expectedNext = [["10-K", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", "next-page.htm", "", "accession-next-page", "next-page"]];
+    handler = (url) => url.pathname.endsWith("/filings") ? {
+      ...envelope("partial", url.searchParams.has("cursor") ? [filing("next-page")] : first,
+        url.searchParams.has("cursor") ? null : "conflict+/= &cursor"),
+      gaps: [{ code: "filing_metadata_conflict" }],
+    } : fallback(url);
+    const expectRows = (expected: string[][]) => {
+      const rows = [...host.querySelectorAll(".sec-record-scroll tbody tr")];
+      expect.soft(rows).toHaveLength(expected.length);
+      expect.soft(rows.map((row) => [...row.querySelectorAll("td")].map((cell) => cell.textContent))).toEqual(expected);
+      expect.soft(host.querySelector('[role="tabpanel"]')?.textContent).toContain("filing_metadata_conflict");
+    };
+    const consoleError = vi.spyOn(console, "error");
+    try {
+      await render(); await load();
+      expectRows(expectedFirst);
+      expect(button("Previous page").disabled).toBe(true);
+      await click("Next page");
+      expectRows(expectedNext);
+      expect(button("Next page").disabled).toBe(true);
+      const catalogRequests = requests.filter(({ url }) => url.pathname.endsWith("/filings"));
+      expect(catalogRequests.map(({ url }) => url.searchParams.get("cursor"))).toEqual([null, "conflict+/= &cursor"]);
+      expect(catalogRequests.map(({ url }) => url.searchParams.get("limit"))).toEqual(["20", "20"]);
+      const requestCount = requests.length;
+      handler = (url) => url.pathname.endsWith("/filings") ? envelope("ok", [filing("new-receipt")]) : fallback(url);
+      await click("Previous page");
+      expectRows(expectedFirst);
+      expect(requests).toHaveLength(requestCount);
+      expect(button("Previous page").disabled).toBe(true);
+      await click("Next page");
+      expectRows(expectedNext);
+      expect(requests).toHaveLength(requestCount);
+      expect(button("Next page").disabled).toBe(true);
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("refresh and resume have distinct payloads and reset pages to the new receipt", async () => {
     await render(); await load(); await click("Next page");
     await click("Refresh structured data");
