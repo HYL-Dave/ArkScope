@@ -21,8 +21,8 @@ URL = f"/sec-research/filings/{FILING_ID}/document"
 ENVELOPE = {"status", "data", "gaps", "observed_at", "coverage", "next_cursor"}
 
 
-def forbidden(*args, **kwargs):
-    pytest.fail("document route crossed a forbidden side-effect boundary")
+class ForbiddenAccess(RuntimeError):
+    """Ordinary request-worker exception; the test-side call ledger is authoritative."""
 
 
 @pytest.fixture
@@ -33,8 +33,24 @@ def route(tmp_path, monkeypatch):
     monkeypatch.setattr(module.SecResearchPaths, "resolve", lambda: paths)
     app = FastAPI()
     app.include_router(module.router)
+    forbidden_calls = []
+
+    def forbidden(*args, **kwargs):
+        forbidden_calls.append((args, kwargs))
+        raise ForbiddenAccess("document route crossed a forbidden side-effect boundary")
+
     with TestClient(app) as client:
-        yield SimpleNamespace(module=module, paths=paths, client=client, app=app)
+        request = client.request
+
+        def checked_request(*args, **kwargs):
+            try:
+                return request(*args, **kwargs)
+            finally:
+                # Check outside the worker even when the route swallowed the sentinel.
+                assert forbidden_calls == [], f"forbidden document access: {forbidden_calls!r}"
+
+        monkeypatch.setattr(client, "request", checked_request)
+        yield SimpleNamespace(module=module, paths=paths, client=client, app=app, forbidden=forbidden)
 
 
 @pytest.fixture
@@ -48,12 +64,12 @@ def configured(route, monkeypatch):
 
 def forbid_get_writes(route, monkeypatch):
     for name in ("get_profile_store", "get_data_provider_store", "SecTransport"):
-        monkeypatch.setattr(route.module, name, forbidden)
-    monkeypatch.setattr(Store, "install", forbidden)
+        monkeypatch.setattr(route.module, name, route.forbidden)
+    monkeypatch.setattr(Store, "install", route.forbidden)
     for name in ("put", "preflight", "recover", "status"):
-        monkeypatch.setattr(CaptureStore, name, forbidden)
+        monkeypatch.setattr(CaptureStore, name, route.forbidden)
     from src.sec_research.document_service import DocumentService
-    monkeypatch.setattr(DocumentService, "refresh", forbidden)
+    monkeypatch.setattr(DocumentService, "refresh", route.forbidden)
 
 
 def snapshot(paths):
@@ -105,7 +121,7 @@ def test_valid_missing_document_is_unavailable_and_get_never_writes(route, monke
 ])
 def test_invalid_get_operands_precede_store_access(route, monkeypatch, mode, params, code):
     setup_store(route, mode)
-    monkeypatch.setattr(route.module.SecResearchPaths, "resolve", forbidden)
+    monkeypatch.setattr(route.module.SecResearchPaths, "resolve", route.forbidden)
     response = route.client.get(URL, params=params)
     assert response.status_code == 422
     assert response.json() == {"detail": {"code": code}}
@@ -113,8 +129,8 @@ def test_invalid_get_operands_precede_store_access(route, monkeypatch, mode, par
 
 @pytest.mark.parametrize("method", ["get", "post"])
 def test_invalid_filing_precedes_permissions_and_paths(route, monkeypatch, method):
-    monkeypatch.setattr(route.module, "require_db_write", forbidden)
-    monkeypatch.setattr(route.module.SecResearchPaths, "resolve", forbidden)
+    monkeypatch.setattr(route.module, "require_db_write", route.forbidden)
+    monkeypatch.setattr(route.module.SecResearchPaths, "resolve", route.forbidden)
     url = "/sec-research/filings/PRIVATE/document"
     response = (route.client.get(url) if method == "get" else
                 route.client.post(url, json={"document_id": "primary"}))
@@ -126,8 +142,8 @@ def test_invalid_filing_precedes_permissions_and_paths(route, monkeypatch, metho
     {"document_id": None}, {"document_id": True}, {"document_id": 1},
     {"document_id": "primary", "PRIVATE": "PRIVATE"}, {"document_id": "PRIVATE"}, []])
 def test_post_requires_exact_primary_body_before_mutation(route, monkeypatch, body):
-    monkeypatch.setattr(route.module, "require_db_write", forbidden)
-    monkeypatch.setattr(route.module.SecResearchPaths, "resolve", forbidden)
+    monkeypatch.setattr(route.module, "require_db_write", route.forbidden)
+    monkeypatch.setattr(route.module.SecResearchPaths, "resolve", route.forbidden)
     response = route.client.post(URL, json=body)
     assert response.status_code == 422
     assert response.json() == {"detail": {"code": "sec_research_query_invalid"}}
@@ -135,7 +151,7 @@ def test_post_requires_exact_primary_body_before_mutation(route, monkeypatch, bo
 
 @pytest.mark.parametrize("body", [b"", b'{"document_id": PRIVATE}'])
 def test_post_body_parse_errors_are_content_free(route, monkeypatch, body):
-    monkeypatch.setattr(route.module, "require_db_write", forbidden)
+    monkeypatch.setattr(route.module, "require_db_write", route.forbidden)
     response = route.client.post(URL, content=body, headers={"Content-Type": "application/json"})
     assert response.status_code == 422
     assert response.json() == {"detail": {"code": "sec_research_query_invalid"}}
@@ -152,7 +168,7 @@ def test_shared_permission_denial_precedes_all_post_owners(route, monkeypatch):
 
     monkeypatch.setattr(permissions, "require_permission", reject)
     for name in ("get_profile_store", "get_data_provider_store", "Store", "CaptureStore"):
-        monkeypatch.setattr(route.module, name, forbidden)
+        monkeypatch.setattr(route.module, name, route.forbidden)
     response = route.client.post(URL, json={"document_id": "primary"})
     assert response.status_code == 403 and response.json() == {"detail": {"code": "denied"}}
     assert not route.paths.market_db_path.exists()
@@ -163,7 +179,7 @@ def test_bad_managed_identity_never_installs_or_uses_environment(configured, mon
     monkeypatch.setenv("ARKSCOPE_SEC_USER_AGENT", "Legacy legacy@example.com")
     monkeypatch.setattr(configured.module, "get_data_provider_store", lambda: SimpleNamespace(
         get_all=lambda: {"sec_edgar": {"user_agent": identity}}))
-    monkeypatch.setattr(Store, "install", forbidden)
+    monkeypatch.setattr(Store, "install", configured.forbidden)
     response = configured.client.post(URL, json={"document_id": "primary"})
     assert response.status_code == 503
     assert response.json() == {"detail": {"code": "sec_identity_unconfigured"}}
@@ -173,7 +189,7 @@ def test_bad_managed_identity_never_installs_or_uses_environment(configured, mon
 def test_corrupt_budget_precedes_installation(configured, monkeypatch):
     monkeypatch.setattr(configured.module, "get_profile_store", lambda: SimpleNamespace(
         get_settings_snapshot=lambda keys: {"sec_research.capture_budget_bytes": "PRIVATE"}))
-    monkeypatch.setattr(Store, "install", forbidden)
+    monkeypatch.setattr(Store, "install", configured.forbidden)
     response = configured.client.post(URL, json={"document_id": "primary"})
     assert response.status_code == 503
     assert response.json() == {"detail": {"code": "sec_research_document_unavailable"}}
@@ -213,7 +229,7 @@ def live_route(configured, rig, monkeypatch):
             checks.append(True)
 
     monkeypatch.setattr(sec, "SecRequestGovernor", Governor)
-    monkeypatch.setattr(sec, "get_sec_user_agent", forbidden)
+    monkeypatch.setattr(sec, "get_sec_user_agent", configured.forbidden)
     monkeypatch.setenv("ARKSCOPE_SEC_USER_AGENT", "Wrong wrong@example.com")
     configured.rig, configured.policy_checks = rig, checks
     return configured
@@ -286,7 +302,7 @@ def test_cursor_binding_rejected_before_absent_store(live_route, monkeypatch):
     attempt = acquire(live_route)
     params = {"capture_id": attempt["capture_id"], "max_chars": 80}
     cursor = live_route.client.get(URL, params=params).json()["data"]["text_start_cursor"]
-    monkeypatch.setattr(live_route.module.SecResearchPaths, "resolve", forbidden)
+    monkeypatch.setattr(live_route.module.SecResearchPaths, "resolve", live_route.forbidden)
     for changed in ({"query": "needle"}, {"max_chars": 81}, {"document_id": "file:actual.htm"},
                     {"capture_id": "secdoc_" + "0" * 64}, {"section_id": "item_1"}):
         response = live_route.client.get(URL, params={**params, "cursor": cursor, **changed})
