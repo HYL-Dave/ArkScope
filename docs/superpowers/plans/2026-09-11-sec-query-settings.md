@@ -23,6 +23,16 @@ in this batch. Ticker resolution, original filing documents/citations, three
 replacement tools/four channels, export and the disabled-by-default schedule
 remain separate completion requirements. No obsolete SEC event control returns.
 
+## Execution Status
+
+| Task | Current gate |
+| --- | --- |
+| 1 | Complete at `7a1b9d99`; receipt read-shape R1 review passed. |
+| 2 | Complete at `e07e459a`; independent review approved. |
+| 3 | Complete at `420e4759`; 953 SEC/API tests and scoped R1 review passed. |
+| 4 | Complete at `c6e2e435`; R1 review and desktop/mobile browser geometry passed. |
+| Final | Whole-change review, fresh complete checks and evidence closeout pending. |
+
 ## Global Constraints
 
 - Work only in the existing linked branch. No production store/config/token
@@ -41,13 +51,21 @@ remain separate completion requirements. No obsolete SEC event control returns.
 - Every query returns status/data/gaps/observed_at/coverage/next_cursor. `empty`
   needs an observed covered selection, never absence or an incomplete traversal.
 - Cursor v1 binds CIK, query kind, normalized filters including page limit, receipt
-  identity and the exact source-snapshot binding digest. Decode strictly with a
+  identity and the exact source-snapshot binding digest. Explicit immutable fact-id
+  queries instead bind the requested ids and retained snapshot identities, without
+  requiring a current receipt to bless historical observations. Decode strictly with a
   4096-byte cap. No secrets, arbitrary paths, SQL fragments or URLs in cursors.
   Cursor is a consistency token, not an authorization credential. Reads remain
   stable after restart/relocation/refresh; malformed or mismatched cursors fail.
 - Page limits are 1..100 whole observations, with a 256 KiB encoded envelope
   ceiling. Oversized records produce a typed gap, never substring truncation or
   an endlessly repeated cursor. Source snapshots remain bounded at 100000 rows.
+  Aggregate filtered-query working input is separately bounded to 100000 rows and
+  64 MiB encoded metadata/rows across snapshots; stream/filter before retaining
+  rows. Limit admitted sources to1024 as well. Exhaustion is partial with an
+  explicit query_budget_exceeded gap (or unavailable if nothing was admitted),
+  never an incomplete result advertised as complete. The cursor covers only the
+  explicitly admitted selection. This is not a measured whole-process RAM cap.
 - Follow current compact Settings conventions. The new section manages real
   structured observations only, not previews of absent future features. No
   schedule or model-facing admission is implied by showing local data.
@@ -67,7 +85,7 @@ explicitly unbound observations; they can never satisfy a covered public query.
 include_amendments=True, cursor=None, limit=20)` produces the closed envelope.
 The same class supplies validated receipt/cursor helpers consumed by Task 2.
 
-- [ ] RED: source binding survives repeated unchanged capture and restart;
+- [x] RED: source binding survives repeated unchanged capture and restart;
   cross-issuer/kind/locator bindings fail; an interrupted new refresh cannot borrow
   an older successful snapshot. Add filter-before-limit, amendment and cursor tests.
 
@@ -80,19 +98,19 @@ assert first['coverage']['receipt_id'] == second['coverage']['receipt_id']
 assert second['data'][0]['filing_id'] == original_second_filing_id
 ```
 
-- [ ] Run named RED owners through the isolated offline harness; expected missing
+- [x] Run named RED owners through the isolated offline harness; expected missing
   binding/query behavior, not missing fixture dependencies.
-- [ ] Add binding validation and stable receipt reopening. Read only bound catalog
+- [x] Add binding validation and stable receipt reopening. Read only bound catalog
   snapshots; merge identical duplicate filing rows, flag conflicting metadata for
   the same filing instead of choosing arbitrary source order. Sort deterministically
   by filed_date descending then accession/filing identity. Normalize form sets;
   `10-K` includes `10-K/A` only when include_amendments is true. Apply dates/forms
   before pagination. Missing historical coverage stays partial even with zero rows.
-- [ ] Own `test_receipt_sequence_does_not_reuse_committed_ids` and
+- [x] Own `test_receipt_sequence_does_not_reuse_committed_ids` and
   `test_sec_schema_leaves_unrelated_autoincrement_sequence_owned_by_sqlite`.
   Inverse mutants: remove AUTOINCREMENT at max-id boundary, use latest receipt on
   cursor continuation, ignore cursor filter hash. Each must kill its named owner.
-- [ ] Run all existing SEC suites; independent review, fix findings and commit.
+- [x] Run all existing SEC suites; independent review, fix findings and commit.
 
 ## Task 2: Exact Stored Financial Fact Queries
 
@@ -104,7 +122,7 @@ entry if needed. Do not duplicate receipt/cursor/envelope mechanics.
 fact_ids=None, accession=None, as_of=None, period='all', start=None, end=None,
 revisions='latest', cursor=None, limit=40)`.
 
-- [ ] RED exact decimal, non-USD unit, unavailable versus observed-empty, filing
+- [x] RED exact decimal, non-USD unit, unavailable versus observed-empty, filing
   availability `as_of`, amendment/latest/all, competing values, missing concepts,
   stable cursor, immutable fact-id reopen, and incompatible filters.
 
@@ -114,24 +132,24 @@ assert page['data'][0]['value'] == '1234567890123456789.123'
 assert all(row['filed_date'] <= '2026-02-01' for row in page['data'])
 ```
 
-- [ ] Reuse reviewed concept alternatives from INCOME_STATEMENT_MAPPING,
+- [x] Reuse reviewed concept alternatives from INCOME_STATEMENT_MAPPING,
   BALANCE_SHEET_MAPPING and CASH_FLOW_MAPPING, not float-based selection code.
   Expose metrics revenue/net_income/operating_income/assets/liabilities/equity/cash/
   operating_cash_flow/capex/eps/shares and exact namespaced concepts. Alternative
   concepts are visible observations, not arbitrarily collapsed interchangeable
   values; missing requested metrics receive typed gaps.
-- [ ] Return reported values only. Distinguish instant/duration windows using the
+- [x] Return reported values only. Distinguish instant/duration windows using the
   original start/end, fiscal labels and frame without deriving Q4 or TTM. Unknown
   period classification is a gap, not a fabricated quarter. Group revisions by
   concept/unit/start/end, take latest available filing date deterministically;
   competing different values at the same latest date remain visible with conflict
   gaps rather than arbitrary accession tie breaking. Preserve source references.
-- [ ] `fact_ids` reopens retained immutable rows without current/latest selection;
+- [x] `fact_ids` reopens retained immutable rows without current/latest selection;
   reject simultaneous metrics/concepts/accession/as_of/period/start/end/revision
   filters. Bind pagination to the requested ids and immutable observation set.
-- [ ] Inverse mutants: float conversion, period-end instead of filed-date as_of,
+- [x] Inverse mutants: float conversion, period-end instead of filed-date as_of,
   applying latest selection to fact_ids. Named owners must fail, then restore.
-- [ ] Run related suites; independent review and commit.
+- [x] Run related suites; independent review and commit.
 
 ## Task 3: Management And Query HTTP Contracts
 
@@ -148,7 +166,7 @@ only strict `{capture_budget_bytes: int}`, persists through typed accessor and
 returns the saved value. All query errors are closed 422 codes; storage failures
 are unavailable envelopes without provider/body/path exception text.
 
-- [ ] RED: read routes cannot construct transport/install/recover; static config
+- [x] RED: read routes cannot construct transport/install/recover; static config
   is not captured by CIK matching; all filter/cursor parameters reach the real
   stored query; permission denial occurs before any mutation owner construction.
   Quota reduction affects neither files nor schedule; invalid persisted config
@@ -161,10 +179,10 @@ assert existing_capture_bytes() == before
 assert transport_calls == []
 ```
 
-- [ ] Connect thin adapters; no ticker guessing or hidden freshness/acquisition.
+- [x] Connect thin adapters; no ticker guessing or hidden freshness/acquisition.
   Reconcile exact route counts from actual registrations (expected +4, 218->222),
   not by deleting count contracts. Query future freshness admission is not exposed.
-- [ ] Run API/permission/source suites; independent review and commit.
+- [x] Run API/permission/source suites; independent review and commit.
 
 ## Task 4: Real Settings Consumers
 
@@ -178,16 +196,20 @@ request/error handling. Panel uses explicit CIK input, local status, catalog/fac
 tabs, bounded next/previous page navigation, refresh and resume commands, quota
 edit/save and current object/reservation/orphan charges. No per-model controls.
 
-- [ ] RED: first render performs stored GET only; quota save exact bytes and error
+- [x] RED: first render performs stored GET only; quota save exact bytes and error
   does not claim saved; refresh/resume distinct payloads; selected issuer/filter
   resets cursors; delayed old request cannot overwrite a new issuer; follow cursor
   unchanged; partial/unavailable/empty states display distinctly.
-- [ ] Build compact unframed section with existing components/lucide tooltips,
+- [x] Build compact unframed section with existing components/lucide tooltips,
   labels/toggles/selects/tables and i18n. Avoid nested panels and explanatory
   feature copy. Show CIK explicitly instead of pretending ticker resolution exists.
   Preserve unsaved quota draft during data refresh; re-read confirmed setting after
   save. Long values and dates cannot overlap on narrow viewports.
-- [ ] Focused/full frontend tests, typecheck, i18n check and fixture-only Playwright
+- [x] Refresh uses an explicit ten-minute client wait allowance, not the generic
+  15-second JSON helper default. Transport timeout is per request/read, so this is
+  not a server wall-clock/cancellation guarantee. A disconnected/timed-out command
+  is unconfirmed, offers stored-status reread and is never automatically retried.
+- [x] Focused/full frontend tests, typecheck, i18n check and fixture-only Playwright
   desktop/mobile screenshots. Network must be mocked, not live backend/provider.
   Independently review UI and its API handling, then commit.
 
