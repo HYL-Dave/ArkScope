@@ -372,7 +372,7 @@ class PublicSourceReader:
     """
 
     def __init__(self, limits: SourceReadLimits, *, now: Callable[[], datetime] | None = None, sec_policy=None,
-                 document_observer=None):
+                 document_observer=None, text_extractor=None):
         self.limits = limits
         self.deadline = time.monotonic() + limits.timeout_seconds
         self._now = now or (lambda: datetime.now(timezone.utc))
@@ -383,6 +383,7 @@ class PublicSourceReader:
         self._read_lock = Lock()
         self.sec_policy = sec_policy
         self.document_observer = document_observer
+        self.text_extractor = text_extractor
         self._observations: list[SourceReadObservation] = []
 
     @property
@@ -516,7 +517,8 @@ class PublicSourceReader:
                 if response.status != 200:
                     raise SourceReadError("source_unavailable")
                 body = self._body(response, observed)
-                text, mime = _page_text(body, response.getheader("Content-Type", "application/octet-stream"), check=self._remaining)
+                extractor = _page_text if self.text_extractor is None else self.text_extractor
+                text, mime = extractor(body, response.getheader("Content-Type", "application/octet-stream"), check=self._remaining)
                 if self.document_observer is not None:
                     self.document_observer(current, body, response.getheader("Content-Type", "application/octet-stream"))
                     self._remaining()
