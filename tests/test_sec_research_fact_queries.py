@@ -72,6 +72,28 @@ def codes(page):
     return {gap["code"] for gap in page["gaps"]}
 
 
+@pytest.mark.parametrize("kind,params,expected", [
+    ("filings", {"forms": ["10-k", "10-K", " 10-Q "]}, {
+        "forms": ["10-K", "10-Q"], "filed_from": None, "filed_to": None,
+        "include_amendments": True, "limit": 20}),
+    ("facts", {"metrics": [" assets ", "assets"], "concepts": ["us-gaap:Assets"]}, {
+        "metrics": ["assets"], "concepts": ["us-gaap:Assets"], "accession": None,
+        "as_of": None, "period": "all", "start": None, "end": None, "revisions": "latest", "limit": 40}),
+    ("facts", {"fact_ids": [MISSING_ID, MISSING_ID]}, {"fact_ids": [MISSING_ID], "limit": 40}),
+])
+def test_shared_query_operand_validation_normalizes_without_storage(monkeypatch, kind, params, expected):
+    import src.sec_research.queries as queries
+    validator = getattr(queries, "validate_query", None)
+    assert callable(validator), "shared storage-independent query validation missing"
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("pure validation constructed or read storage")
+
+    monkeypatch.setattr(Store, "__init__", forbidden)
+    monkeypatch.setattr(Store, "connect", forbidden)
+    assert validator(" CIK:320193 ", kind, **params) == expected
+
+
 def test_exact_decimal_non_usd_and_complete_original_provenance(store):
     sid, ids = publish(store, [fact("1234567890123456789.123")])
     saved = receipt(store, sid)

@@ -68,6 +68,43 @@ def query_date(value):
         raise ValueError("sec_research_query_invalid") from None
 
 
+def _filings_filters(*, forms=None, filed_from=None, filed_to=None,
+                     include_amendments=True, limit=20):
+    if (type(limit) is not int or not 1 <= limit <= 100 or type(include_amendments) is not bool
+            or forms is not None and (not isinstance(forms, (list, tuple))
+            or any(not isinstance(form, str) or not form.strip() for form in forms))):
+        raise ValueError("sec_research_query_invalid")
+    forms = sorted({form.strip().upper() for form in forms}) if forms else None
+    filed_from, filed_to = query_date(filed_from), query_date(filed_to)
+    if filed_from and filed_to and filed_from > filed_to:
+        raise ValueError("sec_research_query_invalid")
+    return {"forms": forms, "filed_from": filed_from, "filed_to": filed_to,
+            "include_amendments": include_amendments, "limit": limit}
+
+
+def _query_token(cik, kind, filters, cursor):
+    filters_hash = _digest(filters)
+    token = _decode(cursor) if cursor is not None else None
+    if token and (token["cik"] != cik or token["kind"] != kind or token["filters_hash"] != filters_hash):
+        raise ValueError("sec_research_cursor_mismatch")
+    return filters_hash, token
+
+
+def validate_query(cik, kind, *, cursor=None, **operands):
+    """Normalize domain operands and validate cursor syntax/request binding, without storage."""
+    cik = normalize_cik(cik)
+    if kind == "filings":
+        filters = _filings_filters(**operands)
+    elif kind == "facts":
+        from .fact_queries import fact_filters
+
+        filters = fact_filters(**operands)
+    else:
+        raise ValueError("sec_research_query_invalid")
+    _query_token(cik, "fact_ids" if "fact_ids" in filters else kind, filters, cursor)
+    return filters
+
+
 @dataclass(frozen=True)
 class QueryContext:
     cik: str
@@ -89,10 +126,7 @@ def open_query(store, cik, *, kind, filters, cursor=None):
     cik = normalize_cik(cik)
     if kind not in ("filings", "facts") or type(filters.get("limit")) is not int or not 1 <= filters["limit"] <= 100:
         raise ValueError("sec_research_query_invalid")
-    filters_hash = _digest(filters)
-    token = _decode(cursor) if cursor is not None else None
-    if token and (token["cik"] != cik or token["kind"] != kind or token["filters_hash"] != filters_hash):
-        raise ValueError("sec_research_cursor_mismatch")
+    filters_hash, token = _query_token(cik, kind, filters, cursor)
     receipt = store.receipt(cik, token["receipt_id"]) if token else store.latest_receipt(cik)
     bindings_digest = _digest(receipt["source_snapshots"] if receipt else {})
     if token and (receipt is None or token["bindings_digest"] != bindings_digest):
@@ -118,11 +152,7 @@ def open_fact_ids_query(store, cik, *, filters, cursor=None):
     Caller validates/normalizes fact_ids and limit before entering storage.
     """
     cik = normalize_cik(cik)
-    filters_hash = _digest(filters)
-    token = _decode(cursor) if cursor is not None else None
-    if token and (token["cik"] != cik or token["kind"] != "fact_ids"
-                  or token["filters_hash"] != filters_hash):
-        raise ValueError("sec_research_cursor_mismatch")
+    filters_hash, token = _query_token(cik, "fact_ids", filters, cursor)
     sources, gaps = {}, []
     row_count = encoded_bytes = 0
     with store.connect(readonly=True) as conn:
@@ -318,16 +348,9 @@ class StoredQueries:
     def filings(self, cik, *, forms=None, filed_from=None, filed_to=None,
                 include_amendments=True, cursor=None, limit=20):
         cik = normalize_cik(cik)
-        if (type(limit) is not int or not 1 <= limit <= 100 or type(include_amendments) is not bool
-                or forms is not None and (not isinstance(forms, (list, tuple))
-                or any(not isinstance(form, str) or not form.strip() for form in forms))):
-            raise ValueError("sec_research_query_invalid")
-        forms = sorted({form.strip().upper() for form in forms}) if forms else None
-        filed_from, filed_to = query_date(filed_from), query_date(filed_to)
-        if filed_from and filed_to and filed_from > filed_to:
-            raise ValueError("sec_research_query_invalid")
-        filters = {"forms": forms, "filed_from": filed_from, "filed_to": filed_to,
-                   "include_amendments": include_amendments, "limit": limit}
+        filters = validate_query(cik, "filings", forms=forms, filed_from=filed_from, filed_to=filed_to,
+                                 include_amendments=include_amendments, cursor=cursor, limit=limit)
+        forms, filed_from, filed_to = filters["forms"], filters["filed_from"], filters["filed_to"]
         allowed = set(forms or [])
         if include_amendments:
             allowed.update(form + "/A" for form in forms or [] if not form.endswith("/A"))

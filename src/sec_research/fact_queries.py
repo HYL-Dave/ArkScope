@@ -15,7 +15,7 @@ from data_sources.sec_edgar_financials import (
 from .common import normalize_cik
 from .queries import (
     open_fact_ids_query, open_query, page_envelope, query_date,
-    read_bound_sources, unavailable_envelope,
+    read_bound_sources, unavailable_envelope, validate_query,
 )
 
 
@@ -49,7 +49,8 @@ def _names(value, pattern):
     return sorted({item.strip() for item in value}) or None
 
 
-def _filters(*, metrics, concepts, fact_ids, accession, as_of, period, start, end, revisions, limit):
+def fact_filters(*, metrics=None, concepts=None, fact_ids=None, accession=None, as_of=None,
+                 period="all", start=None, end=None, revisions="latest", limit=40):
     if (type(limit) is not int or not 1 <= limit <= 100
             or not isinstance(period, str) or period not in ("all", "instant", "annual", "quarterly", "ytd")
             or not isinstance(revisions, str) or revisions not in ("latest", "all")):
@@ -190,8 +191,9 @@ def query_facts(store, cik, *, metrics=None, concepts=None, fact_ids=None, acces
                 as_of=None, period="all", start=None, end=None, revisions="latest",
                 cursor=None, limit=40):
     cik = normalize_cik(cik)
-    filters = _filters(metrics=metrics, concepts=concepts, fact_ids=fact_ids, accession=accession,
-                       as_of=as_of, period=period, start=start, end=end, revisions=revisions, limit=limit)
+    filters = validate_query(cik, "facts", metrics=metrics, concepts=concepts, fact_ids=fact_ids,
+                             accession=accession, as_of=as_of, period=period, start=start, end=end,
+                             revisions=revisions, cursor=cursor, limit=limit)
     ids_mode = "fact_ids" in filters
     allowed = set(filters.get("concepts") or [])
     for metric in filters.get("metrics") or []:
