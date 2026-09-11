@@ -1,0 +1,25 @@
+{
+  "baseline_routes": 216,
+  "current_routes": 218,
+  "baseline_method_path_pairs": 216,
+  "current_method_path_pairs": 218,
+  "added": [
+    [
+      [
+        "GET"
+      ],
+      "/sec-research/{cik}",
+      "src.api.routes.sec_research",
+      "stored_status"
+    ],
+    [
+      [
+        "POST"
+      ],
+      "/sec-research/{cik}/refresh",
+      "src.api.routes.sec_research",
+      "refresh"
+    ]
+  ],
+  "removed": []
+}

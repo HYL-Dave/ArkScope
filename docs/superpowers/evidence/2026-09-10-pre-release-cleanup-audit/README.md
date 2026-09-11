@@ -38,6 +38,17 @@ confirms that main's tracked audit files are not disposable bytecode. Its own
 complete run has 8,304 exact collected/executed nodes, 5 removed / 181 added,
 and unchanged source/test bytes; prior counts above are historical evidence.
 
+The subsequent [durable structured acquisition batch](../2026-09-11-sec-durable-acquisition/README.md)
+connects all four earlier SEC foundations to immutable storage, capacity-bound
+captures, governed acquisition/resume and explicit application commands. Its
+task, whole-change and collateral reviews approved. Fresh full verification is
+8434P/12 unchanged S, 8446 exact collected/executed, 142 added/zero removed and
+794 unchanged source/test paths. This is not the complete three-tool/document/UI
+feature. The two new
+HTTP census candidates await Settings consumers; 30 new SQL uncertainties remain
+under CENSUS-SQL-001. No production schema was activated or dropped. Remaining
+C03/C09-C13 and data-disposition boundaries below still apply.
+
 | Candidate | Current disposition | Commit |
 | --- | --- | --- |
 | C01 | Company-event collector, scheduler registration and Settings source removed; current admission is unconditional; actual stored settings/schema disposition remains open | `06511f44` |
@@ -399,6 +410,23 @@ This item corrects the scanner follow-up's mistaken C21 label. C21 remains the
 deferred SA news-density capability above; C01-C21 and all other candidate
 dispositions remain unchanged. Existing census measurements and raw
 uncertainties are preserved.
+
+### CENSUS-I18N-001: Removed-Surface Locale Reconciliation
+
+Status: **Queued under P1 cleanup; candidate review, not deletion authority.**
+Observed September 11: comparison with the original census has 100 additional
+locale-leaf candidates following UI removal. The exact candidate IDs remain in
+the sealed `2026-09-11-sec-structured-source-core/census-final.json.gz`; the
+count is an observation, not an acceptance constant or proof of dead keys.
+
+Owner: P1's next removed-surface locale cleanup, with
+`apps/arkscope-web/src/i18n/resources/{en,zh-Hant}/` and
+`tests/repository_inventory.py` as the source/measurement boundaries. Before
+deleting a key, map it to the removed component and check current literal,
+dynamic-prefix and shared translator consumers. Keep paired locale inventories
+and current frontend workflow tests green. Re-run the census after the changes;
+do not whitelist this count or bulk-delete every unreferenced leaf. CSS remains
+EIR-001; SQL union-schema accuracy remains CENSUS-SQL-001.
 
 ### Protected Controls And Remaining Review Queues
 

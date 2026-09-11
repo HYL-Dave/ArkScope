@@ -1,0 +1,27 @@
+[
+  {
+    "case": "fixture_codex",
+    "admitted": false,
+    "expected": true
+  },
+  {
+    "case": "fixture_claude",
+    "admitted": false,
+    "expected": true
+  },
+  {
+    "case": "outside_codex",
+    "admitted": false,
+    "expected": false
+  },
+  {
+    "case": "outside_claude",
+    "admitted": false,
+    "expected": false
+  },
+  {
+    "case": "dotdot_escape",
+    "admitted": false,
+    "expected": false
+  }
+]

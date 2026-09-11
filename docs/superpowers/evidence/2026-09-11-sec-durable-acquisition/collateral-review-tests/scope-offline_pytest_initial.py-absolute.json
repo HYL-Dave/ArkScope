@@ -1,0 +1,42 @@
+[
+  {
+    "case": "fixture_codex",
+    "admitted": true,
+    "expected": true
+  },
+  {
+    "case": "fixture_claude",
+    "admitted": true,
+    "expected": true
+  },
+  {
+    "case": "outside_codex",
+    "admitted": false,
+    "expected": false
+  },
+  {
+    "case": "outside_claude",
+    "admitted": false,
+    "expected": false
+  },
+  {
+    "case": "dotdot_escape",
+    "admitted": false,
+    "expected": false
+  },
+  {
+    "case": "prefix_sibling",
+    "admitted": false,
+    "expected": false
+  },
+  {
+    "case": "bare_codex",
+    "admitted": false,
+    "expected": false
+  },
+  {
+    "case": "bare_claude",
+    "admitted": false,
+    "expected": false
+  }
+]

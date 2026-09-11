@@ -6,12 +6,22 @@ Exact original-byte catalog and Company Facts parsers are now implemented under
 `docs/superpowers/plans/2026-09-11-sec-structured-source-core.md` with independent
 review and fresh full backend 8,292 passed / 12 unchanged skips. Historical
 pointer presence is recorded separately from an observed empty list, without a
-whole-history completeness claim. The end-to-end service, three tools and
-user-facing workflow are not implemented. Storage/quota, acquisition/traversal,
-queries, documents/citations, export and integrations still need RED-first plans.
+whole-history completeness claim. The subsequent
+`docs/superpowers/plans/2026-09-11-sec-durable-acquisition.md` implements canonical
+immutable storage, capacity-accounted captures, governed structured traversal,
+durable continuation and explicit GET/POST application commands. Task and whole
+change and collateral reviews approved; a fresh complete run passed **8434 tests
+with 12 unchanged skips**, with exact node/source reconciliation after route-count
+test collateral and an offline-runner path correction. This is not the complete
+end-to-end workflow: issuer resolution, authoritative snapshot/query selection,
+documents/citations, export, three tools/four transports, schedule and UI remain
+open. No unfinished replacement tool is registered; the four earlier foundation
+modules now have real consumers rather than remaining test-only candidates.
 Base inspected: `30bb31c7`. The user approved the product direction on September
 10, including useful tool access rather than collection without consumers.
-Last implementation-tree review: `fef26dcf`. On September 10 the user selected
+Original specification-tree review: `fef26dcf`; current implementation evidence
+is `../evidence/2026-09-11-sec-durable-acquisition/README.md` at source `0f8298fa`.
+On September 10 the user selected
 a **100 GiB adjustable capture budget**, replacing the proposed 20 GiB default.
 The subsequent user decision supersedes the retired-wrapper design: physically
 remove abandoned SEC company-event intake; financial research is a new feature,
