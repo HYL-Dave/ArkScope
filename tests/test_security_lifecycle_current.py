@@ -77,7 +77,7 @@ def test_current_review_and_list_share_one_closed_projection(tmp_path):
     assert row["next_action"]["kind"] == "review_removal"
     assert row["next_action"]["assessment_id"] == c["assessment_id"]
     assert row["next_action"]["state"] == "not_prepared"
-    assert service.get_current_review(row["review_id"], at=NOW) == {"version": 1, "as_of": NOW, "item": row, "web_runs": []}
+    assert service.get_current_review(row["review_id"], at=NOW) == {"version": 1, "as_of": NOW, "item": row}
     text = json.dumps(row)
     for private in ("snapshot_sha256", "source_locator", "_ordinal", "canonical_payload", "decision_provenance", "BBG", "source_ref"):
         assert private not in text
@@ -327,7 +327,9 @@ def test_research_reads_exactly_the_same_current_projection_and_no_mutation_tool
     payload = tools.list_security_lifecycle_reviews()
     assert payload == {"status": "ok", **expected}
     review_id = payload["items"][0]["review_id"]
-    assert tools.get_security_lifecycle_review(review_id) == {"status": "ok", **original_get(review_id, at=NOW)}
+    detail = tools.get_security_lifecycle_review(review_id)
+    assert detail == {"status": "ok", "version": 1, "as_of": NOW, "item": payload["items"][0]}
+    assert original_get(review_id, at=NOW) == {key: value for key, value in detail.items() if key != "status"}
     registry = create_default_registry()
     assert registry.get("list_security_lifecycle_cases") is None
     assert registry.get("get_security_lifecycle_case") is None

@@ -273,7 +273,7 @@ def _project(snapshot, manifest, sources, conn):
             "items": sorted(items, key=lambda row: (row["ticker"], row["review_id"]))}
 
 
-def _read(service, *, at, web_review_id=None):
+def _read(service, *, at):
     at = at if at is not None else datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     paths = (Path(service.market_db_path), Path(service.profile_db_path))
     try:
@@ -290,14 +290,6 @@ def _read(service, *, at, web_review_id=None):
             snapshot = read_population_snapshot(*paths, at=at)
             manifest = build_population_manifest(snapshot)
             result = _project(snapshot, manifest, sources, connections[1])
-            if web_review_id is not None:
-                from src.lifecycle_web_projection import latest_web_runs
-                from src.lifecycle_web_schema import WebJournalError
-                review = next((row for row in result["items"] if row["review_id"] == web_review_id), None)
-                try:
-                    result["web_runs"] = latest_web_runs(connections[1], review["case_ids"] if review else [], at=at)
-                except WebJournalError:
-                    raise LifecyclePopulationUnavailable("current_web_journal_unavailable") from None
             if (sources != _sources(service.sources_by_ticker())
                     or versions != [conn.execute("PRAGMA data_version").fetchone()[0] for conn in connections]
                     or identities != [(path.stat().st_dev, path.stat().st_ino) for path in paths]):
@@ -326,8 +318,8 @@ def list_current_reviews(service, *, at=None, view="attention", ticker=None, cas
 
 
 def get_current_review(service, review_id, *, at=None):
-    result = _read(service, at=at, web_review_id=review_id)
+    result = _read(service, at=at)
     row = next((row for row in result["items"] if row["review_id"] == review_id), None)
     if row is None:
         raise KeyError("current_review_not_found")
-    return {"version": 1, "as_of": result["as_of"], "item": row, "web_runs": result["web_runs"]}
+    return {"version": 1, "as_of": result["as_of"], "item": row}

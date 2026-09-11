@@ -74,6 +74,36 @@ def review_for(result, case_id):
 
 
 @pytest.mark.parametrize("journal_installed", (False, True))
+def test_population_material_contains_only_current_reference_owners(tmp_path, journal_installed):
+    from src.lifecycle_investigation.schema import install_journal
+    from src.security_lifecycle_population import build_population_manifest, read_population_snapshot
+
+    market, profile = stores(tmp_path)
+    persist(profile, sec(market, "OLD", "retained"))
+    if journal_installed:
+        with sqlite3.connect(profile) as conn:
+            install_journal(conn, at=NOW)
+    snapshot = read_population_snapshot(market, profile, at=NOW)
+    assert set(snapshot["material"]) == {"market_observations", "profile_tables", "identity_tables", "composed_cases", "schemas"}
+    retention = build_population_manifest(snapshot)["retention"]
+    assert "web_journal" not in retention
+    assert retention["table_counts"]["security_lifecycle_cases"] == 1
+
+
+@pytest.mark.parametrize("field", ("web_journal_inventory", "unreviewed_retention"))
+def test_population_manifest_rejects_unexpected_material_even_when_sealed(tmp_path, field):
+    from src.security_lifecycle_population import LifecyclePopulationUnavailable, build_population_manifest, read_population_snapshot
+
+    market, profile = stores(tmp_path)
+    snapshot = read_population_snapshot(market, profile, at=NOW)
+    snapshot["material"][field] = {"installed": False, "runs": [], "calls": [], "actions": [], "pages": [], "results": [], "acceptances": []}
+    unsigned = {key: snapshot[key] for key in ("version", "at", "material")}
+    snapshot["sha256"] = hashlib.sha256(json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode()).hexdigest()
+    with pytest.raises(LifecyclePopulationUnavailable, match="population_material_invalid"):
+        build_population_manifest(snapshot)
+
+
+@pytest.mark.parametrize("journal_installed", (False, True))
 def test_population_manifest_accounts_for_all_three_input_populations(tmp_path, journal_installed):
     from src.lifecycle_investigation.schema import install_journal
 

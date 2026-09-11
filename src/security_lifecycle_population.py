@@ -13,7 +13,6 @@ import json
 from pathlib import Path
 import sqlite3
 
-from src.lifecycle_web_schema import INVENTORY_FIELDS, TERMINAL as WEB_TERMINAL, WebJournalError, read_web_inventory
 from src.security_lifecycle import read_market_observations
 from src.security_lifecycle_investigation import (
     LifecycleStoreUnavailable, case_id_for, compose_security_lifecycle_audit, observation_fingerprint,
@@ -73,7 +72,6 @@ def _capture(market, profile, market_conn, profile_conn):
         "market_observations": read_market_observations(str(market), limit=None),
         "profile_tables": _rows(profile_conn, PROFILE_TABLE_SQL),
         "identity_tables": identity_tables,
-        "web_journal_inventory": read_web_inventory(profile_conn),
         "composed_cases": compose_security_lifecycle_audit(str(market), str(profile))["cases"],
         "schemas": {
             "market": _schema(market_conn, MARKET_TABLE_SQL),
@@ -115,7 +113,7 @@ def read_population_snapshot(market_db_path, profile_db_path, *, at: str) -> dic
             after = tuple(conn.execute("PRAGMA data_version").fetchone()[0] for conn in connections)
             if versions != after or identities != tuple(_identity(path) for path in paths):
                 raise LifecyclePopulationUnavailable("population_snapshot_changed")
-    except (LifecycleSchemaMismatch, TickerIdentitySchemaMismatch, WebJournalError):
+    except (LifecycleSchemaMismatch, TickerIdentitySchemaMismatch):
         raise LifecyclePopulationUnavailable("population_schema_invalid") from None
     except (OSError, sqlite3.Error, LifecycleStoreUnavailable):
         raise LifecyclePopulationUnavailable("population_store_unavailable") from None
@@ -466,30 +464,7 @@ def _dispositions(reviews, transitions, latest, *, today):
                 review.update(bucket="current", reason="continuation_followup_pending")
 
 
-def _web_retention(value, *, tables, assessments):
-    if value is None:
-        return {"installed": False, **{key: [] for key in INVENTORY_FIELDS}}
-    if (not isinstance(value, dict) or set(value) != {"installed", *INVENTORY_FIELDS} or type(value["installed"]) is not bool
-            or any(not isinstance(value[key], list) or any(not isinstance(row, dict) or set(row) != set(fields) for row in value[key])
-                   for key, fields in INVENTORY_FIELDS.items()) or (not value["installed"] and any(value[key] for key in INVENTORY_FIELDS))):
-        raise LifecyclePopulationUnavailable("population_web_dependency_invalid")
-    runs = {row["run_id"]: row for row in value["runs"]}
-    cases = {row["case_id"] for row in tables[_PREFIX + "cases"]}
-    results = {row["run_id"] for row in value["results"]}
-    calls = {(row["run_id"], row["call_id"]) for row in value["calls"]}
-    if (len(runs) != len(value["runs"]) or any(row["case_id"] not in cases for row in runs.values())
-            or any(row["run_id"] not in runs for key in INVENTORY_FIELDS if key != "runs" for row in value[key])
-            or any((row["run_id"], row["call_id"]) not in calls for row in value["actions"])
-            or any((row["status"] == "succeeded" and row["run_id"] not in results)
-                   or (row["run_id"] in results and row["status"] not in WEB_TERMINAL) for row in runs.values())
-            or any(row["assessment_id"] not in assessments or row["run_id"] not in results
-                   or runs[row["run_id"]]["status"] != "succeeded"
-                   or assessments[row["assessment_id"]]["case_id"] != runs[row["run_id"]]["case_id"] for row in value["acceptances"])):
-        raise LifecyclePopulationUnavailable("population_web_dependency_invalid")
-    return value
-
-
-def _retention(tables, identity_tables, web_inventory=None):
+def _retention(tables, identity_tables):
     def rows(name):
         return tables[_PREFIX + name]
     assessments = {row["assessment_id"]: row for row in rows("assessments")}
@@ -534,7 +509,6 @@ def _retention(tables, identity_tables, web_inventory=None):
         "proposal_ids": sorted(row["proposal_id"] for row in rows("action_proposals")),
         "transition_ids": sorted(row["transition_id"] for row in transitions),
         "transitions": transitions,
-        "web_journal": _web_retention(web_inventory, tables=tables, assessments=assessments),
         "table_counts": {name: len(value) for name, value in sorted({**tables, **identity_tables}.items())},
         "deletion_candidates": [],
     }
@@ -550,10 +524,9 @@ def build_population_manifest(snapshot: dict) -> dict:
         if snapshot["sha256"] != _digest(unsigned):
             raise LifecyclePopulationUnavailable("population_snapshot_digest")
         material = snapshot["material"]
-        if (not isinstance(material, dict) or set(material) - {"web_journal_inventory"} != {
+        if (not isinstance(material, dict) or set(material) != {
                 "market_observations", "profile_tables", "identity_tables", "composed_cases", "schemas"}
                 or not isinstance(material["schemas"], dict)
-                or ("web_journal_inventory" in material and not isinstance(material["web_journal_inventory"], dict))
                 or set(material["schemas"]) != {"market", "profile"}
                 or any(not isinstance(material[key], list) or any(not isinstance(row, dict) for row in material[key])
                        for key in ("market_observations", "composed_cases"))):
@@ -603,7 +576,7 @@ def _build(snapshot):
         reviews[case_id] = candidate
     review_rows, reviews, coverage = _consolidate(reviews, composed, latest, tables, today=today)
     check_views, coverage = _historical_provider_reviews(history, latest, review_rows, reviews, coverage, today=today)
-    retention = _retention(tables, material["identity_tables"], material.get("web_journal_inventory"))
+    retention = _retention(tables, material["identity_tables"])
     _bind_transition_reviews(retention["transitions"], review_rows, reviews, check_views, composed, history, latest)
     _dispositions(review_rows, retention["transitions"], latest, today=today)
     mappings = []

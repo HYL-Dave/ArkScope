@@ -24,19 +24,20 @@ def running(tmp_path, *, ticker="OLD"):
     return c, store, identity, binding
 
 
-def test_v2_installation_preserves_v1_and_requires_no_case(tmp_path):
+def test_current_installation_preserves_unrelated_data_and_requires_no_case(tmp_path):
     from src.lifecycle_investigation.schema import install_journal, verify_journal
-    from src.lifecycle_web_schema import install_web_journal, verify_web_journal
     c = setup_workflow(tmp_path, assess=False, event_available=False)
     with sqlite3.connect(c["profile"]) as conn:
-        install_web_journal(conn, at=c["now"][0])
-        before = list(conn.execute("SELECT name,sql FROM sqlite_master WHERE name LIKE 'lifecycle_web_%'"))
+        conn.execute("CREATE TABLE unrelated_receipts (receipt TEXT NOT NULL)")
+        conn.execute("INSERT INTO unrelated_receipts VALUES ('retained')")
+        before = conn.execute("SELECT COUNT(*) FROM security_lifecycle_cases").fetchone()[0]
+        conn.commit()
         install_journal(conn, at=c["now"][0])
         verify_journal(conn)
-        verify_web_journal(conn)
-        assert before == list(conn.execute("SELECT name,sql FROM sqlite_master WHERE name LIKE 'lifecycle_web_%'"))
-        assert not list(conn.execute("PRAGMA foreign_key_list(lifecycle_investigation_jobs)"))
         install_journal(conn, at=c["now"][0])
+        assert conn.execute("SELECT * FROM unrelated_receipts").fetchall() == [("retained",)]
+        assert conn.execute("SELECT COUNT(*) FROM security_lifecycle_cases").fetchone()[0] == before
+        assert not list(conn.execute("PRAGMA foreign_key_list(lifecycle_investigation_jobs)"))
 
 
 def test_journal_read_does_not_install_or_tolerate_unknown_schema(tmp_path):
@@ -113,10 +114,10 @@ def test_current_error_projection_keeps_typed_codes_but_never_raw_provider_error
     from src.auth_drivers.lifecycle_web_models import WebModelError
     from src.lifecycle_investigation.store import safe_code
     from src.lifecycle_public_sources import SourceReadError
-    from src.lifecycle_web_store import WebJournalError
+    from src.lifecycle_investigation.store import JournalError
     from src.security_lifecycle_web_contract import WebContractError
 
-    classes = {"model": WebModelError, "journal": WebJournalError, "contract": WebContractError,
+    classes = {"model": WebModelError, "journal": JournalError, "contract": WebContractError,
         "source": SourceReadError, "value": ValueError, "unexpected": RuntimeError}
     expected = "provider_call_failed" if kind not in {"value", "unexpected"} and message == "provider_call_failed" else "web_execution_failed"
     assert safe_code(classes[kind](message)) == expected
@@ -128,3 +129,50 @@ def test_current_error_projection_keeps_the_unavailable_route_code():
     from src.model_routing import ModelRouteUnavailable
 
     assert safe_code(ModelRouteUnavailable()) == "model_route_unavailable"
+
+
+def test_current_start_replays_request_without_resetting_recorded_work(tmp_path):
+    c, store, identity, binding = running(tmp_path)
+    store.step(identity, owner="worker", kind="local_search", payload={"query": {}})
+    before = store.read(identity)
+    assert store.start(binding=binding, owner="other", request_key="explicit-click") == {"run_id": identity, "created": False}
+    assert store.read(identity) == before
+    with pytest.raises(ValueError, match="investigation_running"):
+        store.start(binding=binding, owner="other", request_key="new-click")
+
+
+def test_current_recording_failure_stops_control_before_remote_dispatch(tmp_path, monkeypatch):
+    _, store, identity, _ = running(tmp_path)
+    control = store.control(identity, owner="worker")
+    def fail(*args, **kwargs):
+        raise ValueError("investigation_recording_unavailable")
+    monkeypatch.setattr(store, "reserve_call", fail)
+    with pytest.raises(ValueError, match="^investigation_recording_unavailable$"):
+        control.reserve_model_request("not-dispatched")
+    assert control.stop_state != "running"
+    row = store.read(identity)
+    assert row["calls"] == [] and row["result"] is None and row["status"] == "running"
+
+
+@pytest.mark.parametrize("expired", [False, True])
+def test_current_wrong_or_expired_owner_cannot_record_provider_work(tmp_path, expired):
+    c, store, identity, _ = running(tmp_path)
+    if expired:
+        c["now"][0] = "2026-09-09T00:00:00Z"
+    with pytest.raises(ValueError, match="investigation_not_running" if expired else "investigation_owner_changed"):
+        store.reserve_call(identity, owner="worker" if expired else "other", call_id="not-dispatched")
+    assert store.read(identity)["calls"] == []
+
+
+def test_current_source_rows_are_immutable_and_no_human_acceptance_is_fabricated(tmp_path):
+    from tests.test_lifecycle_investigation_review import context
+    c = context(tmp_path)
+    row = c["investigation"].read(c["run_id"])
+    assert row["status"] == "succeeded" and not row["adopted"]
+    with sqlite3.connect(c["profile"]) as conn:
+        for statement in ("UPDATE lifecycle_investigation_sources SET payload_json='{}'", "DELETE FROM lifecycle_investigation_sources",
+                          "UPDATE lifecycle_investigation_jobs SET status='failed'", "UPDATE lifecycle_investigation_jobs SET cancel_requested_at=created_at"):
+            with pytest.raises(sqlite3.IntegrityError, match="investigation_immutable"):
+                conn.execute(statement)
+        for table in ("security_lifecycle_cases", "security_lifecycle_assessments", "lifecycle_investigation_acceptances"):
+            assert conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0

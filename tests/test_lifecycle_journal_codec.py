@@ -54,13 +54,6 @@ def test_neutral_journal_codec_owns_public_functions():
     assert codec.digest_json.__module__ == _OWNER
 
 
-@pytest.mark.parametrize("name", ["_json", "_sha"])
-def test_retained_journal_does_not_export_legacy_codec_helpers(name):
-    journal = import_module("src.lifecycle_web_store")
-    assert not hasattr(journal, name)
-    assert name not in getattr(journal, "__all__", ())
-
-
 @pytest.mark.parametrize("value,expected_bytes,_digest", _CASES)
 def test_canonical_json_matches_literal_journal_bytes(value, expected_bytes, _digest):
     codec = import_module(_OWNER)
@@ -102,8 +95,7 @@ def test_nonfinite_numbers_are_rejected_before_journaling(number, nested, operat
     ("lifecycle_investigation.target", {"digest_json"}),
     ("lifecycle_investigation.migration", {"digest_json"}),
     ("lifecycle_investigation.disposal", {"canonical_json", "digest_json"}),
-    ("lifecycle_web_store", {"canonical_json", "digest_json"}),
-    ("lifecycle_web_review", {"canonical_json", "digest_json"}),
+    ("lifecycle_investigation.review", {"canonical_json"}),
     ("ticker_identity_history", {"digest_json"}),
 ])
 def test_journal_consumers_import_the_neutral_codec_directly(module, names):

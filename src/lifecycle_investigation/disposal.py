@@ -12,14 +12,13 @@ import json
 import sqlite3
 
 from src.lifecycle_investigation.schema import verify_journal
-from src.lifecycle_web_migration import _backup
-from src.lifecycle_web_schema import TABLES as WEB_TABLES, TRIGGERS as WEB_TRIGGERS
 from src.lifecycle_journal_codec import canonical_json, digest_json
 from src.security_lifecycle_listing_migration import _quote_identifier as q, _sha_file
 from src.security_lifecycle_schema import PROFILE_TABLE_SQL, verify_profile_connection, verify_market_connection, _normalize_sql
+from src.sqlite_backup import backup_connection
 
 
-OWNED = (set(PROFILE_TABLE_SQL) | set(WEB_TABLES)) - {"security_lifecycle_provider_checks", "security_lifecycle_migration_receipts"}
+OWNED = set(PROFILE_TABLE_SQL) - {"security_lifecycle_provider_checks", "security_lifecycle_migration_receipts"}
 RECEIPT_SQL = """CREATE TABLE lifecycle_legacy_disposal_receipts (
     approval_sha256 TEXT PRIMARY KEY, stage TEXT NOT NULL CHECK(stage IN ('market','profile')),
     completed_at TEXT NOT NULL, receipt_json TEXT NOT NULL, receipt_sha256 TEXT NOT NULL)"""
@@ -71,7 +70,11 @@ def foreign_keys(conn):
             groups[row[0]].append(row)
         for group in groups.values():
             ordered = sorted(group, key=lambda row: row[1])
-            edges.append((table, ordered[0][2], tuple((row[3], row[4]) for row in ordered)))
+            # PRAGMA preserves declared spelling; ownership uses SQLite identities.
+            target = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=? COLLATE NOCASE",
+                (ordered[0][2],)).fetchone()
+            parent = target[0] if target is not None else ordered[0][2]
+            edges.append((table, parent, tuple((row[3], row[4]) for row in ordered)))
     return edges
 
 
@@ -91,7 +94,7 @@ def closure(conn, case_id):
             reason = "cross_case_dependency"
         if table == "security_lifecycle_assessments" and row.get("acceptance_authority") == "human":
             reason = "human_assessment"
-        if table in {"security_lifecycle_automation_runs", "security_lifecycle_investigation_runs", "lifecycle_web_runs"} and row.get("status") in {"running", "queued", "searching", "reading_sources", "analyzing", "cancelling", "remote_outcome_unknown"}:
+        if table in {"security_lifecycle_automation_runs", "security_lifecycle_investigation_runs"} and row.get("status") in {"running", "queued", "searching", "reading_sources", "analyzing", "cancelling", "remote_outcome_unknown"}:
             reason = "unfinished_execution"
         for child, parent, columns in edges:
             if parent != table:
@@ -234,7 +237,7 @@ def apply_disposal_stage(path, plan, *, stage, approval_sha256, backup_path, app
         backup = Path(backup_path).resolve()
         if backup == Path(path).resolve():
             raise ValueError("disposal_backup_path")
-        _backup(conn, backup)
+        backup_connection(conn, backup)
         conn.execute("BEGIN IMMEDIATE")
         try:
             if observed() != expected:
@@ -244,18 +247,8 @@ def apply_disposal_stage(path, plan, *, stage, approval_sha256, backup_path, app
                 for sql in RECEIPT_TRIGGERS.values():
                     conn.execute(sql)
             if stage == "profile":
-                dropped = []
-                for name, sql in WEB_TRIGGERS.items():
-                    owner = conn.execute("SELECT tbl_name,sql FROM sqlite_master WHERE name=?", (name,)).fetchone()
-                    if owner and owner[0] in expected:
-                        if _normalize_sql(owner[1]) != _normalize_sql(sql):
-                            raise ValueError("disposal_changed")
-                        conn.execute(f"DROP TRIGGER {q(name)}")
-                        dropped.append(sql)
                 for table in _delete_order(conn, expected):
                     conn.executemany(f"DELETE FROM {q(table)} WHERE rowid=?", [(identity,) for identity in expected[table]["rowids"]])
-                for sql in dropped:
-                    conn.execute(sql)
                 verify_profile_connection(conn)
                 verify_journal(conn)
             else:

@@ -15,7 +15,7 @@ from src.lifecycle_investigation.provider_review import provider_decision, prepa
 from src.lifecycle_investigation.runtime import InvestigationRuntime, RuntimeStore
 from src.lifecycle_investigation.store import InvestigationStore, safe_code
 from src.lifecycle_investigation.target import TargetPreflight, Target, provider_observations
-from src.lifecycle_web_review import prepare, confirm
+from src.lifecycle_investigation.review import prepare, confirm
 from src.security_lifecycle_review import project_packet, now
 from src.security_lifecycle_provider_scan import run_provider_scan
 from src.ticker_identity_service import TickerIdentityConflict

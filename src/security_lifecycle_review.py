@@ -119,7 +119,7 @@ def prepare_on_connection(service, conn, *, case_id, assessment_id, options, web
     assessment = store.get_assessment(assessment_id)
     if assessment["case_id"] != case_id:
         raise ValueError("assessment_case_mismatch")
-    from src.lifecycle_web_review import acceptance_for, prepare_on_connection as prepare_web
+    from src.lifecycle_investigation.review import acceptance_for, prepare_on_connection as prepare_web
     adoption = acceptance_for(conn, assessment_id)
     if adoption is not None:
         return prepare_web(service, conn, run_id=adoption["run_id"], options=options, web_read=web_read)
@@ -239,7 +239,7 @@ def approved_preview(conn, *, packet, case, assessment, confirmation, at, web_re
 
 
 def prepare(service, case_id, *, assessment_id, options):
-    from src.lifecycle_web_review import validated_adoption_read
+    from src.lifecycle_investigation.review import validated_adoption_read
     web_read = validated_adoption_read(service, assessment_id=assessment_id)
     with service._profile_connection(write=False) as conn:
         conn.execute("BEGIN")
@@ -293,7 +293,7 @@ def execute(service, transition_id, *, before_write, trigger="attended_user", we
     with service._profile_connection(write=True) as conn:
         store = service._store(conn)
         if web_read is None:
-            from src.lifecycle_web_review import validated_adoption_read
+            from src.lifecycle_investigation.review import validated_adoption_read
             web_read = validated_adoption_read(service, conn=conn, assessment_id=store.get(transition_id)["assessment_id"])
         if web_read is not None:
             before_write()
@@ -330,7 +330,7 @@ def confirm(service, case_id, *, assessment_id, packet_sha256, action, options, 
         raise ValueError("review_action")
     before_write()
     with service._profile_connection(write=True) as conn:
-        from src.lifecycle_web_review import validated_adoption_read
+        from src.lifecycle_investigation.review import validated_adoption_read
         web_read = validated_adoption_read(service, conn=conn, assessment_id=assessment_id)
         if web_read is not None:
             before_write()
