@@ -34,6 +34,25 @@ _TABLES = {
         completed TEXT NOT NULL, pending TEXT NOT NULL, gaps TEXT NOT NULL,
         observed_at TEXT NOT NULL, recorded_at TEXT NOT NULL,
         source_snapshots TEXT NOT NULL DEFAULT '{}'""",
+    "sec_research_document_directories": """directory_id TEXT PRIMARY KEY NOT NULL,
+        filing_id TEXT NOT NULL, receipt_id INTEGER NOT NULL REFERENCES sec_research_receipts(receipt_id),
+        object_sha256 TEXT NOT NULL REFERENCES sec_research_objects(sha256),
+        observed_at TEXT NOT NULL, metadata TEXT NOT NULL""",
+    "sec_research_documents": """capture_id TEXT PRIMARY KEY NOT NULL,
+        directory_id TEXT NOT NULL REFERENCES sec_research_document_directories(directory_id),
+        filing_id TEXT NOT NULL, document_id TEXT NOT NULL, primary_document TEXT,
+        original_sha256 TEXT NOT NULL REFERENCES sec_research_objects(sha256),
+        text_sha256 TEXT NOT NULL REFERENCES sec_research_objects(sha256),
+        observed_at TEXT NOT NULL, metadata TEXT NOT NULL""",
+    "sec_research_document_sources": """capture_id TEXT NOT NULL REFERENCES sec_research_documents(capture_id),
+        snapshot_id TEXT NOT NULL REFERENCES sec_research_snapshots(snapshot_id),
+        provenance TEXT NOT NULL, PRIMARY KEY(capture_id, snapshot_id)""",
+    "sec_research_document_attempts": """attempt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        filing_id TEXT NOT NULL, document_id TEXT NOT NULL, resolved_document_id TEXT,
+        primary_document TEXT,
+        capture_id TEXT REFERENCES sec_research_documents(capture_id),
+        status TEXT NOT NULL CHECK(status IN ('ok','partial','unavailable')),
+        observed_at TEXT NOT NULL, details TEXT NOT NULL""",
 }
 
 _DDL = {name: ("table", name, f"CREATE TABLE {name}({columns})")
@@ -41,12 +60,14 @@ _DDL = {name: ("table", name, f"CREATE TABLE {name}({columns})")
 for _table, _columns in (
     ("snapshots", "cik, kind"), ("filings", "cik, accession"),
     ("facts", "cik, fact_id"), ("receipts", "cik, receipt_id DESC"),
+    ("document_attempts", "filing_id, attempt_id DESC"),
 ):
     _name = f"sec_research_{_table}_lookup"
     _owner = f"sec_research_{_table}"
     _DDL[_name] = ("index", _owner, f"CREATE INDEX {_name} ON {_owner}({_columns})")
 
-for _table in ("objects", "snapshots", "filings", "facts", "receipts"):
+for _table in ("objects", "snapshots", "filings", "facts", "receipts",
+               "document_directories", "documents", "document_sources", "document_attempts"):
     for _operation in ("UPDATE", "DELETE"):
         _name = f"sec_research_{_table}_no_{_operation.lower()}"
         _owner = f"sec_research_{_table}"
@@ -61,6 +82,10 @@ for _table, _conflict in (
     ("filings", "(snapshot_id=NEW.snapshot_id AND ordinal=NEW.ordinal)"),
     ("facts", "(snapshot_id=NEW.snapshot_id AND ordinal=NEW.ordinal)"),
     ("receipts", "receipt_id=NEW.receipt_id"),
+    ("document_directories", "directory_id=NEW.directory_id"),
+    ("documents", "capture_id=NEW.capture_id"),
+    ("document_sources", "(capture_id=NEW.capture_id AND snapshot_id=NEW.snapshot_id)"),
+    ("document_attempts", "attempt_id=NEW.attempt_id"),
 ):
     _name = f"sec_research_{_table}_no_replace"
     _owner = f"sec_research_{_table}"
