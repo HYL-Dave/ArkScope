@@ -16,7 +16,7 @@ from src.sec_research.captures import CaptureStore
 from src.sec_research.common import normalize_cik
 from src.sec_research.config import MAX_CAPTURE_BUDGET_BYTES, get_capture_budget_bytes, set_capture_budget_bytes
 from src.sec_research.paths import SecResearchPaths
-from src.sec_research.queries import StoredQueries, query_date
+from src.sec_research.queries import StoredQueries, query_date, validate_query
 from src.sec_research.service import ResearchService
 from src.sec_research.store import Store
 
@@ -129,6 +129,7 @@ QueryDate = Annotated[str | None, BeforeValidator(_query_date), Query()]
 def _stored_query(cik, kind, **params):
     cik = _cik(cik)
     try:
+        validate_query(cik, kind, **params)
         store = Store(SecResearchPaths.resolve())
         if not _installed(store):
             return _unavailable("sec_research_not_installed")

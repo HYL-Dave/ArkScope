@@ -477,3 +477,93 @@ def test_facts_real_service_http_domain_validation_is_422(route, stored, params)
     response = route[2].get("/sec-research/320193/facts", params=params)
     assert response.status_code == 422
     assert response.json()["detail"]["code"] in {"sec_research_query_invalid", "sec_research_cursor_invalid"}
+
+
+@pytest.mark.parametrize("storage", ["absent", "corrupt", "installed"])
+@pytest.mark.parametrize("kind,params,code", [
+    ("filings", {}, None),
+    ("facts", {}, None),
+    ("facts", {"fact_ids": "secfact_" + "0" * 64}, None),
+    ("filings", {"forms": ""}, "sec_research_query_invalid"),
+    ("filings", [("forms", "10-K"), ("forms", " ")], "sec_research_query_invalid"),
+    ("filings", {"filed_from": "2026-02-01", "filed_to": "2026-01-01"}, "sec_research_query_invalid"),
+    ("filings", {"limit": "1.0"}, "sec_research_query_invalid"),
+    ("facts", {"metrics": "unknown"}, "sec_research_query_invalid"),
+    ("facts", {"concepts": "Assets"}, "sec_research_query_invalid"),
+    ("facts", {"fact_ids": "bad"}, "sec_research_query_invalid"),
+    ("facts", {"fact_ids": "secfact_" + "0" * 64, "metrics": "assets"}, "sec_research_query_invalid"),
+    ("facts", {"period": "unknown"}, "sec_research_query_invalid"),
+    ("facts", {"revisions": "unknown"}, "sec_research_query_invalid"),
+    ("facts", {"start": "2026-02-01", "end": "2026-01-01"}, "sec_research_query_invalid"),
+    ("facts", {"accession": "bad"}, "sec_research_query_invalid"),
+    ("filings", {"cursor": "!"}, "sec_research_cursor_invalid"),
+    ("facts", {"cursor": "!"}, "sec_research_cursor_invalid"),
+    ("filings", {"cursor": "e30"}, "sec_research_cursor_invalid"),
+    ("facts", {"cursor": "e30"}, "sec_research_cursor_invalid"),
+    ("facts", {"fact_ids": "secfact_" + "0" * 64, "cursor": "!"}, "sec_research_cursor_invalid"),
+])
+def test_query_validation_precedes_storage_availability(route, monkeypatch, storage, kind, params, code):
+    module, paths, client = route
+    if storage == "corrupt":
+        paths.market_db_path.write_bytes(b"not sqlite /private/path")
+    elif storage == "installed":
+        module.Store(paths).install()
+    before = paths.market_db_path.read_bytes() if paths.market_db_path.exists() else None
+    forbid_acquisition(module, monkeypatch)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("stored query constructed a forbidden owner")
+
+    monkeypatch.setattr(module, "get_profile_store", forbidden)
+    monkeypatch.setattr(module, "CaptureStore", forbidden)
+    if code:
+        monkeypatch.setattr(module.SecResearchPaths, "resolve", forbidden)
+    response = client.get("/sec-research/320193/" + kind, params=params)
+    assert response.status_code == (422 if code else 200)
+    if code:
+        assert response.json() == {"detail": {"code": code}}
+    else:
+        assert response.json()["status"] == "unavailable"
+        if storage != "installed":
+            expected = "sec_research_not_installed" if storage == "absent" else "sec_research_store_unavailable"
+            assert response.json()["gaps"] == [{"code": expected}]
+    assert (paths.market_db_path.read_bytes() if paths.market_db_path.exists() else None) == before
+    assert not paths.capture_root.exists()
+
+
+@pytest.mark.parametrize("storage", ["absent", "corrupt"])
+@pytest.mark.parametrize("kind", ["filings", "facts", "fact_ids"])
+@pytest.mark.parametrize("changed", [False, True], ids=["bound-request", "changed-limit"])
+def test_query_cursor_request_validation_before_unavailable_store(
+    route, tmp_path, monkeypatch, storage, kind, changed,
+):
+    from src.sec_research.queries import StoredQueries
+    module, paths, client = route
+    seed = module.Store(module.SecResearchPaths.from_market_db(tmp_path / "seed" / "market.db"))
+    seed.install()
+    params = {"limit": 1}
+    endpoint = "facts" if kind == "fact_ids" else kind
+    if kind == "filings":
+        publish_catalog(seed, [(1, "2026-02-01", "10-K"), (2, "2026-01-01", "10-K")])
+    else:
+        snapshot = publish_facts(seed)
+        if kind == "fact_ids":
+            params["fact_ids"] = [row.fact_id for row in snapshot.facts]
+    cursor = getattr(StoredQueries(seed), endpoint)(CIK, **params)["next_cursor"]
+    assert cursor
+    if storage == "corrupt":
+        paths.market_db_path.write_bytes(b"not sqlite /private/path")
+    before = paths.market_db_path.read_bytes() if paths.market_db_path.exists() else None
+    forbid_acquisition(module, monkeypatch)
+    response = client.get("/sec-research/320193/" + endpoint,
+                          params={**params, "cursor": cursor, "limit": 2 if changed else 1})
+    if changed:
+        assert response.status_code == 422
+        assert response.json() == {"detail": {"code": "sec_research_cursor_mismatch"}}
+    else:
+        assert response.status_code == 200
+        assert response.json()["status"] == "unavailable"
+        expected = "sec_research_not_installed" if storage == "absent" else "sec_research_store_unavailable"
+        assert response.json()["gaps"] == [{"code": expected}]
+    assert (paths.market_db_path.read_bytes() if paths.market_db_path.exists() else None) == before
+    assert not paths.capture_root.exists()
