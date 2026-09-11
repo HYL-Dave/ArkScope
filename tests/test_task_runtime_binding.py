@@ -772,7 +772,7 @@ def test_model_probe_key_echo_is_redacted_before_api_serialization(
     assert len(result["error"]) <= 500
 
 
-@pytest.mark.parametrize("entrypoint", ["openai_stream", "openai_async", "openai_sync", "anthropic_stream", "anthropic_sync"])
+@pytest.mark.parametrize("entrypoint", ["openai_stream", "openai_async", "anthropic_stream", "anthropic_sync"])
 @pytest.mark.parametrize("bound", [True, False])
 def test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors(
     isolated, bound_sdk_wire, caplog, entrypoint, bound,
@@ -803,8 +803,6 @@ def test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors(
             with pytest.raises(Exception) as caught:
                 if entrypoint == "openai_async":
                     asyncio.run(oa.run_query("q", model="gpt-5.6-luna", dal=object()))
-                elif entrypoint == "openai_sync":
-                    oa.run_query_sync("q", model="gpt-5.6-luna", dal=object())
                 else:
                     aa.run_query("q", model="claude-sonnet-5", dal=object())
             public = detail = str(caught.value)
@@ -1014,7 +1012,7 @@ def test_client_construction_key_echo_is_private(isolated, monkeypatch, caplog, 
     assert len(detail) <= 500
 
 
-@pytest.mark.parametrize("entrypoint", ["stream", "async", "sync"])
+@pytest.mark.parametrize("entrypoint", ["stream", "async"])
 def test_openai_retry_key_echo_is_private_without_changing_retry_policy(
     isolated, monkeypatch, bound_sdk_wire, caplog, entrypoint,
 ):
@@ -1032,7 +1030,6 @@ def test_openai_retry_key_echo_is_private_without_changing_retry_policy(
         return run(*args, **kwargs)
 
     monkeypatch.setattr("agents.Runner.run", run_async)
-    monkeypatch.setattr("agents.Runner.run_sync", run)
 
     async def collect():
         return [event async for event in oa.run_query_stream("q", model="gpt-5.6-luna", dal=object())]
@@ -1042,10 +1039,7 @@ def test_openai_retry_key_echo_is_private_without_changing_retry_policy(
             public = asyncio.run(collect())[-1].data["error"]
         else:
             with pytest.raises(Exception) as caught:
-                if entrypoint == "async":
-                    asyncio.run(oa.run_query("q", model="gpt-5.6-luna", dal=object()))
-                else:
-                    oa.run_query_sync("q", model="gpt-5.6-luna", dal=object())
+                asyncio.run(oa.run_query("q", model="gpt-5.6-luna", dal=object()))
             public = str(caught.value)
     assert calls == [1, 1]
     assert_private_failures(isolated, caplog, public)
@@ -1129,7 +1123,7 @@ def enabled_local_sdk_tracing(isolated, monkeypatch):
         assert export_attempts == []
 
 
-@pytest.mark.parametrize("entrypoint", ["async", "sync", "stream", "child", "cross_provider_child"])
+@pytest.mark.parametrize("entrypoint", ["async", "stream", "child", "cross_provider_child"])
 @pytest.mark.parametrize("outcome", ["key_echo", "success"])
 def test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata(
     isolated, monkeypatch, bound_sdk_wire, enabled_local_sdk_tracing, caplog, entrypoint, outcome,
@@ -1167,8 +1161,7 @@ def test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata(
             detail = result.get("error")
         else:
             try:
-                result = (asyncio.run(oa.run_query("q", model=model, dal=object())) if entrypoint == "async"
-                          else oa.run_query_sync("q", model=model, dal=object()))
+                result = asyncio.run(oa.run_query("q", model=model, dal=object()))
                 detail = None
             except RuntimeError as exc:
                 assert outcome == "key_echo"

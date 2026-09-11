@@ -141,7 +141,7 @@ def test_agent_query_signatures_and_replay_schema_have_no_obsolete_attachment_su
         ),
         (
             "src/agents/openai_agent/agent.py",
-            ("run_query", "run_query_sync", "run_query_stream"),
+            ("run_query", "run_query_stream"),
         ),
     ):
         tree = _tree(relative_path)

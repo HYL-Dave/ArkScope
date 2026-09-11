@@ -9,6 +9,6 @@ Usage:
     print(result["tools_used"])
 """
 
-from .agent import run_query, run_query_sync
+from .agent import run_query
 
-__all__ = ["run_query", "run_query_sync"]
+__all__ = ["run_query"]
