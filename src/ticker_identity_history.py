@@ -6,7 +6,7 @@ import json
 from urllib.parse import parse_qsl, urlsplit
 
 from src.lifecycle_public_sources import SourceReadError, canonical_source_url
-from src.lifecycle_web_schema import WebJournalError
+from src.lifecycle_investigation.schema import verify_journal
 from src.lifecycle_journal_codec import digest_json
 from src.security_lifecycle_investigation import (
     SecurityLifecycleInvestigationStore, assessment_fingerprint, observation_fingerprint,
@@ -132,77 +132,37 @@ def _model(value):
     return {"provider": provider, "auth_mode": auth, "model": _text(value["model"], required=True)}
 
 
-def _web_passages(conn, web, citations):
-    # The approval pins SourcePassage digests, including URL and capture time.
-    # Locate the bound quotations inside SQLite without loading full documents
-    # into Python or rerunning today's finding/model validation.
-    passages = []
-    for citation in citations:
-        quote = _text(citation["quote"], required=True)
-        page = conn.execute("""
-            WITH source AS (
-                SELECT page_json,json_extract(page_json,'$.text') AS body
-                FROM lifecycle_web_pages WHERE run_id=? AND source_id=? AND json_valid(page_json)
-            ), located AS (SELECT *,instr(body,?) AS position FROM source)
-            SELECT json_extract(page_json,'$.url') AS source_url,
-                   json_extract(page_json,'$.body_sha256') AS source_document_sha256,
-                   json_extract(page_json,'$.text_sha256') AS source_text_sha256,
-                   json_extract(page_json,'$.retrieved_at') AS retrieved_at,
-                   position,length(CAST(substr(body,1,position-1) AS BLOB)) AS start_byte,
-                   instr(substr(body,position+1),?) AS duplicate_quote
-            FROM located
-            """, (web["run_id"], citation["source_id"], quote, quote)).fetchone()
-        if page is None or page["position"] is None or page["position"] <= 0 or page["duplicate_quote"]:
-            return []
-        passages.append({key: page[key] for key in ("source_url", "source_document_sha256", "source_text_sha256", "retrieved_at", "start_byte")})
-        passages[-1].update(end_byte=page["start_byte"] + len(quote.encode()), excerpt=quote,
-                            cited_text_sha256=hashlib.sha256(quote.encode()).hexdigest())
-    return passages if digest_json(passages) == web["passages_sha256"] else []
-
-
 def _llm(conn, transition, packet, result):
-    target = packet["lane"] == "investigation"
-    if target:
-        from src.lifecycle_investigation.schema import verify_journal
-        verify_journal(conn)
-        jobs, results, calls = "lifecycle_investigation_jobs", "lifecycle_investigation_results", "lifecycle_investigation_calls"
-        result_hash = "payload_sha256"
-    else:
-        from src.lifecycle_web_schema import verify_web_journal
-        verify_web_journal(conn)
-        jobs, results, calls = "lifecycle_web_runs", "lifecycle_web_results", "lifecycle_web_calls"
-        result_hash = "result_sha256"
+    if packet["lane"] != "investigation":
+        raise ValueError("history_journal_binding")
+    verify_journal(conn)
     web = packet["web"]
-    run = conn.execute(f"SELECT header_json,header_sha256,status,finished_at FROM {jobs} WHERE run_id=?", (web["run_id"],)).fetchone()
-    saved = conn.execute(f"SELECT payload_json,{result_hash} FROM {results} WHERE run_id=?", (web["run_id"],)).fetchone()
+    run = conn.execute("SELECT header_json,header_sha256,status,finished_at FROM lifecycle_investigation_jobs WHERE run_id=?", (web["run_id"],)).fetchone()
+    saved = conn.execute("SELECT payload_json,payload_sha256 FROM lifecycle_investigation_results WHERE run_id=?", (web["run_id"],)).fetchone()
     if run is None or saved is None:
         raise ValueError("history_journal_missing")
     header = _bound_json(run["header_json"], web["header_sha256"])
     material = _bound_json(saved["payload_json"], web["result_sha256"])
     selected = _model(header["selection"])
-    completed = conn.execute(f"SELECT terminal,remote_id FROM {calls} WHERE run_id=?", (web["run_id"],)).fetchall()
-    if (run["status"] != "succeeded" or run["header_sha256"] != web["header_sha256"] or saved[result_hash] != web["result_sha256"]
+    completed = conn.execute("SELECT terminal,remote_id FROM lifecycle_investigation_calls WHERE run_id=?", (web["run_id"],)).fetchall()
+    if (run["status"] != "succeeded" or run["header_sha256"] != web["header_sha256"] or saved["payload_sha256"] != web["result_sha256"]
             or selected != _model(web["execution"]) or not completed
             or any(row["terminal"] != "completed" or not row["remote_id"] for row in completed)
             or instant(run["finished_at"]) > instant(transition["approved_at"])):
         raise ValueError("history_execution_binding")
-    finding = material["validated"]["finding"] if target else material["finding"]
+    finding = material["validated"]["finding"]
     if (finding["source_ticker"] != transition["source_ticker"] or finding.get("successor_ticker") != transition["successor_ticker"]
             or finding["effective_date"] != packet["finding"]["effective_date"]):
         raise ValueError("history_finding_binding")
     result.update(method="llm_investigation", model=selected, summary=_text(finding["summary"], required=True),
                   observed_at=_time(run["finished_at"]), limitations=_strings(finding.get("limitations", [])))
-    if target:
-        passages = material["validated"]["passages"]
-        if digest_json(passages) != web["passages_sha256"]:
-            raise ValueError("history_passage_binding")
-        for passage in passages:
-            result["sources"].append(_source(gaps=result["gaps"], name=passage["publisher"], url=passage["url"], title=passage["title"],
-                published_at=passage["published_at"], observed_at=passage["retrieved_at"],
-                kind="document" if passage["corpus"] == "web" else "local_news"))
-    else:
-        for passage in _web_passages(conn, web, finding["citations"]):
-            result["sources"].append(_source(gaps=result["gaps"], url=passage["source_url"], observed_at=passage["retrieved_at"]))
+    passages = material["validated"]["passages"]
+    if digest_json(passages) != web["passages_sha256"]:
+        raise ValueError("history_passage_binding")
+    for passage in passages:
+        result["sources"].append(_source(gaps=result["gaps"], name=passage["publisher"], url=passage["url"], title=passage["title"],
+            published_at=passage["published_at"], observed_at=passage["retrieved_at"],
+            kind="document" if passage["corpus"] == "web" else "local_news"))
     result["source_gaps"] = [{"url": _link(gap["url"], result["gaps"]), "reason": _text(gap["reason"], required=True)}
                              for gap in packet.get("source_gaps", [])]
 
@@ -241,7 +201,7 @@ def project_decision(conn, transition):
             # Legacy fingerprints bind IDs and evidence, not the assessment's
             # prose/date/provenance. Do not imply that those fields were sealed.
             result["gaps"].append("legacy_assessment_unsealed")
-        if packet is not None and packet.get("lane") in {"web", "investigation"}:
+        if packet is not None and (packet.get("lane") == "investigation" or "web" in packet):
             _llm(conn, transition, packet, result)
         else:
             method = provenance.get("automation_method")
@@ -275,5 +235,5 @@ def project_decision(conn, transition):
             result["gaps"].append("sources_missing")
         result["gaps"] = sorted(set(result["gaps"]))
         return result
-    except (KeyError, TypeError, ValueError, WebJournalError):
+    except (KeyError, TypeError, ValueError):
         return _empty(transition, "record_invalid")

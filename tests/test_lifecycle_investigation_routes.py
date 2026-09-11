@@ -146,7 +146,7 @@ def test_saved_provider_observations_are_dated_readonly_and_refresh_is_target_sc
 
 
 def test_pending_confirmed_actions_remain_visible_without_the_legacy_queue(client):
-    from src.lifecycle_web_review import prepare, confirm
+    from src.lifecycle_investigation.review import prepare, confirm
     from src.ticker_identity_transition import TransitionOptions
     c = client
     options = TransitionOptions(execute_on="2026-09-10")

@@ -191,9 +191,18 @@ async def run_agent(target, credential, control, *, runtime, effort, news, provi
         if monotonic() >= deadline:
             raise ValueError("investigation_budget_exhausted")
 
+    def journal_call(callback, *args):
+        # A failed acknowledgement does not prove a write was rolled back.
+        try:
+            return callback(*args)
+        except BaseException as exc:
+            control.request_stop()
+            code = "stop_requested" if isinstance(exc, asyncio.CancelledError) else safe_code(exc)
+            raise AgentFailure(code, None) from None
+
     def record(kind, value):
         check()
-        on_step(kind, value)
+        journal_call(on_step, kind, value)
 
     def gap(reason, *, url=None, corpus=None):
         item = {"reason": reason, "url": url, "corpus": corpus}
@@ -201,11 +210,12 @@ async def run_agent(target, credential, control, *, runtime, effort, news, provi
             gaps.append(item)
 
     def stats():
+        submissions = journal_call(lambda: control.recorded_model_requests)
         totals = {}
         for field in ("input_tokens", "output_tokens"):
             values = [reply.usage[field] for reply in replies]
-            totals[field] = (sum(values) if len(values) == control.model_requests and all(value is not None for value in values) else None)
-        return {**counts, "model_submissions": control.model_requests,
+            totals[field] = (sum(values) if len(values) == submissions and all(value is not None for value in values) else None)
+        return {**counts, "model_submissions": submissions,
             "web_actions": sum(control.observed_web_actions.values()), "sources": len(sources),
             "elapsed_seconds": round(monotonic() - started, 3), **totals}
 
@@ -242,7 +252,7 @@ async def run_agent(target, credential, control, *, runtime, effort, news, provi
         admitted_urls.update(item["url"] for item in source["references"])
         if source["url"]:
             admitted_urls.add(source["url"])
-        on_source(identity, source)
+        journal_call(on_source, identity, source)
         record("source_captured", {"source_id": identity, "url": source["url"], "corpus": source["corpus"],
             "coverage": source["coverage"], "text_sha256": source["text_sha256"]})
         return identity
@@ -284,10 +294,12 @@ async def run_agent(target, credential, control, *, runtime, effort, news, provi
             raise WebModelError("execution_identity_changed")
         if reply.usage_observation is not None:
             validate_usage_observation(reply.usage_observation)
-        replies.append(reply)
-        record("model_result", {"call_id": identity, "phase": phase, "remote_id": reply.remote_id,
+        # Record completed work even after stop/deadline; this dispatches no new work.
+        journal_call(on_step, "model_result", {"call_id": identity, "phase": phase, "remote_id": reply.remote_id,
             "usage": reply.usage, "usage_observation": reply.usage_observation, "output_error": reply.output_error,
             "output": reply.output})
+        replies.append(reply)
+        check()
         if sum(control.observed_web_actions.values()) > runtime.web_actions:
             raise ValueError("investigation_budget_exhausted")
         return reply
@@ -320,7 +332,7 @@ async def run_agent(target, credential, control, *, runtime, effort, news, provi
             reader.request_stop()
             pool.shutdown(wait=True, cancel_futures=True)
             counts["http_requests"] += reader.request_count
-            record("source_read", {"url": url, "http_requests": reader.request_count,
+            journal_call(on_step, "source_read", {"url": url, "http_requests": reader.request_count,
                 "observations": [asdict(item) for item in getattr(reader, "observations", ())]})
 
     try:
@@ -433,6 +445,8 @@ async def run_agent(target, credential, control, *, runtime, effort, news, provi
             # Sources and the latest tool result already carry full supplied passages. Do not repeat them in history.
             history.append({"action": step.action, "reason": step.reason,
                 "result": {key: last_feedback[key] for key in ("code", "source_id", "block_reasons", "url", "next_offset") if key in (last_feedback or {})}})
+    except AgentFailure:
+        raise
     except ValueError as exc:
         if str(exc) == "investigation_budget_exhausted":
             return result("incomplete", "investigation_budget_exhausted")

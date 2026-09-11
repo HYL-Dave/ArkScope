@@ -20,17 +20,15 @@ from src.security_lifecycle_web_contract import ExecutionSelection
 from src.ticker_identity_transition import build_transition_effects, _execution_date
 
 
-def is_target_run(run_id):
-    return isinstance(run_id, str) and run_id.startswith("li_")
-
-
 def binding_on_connection(conn, run_id):
     conn.row_factory = sqlite3.Row
     verify_journal(conn)
     row, _ = InvestigationStore.row(conn, run_id)
     saved = conn.execute("SELECT payload_sha256 FROM lifecycle_investigation_results WHERE run_id=?", (run_id,)).fetchone()
     sources = tuple(tuple(item) for item in conn.execute("SELECT source_id,payload_sha256 FROM lifecycle_investigation_sources WHERE run_id=? ORDER BY source_id", (run_id,)))
-    return (row["header_sha256"], row["status"], None if saved is None else saved[0], sources,
+    steps = tuple(tuple(item) for item in conn.execute("SELECT ordinal,kind,payload_sha256 FROM lifecycle_investigation_steps WHERE run_id=? ORDER BY ordinal", (run_id,)))
+    calls = tuple(tuple(item) for item in conn.execute("SELECT call_id,remote_id,terminal FROM lifecycle_investigation_calls WHERE run_id=? ORDER BY call_id", (run_id,)))
+    return (row["header_sha256"], row["status"], None if saved is None else saved[0], sources, steps, calls,
             conn.execute("PRAGMA schema_version").fetchone()[0])
 
 
@@ -43,6 +41,9 @@ def as_adoption(row):
     outputs = [step["payload"] for step in row["steps"] if step["kind"] == "model_result"]
     if not requests or not outputs:
         raise ValueError("investigation_integrity")
+    supplied = requests[-1].get("supplied_passages")
+    if type(supplied) is not list or any(type(item) is not str for item in supplied):
+        raise ValueError("investigation_integrity")
     last = outputs[-1]
     actual = last["output"]
     if (last.get("output_error") is not None or type(actual) is not dict or actual.get("action") != "conclude"
@@ -50,7 +51,7 @@ def as_adoption(row):
             or last["call_id"] != requests[-1]["call_id"]
             or not any(call["call_id"] == last["call_id"] and call["remote_id"] == last["remote_id"] and call["terminal"] == "completed" for call in row["calls"])):
         raise ValueError("investigation_integrity")
-    checked = validate_finding(target, result["validated"]["finding"], row["sources"], set(requests[-1]["supplied_passages"]))
+    checked = validate_finding(target, result["validated"]["finding"], row["sources"], set(supplied))
     if checked != result["validated"]:
         raise ValueError("investigation_integrity")
     source = {"source": "lifecycle_investigation", "source_ref": row["run_id"], "ticker": target.ticker}
@@ -83,8 +84,9 @@ def validated_read(path, run_id):
     store = InvestigationStore(path)
     with store.connection() as conn:
         binding = binding_on_connection(conn, run_id)
-        row = InvestigationStore.read_on_connection(conn, run_id)
+        capture = store.capture_on_connection(conn, run_id)
     # Large source parsing is outside the mutable profile transaction.
+    row = store.decode_capture(capture)
     read = ValidatedInvestigationRead(store.path, run_id, binding, as_adoption(row))
     with store.connection() as conn:
         read.on_connection(conn, run_id)
@@ -101,7 +103,7 @@ def read_on_connection(conn, run_id, *, validated=None):
 
 
 def prepare_on_connection(service, conn, *, run_id, options, web_read=None):
-    from src.lifecycle_web_review import assessment_id_for, acceptance_for, _adoption_values, _provider_veto, _freshness
+    from src.lifecycle_investigation.review import assessment_id_for, acceptance_for, _adoption_values, _provider_veto, _freshness
     run = read_on_connection(conn, run_id, validated=web_read)
     case = run["target_case"]
     store = SecurityLifecycleInvestigationStore(conn)

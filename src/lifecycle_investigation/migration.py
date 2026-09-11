@@ -7,10 +7,10 @@ import sqlite3
 
 from src.lifecycle_investigation.schema import installed, schema_digest, verify_journal, _install_on_connection
 from src.lifecycle_journal_codec import digest_json
-from src.lifecycle_web_migration import _backup
 from src.security_lifecycle_listing_migration import _encode_cell, _quote_identifier as q, _sha_file
 from src.security_lifecycle_provider_snapshot import instant
 from src.security_lifecycle_schema import verify_profile_connection, assert_lifecycle_writes_available
+from src.sqlite_backup import backup_connection
 
 
 def _snapshot(conn, names=None):
@@ -64,7 +64,7 @@ def apply_installation(path, *, backup_path, approval_sha256, at, app_stopped):
         assert_lifecycle_writes_available(conn)
         if before["installed"]:
             return {"changed": False, **before}
-        _backup(conn, backup)
+        backup_connection(conn, backup)
         if preview_installation(backup) != before:
             raise ValueError("investigation_install_backup_changed")
         conn.execute("BEGIN IMMEDIATE")

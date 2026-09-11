@@ -9,15 +9,21 @@ import json
 from uuid import uuid4
 
 from src.auth_drivers.lifecycle_web_models import WebModelError
+from src.auth_drivers.lifecycle_web_usage import token_totals, validate_usage_observation
 from src.lifecycle_investigation.runtime import InvestigationRuntime
 from src.lifecycle_investigation.schema import verify_journal
 from src.lifecycle_journal_codec import canonical_json, digest_json
-from src.lifecycle_public_sources import SourceReadError
-from src.lifecycle_web_store import WebJournalError
+from src.lifecycle_public_sources import SourceReadError, canonical_source_url, validate_source_read_report
 from src.model_routing import ModelRouteUnavailable
 from src.security_lifecycle_provider_snapshot import instant
 from src.security_lifecycle_schema import assert_lifecycle_writes_available
 from src.security_lifecycle_web_contract import ExecutionSelection, RunControl, WebContractError, validate_selection
+
+
+class JournalError(RuntimeError):
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
 
 
 def safe_code(exc):
@@ -33,7 +39,7 @@ def safe_code(exc):
     value = str(exc)
     if value in known:
         return value
-    if isinstance(exc, (WebModelError, WebJournalError, WebContractError, SourceReadError, ModelRouteUnavailable)):
+    if isinstance(exc, (WebModelError, JournalError, WebContractError, SourceReadError, ModelRouteUnavailable)):
         if value and len(value) <= 100 and all(character in "abcdefghijklmnopqrstuvwxyz_" for character in value):
             return value
     return "web_execution_failed"
@@ -52,6 +58,53 @@ def _decoded(raw, digest):
             raise ValueError()
         return value
     except (ValueError, TypeError):
+        raise ValueError("investigation_integrity") from None
+
+
+def _validate_observations(row):
+    """A valid digest alone does not bind reported usage to completed calls."""
+    try:
+        calls = {call["call_id"]: call for call in row["calls"]}
+        usages = {}
+        for step in row["steps"]:
+            payload = step["payload"]
+            if step["kind"] == "model_result":
+                identity = payload["call_id"]
+                if (identity in usages or identity not in calls or calls[identity]["terminal"] != "completed"
+                        or payload["remote_id"] != calls[identity]["remote_id"]):
+                    raise ValueError()
+                usages[identity] = token_totals(payload["usage"])
+                if payload["usage_observation"] is not None:
+                    observation = validate_usage_observation(payload["usage_observation"])
+                    if any(observation["values"][key] != value for key, value in usages[identity].items()):
+                        raise ValueError()
+            elif step["kind"] == "source_read":
+                if (set(payload) != {"url", "http_requests", "observations"}
+                        or canonical_source_url(payload["url"]) != payload["url"]):
+                    raise ValueError()
+                validate_source_read_report({"requests": payload["http_requests"], "observations": payload["observations"]},
+                    max_requests=row["binding"]["runtime"]["http_requests"])
+        result = row["result"]
+        if result is None:
+            return
+        stats = result["stats"]
+        if type(stats["model_submissions"]) is not int or stats["model_submissions"] != len(calls):
+            raise ValueError()
+        totals = token_totals({key: stats[key] for key in ("input_tokens", "output_tokens")})
+        for key, total in totals.items():
+            values = [usage[key] for usage in usages.values()]
+            expected = sum(values) if len(values) == len(calls) and all(value is not None for value in values) else None
+            if total != expected:
+                raise ValueError()
+        if type(result["gaps"]) is not list:
+            raise ValueError()
+        for gap in result["gaps"]:
+            if (type(gap) is not dict or set(gap) != {"url", "reason", "corpus"}
+                    or type(gap["reason"]) is not str or re.fullmatch(r"[a-z_]{1,100}", gap["reason"]) is None
+                    or gap["corpus"] not in (None, "news", "sa_market_news")
+                    or (gap["url"] is not None and canonical_source_url(gap["url"]) != gap["url"])):
+                raise ValueError()
+    except (KeyError, TypeError, ValueError, WebModelError):
         raise ValueError("investigation_integrity") from None
 
 
@@ -223,23 +276,41 @@ class InvestigationStore:
                     (status, self._now(), "remote_outcome_unknown" if pending else "worker_interrupted", row[0]))
 
     @classmethod
-    def read_on_connection(cls, conn, run_id, *, include_sources=True):
+    def capture_on_connection(cls, conn, run_id, *, include_sources=True):
         row, binding = cls.row(conn, run_id)
+        return {
+            "row": row, "binding": binding,
+            "steps": conn.execute("SELECT * FROM lifecycle_investigation_steps WHERE run_id=? ORDER BY ordinal", (run_id,)).fetchall(),
+            "saved": conn.execute("SELECT * FROM lifecycle_investigation_results WHERE run_id=?", (run_id,)).fetchone(),
+            "sources": conn.execute("SELECT * FROM lifecycle_investigation_sources WHERE run_id=? ORDER BY rowid", (run_id,)).fetchall() if include_sources else [],
+            "adopted": conn.execute("SELECT 1 FROM lifecycle_investigation_acceptances WHERE run_id=?", (run_id,)).fetchone() is not None,
+            "calls": [dict(item) for item in conn.execute("SELECT call_id,remote_id,terminal FROM lifecycle_investigation_calls WHERE run_id=? ORDER BY rowid", (run_id,))],
+        }
+
+    @staticmethod
+    def decode_capture(capture):
         steps = [{"ordinal": item["ordinal"], "kind": item["kind"], "at": item["created_at"],
                   "payload": _decoded(item["payload_json"], item["payload_sha256"])}
-            for item in conn.execute("SELECT * FROM lifecycle_investigation_steps WHERE run_id=? ORDER BY ordinal", (run_id,))]
-        saved = conn.execute("SELECT * FROM lifecycle_investigation_results WHERE run_id=?", (run_id,)).fetchone()
+            for item in capture["steps"]]
+        saved = capture["saved"]
         sources = {item["source_id"]: _decoded(item["payload_json"], item["payload_sha256"])
-            for item in conn.execute("SELECT * FROM lifecycle_investigation_sources WHERE run_id=? ORDER BY rowid", (run_id,))} if include_sources else {}
-        adopted = conn.execute("SELECT 1 FROM lifecycle_investigation_acceptances WHERE run_id=?", (run_id,)).fetchone() is not None
-        return {**row, "binding": binding, "steps": steps, "sources": sources, "adopted": adopted,
-            "calls": [dict(item) for item in conn.execute("SELECT call_id,remote_id,terminal FROM lifecycle_investigation_calls WHERE run_id=? ORDER BY rowid", (run_id,))],
+            for item in capture["sources"]}
+        row = {**capture["row"], "binding": capture["binding"], "steps": steps, "sources": sources, "adopted": capture["adopted"],
+            "calls": capture["calls"],
             "result": None if saved is None else _decoded(saved["payload_json"], saved["payload_sha256"]),
             "result_sha256": None if saved is None else saved["payload_sha256"]}
+        _validate_observations(row)
+        return row
+
+    @classmethod
+    def read_on_connection(cls, conn, run_id, *, include_sources=True):
+        return cls.decode_capture(cls.capture_on_connection(conn, run_id, include_sources=include_sources))
 
     def read(self, run_id, *, include_sources=True):
         with self.connection() as conn:
-            return self.read_on_connection(conn, run_id, include_sources=include_sources)
+            capture = self.capture_on_connection(conn, run_id, include_sources=include_sources)
+        # Owned reads release their snapshot before decoding large source bodies.
+        return self.decode_capture(capture)
 
     def latest(self, ticker):
         with self.connection() as conn:
@@ -255,6 +326,12 @@ class InvestigationControl(RunControl):
     def __init__(self, store, run_id, owner, selection, runtime):
         super().__init__(selection=selection, max_model_requests=runtime["model_submissions"])
         self.store, self.run_id, self.owner, self.web_limit = store, run_id, owner, runtime["web_actions"]
+
+    @property
+    def recorded_model_requests(self):
+        with self.store.connection() as conn:
+            self.store.row(conn, self.run_id)
+            return conn.execute("SELECT COUNT(*) FROM lifecycle_investigation_calls WHERE run_id=?", (self.run_id,)).fetchone()[0]
 
     def _record(self, method, **kwargs):
         try:

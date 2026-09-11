@@ -95,7 +95,7 @@ def test_approved_review_snapshot_survives_later_assessment_and_source_changes(t
 ])
 def test_target_investigation_history_names_the_recorded_model_and_cited_news_only(tmp_path, monkeypatch, provider, auth, model):
     from tests.test_lifecycle_investigation_review import context
-    from src.lifecycle_web_review import prepare, confirm
+    from src.lifecycle_investigation.review import prepare, confirm
     c = context(tmp_path, provider=provider, auth=auth)
     options = TransitionOptions(execute_on=None)
     packet = prepare(c["service"], c["run_id"], options=options)
@@ -120,23 +120,6 @@ def test_target_investigation_history_names_the_recorded_model_and_cited_news_on
     assert decision["gaps"] == []
     assert rows(c) == before
     assert not any(key in json.dumps(decision) for key in ("credential_id", "remote_id", "sha256", "passage_id", "run_id"))
-
-
-def test_legacy_web_investigation_history_preserves_auth_model_and_source_link(tmp_path, monkeypatch):
-    from tests.test_lifecycle_web_review import context, prepare, confirm
-    c = context(tmp_path, provider="anthropic", auth="claude_code_oauth")
-    confirm(c, prepare(c))
-    monkeypatch.setattr("src.lifecycle_web_store.LifecycleWebStore._decode_page",
-        lambda *a, **k: (_ for _ in ()).throw(AssertionError("Do not parse full source bodies in history")))
-    before = rows(c)
-    decision = history(c, monkeypatch)[0].get("decision")
-    assert decision is not None
-    assert decision["method"] == "llm_investigation"
-    assert decision["model"] == {"provider": "anthropic", "model": "claude-sonnet-5", "auth_mode": "claude_code_oauth"}
-    assert decision["summary"] == "The old NASDAQ listing ended; no claim is made about a replacement."
-    assert decision["sources"][0]["url"] == "https://ir.example.com/notice"
-    assert decision["sources"][0]["observed_at"] == "2026-09-06T01:00:00Z"
-    assert rows(c) == before
 
 
 def test_acknowledgement_and_reversal_keep_original_explanation(tmp_path, monkeypatch):
@@ -194,24 +177,40 @@ def test_malformed_unbound_provider_observation_cannot_poison_bound_history(tmp_
 
 
 @pytest.mark.parametrize("field,value", [("url", "https://unrelated.example/forged"),
-    ("retrieved_at", "2026-09-06T02:00:00Z"), ("text_sha256", "f" * 64), ("body_sha256", "f" * 64)])
-def test_legacy_web_source_metadata_must_match_the_approved_passage_digest(tmp_path, monkeypatch, field, value):
-    from tests.test_lifecycle_web_review import context, prepare, confirm
-    c = context(tmp_path, provider="anthropic", auth="claude_code_oauth")
-    confirm(c, prepare(c))
+    ("retrieved_at", "2026-09-08T02:00:00Z"), ("text", "Unbound replacement quotation")])
+def test_current_history_requires_approved_passage_digest_even_when_result_is_resigned(tmp_path, monkeypatch, field, value):
+    from src.lifecycle_journal_codec import canonical_json, digest_json
+    from src.security_lifecycle_review import packet_digest, confirmation_for
+    from src.ticker_identity_transition import profile_snapshot_sha256
+    from tests.test_lifecycle_investigation_review import context, prepare, confirm
+    c = context(tmp_path)
+    applied = confirm(c, prepare(c))
     with sqlite3.connect(c["profile"]) as conn:
-        damage_saved_rows(conn, "lifecycle_web_pages",
-            "UPDATE lifecycle_web_pages SET page_json=json_set(page_json,?,?)", (f"$.{field}", value))
+        saved = json.loads(conn.execute("SELECT payload_json FROM lifecycle_investigation_results").fetchone()[0])
+        saved["validated"]["passages"][0][field] = value
+        result_digest = digest_json(saved)
+        damage_saved_rows(conn, "lifecycle_investigation_results",
+            "UPDATE lifecycle_investigation_results SET payload_json=?,payload_sha256=?", (canonical_json(saved), result_digest))
+        store = TickerIdentityTransitionStore(conn)
+        preview = store.get(applied["transition_id"])["approved_preview"]
+        receipt = preview["review_confirmation"]
+        packet = receipt["packet"]
+        packet["web"]["result_sha256"] = result_digest
+        receipt["packet_sha256"] = packet["packet_sha256"] = packet_digest(packet)
+        digest = preview["preview_sha256"] = profile_snapshot_sha256(preview)
+        conn.execute("UPDATE ticker_identity_transitions SET approved_preview_json=?,approved_preview_sha256=? WHERE transition_id=?",
+            (json.dumps(preview), digest, applied["transition_id"]))
+        assert confirmation_for(store.get(applied["transition_id"]))["packet"] == packet
     decision = history(c, monkeypatch)[0]["decision"]
-    assert decision["summary"] == "The old NASDAQ listing ended; no claim is made about a replacement."
+    assert decision["summary"] is None
     assert decision["sources"] == []
-    assert decision["gaps"] == ["sources_missing"]
+    assert decision["gaps"] == ["record_invalid"]
 
 
 @pytest.mark.parametrize("published", ["September 1, 2026", "Sep 1, 2026 08:30 ET"])
 def test_history_preserves_valid_publisher_date_text_from_the_real_investigation(tmp_path, monkeypatch, published):
     from tests.test_lifecycle_investigation_review import context
-    from src.lifecycle_web_review import prepare, confirm
+    from src.lifecycle_investigation.review import prepare, confirm
     publisher_date_fixture(monkeypatch, published)
     c = context(tmp_path, provider="anthropic", auth="claude_code_oauth")
     options = TransitionOptions(execute_on=None)
@@ -240,6 +239,42 @@ def test_damaged_approval_does_not_erase_activity_or_offer_a_fabricated_explanat
     assert rows(c) == before
 
 
+@pytest.mark.parametrize("binding", ["missing", "null", "wrong_lane", "unbound_result"])
+def test_current_history_rejects_resigned_missing_or_corrupt_investigation_binding(tmp_path, monkeypatch, binding):
+    from src.security_lifecycle_review import packet_digest, confirmation_for
+    from src.ticker_identity_transition import profile_snapshot_sha256
+    from tests.test_lifecycle_investigation_review import context, prepare, confirm
+    c = context(tmp_path)
+    applied = confirm(c, prepare(c))
+    with sqlite3.connect(c["profile"]) as conn:
+        store = TickerIdentityTransitionStore(conn)
+        transition = store.get(applied["transition_id"])
+        preview = transition["approved_preview"]
+        receipt = preview["review_confirmation"]
+        packet = receipt["packet"]
+        if binding == "missing":
+            packet.pop("web")
+        elif binding == "null":
+            packet["web"] = None
+        elif binding == "wrong_lane":
+            packet["lane"] = "manual"
+        else:
+            packet["web"]["result_sha256"] = "0" * 64
+        receipt["packet_sha256"] = packet["packet_sha256"] = packet_digest(packet)
+        digest = preview["preview_sha256"] = profile_snapshot_sha256(preview)
+        conn.execute("UPDATE ticker_identity_transitions SET approved_preview_json=?,approved_preview_sha256=? WHERE transition_id=?",
+            (json.dumps(preview), digest, applied["transition_id"]))
+        assert confirmation_for(store.get(applied["transition_id"]))["packet"] == packet
+    before = rows(c)
+    items = history(c, monkeypatch)
+    assert len(items) == 1 and items[0]["activity_type"] == "applied"
+    decision = items[0]["decision"]
+    assert decision["summary"] is None and decision["sources"] == []
+    assert decision["gaps"] == ["record_invalid"]
+    assert decision["method"] != "manual_review"
+    assert rows(c) == before
+
+
 @pytest.mark.parametrize("lane", ("provider", "llm"))
 def test_shared_frontend_fixture_is_owned_by_real_persisted_history(tmp_path, monkeypatch, lane):
     if lane == "provider":
@@ -247,7 +282,7 @@ def test_shared_frontend_fixture_is_owned_by_real_persisted_history(tmp_path, mo
         legacy(c)
     else:
         from tests.test_lifecycle_investigation_review import context
-        from src.lifecycle_web_review import prepare, confirm
+        from src.lifecycle_investigation.review import prepare, confirm
         publisher_date_fixture(monkeypatch, "September 1, 2026")
         c = context(tmp_path, provider="anthropic", auth="claude_code_oauth")
         options = TransitionOptions(execute_on=None)

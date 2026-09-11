@@ -187,6 +187,11 @@ class RunControl:
             return len(self._calls)
 
     @property
+    def recorded_model_requests(self) -> int:
+        """Non-journal controls have only their local reservation record."""
+        return self.model_requests
+
+    @property
     def all_requests_terminal(self) -> bool:
         with self._lock:
             return all(call.terminal is not None for call in self._calls.values())

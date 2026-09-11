@@ -1,4 +1,4 @@
-"""Explicit v2 installation; legacy v1 journals are neither rewritten nor dropped."""
+"""Current investigation journal; initialization never rewrites populated stores."""
 
 import hashlib
 

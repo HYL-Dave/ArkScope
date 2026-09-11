@@ -882,8 +882,8 @@ def build_transition_preview(
     else:
         blockers.append("outcome_not_executable")
 
-    from src.lifecycle_web_review import web_transition_guard
-    web_blockers = web_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
+    from src.lifecycle_investigation.review import investigation_transition_guard
+    web_blockers = investigation_transition_guard(conn, assessment=assessment, observation_sha256=observation_fingerprint,
         transition_kind=transition_kind, successor_ticker=successor_ticker, at=at or _utc_now(), web_read=web_read)
     if web_blockers is not None:
         blockers.extend(web_blockers)
@@ -1483,12 +1483,12 @@ class TickerIdentityTransitionStore:
                 return membership_blockers
         from src.sa_tracking_memberships import SaTrackingMembershipStore
         from src.security_lifecycle_provider_authority import provider_transition_guard
-        from src.lifecycle_web_review import acceptance_for, web_transition_guard
+        from src.lifecycle_investigation.review import acceptance_for, investigation_transition_guard
         identity = str(preview.get("assessment_id") or "")
         if identity.startswith("sla_web_") or acceptance_for(self.conn, identity) is not None:
             from src.security_lifecycle_investigation import SecurityLifecycleInvestigationStore
             assessment = SecurityLifecycleInvestigationStore(self.conn).get_assessment(identity)
-            return web_transition_guard(self.conn, assessment=assessment,
+            return investigation_transition_guard(self.conn, assessment=assessment,
                 observation_sha256=preview["observation_fingerprint_sha256"], transition_kind=preview["transition_kind"],
                 successor_ticker=preview.get("successor_ticker"), at=at, automation=automation,
                 confirmation=preview.get("review_confirmation"), require_confirmation=True, web_read=web_read)

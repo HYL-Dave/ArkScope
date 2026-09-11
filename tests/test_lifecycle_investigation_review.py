@@ -20,7 +20,8 @@ from tests.lifecycle_investigation_fixtures import synthetic_credentials
 from tests.test_security_lifecycle_terminal_workflow import setup_workflow
 
 
-def context(tmp_path, *, finding_edit=lambda value: value, provider="openai", auth="api_key", body=NOTICE):
+def context(tmp_path, *, finding_edit=lambda value: value, provider="openai", auth="api_key", body=NOTICE,
+            model=None, reader_factory=None, kind="terminal_delisting", future=False, expected_status="succeeded"):
     c = setup_workflow(tmp_path, assess=False, event_available=False)
     c["now"][0] = "2026-09-08T01:00:00Z"
     c["checks"].record(ticker="OLD", at=c["now"][0], evidence=(), diagnostics={}, blockers=("massive_unavailable",))
@@ -35,21 +36,45 @@ def context(tmp_path, *, finding_edit=lambda value: value, provider="openai", au
     job = store.start(binding=binding, owner="worker", request_key="explicit-click")
     identity = job["run_id"]
     control = store.control(identity, owner="worker")
-    async def model(call, credential, control):
+    if kind == "symbol_continuation":
+        body = NOTICE.split("\n")[0] + "\nOn September 1, 2026, the same common stock on NASDAQ changed its ticker from OLD to NEW and continues trading."
+    async def default_model(call, credential, control):
         material = json.loads(call.prompt.split("\nMATERIAL\n")[1])
-        return completed(call, control, choose("conclude", finding=finding_edit(payload(material["sources"][0]["passages"]))))
+        finding = payload(material["sources"][0]["passages"])
+        if kind == "symbol_continuation":
+            finding.update(event_kind="symbol_continuation", successor_ticker="NEW", summary="The same common stock now trades as NEW.")
+            finding["citations"][-1]["supports"] = ["same_security_continuation", "effective_date"]
+        return completed(call, control, choose("conclude", finding=finding_edit(finding)))
+    reader = {} if reader_factory is None else {"reader_factory": reader_factory}
     result = asyncio.run(run_agent(Target.model_validate(binding["target"]), WebCredential(ExecutionSelection(**binding["selection"])), control,
-        runtime=InvestigationRuntime(), effort="high", news=LocalNews(corpus(tmp_path, body=body), None, clock=lambda: c["now"][0]), model=model,
+        runtime=InvestigationRuntime(), effort="high", news=LocalNews(corpus(tmp_path, body=body), None, clock=lambda: c["now"][0]), model=model or default_model,
         on_source=lambda key, value: store.source(identity, owner="worker", source_id=key, payload=value),
-        on_step=lambda kind, value: store.step(identity, owner="worker", kind=kind, payload=value)))
-    assert result["status"] == "succeeded", result
-    store.finish(identity, owner="worker", status="succeeded", payload=result)
-    c.update(investigation=store, run_id=identity, preflight=preflight)
+        on_step=lambda kind, value: store.step(identity, owner="worker", kind=kind, payload=value), **reader))
+    assert result["status"] == expected_status, result
+    store.finish(identity, owner="worker", status=result["status"], payload=result)
+    c.update(investigation=store, run_id=identity, preflight=preflight, control=control,
+        options=TransitionOptions(execute_on="2026-09-09" if future else None))
     return c
 
 
+def prepare(c):
+    from src.lifecycle_investigation.review import prepare
+    return prepare(c["service"], c["run_id"], options=c["options"])
+
+
+def confirm(c, packet, *, before_write=lambda: None, acknowledge_source_gaps=False):
+    from src.lifecycle_investigation.review import confirm
+    return confirm(c["service"], c["run_id"], packet_sha256=packet["packet_sha256"], action=packet["action"],
+        options=c["options"], before_write=before_write, acknowledge_source_gaps=acknowledge_source_gaps)
+
+
+def rows(c):
+    with sqlite3.connect(c["profile"]) as conn:
+        return tuple(conn.iterdump())
+
+
 def test_target_finding_uses_existing_atomic_receipt_without_fabricating_a_case_at_launch(tmp_path):
-    from src.lifecycle_web_review import prepare, confirm
+    from src.lifecycle_investigation.review import prepare, confirm
     c = context(tmp_path)
     with sqlite3.connect(c["profile"]) as conn:
         assert conn.execute("SELECT COUNT(*) FROM security_lifecycle_cases").fetchone()[0] == 0
@@ -69,7 +94,7 @@ def test_target_finding_uses_existing_atomic_receipt_without_fabricating_a_case_
 
 
 def test_failed_adoption_does_not_leave_an_anchor_or_partial_profile_change(tmp_path, monkeypatch):
-    from src.lifecycle_web_review import prepare, confirm
+    from src.lifecycle_investigation.review import prepare, confirm
     from src.ticker_identity_transition import TickerIdentityTransitionStore
     c = context(tmp_path)
     packet = prepare(c["service"], c["run_id"], options=TransitionOptions(execute_on=None))
@@ -84,7 +109,7 @@ def test_failed_adoption_does_not_leave_an_anchor_or_partial_profile_change(tmp_
 
 
 def test_unknown_event_date_is_explicit_and_requires_an_attended_execution_date(tmp_path):
-    from src.lifecycle_web_review import prepare, confirm
+    from src.lifecycle_investigation.review import prepare, confirm
     def unknown_date(value):
         return {**value, "effective_date": None, "effective_date_text": None,
             "limitations": ["The exact trading-end date was not established."]}
@@ -105,7 +130,7 @@ def test_unknown_event_date_is_explicit_and_requires_an_attended_execution_date(
 
 
 def test_new_position_invalidates_target_review_even_with_source_gap_acknowledgement(tmp_path):
-    from src.lifecycle_web_review import prepare, confirm
+    from src.lifecycle_investigation.review import prepare, confirm
     from src.portfolio_state import PortfolioStore
     from src.ticker_identity_service import TickerIdentityConflict
     c = context(tmp_path)
@@ -123,7 +148,7 @@ def test_new_position_invalidates_target_review_even_with_source_gap_acknowledge
 
 
 def test_fresh_active_provider_evidence_is_not_waived_by_source_gap_acknowledgement(tmp_path):
-    from src.lifecycle_web_review import prepare, confirm
+    from src.lifecycle_investigation.review import prepare, confirm
     from tests.test_security_lifecycle_population import active
     from src.ticker_identity_service import TickerIdentityConflict
     c = context(tmp_path)
@@ -139,7 +164,7 @@ def test_fresh_active_provider_evidence_is_not_waived_by_source_gap_acknowledgem
 
 
 def test_same_security_rename_moves_tracking_but_preserves_the_source_history(tmp_path):
-    from src.lifecycle_web_review import prepare, confirm
+    from src.lifecycle_investigation.review import prepare, confirm
     body = NOTICE.split("\n")[0] + "\nOn September 1, 2026, the same common stock on NASDAQ changed its ticker from OLD to NEW and continues trading."
     def rename(value):
         value.update(event_kind="symbol_continuation", successor_ticker="NEW", summary="The same common stock now trades as NEW.")
