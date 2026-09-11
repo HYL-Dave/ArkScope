@@ -47,6 +47,7 @@ import {
 } from "./settingsReadCache";
 import { SettingsSubsectionAnchor } from "./SettingsSectionAnchor";
 import { PriceCoverageRepair } from "./PriceCoverageRepair";
+import { SecResearchPanel } from "./SecResearchPanel";
 
 export function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
@@ -213,6 +214,9 @@ export function DataStorageSection({
           developerMode={developerMode}
           settingsReadCache={settingsReadCache}
         />
+      </SettingsSubsectionAnchor>
+      <SettingsSubsectionAnchor id="sec_structured_storage">
+        <SecResearchPanel />
       </SettingsSubsectionAnchor>
     </div>
   );

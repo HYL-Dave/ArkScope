@@ -8,7 +8,8 @@ import { describe, expect, it } from "vitest";
 const here = fileURLToPath(new URL(".", import.meta.url));
 const primitiveCss = readFileSync(resolve(here, "./primitives.css"), "utf8");
 const settingsCss = readFileSync(resolve(here, "../settings/settings.css"), "utf8");
-const css = [readFileSync(resolve(here, "../styles.css"), "utf8"), primitiveCss, settingsCss].join("\n");
+const secResearchCss = readFileSync(resolve(here, "../settings/secResearch.css"), "utf8");
+const css = [readFileSync(resolve(here, "../styles.css"), "utf8"), primitiveCss, settingsCss, secResearchCss].join("\n");
 
 function tsxSources(root: string): string[] {
   if (!existsSync(root)) return [];

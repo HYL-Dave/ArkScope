@@ -194,6 +194,7 @@ vi.mock("./settings/DataStorageSection", () => ({
     <div>
       <p>市場資料內容</p>
       <div data-settings-location="trading_day_coverage" />
+      <div data-settings-location="sec_structured_storage" />
     </div>
   ),
 }));
@@ -758,6 +759,7 @@ describe("Settings workspace", () => {
         "市場資料",
         "標的事件調查",
         "交易日 / 價格覆蓋",
+        "SEC 結構化資料",
         "新聞資料",
         "總經資料",
       ]);

@@ -173,6 +173,7 @@ vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
+    getSecResearchConfig: vi.fn(async () => ({ capture_budget_bytes: 107374182400, capacity: null })),
     getModelCatalog: vi.fn(async () => emptyCatalog),
     getMarketDataStatus: vi.fn(async () => {
       if (mocked.marketError) throw mocked.marketError;
@@ -459,6 +460,7 @@ describe("local storage panels", () => {
         "市場資料",
         "標的事件調查",
         "交易日 / 價格覆蓋",
+        "SEC 結構化資料",
         "新聞資料",
         "總經資料",
       ]);
@@ -558,7 +560,7 @@ describe("local storage panels", () => {
     const mountedStorage = host!.querySelector('[data-settings-anchor="data_storage"]');
     if (!mountedStorage) throw new Error("missing mounted Market Data section");
     expect(mountedStorage.textContent).toContain(
-      "查看已儲存的價格、新聞、SEC 基本面與獨立財務快取。價格與新聞的抓取工作由「資料來源與排程」管理；基本面資料尚未接入 App 排程，本頁只會重新讀取狀態。",
+      "查看已儲存的價格、新聞、SEC 基本面與獨立財務快取。價格與新聞的抓取工作由「資料來源與排程」管理；基本面資料尚未接入 App 排程，基本面摘要只會重新讀取狀態。",
     );
     expect(mountedStorage.textContent).not.toContain("隱含波動率");
     expect(mountedStorage.textContent).not.toContain("最近增量更新");
@@ -608,7 +610,7 @@ describe("local storage panels", () => {
     expect(storage).toBe(mountedStorage);
     expect(storage.querySelector("h2")?.textContent).toBe("Market Data");
     expect(storage.textContent).toContain(
-      "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals data is not connected to an App schedule, and this page only reloads status.",
+      "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals data is not connected to an App schedule, and the fundamentals summary only reloads status.",
     );
     expect(storage.textContent).not.toContain("implied volatility");
     expect(Array.from(storage.querySelectorAll("dl.ds-kv > dt")).map((node) => node.textContent))

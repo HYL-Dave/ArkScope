@@ -14,7 +14,8 @@ const settingsPreferencesPath = resolve(settingsRoot, "./settingsPreferences.ts"
 const stylesCss = readFileSync(resolve(here, "./styles.css"), "utf8");
 const primitivesCss = readFileSync(resolve(here, "./ui/primitives.css"), "utf8");
 const settingsCss = readFileSync(resolve(settingsRoot, "./settings.css"), "utf8");
-const allCss = [stylesCss, primitivesCss, settingsCss].join("\n");
+const secResearchCss = readFileSync(resolve(settingsRoot, "./secResearch.css"), "utf8");
+const allCss = [stylesCss, primitivesCss, settingsCss, secResearchCss].join("\n");
 const settingsSource = readFileSync(settingsPath, "utf8");
 
 function sourceFiles(root: string): string[] {

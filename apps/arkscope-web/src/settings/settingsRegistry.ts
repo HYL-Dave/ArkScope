@@ -19,6 +19,7 @@ export type SettingsSubsectionId =
   | "provider_connections"
   | "source_schedules"
   | "security_lifecycle"
+  | "sec_structured_storage"
   | "trading_day_coverage";
 
 export type SettingsLocationId = SettingsAnchorId | SettingsSubsectionId;
@@ -103,6 +104,7 @@ export const SETTINGS_SUBSECTIONS: readonly SettingsSubsectionDefinition[] = [
   { id: "source_schedules", parent: "data_sources" },
   { id: "security_lifecycle", parent: "data_storage" },
   { id: "trading_day_coverage", parent: "data_storage" },
+  { id: "sec_structured_storage", parent: "data_storage" },
 ];
 
 const SECTIONS_BY_ID = new Map<SettingsAnchorId, SettingsSectionDefinition>(
