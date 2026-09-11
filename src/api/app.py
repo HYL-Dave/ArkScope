@@ -199,6 +199,7 @@ def create_app() -> FastAPI:
     from .routes.symbols import router as symbols_router
     from .routes.consensus import router as consensus_router
     from .routes.market_data import router as market_data_router
+    from .routes.sec_research import router as sec_research_router
     from .routes.security_lifecycle import router as security_lifecycle_router
     from .routes.lifecycle_investigation import router as lifecycle_investigation_router
     from .routes.ticker_identity import router as ticker_identity_router
@@ -227,6 +228,7 @@ def create_app() -> FastAPI:
     app.include_router(symbols_router)
     app.include_router(consensus_router)
     app.include_router(market_data_router)
+    app.include_router(sec_research_router)
     # Specific current paths must precede the retained /investigations/{run_id} reader.
     app.include_router(lifecycle_investigation_router)
     app.include_router(security_lifecycle_router)
