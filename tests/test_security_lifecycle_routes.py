@@ -462,7 +462,11 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 216
+    assert len(rows) == 218
+    assert {row for row in rows if row[1].startswith("/sec-research/")} == {
+        ("GET", "/sec-research/{cik}"),
+        ("POST", "/sec-research/{cik}/refresh"),
+    }
     assert {row for row in rows if row[1].startswith("/security-lifecycle/investigations/")} == {
         ("GET", "/security-lifecycle/investigations/{run_id}"),  # Retained historical audit read.
         ("GET", "/security-lifecycle/investigations/targets"),
