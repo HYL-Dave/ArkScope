@@ -126,6 +126,128 @@ def test_undeclared_ix_compatibility_never_overrides_explicit_unbinding(mime):
     assert extract(body, mime) == ("Visible explicit unbinding", mime)
 
 
+@pytest.mark.parametrize("inline,other", [("ix", "IX"), ("fact", "Fact"), ("F", "f")])
+def test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace(inline, other):
+    namespace = "http://www.xbrl.org/2013/inlineXBRL"
+    body = (
+        '<html xmlns="http://www.w3.org/1999/xhtml" '
+        f'xmlns:{inline}="{namespace}"><body><div xmlns:{other}="urn:unrelated">'
+        f'<{inline}:header><{inline}:hidden>HIDDEN FACT</{inline}:hidden></{inline}:header>'
+        f'<p><{other}:hidden>Visible unrelated</{other}:hidden></p></div>'
+        '<p>Visible tail</p></body></html>'
+    ).encode()
+    root = ET.fromstring(body)
+    assert root.find(f".//{{{namespace}}}hidden").text == "HIDDEN FACT"
+    assert root.find(".//{urn:unrelated}hidden").text == "Visible unrelated"
+    assert extract(body, "application/xhtml+xml") == (
+        "Visible unrelated\nVisible tail", "application/xhtml+xml")
+
+
+@pytest.mark.parametrize("inline,other", [("ix", "IX"), ("fact", "Fact"), ("F", "f")])
+def test_xhtml_case_distinct_namespace_declarations_are_not_conflicting(inline, other):
+    namespace = "http://www.xbrl.org/2013/inlineXBRL"
+    body = (
+        '<html xmlns="http://www.w3.org/1999/xhtml" '
+        f'xmlns:{inline}="{namespace}" xmlns:{other}="urn:unrelated">'
+        f'<body><{inline}:header><{inline}:hidden>HIDDEN FACT</{inline}:hidden></{inline}:header>'
+        f'<p><{other}:hidden>Visible unrelated</{other}:hidden></p></body></html>'
+    ).encode()
+    root = ET.fromstring(body)
+    assert root.find(f".//{{{namespace}}}hidden").text == "HIDDEN FACT"
+    assert root.find(".//{urn:unrelated}hidden").text == "Visible unrelated"
+    assert extract(body, "application/xhtml+xml") == ("Visible unrelated", "application/xhtml+xml")
+
+
+def test_xhtml_inline_local_name_is_case_sensitive():
+    body = (b'<root xmlns:Fact="http://www.xbrl.org/2013/inlineXBRL">'
+            b'<p><Fact:Hidden>Visible distinct local name</Fact:Hidden></p>'
+            b'<Fact:hidden>HIDDEN</Fact:hidden></root>')
+    assert extract(body, "application/xhtml+xml") == (
+        "Visible distinct local name", "application/xhtml+xml")
+
+
+def test_xhtml_namespace_declaration_name_is_case_sensitive():
+    body = (b'<root xmlns:fact="urn:unrelated" xmlns:XMLNS="urn:attributes" '
+            b'XMLNS:fact="http://www.xbrl.org/2013/inlineXBRL">'
+            b'<fact:hidden>Visible unrelated</fact:hidden></root>')
+    assert ET.fromstring(body).find("{urn:unrelated}hidden").text == "Visible unrelated"
+    assert extract(body, "application/xhtml+xml") == ("Visible unrelated", "application/xhtml+xml")
+
+
+@pytest.mark.parametrize("outer,inner", [
+    ("f:box", "F:box"), ("f:Box", "f:box"), ("Scope", "scope"),
+])
+def test_xhtml_case_distinct_nested_qnames_restore_each_scope(outer, inner):
+    body = (
+        '<root xmlns:f="urn:nodes" xmlns:F="urn:other-nodes" '
+        'xmlns:fact="http://www.xbrl.org/2013/inlineXBRL">'
+        f'<{outer} xmlns:fact="urn:visible">'
+        '<p><fact:hidden>Visible outer</fact:hidden></p>'
+        f'<{inner} xmlns:fact="http://www.xbrl.org/2013/inlineXBRL">'
+        f'<fact:hidden>HIDDEN inner</fact:hidden></{inner}>'
+        f'<p><fact:hidden>Visible restored outer</fact:hidden></p></{outer}>'
+        '<fact:hidden>HIDDEN restored parent</fact:hidden><p>Visible tail</p></root>'
+    ).encode()
+    assert len(ET.fromstring(body).findall(".//{urn:visible}hidden")) == 2
+    assert extract(body, "application/xhtml+xml") == (
+        "Visible outer\nVisible restored outer\nVisible tail", "application/xhtml+xml")
+
+
+def test_xhtml_mismatched_case_close_does_not_restore_namespace_early():
+    body = (b'<root xmlns:fact="urn:visible"><Scope xmlns:fact="http://www.xbrl.org/2013/inlineXBRL">'
+            b'</scope><fact:hidden>HIDDEN still scoped</fact:hidden></Scope>'
+            b'<p><fact:hidden>Visible restored</fact:hidden></p></root>')
+    assert extract(body, "application/xhtml+xml") == ("Visible restored", "application/xhtml+xml")
+
+
+@pytest.mark.parametrize("tag", ["Scope", "F:scope"])
+def test_xhtml_case_preserving_empty_qname_restores_namespace(tag):
+    body = (f'<root xmlns:F="urn:nodes" xmlns:fact="urn:visible">'
+            f'<{tag} xmlns:fact="http://www.xbrl.org/2013/inlineXBRL"/>'
+            '<p><fact:hidden>Visible after empty</fact:hidden></p></root>').encode()
+    assert extract(body, "application/xhtml+xml") == ("Visible after empty", "application/xhtml+xml")
+
+
+def test_xhtml_qname_identity_preserves_tolerant_html_display_controls():
+    body = (b'<P HIDDEN>HIDDEN attribute</P><SCRIPT>HIDDEN script</SCRIPT>'
+            b'<P ARIA-HIDDEN="true">HIDDEN aria</P><P>Visible &nbsp; start'
+            b'<BR xmlns:fact="http://www.xbrl.org/2013/inlineXBRL">'
+            b'<fact:hidden>Visible after void</fact:hidden></P>')
+    assert extract(body, "application/xhtml+xml") == (
+        "Visible start\nVisible after void", "application/xhtml+xml")
+
+
+@pytest.mark.parametrize("chunk", [1, 7, 65536])
+def test_xhtml_source_namespace_tokens_preserve_quotes_entities_and_chunks(chunk, monkeypatch):
+    monkeypatch.setattr(mod, "_CHUNK", chunk)
+    body = (b'<root note=unquoted data-note=\'xmlns:Fact="urn:misleading"\' '
+            b'xmlns:Fact="http://www.xbrl.org/2013/inline&#88;BRL" xmlns:fact="urn:visible">'
+            b'<Fact:hidden>HIDDEN</Fact:hidden><p><fact:hidden>Visible</fact:hidden></p></root>')
+    assert extract(body, "application/xhtml+xml") == ("Visible", "application/xhtml+xml")
+
+
+def test_xhtml_source_attribute_token_work_consumes_parser_budget(monkeypatch):
+    monkeypatch.setattr(mod, "MAX_PARSER_EVENTS", 20)
+    attrs = " ".join(f'data-n{index}="value"' for index in range(30))
+    with pytest.raises(public.SourceReadError, match="^source_document_complexity$"):
+        extract(f"<root {attrs}>Visible</root>".encode(), "application/xhtml+xml")
+
+
+def test_xhtml_source_attribute_token_work_is_cancellable():
+    attrs = " ".join(f'data-n{index}="value"' for index in range(100))
+    calls = 0
+
+    def check():
+        nonlocal calls
+        calls += 1
+        if calls == 20:
+            raise public.SourceReadError("source_read_cancelled")
+
+    with pytest.raises(public.SourceReadError, match="^source_read_cancelled$"):
+        extract(f"<root {attrs}>Visible</root>".encode(), "application/xhtml+xml", check=check)
+    assert calls == 20
+
+
 def test_namespace_declarations_consume_parser_budget(monkeypatch):
     monkeypatch.setattr(mod, "MAX_PARSER_EVENTS", 20)
     attributes = " ".join(f'xmlns:n{index}="urn:scope:{index}"' for index in range(30))
