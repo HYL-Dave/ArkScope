@@ -150,7 +150,7 @@ export function SecResearchPanel() {
   const [refreshError, setRefreshError] = useState<unknown>(null);
   const [unconfirmed, setUnconfirmed] = useState(false);
   const rememberedDocuments = useRef(new Map<string, SecDocumentLocator>());
-  const uncertainDocuments = useRef(new Set<string>());
+  const [uncertainDocuments, setUncertainDocuments] = useState(new Set<string>());
   const readerSequence = useRef(0);
   const [reader, setReader] = useState<{ filing: SecResearchFiling; key: number; opener: HTMLButtonElement; initial?: SecDocumentLocator } | null>(null);
   const bytes = wholeBytes(draft, unit);
@@ -345,8 +345,12 @@ export function SecResearchPanel() {
       { value: "facts", label: t(($) => $.secResearch.facts), panel: table },
     ]} />
     {reader && <SecDocumentReader key={reader.key} filing={reader.filing} initial={reader.initial}
-      uncertain={uncertainDocuments.current.has(reader.filing.filing_id)}
-      onUncertain={(value) => { if (value) uncertainDocuments.current.add(reader.filing.filing_id); else uncertainDocuments.current.delete(reader.filing.filing_id); }}
+      uncertain={uncertainDocuments.has(reader.filing.filing_id)}
+      onUncertain={(value) => setUncertainDocuments((previous) => {
+        const next = new Set(previous);
+        if (value) next.add(reader.filing.filing_id); else next.delete(reader.filing.filing_id);
+        return next;
+      })}
       onClose={() => { setReader(null); if (reader.opener.isConnected) reader.opener.focus(); }}
       onCapture={(locator) => rememberedDocuments.current.set(JSON.stringify(reader.filing), locator)} />}
   </section>;

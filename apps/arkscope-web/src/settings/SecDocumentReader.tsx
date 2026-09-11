@@ -45,7 +45,7 @@ export function SecDocumentReader({ filing, initial, uncertain, onUncertain, onC
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [acquiring, setAcquiring] = useState(false);
-  const [unknownOutcome, setUnknownOutcome] = useState(uncertain);
+  const unknownOutcome = uncertain;
   const [attempt, setAttempt] = useState<SecDocumentAttempt | null>(null);
   const [error, setError] = useState<unknown>(null);
   const page = pages[position];
@@ -134,21 +134,19 @@ export function SecDocumentReader({ filing, initial, uncertain, onUncertain, onC
   async function acquire() {
     if (postActive.current || unknownOutcome) return;
     postActive.current = true;
-    onUncertain(true); setUnknownOutcome(true);
+    onUncertain(true);
     const request = ++generation.current;
     setBusy(false); setAcquiring(true); setError(null); setAttempt(null);
     if (locator.capture_id) setPinned(true);
     try {
       const result = await acquireSecResearchDocument(filing.filing_id);
       onUncertain(false);
-      if (active.current) setUnknownOutcome(false);
       if (!current(request)) return;
       setAttempt(result);
       await readIndex({ document_id: "primary" }, false);
     } catch (err) {
       if (err instanceof ApiError && err.status < 500) {
         onUncertain(false);
-        if (active.current) setUnknownOutcome(false);
         if (current(request)) setError(err);
       }
     } finally {
@@ -170,7 +168,7 @@ export function SecDocumentReader({ filing, initial, uncertain, onUncertain, onC
 
   const choices = directory?.pages.slice(0, directory.position + 1).flatMap((value) => value.data?.documents ?? []) ?? [];
   const boundDirectory = locator.capture_id && locator.capture_id === directory?.locator.capture_id;
-  const sections = boundDirectory ? directory.pages.slice(0, directory.position + 1).flatMap((value) => value.data?.sections ?? []) : [];
+  const sections = boundDirectory ? directory.pages.flatMap((value) => value.data?.sections ?? []) : [];
   const statusLabel = shown?.status === "ok" ? t(($) => $.secResearch.ok)
     : shown?.status === "empty" ? t(($) => $.secResearch.empty)
     : shown?.status === "partial" ? t(($) => $.secResearch.partial)
@@ -201,8 +199,12 @@ export function SecDocumentReader({ filing, initial, uncertain, onUncertain, onC
     <div className="sec-fields">
       <label><span>{t(($) => $.secDocument.document)}</span><select aria-label={t(($) => $.secDocument.document)} value={locator.document_id} onChange={(event) => {
         const id = event.target.value;
-        const ownDocument = directory?.pages[0]?.data?.document?.document_id === id;
-        void readIndex({ document_id: id, ...(ownDocument ? { capture_id: directory?.locator.capture_id } : {}) }, Boolean(ownDocument), true);
+        const observed = directory?.pages[0]?.data?.document;
+        const sameDocument = observed?.document_id === id || (id === "primary"
+          && observed?.primary_document != null && observed.document_id === `file:${observed.primary_document}`);
+        const captureId = sameDocument && observed?.filing_id === filing.filing_id
+          && observed.capture_id === directory?.locator.capture_id ? observed.capture_id : undefined;
+        void readIndex({ document_id: id, ...(captureId ? { capture_id: captureId } : {}) }, Boolean(captureId), true);
       }}><option value="primary">{t(($) => $.secResearch.document)}</option>
         {choices.map((entry) => <option key={entry.document_id} value={entry.document_id}>{entry.name}</option>)}
         {locator.document_id !== "primary" && !choices.some((entry) => entry.document_id === locator.document_id) && <option value={locator.document_id}>{locator.document_id}</option>}
