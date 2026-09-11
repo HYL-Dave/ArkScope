@@ -1,0 +1,186 @@
+"""Descriptor-bound capture I/O and an exclusive, crash-released writer lease."""
+
+from __future__ import annotations
+
+from contextlib import contextmanager
+import errno
+import hashlib
+import os
+from pathlib import Path
+import stat
+
+from src.ibkr_gateway_lock import lock_dir
+
+
+def _io_failure(exc):
+    if exc.errno == errno.ENOSPC:
+        return ValueError("storage_space_insufficient")
+    if exc.errno in (errno.ELOOP, errno.ENOTDIR, errno.ENOENT):
+        return ValueError("capture_path_unsafe")
+    return ValueError("capture_store_write_failed")
+
+
+def _supported():
+    return os.name == "posix" and hasattr(os, "O_NOFOLLOW") and os.open in os.supports_dir_fd
+
+
+def _directory(parent_fd, name, *, create=False):
+    if create:
+        try:
+            os.mkdir(name, mode=0o700, dir_fd=parent_fd)
+        except FileExistsError:
+            pass
+        # Also sync on retry: the preceding process may have died after mkdir.
+        os.fsync(parent_fd)
+    return os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
+
+
+class CaptureDirectory:
+    """All capture file operations are relative to already-validated directories."""
+
+    def __init__(self, root: Path, *, create=False):
+        if not _supported():
+            raise ValueError("capture_platform_unsupported")
+        self.root = Path(root).absolute()
+        self.root_fd = None
+        self.children = {}
+        fd = os.open(self.root.anchor, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            for index, part in enumerate(self.root.parts[1:]):
+                next_fd = _directory(fd, part, create=create and index == len(self.root.parts) - 2)
+                os.close(fd)
+                fd = next_fd
+            self.root_fd = fd
+            fd = None
+            for name in ("objects", "staging"):
+                self.children[name] = _directory(self.root_fd, name, create=create)
+        except OSError as exc:
+            self.close()
+            raise _io_failure(exc) from None
+        finally:
+            if fd is not None:
+                os.close(fd)
+
+    def close(self):
+        for fd in self.children.values():
+            os.close(fd)
+        self.children.clear()
+        if self.root_fd is not None:
+            os.close(self.root_fd)
+            self.root_fd = None
+
+    def assert_current(self):
+        try:
+            current = self.root.lstat()
+            opened = os.fstat(self.root_fd)
+            if not stat.S_ISDIR(current.st_mode) or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino):
+                raise ValueError("capture_path_unsafe")
+            for name, fd in self.children.items():
+                current = os.stat(name, dir_fd=self.root_fd, follow_symlinks=False)
+                opened = os.fstat(fd)
+                if not stat.S_ISDIR(current.st_mode) or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino):
+                    raise ValueError("capture_path_unsafe")
+        except OSError:
+            raise ValueError("capture_path_unsafe") from None
+
+    def _key(self, key):
+        parts = key.split("/")
+        if len(parts) != 2 or parts[0] not in self.children or not parts[1] or any(c not in "0123456789abcdef" for c in parts[1]):
+            raise ValueError("capture_path_unsafe")
+        return self.children[parts[0]], parts[1]
+
+    def read(self, key, size):
+        parent, name = self._key(key)
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_size != size:
+                raise ValueError("capture_integrity_failed")
+            with os.fdopen(fd, "rb", closefd=False) as handle:
+                body = handle.read(size + 1)
+            if len(body) != size:
+                raise ValueError("capture_integrity_failed")
+            return body
+        finally:
+            os.close(fd)
+
+    def stage(self, name, body):
+        fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                     0o600, dir_fd=self.children["staging"])
+        try:
+            with os.fdopen(fd, "wb", closefd=False) as handle:
+                handle.write(body)
+                handle.flush()
+                os.fsync(fd)
+            os.fsync(self.children["staging"])
+        finally:
+            os.close(fd)
+
+    def publish(self, stage, sha):
+        self.assert_current()
+        os.link(stage, sha, src_dir_fd=self.children["staging"],
+                dst_dir_fd=self.children["objects"], follow_symlinks=False)
+        os.fsync(self.children["objects"])
+
+    def remove_stage(self, stage):
+        os.unlink(stage, dir_fd=self.children["staging"])
+        os.fsync(self.children["staging"])
+
+    def files(self):
+        self.assert_current()
+        rows = []
+        for category, fd in self.children.items():
+            for name in sorted(os.listdir(fd)):
+                key = category + "/" + name
+                self._key(key)
+                info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                if not stat.S_ISREG(info.st_mode):
+                    raise ValueError("capture_path_unsafe")
+                rows.append((key, info.st_size, (info.st_dev, info.st_ino)))
+        return rows
+
+
+@contextmanager
+def _lease(root: Path, name: str, busy_code: str):
+    directory = CaptureDirectory(root, create=True)
+    fd = None
+    lock_parent = None
+    try:
+        import fcntl
+        try:
+            # Coordination lives outside mutable capture content. As with the
+            # market/governor locks, this configured namespace is trusted and
+            # must not be replaced by cleanup or an operator while App runs.
+            path = lock_dir().absolute()
+            lock_parent = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
+            for part in path.parts[1:]:
+                next_fd = _directory(lock_parent, part, create=True)
+                os.close(lock_parent)
+                lock_parent = next_fd
+            key = "sec-research-" + hashlib.sha256(str(directory.root).encode()).hexdigest() + name
+            fd = os.open(key, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
+                         0o600, dir_fd=lock_parent)
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise ValueError("capture_path_unsafe")
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError(busy_code) from None
+        except OSError as exc:
+            raise _io_failure(exc) from None
+        directory.assert_current()
+        yield directory
+    finally:
+        if fd is not None:
+            os.close(fd)
+        if lock_parent is not None:
+            os.close(lock_parent)
+        directory.close()
+
+
+def capture_writer(root: Path):
+    return _lease(root, ".writer.lock", "capture_store_busy")
+
+
+def issuer_refresh(root: Path, cik: str):
+    from src.sec_research.common import normalize_cik
+    return _lease(root, ".refresh-" + normalize_cik(cik) + ".lock", "sec_research_refresh_busy")
