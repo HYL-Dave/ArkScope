@@ -29,13 +29,21 @@ _ERROR_CODES = frozenset({
     "source_response_invalid", "source_text_empty", "source_transport_unavailable",
     "source_unavailable", "unsafe_source_address", "unsafe_source_url",
     "source_document_complexity", "source_text_too_large", "sec_identity_unavailable",
-    "sec_identity_invalid", "sec_governor_unavailable",
+    "sec_identity_invalid", "sec_governor_unavailable", "source_read_cleanup_failed",
 })
 
 
 def _error_code(error):
     code = str(error)
     return code if code in _ERROR_CODES else "document_acquisition_failed"
+
+
+def _failure_outcome(requests):
+    if any(request["dispatch_state"] == "dispatched" for request in requests):
+        return "failed"
+    if any(request["dispatch_state"] == "unknown" for request in requests):
+        return "interrupted"
+    return "no_dispatch"
 
 
 def _catalog(store, filing_id):
@@ -100,13 +108,32 @@ class DocumentService:
             max_response_bytes=(16 if metadata else 32) * 1024**2,
             max_decoded_bytes=(16 if metadata else 128) * 1024**2, timeout_seconds=60)
         reader = self.reader_factory(limits, document_observer=observe, text_extractor=extract)
+        evidence = {"operation": operation, "url": url, "request_count": None,
+                    "dispatch_state": "unknown", "report": None, "gaps": []}
+        requests.append(evidence)
         try:
             page = reader.read(url)
         finally:
-            reader.request_stop()
-            report = validate_source_read_report({"requests": reader.request_count,
-                "observations": [asdict(row) for row in reader.observations]}, max_requests=1)
-            requests.append({"operation": operation, "url": url, "report": report})
+            # Snapshot dispatch independently before validation or cleanup can fail.
+            # Reporting failures must not replace the original read exception.
+            try:
+                count = reader.request_count
+                if type(count) is not int or not 0 <= count < 2**53:
+                    raise SourceReadError("source_read_report_invalid")
+                evidence["request_count"] = count
+                evidence["dispatch_state"] = "dispatched" if count else "not_dispatched"
+                evidence["report"] = validate_source_read_report({"requests": count,
+                    "observations": [asdict(row) for row in reader.observations]}, max_requests=1)
+            except Exception:
+                evidence["gaps"].append({"code": "source_read_report_invalid"})
+            finally:
+                try:
+                    reader.request_stop()
+                except Exception:
+                    evidence["gaps"].append({"code": "source_read_cleanup_failed"})
+        if evidence["gaps"]:
+            raise SourceReadError(evidence["gaps"][0]["code"])
+        report = evidence["report"]
         check()
         if (len(observed) != 1 or observed[0][0] != url or page.url != url or page.redirect_chain
                 or hashlib.sha256(observed[0][1]).hexdigest() != page.body_sha256
@@ -128,17 +155,20 @@ class DocumentService:
         observation_id = uuid.uuid4().hex
         requests, gaps = [], []
         resolved = primary = None
+        invalidation_primary = None
         started = False
 
         def record(*, capture_id=None, outcome, failure_gaps=None):
             return self.documents.record_attempt(filing_id, document_id, observed_at=observed_at,
                 resolved_document_id=resolved, primary_document=primary, capture_id=capture_id,
                 acquisition_id=observation_id,
+                invalidation_primary_document=invalidation_primary,
                 status=("partial" if gaps else "ok") if capture_id else "unavailable",
                 outcome=outcome, gaps=gaps if failure_gaps is None else failure_gaps, requests=requests)
 
         try:
             with document_acquisition(self.store.paths.capture_root):
+                invalidation_primary = self.documents.invalidation_primary_document(filing_id, document_id)
                 # A crash after this append cannot expose an older successful observation as latest.
                 record(outcome="interrupted", failure_gaps=[{"code": "document_acquisition_interrupted"}])
                 started = True
@@ -202,12 +232,16 @@ class DocumentService:
                     capture_id = self.documents.publish(directory=directory_record, metadata=metadata)
                     return record(capture_id=capture_id, outcome="complete")
                 except Exception as error:
-                    gaps = [*gaps, {"code": _error_code(error)}]
-                    return record(outcome="failed" if any(r["report"]["requests"] for r in requests) else "no_dispatch")
+                    failures = [gap for request in requests for gap in request["gaps"]]
+                    for gap in [*failures, {"code": _error_code(error)}]:
+                        if gap not in gaps:
+                            gaps.append(gap)
+                    return record(outcome=_failure_outcome(requests))
         except Exception as error:
             # Lease/storage failure must not append while another acquisition owns this root.
             return {"attempt_id": None, "filing_id": filing_id, "document_id": document_id,
                 "resolved_document_id": resolved, "primary_document": primary, "acquisition_id": observation_id,
+                "invalidation_primary_document": invalidation_primary,
                 "capture_id": None, "status": "unavailable",
                 "observed_at": observed_at, "outcome": "interrupted" if started else "no_dispatch",
                 "gaps": [{"code": _error_code(error)}], "requests": requests}
