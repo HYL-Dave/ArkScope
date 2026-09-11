@@ -82,7 +82,7 @@ section_id,label,start_byte,end_byte. This pure core does not publish or request
 PublicSourceReader optional `text_extractor` receives the same body/content_type
 and `check` as the existing extraction path; omitted means existing behavior.
 
-- [ ] RED named owners `test_directory_rejects_escape_and_cross_accession`,
+- [x] RED named owners `test_directory_rejects_escape_and_cross_accession`,
   `test_directory_keeps_actual_document_ids_and_unknown_size`,
   `test_accession_filer_prefix_need_not_equal_issuer`,
   `test_sec_text_keeps_visible_ixbrl_and_hides_ix_hidden`,
@@ -98,21 +98,21 @@ section = next(row for row in sections if row["section_id"] == "item_1")
 assert text.encode()[section["start_byte"]:section["end_byte"]].decode().startswith("ITEM 1.")
 ```
 
-- [ ] Verify RED from missing/new behavior, not fixture import failure. Parse
+- [x] Verify RED from missing/new behavior, not fixture import failure. Parse
   directory JSON with the existing exact decoder; reject malformed lists, duplicate
   conflicting names, unsafe names and mismatched directory path. Directory-only
   entries are not fetchable. Size is advisory; missing/empty size is unknown, not
   zero and not a permission to truncate. Preserve source provenance.
-- [ ] Stream existing admitted HTML/XHTML/plain/XML extraction primitives with
+- [x] Stream existing admitted HTML/XHTML/plain/XML extraction primitives with
   explicit complexity limits. Preserve iXBRL visible content and exclude its hidden
   header/data. No remote entity/DTD expansion or fetched subresources. Unsupported
   MIME/PDF is a typed gap. Do not alter lifecycle default text/hashes.
-- [ ] Recognize conservative10-K/10-Q form-aware Part/Item headings and common8-K
+- [x] Recognize conservative10-K/10-Q form-aware Part/Item headings and common8-K
   numbered item headings from canonical lines. Duplicate/TOC ambiguity omits the
   ambiguous section, retains full text and reports the gap. Unknown forms still
   support whole-text reading. Check during parsing/indexing; avoid quadratic
   repeated prefix encoding. The specification guarantees only unambiguous indexes.
-- [ ] Inverse owners: accept unsafe directory name; ignore nesting limit; choose
+- [x] Inverse owners: accept unsafe directory name; ignore nesting limit; choose
   a duplicate Item heading. Each must fail a named test and restore source hashes.
   Run shared reader/SEC parser suites; independent review then scoped commit.
 
@@ -133,7 +133,7 @@ Reader factory receives limits, observer and bounded extractor, and returns a
 PublicSourceReader-compatible instance. Production identity comes from explicit
 profile configuration at the API boundary, never a new env fallback.
 
-- [ ] RED named owners for immutable original/text object registration, repeated
+- [x] RED named owners for immutable original/text object registration, repeated
   capture, exact schema mismatch, unrelated-table preservation, missing/corrupt
   object rejection, interruption before publication and lock-free provider call.
   Add `test_document_primary_must_be_in_bound_directory`,
@@ -152,30 +152,30 @@ again = queries.read(FILING_ID, capture_id=old["capture_id"], query="needle", ma
 assert again == first
 ```
 
-- [ ] Add immutable owned directory/document/attempt records and exact canonical
+- [x] Add immutable owned directory/document/attempt records and exact canonical
   verification. Records reference existing object/catalog snapshots with FKs;
   original/text/directory bytes go through CaptureStore, never ad hoc file writes.
   Capture identity includes immutable observation/provenance metadata. Keep
   structured receipt kind/anchors unchanged; new failed attempts retain history.
-- [ ] Resolve filing metadata only from receipt-bound catalog snapshots, using
+- [x] Resolve filing metadata only from receipt-bound catalog snapshots, using
   existing query binding/bounded-source mechanics. Ambiguous primary/form metadata
   is unavailable before document dispatch; pinned reads do not re-resolve it.
   A directory's observed safe file ID, not extension or arbitraryURL, grants
   acquisition. Capture root document lease is separate from the short writer lease.
-- [ ] Preflight quota/space before each request. Strict32/128MiB document and
+- [x] Preflight quota/space before each request. Strict32/128MiB document and
  16MiB metadata limits; one attempt/no redirects; record actual wire/decoded sizes
   from reader observations. Keep body observer in memory until parsing succeeds;
   original bytes are after decompression, not wire bytes. Hash-check all bytes
   before publication. Cancellation calls request_stop and awaits the owned worker
   if an async/thread bridge is introduced; do not leave a writer running.
-- [ ] No section/query/cursor returns a bounded document/section index with a
+- [x] No section/query/cursor returns a bounded document/section index with a
   `text_start_cursor`; index continuation must expose all admitted entries without
   truncation. `data` contains document metadata, document entries, sections and
   passages as appropriate. Literal query searches only the requested section if
   supplied; paginate non-overlapping match starts with exact context citations.
   Unknown section is unavailable with its gap and whole-text start cursor.
   Pinned capture and cursor can never switch to latest. Stored reads acquire nothing.
-- [ ] Inverses: substitute latest for pinned capture; remove query cursor binding;
+- [x] Inverses: substitute latest for pinned capture; remove query cursor binding;
   fabricate primary file absence; mark truncated read complete. Each kills its
   named owner. Run all SEC/store/reader/lock tests, independent review and commit.
 
@@ -192,15 +192,15 @@ POST returns attempt with status/gaps/capture_id and never pretends a timeout
 failed before dispatch. Add two actual routes222->224, no other route removed.
 Static segments cannot be captured by existing `/{cik}` routes.
 
-- [ ] RED query/cursor validation before absent/corrupt store handling, zero
+- [x] RED query/cursor validation before absent/corrupt store handling, zero
   GET acquisition/implicit installation, invalid IDs and permission denial before
   mutation, exact profile identity use and small real-service integration.
-- [ ] Connect both real service paths. Profile-configured SecSourcePolicy handles
+- [x] Connect both real service paths. Profile-configured SecSourcePolicy handles
   each actual SEC request; no env credentials/providerfallback. POST may explicitly
   install a fresh schema but not repair old shapes. Use content-free typed errors.
   Validate malformed operands consistently422 even before installation; valid
   missing store/document is an unavailable envelope, not an empty document.
-- [ ] Tests preserve existing six SEC endpoints and current task/registry contracts.
+- [x] Tests preserve existing six SEC endpoints and current task/registry contracts.
   Run actual mounted route inventory, shared permissions and all SEC suites;
   independent review then scoped commit.
 
@@ -216,16 +216,16 @@ acquisition POST uses a ten-minute client allowance and offers GET reread when
 outcome is unknown, never auto-retries POST. View shows document choice, sections,
 literal search, bounded page navigation, capture time and source citation link.
 
-- [ ] RED stored-only opening, original selected filing identity, conflict rows
+- [x] RED stored-only opening, original selected filing identity, conflict rows
   retained, stale async response ignored after changing filing/closing, exact
   Unicode text, current/pinned distinction and lostPOSTstate. Ensure pagination
   forwards unchanged cursor and filters and does not silently switch captures.
-- [ ] Use a side panel or unframed bounded reader beside/below the table, consistent
+- [x] Use a side panel or unframed bounded reader beside/below the table, consistent
   with existing Settings. No fetched HTML rendering, unsafe links, nested cards
   or giant data dumps. Use actual available document entries, form-aware sections
   and plaintext passages. Stable control/table dimensions and mobile scrolling.
   Citation metadata remains available without making it the primary reading text.
-- [ ] Complete frontend/typecheck/i18n tests and fixture-only Playwright en/zh-Hant
+- [x] Complete frontend/typecheck/i18n tests and fixture-only Playwright en/zh-Hant
   desktop/mobile through actual HTTP/service/store with generated transport bodies.
   Verify original/pinned reopening, next/back, section/search, unknown-section gap,
   lostPOSTreread and no unexpected requests. Inspect screenshots for overlaps.
@@ -233,18 +233,38 @@ literal search, bounded page navigation, capture time and source citation link.
 
 ## Final Gates
 
-- [ ] All four task reviews and final whole-change review approved; fix full
+- [x] All four task reviews and final whole-change review approved; fix full
   findings lists with RED evidence, not successive undocumented partial reviews.
-- [ ] Fresh complete backend baseline8823nodes(8811P/12S); reconcile exact added/
+- [x] Fresh complete backend baseline8823nodes(8811P/12S); reconcile exact added/
   removed/executed nodes and unchanged skip identities. Freeze source identities
   during execution. Full frontend baseline1738; no guessed passing counts.
-- [ ] Mechanical census against the sealed query/Settings batch; report raw
+- [x] Mechanical census against the sealed query/Settings batch; report raw
   candidates, uncertainties, coverage/dependency/untracked drift honestly.
-- [ ] Archive logs, commands, inverses, reviews, source hashes and browser evidence.
+- [x] Archive logs, commands, inverses, reviews, source hashes and browser evidence.
   Update current spec/priority map with actual completed and remaining scope.
   Register SEC-RECOVERY-001/002 as open, not silently completed by this feature.
   No merge/push/production activation. Remove only this plan's disposable scratch
   after evidence is safely published and verified.
+
+### Completion Record
+
+Product checkpoint `02a0fff4`: four task reviews and final integrated review
+approved. Complete backend9168P/12unchangedS reconciles9180nodes,+357/-0;
+frontend1776P, typecheck/i18n and four real-service/store browser fixtures pass.
+All1102product/test hashes remain frozen. Current17inverses yield63intended
+failures, no errors. Census remains review_required (four newly observed
+candidates have real consumers), with no coverage/dependency/untracked drift.
+The archive contains785manifested artifacts, all verified against their source
+hashes and exact Git-index bytes, plus the manifest. Initial normal staging
+omitted compressed logs under existing `*.log.*`; only this named archive was
+explicitly force-added, without changing ignore rules. Evidence, including failed
+launches and review RED checkpoints, is under
+`docs/superpowers/evidence/2026-09-12-sec-document-reading/README.md`.
+Fixture server and agents are stopped. No merge/push or production activation.
+The live product/current-doc diff passes whitespace checking. The full staged
+archive check reports only original trailing blank lines in task-1/2/3-requirements.md;
+these extracted briefs remain verbatim under their recorded hashes. This is an
+archive-format warning, not a claim that the entire staged diff is whitespace-clean.
 
 ## Public Technical Sources
 
