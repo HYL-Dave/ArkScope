@@ -2,6 +2,7 @@
 
 import codecs
 from email.message import Message
+from html.parser import attrfind_tolerant, tagfind_tolerant
 import re
 from typing import Callable, TypedDict
 from xml.etree.ElementTree import C14NWriterTarget
@@ -17,7 +18,7 @@ MAX_NESTING = 512
 MAX_PARSER_EVENTS = 2_000_000
 MAX_TEXT_BYTES = 128 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 128 * 1024 * 1024
-EXTRACTION_VERSION = "sec-document-text-v2"
+EXTRACTION_VERSION = "sec-document-text-v3"
 _CHUNK = 65536
 
 
@@ -141,10 +142,10 @@ class _DocumentHTMLParser(_SourceTextParser):
             else:
                 self.namespaces[prefix] = namespace
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag, attrs, *, namespace_attrs=None):
         if tag not in self._VOID and len(self.stack) >= MAX_NESTING:
             raise SourceReadError("source_document_complexity")
-        previous = self._bind_namespaces(attrs)
+        previous = self._bind_namespaces(attrs if namespace_attrs is None else namespace_attrs)
         prefix, separator, local = tag.partition(":")
         if not separator:
             prefix, local = "", tag
@@ -190,6 +191,63 @@ class _DocumentHTMLParser(_SourceTextParser):
                 raise SourceReadError("source_document_complexity")
             super().feed(part)
             offset += count
+
+
+class _HTMLDisplayNames(frozenset):
+    """Keep tolerant HTML display rules separate from case-sensitive XML identity."""
+
+    def __contains__(self, name):
+        return super().__contains__(name.lower())
+
+
+class _DocumentXHTMLParser(_DocumentHTMLParser):
+    _SKIP = _HTMLDisplayNames(_SourceTextParser._SKIP)
+    _VOID = _HTMLDisplayNames(_SourceTextParser._VOID)
+    _BREAK = _HTMLDisplayNames(_SourceTextParser._BREAK)
+
+    def __init__(self, budget, output):
+        super().__init__(budget, output)
+        self._end_qname = None
+
+    def _source_starttag(self, attrs):
+        # Use the parser's original token and lexical matchers, not its folded names.
+        self.check()
+        source = self.get_starttag_text()
+        match = tagfind_tolerant.match(source, 1)
+        assert match
+        qname, offset = match.group(1), match.end()
+        declarations = []
+        for _, value in attrs:
+            self.check()
+            match = attrfind_tolerant.match(source, offset)
+            assert match
+            name, offset = match.group(1), match.end()
+            if name == "xmlns" or name.startswith("xmlns:"):
+                declarations.append((name, value))
+        return qname, declarations
+
+    def handle_starttag(self, tag, attrs):
+        qname, declarations = self._source_starttag(attrs)
+        super().handle_starttag(qname, attrs, namespace_attrs=declarations)
+
+    def handle_startendtag(self, tag, attrs):
+        qname, declarations = self._source_starttag(attrs)
+        super().handle_starttag(qname, attrs, namespace_attrs=declarations)
+        if qname not in self._VOID:
+            super().handle_endtag(qname)
+
+    def parse_endtag(self, offset):
+        self.check()
+        match = tagfind_tolerant.match(self.rawdata, offset + 2)
+        self._end_qname = match.group(1) if match else None
+        try:
+            return super().parse_endtag(offset)
+        finally:
+            self._end_qname = None
+
+    def handle_endtag(self, tag):
+        assert self._end_qname is not None
+        super().handle_endtag(self._end_qname)
 
 
 class _DocumentXMLTarget(C14NWriterTarget):
@@ -296,7 +354,8 @@ def extract_document_text(
         for chunk in _decoded_chunks(body, charset, budget):
             output.append(chunk)
     else:
-        parser = _DocumentHTMLParser(budget, output)
+        parser_type = _DocumentXHTMLParser if mime == "application/xhtml+xml" else _DocumentHTMLParser
+        parser = parser_type(budget, output)
         try:
             for chunk in _decoded_chunks(body, charset, budget):
                 parser.feed(chunk)
