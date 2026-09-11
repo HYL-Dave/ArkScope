@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="0.191" timestamp="2026-09-11T11:52:12.102914+08:00" hostname="ais"><testcase classname="tests.test_sec_research_facts" name="test_ytd_and_quarter_observations_keep_distinct_periods" time="0.094"><failure message="AssertionError: assert [('2026-01-01... 'Q2', '200')] == [('2025-10-01... 'Q2', '200')]&#10;  &#10;  At index 0 diff: ('2026-01-01', '2026-03-31', 'Q2', '200') != ('2025-10-01', '2026-03-31', 'Q2', '400')&#10;  Right contains one more item: ('2026-01-01', '2026-03-31', 'Q2', '200')&#10;  Use -v to get more diff">tests/test_sec_research_facts.py:95: in test_ytd_and_quarter_observations_keep_distinct_periods
+    assert [(fact.start, fact.end, fact.fiscal_period, fact.value) for fact in facts] == [
+E   AssertionError: assert [('2026-01-01... 'Q2', '200')] == [('2025-10-01... 'Q2', '200')]
+E     
+E     At index 0 diff: ('2026-01-01', '2026-03-31', 'Q2', '200') != ('2025-10-01', '2026-03-31', 'Q2', '400')
+E     Right contains one more item: ('2026-01-01', '2026-03-31', 'Q2', '200')
+E     Use -v to get more diff</failure></testcase><testcase classname="tests.test_sec_research_facts" name="test_amended_and_original_values_are_both_retained" time="0.002"><failure message="AssertionError: assert [('10-Q/A', '...6-01', '124')] == [('10-Q', '00...6-01', '124')]&#10;  &#10;  At index 0 diff: ('10-Q/A', '0000950170-26-000002', '2026-06-01', '124') != ('10-Q', '0000950170-26-000001', '2026-05-01', '123')&#10;  Right contains one more item: ('10-Q/A', '0000950170-26-000002', '2026-06-01', '124')&#10;  Use -v to get more diff">tests/test_sec_research_facts.py:112: in test_amended_and_original_values_are_both_retained
+    assert [(fact.form, fact.accession, fact.filed_date, fact.value) for fact in facts] == [
+E   AssertionError: assert [('10-Q/A', '...6-01', '124')] == [('10-Q', '00...6-01', '124')]
+E     
+E     At index 0 diff: ('10-Q/A', '0000950170-26-000002', '2026-06-01', '124') != ('10-Q', '0000950170-26-000001', '2026-05-01', '123')
+E     Right contains one more item: ('10-Q/A', '0000950170-26-000002', '2026-06-01', '124')
+E     Use -v to get more diff</failure></testcase></testsuite></testsuites>

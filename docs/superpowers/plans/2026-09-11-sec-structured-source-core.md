@@ -59,7 +59,7 @@ Existing sealed evidence is not rewritten.
 passed, 1 means the exact defect reproduced, 2 means inconclusive/probe failure.
 There is no database-path argument, repair, application import or installation.
 
-- [ ] Build the executable form of the exact SQL already archived in
+- [x] Build the executable form of the exact SQL already archived in
   `current-journal-cleanup/sqlite-research.md`, not a newly guessed UPSERT shape.
   Keep upstream REPLACE + duplicated ON CONFLICT, the two replacement spelling
   variants, and the two single-clause controls in separate in-memory databases.
@@ -72,18 +72,18 @@ REPLACE INTO v0 VALUES(0,11)
  ON CONFLICT(c2) DO UPDATE SET c1=c1,c2=c1;
 ```
 
-- [ ] Record engine version/source ID, journal mode, table/index counts, full
+- [x] Record engine version/source ID, journal mode, table/index counts, full
   integrity_check, quick_check and classified result. Expected on the previously
   inspected binary: duplicate-clause index count 3 vs table count 2; single-clause
   controls 2 vs 2 and integrity ok. Actual output, not version, decides status.
-- [ ] Run with explicit interpreter and clean `env -i`, `-I -S -B`; archive
+- [x] Run with explicit interpreter and clean `env -i`, `-I -S -B`; archive
   actual output and command. Do not claim the running App has that interpreter,
   or that a memory probe inspected the user's data. Negative/inconclusive output
   is retained rather than forced into the expected classification.
-- [ ] Document the checked main/worktree audit-directory distinction and the
+- [x] Document the checked main/worktree audit-directory distinction and the
   existing September 8 plan's limitations/execution-date policy. Run current
   execution-date positive/negative owners without changing their expectations.
-- [ ] Independent review verifies the SQL, absence of filesystem-backed SQLite,
+- [x] Independent review verifies the SQL, absence of filesystem-backed SQLite,
   classification and reproduction instructions. Parent commits after review.
 
 ### Task 2: Remove The Unused OpenAI Sync Entrypoint
@@ -95,7 +95,7 @@ new `tests/test_openai_sync_surface_cleanup.py`.
 **Interfaces:** `run_query` and `run_query_stream` remain unchanged. No
 `run_query_sync` export, implementation or compatibility wrapper remains.
 
-- [ ] Add an assertion-based RED owner for absent function/export and present
+- [x] Add an assertion-based RED owner for absent function/export and present
   async/stream owners. Expected RED: old function/export still exists.
 
 ```python
@@ -106,15 +106,15 @@ def test_openai_sync_implementation_is_removed():
     assert {"run_query", "run_query_stream"} <= names
 ```
 
-- [ ] Run existing binding/error/tracing tests as positive controls before edits.
-- [ ] Delete only sync implementation and export; update module description.
+- [x] Run existing binding/error/tracing tests as positive controls before edits.
+- [x] Delete only sync implementation and export; update module description.
   Remove the sync-only parameter cases/branches from three runtime-binding tests.
   Retain exact assertions for live stream/async and Anthropic sync, child and
   cross-provider child. Remove the old signature guard's sync declaration.
-- [ ] Verify retained functions by AST comparison against the base. Run all
+- [x] Verify retained functions by AST comparison against the base. Run all
   binding/legacy/agent/streaming/replay tests; report exact removed/added node IDs.
   A reintroduced export/function must fail the new absence owner.
-- [ ] Review and commit; no changes to actual provider transport or API routes.
+- [x] Review and commit; no changes to actual provider transport or API routes.
 
 ### Task 3: Exact SEC Source Decoding And Catalog
 
@@ -128,6 +128,8 @@ pointer) -> SourceRef` and `json_pointer(*parts) -> str` provide exact binding.
 `parse_submissions(body: bytes, *, cik: str, historical_name: str | None = None)
 -> CatalogSnapshot`. The snapshot contains canonical CIK, original-body hash,
 tuple of frozen `Filing` records and tuple of `HistoricalFile` pointers.
+`historical_files_observed` distinguishes a present empty recent `files` array
+from an unobserved/missing array; historical-root snapshots set it false.
 
 Filing fields: `filing_id`, `cik`, `accession`, `form`, `filed_date`, optional
 `report_date`, optional `accepted_at`, optional `primary_document`, optional
@@ -136,7 +138,7 @@ optional `filed_from`, optional `filed_to`, `source`. Missing optional metadata
 stays None; it is not supplied from another field. There is no complete-history
 claim on this snapshot type; its historical pointers are explicit pending work.
 
-- [ ] Assertion-based module RED before implementation. Then named tests:
+- [x] Assertion-based module RED before implementation. Then named tests:
   `test_decode_preserves_exact_decimal_and_large_integer`,
   `test_duplicate_keys_and_nonfinite_numbers_are_rejected`,
   `test_cik_requires_nonzero_ascii_digits`,
@@ -146,29 +148,31 @@ claim on this snapshot type; its historical pointers are explicit pending work.
   `test_amendments_remain_distinct_accessions`,
   `test_primary_url_uses_actual_document_name`,
   `test_historical_pointer_cannot_leave_submissions_directory`.
-- [ ] Decode original UTF-8 bytes with `json.loads(parse_float=Decimal)`;
+  `test_missing_historical_files_is_distinct_from_observed_empty` owns the
+  missing-versus-explicit-empty distinction before later coverage traversal.
+- [x] Decode original UTF-8 bytes with `json.loads(parse_float=Decimal)`;
   reject duplicate object keys, non-finite constants and non-object roots. Do
   not accept str/dict as substitutes for the source bytes. RFC6901 pointer
   escaping is lossless. Bound SHA256 is over original bytes, not reserialization.
-- [ ] Normalize explicit `CIK:` (case-insensitive) or numeric CIK input; trim
+- [x] Normalize explicit `CIK:` (case-insensitive) or numeric CIK input; trim
   outer whitespace, allow 1-10 ASCII digits, reject zero/signs/non-ASCII/overflow.
   Do not read a provider or bundled ticker map to fill missing identity.
-- [ ] Parse recent arrays and historical-file root arrays. Validate column
+- [x] Parse recent arrays and historical-file root arrays. Validate column
   types/alignment before output. Required row fields are accessionNumber,
   filingDate, form; optional reportDate/acceptanceDateTime/primaryDocument are
   None when absent/empty. All present array columns must share the row count.
   Preserve actual dates; aware accepted timestamps normalize to UTC.
-- [ ] Validate accession shape and real document basename (no traversal,
+- [x] Validate accession shape and real document basename (no traversal,
   slash, encoded path tricks, query/fragment, control or unsafe URL component).
   Form actual SEC directory URL only with validated CIK/accession/document.
   No inferred XML URL. Validate historical names against the same CIK and
   `CIK##########-submissions-<digits>.json`; retain declared counts/date bounds.
-- [ ] GREEN and inverse mutations: ordinary float JSON decode breaks exact
+- [x] GREEN and inverse mutations: ordinary float JSON decode breaks exact
   decimal owner; filing-date-for-report-date substitution breaks date owner;
   accepting malformed arrays breaks the all-or-nothing owner. Tests also cover
   truthful zero-row source, explicit missing arrays, invalid dates, conflicting
   duplicate accessions and cross-CIK payload rejection.
-- [ ] Task review checks spec/quality, then parent commits scoped files.
+- [x] Task review checks spec/quality, then parent commits scoped files.
 
 ### Task 4: Immutable Company Facts Observations
 
@@ -183,40 +187,50 @@ optional `fiscal_period`, `form`, `accession`, `filed_date`, optional `frame`,
 `source`. IDs deterministically bind source hash + JSON pointer, not a mutable
 latest-value key. Source reference exposes the exact original JSON location.
 
-- [ ] Add assertion-based module RED, then tests
+- [x] Add assertion-based module RED, then tests
   `test_fractional_value_never_passes_through_binary_float`,
   `test_large_integer_and_non_usd_units_are_preserved`,
   `test_ytd_and_quarter_observations_keep_distinct_periods`,
   `test_amended_and_original_values_are_both_retained`,
   `test_fact_ids_reopen_the_exact_source_pointer`,
   `test_malformed_observation_is_not_silently_dropped`.
-- [ ] Validate body CIK, namespaces/concepts/units and observation types. Accept
+- [x] Validate body CIK, namespaces/concepts/units and observation types. Accept
   only finite Decimal or int values (not booleans), store decimal text without
   rounding/clamping. Require real end/filed dates, accession and form. Optional
   fiscal labels/frame/start remain explicit; start cannot exceed end. Accept
   arbitrary valid namespace/concept/unit text without inventing currency or
   deriving numeric quarters from fiscal labels.
-- [ ] Preserve every reported observation including overlapping periods,
+- [x] Preserve every reported observation including overlapping periods,
   amendments, duplicate values at different source pointers and contradictory
   observations. Deterministic ordering follows source structure; future query
   selection owns as_of, revisions and conflict resolution, not the parser.
-- [ ] GREEN; inverse mutation converting val to float must kill precision owner;
+- [x] GREEN; inverse mutation converting val to float must kill precision owner;
   overwriting observations by concept must kill revisions/period owner.
-- [ ] Task review and commit. No scheduled write or incomplete tool registration.
+- [x] Task review and commit. No scheduled write or incomplete tool registration.
 
 ### Task 5: Combined Verification And Handoff
 
 **Files:** new evidence directory above; audit README, priority map and SEC spec
 status only. Do not change historical sealed evidence or duplicate the backlog.
 
-- [ ] Verify all task source diffs, reviewer findings and fresh focused tests.
-- [ ] Run full backend under the existing offline runner with isolated fixtures,
+- [x] Verify all task source diffs, reviewer findings and fresh focused tests.
+- [x] Run full backend under the existing offline runner with isolated fixtures,
   production-read/provider guards and reviewed Node PATH. Capture complete
   collection/execution IDs and exact changes vs this plan's base.
-- [ ] Re-run mechanical census against the existing baseline, retain review
+- [x] Re-run mechanical census against the existing baseline, retain review
   required and explain unconnected pure modules; do not call candidates bugs or
   falsely report the full feature complete.
-- [ ] Whole-batch independent review; fix findings and rerun affected/full tests
+- [x] Whole-batch independent review; fix findings and rerun affected/full tests
   as required. Archive source hashes, commands, results and owner accounting.
-- [ ] Commit locally; report work completed, remaining full SEC/cleanup/SQLite
+- [x] Commit locally; report work completed, remaining full SEC/cleanup/SQLite
   installation separately. No merge/push, production-disposal or manual-test claim.
+
+## Completed Checkpoint
+
+Source commits: `755cba8d`, `41ab878e`, `82512b8b`, `dd93bcf8`.
+Fresh complete backend: **8,292 passed / 12 unchanged skips**, 1,108.57 seconds.
+Exactly 8,304 collected/executed cases; 5 removed/181 added; all 783 source/test
+paths stable. Independent task and integration reviews passed. The final census
+retains review_required with only two new intentionally unconnected parser modules.
+Evidence and remaining full-service work:
+`docs/superpowers/evidence/2026-09-11-sec-structured-source-core/README.md`.

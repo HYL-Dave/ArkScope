@@ -6,7 +6,9 @@ Status updated September 11: **first leaf batch, bounded SEC intake/execution/UI
 neutral journal codec, five further unused HTTP entries, obsolete fixed
 orchestrator, test-only wrappers and spent operators/scheduler cleaned up;
 current journal/review extraction and SEC configuration/path foundation are
-implemented and verified. Wider cleanup and actual data disposition stay open**.
+implemented and verified. The C08 and pure SEC source-parser batch has
+passed independent review and fresh full verification (8,292P / 12 unchanged S).
+Wider cleanup and actual data disposition stay open**.
 The original findings below are a dated source inventory, not all-complete
 status. Implementation and verification details: [leaf-cleanup.md](leaf-cleanup.md)
 and [SEC entrypoint cleanup](sec-entrypoint-cleanup/README.md). The preceding
@@ -29,6 +31,13 @@ its own frozen review and verification; do not reuse the preceding test counts.
 That batch's fresh complete backend is **8,116 passed / 12 unchanged skips**,
 with 8,128 exact collected/executed nodes and 191 removed / 341 added IDs.
 
+The current [structured-source core and C08 follow-up](../2026-09-11-sec-structured-source-core/README.md)
+adds exact raw JSON/catalog/fact parsing without registering unfinished tools.
+It also archives an executable form of the exact SQLite UPSERT reproducer and
+confirms that main's tracked audit files are not disposable bytecode. Its own
+complete run has 8,304 exact collected/executed nodes, 5 removed / 181 added,
+and unchanged source/test bytes; prior counts above are historical evidence.
+
 | Candidate | Current disposition | Commit |
 | --- | --- | --- |
 | C01 | Company-event collector, scheduler registration and Settings source removed; current admission is unconditional; actual stored settings/schema disposition remains open | `06511f44` |
@@ -39,6 +48,7 @@ with 8,128 exact collected/executed nodes and 191 removed / 341 added IDs.
 | C05/C06 | Six test-only macro delegates and two unused subprocess wrappers removed; current macro execution, sanitized workers and daily CLI retained | `36dac28d` |
 | C14/C16 | Three spent audit CLIs, empty audit package and independent monitor scheduler removed; live SA reconciliation and monitor engine/job/tools retained | `2f80f452` |
 | C07 | Unreachable auth factory placeholder/export removed; six real modes retained | `263c21a5` |
+| C08 | Unused OpenAI synchronous entrypoint/export and five sync-only test nodes removed; current async/stream and Anthropic synchronous Research retained, 16 retained ASTs identical | `41ab878e`; [evidence](../2026-09-11-sec-structured-source-core/README.md) |
 | C17 | Old publisher-acquisition adapter deleted; current investigation news retained | `300b7400` |
 | C18 | Disconnected SEC earnings parser/CLI and catalog claim removed | `300b7400` |
 | C19 | Unused repair facade deleted; current identity planner/admin retained | `300b7400` |

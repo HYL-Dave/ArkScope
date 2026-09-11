@@ -1,0 +1,23 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_ytd_and_quarter_observations_keep_distinct_periods ____________
+tests/test_sec_research_facts.py:95: in test_ytd_and_quarter_observations_keep_distinct_periods
+    assert [(fact.start, fact.end, fact.fiscal_period, fact.value) for fact in facts] == [
+E   AssertionError: assert [('2026-01-01... 'Q2', '200')] == [('2025-10-01... 'Q2', '200')]
+E     
+E     At index 0 diff: ('2026-01-01', '2026-03-31', 'Q2', '200') != ('2025-10-01', '2026-03-31', 'Q2', '400')
+E     Right contains one more item: ('2026-01-01', '2026-03-31', 'Q2', '200')
+E     Use -v to get more diff
+______________ test_amended_and_original_values_are_both_retained ______________
+tests/test_sec_research_facts.py:112: in test_amended_and_original_values_are_both_retained
+    assert [(fact.form, fact.accession, fact.filed_date, fact.value) for fact in facts] == [
+E   AssertionError: assert [('10-Q/A', '...6-01', '124')] == [('10-Q', '00...6-01', '124')]
+E     
+E     At index 0 diff: ('10-Q/A', '0000950170-26-000002', '2026-06-01', '124') != ('10-Q', '0000950170-26-000001', '2026-05-01', '123')
+E     Right contains one more item: ('10-Q/A', '0000950170-26-000002', '2026-06-01', '124')
+E     Use -v to get more diff
+- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-structured-source-core/task4-overwrite-inverse.xml -
+=========================== short test summary info ============================
+FAILED tests/test_sec_research_facts.py::test_ytd_and_quarter_observations_keep_distinct_periods
+FAILED tests/test_sec_research_facts.py::test_amended_and_original_values_are_both_retained
+2 failed in 0.19s

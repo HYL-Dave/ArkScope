@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.178" timestamp="2026-09-11T11:41:11.271878+08:00" hostname="ais"><testcase classname="tests.test_sec_research_facts" name="test_fact_parser_has_a_runtime_owner" time="0.092"><failure message="AssertionError: SEC fact parser missing&#10;assert False&#10; +  where False = is_file()&#10; +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file">tests/test_sec_research_facts.py:19: in test_fact_parser_has_a_runtime_owner
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file</failure></testcase></testsuite></testsuites>

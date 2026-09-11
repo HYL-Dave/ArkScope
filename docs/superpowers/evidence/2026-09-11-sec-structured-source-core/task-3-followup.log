@@ -1,0 +1,210 @@
+Task 3 historical_files_observed follow-up
+Flag RED:
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_missing_historical_files_is_distinct_from_observed_empty[missing-False] _
+tests/test_sec_research_catalog.py:88: in test_missing_historical_files_is_distinct_from_observed_empty
+    assert getattr(snapshot, "historical_files_observed", None) is observed
+E   AssertionError: assert None is False
+E    +  where None = getattr(CatalogSnapshot(cik='0000320193', sha256='22cf71c4e45e3e5e21e2920d12fcfa629f298669e0f11d39180514501db8d56e', filings=(...9e0f11d39180514501db8d56e', pointer='/filings/recent/accessionNumber/0')),), historical_files=(), historical_name=None), 'historical_files_observed', None)
+__ test_missing_historical_files_is_distinct_from_observed_empty[empty-True] ___
+tests/test_sec_research_catalog.py:88: in test_missing_historical_files_is_distinct_from_observed_empty
+    assert getattr(snapshot, "historical_files_observed", None) is observed
+E   AssertionError: assert None is True
+E    +  where None = getattr(CatalogSnapshot(cik='0000320193', sha256='ef31d4c5d4d4ca90730c1bcdd9f9c6d7b40fb6164ab5f09e9c6c8f994c936d25', filings=(...64ab5f09e9c6c8f994c936d25', pointer='/filings/recent/accessionNumber/0')),), historical_files=(), historical_name=None), 'historical_files_observed', None)
+_ test_missing_historical_files_is_distinct_from_observed_empty[declared-True] _
+tests/test_sec_research_catalog.py:88: in test_missing_historical_files_is_distinct_from_observed_empty
+    assert getattr(snapshot, "historical_files_observed", None) is observed
+E   AssertionError: assert None is True
+E    +  where None = getattr(CatalogSnapshot(cik='0000320193', sha256='c3d7c77a91176957b5f47564f24db346b2bf5eb4dcba44d94e558c031cbc6fed', filings=(...3d7c77a91176957b5f47564f24db346b2bf5eb4dcba44d94e558c031cbc6fed', pointer='/filings/files/0')),), historical_name=None), 'historical_files_observed', None)
+_ test_missing_historical_files_is_distinct_from_observed_empty[historical-False] _
+tests/test_sec_research_catalog.py:88: in test_missing_historical_files_is_distinct_from_observed_empty
+    assert getattr(snapshot, "historical_files_observed", None) is observed
+E   AssertionError: assert None is False
+E    +  where None = getattr(CatalogSnapshot(cik='0000320193', sha256='9b214e67abf188bea791535420eda887bf9fada57b76086380d02d20a043a8a6', filings=(...a043a8a6', pointer='/accessionNumber/0')),), historical_files=(), historical_name='CIK0000320193-submissions-001.json'), 'historical_files_observed', None)
+=========================== short test summary info ============================
+FAILED tests/test_sec_research_catalog.py::test_missing_historical_files_is_distinct_from_observed_empty[missing-False]
+FAILED tests/test_sec_research_catalog.py::test_missing_historical_files_is_distinct_from_observed_empty[empty-True]
+FAILED tests/test_sec_research_catalog.py::test_missing_historical_files_is_distinct_from_observed_empty[declared-True]
+FAILED tests/test_sec_research_catalog.py::test_missing_historical_files_is_distinct_from_observed_empty[historical-False]
+4 failed in 0.25s
+
+
+Source SHA256 digests before and after all isolated mutations (equal):
+46354d9b83987b73faf12a89361bdb90ad41040512622b60fc1314e4c8906db2  src/sec_research/common.py
+a3d40b51f8d4f12e29116516cc6d882de0449a9fb91d9b3556abfe1e03b2e9e0  src/sec_research/catalog.py
+
+
+Per-process mutation execution: same env -i PATH/PYTHONDONTWRITEBYTECODE/PYTEST_DISABLE_PLUGIN_AUTOLOAD/ARKSCOPE_OFFLINE_TEST_WORKSPACE prefix as task-3-report.md; python -c with the following code. No shared source writes.
+
+float-decode
+Code:
+import sys, types, runpy, importlib, inspect
+plugin = types.ModuleType("task3_inverse")
+def pytest_sessionstart(session):
+    module = importlib.import_module("src.sec_research.common")
+    original = inspect.getsource(getattr(module, "decode_object"))
+    old = "parse_float=_decimal_number"
+    assert original.count(old) == 1
+    mutated = original.replace(old, "parse_float=float", 1)
+    exec(compile(mutated, "<task3-inverse:float-decode>", "exec"), module.__dict__)
+plugin.pytest_sessionstart = pytest_sessionstart
+sys.modules["task3_inverse"] = plugin
+sys.argv = ["offline_pytest.py", "-p", "task3_inverse", "-q", "tests/test_sec_research_common.py::test_decode_preserves_exact_decimal_and_large_integer"]
+runpy.run_path(".superpowers/sdd/2026-09-11-sec-structured-source-core/offline_pytest.py", run_name="__main__")
+
+Exit code: 1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________ test_decode_preserves_exact_decimal_and_large_integer _____________
+tests/test_sec_research_common.py:30: in test_decode_preserves_exact_decimal_and_large_integer
+    assert result["value"] == Decimal("1234567890.123456789012345678900")
+E   AssertionError: assert 1234567890.1234567 == Decimal('1234567890.123456789012345678900')
+E    +  where Decimal('1234567890.123456789012345678900') = Decimal('1234567890.123456789012345678900')
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:812
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:812: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; task3_inverse
+    self.import_plugin(arg, consider_entry_points=True)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_sec_research_common.py::test_decode_preserves_exact_decimal_and_large_integer
+1 failed, 1 warning in 0.21s
+
+
+report-date
+Code:
+import sys, types, runpy, importlib, inspect
+plugin = types.ModuleType("task3_inverse")
+def pytest_sessionstart(session):
+    module = importlib.import_module("src.sec_research.catalog")
+    original = inspect.getsource(getattr(module, "_filings"))
+    old = "report = date_value(optional(\"reportDate\"), pointer(\"reportDate\"), optional=True)"
+    assert original.count(old) == 1
+    mutated = original.replace(old, "report = filed", 1)
+    exec(compile(mutated, "<task3-inverse:report-date>", "exec"), module.__dict__)
+plugin.pytest_sessionstart = pytest_sessionstart
+sys.modules["task3_inverse"] = plugin
+sys.argv = ["offline_pytest.py", "-p", "task3_inverse", "-q", "tests/test_sec_research_catalog.py::test_catalog_preserves_report_filed_accepted_dates_separately"]
+runpy.run_path(".superpowers/sdd/2026-09-11-sec-structured-source-core/offline_pytest.py", run_name="__main__")
+
+Exit code: 1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_catalog_preserves_report_filed_accepted_dates_separately _________
+tests/test_sec_research_catalog.py:54: in test_catalog_preserves_report_filed_accepted_dates_separately
+    assert (filing.filed_date, filing.report_date, filing.accepted_at) == ("2026-05-01", "2026-03-31", "2026-05-01T00:30:15Z")
+E   AssertionError: assert ('2026-05-01'...01T00:30:15Z') == ('2026-05-01'...01T00:30:15Z')
+E     
+E     At index 1 diff: '2026-05-01' != '2026-03-31'
+E     Use -v to get more diff
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:812
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:812: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; task3_inverse
+    self.import_plugin(arg, consider_entry_points=True)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_sec_research_catalog.py::test_catalog_preserves_report_filed_accepted_dates_separately
+1 failed, 1 warning in 0.18s
+
+
+alignment
+Code:
+import sys, types, runpy, importlib, inspect
+plugin = types.ModuleType("task3_inverse")
+def pytest_sessionstart(session):
+    module = importlib.import_module("src.sec_research.catalog")
+    original = inspect.getsource(getattr(module, "_filings"))
+    old = "raise SourceError(\"misaligned_columns\", json_pointer(*parts, name))"
+    assert original.count(old) == 1
+    mutated = original.replace(old, "return ()", 1)
+    exec(compile(mutated, "<task3-inverse:alignment>", "exec"), module.__dict__)
+plugin.pytest_sessionstart = pytest_sessionstart
+sys.modules["task3_inverse"] = plugin
+sys.argv = ["offline_pytest.py", "-p", "task3_inverse", "-q", "tests/test_sec_research_catalog.py::test_misaligned_arrays_never_yield_a_partial_success"]
+runpy.run_path(".superpowers/sdd/2026-09-11-sec-structured-source-core/offline_pytest.py", run_name="__main__")
+
+Exit code: 1
+FFFFFF....                                                               [100%]
+=================================== FAILURES ===================================
+___ test_misaligned_arrays_never_yield_a_partial_success[form-value0-False] ____
+tests/test_sec_research_catalog.py:97: in test_misaligned_arrays_never_yield_a_partial_success
+    with pytest.raises(catalog.SourceError) as caught:
+E   Failed: DID NOT RAISE <class 'src.sec_research.common.SourceError'>
+____ test_misaligned_arrays_never_yield_a_partial_success[form-value0-True] ____
+tests/test_sec_research_catalog.py:97: in test_misaligned_arrays_never_yield_a_partial_success
+    with pytest.raises(catalog.SourceError) as caught:
+E   Failed: DID NOT RAISE <class 'src.sec_research.common.SourceError'>
+_ test_misaligned_arrays_never_yield_a_partial_success[reportDate-value1-False] _
+tests/test_sec_research_catalog.py:97: in test_misaligned_arrays_never_yield_a_partial_success
+    with pytest.raises(catalog.SourceError) as caught:
+E   Failed: DID NOT RAISE <class 'src.sec_research.common.SourceError'>
+_ test_misaligned_arrays_never_yield_a_partial_success[reportDate-value1-True] _
+tests/test_sec_research_catalog.py:97: in test_misaligned_arrays_never_yield_a_partial_success
+    with pytest.raises(catalog.SourceError) as caught:
+E   Failed: DID NOT RAISE <class 'src.sec_research.common.SourceError'>
+___ test_misaligned_arrays_never_yield_a_partial_success[extra-value2-False] ___
+tests/test_sec_research_catalog.py:97: in test_misaligned_arrays_never_yield_a_partial_success
+    with pytest.raises(catalog.SourceError) as caught:
+E   Failed: DID NOT RAISE <class 'src.sec_research.common.SourceError'>
+___ test_misaligned_arrays_never_yield_a_partial_success[extra-value2-True] ____
+tests/test_sec_research_catalog.py:97: in test_misaligned_arrays_never_yield_a_partial_success
+    with pytest.raises(catalog.SourceError) as caught:
+E   Failed: DID NOT RAISE <class 'src.sec_research.common.SourceError'>
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:812
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:812: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; task3_inverse
+    self.import_plugin(arg, consider_entry_points=True)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_sec_research_catalog.py::test_misaligned_arrays_never_yield_a_partial_success[form-value0-False]
+FAILED tests/test_sec_research_catalog.py::test_misaligned_arrays_never_yield_a_partial_success[form-value0-True]
+FAILED tests/test_sec_research_catalog.py::test_misaligned_arrays_never_yield_a_partial_success[reportDate-value1-False]
+FAILED tests/test_sec_research_catalog.py::test_misaligned_arrays_never_yield_a_partial_success[reportDate-value1-True]
+FAILED tests/test_sec_research_catalog.py::test_misaligned_arrays_never_yield_a_partial_success[extra-value2-False]
+FAILED tests/test_sec_research_catalog.py::test_misaligned_arrays_never_yield_a_partial_success[extra-value2-True]
+6 failed, 4 passed, 1 warning in 0.21s
+
+
+observed-files
+Code:
+import sys, types, runpy, importlib, inspect
+plugin = types.ModuleType("task3_inverse")
+def pytest_sessionstart(session):
+    module = importlib.import_module("src.sec_research.catalog")
+    original = inspect.getsource(getattr(module, "parse_submissions"))
+    old = "historical_files_observed=\"files\" in container"
+    assert original.count(old) == 1
+    mutated = original.replace(old, "historical_files_observed=True", 1)
+    exec(compile(mutated, "<task3-inverse:observed-files>", "exec"), module.__dict__)
+plugin.pytest_sessionstart = pytest_sessionstart
+sys.modules["task3_inverse"] = plugin
+sys.argv = ["offline_pytest.py", "-p", "task3_inverse", "-q", "tests/test_sec_research_catalog.py::test_missing_historical_files_is_distinct_from_observed_empty"]
+runpy.run_path(".superpowers/sdd/2026-09-11-sec-structured-source-core/offline_pytest.py", run_name="__main__")
+
+Exit code: 1
+F...                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_missing_historical_files_is_distinct_from_observed_empty[missing-False] _
+tests/test_sec_research_catalog.py:88: in test_missing_historical_files_is_distinct_from_observed_empty
+    assert getattr(snapshot, "historical_files_observed", None) is observed
+E   AssertionError: assert True is False
+E    +  where True = getattr(CatalogSnapshot(cik='0000320193', sha256='22cf71c4e45e3e5e21e2920d12fcfa629f298669e0f11d39180514501db8d56e', filings=(...ter='/filings/recent/accessionNumber/0')),), historical_files=(), historical_name=None, historical_files_observed=True), 'historical_files_observed', None)
+=============================== warnings summary ===============================
+../../home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:812
+  /home/hyl/.virtualenvs/llm_app/lib/python3.10/site-packages/_pytest/config/__init__.py:812: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; task3_inverse
+    self.import_plugin(arg, consider_entry_points=True)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_sec_research_catalog.py::test_missing_historical_files_is_distinct_from_observed_empty[missing-False]
+1 failed, 3 passed, 1 warning in 0.19s
+
+
+Final unmodified focused run:
+........................................................................ [ 58%]
+....................................................                     [100%]
+124 passed in 0.50s
+

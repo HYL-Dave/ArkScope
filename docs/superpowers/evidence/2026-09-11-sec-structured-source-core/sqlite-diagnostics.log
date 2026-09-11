@@ -1,0 +1,11 @@
+test_all_pass_does_not_depend_on_version (__main__.DiagnosticTests) ... ok
+test_cli_report_exit_status_and_rejected_argument (__main__.DiagnosticTests) ... ok
+test_exact_defect_with_valid_controls (__main__.DiagnosticTests) ... ok
+test_inconclusive_takes_precedence_over_defect (__main__.DiagnosticTests) ... ok
+test_missing_duplicate_and_incomplete_cases_fail_closed (__main__.DiagnosticTests) ... ok
+test_real_matrix_is_memory_only_and_matches_archived_sql (__main__.DiagnosticTests) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.036s
+
+OK

@@ -1,0 +1,38 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+___________ test_fractional_value_never_passes_through_binary_float ____________
+tests/test_sec_research_facts.py:71: in test_fractional_value_never_passes_through_binary_float
+    assert result.facts[0].value == "1234567890.123456789012345678900"
+E   AssertionError: assert '1234567890.1234567' == '1234567890.1...9012345678900'
+E     
+E     - 1234567890.123456789012345678900
+E     + 1234567890.1234567
+_ test_large_integer_and_non_usd_units_are_preserved[1208925819614629174706177-JPY] _
+tests/test_sec_research_facts.py:78: in test_large_integer_and_non_usd_units_are_preserved
+    assert result.facts[0].value == str(value)
+E   AssertionError: assert '1.2089258196146292e+24' == '1208925819614629174706177'
+E     
+E     - 1208925819614629174706177
+E     + 1.2089258196146292e+24
+_________ test_large_integer_and_non_usd_units_are_preserved[0-shares] _________
+tests/test_sec_research_facts.py:78: in test_large_integer_and_non_usd_units_are_preserved
+    assert result.facts[0].value == str(value)
+E   AssertionError: assert '0.0' == '0'
+E     
+E     - 0
+E     + 0.0
+_________ test_large_integer_and_non_usd_units_are_preserved[-999-EUR] _________
+tests/test_sec_research_facts.py:78: in test_large_integer_and_non_usd_units_are_preserved
+    assert result.facts[0].value == str(value)
+E   AssertionError: assert '-999.0' == '-999'
+E     
+E     - -999
+E     + -999.0
+E     ?     ++
+- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-structured-source-core/task4-float-inverse.xml -
+=========================== short test summary info ============================
+FAILED tests/test_sec_research_facts.py::test_fractional_value_never_passes_through_binary_float
+FAILED tests/test_sec_research_facts.py::test_large_integer_and_non_usd_units_are_preserved[1208925819614629174706177-JPY]
+FAILED tests/test_sec_research_facts.py::test_large_integer_and_non_usd_units_are_preserved[0-shares]
+FAILED tests/test_sec_research_facts.py::test_large_integer_and_non_usd_units_are_preserved[-999-EUR]
+4 failed in 0.19s

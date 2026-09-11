@@ -1,0 +1,429 @@
+EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE                    [100%]
+==================================== ERRORS ====================================
+__ ERROR at setup of test_fractional_value_never_passes_through_binary_float ___
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_large_integer_and_non_usd_units_are_preserved[1208925819614629174706177-JPY] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_large_integer_and_non_usd_units_are_preserved[0-shares] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_large_integer_and_non_usd_units_are_preserved[-999-EUR] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_decimal_exponents_are_preserved_without_context_rounding[1.234567890123456789E+1000-1.234567890123456789E+1000] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_decimal_exponents_are_preserved_without_context_rounding[-0.000--0.000] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_decimal_exponents_are_preserved_without_context_rounding[1E-1000-1E-1000] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+__ ERROR at setup of test_ytd_and_quarter_observations_keep_distinct_periods ___
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+__________ ERROR at setup of test_instant_value_has_no_invented_start __________
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_____ ERROR at setup of test_amended_and_original_values_are_both_retained _____
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_______ ERROR at setup of test_fact_ids_reopen_the_exact_source_pointer ________
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_namespace_and_unit_pointer_escaping_preserves_original_keys _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+___________ ERROR at setup of test_optional_metadata_is_not_inferred ___________
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_______ ERROR at setup of test_snapshots_and_observations_are_immutable ________
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_observed_empty_facts_are_distinct_from_missing_source[facts0] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_observed_empty_facts_are_distinct_from_missing_source[facts1] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_observed_empty_facts_are_distinct_from_missing_source[facts2] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes0] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes1] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes2] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes3] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes4] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes5] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes6] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes7] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes8] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes9] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes10] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes11] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes12] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes13] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes14] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes15] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes16] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes17] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes18] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes19] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes20] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes21] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_malformed_observation_is_not_silently_dropped[changes22] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+__ ERROR at setup of test_required_observation_fields_cannot_be_missing[val] ___
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+__ ERROR at setup of test_required_observation_fields_cannot_be_missing[end] ___
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_required_observation_fields_cannot_be_missing[filed] __
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+__ ERROR at setup of test_required_observation_fields_cannot_be_missing[accn] __
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+__ ERROR at setup of test_required_observation_fields_cannot_be_missing[form] __
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value0] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value1] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value2] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value3] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value4] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value5] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value6] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+_ ERROR at setup of test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value7] _
+tests/test_sec_research_facts.py:20: in parser
+    assert (ROOT / "src/sec_research/facts.py").is_file(), "SEC fact parser missing"
+E   AssertionError: SEC fact parser missing
+E   assert False
+E    +  where False = is_file()
+E    +    where is_file = (PosixPath('/tmp/arkscope-listing-sec-macro-convergence') / 'src/sec_research/facts.py').is_file
+- generated xml file: /tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-structured-source-core/task4-red.xml -
+=========================== short test summary info ============================
+ERROR tests/test_sec_research_facts.py::test_fractional_value_never_passes_through_binary_float
+ERROR tests/test_sec_research_facts.py::test_large_integer_and_non_usd_units_are_preserved[1208925819614629174706177-JPY]
+ERROR tests/test_sec_research_facts.py::test_large_integer_and_non_usd_units_are_preserved[0-shares]
+ERROR tests/test_sec_research_facts.py::test_large_integer_and_non_usd_units_are_preserved[-999-EUR]
+ERROR tests/test_sec_research_facts.py::test_decimal_exponents_are_preserved_without_context_rounding[1.234567890123456789E+1000-1.234567890123456789E+1000]
+ERROR tests/test_sec_research_facts.py::test_decimal_exponents_are_preserved_without_context_rounding[-0.000--0.000]
+ERROR tests/test_sec_research_facts.py::test_decimal_exponents_are_preserved_without_context_rounding[1E-1000-1E-1000]
+ERROR tests/test_sec_research_facts.py::test_ytd_and_quarter_observations_keep_distinct_periods
+ERROR tests/test_sec_research_facts.py::test_instant_value_has_no_invented_start
+ERROR tests/test_sec_research_facts.py::test_amended_and_original_values_are_both_retained
+ERROR tests/test_sec_research_facts.py::test_fact_ids_reopen_the_exact_source_pointer
+ERROR tests/test_sec_research_facts.py::test_namespace_and_unit_pointer_escaping_preserves_original_keys
+ERROR tests/test_sec_research_facts.py::test_optional_metadata_is_not_inferred
+ERROR tests/test_sec_research_facts.py::test_snapshots_and_observations_are_immutable
+ERROR tests/test_sec_research_facts.py::test_observed_empty_facts_are_distinct_from_missing_source[facts0]
+ERROR tests/test_sec_research_facts.py::test_observed_empty_facts_are_distinct_from_missing_source[facts1]
+ERROR tests/test_sec_research_facts.py::test_observed_empty_facts_are_distinct_from_missing_source[facts2]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes0]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes1]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes2]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes3]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes4]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes5]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes6]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes7]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes8]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes9]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes10]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes11]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes12]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes13]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes14]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes15]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes16]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes17]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes18]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes19]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes20]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes21]
+ERROR tests/test_sec_research_facts.py::test_malformed_observation_is_not_silently_dropped[changes22]
+ERROR tests/test_sec_research_facts.py::test_required_observation_fields_cannot_be_missing[val]
+ERROR tests/test_sec_research_facts.py::test_required_observation_fields_cannot_be_missing[end]
+ERROR tests/test_sec_research_facts.py::test_required_observation_fields_cannot_be_missing[filed]
+ERROR tests/test_sec_research_facts.py::test_required_observation_fields_cannot_be_missing[accn]
+ERROR tests/test_sec_research_facts.py::test_required_observation_fields_cannot_be_missing[form]
+ERROR tests/test_sec_research_facts.py::test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value0]
+ERROR tests/test_sec_research_facts.py::test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value1]
+ERROR tests/test_sec_research_facts.py::test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value2]
+ERROR tests/test_sec_research_facts.py::test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value3]
+ERROR tests/test_sec_research_facts.py::test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value4]
+ERROR tests/test_sec_research_facts.py::test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value5]
+ERROR tests/test_sec_research_facts.py::test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value6]
+ERROR tests/test_sec_research_facts.py::test_invalid_companyfacts_shape_or_identity_cannot_be_empty_success[value7]
+53 errors in 0.44s

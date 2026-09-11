@@ -1,0 +1,156 @@
+{
+  "cases": [
+    {
+      "classification": "defect_signature",
+      "error": null,
+      "indexed_count": 3,
+      "integrity_check": [
+        "wrong # of entries in index sqlite_autoindex_v0_1"
+      ],
+      "journal_mode": "memory",
+      "name": "upstream_replace_duplicate",
+      "quick_check": [
+        "ok"
+      ],
+      "role": "reproducer",
+      "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY ON CONFLICT REPLACE,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nREPLACE INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2 ON CONFLICT(c2) DO UPDATE SET c1=c1,c2=c1;",
+      "sqlite_source_id": "2022-01-06 13:25:41 872ba256cbf61d9290b571c0e6d82a20c224ca3ad82971edc46b29818d5dalt1",
+      "sqlite_version": "3.37.2",
+      "table_count": 2,
+      "table_rows": [
+        [
+          0,
+          11
+        ],
+        [
+          11,
+          22
+        ]
+      ]
+    },
+    {
+      "classification": "defect_signature",
+      "error": null,
+      "indexed_count": 3,
+      "integrity_check": [
+        "wrong # of entries in index sqlite_autoindex_v0_1"
+      ],
+      "journal_mode": "memory",
+      "name": "insert_schema_replace_duplicate",
+      "quick_check": [
+        "ok"
+      ],
+      "role": "reproducer",
+      "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY ON CONFLICT REPLACE,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nINSERT INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2 ON CONFLICT(c2) DO UPDATE SET c1=c1,c2=c1;",
+      "sqlite_source_id": "2022-01-06 13:25:41 872ba256cbf61d9290b571c0e6d82a20c224ca3ad82971edc46b29818d5dalt1",
+      "sqlite_version": "3.37.2",
+      "table_count": 2,
+      "table_rows": [
+        [
+          0,
+          11
+        ],
+        [
+          11,
+          22
+        ]
+      ]
+    },
+    {
+      "classification": "defect_signature",
+      "error": null,
+      "indexed_count": 3,
+      "integrity_check": [
+        "wrong # of entries in index sqlite_autoindex_v0_1"
+      ],
+      "journal_mode": "memory",
+      "name": "insert_or_replace_duplicate",
+      "quick_check": [
+        "ok"
+      ],
+      "role": "reproducer",
+      "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nINSERT OR REPLACE INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2 ON CONFLICT(c2) DO UPDATE SET c1=c1,c2=c1;",
+      "sqlite_source_id": "2022-01-06 13:25:41 872ba256cbf61d9290b571c0e6d82a20c224ca3ad82971edc46b29818d5dalt1",
+      "sqlite_version": "3.37.2",
+      "table_count": 2,
+      "table_rows": [
+        [
+          0,
+          11
+        ],
+        [
+          11,
+          22
+        ]
+      ]
+    },
+    {
+      "classification": "pass",
+      "error": null,
+      "indexed_count": 2,
+      "integrity_check": [
+        "ok"
+      ],
+      "journal_mode": "memory",
+      "name": "replace_single_clause",
+      "quick_check": [
+        "ok"
+      ],
+      "role": "control",
+      "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY ON CONFLICT REPLACE,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nREPLACE INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2;",
+      "sqlite_source_id": "2022-01-06 13:25:41 872ba256cbf61d9290b571c0e6d82a20c224ca3ad82971edc46b29818d5dalt1",
+      "sqlite_version": "3.37.2",
+      "table_count": 2,
+      "table_rows": [
+        [
+          0,
+          11
+        ],
+        [
+          11,
+          22
+        ]
+      ]
+    },
+    {
+      "classification": "pass",
+      "error": null,
+      "indexed_count": 2,
+      "integrity_check": [
+        "ok"
+      ],
+      "journal_mode": "memory",
+      "name": "insert_single_clause",
+      "quick_check": [
+        "ok"
+      ],
+      "role": "control",
+      "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY ON CONFLICT REPLACE,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nINSERT INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2;",
+      "sqlite_source_id": "2022-01-06 13:25:41 872ba256cbf61d9290b571c0e6d82a20c224ca3ad82971edc46b29818d5dalt1",
+      "sqlite_version": "3.37.2",
+      "table_count": 2,
+      "table_rows": [
+        [
+          0,
+          11
+        ],
+        [
+          11,
+          22
+        ]
+      ]
+    }
+  ],
+  "classification": "defect_reproduced",
+  "error": null,
+  "exit_code": 1,
+  "python_executable": "/home/hyl/.virtualenvs/llm_app/bin/python",
+  "python_flags": {
+    "dont_write_bytecode": 1,
+    "isolated": 1,
+    "no_site": 1
+  },
+  "python_version": "3.10.12 (main, Aug 31 2026, 10:18:17) [GCC 11.4.0]",
+  "reproduction_command": "env -i PATH=/usr/bin:/bin /home/hyl/.virtualenvs/llm_app/bin/python -I -S -B /tmp/arkscope-listing-sec-macro-convergence/docs/superpowers/evidence/2026-09-11-sec-structured-source-core/sqlite_upsert_repro.py",
+  "scope": "synthetic :memory: SQLite only; no App runtime or user-data assessment"
+}

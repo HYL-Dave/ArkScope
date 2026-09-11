@@ -1,0 +1,1 @@
+{"candidates": 4311, "coverage": {"decode_failed": 3, "documentation": 195, "excluded_evidence": 6139, "excluded_non_source": 23, "excluded_private": 6, "read": 1100}, "output": ".superpowers/sdd/2026-09-11-sec-structured-source-core/census-final.json.gz", "uncertainties": 3352}

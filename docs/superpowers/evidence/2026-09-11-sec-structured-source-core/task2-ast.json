@@ -1,0 +1,8 @@
+{
+  "retained_functions_identical": 16,
+  "removed": [
+    "run_query_sync"
+  ],
+  "changed": [],
+  "added": []
+}

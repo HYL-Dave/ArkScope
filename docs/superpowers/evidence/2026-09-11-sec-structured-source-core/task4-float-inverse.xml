@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="4" time="0.195" timestamp="2026-09-11T11:52:11.431096+08:00" hostname="ais"><testcase classname="tests.test_sec_research_facts" name="test_fractional_value_never_passes_through_binary_float" time="0.094"><failure message="AssertionError: assert '1234567890.1234567' == '1234567890.1...9012345678900'&#10;  &#10;  - 1234567890.123456789012345678900&#10;  + 1234567890.1234567">tests/test_sec_research_facts.py:71: in test_fractional_value_never_passes_through_binary_float
+    assert result.facts[0].value == "1234567890.123456789012345678900"
+E   AssertionError: assert '1234567890.1234567' == '1234567890.1...9012345678900'
+E     
+E     - 1234567890.123456789012345678900
+E     + 1234567890.1234567</failure></testcase><testcase classname="tests.test_sec_research_facts" name="test_large_integer_and_non_usd_units_are_preserved[1208925819614629174706177-JPY]" time="0.002"><failure message="AssertionError: assert '1.2089258196146292e+24' == '1208925819614629174706177'&#10;  &#10;  - 1208925819614629174706177&#10;  + 1.2089258196146292e+24">tests/test_sec_research_facts.py:78: in test_large_integer_and_non_usd_units_are_preserved
+    assert result.facts[0].value == str(value)
+E   AssertionError: assert '1.2089258196146292e+24' == '1208925819614629174706177'
+E     
+E     - 1208925819614629174706177
+E     + 1.2089258196146292e+24</failure></testcase><testcase classname="tests.test_sec_research_facts" name="test_large_integer_and_non_usd_units_are_preserved[0-shares]" time="0.002"><failure message="AssertionError: assert '0.0' == '0'&#10;  &#10;  - 0&#10;  + 0.0">tests/test_sec_research_facts.py:78: in test_large_integer_and_non_usd_units_are_preserved
+    assert result.facts[0].value == str(value)
+E   AssertionError: assert '0.0' == '0'
+E     
+E     - 0
+E     + 0.0</failure></testcase><testcase classname="tests.test_sec_research_facts" name="test_large_integer_and_non_usd_units_are_preserved[-999-EUR]" time="0.002"><failure message="AssertionError: assert '-999.0' == '-999'&#10;  &#10;  - -999&#10;  + -999.0&#10;  ?     ++">tests/test_sec_research_facts.py:78: in test_large_integer_and_non_usd_units_are_preserved
+    assert result.facts[0].value == str(value)
+E   AssertionError: assert '-999.0' == '-999'
+E     
+E     - -999
+E     + -999.0
+E     ?     ++</failure></testcase></testsuite></testsuites>

@@ -1,10 +1,14 @@
 # SEC Research Data And Tools
 
-Status: product direction and cleanup boundary approved; implementation has
-started with SEC typed capacity configuration and portable paths under
-`docs/superpowers/plans/2026-09-11-current-journal-and-sec-foundation.md`.
-The end-to-end research service, three tools and user-facing workflow are not
-implemented. Subsequent acquisition/storage/tool slices still need RED-first plans.
+Status: product direction and cleanup boundary approved. Typed capacity and
+portable paths are implemented under `2026-09-11-current-journal-and-sec-foundation`.
+Exact original-byte catalog and Company Facts parsers are now implemented under
+`docs/superpowers/plans/2026-09-11-sec-structured-source-core.md` with independent
+review and fresh full backend 8,292 passed / 12 unchanged skips. Historical
+pointer presence is recorded separately from an observed empty list, without a
+whole-history completeness claim. The end-to-end service, three tools and
+user-facing workflow are not implemented. Storage/quota, acquisition/traversal,
+queries, documents/citations, export and integrations still need RED-first plans.
 Base inspected: `30bb31c7`. The user approved the product direction on September
 10, including useful tool access rather than collection without consumers.
 Last implementation-tree review: `fef26dcf`. On September 10 the user selected
