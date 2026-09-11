@@ -50,9 +50,10 @@ class MemoryStore:
         self.published.append((snapshot, observed_at, source_url))
         return str(len(self.published))
 
-    def record_receipt(self, cik, *, status, completed, pending, gaps, observed_at):
+    def record_receipt(self, cik, *, status, completed, pending, gaps, observed_at, source_snapshots=None):
         self.receipts.append(deepcopy(dict(cik=cik, status=status, completed=completed,
-                                          pending=pending, gaps=gaps, observed_at=observed_at)))
+                                          pending=pending, gaps=gaps, observed_at=observed_at,
+                                          source_snapshots=source_snapshots or {})))
 
     def latest_receipt(self, cik):
         rows = [row for row in self.receipts if row["cik"] == cik]
@@ -648,3 +649,49 @@ def test_real_stored_only_does_not_create_capture_root_or_change_database(durabl
     assert not store.paths.capture_root.exists()
     assert store.paths.market_db_path.read_bytes() == before
     assert transport.calls == []
+
+
+def test_real_receipt_bindings_survive_unchanged_capture_restart_and_resume(durable, service_type):
+    from src.sec_research.store import Store
+
+    service, store, captures, transport = durable
+    first = service.refresh(CIK)
+    assert "source_snapshots" in first, "receipts must bind published snapshots"
+    later = "2026-09-12T12:00:00Z"
+    reopened = Store(store.paths)
+    second_service = service_type(reopened, captures, transport, clock=lambda: later)
+    second = second_service.refresh(CIK, max_sources=1)
+    assert second["source_snapshots"] == {"submissions": {
+        "snapshot_id": first["source_snapshots"]["submissions"]["snapshot_id"],
+        "observed_at": later}}
+    resumed = second_service.refresh(CIK, resume=True)
+    assert set(resumed["source_snapshots"]) == {"submissions", "companyfacts", HISTORY}
+    assert resumed["source_snapshots"]["submissions"] == second["source_snapshots"]["submissions"]
+    assert all(binding["observed_at"] == later for binding in resumed["source_snapshots"].values())
+    assert reopened.snapshots(CIK, "catalog")[0]["observed_at"] == NOW
+
+
+def test_interrupted_new_refresh_has_no_prior_snapshot_authority(durable):
+    service, store, _, transport = durable
+    first = service.refresh(CIK)
+    transport.responses[SUBMISSIONS_URL] = SystemExit("interrupted")
+    with pytest.raises(SystemExit):
+        service.refresh(CIK)
+    latest = store.latest_receipt(CIK)
+    assert latest["receipt_id"] > first["receipt_id"]
+    assert latest.get("source_snapshots") == {}, "new intent must be explicitly unbound"
+    assert store.snapshots(CIK, "catalog")
+    from src.sec_research.queries import StoredQueries
+    result = StoredQueries(store).filings(CIK)
+    assert result["status"] == "unavailable"
+    assert result["data"] == []
+
+
+@pytest.mark.parametrize("pending", [[], ["companyfacts"]])
+def test_resume_explicitly_unbound_receipt_reacquires_instead_of_blessing_it(durable, pending):
+    service, store, _, transport = durable
+    store.record_receipt(CIK, status="partial" if pending else "ok", completed=["submissions"],
+                         pending=pending, gaps=[], observed_at=NOW)
+    resumed = service.refresh(CIK, resume=True, max_sources=1)
+    assert [url for url, _ in transport.calls] == [SUBMISSIONS_URL]
+    assert set(resumed["source_snapshots"]) == {"submissions"}

@@ -407,3 +407,96 @@ def test_receipt_limits_reject_before_writer_lock(store, modules, monkeypatch, b
     receipt = store.record_receipt(CIK, status="ok", completed=["submissions", "companyfacts"],
                                    pending=[], gaps=[], observed_at=WHEN)
     assert store.latest_receipt(CIK) == receipt
+
+
+def bound_receipt(store, bindings, *, completed=None):
+    return store.record_receipt(
+        CIK, status="ok", completed=list(bindings) if completed is None else completed,
+        pending=[], gaps=[], observed_at=WHEN, source_snapshots=bindings,
+    )
+
+
+def test_receipt_binding_reopens_exact_snapshot_and_capture_time(store, modules):
+    sid = publish(store, catalog())
+    later = "2026-09-12T00:00:00Z"
+    bindings = {"submissions": {"snapshot_id": sid, "observed_at": later}}
+    receipt = bound_receipt(store, bindings)
+    bindings["submissions"]["observed_at"] = WHEN
+    reopened = modules[1].Store(store.paths)
+    assert reopened.receipt(CIK, receipt["receipt_id"])["source_snapshots"] == {
+        "submissions": {"snapshot_id": sid, "observed_at": later}}
+    assert reopened.receipt("1", receipt["receipt_id"]) is None
+    assert reopened.snapshot(CIK, sid)["observed_at"] == WHEN
+    assert reopened.snapshot("1", sid) is None
+    assert reopened.snapshot_observations(CIK, sid)[0]["form"] == "10-Q"
+    assert reopened.snapshot_observations("1", sid) == []
+
+
+@pytest.mark.parametrize("wrong", ["issuer", "kind", "locator", "missing"])
+def test_receipt_rejects_cross_source_snapshot_binding(store, wrong):
+    pair = facts() if wrong == "kind" else catalog(historical=wrong == "locator")
+    if wrong == "issuer":
+        raw = pair[0].replace(b"320193", b"789019")
+        pair = raw, parse_submissions(raw, cik="789019")
+    sid = publish(store, pair)
+    if wrong == "missing":
+        sid = "secsnapshot_" + "0" * 64
+    with pytest.raises(ValueError, match="^sec_research_receipt_binding_invalid$"):
+        bound_receipt(store, {"submissions": {"snapshot_id": sid, "observed_at": WHEN}})
+    assert store.latest_receipt(CIK) is None
+
+
+@pytest.mark.parametrize("binding", [None, {}, {"snapshot_id": "x"},
+    {"snapshot_id": "secsnapshot_" + "0" * 64, "observed_at": "yesterday"},
+    {"snapshot_id": "secsnapshot_" + "0" * 64, "observed_at": WHEN, "extra": 1}])
+def test_receipt_binding_shape_is_closed(store, binding):
+    with pytest.raises(ValueError, match="^sec_research_receipt_binding_invalid$"):
+        bound_receipt(store, {"submissions": binding})
+
+
+def test_receipt_bindings_cover_completed_exactly_and_unbound_is_explicit(store):
+    sid = publish(store, catalog())
+    binding = {"submissions": {"snapshot_id": sid, "observed_at": WHEN}}
+    for mapping, completed in [(binding, []), ({}, ["submissions"])]:
+        with pytest.raises(ValueError, match="^sec_research_receipt_binding_invalid$"):
+            bound_receipt(store, mapping, completed=completed)
+    unbound = store.record_receipt(CIK, status="ok", completed=["submissions"],
+                                   pending=[], gaps=[], observed_at=WHEN)
+    assert unbound["source_snapshots"] == {}
+
+
+def test_receipt_sequence_does_not_reuse_committed_ids(store):
+    maximum = 2**63 - 1
+    with store.connect() as conn:
+        conn.execute("""INSERT INTO sec_research_receipts
+            (receipt_id, cik, status, completed, pending, gaps, observed_at, recorded_at)
+            VALUES (?, ?, 'ok', '[]', '[]', '[]', ?, ?)""", (maximum, CIK, WHEN, WHEN))
+    with pytest.raises(sqlite3.OperationalError, match="full"):
+        store.record_receipt(CIK, status="ok", completed=[], pending=[], gaps=[], observed_at=WHEN)
+    assert store.latest_receipt(CIK)["receipt_id"] == maximum
+    with store.connect(readonly=True) as conn:
+        assert conn.execute("SELECT count(*) FROM sec_research_receipts").fetchone()[0] == 1
+
+
+def test_sec_schema_leaves_unrelated_autoincrement_sequence_owned_by_sqlite(tmp_path, modules):
+    store = modules[1].Store(SecResearchPaths(tmp_path / "market.db"))
+    with store.connect() as conn:
+        conn.execute("CREATE TABLE unrelated(id INTEGER PRIMARY KEY AUTOINCREMENT, value TEXT)")
+        conn.execute("INSERT INTO unrelated VALUES (42, 'keep')")
+        before = tuple(conn.execute("SELECT * FROM sqlite_sequence WHERE name='unrelated'").fetchone())
+    store.install()
+    store.record_receipt(CIK, status="ok", completed=[], pending=[], gaps=[], observed_at=WHEN)
+    store.install()
+    with store.connect() as conn:
+        modules[0].verify(conn)
+        assert tuple(conn.execute("SELECT * FROM sqlite_sequence WHERE name='unrelated'").fetchone()) == before
+        conn.execute("INSERT INTO unrelated(value) VALUES ('next')")
+        assert conn.execute("SELECT max(id) FROM unrelated").fetchone()[0] == 43
+
+
+@pytest.mark.parametrize("completed,pending", [(["submissions", "submissions"], []),
+    ([], ["submissions", "submissions"]), (["submissions"], ["submissions"])])
+def test_receipt_locators_have_one_unambiguous_state(store, completed, pending):
+    with pytest.raises(ValueError, match="^sec_research_receipt_invalid$"):
+        store.record_receipt(CIK, status="partial", completed=completed, pending=pending,
+                             gaps=[], observed_at=WHEN)
