@@ -1,0 +1,30 @@
+{
+  "name": "census-final",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "-m",
+    "tests.repository_inventory",
+    "--root",
+    ".",
+    "--output",
+    "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/census-final/census.json.gz",
+    "--untracked-root",
+    "/mnt/md0/PycharmProjects/ArkScope",
+    "--compare",
+    "docs/superpowers/evidence/2026-09-11-sec-durable-acquisition/census-final.json.gz"
+  ],
+  "cwd": "/tmp/arkscope-listing-sec-macro-convergence",
+  "exit_code": 2,
+  "seconds": 12.98,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/census-final",
+    "HOME": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/census-final/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/census-final/output.log"
+}

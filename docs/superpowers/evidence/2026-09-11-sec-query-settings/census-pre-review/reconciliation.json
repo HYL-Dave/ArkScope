@@ -1,0 +1,68 @@
+{
+  "candidate_count": 4360,
+  "comparison_counts": {
+    "coverage_reductions": 0,
+    "dependency_metadata_changed": 0,
+    "new_candidates": 53,
+    "new_uncertainties": 248,
+    "new_untracked_paths": 0,
+    "review_required": true
+  },
+  "coverage": {
+    "decode_failed": 3,
+    "documentation": 197,
+    "excluded_evidence": 6301,
+    "excluded_non_source": 23,
+    "excluded_private": 6,
+    "read": 1119
+  },
+  "interpretation": "Raw scanner candidates retained; runtime consumers require independent evidence.",
+  "new_candidate_kinds": {
+    "css": 7,
+    "http": 2,
+    "i18n": 44
+  },
+  "new_uncertainty_ids_with_matching_previous_location_independent_metadata": 186,
+  "new_uncertainty_kinds": {
+    "frontend": 216,
+    "sql": 32
+  },
+  "removed_candidates": [
+    "http:GET:/sec-research/{cik}:src/api/routes/sec_research.py",
+    "http:POST:/sec-research/{cik}/refresh:src/api/routes/sec_research.py"
+  ],
+  "sec_routes": [
+    {
+      "method": "GET",
+      "path_template": "/sec-research/config",
+      "state": "syntactic_frontend_match"
+    },
+    {
+      "method": "PUT",
+      "path_template": "/sec-research/config",
+      "state": "syntactic_frontend_match"
+    },
+    {
+      "method": "GET",
+      "path_template": "/sec-research/{cik}",
+      "state": "syntactic_frontend_match"
+    },
+    {
+      "method": "GET",
+      "path_template": "/sec-research/{cik}/filings",
+      "state": "no_frontend_match_observed"
+    },
+    {
+      "method": "GET",
+      "path_template": "/sec-research/{cik}/facts",
+      "state": "no_frontend_match_observed"
+    },
+    {
+      "method": "POST",
+      "path_template": "/sec-research/{cik}/refresh",
+      "state": "syntactic_frontend_match"
+    }
+  ],
+  "status": "review_required_not_a_deletion_list",
+  "uncertainty_count": 3444
+}

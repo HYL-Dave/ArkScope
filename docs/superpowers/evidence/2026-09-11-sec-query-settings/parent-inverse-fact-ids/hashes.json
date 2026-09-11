@@ -1,0 +1,14 @@
+{
+  "mutant": "ids-latest",
+  "before": {
+    "src/sec_research/queries.py": "1aa4b4f322fc95b2889c2b49cc7915320616bf8239d58116a3fe899df6e024a4",
+    "src/sec_research/fact_queries.py": "8274750f9f1ee6fb065da7afa307da55dc41254695c53019f989a39675ed694e",
+    "tests/test_sec_research_fact_queries.py": "2e603bd36b70569a4bcf90a0f6bafba69bf55b32b10f15d89e73b3f84b60e86d"
+  },
+  "after": {
+    "src/sec_research/queries.py": "1aa4b4f322fc95b2889c2b49cc7915320616bf8239d58116a3fe899df6e024a4",
+    "src/sec_research/fact_queries.py": "8274750f9f1ee6fb065da7afa307da55dc41254695c53019f989a39675ed694e",
+    "tests/test_sec_research_fact_queries.py": "2e603bd36b70569a4bcf90a0f6bafba69bf55b32b10f15d89e73b3f84b60e86d"
+  },
+  "unchanged": true
+}

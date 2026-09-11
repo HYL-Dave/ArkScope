@@ -1,0 +1,111 @@
+{
+  "config_installed": {
+    "capture_budget_bytes": 107374182400,
+    "capacity": {
+      "persisted_bytes": 0,
+      "orphan_bytes": 0,
+      "reserved_bytes": 0,
+      "charged_bytes": 0,
+      "budget_bytes": 107374182400,
+      "remaining_bytes": 107374182400,
+      "over_budget": false
+    }
+  },
+  "config_saved": {
+    "capture_budget_bytes": 1
+  },
+  "config_over_budget": {
+    "capture_budget_bytes": 1,
+    "capacity": {
+      "persisted_bytes": 146,
+      "orphan_bytes": 0,
+      "reserved_bytes": 0,
+      "charged_bytes": 146,
+      "budget_bytes": 1,
+      "remaining_bytes": 0,
+      "over_budget": true
+    }
+  },
+  "filings_ok": {
+    "status": "ok",
+    "data": [
+      {
+        "filing_id": "0000320193:0000320193-26-000001",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000001",
+        "form": "10-K",
+        "filed_date": "2026-02-01",
+        "report_date": null,
+        "accepted_at": null,
+        "primary_document": null,
+        "primary_url": null,
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_b4ddcdb88125fd34f0973392b6018086c4598aaed62a193c6e78a72c08406c5d",
+            "source": {
+              "sha256": "435ff1d6a30c4aa43fee9a6b1388ae23784ca823fe7d25d5e07ece7debfda2bd",
+              "pointer": "/filings/recent/accessionNumber/0"
+            },
+            "observed_at": "2026-09-11T12:00:00Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "435ff1d6a30c4aa43fee9a6b1388ae23784ca823fe7d25d5e07ece7debfda2bd"
+          }
+        ]
+      }
+    ],
+    "gaps": [],
+    "observed_at": "2026-09-11T12:00:00Z",
+    "coverage": {
+      "catalog_sources": 1,
+      "admitted_rows": 1,
+      "admitted_bytes": 1044,
+      "receipt_id": 1,
+      "bindings_digest": "1da70fffc28a26226c77c009eed0c80ba4529f57e5a08eb0d113276343ec8fbc",
+      "selection_total": 1,
+      "complete": true
+    },
+    "next_cursor": null
+  },
+  "filings_empty": {
+    "status": "empty",
+    "data": [],
+    "gaps": [],
+    "observed_at": "2026-09-11T12:00:00Z",
+    "coverage": {
+      "catalog_sources": 1,
+      "admitted_rows": 0,
+      "admitted_bytes": 409,
+      "receipt_id": 1,
+      "bindings_digest": "1da70fffc28a26226c77c009eed0c80ba4529f57e5a08eb0d113276343ec8fbc",
+      "selection_total": 0,
+      "complete": true
+    },
+    "next_cursor": null
+  },
+  "invalid_cursor": {
+    "detail": {
+      "code": "sec_research_cursor_invalid"
+    }
+  },
+  "filings_partial": {
+    "status": "partial",
+    "data": [],
+    "gaps": [
+      {
+        "code": "catalog_sources_pending",
+        "count": 1
+      }
+    ],
+    "observed_at": "2026-09-11T12:00:00Z",
+    "coverage": {
+      "catalog_sources": 1,
+      "admitted_rows": 0,
+      "admitted_bytes": 624,
+      "receipt_id": 2,
+      "bindings_digest": "cd677e2676ee0243a100ed482c0cc16af43ab550490eac373c6953dc1281e9c4",
+      "selection_total": 0,
+      "complete": false
+    },
+    "next_cursor": null
+  }
+}

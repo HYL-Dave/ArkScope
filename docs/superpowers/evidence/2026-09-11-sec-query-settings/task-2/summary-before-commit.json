@@ -1,0 +1,303 @@
+{
+  "runs": {
+    "green-edge": {
+      "tests": 329,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_research_fact_queries": 91,
+        "tests.test_sec_research_queries": 72,
+        "tests.test_sec_research_store": 115,
+        "tests.test_sec_research_service": 51
+      }
+    },
+    "green-final": {
+      "tests": 814,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_edgar_financials.TestGetQuarterlyPeriods": 5,
+        "tests.test_sec_edgar_financials.TestGetReportEndDate": 4,
+        "tests.test_sec_edgar_financials.TestIncomeStatement": 6,
+        "tests.test_sec_edgar_financials.TestBalanceSheet": 2,
+        "tests.test_sec_edgar_financials.TestCashFlowStatement": 2,
+        "tests.test_sec_research_capture_lock": 11,
+        "tests.test_sec_research_captures": 24,
+        "tests.test_sec_research_catalog": 66,
+        "tests.test_sec_research_common": 58,
+        "tests.test_sec_research_config": 54,
+        "tests.test_sec_research_fact_queries": 91,
+        "tests.test_sec_research_facts": 54,
+        "tests.test_sec_research_paths": 72,
+        "tests.test_sec_research_queries": 72,
+        "tests.test_sec_research_routes": 79,
+        "tests.test_sec_research_service": 51,
+        "tests.test_sec_research_store": 115,
+        "tests.test_sec_tools.TestGetSecFilings": 4,
+        "tests.test_sec_tools.TestGetInsiderTrades": 5,
+        "tests.test_sec_tools.TestBridgeIntegration": 4,
+        "tests.test_sec_transport": 10,
+        "tests.test_sec_user_agent": 5,
+        "tests.test_stored_sec_projection": 4,
+        "tests.test_fundamentals_sec_cache": 8,
+        "tests.test_lifecycle_web_sec_sources": 8
+      }
+    },
+    "green-final-http": {
+      "tests": 815,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_edgar_financials.TestGetQuarterlyPeriods": 5,
+        "tests.test_sec_edgar_financials.TestGetReportEndDate": 4,
+        "tests.test_sec_edgar_financials.TestIncomeStatement": 6,
+        "tests.test_sec_edgar_financials.TestBalanceSheet": 2,
+        "tests.test_sec_edgar_financials.TestCashFlowStatement": 2,
+        "tests.test_sec_research_capture_lock": 11,
+        "tests.test_sec_research_captures": 24,
+        "tests.test_sec_research_catalog": 66,
+        "tests.test_sec_research_common": 58,
+        "tests.test_sec_research_config": 54,
+        "tests.test_sec_research_fact_queries": 92,
+        "tests.test_sec_research_facts": 54,
+        "tests.test_sec_research_paths": 72,
+        "tests.test_sec_research_queries": 72,
+        "tests.test_sec_research_routes": 79,
+        "tests.test_sec_research_service": 51,
+        "tests.test_sec_research_store": 115,
+        "tests.test_sec_tools.TestGetSecFilings": 4,
+        "tests.test_sec_tools.TestGetInsiderTrades": 5,
+        "tests.test_sec_tools.TestBridgeIntegration": 4,
+        "tests.test_sec_transport": 10,
+        "tests.test_sec_user_agent": 5,
+        "tests.test_stored_sec_projection": 4,
+        "tests.test_fundamentals_sec_cache": 8,
+        "tests.test_lifecycle_web_sec_sources": 8
+      }
+    },
+    "green-initial": {
+      "tests": 297,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_research_fact_queries": 59,
+        "tests.test_sec_research_queries": 72,
+        "tests.test_sec_research_store": 115,
+        "tests.test_sec_research_service": 51
+      }
+    },
+    "green-post-inverse": {
+      "tests": 409,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_research_fact_queries": 92,
+        "tests.test_sec_research_queries": 72,
+        "tests.test_sec_research_store": 115,
+        "tests.test_sec_research_service": 51,
+        "tests.test_sec_research_routes": 79
+      }
+    },
+    "green-unresolved": {
+      "tests": 163,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_research_fact_queries": 91,
+        "tests.test_sec_research_queries": 72
+      }
+    },
+    "inverse-as-of-end": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        ".superpowers.sdd.2026-09-11-sec-query-settings.task-2.mutants.test_sec_research_fact_queries": 1
+      }
+    },
+    "inverse-final-as-of-end": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        ".superpowers.sdd.2026-09-11-sec-query-settings.task-2.mutants.test_sec_research_fact_queries": 1
+      }
+    },
+    "inverse-final-float": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        ".superpowers.sdd.2026-09-11-sec-query-settings.task-2.mutants.test_sec_research_fact_queries": 1
+      }
+    },
+    "inverse-final-ids-latest": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        ".superpowers.sdd.2026-09-11-sec-query-settings.task-2.mutants.test_sec_research_fact_queries": 1
+      }
+    },
+    "inverse-float": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        ".superpowers.sdd.2026-09-11-sec-query-settings.task-2.mutants.test_sec_research_fact_queries": 1
+      }
+    },
+    "inverse-ids-latest": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        ".superpowers.sdd.2026-09-11-sec-query-settings.task-2.mutants.test_sec_research_fact_queries": 1
+      }
+    },
+    "red": {
+      "tests": 59,
+      "failures": 59,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_research_fact_queries": 59
+      }
+    },
+    "red-edge": {
+      "tests": 91,
+      "failures": 2,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_research_fact_queries": 91
+      }
+    },
+    "red-period-contract": {
+      "tests": 15,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_research_fact_queries": 15
+      }
+    },
+    "red-unobserved": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_research_fact_queries": 1
+      }
+    },
+    "red-unresolved": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "owners": {
+        "tests.test_sec_research_fact_queries": 1
+      }
+    }
+  },
+  "hashes": {
+    "src/sec_research/queries.py": "0ad7b43182bcf731efd519233d53f1c54493f3bd9ce76cf66fe5e22f66906ae9",
+    "src/sec_research/fact_queries.py": "b4f0f87fdf13ec70aed5fe77837262d95b763f85faf7fb3a9b58357a9244ab4a",
+    "tests/test_sec_research_fact_queries.py": "cbc74ef489cc070ac9e8c35c6e1480128d0ac4ec35d56f8c28a11a33f440ba04"
+  },
+  "git": {
+    "head": {
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "stdout": "baecc18c33d3b23ff1f477ae83a2cedf52e7bb0a\n",
+      "stderr": ""
+    },
+    "status": {
+      "command": [
+        "git",
+        "status",
+        "--short",
+        "--",
+        "src/sec_research/queries.py",
+        "src/sec_research/fact_queries.py",
+        "tests/test_sec_research_fact_queries.py"
+      ],
+      "exit_code": 0,
+      "stdout": " M src/sec_research/queries.py\n?? src/sec_research/fact_queries.py\n?? tests/test_sec_research_fact_queries.py\n",
+      "stderr": ""
+    },
+    "staged": {
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--name-only",
+        "--",
+        "src/sec_research/queries.py",
+        "src/sec_research/fact_queries.py",
+        "tests/test_sec_research_fact_queries.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "diff_check": {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "src/sec_research/queries.py",
+        "src/sec_research/fact_queries.py",
+        "tests/test_sec_research_fact_queries.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "new_fact_check": {
+      "command": [
+        "git",
+        "diff",
+        "--no-index",
+        "--check",
+        "/dev/null",
+        "src/sec_research/fact_queries.py"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "new_test_check": {
+      "command": [
+        "git",
+        "diff",
+        "--no-index",
+        "--check",
+        "/dev/null",
+        "tests/test_sec_research_fact_queries.py"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  "inverse_final_hashes_match": true
+}

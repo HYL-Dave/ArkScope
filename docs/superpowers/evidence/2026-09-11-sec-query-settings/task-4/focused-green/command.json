@@ -1,0 +1,27 @@
+{
+  "name": "task-4/focused-green",
+  "command": [
+    "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+    "test",
+    "--",
+    "src/secResearchApi.test.ts",
+    "src/settings/SecResearchPanel.test.tsx",
+    "src/settings/DataStorageSection.test.tsx",
+    "src/settings/settingsRegistry.test.ts",
+    "src/SettingsLocalStorage.test.ts"
+  ],
+  "cwd": "/tmp/arkscope-listing-sec-macro-convergence/apps/arkscope-web",
+  "exit_code": 1,
+  "seconds": 3.052,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/task-4/focused-green",
+    "HOME": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/task-4/focused-green/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "NODE_OPTIONS": "--require=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/offline_node.cjs"
+  },
+  "log": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/task-4/focused-green/output.log"
+}

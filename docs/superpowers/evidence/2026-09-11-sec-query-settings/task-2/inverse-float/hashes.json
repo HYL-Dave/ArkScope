@@ -1,0 +1,14 @@
+{
+  "mutant": "float",
+  "before": {
+    "src/sec_research/queries.py": "0ad7b43182bcf731efd519233d53f1c54493f3bd9ce76cf66fe5e22f66906ae9",
+    "src/sec_research/fact_queries.py": "1eeba14ae465d18a32603b015a71abc528093e34ac5a7a76a0e0b9e915fb7d43",
+    "tests/test_sec_research_fact_queries.py": "99bc702b5cc2b3410f71baa93e7ee29e8eff0055ee8f73c889f5c4103e9aa1da"
+  },
+  "after": {
+    "src/sec_research/queries.py": "0ad7b43182bcf731efd519233d53f1c54493f3bd9ce76cf66fe5e22f66906ae9",
+    "src/sec_research/fact_queries.py": "1eeba14ae465d18a32603b015a71abc528093e34ac5a7a76a0e0b9e915fb7d43",
+    "tests/test_sec_research_fact_queries.py": "99bc702b5cc2b3410f71baa93e7ee29e8eff0055ee8f73c889f5c4103e9aa1da"
+  },
+  "unchanged": true
+}

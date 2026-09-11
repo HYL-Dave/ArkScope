@@ -1,0 +1,26 @@
+{
+  "name": "parent-inverse-green",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/offline_pytest.py",
+    "-q",
+    "tests/test_sec_research_fact_queries.py::test_exact_decimal_non_usd_and_complete_original_provenance",
+    "tests/test_sec_research_fact_queries.py::test_as_of_is_filed_availability_not_period_end",
+    "tests/test_sec_research_fact_queries.py::test_fact_ids_reopen_all_original_revisions_without_latest_receipt",
+    "--junitxml=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/parent-inverse-green/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-listing-sec-macro-convergence",
+  "exit_code": 0,
+  "seconds": 1.055,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/parent-inverse-green",
+    "HOME": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/parent-inverse-green/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-11-sec-query-settings/parent-inverse-green/output.log"
+}

@@ -1,0 +1,27 @@
+{
+  "backend_checkpoint": "verification-summary.json",
+  "backend_checkpoint_sha256": "037d27faf4fa9c50fccff90b83a6fc240c84f40c6d564084fefaa43b44173205",
+  "backend_counts": {
+    "passed": 8811,
+    "skipped": 12
+  },
+  "backend_paths_unchanged": 798,
+  "backend_rerun_after_frontend_only_fix": false,
+  "before_patch_sha256": "96681417839d40d9b02893d6e6cb28be9e96acffec52c574b13806aa0682e49c",
+  "changed_paths": [
+    "apps/arkscope-web/src/settings/SecResearchPanel.test.tsx",
+    "apps/arkscope-web/src/settings/SecResearchPanel.tsx"
+  ],
+  "changes": {
+    "apps/arkscope-web/src/settings/SecResearchPanel.test.tsx": {
+      "after": "c2cd1581cbcb1754f4ce06b3457f2cca7bef7c90df5a01243eaf3bdfdc0b833c",
+      "before": "e03d373d5a3035083a935207a98768612471bd9f46fe6d7772e55b6a48881b47"
+    },
+    "apps/arkscope-web/src/settings/SecResearchPanel.tsx": {
+      "after": "7b018e561c6777814cc4dfe6bf33702dfe5fce9ac981b5598210438d6f0702d1",
+      "before": "411341e410cb0ecc2f2a2dd11892072c117aab1b4921181c68eab7626b5a22dd"
+    }
+  },
+  "final_patch_sha256": "c4603ccf2f249cfc2c0c48f65c9e9920b736f874a4713b1971d7588afec1a0a9",
+  "full_source_paths": 1088
+}

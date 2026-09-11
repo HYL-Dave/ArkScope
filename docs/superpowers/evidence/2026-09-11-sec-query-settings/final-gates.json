@@ -1,0 +1,57 @@
+{
+  "backend_evidence": "verification-summary.json",
+  "backend_reuse_proof": "post-fix-verification.json",
+  "browser_cases": 4,
+  "census": {
+    "candidates": 4360,
+    "comparison": {
+      "coverage_reductions": 0,
+      "dependency_metadata_changed": 0,
+      "new_candidates": 53,
+      "new_uncertainties": 248,
+      "new_untracked_paths": 0,
+      "review_required": true
+    },
+    "uncertainties": 3444
+  },
+  "frontend": {
+    "added": 46,
+    "baseline_passed": 1692,
+    "files": 121,
+    "passed": 1738
+  },
+  "runs": {
+    "browser-post-fix": {
+      "command_sha256": "0c43d18f4407c37ab7f5b13c9fb706b43463a4931dae85cc56649f1f17d30ea3",
+      "exit_code": 0,
+      "log_sha256": "b8338c2326a7308ac98a24d6b371ce8abafa1621a6690cd977b97e3bee6a201e",
+      "seconds": 13.944
+    },
+    "census-post-fix": {
+      "command_sha256": "f6ae12b0e1685af180e5b39bce0e17ec51832c2e4eb4826628b7d85e31327a9c",
+      "exit_code": 2,
+      "log_sha256": "3d2afcee93c0e3468668cede39aec61b0944a2ad6de81d1a144e97948d3f8ce5",
+      "seconds": 12.836
+    },
+    "frontend-post-fix": {
+      "command_sha256": "a9ad77aba4822fcd6a55a698ae6f6402b298cb17e9012a480df160f6ed542743",
+      "exit_code": 0,
+      "log_sha256": "9cf8c7f7d9014ed0c17ddc26e702ee4f482768c5c9776917944b34db5340b54a",
+      "seconds": 14.071
+    },
+    "i18n-post-fix": {
+      "command_sha256": "17852f65b74e1b02b57eea616658263b3778cbed84f10512aad7664fddc79a3b",
+      "exit_code": 0,
+      "log_sha256": "f3ff49dfdae1cbb61ff75d18c2a37b6dcf17abe70a175f97b5d46febdc06d0a2",
+      "seconds": 0.802
+    },
+    "typecheck-post-fix": {
+      "command_sha256": "0bb11b60aed92f63ed4d1983df19e6beea02beae7d5f07a332484ad25c045c34",
+      "exit_code": 0,
+      "log_sha256": "f11cc6b081b601fbfb3d906dd86e989fdf90f9d1b527808504811363f1303fad",
+      "seconds": 11.147
+    }
+  },
+  "source_patch_sha256": "c4603ccf2f249cfc2c0c48f65c9e9920b736f874a4713b1971d7588afec1a0a9",
+  "source_paths_verified": 1088
+}

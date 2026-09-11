@@ -1,0 +1,626 @@
+[
+  {
+    "locale": "zh-Hant",
+    "viewport": [
+      1280,
+      960
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiJkNzJjZmJiZjQzMTk0Y2FkZTI4OTk3Zjc5MjJlNmM5MmY3OTkxNmU3MTdlMGJkOGE2YzczNWVkN2FiN2Q0YzBiIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiIxMzM1MTFkZTNlYTJlNWUzZDZlNzE3OGFmOTU2OTRhZWQyYzg3ZTBjNGQzYTFjODNmNzA4NDkwNjQxZDlkYjE4IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjYsInYiOjF9"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=10-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=8-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiIxMzM1MTFkZTNlYTJlNWUzZDZlNzE3OGFmOTU2OTRhZWQyYzg3ZTBjNGQzYTFjODNmNzA4NDkwNjQxZDlkYjE4IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjY3YTBkNjI0MDc2N2FmYzY4NzdhOGNlODQ1ZDEyOTNmYTVmODEwMjVlZWNmNzEyMmZiYTU1YjkyYjJjMWQyYjEiLCJraW5kIjoiZmFjdHMiLCJvZmZzZXQiOjQwLCJyZWNlaXB0X2lkIjo2LCJ2IjoxfQ"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "PUT",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      }
+    ],
+    "state": {
+      "source_dispatches": [
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json"
+      ],
+      "writes": [
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_config",
+          "detail": {
+            "capture_budget_bytes": 1
+          }
+        }
+      ],
+      "fail_history": false
+    },
+    "errors": []
+  },
+  {
+    "locale": "zh-Hant",
+    "viewport": [
+      390,
+      844
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiJkZmQ1NjgyOGMzNTE2MTU1MzliZWRhMDI3NmZjZDMzZDEzY2M0NTUxMmRlZTI4YTJlMDdiOWZiOTg5Yjg3ZTQ5IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiJlODQwNmUzMWE2MDI1MzcwMWY1Yjk4OGFkZGQ3MGVjYWY5MTdhODY4ZDU1MGQ3MTk5MDhkOTQ2Nzg4ZWZhNWNhIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjYsInYiOjF9"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=10-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=8-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiJlODQwNmUzMWE2MDI1MzcwMWY1Yjk4OGFkZGQ3MGVjYWY5MTdhODY4ZDU1MGQ3MTk5MDhkOTQ2Nzg4ZWZhNWNhIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjY3YTBkNjI0MDc2N2FmYzY4NzdhOGNlODQ1ZDEyOTNmYTVmODEwMjVlZWNmNzEyMmZiYTU1YjkyYjJjMWQyYjEiLCJraW5kIjoiZmFjdHMiLCJvZmZzZXQiOjQwLCJyZWNlaXB0X2lkIjo2LCJ2IjoxfQ"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "PUT",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      }
+    ],
+    "state": {
+      "source_dispatches": [
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json"
+      ],
+      "writes": [
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_config",
+          "detail": {
+            "capture_budget_bytes": 1
+          }
+        }
+      ],
+      "fail_history": false
+    },
+    "errors": []
+  },
+  {
+    "locale": "en",
+    "viewport": [
+      1280,
+      960
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiIxMTIyZTdhNWVmMjU2NjQxZDExNzcwZmQ5ODA0N2NkNzczYmQ0ZTczODJiZjU3YzgyNDE1NWViYWEzMjIwOWYwIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI5Mzg5YWM3NWQ0OWExZjhiNDljNjJiNGI2YTE2ZDdiZDgyZWM4NzJjZmMzNGQ5NWMxOGFlOTc1ZTJmZjU1NGUxIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjYsInYiOjF9"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=10-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=8-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI5Mzg5YWM3NWQ0OWExZjhiNDljNjJiNGI2YTE2ZDdiZDgyZWM4NzJjZmMzNGQ5NWMxOGFlOTc1ZTJmZjU1NGUxIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjY3YTBkNjI0MDc2N2FmYzY4NzdhOGNlODQ1ZDEyOTNmYTVmODEwMjVlZWNmNzEyMmZiYTU1YjkyYjJjMWQyYjEiLCJraW5kIjoiZmFjdHMiLCJvZmZzZXQiOjQwLCJyZWNlaXB0X2lkIjo2LCJ2IjoxfQ"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "PUT",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      }
+    ],
+    "state": {
+      "source_dispatches": [
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json"
+      ],
+      "writes": [
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_config",
+          "detail": {
+            "capture_budget_bytes": 1
+          }
+        }
+      ],
+      "fail_history": false
+    },
+    "errors": []
+  },
+  {
+    "locale": "en",
+    "viewport": [
+      390,
+      844
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI3NzU3NWNkODMwOGEyNjVjNTYxMDFlY2JkMDI4NTQ3ZDE2NzUyZjdjN2ViNDdmZjE5NjVhMGI0YmMyNWMyMDA3IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiIwMmFhOTdkMThhNWJmY2FkOTA0M2NhZTU2ZGE0YjkwNTY1YTgwYjQ1YjNjMWY0MzU1MTY4YzQwMzE1ZDc2MGYzIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjYsInYiOjF9"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=10-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=8-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiIwMmFhOTdkMThhNWJmY2FkOTA0M2NhZTU2ZGE0YjkwNTY1YTgwYjQ1YjNjMWY0MzU1MTY4YzQwMzE1ZDc2MGYzIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjY3YTBkNjI0MDc2N2FmYzY4NzdhOGNlODQ1ZDEyOTNmYTVmODEwMjVlZWNmNzEyMmZiYTU1YjkyYjJjMWQyYjEiLCJraW5kIjoiZmFjdHMiLCJvZmZzZXQiOjQwLCJyZWNlaXB0X2lkIjo2LCJ2IjoxfQ"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "PUT",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      }
+    ],
+    "state": {
+      "source_dispatches": [
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json"
+      ],
+      "writes": [
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_config",
+          "detail": {
+            "capture_budget_bytes": 1
+          }
+        }
+      ],
+      "fail_history": false
+    },
+    "errors": []
+  }
+]

@@ -1,0 +1,866 @@
+[
+  {
+    "locale": "zh-Hant",
+    "viewport": [
+      1280,
+      960
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?period=unknown"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI1NjI5MjZmYjdmYTMwZmI3MDQxZTk3MzU2ZDc0OTliMjUwMGQ4NWYxYjdjNzYyNTRlZDIyNWViZmUwZjdlMWVkIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiJlNGNjODAyMjY5MGVjMDk4ZGY4ZjY4MTM0ZjgyODEwMjM5YmFmNTljNzYwNWUzODE1ZDE3ZDdlODkyMzVjYzRmIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjYsInYiOjF9"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=10-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=8-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiJlNGNjODAyMjY5MGVjMDk4ZGY4ZjY4MTM0ZjgyODEwMjM5YmFmNTljNzYwNWUzODE1ZDE3ZDdlODkyMzVjYzRmIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjY3YTBkNjI0MDc2N2FmYzY4NzdhOGNlODQ1ZDEyOTNmYTVmODEwMjVlZWNmNzEyMmZiYTU1YjkyYjJjMWQyYjEiLCJraW5kIjoiZmFjdHMiLCJvZmZzZXQiOjQwLCJyZWNlaXB0X2lkIjo2LCJ2IjoxfQ"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "PUT",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      }
+    ],
+    "state": {
+      "source_dispatches": [
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json"
+      ],
+      "writes": [
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_config",
+          "detail": {
+            "capture_budget_bytes": 1
+          }
+        }
+      ],
+      "fail_history": false
+    },
+    "errors": [],
+    "pagination_geometry": [
+      {
+        "button": [
+          96,
+          1302.5,
+          128,
+          1330.5
+        ],
+        "icon": [
+          104,
+          1308.5,
+          120,
+          1324.5
+        ],
+        "contained": true
+      },
+      {
+        "button": [
+          212,
+          1302.5,
+          244,
+          1330.5
+        ],
+        "icon": [
+          220,
+          1308.5,
+          236,
+          1324.5
+        ],
+        "contained": true
+      }
+    ],
+    "fact_headers": [
+      "\u8ca1\u52d9\u6982\u5ff5",
+      "\u7533\u5831\u6578\u503c",
+      "\u55ae\u4f4d",
+      "\u8fc4\u65e5",
+      "\u547d\u540d\u7a7a\u9593",
+      "\u7533\u5831\u65e5\u671f",
+      "\u7533\u5831\u7de8\u865f",
+      "\u4e8b\u5be6 ID"
+    ],
+    "table_geometry": {
+      "height": 480,
+      "width": 1088,
+      "scrollHeight": 1353,
+      "scrollWidth": 1244
+    },
+    "absent_store_invalid_filter": {
+      "status": 422,
+      "body": {
+        "detail": {
+          "code": "sec_research_query_invalid"
+        }
+      }
+    }
+  },
+  {
+    "locale": "zh-Hant",
+    "viewport": [
+      390,
+      844
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?period=unknown"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiJhN2UyM2FmNDM5NzUzYWZhOTk1YzdjNjNhOWNiMjU1NWI4YmJiMTg5ZDlkMjk1OGYwMWU2ZmQ2Y2EzMjBkYzk3IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI0NWQ3YmVhOGViOTYyYWMxM2UwMmI2YTE3YzgzZDAzNzI1MWRkOWQ1ZGU3YmQxNGFjZDg0NWM2ZjVmNjAwZGI1IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjYsInYiOjF9"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=10-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=8-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI0NWQ3YmVhOGViOTYyYWMxM2UwMmI2YTE3YzgzZDAzNzI1MWRkOWQ1ZGU3YmQxNGFjZDg0NWM2ZjVmNjAwZGI1IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjY3YTBkNjI0MDc2N2FmYzY4NzdhOGNlODQ1ZDEyOTNmYTVmODEwMjVlZWNmNzEyMmZiYTU1YjkyYjJjMWQyYjEiLCJraW5kIjoiZmFjdHMiLCJvZmZzZXQiOjQwLCJyZWNlaXB0X2lkIjo2LCJ2IjoxfQ"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "PUT",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      }
+    ],
+    "state": {
+      "source_dispatches": [
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json"
+      ],
+      "writes": [
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_config",
+          "detail": {
+            "capture_budget_bytes": 1
+          }
+        }
+      ],
+      "fail_history": false
+    },
+    "errors": [],
+    "pagination_geometry": [
+      {
+        "button": [
+          16,
+          1710.5,
+          48,
+          1738.5
+        ],
+        "icon": [
+          24,
+          1716.5,
+          40,
+          1732.5
+        ],
+        "contained": true
+      },
+      {
+        "button": [
+          132,
+          1710.5,
+          164,
+          1738.5
+        ],
+        "icon": [
+          140,
+          1716.5,
+          156,
+          1732.5
+        ],
+        "contained": true
+      }
+    ],
+    "fact_headers": [
+      "\u8ca1\u52d9\u6982\u5ff5",
+      "\u7533\u5831\u6578\u503c",
+      "\u55ae\u4f4d",
+      "\u8fc4\u65e5",
+      "\u547d\u540d\u7a7a\u9593",
+      "\u7533\u5831\u65e5\u671f",
+      "\u7533\u5831\u7de8\u865f",
+      "\u4e8b\u5be6 ID"
+    ],
+    "table_geometry": {
+      "height": 480,
+      "width": 358,
+      "scrollHeight": 1353,
+      "scrollWidth": 1244
+    },
+    "absent_store_invalid_filter": {
+      "status": 422,
+      "body": {
+        "detail": {
+          "code": "sec_research_query_invalid"
+        }
+      }
+    }
+  },
+  {
+    "locale": "en",
+    "viewport": [
+      1280,
+      960
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?period=unknown"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiJkZjA2MjYzOGVlM2YyNmRhYjMxYjFkOTRiYzA1YTJhNDgxYTczYmE3MzQ5N2M0ODk3ZjllOTJlMmNkMGM1YTY1IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI2Njk5MmRjNDdjNmVlMDUzYWNlOTdjYTU3YTdkYzJjMjUxZmE4ZDFmMzViMTYzN2IzOTk0OTczN2Y1ZTliYjE3IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjYsInYiOjF9"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=10-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=8-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI2Njk5MmRjNDdjNmVlMDUzYWNlOTdjYTU3YTdkYzJjMjUxZmE4ZDFmMzViMTYzN2IzOTk0OTczN2Y1ZTliYjE3IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjY3YTBkNjI0MDc2N2FmYzY4NzdhOGNlODQ1ZDEyOTNmYTVmODEwMjVlZWNmNzEyMmZiYTU1YjkyYjJjMWQyYjEiLCJraW5kIjoiZmFjdHMiLCJvZmZzZXQiOjQwLCJyZWNlaXB0X2lkIjo2LCJ2IjoxfQ"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "PUT",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      }
+    ],
+    "state": {
+      "source_dispatches": [
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json"
+      ],
+      "writes": [
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_config",
+          "detail": {
+            "capture_budget_bytes": 1
+          }
+        }
+      ],
+      "fail_history": false
+    },
+    "errors": [],
+    "pagination_geometry": [
+      {
+        "button": [
+          96,
+          1302.5,
+          128,
+          1330.5
+        ],
+        "icon": [
+          104,
+          1308.5,
+          120,
+          1324.5
+        ],
+        "contained": true
+      },
+      {
+        "button": [
+          212,
+          1302.5,
+          244,
+          1330.5
+        ],
+        "icon": [
+          220,
+          1308.5,
+          236,
+          1324.5
+        ],
+        "contained": true
+      }
+    ],
+    "fact_headers": [
+      "Concept",
+      "Reported value",
+      "Unit",
+      "End",
+      "Namespace",
+      "Filed date",
+      "Accession",
+      "Fact ID"
+    ],
+    "table_geometry": {
+      "height": 480,
+      "width": 1088,
+      "scrollHeight": 1353,
+      "scrollWidth": 1284
+    },
+    "absent_store_invalid_filter": {
+      "status": 422,
+      "body": {
+        "detail": {
+          "code": "sec_research_query_invalid"
+        }
+      }
+    }
+  },
+  {
+    "locale": "en",
+    "viewport": [
+      390,
+      844
+    ],
+    "requests": [
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?period=unknown"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI5NWRmNDFkMmZkZTBhNGJkZGIwOWY1MGZmMDA2YTc0ZTFiOGYxZWYzOTYyYzA2YjY3N2U3YTcyY2JlMGVjMjEwIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiIwODIxMzVjOTY1NDQ3MTljY2QwZmU4MTY3MjZkZWIwYmY3ZDQwMDhiODZkNjA0ZTYwN2RjN2RmOWNkZTJhMjAxIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjYsInYiOjF9"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=10-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/filings?forms=8-K&include_amendments=false&limit=20"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiIwODIxMzVjOTY1NDQ3MTljY2QwZmU4MTY3MjZkZWIwYmY3ZDQwMDhiODZkNjA0ZTYwN2RjN2RmOWNkZTJhMjAxIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjY3YTBkNjI0MDc2N2FmYzY4NzdhOGNlODQ1ZDEyOTNmYTVmODEwMjVlZWNmNzEyMmZiYTU1YjkyYjJjMWQyYjEiLCJraW5kIjoiZmFjdHMiLCJvZmZzZXQiOjQwLCJyZWNlaXB0X2lkIjo2LCJ2IjoxfQ"
+      },
+      {
+        "method": "POST",
+        "path": "/sec-research/0000320193/refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      },
+      {
+        "method": "PUT",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/config"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193"
+      },
+      {
+        "method": "GET",
+        "path": "/sec-research/0000320193/facts?revisions=latest&limit=40"
+      }
+    ],
+    "state": {
+      "source_dispatches": [
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json"
+      ],
+      "writes": [
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_refresh",
+          "detail": {
+            "cik": "0000320193"
+          }
+        },
+        {
+          "action": "sec_research_config",
+          "detail": {
+            "capture_budget_bytes": 1
+          }
+        }
+      ],
+      "fail_history": false
+    },
+    "errors": [],
+    "pagination_geometry": [
+      {
+        "button": [
+          16,
+          1730,
+          48,
+          1758
+        ],
+        "icon": [
+          24,
+          1736,
+          40,
+          1752
+        ],
+        "contained": true
+      },
+      {
+        "button": [
+          132,
+          1730,
+          164,
+          1758
+        ],
+        "icon": [
+          140,
+          1736,
+          156,
+          1752
+        ],
+        "contained": true
+      }
+    ],
+    "fact_headers": [
+      "Concept",
+      "Reported value",
+      "Unit",
+      "End",
+      "Namespace",
+      "Filed date",
+      "Accession",
+      "Fact ID"
+    ],
+    "table_geometry": {
+      "height": 480,
+      "width": 358,
+      "scrollHeight": 1353,
+      "scrollWidth": 1284
+    },
+    "absent_store_invalid_filter": {
+      "status": 422,
+      "body": {
+        "detail": {
+          "code": "sec_research_query_invalid"
+        }
+      }
+    }
+  }
+]

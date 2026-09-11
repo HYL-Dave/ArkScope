@@ -1,0 +1,19 @@
+{
+  "source": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+  "source_sha256": "411341e410cb0ecc2f2a2dd11892072c117aab1b4921181c68eab7626b5a22dd",
+  "before": 20,
+  "expected_after_count": 1,
+  "actual_after_count": 2,
+  "after": [
+    "10-K2026-01-01same-filingsame-filing",
+    "10-K2026-01-01next-pagenext-page"
+  ],
+  "unique_key_control_count": 1,
+  "unique_key_control": [
+    "10-K2026-01-01next-pagenext-page"
+  ],
+  "warnings": [
+    "Warning: Encountered two children with the same key, `%s`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.%s same-filing \n    at tbody\n    at table\n    at div\n    at Records (evalmachine.<anonymous>:34:20)"
+  ],
+  "exit_code": 1
+}

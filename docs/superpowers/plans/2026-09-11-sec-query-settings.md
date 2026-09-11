@@ -31,7 +31,7 @@ remain separate completion requirements. No obsolete SEC event control returns.
 | 2 | Complete at `e07e459a`; independent review approved. |
 | 3 | Complete at `420e4759`; 953 SEC/API tests and scoped R1 review passed. |
 | 4 | Complete at `c6e2e435`; R1 review and desktop/mobile browser geometry passed. |
-| Final | Whole-change review, fresh complete checks and evidence closeout pending. |
+| Final | Complete after `5d03c57e` correction and scoped approval; backend8811P/12S, frontend1738P, typecheck/i18n and four browser cases pass. 452 evidence artifacts hash-verified against Git index. |
 
 ## Global Constraints
 
@@ -215,16 +215,31 @@ edit/save and current object/reservation/orphan charges. No per-model controls.
 
 ## Verification And Closeout
 
-- [ ] Final independent whole-change review after all task fixes.
-- [ ] Re-run backend with fresh isolated HOME/data/config/token/lock paths using
+- [x] Final independent whole-change review after all task fixes.
+  Final P2 duplicate catalog keys required one correction at `5d03c57e`;
+  named RED/inverse and actual-route/store browser RED/GREEN prove closure.
+  Original reviewer approved the scoped fix with no residual findings.
+- [x] Re-run backend with fresh isolated HOME/data/config/token/lock paths using
   the archived offline harness copied into this plan's own ignored workspace.
   Baseline is 8446 nodes (8434 pass/12 skip), reconcile added/removed nodes exactly.
   Do not mask runner failures by changing product contracts or historical tests.
-- [ ] Re-run mechanical census against the existing audit baseline. Reconcile
+  Result8811P/12unchangedS, exact8823 collected/executed,+377/-0. All1088 source
+  paths remained unchanged during that run. The later frontend-only fix changes
+  exactly two files; all798backendpaths remain byte-identical. A separate final
+  certificate binds fresh frontend1738P/typecheck/i18n and four browser cases.
+- [x] Re-run mechanical census against the existing audit baseline. Reconcile
   candidates/uncertainties/coverage changes; HTTP routes now have actual UI
   consumers. Keep foundation/wiring and cleanup owners explicit, no clean claim
   from a partial candidate list.
-- [ ] Archive raw RED/GREEN/inverse/review/full suite evidence plus hashes,
+  Final1119read/4360candidates/3444uncertainties;53newcandidateIDs,248newuncertainty
+  IDs,zero coverage/dependency/untracked drift. Two query-route candidates have
+  actual browser consumers; composed URL recognition remains scanner work.
+- [x] Archive raw RED/GREEN/inverse/review/full suite evidence plus hashes,
   update spec/priority-map progress. Do not label SEC first release complete.
   News collector cleanup, actual old-schema disposition and SQLite upgrade remain
   open; no irreversible operation or merge is included in this work.
+  Evidence: `docs/superpowers/evidence/2026-09-11-sec-query-settings/README.md`.
+  All452manifest entries verified against source and tracked Git-index bytes;
+  logs are explicitly tracked despite ignore rules. Fixture server is stopped.
+  Preserve the branch/worktree, with no merge or push; discard only this plan's
+  generated scratch after publication and source identity checks.
