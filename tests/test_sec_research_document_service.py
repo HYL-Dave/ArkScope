@@ -353,3 +353,135 @@ def test_observed_long_safe_filename_uses_reader_url_limit(rig):
     page = owner("document_queries").DocumentQueries(rig.store, rig.captures).read(
         FILING_ID, document_id="file:" + name, capture_id=result["capture_id"])
     assert page["status"] == "ok" and len(page["data"]["text_start_cursor"]) <= 4096
+
+
+@pytest.mark.parametrize("operation", ["directory", "document"])
+def test_invalid_reader_report_preserves_independent_dispatch(rig, operation):
+    rig.enqueue()
+    index = 0 if operation == "directory" else 1
+    rig.queue[index] = Response(b"PRIVATE malformed report response", status=600)
+    result = service(rig).refresh(FILING_ID)
+    assert rig.readers[index].observations[0].status == 600
+    assert result["status"] == "unavailable" and result["capture_id"] is None
+    assert result["outcome"] == "failed"
+    assert len(rig.requests) == index + 1 == len(result["requests"])
+    assert sum(row["request_count"] for row in result["requests"]) == index + 1
+    failed = result["requests"][index]
+    assert failed["operation"] == operation and failed["dispatch_state"] == "dispatched"
+    assert failed["report"] is None
+    assert failed["gaps"] == [{"code": "source_read_report_invalid"}]
+    assert {gap["code"] for gap in result["gaps"]} == {"source_unavailable", "source_read_report_invalid"}
+    if index:
+        assert result["requests"][0]["report"]["observations"][0]["result_code"] == "complete"
+    saved = owner("document_store").DocumentStore(rig.store).latest_attempt(FILING_ID, "primary")
+    assert saved == result and "PRIVATE" not in json.dumps(saved)
+    with rig.store.connect(readonly=True) as conn:
+        assert conn.execute("SELECT count(*) FROM sec_research_documents").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("operation", ["directory", "document"])
+@pytest.mark.parametrize("status", [200, 503, 600])
+def test_cleanup_failure_keeps_dispatch_reports_and_original_failure(rig, monkeypatch, operation, status):
+    rig.enqueue()
+    index = 0 if operation == "directory" else 1
+    if status != 200:
+        rig.queue[index] = Response(b"PRIVATE unavailable", status=status)
+    factory = rig.factory
+    stops = []
+    def failing_cleanup_factory(*args, **kwargs):
+        reader = factory(*args, **kwargs)
+        if len(rig.readers) == index + 1:
+            stop = reader.request_stop
+            def fail_stop():
+                stop()
+                stops.append(reader.request_count)
+                raise RuntimeError("PRIVATE cleanup detail")
+            monkeypatch.setattr(reader, "request_stop", fail_stop)
+        return reader
+    rig.factory = failing_cleanup_factory
+    result = service(rig).refresh(FILING_ID)
+    assert result["outcome"] == "failed" and result["capture_id"] is None
+    assert stops == [1] and len(rig.requests) == index + 1
+    assert len(result["requests"]) == index + 1
+    failed = result["requests"][-1]
+    assert failed["request_count"] == 1 and failed["dispatch_state"] == "dispatched"
+    if status == 600:
+        assert failed["report"] is None
+    else:
+        assert failed["report"]["observations"][0]["result_code"] == (
+            "complete" if status == 200 else "source_unavailable")
+    codes = {gap["code"] for gap in result["gaps"]}
+    assert "source_read_cleanup_failed" in codes
+    assert ("source_read_report_invalid" in codes) == (status == 600)
+    assert ("source_unavailable" in codes) == (status != 200)
+    assert "PRIVATE" not in json.dumps(result)
+    assert owner("document_store").DocumentStore(rig.store).latest_attempt(FILING_ID, "primary") == result
+
+
+def test_valid_zero_dispatch_is_distinct_from_missing_report(rig):
+    from src.lifecycle_web_sec_sources import SecSourcePolicy
+
+    factory = rig.factory
+    def no_identity_factory(*args, **kwargs):
+        reader = factory(*args, **kwargs)
+        reader.sec_policy = SecSourcePolicy(user_agent="")
+        return reader
+    rig.factory = no_identity_factory
+    result = service(rig).refresh(FILING_ID)
+    assert result["outcome"] == "no_dispatch" and not rig.requests
+    request = result["requests"][0]
+    assert request["request_count"] == 0 and request["dispatch_state"] == "not_dispatched"
+    assert request["report"] == {"requests": 0, "observations": []}
+
+
+@pytest.mark.parametrize("operation", ["directory", "document"])
+def test_unreadable_request_count_is_unknown_not_zero(rig, operation):
+    factory = rig.factory
+    index = 0 if operation == "directory" else 1
+    class BrokenCount:
+        def __init__(self, reader):
+            self.reader = reader
+        @property
+        def request_count(self):
+            raise RuntimeError("PRIVATE missing counter")
+        def __getattr__(self, name):
+            return getattr(self.reader, name)
+    def broken_count_factory(*args, **kwargs):
+        reader = factory(*args, **kwargs)
+        return BrokenCount(reader) if len(rig.readers) == index + 1 else reader
+    rig.factory = broken_count_factory
+    rig.enqueue()
+    rig.queue[index] = Response(b"fixture unavailable", status=503)
+    result = service(rig).refresh(FILING_ID)
+    assert len(rig.requests) == index + 1 and rig.readers[index].request_count == 1
+    assert result["outcome"] == ("interrupted" if index == 0 else "failed")
+    request = result["requests"][index]
+    assert request["request_count"] is None and request["dispatch_state"] == "unknown"
+    assert request["report"] is None
+    assert "source_read_report_invalid" in {gap["code"] for gap in result["gaps"]}
+    assert "PRIVATE" not in json.dumps(result)
+
+
+def test_cleanup_failure_cannot_rewrite_captured_request_count(rig, monkeypatch):
+    factory = rig.factory
+    def changing_cleanup_factory(*args, **kwargs):
+        reader = factory(*args, **kwargs)
+        stop = reader.request_stop
+        def corrupt_stop():
+            stop()
+            with reader._lock:
+                reader._request_count = 0
+                reader._observations.clear()
+            raise RuntimeError("PRIVATE destructive cleanup failure")
+        monkeypatch.setattr(reader, "request_stop", corrupt_stop)
+        return reader
+    rig.factory = changing_cleanup_factory
+    rig.enqueue()
+    rig.queue[0] = Response(b"fixture unavailable", status=503)
+    result = service(rig).refresh(FILING_ID)
+    assert len(rig.requests) == 1 and rig.readers[0].request_count == 0
+    assert result["outcome"] == "failed"
+    request = result["requests"][0]
+    assert request["request_count"] == request["report"]["requests"] == 1
+    assert request["dispatch_state"] == "dispatched"
+    assert request["report"]["observations"][0]["result_code"] == "source_unavailable"

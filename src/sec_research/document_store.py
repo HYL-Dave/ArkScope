@@ -3,6 +3,7 @@
 import json
 
 from . import schema
+from .catalog import _primary_document
 from .documents import parse_filing_id
 from .queries import _digest
 from .store import _bounded_json, _timestamp
@@ -17,12 +18,17 @@ def _attempt(row):
         return None
     result = dict(row)
     details = json.loads(result.pop("details"))
-    if (not isinstance(details, dict) or set(details) != {"outcome", "gaps", "requests", "acquisition_id"}
+    required = {"outcome", "gaps", "requests", "acquisition_id"}
+    if (not isinstance(details, dict)
+            or set(details) not in (required, required | {"invalidation_primary_document"})
             or details["outcome"] not in {"interrupted", "no_dispatch", "failed", "complete"}
             or not isinstance(details["gaps"], list) or not isinstance(details["requests"], list)
             or (result["capture_id"] is None) != (result["status"] == "unavailable")):
         raise ValueError("document_integrity_failed")
-    return {**result, **details}
+    invalidation = details.get("invalidation_primary_document")
+    if invalidation is not None and _primary_document(invalidation, "") != invalidation:
+        raise ValueError("document_integrity_failed")
+    return {**result, **details, "invalidation_primary_document": invalidation}
 
 
 class DocumentStore:
@@ -97,10 +103,11 @@ class DocumentStore:
 
     def record_attempt(self, filing_id, document_id, *, observed_at, status="unavailable",
                        resolved_document_id=None, primary_document=None, capture_id=None,
-                       acquisition_id, outcome, gaps, requests):
+                       acquisition_id, outcome, gaps, requests, invalidation_primary_document=None):
         parse_filing_id(filing_id)
         observed_at = _timestamp(observed_at)
-        details = _bounded_json(dict(acquisition_id=acquisition_id, outcome=outcome, gaps=gaps, requests=requests))
+        details = _bounded_json(dict(acquisition_id=acquisition_id, outcome=outcome, gaps=gaps, requests=requests,
+                                     invalidation_primary_document=invalidation_primary_document))
         with self.store._write() as conn:
             inserted = conn.execute("""INSERT INTO sec_research_document_attempts
                 (filing_id, document_id, resolved_document_id, primary_document, capture_id, status, observed_at, details)
@@ -109,10 +116,24 @@ class DocumentStore:
             return _attempt(conn.execute("SELECT * FROM sec_research_document_attempts WHERE attempt_id=?",
                                          (inserted.lastrowid,)).fetchone())
 
+    def invalidation_primary_document(self, filing_id, document_id):
+        """Retain only the most recently established alias, never dispatch authority."""
+        with self.store.connect(readonly=True) as conn:
+            schema.verify(conn)
+            row = conn.execute("""SELECT primary_document FROM sec_research_document_attempts
+                WHERE filing_id=? AND resolved_document_id='file:' || primary_document
+                ORDER BY attempt_id DESC LIMIT 1""", (filing_id,)).fetchone()
+        if row is None or document_id not in ("primary", "file:" + row["primary_document"]):
+            return None
+        return row["primary_document"]
+
     def latest_attempt(self, filing_id, document_id):
         with self.store.connect(readonly=True) as conn:
             schema.verify(conn)
             return _attempt(conn.execute("""SELECT * FROM sec_research_document_attempts
                 WHERE filing_id=? AND (document_id=? OR resolved_document_id=?
-                    OR (?='primary' AND resolved_document_id='file:' || primary_document))
-                ORDER BY attempt_id DESC LIMIT 1""", (filing_id, document_id, document_id, document_id)).fetchone())
+                    OR (?='primary' AND resolved_document_id='file:' || primary_document)
+                    OR (?='primary' AND json_extract(details, '$.invalidation_primary_document') IS NOT NULL)
+                    OR ?='file:' || json_extract(details, '$.invalidation_primary_document'))
+                ORDER BY attempt_id DESC LIMIT 1""",
+                (filing_id, document_id, document_id, document_id, document_id, document_id)).fetchone())

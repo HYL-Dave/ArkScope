@@ -10,7 +10,7 @@ from src.sec_research.captures import CaptureStore
 from src.sec_research.paths import SecResearchPaths
 from src.sec_research.store import Store
 from tests.test_sec_research_document_service import (
-    FILING_ID, CIK, bind_catalog, owner, rig, service,
+    FILING_ID, CIK, HISTORY, NOW, bind_catalog, owner, rig, service,
 )
 
 
@@ -269,3 +269,92 @@ def test_oversized_index_entry_does_not_hide_following_choices(rig):
     after = read.read(FILING_ID, max_chars=20000, cursor=blocked["next_cursor"])
     assert [entry["name"] for entry in after["data"]["documents"]] == ["after.xml"]
     assert len(json.dumps(blocked, ensure_ascii=True).encode()) <= 256 * 1024
+
+
+@pytest.mark.parametrize("requested,other", [
+    ("primary", "file:actual.htm"), ("file:actual.htm", "primary"),
+])
+@pytest.mark.parametrize("failure", ["conflict", "early_cancel"])
+def test_pre_resolution_failure_invalidates_both_observed_aliases(rig, requested, other, failure):
+    from src.lifecycle_public_sources import SourceReadError
+
+    rig.enqueue()
+    captured = service(rig).refresh(FILING_ID)
+    read = queries(rig)
+    pinned = read.read(FILING_ID, capture_id=captured["capture_id"], query="needle")
+    before = len(rig.requests)
+    check = None
+    if failure == "conflict":
+        recent = rig.store.latest_receipt(CIK)["source_snapshots"]["submissions"]
+        sid = bind_catalog(rig.store, rig.captures, history=HISTORY, bind=False, primary="other.htm")
+        bindings = {"submissions": recent, HISTORY: {"snapshot_id": sid, "observed_at": NOW}}
+        rig.store.record_receipt(CIK, status="ok", completed=list(bindings), pending=[], gaps=[],
+                                 observed_at=NOW, source_snapshots=bindings)
+    else:
+        def check():
+            raise SourceReadError("source_read_cancelled")
+    failed = service(rig).refresh(FILING_ID, requested, check=check)
+    assert failed["outcome"] == "no_dispatch" and failed["capture_id"] is None
+    assert len(rig.requests) == before
+    assert read.read(FILING_ID, document_id=requested)["status"] == "unavailable"
+    assert read.read(FILING_ID, document_id=other)["status"] == "unavailable"
+    assert failed["invalidation_primary_document"] == "actual.htm"
+    assert failed["resolved_document_id"] is None and failed["primary_document"] is None
+    assert read.read(FILING_ID, capture_id=captured["capture_id"], query="needle") == pinned
+    assert read.read(FILING_ID, document_id="file:actual.htm", capture_id=captured["capture_id"],
+                     query="needle")["data"]["passages"] == pinned["data"]["passages"]
+
+
+@pytest.mark.parametrize("requested,other", [
+    ("primary", "file:actual.htm"), ("file:actual.htm", "primary"),
+])
+def test_first_interruption_marker_invalidates_both_observed_aliases(rig, requested, other):
+    rig.enqueue()
+    captured = service(rig).refresh(FILING_ID)
+    read = queries(rig)
+    before = len(rig.requests)
+    observed = []
+    def interrupt():
+        observed.append(read.read(FILING_ID, document_id=other)["status"])
+        raise KeyboardInterrupt
+    with pytest.raises(KeyboardInterrupt):
+        service(rig).refresh(FILING_ID, requested, check=interrupt)
+    assert observed == ["unavailable"]
+    assert len(rig.requests) == before
+    documents = owner("document_store").DocumentStore(rig.store)
+    requested_attempt = documents.latest_attempt(FILING_ID, requested)
+    assert documents.latest_attempt(FILING_ID, other) == requested_attempt
+    assert requested_attempt["outcome"] == "interrupted" and requested_attempt["capture_id"] is None
+    assert read.read(FILING_ID, document_id=other)["status"] == "unavailable"
+    assert read.read(FILING_ID, capture_id=captured["capture_id"])["status"] == "ok"
+
+
+def test_early_exhibit_failure_does_not_invalidate_primary(rig):
+    from src.lifecycle_public_sources import SourceReadError
+
+    rig.enqueue()
+    primary = service(rig).refresh(FILING_ID)
+    rig.enqueue()
+    service(rig).refresh(FILING_ID, "file:exhibit.xml")
+    def cancel():
+        raise SourceReadError("source_read_cancelled")
+    failed = service(rig).refresh(FILING_ID, "file:exhibit.xml", check=cancel)
+    assert failed["outcome"] == "no_dispatch"
+    assert queries(rig).read(FILING_ID)["data"]["document"]["capture_id"] == primary["capture_id"]
+    assert queries(rig).read(FILING_ID, document_id="file:exhibit.xml")["status"] == "unavailable"
+
+
+def test_old_primary_spelling_cannot_invalidate_newer_primary(rig):
+    from src.lifecycle_public_sources import SourceReadError
+
+    rig.enqueue()
+    old = service(rig).refresh(FILING_ID)
+    bind_catalog(rig.store, rig.captures, primary="new.htm")
+    rig.enqueue(names=["new.htm", "actual.htm"])
+    new = service(rig).refresh(FILING_ID)
+    def cancel():
+        raise SourceReadError("source_read_cancelled")
+    service(rig).refresh(FILING_ID, "file:actual.htm", check=cancel)
+    assert queries(rig).read(FILING_ID)["data"]["document"]["capture_id"] == new["capture_id"]
+    assert queries(rig).read(FILING_ID, document_id="file:actual.htm")["status"] == "unavailable"
+    assert queries(rig).read(FILING_ID, capture_id=old["capture_id"])["status"] == "ok"
