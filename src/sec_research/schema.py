@@ -32,7 +32,8 @@ _TABLES = {
     "sec_research_receipts": """receipt_id INTEGER PRIMARY KEY AUTOINCREMENT,
         cik TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('ok','partial','unavailable')),
         completed TEXT NOT NULL, pending TEXT NOT NULL, gaps TEXT NOT NULL,
-        observed_at TEXT NOT NULL, recorded_at TEXT NOT NULL""",
+        observed_at TEXT NOT NULL, recorded_at TEXT NOT NULL,
+        source_snapshots TEXT NOT NULL DEFAULT '{}'""",
 }
 
 _DDL = {name: ("table", name, f"CREATE TABLE {name}({columns})")

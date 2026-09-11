@@ -86,10 +86,16 @@ class ResearchService:
     def _refresh(self, cik, *, max_sources, resume, check):
         prior = self.store.latest_receipt(cik) if resume else None
         completed = list(prior["completed"]) if prior else []
+        source_snapshots = dict(prior["source_snapshots"]) if prior else {}
         pending = list(prior["pending"]) if prior else ["submissions", "companyfacts"]
         gaps = [dict(gap) for gap in prior["gaps"]] if prior else []
         for source in completed + pending:
             _source_url(cik, source)
+        # Explicitly unbound observations must be reacquired, not blessed by a
+        # resume checkpoint that happens to find retained older snapshots.
+        unbound = [source for source in completed if source not in source_snapshots]
+        completed = [source for source in completed if source in source_snapshots]
+        pending = list(dict.fromkeys([*unbound, *pending]))
         if prior and not pending:
             return prior
 
@@ -98,6 +104,7 @@ class ResearchService:
                 cik, status=_status(completed, pending, gaps),
                 completed=completed, pending=pending, gaps=gaps,
                 observed_at=self.clock(),
+                source_snapshots=source_snapshots,
             )
 
         def gap(source, code):
@@ -155,8 +162,8 @@ class ResearchService:
             try:
                 digest = self.captures.put(body)
                 if snapshot is not None:
-                    self.store.publish(snapshot, object_sha256=digest,
-                                       observed_at=observed_at, source_url=url)
+                    snapshot_id = self.store.publish(snapshot, object_sha256=digest,
+                                                     observed_at=observed_at, source_url=url)
             except Exception as exc:
                 gap(source, _storage_code(exc))
                 checkpoint()
@@ -168,6 +175,7 @@ class ResearchService:
 
             pending.remove(source)
             completed.append(source)
+            source_snapshots[source] = {"snapshot_id": snapshot_id, "observed_at": observed_at}
             gaps[:] = [item for item in gaps if item["source"] != source]
             if source == "submissions":
                 for historical in snapshot.historical_files:
