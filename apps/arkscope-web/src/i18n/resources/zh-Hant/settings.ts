@@ -1,5 +1,21 @@
 // Translation authority: docs/design/ARKSCOPE_TERMINOLOGY.md
 const settings = {
+  secDocument: {
+    title: "申報文件閱讀器", open: "閱讀申報文件", close: "關閉閱讀器",
+    document: "文件", section: "章節", search: "字面搜尋（區分大小寫）",
+    searchAction: "搜尋段落", whole: "完整文件",
+    acquire: "擷取主要文件", reread: "重新讀取儲存文件",
+    currentAction: "讀取目前擷取版本", current: "讀取時的目前版本", pinned: "固定擷取版本",
+    captureId: "擷取 ID", pinAction: "開啟固定擷取版本", observed: "擷取觀測時間",
+    directoryCapture: "目錄觀測所屬擷取版本", indexPage: "目錄第 {{page}} 頁",
+    indexPrevious: "上一頁目錄", indexNext: "下一頁目錄",
+    previous: "上一頁段落", next: "下一頁段落",
+    source: "來源引註", citation: "引註中繼資料", attempt: "擷取嘗試",
+    unknownOutcome: "擷取結果未知。伺服器可能仍在執行。",
+    noCapture: "尚無儲存文件擷取版本", sectionUnavailable: "章節無法使用",
+    sectionAmbiguous: "章節不明確", indexEntryTooLarge: "目錄項目超過回應上限",
+    pageInsufficient: "頁面大小不足以容納此段落",
+  },
   secResearch: {
     title: "SEC 結構化資料", cik: "CIK", load: "讀取本機",
     refresh: "更新結構化資料", resume: "接續更新", reread: "重新讀取儲存狀態",

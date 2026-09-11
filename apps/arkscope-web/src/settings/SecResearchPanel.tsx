@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, ArrowRight, Database, ExternalLink, Play, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Database, ExternalLink, Play, RefreshCw, Save } from "lucide-react";
 import {
   ApiError, getSecResearchConfig, getSecResearchFacts, getSecResearchFilings,
   getSecResearchStatus, refreshSecResearch, setSecResearchBudget,
@@ -12,6 +12,7 @@ import { formatSystemTimestamp } from "../timeDisplay";
 import { Button, IconButton } from "../ui/Button";
 import { Tabs } from "../ui/Tabs";
 import type { SettingsT } from "./settingsCopy";
+import { SecDocumentReader, type SecDocumentLocator } from "./SecDocumentReader";
 import "./secResearch.css";
 
 type Unit = "bytes" | "gib";
@@ -79,7 +80,7 @@ function safeCatalogUrl(value: unknown): string | null {
   } catch { return null; }
 }
 
-function Records({ page, view, t }: { page: Page | null; view: View; t: SettingsT }) {
+function Records({ page, view, t, onOpen }: { page: Page | null; view: View; t: SettingsT; onOpen: (filing: SecResearchFiling, opener: HTMLButtonElement) => void }) {
   const rows = page?.data ?? [];
   const columns: [string, string][] = view === "filings" ? [
     ["form", t(($) => $.secResearch.form)], ["filed_date", t(($) => $.secResearch.filedDate)],
@@ -93,7 +94,7 @@ function Records({ page, view, t }: { page: Page | null; view: View; t: Settings
     ["filed_date", t(($) => $.secResearch.filedDate)], ["accession", t(($) => $.secResearch.accession)],
     ["fact_id", t(($) => $.secResearch.factId)],
   ];
-  const present = columns.filter(([key]) => rows.some((row) => row[key] != null && row[key] !== ""));
+  const present = columns.filter(([key]) => (view === "filings" && key === "primary_document") || rows.some((row) => row[key] != null && row[key] !== ""));
   return <>
     <Observation value={page} t={t} />
     {rows.length > 0 && <div className="sec-record-scroll" tabIndex={0} role="region" aria-label={t(($) => $.secResearch.views)}>
@@ -103,7 +104,7 @@ function Records({ page, view, t }: { page: Page | null; view: View; t: Settings
           const url = key === "primary_url" ? safeCatalogUrl(row[key]) : null;
           return <td key={key}>{key === "primary_url"
             ? url && <a href={url} target="_blank" rel="noopener noreferrer" title={t(($) => $.secResearch.catalogUrl)} aria-label={t(($) => $.secResearch.catalogUrl)}><ExternalLink size={16} aria-hidden="true" /></a>
-            : row[key] == null ? null : String(row[key])}</td>;
+            : row[key] == null ? null : String(row[key])}{view === "filings" && key === "primary_document" && <IconButton size="compact" label={t(($) => $.secDocument.open)} icon={<BookOpen size={16} />} onClick={(event) => onOpen(row as SecResearchFiling, event.currentTarget)} />}</td>;
         })}</tr>)}</tbody>
       </table>
     </div>}
@@ -148,6 +149,10 @@ export function SecResearchPanel() {
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [refreshError, setRefreshError] = useState<unknown>(null);
   const [unconfirmed, setUnconfirmed] = useState(false);
+  const rememberedDocuments = useRef(new Map<string, SecDocumentLocator>());
+  const uncertainDocuments = useRef(new Set<string>());
+  const readerSequence = useRef(0);
+  const [reader, setReader] = useState<{ filing: SecResearchFiling; key: number; opener: HTMLButtonElement; initial?: SecDocumentLocator } | null>(null);
   const bytes = wholeBytes(draft, unit);
   const page = pages[pageIndex] ?? null;
 
@@ -200,7 +205,7 @@ export function SecResearchPanel() {
   function invalidate(issuer = false) {
     generation.current++;
     setPages([]); setPageIndex(0); setLoaded(false); setReading(false); setReadError(null);
-    if (issuer) { issuerGeneration.current++; setStored(null); setReceipt(null); setRefreshError(null); setUnconfirmed(false); }
+    if (issuer) { issuerGeneration.current++; setStored(null); setReceipt(null); setRefreshError(null); setUnconfirmed(false); setReader(null); }
   }
 
   function query(issuer: string, kind: View, cursor?: string): Promise<Page> {
@@ -284,7 +289,7 @@ export function SecResearchPanel() {
     <div className="sec-fields">{filters}</div>
     {reading && <p role="status">{t(($) => $.secResearch.loading)}</p>}
     {readError != null && <p role="alert">{message(t(($) => $.secResearch.readError), readError)}</p>}
-    <Records page={page} view={view} t={t} />
+    <Records page={page} view={view} t={t} onOpen={(filing, opener) => setReader({ filing, opener, key: ++readerSequence.current, initial: rememberedDocuments.current.get(JSON.stringify(filing)) })} />
     <div className="sec-pagination">
       <IconButton size="compact" label={t(($) => $.secResearch.previous)} icon={<ArrowLeft size={16} />} disabled={reading || pageIndex === 0} onClick={() => { setPageIndex(pageIndex - 1); setReadError(null); }} />
       <span>{t(($) => $.secResearch.page, { page: pageIndex + 1 })}</span>
@@ -339,5 +344,10 @@ export function SecResearchPanel() {
       { value: "filings", label: t(($) => $.secResearch.catalog), panel: table },
       { value: "facts", label: t(($) => $.secResearch.facts), panel: table },
     ]} />
+    {reader && <SecDocumentReader key={reader.key} filing={reader.filing} initial={reader.initial}
+      uncertain={uncertainDocuments.current.has(reader.filing.filing_id)}
+      onUncertain={(value) => { if (value) uncertainDocuments.current.add(reader.filing.filing_id); else uncertainDocuments.current.delete(reader.filing.filing_id); }}
+      onClose={() => { setReader(null); if (reader.opener.isConnected) reader.opener.focus(); }}
+      onCapture={(locator) => rememberedDocuments.current.set(JSON.stringify(reader.filing), locator)} />}
   </section>;
 }

@@ -1,5 +1,21 @@
 // Translation authority: docs/design/ARKSCOPE_TERMINOLOGY.md
 const settings = {
+  secDocument: {
+    title: "Filing reader", open: "Read filing", close: "Close reader",
+    document: "Document", section: "Section", search: "Literal search (case-sensitive)",
+    searchAction: "Search passages", whole: "Whole document",
+    acquire: "Acquire primary document", reread: "Reread stored document",
+    currentAction: "Read current capture", current: "Current at read", pinned: "Pinned capture",
+    captureId: "Capture ID", pinAction: "Open pinned capture", observed: "Capture observed",
+    directoryCapture: "Directory observed with capture", indexPage: "Index page {{page}}",
+    indexPrevious: "Previous index page", indexNext: "Next index page",
+    previous: "Previous passage page", next: "Next passage page",
+    source: "Source citation", citation: "Citation metadata", attempt: "Acquisition attempt",
+    unknownOutcome: "Acquisition outcome unknown. The server may still be running.",
+    noCapture: "No stored document capture", sectionUnavailable: "Section unavailable",
+    sectionAmbiguous: "Section ambiguous", indexEntryTooLarge: "Index entry exceeds the response limit",
+    pageInsufficient: "Page size insufficient for this passage",
+  },
   secResearch: {
     title: "SEC structured data", cik: "CIK", load: "Load local",
     refresh: "Refresh structured data", resume: "Resume refresh", reread: "Reread stored status",
