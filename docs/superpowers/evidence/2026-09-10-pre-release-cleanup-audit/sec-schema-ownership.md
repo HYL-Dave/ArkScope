@@ -7,6 +7,23 @@ read now has a [bounded retention manifest](sec-retention-helper-cleanup/retenti
 Current-store read authorization and digest-bound disposal approval are separate
 from source-code removal.
 
+## Current Source Status
+
+The [current journal batch](current-journal-cleanup/README.md) now physically
+removes `lifecycle_web_store`, `lifecycle_web_review`, `lifecycle_web_projection`,
+`lifecycle_web_schema` and `lifecycle_web_migration`. Current review/adoption and
+historical provenance read the current journal directly. The useful backup
+primitive has an independent owner, and old two-phase usage report helpers have
+no remaining implementation. Independent Task 1/2 reviews have passed; complete
+integration verification is recorded separately in that batch's evidence.
+
+The earlier dependency inventory below is retained as provenance, not work to
+repeat. The prior authorized inventory found all seven old-web tables absent;
+this batch did not reopen the actual stores. Shared case/evidence/history
+disposition, old source-owned settings cleanup and canonical retained-data shape
+remain unfinished. SEC typed capacity/path foundation exists, but the research
+catalog/facts/documents, tools, scheduling and export workflow do not yet exist.
+
 ## What Can Disappear Without A Data Conversion
 
 - `sec_corporate_actions` SourceDef, provider mapping, module entrypoint and
@@ -27,7 +44,7 @@ The active SEC credential/identity configuration and financial queries remain.
 | Profile `security_lifecycle_cases`, assessments, assessment outcomes/evidence | Current listing decisions and target investigation acceptances use these shared tables, including direct FK from `lifecycle_investigation_acceptances.assessment_id` | Keep current shape unless required historical references have been moved; never select for DROP by prefix |
 | Profile `security_lifecycle_provider_checks` and append-only guards | Current Massive/EODHD listing authority and `ticker_identity_history` match approved observation digests against these rows | Retain provider observations and immutable guards |
 | Profile legacy investigation runs, automation facts/blockers/evidence/translations, acknowledgements and proposals | Some are old-only workflows; `security_lifecycle_evidence` and automation runs also support accepted listing/history relationships | Classify exact reader/writer and retained FK closure before deleting columns/tables; old-only translation UI removal alone is not proof all cited evidence is disposable |
-| Profile `lifecycle_web_installation`, runs, calls, actions, pages, results and acceptances | `ticker_identity_history._llm` still reads case-scoped accepted history. `_web_passages` locates approved quotations in old pages and verifies the pinned passage digest. `lifecycle_web_review` guards existing acceptance/reversal material | Move actual retained history into a current immutable readable representation, verify same explanatory material/digests, then remove old writer/helper/schema. Never replace a missing history source with a fabricated explanation |
+| Old profile `lifecycle_web_installation`, runs, calls, actions, pages, results and acceptances | All seven were absent in the authorized inventory; current review/history owners no longer read or create the old schema | No persisted old-web migration is needed for that observed installation. Current captured evidence/digests remain required; missing provenance must not receive a fabricated explanation |
 | Profile `lifecycle_investigation_*` tables and immutable guards | Current target-bound jobs, sources, calls, results, acceptances and recovery | Retain; no reset/reinstallation as a cleanup shortcut |
 | Profile `ticker_identity_*`, Former membership acceptance/removal records | Applied/scheduled transitions, reversal readiness and user suppression survive imports/aliases | Retain all current receipts, identities and tombstones |
 | Profile `schedule.sec_corporate_actions.*` keys and old source runtime rows | No runtime owner after source removal; values must not enable the new research schedule | Delete only enumerated source-owned keys/rows in approved actual-store operation; preserve unrelated source schedules, credentials and routes |
@@ -49,9 +66,11 @@ authorized statistics-only inspection: it reads unrelated profile rows too.
 Use a separate allowlisted metadata/count/reference query for that read permission;
 do not quietly invoke the broad snapshot under a narrower authorization.
 
-## Remaining Source Extraction
+## Earlier Source Dependencies
 
-This is an actionable remainder, not a reason to preserve dead execution forever:
+The following records the pre-extraction dependency reasoning. The current batch
+resolves the store/review/projection/schema items; remaining live case services
+and actual retained-data disposition must not be deleted by association:
 
 - `lifecycle_web_store.ValidatedWebRead`, `validated_read` and
   `read_on_connection` still support current adoption and retained evidence.
@@ -106,7 +125,7 @@ and `confirmation_for` receipt readers remain current. See
 [helper cleanup evidence](sec-retention-helper-cleanup/README.md) for checkpoint
 heads, exact test accounting and the remaining production read boundary.
 
-Current old-web declarations name seven tables (`installation`, `runs`, `calls`,
+The now-deleted old-web declarations named seven tables (`installation`, `runs`, `calls`,
 `actions`, `pages`, `results`, `acceptances`), an active-case unique index and
 immutable identity/page/result/acceptance/call guards. These are source counts,
 not observations of the user's installation. Accepted historical evidence must
@@ -117,8 +136,8 @@ separate owners and must not be deleted by a broad string-prefix match.
 
 The renewed actual-store observation finds all seven old-web tables **absent**.
 There is therefore no old-web persisted journal to migrate in this observed
-installation. This narrows the data work, not the current function-extraction
-requirements above. Shared cases/evidence/assessments remain populated, including
+installation. This narrowed the data work; the current function-extraction
+requirements above have since been implemented. Shared cases/evidence/assessments remain populated, including
 four historical translations. Three current transitions and three removed Former
 memberships must survive cleanup. No future/other installation is inferred from
 this one read, and no production DROP was authorized.
@@ -149,5 +168,6 @@ Neither attempt authorizes row/schema disposal or a broad private-data backup.
 5. Present the exact backup/disposition digest for approval before production
    writes. Separate source cleanup completion from actual schema disposal.
 
-This checkpoint does not implement the new three-tool SEC research service and
-does not claim that the old web schema or every obsolete lifecycle helper is gone.
+This checkpoint does not complete the new three-tool SEC research service or
+actual-store disposition. The old web schema implementation is now gone; this
+does not claim that every other cleanup candidate or shared schema is resolved.

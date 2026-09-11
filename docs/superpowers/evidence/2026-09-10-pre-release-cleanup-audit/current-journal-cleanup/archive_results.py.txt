@@ -1,0 +1,48 @@
+"""Archive only named verification outputs, never test homes or databases."""
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+
+WORK = Path(__file__).resolve().parent
+ROOT = WORK.parents[2]
+DEST = ROOT / "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/current-journal-cleanup"
+DEST.mkdir(exist_ok=True)
+sources = sorted({path for pattern in ("*.xml", "*.md", "*.json", "*.json.gz", "*.txt", "*.py")
+                  for path in WORK.glob(pattern)})
+sources += [WORK / name for name in (
+    "offline_pytest.py", "account_verification.py", "census_account.py", "make_review.py",
+    "archive_results.py", "capture_tested_tree.py", "task1_mutation_plugin.py", "collect_support/conftest.py",
+    "binding_mutation/conftest.py", "report_mutation/conftest.py",
+    "task1-move-check.py", "backend-collection/backend-nodeids.json")]
+for path in (WORK / "task1_inverse").glob("*.py"):
+    sources.append(path)
+index = {}
+for source in sorted(set(sources)):
+    if not source.is_file():
+        continue
+    name = str(source.relative_to(WORK))
+    data = source.read_bytes()
+    source_hash = hashlib.sha256(data).hexdigest()
+    if name.endswith(".py"):
+        name += ".txt"
+    if name.endswith(".xml") or name.endswith("-review-package.md") or name == "backend-collection/backend-nodeids.json":
+        name += ".gz"
+        data = gzip.compress(data, mtime=0)
+    target = DEST / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb") as stream:
+        stream.write(data)
+    index[name] = {"source": str(source.relative_to(WORK)), "source_sha256": source_hash,
+                  "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+patch = subprocess.check_output(["git", "diff", "2842c497", "--", "src", "tests"], cwd=ROOT)
+patch_data = gzip.compress(patch, mtime=0)
+with (DEST / "tested.patch.gz").open("xb") as stream:
+    stream.write(patch_data)
+index["tested.patch.gz"] = {"source": "git diff 2842c497 -- src tests", "source_sha256": hashlib.sha256(patch).hexdigest(),
+                            "sha256": hashlib.sha256(patch_data).hexdigest(), "bytes": len(patch_data)}
+with (DEST / "artifact-index.json").open("x", encoding="utf-8") as stream:
+    json.dump(index, stream, indent=2)
+    stream.write("\n")
+print(json.dumps({"files": len(index), "bytes": sum(row["bytes"] for row in index.values())}))

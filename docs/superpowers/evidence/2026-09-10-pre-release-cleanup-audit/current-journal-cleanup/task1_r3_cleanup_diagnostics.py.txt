@@ -1,0 +1,91 @@
+"""Web-source cleanup must preserve host persistence failure, not relabel it."""
+
+import json
+import time
+
+import pytest
+
+from src.lifecycle_investigation.agent import run_agent
+from src.lifecycle_investigation.news import LocalNews
+from tests.lifecycle_investigation_fixtures import controller
+from tests.test_lifecycle_investigation_agent import choose, completed
+from tests.test_lifecycle_investigation_findings import NOTICE, payload
+from tests.test_security_lifecycle_web_finding import source_page
+
+
+@pytest.mark.parametrize("boundary", ["source", "source_captured"])
+@pytest.mark.parametrize("failure", ["none", "before_commit", "after_commit"])
+def test_web_source_cleanup_preserves_journal_failure(tmp_path, monkeypatch, boundary, failure):
+    url = "https://issuer.example/notice"
+    calls, readers = [], []
+
+    class Reader:
+        request_count = 0
+        stopped = False
+
+        def read(self, actual_url):
+            assert actual_url == url
+            self.request_count += 1
+            return source_page(NOTICE, actual_url)
+
+        def request_stop(self):
+            self.stopped = True
+
+    def reader_factory(limits):
+        reader = Reader()
+        readers.append(reader)
+        return reader
+
+    async def model(call, credential, control):
+        calls.append(call.call_id)
+        if len(calls) == 1:
+            output = choose("search_web", query="OLD listing")
+        elif call.phase == "search":
+            output = {"sources": [url], "unresolved_conditions": []}
+        elif len(calls) == 3:
+            output = choose("read_url", url=url)
+        else:
+            material = json.loads(call.prompt.split("\nMATERIAL\n")[1])
+            output = choose("conclude", finding=payload(material["sources"][0]["passages"]))
+        return completed(call, control, output)
+
+    async def runner(*args, **kwargs):
+        return await run_agent(*args, **kwargs, model=model)
+
+    service, store, loads, binding = controller(tmp_path, runner=runner, reader_factory=reader_factory)
+    service.news_factory = lambda: LocalNews(None, None)
+    method = "source" if boundary == "source" else "step"
+    original = getattr(store, method)
+
+    def write(*args, **kwargs):
+        selected = boundary == "source" or kwargs["kind"] == "source_captured"
+        if selected and failure == "before_commit":
+            raise ValueError("investigation_recording_unavailable")
+        original(*args, **kwargs)
+        if selected and failure == "after_commit":
+            raise ValueError("investigation_recording_unavailable")
+
+    monkeypatch.setattr(store, method, write)
+    try:
+        identity = service.start(binding=binding, request_key="r3-web-cleanup")["run_id"]
+        until = time.monotonic() + 5
+        while service.is_local_running(identity) and time.monotonic() < until:
+            time.sleep(0.01)
+        assert not service.is_local_running(identity)
+        row = store.read(identity)
+        assert len(readers) == 1 and readers[0].stopped and readers[0].request_count == 1
+        assert len(calls) == (4 if failure == "none" else 3)
+        assert all(call["terminal"] == "completed" for call in row["calls"])
+        assert row["cancel_requested_at"] is None
+        expected_source = not (boundary == "source" and failure == "before_commit")
+        assert bool(row["sources"]) is expected_source
+        assert len(loads) == 1 and not row["adopted"]
+        if failure == "none":
+            assert row["status"] == "succeeded" and row["result"] is not None
+        else:
+            assert (row["status"], row["failure_code"], row["result"]) == (
+                "failed", "investigation_recording_unavailable", None,
+            )
+            assert service.read(identity)["action"] is None
+    finally:
+        service.close()

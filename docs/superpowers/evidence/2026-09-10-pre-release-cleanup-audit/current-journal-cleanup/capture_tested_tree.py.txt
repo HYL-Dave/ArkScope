@@ -1,0 +1,21 @@
+"""Bind a complete test run to exact changed-file bytes, including deletions."""
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+WORK = Path(__file__).resolve().parent
+ROOT = WORK.parents[2]
+BASE = "2842c497dabfdb0b13c315e22b206128eba9f57d"
+paths = subprocess.check_output(["git", "diff", "--name-only", BASE, "--", "src", "tests"], cwd=ROOT, text=True).splitlines()
+values = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() if (ROOT / name).is_file() else None for name in paths}
+destination = WORK / "tested-source-hashes.json"
+if len(sys.argv) > 1 and sys.argv[1] == "--check":
+    assert json.loads(destination.read_text()) == values, "source/test changed after run started"
+    print(json.dumps({"verified_files": len(values), "changed_during_run": False}))
+else:
+    with destination.open("x", encoding="utf-8") as stream:
+        json.dump(values, stream, indent=2)
+        stream.write("\n")
+    print(json.dumps({"captured_files": len(values)}))

@@ -1,0 +1,68 @@
+"""Read-only-source regression proofs using the current real agent/controller."""
+
+import json
+import sqlite3
+import time
+
+import pytest
+
+from src.lifecycle_investigation.agent import run_agent
+from src.lifecycle_investigation.store import InvestigationStore
+from tests.lifecycle_investigation_fixtures import controller
+from tests.test_lifecycle_investigation_agent import choose, completed
+from tests.test_lifecycle_investigation_findings import payload
+
+
+@pytest.mark.parametrize("interruption", ["none", "cancel", "deadline"])
+def test_completed_reply_interruption_remains_readable(tmp_path, interruption):
+    ticks = [0.0]
+
+    async def model(call, credential, control):
+        material = json.loads(call.prompt.split("\nMATERIAL\n")[1])
+        reply = completed(
+            call, control,
+            choose("conclude", finding=payload(material["sources"][0]["passages"])),
+        )
+        # The remote terminal is durable; the local result step is not yet saved.
+        if interruption == "cancel":
+            service.cancel(control.run_id)
+        elif interruption == "deadline":
+            ticks[0] = binding["runtime"]["deadline_seconds"] + 1
+        return reply
+
+    async def runner(*args, **kwargs):
+        return await run_agent(*args, **kwargs, model=model, monotonic=lambda: ticks[0])
+
+    service, store, loads, binding = controller(tmp_path, runner=runner)
+    try:
+        identity = service.start(binding=binding, request_key="review-interruption")["run_id"]
+        until = time.monotonic() + 5
+        while service.is_local_running(identity) and time.monotonic() < until:
+            time.sleep(0.01)
+        assert not service.is_local_running(identity)
+        expected_status = {"none": "succeeded", "cancel": "cancelled", "deadline": "incomplete"}[interruption]
+        with sqlite3.connect(store.path.as_uri() + "?mode=ro", uri=True) as conn:
+            status = conn.execute(
+                "SELECT status FROM lifecycle_investigation_jobs WHERE run_id=?", (identity,),
+            ).fetchone()[0]
+            saved = json.loads(conn.execute(
+                "SELECT payload_json FROM lifecycle_investigation_results WHERE run_id=?", (identity,),
+            ).fetchone()[0])
+            calls = conn.execute(
+                "SELECT call_id,terminal FROM lifecycle_investigation_calls WHERE run_id=?", (identity,),
+            ).fetchall()
+            result_steps = conn.execute(
+                "SELECT COUNT(*) FROM lifecycle_investigation_steps WHERE run_id=? AND kind='model_result'", (identity,),
+            ).fetchone()[0]
+        assert status == expected_status
+        assert calls == [("step-1", "completed")]
+        assert result_steps == (1 if interruption == "none" else 0)
+        assert (saved["stats"]["model_submissions"], saved["stats"]["input_tokens"], saved["stats"]["output_tokens"]) == (1, 10, 20)
+        assert len(loads) == 1
+
+        # Both projections must disclose real terminal work without redispatch.
+        assert service.read(identity)["status"] == expected_status
+        assert service.latest("OLD")["run_id"] == identity
+        assert InvestigationStore(store.path).read(identity)["status"] == expected_status
+    finally:
+        service.close()

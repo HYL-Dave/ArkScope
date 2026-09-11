@@ -1,0 +1,14 @@
+"""Inverse mutation of ephemeral binding; affects only this pytest process."""
+
+
+def pytest_sessionstart(session):
+    from src.lifecycle_investigation import adoption
+
+    original = adoption.binding_on_connection
+
+    def omit_steps_and_calls(conn, run_id):
+        binding = original(conn, run_id)
+        assert len(binding) == 7
+        return binding[:4] + binding[6:]
+
+    adoption.binding_on_connection = omit_steps_and_calls

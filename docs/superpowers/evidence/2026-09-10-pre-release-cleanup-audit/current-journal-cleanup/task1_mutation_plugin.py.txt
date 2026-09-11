@@ -1,0 +1,21 @@
+"""In-process inverse mutations; never changes product files or persisted schemas."""
+
+import inspect
+import os
+
+
+def pytest_configure(config):
+    mutation = os.environ["TASK1_INVERSE_MUTATION"]
+    if mutation == "skip_binding":
+        from src.lifecycle_investigation.adoption import ValidatedInvestigationRead
+        ValidatedInvestigationRead.on_connection = lambda self, conn, run_id: self.material
+    else:
+        from src import ticker_identity_history as history
+        function, before, after = {
+            "missing_history_binding": (history.project_decision,
+                '(packet.get("lane") == "investigation" or "web" in packet)', '"web" in packet'),
+            "skip_passage_digest": (history._llm, 'if digest_json(passages) != web["passages_sha256"]:', 'if False:'),
+        }[mutation]
+        source = inspect.getsource(function)
+        assert source.count(before) == 1
+        exec(compile(source.replace(before, after), "<task1-inverse-mutation>", "exec"), history.__dict__)

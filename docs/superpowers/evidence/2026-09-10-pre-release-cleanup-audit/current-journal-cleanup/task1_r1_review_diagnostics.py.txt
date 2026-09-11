@@ -1,0 +1,103 @@
+"""Focused r1 producer/reader checks; source files remain unchanged."""
+
+from dataclasses import replace
+import json
+import sqlite3
+import time
+
+import pytest
+
+from src.lifecycle_investigation.agent import run_agent
+from src.lifecycle_investigation.store import InvestigationStore
+from tests.lifecycle_investigation_fixtures import controller
+from tests.test_lifecycle_investigation_agent import choose, completed
+from tests.test_lifecycle_investigation_findings import payload
+
+
+def worker_done(service, identity):
+    until = time.monotonic() + 5
+    while service.is_local_running(identity) and time.monotonic() < until:
+        time.sleep(0.01)
+    assert not service.is_local_running(identity)
+
+
+@pytest.mark.parametrize("interruption", ["none", "cancel_before_reservation", "reservation_failure"])
+def test_pre_dispatch_reservation_interruption_remains_readable(tmp_path, monkeypatch, interruption):
+    dispatched = []
+
+    async def model(call, credential, control):
+        material = json.loads(call.prompt.split("\nMATERIAL\n")[1])
+        reply = completed(call, control, choose("conclude", finding=payload(material["sources"][0]["passages"])))
+        dispatched.append(call.call_id)
+        return reply
+
+    async def runner(*args, **kwargs):
+        return await run_agent(*args, **kwargs, model=model)
+
+    service, store, loads, binding = controller(tmp_path, runner=runner)
+    reserve = store.reserve_call
+
+    def reserve_with_interruption(identity, **kwargs):
+        if interruption == "cancel_before_reservation":
+            # Another connection requests cancellation after in-memory reservation.
+            store.cancel(identity)
+        elif interruption == "reservation_failure":
+            raise ValueError("investigation_recording_unavailable")
+        return reserve(identity, **kwargs)
+
+    monkeypatch.setattr(store, "reserve_call", reserve_with_interruption)
+    try:
+        identity = service.start(binding=binding, request_key="r1-reservation")["run_id"]
+        worker_done(service, identity)
+        expected = {"none": "succeeded", "cancel_before_reservation": "cancelled", "reservation_failure": "failed"}[interruption]
+        with sqlite3.connect(store.path.as_uri() + "?mode=ro", uri=True) as conn:
+            status = conn.execute("SELECT status FROM lifecycle_investigation_jobs WHERE run_id=?", (identity,)).fetchone()[0]
+            calls = conn.execute("SELECT COUNT(*) FROM lifecycle_investigation_calls WHERE run_id=?", (identity,)).fetchone()[0]
+            saved = json.loads(conn.execute("SELECT payload_json FROM lifecycle_investigation_results WHERE run_id=?", (identity,)).fetchone()[0])
+        assert status == expected
+        assert calls == (1 if interruption == "none" else 0)
+        assert len(dispatched) == calls
+        assert saved["stats"]["model_submissions"] == 1
+        if interruption != "none":
+            assert (saved["stats"]["input_tokens"], saved["stats"]["output_tokens"]) == (None, None)
+        assert len(loads) == 1
+        assert service.read(identity)["status"] == expected
+        assert service.latest("OLD")["run_id"] == identity
+    finally:
+        service.close()
+
+
+@pytest.mark.parametrize("interruption", ["cancel", "deadline"])
+@pytest.mark.parametrize("unknown", [False, True])
+def test_completed_observation_preserves_token_coverage_and_stops_actions(tmp_path, interruption, unknown):
+    ticks, dispatched = [0.0], []
+
+    async def model(call, credential, control):
+        reply = completed(call, control, choose("search_web", query="OLD listing"))
+        dispatched.append(call.call_id)
+        if unknown:
+            reply = replace(reply, usage={"input_tokens": None, "output_tokens": None})
+        if interruption == "cancel":
+            service.cancel(control.run_id)
+        else:
+            ticks[0] = binding["runtime"]["deadline_seconds"] + 1
+        return reply
+
+    async def runner(*args, **kwargs):
+        return await run_agent(*args, **kwargs, model=model, monotonic=lambda: ticks[0])
+
+    service, store, loads, binding = controller(tmp_path, runner=runner)
+    try:
+        identity = service.start(binding=binding, request_key="r1-completed-stop")["run_id"]
+        worker_done(service, identity)
+        row = InvestigationStore(store.path).read(identity)
+        assert row["status"] == ("cancelled" if interruption == "cancel" else "incomplete")
+        assert dispatched == ["step-1"] and len(loads) == 1
+        assert len([step for step in row["steps"] if step["kind"] == "model_result"]) == 1
+        assert not any(step["kind"] in {"agent_action", "web_search"} for step in row["steps"])
+        assert row["result"]["validated"] is None and not row["adopted"]
+        stats = row["result"]["stats"]
+        assert (stats["input_tokens"], stats["output_tokens"]) == ((None, None) if unknown else (10, 20))
+        assert service.read(identity)["action"] is None
+    finally:
+        service.close()

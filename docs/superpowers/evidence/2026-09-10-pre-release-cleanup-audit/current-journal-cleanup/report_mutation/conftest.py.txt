@@ -1,0 +1,10 @@
+"""Exercise the moved current source-report branch without editing product code."""
+import inspect
+
+
+def pytest_configure():
+    from src.lifecycle_investigation import store
+    source = inspect.getsource(store._validate_observations)
+    before = 'elif step["kind"] == "source_read":'
+    assert source.count(before) == 1
+    exec(compile(source.replace(before, "elif False:"), "<source-report-mutation>", "exec"), store.__dict__)

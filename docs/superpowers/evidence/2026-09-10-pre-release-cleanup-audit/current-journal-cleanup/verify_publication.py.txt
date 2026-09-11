@@ -1,0 +1,42 @@
+"""Verify the exact archived evidence and tested source, without DB access."""
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+
+WORK = Path(__file__).resolve().parent
+ROOT = WORK.parents[2]
+DEST = ROOT / "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/current-journal-cleanup"
+index = json.loads((DEST / "artifact-index.json").read_text())
+for name, expected in index.items():
+    path = DEST / name
+    assert path.resolve().is_relative_to(DEST.resolve()), name
+    raw = path.read_bytes()
+    assert len(raw) == expected["bytes"], name
+    assert hashlib.sha256(raw).hexdigest() == expected["sha256"], name
+    source = expected["source"]
+    decoded = gzip.decompress(raw) if name.endswith(".gz") and not source.endswith(".gz") else raw
+    assert hashlib.sha256(decoded).hexdigest() == expected["source_sha256"], name
+expected_files = {*index, "README.md", "artifact-index.json"}
+actual_files = {str(path.relative_to(DEST)) for path in DEST.rglob("*") if path.is_file()}
+assert actual_files == expected_files, sorted(actual_files ^ expected_files)
+tested = json.loads((DEST / "tested-source-hashes.json").read_text())
+for name, digest in tested.items():
+    path = ROOT / name
+    actual = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+    assert actual == digest, name
+patch = subprocess.check_output(["git", "diff", "2842c497", "--", "src", "tests"], cwd=ROOT)
+assert hashlib.sha256(patch).hexdigest() == index["tested.patch.gz"]["source_sha256"]
+verification = json.loads((DEST / "verification-summary.json").read_text())
+assert verification["collected_nodes"] == verification["executed_nodes"]
+assert verification["skip_identities_unchanged"]
+assert not (set(verification["outcomes"]) - {"passed", "skipped"})
+result = {
+    "indexed_artifacts_verified": len(index), "archive_bytes": sum(row["bytes"] for row in index.values()),
+    "source_paths_verified": len(tested), "exact_patch_verified": True,
+    "unindexed_files": sorted(expected_files - set(index)), "verification": verification["outcomes"],
+    "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+    "production_access": False,
+}
+print(json.dumps(result, indent=2))

@@ -5,7 +5,8 @@ Observed: 2026-09-10. Source tree: `fef26dcf` on
 Status updated September 11: **first leaf batch, bounded SEC intake/execution/UI,
 neutral journal codec, five further unused HTTP entries, obsolete fixed
 orchestrator, test-only wrappers and spent operators/scheduler cleaned up;
-remaining shared readers/helpers and data disposition stay open**.
+current journal/review extraction and SEC configuration/path foundation are
+implemented and verified. Wider cleanup and actual data disposition stay open**.
 The original findings below are a dated source inventory, not all-complete
 status. Implementation and verification details: [leaf-cleanup.md](leaf-cleanup.md)
 and [SEC entrypoint cleanup](sec-entrypoint-cleanup/README.md). The preceding
@@ -19,6 +20,14 @@ The latest [obsolete execution cleanup](obsolete-execution-cleanup/README.md)
 records the source-only continuation through `38319f16`: fresh full backend
 7,966P/12S, exact7,978-node accounting, no new census candidates and explained
 remaining review-required deltas. It performs no renewed production inventory.
+The next [current journal cleanup](current-journal-cleanup/README.md) removes the
+old journal/schema/migration and directly owns retained current review/history.
+Its strict readback transfer also required producer interruption fixes and
+case-correct external-FK retention. The new SEC capacity/path modules are only
+a foundation, not a working catalog/facts/document service. See that batch for
+its own frozen review and verification; do not reuse the preceding test counts.
+That batch's fresh complete backend is **8,116 passed / 12 unchanged skips**,
+with 8,128 exact collected/executed nodes and 191 removed / 341 added IDs.
 
 | Candidate | Current disposition | Commit |
 | --- | --- | --- |
@@ -26,6 +35,7 @@ remaining review-required deltas. It performs no renewed production inventory.
 | C02 | Dormant edgartools module physically deleted; active SEC clients retained | `300b7400` |
 | C04 | Current execution owner and neutral codec extracted; old case-web execution/UI and five individually reviewed HTTP entries removed. Current shared history/confirmation readers and schema disposition remain | `83eeb5ef`, `302106d2`, `5d41f570`, `0c5896a5` |
 | C04 follow-up | Fixed two-call orchestrator physically deleted; current agent owns cancellable source reads and retains four-channel behavior. Shared journal readers/writers and disposition remain separate | `38319f16` |
+| C04 current journal | Old store/review/projection/schema/migration and orphan two-phase usage helpers removed; current review/history/source/usage owners transferred and verified. No actual-store disposal | `e2f77cb7`; [evidence](current-journal-cleanup/README.md) |
 | C05/C06 | Six test-only macro delegates and two unused subprocess wrappers removed; current macro execution, sanitized workers and daily CLI retained | `36dac28d` |
 | C14/C16 | Three spent audit CLIs, empty audit package and independent monitor scheduler removed; live SA reconciliation and monitor engine/job/tools retained | `2f80f452` |
 | C07 | Unreachable auth factory placeholder/export removed; six real modes retained | `263c21a5` |

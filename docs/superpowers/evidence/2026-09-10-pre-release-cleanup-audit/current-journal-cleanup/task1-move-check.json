@@ -1,0 +1,12 @@
+{
+  "base": "2842c497dabfdb0b13c315e22b206128eba9f57d",
+  "old_review_sha256": "d4eb3815a2886b3c33a36a280fcd6654985218f4bfcaef20da19e183c508cc0d",
+  "current_review_sha256": "b0987f181aa6649cff93a034af1c49801e93a8f2d0f94d9a147f8f34247f40ce",
+  "identical_retained_helper_ast": {
+    "assessment_id_for": true,
+    "_adoption_values": true,
+    "_provider_veto": true,
+    "_freshness": true
+  },
+  "scope": "Pure helper extraction only; not a substitute for behavioral verification."
+}

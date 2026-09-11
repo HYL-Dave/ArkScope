@@ -1,0 +1,56 @@
+"""Reconcile exact backend collection, execution and cleanup node changes."""
+from collections import Counter
+import gzip
+import json
+from pathlib import Path
+import xml.etree.ElementTree as ET
+
+WORK = Path(__file__).resolve().parent
+ROOT = WORK.parents[2]
+BASE = ROOT / "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/obsolete-execution-cleanup/backend-collection/backend-nodeids.json.gz"
+
+
+def ids(rows):
+    values = [row["nodeid"] for row in rows]
+    assert len(values) == len(set(values)), "duplicate collected node IDs"
+    return set(values)
+
+
+with gzip.open(BASE, "rt", encoding="utf-8") as stream:
+    baseline = json.load(stream)
+final = json.loads((WORK / "backend-collection/backend-nodeids.json").read_text())
+old, new = ids(baseline), ids(final)
+assert len(old) == 7978, "unexpected immutable baseline"
+executed = ET.parse(WORK / "backend-full.xml").findall(".//testcase")
+collected_keys = Counter((row["classname"], row["name"]) for row in final)
+executed_keys = Counter((row.attrib["classname"], row.attrib["name"]) for row in executed)
+assert collected_keys == executed_keys, "collection/execution mismatch"
+outcomes = Counter(
+    "failed" if row.find("failure") is not None else
+    "error" if row.find("error") is not None else
+    "skipped" if row.find("skipped") is not None else "passed"
+    for row in executed
+)
+key_to_id = {(row["classname"], row["name"]): row["nodeid"] for row in final}
+skips = sorted(key_to_id[row.attrib["classname"], row.attrib["name"]]
+               for row in executed if row.find("skipped") is not None)
+with gzip.open(BASE.parents[1] / "backend-full.xml.gz", "rt", encoding="utf-8") as stream:
+    old_executed = ET.fromstring(stream.read()).findall(".//testcase")
+old_keys = {(row["classname"], row["name"]): row["nodeid"] for row in baseline}
+old_skips = sorted(old_keys[row.attrib["classname"], row.attrib["name"]]
+                   for row in old_executed if row.find("skipped") is not None)
+assert skips == old_skips, "changed skip identities"
+result = {
+    "base": "2842c497dabfdb0b13c315e22b206128eba9f57d",
+    "baseline_nodes": len(old), "collected_nodes": len(new),
+    "executed_nodes": len(executed), "outcomes": dict(outcomes),
+    "removed": sorted(old - new), "added": sorted(new - old),
+    "removed_by_file": dict(sorted(Counter(item.split("::")[0] for item in old - new).items())),
+    "added_by_file": dict(sorted(Counter(item.split("::")[0] for item in new - old).items())),
+    "skipped": skips, "skip_identities_unchanged": True,
+}
+assert not outcomes["failed"] and not outcomes["error"], result["outcomes"]
+with (WORK / "verification-summary.json").open("x", encoding="utf-8") as stream:
+    json.dump(result, stream, indent=2)
+    stream.write("\n")
+print(json.dumps({key: value for key, value in result.items() if key not in {"removed", "added", "skipped"}}, indent=2))

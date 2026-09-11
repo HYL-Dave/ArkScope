@@ -1,0 +1,566 @@
+{
+  "base": "2842c497dabfdb0b13c315e22b206128eba9f57d",
+  "baseline": "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/obsolete-execution-cleanup/census.json.gz",
+  "census": "census-final.json.gz",
+  "comparison": {
+    "coverage_reductions": [
+      "src/lifecycle_web_migration.py",
+      "src/lifecycle_web_projection.py",
+      "src/lifecycle_web_review.py",
+      "src/lifecycle_web_schema.py",
+      "src/lifecycle_web_store.py",
+      "tests/test_lifecycle_web_attended_concurrency.py",
+      "tests/test_lifecycle_web_gaps.py",
+      "tests/test_lifecycle_web_migration.py",
+      "tests/test_lifecycle_web_read.py",
+      "tests/test_lifecycle_web_review.py",
+      "tests/test_lifecycle_web_store.py",
+      "tests/test_lifecycle_web_usage_journal.py"
+    ],
+    "dependency_metadata_changed": [],
+    "new_candidates": [
+      "python:src.sec_research.config",
+      "python:src.sec_research.paths"
+    ],
+    "new_uncertainties": [
+      "sql:01b2419c923cfae2",
+      "sql:04a7fe2e7ab3acb4",
+      "sql:0e825bf028ea2c89",
+      "sql:120c7748e2c11431",
+      "sql:17bb89cea3eebf4b",
+      "sql:2a886844dc0a55da",
+      "sql:2b85132e5eba2ab3",
+      "sql:318437a73d4d1cc2",
+      "sql:33c4a4f90a606f60",
+      "sql:3aa1dfd4c07f091b",
+      "sql:46a1db92512d5daf",
+      "sql:5d0a0095985d910e",
+      "sql:6281c218d6273c73",
+      "sql:70bea5bfcb78da61",
+      "sql:78ee531b2e522b0f",
+      "sql:79167e1a4e15f22e",
+      "sql:823667996bae354a",
+      "sql:927105f7e843335b",
+      "sql:97b751e42aa20deb",
+      "sql:9d6e533f6c4aad4c",
+      "sql:9d94910064eed47c",
+      "sql:a8e7ff38796482fb",
+      "sql:ac210b658411852e",
+      "sql:ae693865c7d13371",
+      "sql:cc1f81098282cdcb",
+      "sql:ce1467972290bb9d",
+      "sql:d57762960c609216",
+      "sql:d8353f8a7ddaeff2",
+      "sql:e2578ebef9ba3fbc",
+      "sql:e39d038e20c4a6da",
+      "sql:f08c801084e3d8a4",
+      "sql:f7ff9c22180c4e9d"
+    ],
+    "new_untracked_paths": [],
+    "review_required": true
+  },
+  "coverage": {
+    "decode_failed": 3,
+    "documentation": 193,
+    "excluded_evidence": 5993,
+    "excluded_non_source": 23,
+    "excluded_private": 6,
+    "read": 1093
+  },
+  "candidate_rows": 4309,
+  "uncertainty_rows": 3352,
+  "new_candidate_rows": [
+    {
+      "entrypoint_kind": null,
+      "id": "python:src.sec_research.config",
+      "kind": "test_only",
+      "path": "src/sec_research/config.py"
+    },
+    {
+      "entrypoint_kind": null,
+      "id": "python:src.sec_research.paths",
+      "kind": "test_only",
+      "path": "src/sec_research/paths.py"
+    }
+  ],
+  "removed_candidates": [
+    {
+      "id": "column:lifecycle_investigation_acceptances.actor",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_investigation_acceptances.assessment_id",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_investigation_acceptances.confirmed_at",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_investigation_acceptances.packet_json",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_investigation_acceptances.packet_sha256",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_web_acceptances.actor",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_web_acceptances.assessment_id",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_web_acceptances.confirmed_at",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_web_acceptances.packet_json",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_web_acceptances.packet_sha256",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_web_acceptances.run_id",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "column:lifecycle_web_installation.installed_at",
+      "kind": "no_static_column_read"
+    },
+    {
+      "id": "table:lifecycle_web_acceptances",
+      "kind": "no_static_reader_observed"
+    }
+  ],
+  "uncertainty_explanations": [
+    {
+      "axis": "sql",
+      "id": "sql:01b2419c923cfae2",
+      "kind": "dynamic_sql",
+      "line": 111,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 108,
+      "previous_ids": [
+        "sql:dfae7a462b586b53"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:04a7fe2e7ab3acb4",
+      "kind": "dynamic_sql",
+      "line": 215,
+      "path": "src/lifecycle_investigation/review.py",
+      "previous_path": "src/lifecycle_web_review.py",
+      "previous_line": 288,
+      "previous_ids": [
+        "sql:ad303f0307009dee"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:0e825bf028ea2c89",
+      "kind": "unmodeled_sql_statement",
+      "line": 294,
+      "path": "src/security_lifecycle_current.py",
+      "previous_path": "src/security_lifecycle_current.py",
+      "previous_line": 302,
+      "previous_ids": [
+        "sql:72ff26a8701b09d9"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:120c7748e2c11431",
+      "kind": "unmodeled_sql_statement",
+      "line": 258,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 265,
+      "previous_ids": [
+        "sql:86ec610b7b3e3f19"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:17bb89cea3eebf4b",
+      "kind": "unmodeled_sql_statement",
+      "line": 58,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 59,
+      "previous_ids": [
+        "sql:b3af9d92fbf4d06b"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:2a886844dc0a55da",
+      "kind": "sql_prepare_failed",
+      "line": 146,
+      "path": "src/lifecycle_investigation/review.py",
+      "previous_path": "src/lifecycle_web_review.py",
+      "previous_line": 217,
+      "previous_ids": [
+        "sql:ed3cc6bb385bd95f"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:2b85132e5eba2ab3",
+      "kind": "unmodeled_sql_statement",
+      "line": 168,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 165,
+      "previous_ids": [
+        "sql:cdebac24a1ad637c"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:318437a73d4d1cc2",
+      "kind": "dynamic_sql",
+      "line": 248,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 245,
+      "previous_ids": [
+        "sql:dcaa68ed559f9123"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:33c4a4f90a606f60",
+      "kind": "dynamic_sql",
+      "line": 25,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 26,
+      "previous_ids": [
+        "sql:7d8268dbcc5027d1"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:3aa1dfd4c07f091b",
+      "kind": "sql_prepare_failed",
+      "line": 116,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 113,
+      "previous_ids": [
+        "sql:5ebcd0328958a884"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:46a1db92512d5daf",
+      "kind": "unmodeled_sql_statement",
+      "line": 113,
+      "path": "src/security_lifecycle_population.py",
+      "previous_path": "src/security_lifecycle_population.py",
+      "previous_line": 115,
+      "previous_ids": [
+        "sql:b7831d5d50859d11"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:5d0a0095985d910e",
+      "kind": "unmodeled_sql_statement",
+      "line": 56,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 57,
+      "previous_ids": [
+        "sql:f7c21d84340475db"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:6281c218d6273c73",
+      "kind": "sql_prepare_failed",
+      "line": 255,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 262,
+      "previous_ids": [
+        "sql:b83f7e80f4bbe7e7"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:70bea5bfcb78da61",
+      "kind": "dynamic_sql",
+      "line": 129,
+      "path": "src/lifecycle_investigation/store.py",
+      "previous_path": "src/lifecycle_investigation/store.py",
+      "previous_line": 76,
+      "previous_ids": [
+        "sql:06cff8e04b44b116"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:78ee531b2e522b0f",
+      "kind": "sql_prepare_failed",
+      "line": 150,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 147,
+      "previous_ids": [
+        "sql:955bca4de875e374"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:79167e1a4e15f22e",
+      "kind": "unmodeled_sql_statement",
+      "line": 107,
+      "path": "src/security_lifecycle_population.py",
+      "previous_path": "src/security_lifecycle_population.py",
+      "previous_line": 109,
+      "previous_ids": [
+        "sql:39d1b44b1a5ffd62"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:823667996bae354a",
+      "kind": "sql_prepare_failed",
+      "line": 134,
+      "path": "src/lifecycle_investigation/adoption.py",
+      "previous_path": "src/lifecycle_investigation/adoption.py",
+      "previous_line": 132,
+      "previous_ids": [
+        "sql:c087f6f746ac030d"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:927105f7e843335b",
+      "kind": "dynamic_sql",
+      "line": 251,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 256,
+      "previous_ids": [
+        "sql:fa98750d6695b5c7"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:97b751e42aa20deb",
+      "kind": "dynamic_sql",
+      "line": 158,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 155,
+      "previous_ids": [
+        "sql:1e4951af1b2bc213"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:9d6e533f6c4aad4c",
+      "kind": "unmodeled_sql_statement",
+      "line": 125,
+      "path": "src/lifecycle_investigation/store.py",
+      "previous_path": "src/lifecycle_investigation/store.py",
+      "previous_line": 72,
+      "previous_ids": [
+        "sql:a95129413c5f9fe2"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:9d94910064eed47c",
+      "kind": "dynamic_sql",
+      "line": 60,
+      "path": "src/security_lifecycle_population.py",
+      "previous_path": "src/security_lifecycle_population.py",
+      "previous_line": 61,
+      "previous_ids": [
+        "sql:87cee70d8b35f028"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:a8e7ff38796482fb",
+      "kind": "sql_prepare_failed",
+      "line": 128,
+      "path": "src/lifecycle_investigation/adoption.py",
+      "previous_path": "src/lifecycle_investigation/adoption.py",
+      "previous_line": 126,
+      "previous_ids": [
+        "sql:cc58521aeeffacec"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:ac210b658411852e",
+      "kind": "unmodeled_sql_statement",
+      "line": 102,
+      "path": "src/lifecycle_investigation/review.py",
+      "previous_path": "src/lifecycle_web_review.py",
+      "previous_line": 173,
+      "previous_ids": [
+        "sql:f2737089ac15570b"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:ae693865c7d13371",
+      "kind": "unmodeled_sql_statement",
+      "line": 32,
+      "path": "src/lifecycle_investigation/adoption.py",
+      "previous_path": "src/lifecycle_investigation/adoption.py",
+      "previous_line": 34,
+      "previous_ids": [
+        "sql:27e33a3defa3d919"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:cc1f81098282cdcb",
+      "kind": "unmodeled_sql_statement",
+      "line": 167,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 164,
+      "previous_ids": [
+        "sql:c7fea69b48c77793"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:ce1467972290bb9d",
+      "kind": "sql_prepare_failed",
+      "line": 149,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 146,
+      "previous_ids": [
+        "sql:f3b6cdf54c8ae65e"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:d57762960c609216",
+      "kind": "unmodeled_sql_statement",
+      "line": 76,
+      "path": "src/lifecycle_investigation/adoption.py",
+      "previous_path": "src/lifecycle_investigation/adoption.py",
+      "previous_line": 75,
+      "previous_ids": [
+        "sql:87a7bddc8d8f9010"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:d8353f8a7ddaeff2",
+      "kind": "dynamic_sql",
+      "line": 52,
+      "path": "src/security_lifecycle_population.py",
+      "previous_path": "src/security_lifecycle_population.py",
+      "previous_line": 53,
+      "previous_ids": [
+        "sql:4955d072c9933bff"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:e2578ebef9ba3fbc",
+      "kind": "sql_prepare_failed",
+      "line": 143,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 140,
+      "previous_ids": [
+        "sql:10e32f82cd357277"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:e39d038e20c4a6da",
+      "kind": "unmodeled_sql_statement",
+      "line": 168,
+      "path": "src/lifecycle_investigation/review.py",
+      "previous_path": "src/lifecycle_web_review.py",
+      "previous_line": 239,
+      "previous_ids": [
+        "sql:a732bf535992e337"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:f08c801084e3d8a4",
+      "kind": "unmodeled_sql_statement",
+      "line": 241,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 238,
+      "previous_ids": [
+        "sql:84c9284ef7d51e88"
+      ],
+      "classification": "unchanged_source_relocated"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:f7ff9c22180c4e9d",
+      "kind": "dynamic_sql",
+      "line": 69,
+      "path": "src/lifecycle_investigation/disposal.py",
+      "previous_path": "src/lifecycle_investigation/disposal.py",
+      "previous_line": 70,
+      "previous_ids": [
+        "sql:37006a3e39b9f8e8"
+      ],
+      "classification": "unchanged_source_relocated"
+    }
+  ]
+}

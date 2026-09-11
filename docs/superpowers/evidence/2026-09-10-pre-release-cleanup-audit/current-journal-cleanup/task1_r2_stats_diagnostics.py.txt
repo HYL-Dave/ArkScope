@@ -1,0 +1,85 @@
+"""A failed durable statistics read cannot invent zero usage or dispatch work."""
+
+from contextlib import contextmanager
+import json
+import time
+
+import pytest
+
+from src.auth_drivers.lifecycle_web_models import WebModelError
+from src.lifecycle_investigation.agent import run_agent
+from tests.lifecycle_investigation_fixtures import controller
+from tests.test_lifecycle_investigation_agent import choose, completed
+from tests.test_lifecycle_investigation_findings import payload
+
+
+@pytest.mark.parametrize("outcome", ["completed", "pending"])
+@pytest.mark.parametrize("stats_unavailable", [False, True])
+def test_stats_read_failure_preserves_readable_terminal_without_result(tmp_path, monkeypatch, outcome, stats_unavailable):
+    state = {"stats_phase": False, "reads": 0}
+    entries = []
+
+    async def model(call, credential, control):
+        entries.append(call.call_id)
+        if outcome == "completed":
+            material = json.loads(call.prompt.split("\nMATERIAL\n")[1])
+            reply = completed(call, control, choose("conclude", finding=payload(material["sources"][0]["passages"])))
+        else:
+            control.reserve_model_request(call.call_id)
+        state["stats_phase"] = True
+        before_polling = state["reads"]
+        for _ in range(32):
+            assert control.model_requests == len(entries)
+            assert control.max_model_requests == binding["runtime"]["model_submissions"]
+            assert control.stop_state == "running"
+            assert control.selection == credential.selection
+            control.terminal_statuses
+        assert state["reads"] == before_polling
+        if outcome == "pending":
+            raise WebModelError("provider_call_failed")
+        return reply
+
+    async def runner(*args, **kwargs):
+        return await run_agent(*args, **kwargs, model=model)
+
+    service, store, loads, binding = controller(tmp_path, runner=runner)
+    original = store.connection
+
+    @contextmanager
+    def connection(*, write=False):
+        if state["stats_phase"] and not write:
+            state["reads"] += 1
+            if stats_unavailable:
+                raise ValueError("investigation_recording_unavailable")
+        with original(write=write) as conn:
+            yield conn
+
+    monkeypatch.setattr(store, "connection", connection)
+    try:
+        identity = service.start(binding=binding, request_key="r2-stats-read")["run_id"]
+        until = time.monotonic() + 5
+        while service.is_local_running(identity) and time.monotonic() < until:
+            time.sleep(0.01)
+        assert not service.is_local_running(identity)
+        state["stats_phase"] = False
+        assert state["reads"] >= 1
+        if not stats_unavailable or outcome == "pending":
+            assert state["reads"] == 1
+        row = store.read(identity)
+        status = "remote_outcome_unknown" if outcome == "pending" else "failed" if stats_unavailable else "succeeded"
+        assert row["status"] == status
+        assert len(row["calls"]) == 1
+        assert row["calls"][0]["terminal"] == ("completed" if outcome == "completed" else None)
+        assert (row["result"] is None) is stats_unavailable
+        assert entries == ["step-1"] and len(loads) == 1 and not row["adopted"]
+        view = service.read(identity)
+        assert view["status"] == status
+        assert view["stats"]["model_submissions"] == 1
+        tokens = (10, 20) if outcome == "completed" and not stats_unavailable else (None, None)
+        assert (view["stats"]["input_tokens"], view["stats"]["output_tokens"]) == tokens
+        if stats_unavailable or outcome == "pending":
+            assert view["action"] is None
+        assert service.latest("OLD")["run_id"] == identity
+    finally:
+        state["stats_phase"] = False
+        service.close()

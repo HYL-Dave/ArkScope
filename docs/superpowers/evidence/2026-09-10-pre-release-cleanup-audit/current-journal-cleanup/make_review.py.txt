@@ -1,0 +1,33 @@
+"""Create an immutable task-scoped review package from staged/working changes."""
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+WORK = Path(__file__).resolve().parent
+ROOT = WORK.parents[2]
+BASE = "2842c497dabfdb0b13c315e22b206128eba9f57d"
+name, *paths = sys.argv[1:]
+assert paths and name.isalnum()
+
+
+def git(*args):
+    return subprocess.check_output(["git", *args], cwd=ROOT).decode()
+
+
+manifest = {}
+for path in paths:
+    target = ROOT / path
+    manifest[path] = hashlib.sha256(target.read_bytes()).hexdigest() if target.is_file() else None
+body = "\n".join([
+    f"# Review {name}\n\nBase: {BASE}\nHead: frozen uncommitted task snapshot.\n",
+    "## Commits Since Base\n" + git("log", "--oneline", f"{BASE}..HEAD"),
+    "## Scope And Current File Hashes\n```json\n" + json.dumps(manifest, indent=2) + "\n```\n",
+    "## Stat\n```text\n" + git("diff", "--stat", BASE, "--", *paths) + "\n```\n",
+    "## Patch\n```diff\n" + git("diff", "-U20", BASE, "--", *paths) + "\n```\n",
+])
+destination = WORK / f"{name}-review-package.md"
+with destination.open("x", encoding="utf-8") as stream:
+    stream.write(body)
+print(destination)

@@ -1,0 +1,34 @@
+"""Compare retained review helpers with the immutable pre-cleanup source."""
+import ast
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[3]
+BASE = "2842c497dabfdb0b13c315e22b206128eba9f57d"
+
+
+def functions(source):
+    return {item.name: ast.dump(item, include_attributes=False)
+            for item in ast.parse(source).body if isinstance(item, ast.FunctionDef)}
+
+
+old = subprocess.check_output(
+    ["git", "show", f"{BASE}:src/lifecycle_web_review.py"], cwd=ROOT)
+new = (ROOT / "src/lifecycle_investigation/review.py").read_bytes()
+before, after = functions(old), functions(new)
+names = ["assessment_id_for", "_adoption_values", "_provider_veto", "_freshness"]
+result = {
+    "base": BASE,
+    "old_review_sha256": hashlib.sha256(old).hexdigest(),
+    "current_review_sha256": hashlib.sha256(new).hexdigest(),
+    "identical_retained_helper_ast": {name: before[name] == after[name] for name in names},
+    "scope": "Pure helper extraction only; not a substitute for behavioral verification.",
+}
+assert all(result["identical_retained_helper_ast"].values()), result
+destination = Path(__file__).with_suffix(".json")
+with destination.open("x", encoding="utf-8") as stream:
+    json.dump(result, stream, indent=2)
+    stream.write("\n")
+print(json.dumps(result, indent=2))

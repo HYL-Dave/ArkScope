@@ -1,0 +1,53 @@
+"""Explain scanner deltas without erasing unresolved candidates or uncertainty."""
+from collections import Counter
+import difflib
+import gzip
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+WORK = Path(__file__).resolve().parent
+ROOT = WORK.parents[2]
+BASE = "2842c497dabfdb0b13c315e22b206128eba9f57d"
+before_path = ROOT / "docs/superpowers/evidence/2026-09-10-pre-release-cleanup-audit/obsolete-execution-cleanup/census.json.gz"
+after_path = WORK / sys.argv[1]
+before = json.loads(gzip.decompress(before_path.read_bytes()))
+after = json.loads(gzip.decompress(after_path.read_bytes()))
+old_rows = before["uncertainties"]
+old_candidates = {row["id"]: row for row in before["candidates"]}
+new_candidates = {row["id"]: row for row in after["candidates"]}
+line_maps, explanations = {}, []
+for row in after["uncertainties"]:
+    if row["id"] not in after["comparison"]["new_uncertainties"]:
+        continue
+    path = row["path"]
+    if row.get("status") == "tracked_file_missing":
+        explanations.append({**row, "classification": "pending_index_deletion"})
+        continue
+    old_path = "src/lifecycle_web_review.py" if path == "src/lifecycle_investigation/review.py" else path
+    if path not in line_maps:
+        source = subprocess.run(["git", "show", f"{BASE}:{old_path}"], cwd=ROOT, capture_output=True, text=True)
+        old = source.stdout.splitlines() if source.returncode == 0 else []
+        new = (ROOT / path).read_text().splitlines()
+        line_maps[path] = {block.b + i + 1: block.a + i + 1
+            for block in difflib.SequenceMatcher(None, old, new, autojunk=False).get_matching_blocks()
+            for i in range(block.size)}
+    old_line = line_maps[path].get(row.get("line"))
+    comparable = {k: v for k, v in row.items() if k not in {"id", "line", "path"}}
+    matches = [old["id"] for old in old_rows if old.get("path") == old_path and old.get("line") == old_line
+        and {k: v for k, v in old.items() if k not in {"id", "line", "path"}} == comparable]
+    explanations.append({**row, "previous_path": old_path, "previous_line": old_line,
+        "previous_ids": matches, "classification": "unchanged_source_relocated" if matches else "requires_review"})
+result = {
+    "base": BASE, "baseline": str(before_path.relative_to(ROOT)), "census": after_path.name,
+    "comparison": after["comparison"], "coverage": after["coverage"],
+    "candidate_rows": len(after["candidates"]), "uncertainty_rows": len(after["uncertainties"]),
+    "new_candidate_rows": [new_candidates[key] for key in after["comparison"]["new_candidates"]],
+    "removed_candidates": [old_candidates[key] for key in sorted(old_candidates.keys() - new_candidates.keys())],
+    "uncertainty_explanations": explanations,
+}
+with (WORK / sys.argv[2]).open("x", encoding="utf-8") as stream:
+    json.dump(result, stream, indent=2)
+    stream.write("\n")
+print(json.dumps({"comparison": result["comparison"], "explanations": dict(Counter(row["classification"] for row in explanations))}, indent=2))
