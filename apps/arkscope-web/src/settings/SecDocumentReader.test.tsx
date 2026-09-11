@@ -233,3 +233,142 @@ it("does not restore focus to a disconnected catalog opener", async () => {
   await click("Load local"); expect(opener.isConnected).toBe(false);
   await click("Close reader"); expect(focus).not.toHaveBeenCalled();
 });
+
+const knownAttempt = (outcome = "failed") => ({
+  attempt_id: 2, filing_id: "123:000-1", document_id: "primary", resolved_document_id: "file:annual.htm",
+  primary_document: "annual.htm", invalidation_primary_document: "annual.htm", acquisition_id: "attempt2",
+  status: outcome === "complete" ? "ok" : "unavailable", capture_id: outcome === "complete" ? capture : null,
+  observed_at: "2026-09-12T02:00:00Z", outcome, gaps: outcome === "complete" ? [] : [{ code: "source_timeout" }], requests: [],
+});
+
+it.each(["complete", "failed", "rejected"])("I1: pending-close-reopen reacts to definite %s without replacing the newer reading", async (outcome) => {
+  const pending = deferred();
+  handler = (url, init) => init.method === "POST" ? pending.promise
+    : url.searchParams.has("query") ? textPage("newer reopened search") : fallback(url);
+  await open(); await click("Acquire primary document"); await click("Close reader"); await click("Read filing");
+  expect(button("Acquire primary document").disabled).toBe(true);
+  await click("Reread stored document");
+  expect(reader().textContent).toContain("Acquisition outcome unknown");
+  await change("Literal search (case-sensitive)", "newer"); await click("Search passages");
+  const count = reads().length;
+  await act(async () => pending.resolve(outcome === "rejected"
+    ? new Response(JSON.stringify({ detail: { code: "permission_denied" } }), { status: 403 }) : knownAttempt(outcome)));
+  expect(reader().textContent).not.toContain("Acquisition outcome unknown");
+  expect(button("Acquire primary document").disabled).toBe(false);
+  expect(reads()).toHaveLength(count);
+  expect(reader().querySelector(".sec-document-text")?.textContent).toBe("newer reopened search");
+  await click("Reread stored document");
+  expect(button("Acquire primary document").disabled).toBe(false);
+  expect(reads().filter(({ init }) => init.method === "POST")).toHaveLength(1);
+});
+
+it("I1 control: a genuinely lost POST after pending-close-reopen remains unknown and GET-only", async () => {
+  const pending = deferred(); handler = (url, init) => init.method === "POST" ? pending.promise : fallback(url);
+  await open(); await click("Acquire primary document"); await click("Close reader"); await click("Read filing");
+  await act(async () => pending.reject(new TypeError("lost response")));
+  await click("Reread stored document");
+  expect(reader().textContent).toContain("Acquisition outcome unknown");
+  expect(button("Acquire primary document").disabled).toBe(true);
+  expect(reads().at(-2)!.url.searchParams.has("capture_id")).toBe(false);
+  expect(reads().filter(({ init }) => init.method === "POST")).toHaveLength(1);
+});
+
+it("I1 control: completing another filing does not clear this filing's pending acquisition", async () => {
+  const first = deferred(); const second = deferred();
+  handler = (url, init) => init.method === "POST" ? (url.pathname.includes("000-1") ? first.promise : second.promise) : fallback(url);
+  await open(); await click("Acquire primary document"); await click("Read filing", 2); await click("Acquire primary document");
+  await act(async () => first.resolve(knownAttempt()));
+  expect(reader().textContent).toContain("second.htm");
+  expect(reader().textContent).toContain("Acquisition outcome unknown");
+  expect(button("Acquire primary document").disabled).toBe(true);
+  await act(async () => second.resolve({ ...knownAttempt(), filing_id: "123:000-2" }));
+  expect(reader().textContent).not.toContain("Acquisition outcome unknown");
+  expect(button("Acquire primary document").disabled).toBe(false);
+});
+
+it.each([
+  ["newer capture B", false], ["failed latest", false],
+  ["newer capture B", true], ["failed latest", true],
+] as const)("I2: primary alias keeps A against %s, missing-secondary navigation=%s", async (latest, visitSecondary) => {
+  const captureB = "secdoc_" + "b".repeat(64);
+  let advanced = false;
+  handler = (url) => {
+    if (!url.pathname.endsWith("/document")) return fallback(url);
+    if (url.searchParams.get("document_id") === "file:exhibit.htm") return unavailable();
+    const pinnedA = url.searchParams.get("capture_id") === capture;
+    if (advanced && !pinnedA && latest === "failed latest") return unavailable();
+    const selected = advanced && !pinnedA ? captureB : capture;
+    const result = url.searchParams.has("cursor") ? textPage(selected === capture ? "capture A text" : "capture B text") : index();
+    return { ...result, coverage: { ...result.coverage, capture_id: selected }, data: { ...result.data,
+      document: { ...doc, capture_id: selected },
+      passages: result.data.passages.map((passage) => ({ ...passage, citation: { ...citation, capture_id: selected } })),
+    } };
+  };
+  await open(); advanced = true;
+  await select("Document", "file:annual.htm");
+  expect(reads().at(-2)!.url.searchParams.get("capture_id")).toBe(capture);
+  if (visitSecondary) {
+    await select("Document", "file:exhibit.htm");
+    expect(reads().at(-1)!.url.searchParams.has("capture_id")).toBe(false);
+    expect(reader().querySelector(".sec-document-text")).toBeNull();
+  }
+  const before = reads().length;
+  await select("Document", "primary");
+  expect(reads()[before].url.searchParams.get("capture_id")).toBe(capture);
+  expect(reads()[before].url.searchParams.get("document_id")).toBe("primary");
+  expect(reader().querySelector(".sec-document-text")?.textContent).toBe("capture A text");
+  expect(reader().textContent).toContain("Pinned capture");
+  const beforeCurrent = reads().length; await click("Read current capture");
+  expect(reads()[beforeCurrent].url.searchParams.has("capture_id")).toBe(false);
+  expect(reader().querySelector(".sec-document-text")?.textContent ?? null).toBe(latest === "failed latest" ? null : "capture B text");
+  expect(reads().every(({ init }) => (init.method ?? "GET") === "GET")).toBe(true);
+});
+
+it("I2 control: primary alias never borrows a nonprimary document capture", async () => {
+  const secondaryCapture = "secdoc_" + "c".repeat(64);
+  handler = (url) => {
+    if (url.searchParams.get("document_id") !== "file:exhibit.htm") return fallback(url);
+    const result = url.searchParams.has("cursor") ? textPage("secondary text") : index();
+    return { ...result, coverage: { ...result.coverage, capture_id: secondaryCapture }, data: { ...result.data,
+      document: { ...doc, capture_id: secondaryCapture, document_id: "file:exhibit.htm", primary_document: "annual.htm" },
+      passages: result.data.passages.map((passage) => ({ ...passage, citation: { ...citation, capture_id: secondaryCapture, document_id: "file:exhibit.htm" } })),
+    } };
+  };
+  await open(); await select("Document", "file:exhibit.htm");
+  expect(reader().querySelector(".sec-document-text")?.textContent).toBe("secondary text");
+  const before = reads().length; await select("Document", "primary");
+  expect(reads()[before].url.searchParams.has("capture_id")).toBe(false);
+  expect(reader().querySelector(".sec-document-text")?.textContent).not.toBe("secondary text");
+});
+
+it("I3: index Back preserves the visible observed section and its exact outgoing search filter", async () => {
+  handler = (url) => {
+    if (!url.pathname.endsWith("/document")) return fallback(url);
+    if (url.searchParams.get("cursor") === "later-sections") return { ...index(), data: { ...index().data, documents: [], sections: [index().data.sections[1]] }, coverage: { ...index().coverage, index_offset: 2 } };
+    if (url.searchParams.has("query")) return textPage("section search result", "search-next");
+    if (url.searchParams.has("cursor") || url.searchParams.has("section_id")) return textPage("selected section text");
+    return { ...index("later-sections"), data: { ...index().data, sections: [] } };
+  };
+  await open();
+  expect(reader().querySelector('select[aria-label="Section"] option[value="item_1a"]')).toBeNull();
+  await click("Next index page"); await select("Section", "item_1a");
+  const beforeBack = reads().length; await click("Previous index page");
+  expect(reads()).toHaveLength(beforeBack);
+  const sectionSelect = reader().querySelector<HTMLSelectElement>('select[aria-label="Section"]')!;
+  expect(sectionSelect.value).toBe("item_1a");
+  expect(sectionSelect.selectedOptions[0].textContent).toBe("Item 1A. Risk factors");
+  expect(reader().querySelector(".sec-document-text")?.textContent).toBe("selected section text");
+  await change("Literal search (case-sensitive)", " Café.* "); await click("Search passages");
+  expect(reads().at(-1)!.url.searchParams.get("section_id")).toBe("item_1a");
+  expect(reads().at(-1)!.url.searchParams.get("query")).toBe(" Café.* ");
+  await click("Next passage page");
+  expect(reads().at(-1)!.url.searchParams.get("section_id")).toBe("item_1a");
+  expect(reads().at(-1)!.url.searchParams.get("capture_id")).toBe(capture);
+  expect(reads().at(-1)!.url.searchParams.get("cursor")).toBe("search-next");
+  await click("Whole document");
+  expect(sectionSelect.value).toBe("");
+  expect(reads().at(-1)!.url.searchParams.has("section_id")).toBe(false);
+  expect(reads().at(-1)!.url.searchParams.has("query")).toBe(false);
+  const beforeForward = reads().length; await click("Next index page");
+  expect(reads()).toHaveLength(beforeForward);
+});
