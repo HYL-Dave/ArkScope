@@ -1,0 +1,24 @@
+{
+  "name": "task4-review-pending-reopen-02",
+  "command": [
+    "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+    "test",
+    "--",
+    "--config",
+    "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task4-review-probe/vitest.config.mjs"
+  ],
+  "cwd": "/tmp/arkscope-listing-sec-macro-convergence/apps/arkscope-web",
+  "exit_code": 1,
+  "seconds": 1.57,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task4-review-pending-reopen-02",
+    "HOME": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task4-review-pending-reopen-02/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "NODE_OPTIONS": "--require=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/offline_node.cjs"
+  },
+  "log": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task4-review-pending-reopen-02/output.log"
+}

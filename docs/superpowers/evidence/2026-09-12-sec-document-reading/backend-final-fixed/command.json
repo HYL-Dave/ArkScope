@@ -1,0 +1,23 @@
+{
+  "name": "backend-final-fixed",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/offline_pytest.py",
+    "-q",
+    "--junitxml=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/backend-final-fixed/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-listing-sec-macro-convergence",
+  "exit_code": 2,
+  "seconds": 9.547,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/backend-final-fixed",
+    "HOME": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/backend-final-fixed/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/backend-final-fixed/output.log"
+}

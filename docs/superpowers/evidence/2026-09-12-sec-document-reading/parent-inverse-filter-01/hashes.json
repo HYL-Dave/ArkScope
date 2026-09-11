@@ -1,0 +1,17 @@
+{
+  "after": {
+    "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+    "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87"
+  },
+  "before": {
+    "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+    "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87"
+  },
+  "choice": "filter",
+  "disk_source_modified": false,
+  "kind": "process_local_compiled_source",
+  "mutated": {
+    "src/sec_research/document_queries.py": "a4f67e93b8f2ab2c4f2d94deaac069338562d394313ce8954d035aafa2ca7705",
+    "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87"
+  }
+}

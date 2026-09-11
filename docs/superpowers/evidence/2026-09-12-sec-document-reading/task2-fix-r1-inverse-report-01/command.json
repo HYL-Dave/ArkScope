@@ -1,0 +1,24 @@
+{
+  "name": "task2-fix-r1-inverse-report-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/offline_pytest.py",
+    "-q",
+    "tests/test_sec_research_document_service.py::test_invalid_reader_report_preserves_independent_dispatch",
+    "--junitxml=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task2-fix-r1-inverse-report-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-listing-sec-macro-convergence",
+  "exit_code": 1,
+  "seconds": 0.917,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task2-fix-r1-inverse-report-01",
+    "HOME": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task2-fix-r1-inverse-report-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task2-fix-r1-inverse-report-01/output.log"
+}

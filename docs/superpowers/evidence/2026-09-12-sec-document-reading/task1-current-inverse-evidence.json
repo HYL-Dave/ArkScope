@@ -1,0 +1,128 @@
+[
+  {
+    "change": "Lowercase original attribute name before namespace admission/binding/duplicate detection.",
+    "failed_testcases": [
+      ".superpowers.sdd.2026-09-12-sec-document-reading.task-1.test_rereview_r1_prefix_case_probe::test_case_distinct_namespace_declarations_are_not_conflicting",
+      ".superpowers.sdd.2026-09-12-sec-document-reading.task-1.test_rereview_r1_prefix_case_probe::test_case_distinct_nested_prefix_does_not_rebind_inline_namespace",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_namespace_declarations_are_not_conflicting[F-f]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_namespace_declarations_are_not_conflicting[fact-Fact]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_namespace_declarations_are_not_conflicting[ix-IX]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[F-f]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[fact-Fact]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[ix-IX]",
+      "tests.test_sec_research_document_text::test_xhtml_namespace_declaration_name_is_case_sensitive"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "579862c9f76c3d023ca70af17f8bea9d93d964ffb9796cea8b0933fa0891e1ee",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-declaration-case-01"
+  },
+  {
+    "change": "Lowercase original start QName before namespace lookup and stack identity.",
+    "failed_testcases": [
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[F-f]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[fact-Fact]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[ix-IX]",
+      "tests.test_sec_research_document_text::test_xhtml_inline_local_name_is_case_sensitive"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "0a403448c1d1ca6e1cfdc22b562abbcc54d2fa34ad583bb24b9a7693cc6ddba4",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-start-qname-01"
+  },
+  {
+    "change": "Lowercase original closing QName before stack matching and scope restoration.",
+    "failed_testcases": [
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_qnames_restore_each_scope[Scope-scope]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_qnames_restore_each_scope[f:Box-f:box]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_qnames_restore_each_scope[f:box-F:box]",
+      "tests.test_sec_research_document_text::test_xhtml_mismatched_case_close_does_not_restore_namespace_early"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "e90b0303d99248ec86341bb9b7455b1c82f2491aa8c94fddc64b172782cd20e1",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-end-qname-01"
+  },
+  {
+    "change": "Lowercase the synthetic closing QName for self-closing elements.",
+    "failed_testcases": [
+      "tests.test_sec_research_document_text::test_xhtml_case_preserving_empty_qname_restores_namespace[F:scope]",
+      "tests.test_sec_research_document_text::test_xhtml_case_preserving_empty_qname_restores_namespace[Scope]"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "fffed797f4e940365d1c95d777330f1199f624358dcdfef4dcd8032f31a80cb0",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-empty-qname-01"
+  },
+  {
+    "change": "Remove the per-attribute budget/cancellation tick when reading original source tokens.",
+    "failed_testcases": [
+      "tests.test_sec_research_document_text::test_xhtml_source_attribute_token_work_consumes_parser_budget",
+      "tests.test_sec_research_document_text::test_xhtml_source_attribute_token_work_is_cancellable"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "0242b2f1dcab40f99925b00f1cad6f8c509135b07fd0d9020d00d1d89c3dc95f",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-token-work-01"
+  }
+]

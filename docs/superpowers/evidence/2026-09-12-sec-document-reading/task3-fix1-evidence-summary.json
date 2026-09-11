@@ -1,0 +1,226 @@
+{
+  "archived_red": {
+    "get-budget": {
+      "errors": 1,
+      "failed_testcases": [
+        "tests.test_sec_research_document_routes::test_corrupt_budget_does_not_block_existing_stored_document",
+        "tests.test_sec_research_document_routes::test_real_post_get_search_and_pinned_reread_keep_exact_bytes"
+      ],
+      "failures": 2,
+      "passed": 0,
+      "skipped": 0
+    },
+    "permission": {
+      "errors": 1,
+      "failed_testcases": [
+        "tests.test_sec_research_document_routes::test_shared_permission_denial_precedes_all_post_owners"
+      ],
+      "failures": 1,
+      "passed": 0,
+      "skipped": 0
+    },
+    "profile-identity": {
+      "errors": 0,
+      "failed_testcases": [
+        "tests.test_sec_research_document_routes::test_email_only_profile_identity_is_normalized_on_both_actual_requests",
+        "tests.test_sec_research_document_routes::test_real_post_get_search_and_pinned_reread_keep_exact_bytes"
+      ],
+      "failures": 2,
+      "passed": 0,
+      "skipped": 0
+    },
+    "validation-order": {
+      "errors": 17,
+      "failed_testcases": [
+        "tests.test_sec_research_document_routes::test_cursor_binding_rejected_before_absent_store",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params0-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params0-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params1-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params1-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params2-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params2-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params3-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params3-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params4-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params4-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params5-sec_research_cursor_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params5-sec_research_cursor_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params6-sec_research_cursor_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params6-sec_research_cursor_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params7-sec_research_cursor_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params7-sec_research_cursor_invalid-corrupt]"
+      ],
+      "failures": 17,
+      "passed": 16,
+      "skipped": 0
+    }
+  },
+  "current": [
+    {
+      "before": {
+        "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "errors": 0,
+      "failed_testcases": [
+        "tests.test_sec_research_document_routes::test_cursor_binding_rejected_before_absent_store",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params0-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params0-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params1-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params1-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params2-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params2-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params3-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params3-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params4-sec_research_query_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params4-sec_research_query_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params5-sec_research_cursor_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params5-sec_research_cursor_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params6-sec_research_cursor_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params6-sec_research_cursor_invalid-corrupt]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params7-sec_research_cursor_invalid-absent]",
+        "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params7-sec_research_cursor_invalid-corrupt]"
+      ],
+      "failures": 17,
+      "kind": "process_local_compiled_source",
+      "mutated": {
+        "src/api/routes/sec_research.py": "def3ea1dd1897f55fffd391f93d1bb0dd42f1bb844cbd513bf8754ca1ce923aa",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "mutation": "task3-fix1-inverse-validation-order-01/mutation.py",
+      "passed": 16,
+      "record": "task3-fix1-inverse-validation-order-01/hashes.json",
+      "restored": {
+        "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "run": "task3-fix1-inverse-validation-order-01",
+      "skipped": 0
+    },
+    {
+      "before": {
+        "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "errors": 0,
+      "failed_testcases": [
+        "tests.test_sec_research_document_routes::test_corrupt_budget_does_not_block_existing_stored_document",
+        "tests.test_sec_research_document_routes::test_real_post_get_search_and_pinned_reread_keep_exact_bytes"
+      ],
+      "failures": 2,
+      "kind": "process_local_compiled_source",
+      "mutated": {
+        "src/api/routes/sec_research.py": "762f06c4ff8bf678f9a640a21d612e1aa4aaccb7728984cd6a02533c6b82163c",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "mutation": "task3-fix1-inverse-get-budget-01/mutation.py",
+      "passed": 0,
+      "record": "task3-fix1-inverse-get-budget-01/hashes.json",
+      "restored": {
+        "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "run": "task3-fix1-inverse-get-budget-01",
+      "skipped": 0
+    },
+    {
+      "before": {
+        "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "errors": 0,
+      "failed_testcases": [
+        "tests.test_sec_research_document_routes::test_email_only_profile_identity_is_normalized_on_both_actual_requests",
+        "tests.test_sec_research_document_routes::test_real_post_get_search_and_pinned_reread_keep_exact_bytes"
+      ],
+      "failures": 2,
+      "kind": "process_local_compiled_source",
+      "mutated": {
+        "src/api/routes/sec_research.py": "a93d6a93fd268f2972c9b703715b4a636495c13a246d85ede996988508055abf",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "mutation": "task3-fix1-inverse-profile-identity-01/mutation.py",
+      "passed": 0,
+      "record": "task3-fix1-inverse-profile-identity-01/hashes.json",
+      "restored": {
+        "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "run": "task3-fix1-inverse-profile-identity-01",
+      "skipped": 0
+    },
+    {
+      "before": {
+        "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "errors": 0,
+      "failed_testcases": [
+        "tests.test_sec_research_document_routes::test_shared_permission_denial_precedes_all_post_owners"
+      ],
+      "failures": 1,
+      "kind": "process_local_compiled_source",
+      "mutated": {
+        "src/api/routes/sec_research.py": "889b1d108a674b4225ffa145d12ccb8d06c607e1052baedc41c1c2734f63f3c3",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "mutation": "task3-fix1-inverse-permission-01/mutation.py",
+      "passed": 0,
+      "record": "task3-fix1-inverse-permission-01/hashes.json",
+      "restored": {
+        "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+        "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+        "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+        "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+      },
+      "run": "task3-fix1-inverse-permission-01",
+      "skipped": 0
+    }
+  ],
+  "current_hashes": {
+    "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+    "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+    "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+    "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+  },
+  "focused_green": {
+    "task3-fix1-green-01": {
+      "errors": 0,
+      "failed_testcases": [],
+      "failures": 0,
+      "passed": 81,
+      "skipped": 0
+    },
+    "task3-fix1-precommit-01": {
+      "errors": 0,
+      "failed_testcases": [],
+      "failures": 0,
+      "passed": 234,
+      "skipped": 0
+    }
+  },
+  "focused_node_ids_unchanged": true,
+  "helper_sha256": "1d56793d156cec31fc63aa1d6e81ae704d12f7c7a75a71d7b243c6783474428a"
+}

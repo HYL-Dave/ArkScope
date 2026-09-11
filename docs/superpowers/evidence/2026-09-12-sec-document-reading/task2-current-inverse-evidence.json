@@ -1,0 +1,62 @@
+[
+  {
+    "failed_testcases": [
+      "tests.test_sec_research_document_service::test_only_receipt_bound_catalog_is_authority"
+    ],
+    "mutated": {
+      "src/sec_research/document_service.py": "842bdc470e41a645a76004bb5b1f895071112d0f798018c23a5c4edf2ec1175a",
+      "tests/test_sec_research_document_service.py": "b02b019e4d87bbf95908f43cd8a0847780e53d843d4a974a91f6ca971469c867"
+    },
+    "record": "task-2/inverse-hashes.json",
+    "restored": {
+      "src/sec_research/document_service.py": "257743fc5e5ac65f24619581ddb83b8b0c2e72730429cdae8f374dd42bfb19c9",
+      "tests/test_sec_research_document_service.py": "b02b019e4d87bbf95908f43cd8a0847780e53d843d4a974a91f6ca971469c867"
+    },
+    "run": "task2-inverse-primary-absence-01"
+  },
+  {
+    "failed_testcases": [
+      "tests.test_sec_research_document_service::test_incomplete_or_unsupported_capture_is_never_published[truncated]"
+    ],
+    "mutated": {
+      "src/sec_research/document_service.py": "cdd4ab843e4708bb6337b36eca69879331d261e265fef6fc53c9271a8eb99434",
+      "tests/test_sec_research_document_service.py": "b02b019e4d87bbf95908f43cd8a0847780e53d843d4a974a91f6ca971469c867"
+    },
+    "record": "task-2/inverse-hashes.json",
+    "restored": {
+      "src/sec_research/document_service.py": "257743fc5e5ac65f24619581ddb83b8b0c2e72730429cdae8f374dd42bfb19c9",
+      "tests/test_sec_research_document_service.py": "b02b019e4d87bbf95908f43cd8a0847780e53d843d4a974a91f6ca971469c867"
+    },
+    "run": "task2-inverse-truncated-complete-01"
+  },
+  {
+    "failed_testcases": [
+      "tests.test_sec_research_document_queries::test_pinned_capture_survives_refresh_restart_and_relocation"
+    ],
+    "mutated": {
+      "src/sec_research/document_queries.py": "2634d9846fc846053df6a750b0e9737a46d634e063ab47f661f3bcf815aa63de",
+      "tests/test_sec_research_document_queries.py": "6cb0a66dc0e97662e2a8ef04583fd8e936d21c2fb3af786fe271d118de9daaba"
+    },
+    "record": "task-2/final-inverse-hashes.json",
+    "restored": {
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "tests/test_sec_research_document_queries.py": "6cb0a66dc0e97662e2a8ef04583fd8e936d21c2fb3af786fe271d118de9daaba"
+    },
+    "run": "task2-inverse-latest-final-01"
+  },
+  {
+    "failed_testcases": [
+      "tests.test_sec_research_document_queries::test_document_cursor_binds_capture_filter_and_size"
+    ],
+    "mutated": {
+      "src/sec_research/document_queries.py": "a4f67e93b8f2ab2c4f2d94deaac069338562d394313ce8954d035aafa2ca7705",
+      "tests/test_sec_research_document_queries.py": "6cb0a66dc0e97662e2a8ef04583fd8e936d21c2fb3af786fe271d118de9daaba"
+    },
+    "record": "task-2/final-inverse-hashes.json",
+    "restored": {
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "tests/test_sec_research_document_queries.py": "6cb0a66dc0e97662e2a8ef04583fd8e936d21c2fb3af786fe271d118de9daaba"
+    },
+    "run": "task2-inverse-query-binding-final-01"
+  }
+]

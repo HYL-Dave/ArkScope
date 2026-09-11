@@ -1,0 +1,65 @@
+{
+  "fix_base": "6cad56cf55a08955f389644ecae9cb0d64d875df",
+  "mutated_file": "src/sec_research/document_text.py",
+  "restored_sha256": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+  "restoration_manifest": "task-1/fix-r2-before-inverses.sha256",
+  "restoration_method": "apply_patch, followed after each mutation by sha256sum -c for all five Task1 files",
+  "mutations": [
+    {
+      "run": "task1-fix-r2-inverse-declaration-case-01",
+      "change": "Lowercase original attribute name before namespace admission/binding/duplicate detection.",
+      "mutated_sha256": "579862c9f76c3d023ca70af17f8bea9d93d964ffb9796cea8b0933fa0891e1ee",
+      "failed": 9,
+      "owners": [
+        "tests/test_sec_research_document_text.py::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace",
+        "tests/test_sec_research_document_text.py::test_xhtml_case_distinct_namespace_declarations_are_not_conflicting",
+        "tests/test_sec_research_document_text.py::test_xhtml_namespace_declaration_name_is_case_sensitive",
+        ".superpowers/sdd/2026-09-12-sec-document-reading/task-1/test_rereview_r1_prefix_case_probe.py"
+      ],
+      "restored_all_task1_hashes": true
+    },
+    {
+      "run": "task1-fix-r2-inverse-start-qname-01",
+      "change": "Lowercase original start QName before namespace lookup and stack identity.",
+      "mutated_sha256": "0a403448c1d1ca6e1cfdc22b562abbcc54d2fa34ad583bb24b9a7693cc6ddba4",
+      "failed": 4,
+      "owners": [
+        "tests/test_sec_research_document_text.py::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace",
+        "tests/test_sec_research_document_text.py::test_xhtml_inline_local_name_is_case_sensitive"
+      ],
+      "restored_all_task1_hashes": true
+    },
+    {
+      "run": "task1-fix-r2-inverse-end-qname-01",
+      "change": "Lowercase original closing QName before stack matching and scope restoration.",
+      "mutated_sha256": "e90b0303d99248ec86341bb9b7455b1c82f2491aa8c94fddc64b172782cd20e1",
+      "failed": 4,
+      "owners": [
+        "tests/test_sec_research_document_text.py::test_xhtml_case_distinct_nested_qnames_restore_each_scope",
+        "tests/test_sec_research_document_text.py::test_xhtml_mismatched_case_close_does_not_restore_namespace_early"
+      ],
+      "restored_all_task1_hashes": true
+    },
+    {
+      "run": "task1-fix-r2-inverse-empty-qname-01",
+      "change": "Lowercase the synthetic closing QName for self-closing elements.",
+      "mutated_sha256": "fffed797f4e940365d1c95d777330f1199f624358dcdfef4dcd8032f31a80cb0",
+      "failed": 2,
+      "owners": [
+        "tests/test_sec_research_document_text.py::test_xhtml_case_preserving_empty_qname_restores_namespace"
+      ],
+      "restored_all_task1_hashes": true
+    },
+    {
+      "run": "task1-fix-r2-inverse-token-work-01",
+      "change": "Remove the per-attribute budget/cancellation tick when reading original source tokens.",
+      "mutated_sha256": "0242b2f1dcab40f99925b00f1cad6f8c509135b07fd0d9020d00d1d89c3dc95f",
+      "failed": 2,
+      "owners": [
+        "tests/test_sec_research_document_text.py::test_xhtml_source_attribute_token_work_consumes_parser_budget",
+        "tests/test_sec_research_document_text.py::test_xhtml_source_attribute_token_work_is_cancellable"
+      ],
+      "restored_all_task1_hashes": true
+    }
+  ]
+}

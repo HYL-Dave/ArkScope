@@ -1,0 +1,58 @@
+{
+  "baseline": [
+    {
+      "path": "src/sec_research/document_store.py",
+      "sha256": "3941d53a94edd17c8f8e2c52e5a80091b66af5ae1e28769108bd44e613e10ab1"
+    },
+    {
+      "path": "src/sec_research/document_service.py",
+      "sha256": "257743fc5e5ac65f24619581ddb83b8b0c2e72730429cdae8f374dd42bfb19c9"
+    },
+    {
+      "path": "src/sec_research/document_queries.py",
+      "sha256": "fd9a6d00e0ce62ec3a2e8941fcdbc11a8d4e9e9c159101d595e13c5b17c0d201"
+    },
+    {
+      "path": "src/sec_research/schema.py",
+      "sha256": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5"
+    },
+    {
+      "path": "src/sec_research/capture_lock.py",
+      "sha256": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd"
+    },
+    {
+      "path": "tests/test_sec_research_document_store.py",
+      "sha256": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    {
+      "path": "tests/test_sec_research_document_service.py",
+      "sha256": "b02b019e4d87bbf95908f43cd8a0847780e53d843d4a974a91f6ca971469c867"
+    },
+    {
+      "path": "tests/test_sec_research_document_queries.py",
+      "sha256": "bef6bd361ec15b6c412f8994a73c52ccc77a55724bc5d9b6573a28146983b908"
+    }
+  ],
+  "inverses": [
+    {
+      "name": "latest",
+      "mutated_hash": "03837ad6e28ea2e738f8b76ebd429f6ca006bd66f469179afaa2ae368403ec73  src/sec_research/document_queries.py",
+      "all_eight_files_restored": true
+    },
+    {
+      "name": "query",
+      "mutated_hash": "0572be6368846b1ebdd5c94035b5ace897a9bcdc90ecafa46b5624d28662a5bf  src/sec_research/document_queries.py",
+      "all_eight_files_restored": true
+    },
+    {
+      "name": "primary",
+      "mutated_hash": "842bdc470e41a645a76004bb5b1f895071112d0f798018c23a5c4edf2ec1175a  src/sec_research/document_service.py",
+      "all_eight_files_restored": true
+    },
+    {
+      "name": "truncated",
+      "mutated_hash": "cdd4ab843e4708bb6337b36eca69879331d261e265fef6fc53c9271a8eb99434  src/sec_research/document_service.py",
+      "all_eight_files_restored": true
+    }
+  ]
+}

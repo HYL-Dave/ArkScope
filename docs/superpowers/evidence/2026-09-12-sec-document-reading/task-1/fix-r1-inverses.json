@@ -1,0 +1,61 @@
+{
+  "source": "src/sec_research/document_text.py",
+  "restored_sha256": "da1e0b23f71ccb154e4e71f2d5e2b6d44a928bcdb91e348f3e6b5c4cdd8b7c8a",
+  "manifest": "task-1/fix-r1-before-inverses.sha256",
+  "restoration": "All five manifest entries passed sha256sum -c after each mutation, before the next mutation; raw test logs are retained per run.",
+  "mutations": [
+    {
+      "run": "task1-fix-r1-inverse-alias-01",
+      "change": "Require undeclared_ix only instead of exact admitted namespace OR undeclared_ix",
+      "mutated_sha256": "f95950e3c98bff518c769be339053d6457222940d59e21a122b966aa7b794d90",
+      "owners": ["tests/test_sec_research_document_text.py::test_namespace_aliased_ixbrl_does_not_publish_hidden_facts"],
+      "failed": 4,
+      "passed": 0
+    },
+    {
+      "run": "task1-fix-r1-inverse-namespace-identity-01",
+      "change": "Match hidden local names without namespace admission",
+      "mutated_sha256": "e194f467573a17990720dd4ff871441ff9f662941d90d4d1f8d5abcff7205032",
+      "owners": [
+        "tests/test_sec_research_document_text.py::test_unrelated_namespace_hidden_names_remain_visible",
+        "tests/test_sec_research_document_text.py::test_namespace_uri_matching_is_exact_not_casefolded_or_prefix_matched"
+      ],
+      "failed": 18,
+      "passed": 0
+    },
+    {
+      "run": "task1-fix-r1-inverse-scope-restoration-01",
+      "change": "Iterate an empty tuple instead of previous.items() when restoring namespace deltas",
+      "mutated_sha256": "799a3f8319ec67760454b5d36b592d3dc2c763ffd2a4cdc6317d0ce5ec4e582b",
+      "owners": [
+        "tests/test_sec_research_document_text.py::test_namespace_rebinding_restores_enclosing_inline_binding",
+        "tests/test_sec_research_document_text.py::test_namespace_rebinding_restores_enclosing_unrelated_binding",
+        "tests/test_sec_research_document_text.py::test_namespace_scope_follows_empty_and_unwound_elements"
+      ],
+      "failed": 10,
+      "passed": 0
+    },
+    {
+      "run": "task1-fix-r1-inverse-map-clone-01",
+      "change": "Initialize each scope with self.namespaces.copy() instead of an empty declaration delta",
+      "mutated_sha256": "321ffba1662f2a9ac5c33c089c9070cc026d9a0dcc617e029de64bc12a57046a",
+      "owners": [".superpowers/sdd/2026-09-12-sec-document-reading/task-1/test_fix_r1_resource_probe.py::test_namespace_scopes_do_not_multiply_inherited_maps"],
+      "failed_parameters": ["400"],
+      "failed": 1,
+      "passed": 1,
+      "mutated_peak_traced_bytes_at_depth_400": 60212914
+    },
+    {
+      "run": "task1-fix-r1-inverse-toc-transition-01",
+      "change": "Restore in_toc = False when any section_id is repeated",
+      "mutated_sha256": "27c8a34b1e94018c2682a4262db6c1faf94346719fdb428156144f364ab6ebcc",
+      "owners": [
+        "tests/test_sec_research_document_text.py::test_ambiguous_toc_heading_does_not_fabricate_section",
+        "tests/test_sec_research_document_text.py::test_duplicate_inside_toc_does_not_authorize_later_toc_only_item",
+        "tests/test_sec_research_document_text.py::test_toc_uncertainty_retains_full_text_and_omits_later_current_report_items"
+      ],
+      "failed": 3,
+      "passed": 0
+    }
+  ]
+}

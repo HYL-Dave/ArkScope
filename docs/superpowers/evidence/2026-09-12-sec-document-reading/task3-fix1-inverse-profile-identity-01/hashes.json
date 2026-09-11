@@ -1,0 +1,34 @@
+{
+  "after": {
+    "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+    "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+    "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+    "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+  },
+  "before": {
+    "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+    "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+    "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+    "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+  },
+  "choice": "profile-identity",
+  "disk_source_modified": false,
+  "kind": "process_local_compiled_source",
+  "mutated": {
+    "src/api/routes/sec_research.py": "a93d6a93fd268f2972c9b703715b4a636495c13a246d85ede996988508055abf",
+    "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+    "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+    "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+  },
+  "patch": {
+    "new": "        policy = SecSourcePolicy(user_agent=\"Wrong wrong@example.com\")\n",
+    "old": "        policy = SecSourcePolicy(user_agent=identity)\n",
+    "path": "src/api/routes/sec_research.py"
+  },
+  "restored": {
+    "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+    "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+    "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+    "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+  }
+}

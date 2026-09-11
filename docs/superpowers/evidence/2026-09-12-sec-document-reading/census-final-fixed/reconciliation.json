@@ -1,0 +1,95 @@
+{
+  "candidate_count": 4346,
+  "comparison_counts": {
+    "coverage_reductions": 0,
+    "dependency_metadata_changed": 0,
+    "new_candidates": 4,
+    "new_uncertainties": 166,
+    "new_untracked_paths": 0,
+    "review_required": true
+  },
+  "coverage": {
+    "decode_failed": 3,
+    "documentation": 198,
+    "excluded_evidence": 6754,
+    "excluded_non_source": 23,
+    "excluded_private": 6,
+    "read": 1133
+  },
+  "interpretation": "Raw scanner candidates retained; runtime consumers require independent evidence.",
+  "new_candidate_kinds": {
+    "css": 1,
+    "http": 1,
+    "i18n": 2
+  },
+  "new_uncertainty_ids_with_matching_previous_location_independent_metadata": 150,
+  "new_uncertainty_kinds": {
+    "frontend": 148,
+    "python": 1,
+    "sql": 17
+  },
+  "removed_candidates": [
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:secResearch.accession",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:secResearch.document",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:secResearch.empty",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:secResearch.filingId",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:secResearch.form",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:secResearch.gaps",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:secResearch.ok",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:secResearch.partial",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:secResearch.unavailable",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:secResearch.accession",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:secResearch.document",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:secResearch.empty",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:secResearch.filingId",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:secResearch.form",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:secResearch.gaps",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:secResearch.ok",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:secResearch.partial",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:secResearch.unavailable"
+  ],
+  "sec_routes": [
+    {
+      "method": "GET",
+      "path_template": "/sec-research/config",
+      "state": "syntactic_frontend_match"
+    },
+    {
+      "method": "PUT",
+      "path_template": "/sec-research/config",
+      "state": "syntactic_frontend_match"
+    },
+    {
+      "method": "GET",
+      "path_template": "/sec-research/{cik}",
+      "state": "syntactic_frontend_match"
+    },
+    {
+      "method": "GET",
+      "path_template": "/sec-research/{cik}/filings",
+      "state": "no_frontend_match_observed"
+    },
+    {
+      "method": "GET",
+      "path_template": "/sec-research/{cik}/facts",
+      "state": "no_frontend_match_observed"
+    },
+    {
+      "method": "POST",
+      "path_template": "/sec-research/{cik}/refresh",
+      "state": "syntactic_frontend_match"
+    },
+    {
+      "method": "GET",
+      "path_template": "/sec-research/filings/{filing_id}/document",
+      "state": "no_frontend_match_observed"
+    },
+    {
+      "method": "POST",
+      "path_template": "/sec-research/filings/{filing_id}/document",
+      "state": "syntactic_frontend_match"
+    }
+  ],
+  "status": "review_required_not_a_deletion_list",
+  "uncertainty_count": 3460
+}

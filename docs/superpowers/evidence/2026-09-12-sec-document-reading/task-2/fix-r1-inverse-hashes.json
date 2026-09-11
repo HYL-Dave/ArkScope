@@ -1,0 +1,166 @@
+{
+  "base_commit": "eeffb971adeb55186f33cd2821ca9ced80d62372",
+  "baseline": [
+    {
+      "path": "src/sec_research/document_store.py",
+      "sha256": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9"
+    },
+    {
+      "path": "src/sec_research/document_service.py",
+      "sha256": "4e1b311d4b5483e49906b015bf9b3649142bf759309c6ea6e51255aef209d858"
+    },
+    {
+      "path": "src/sec_research/document_queries.py",
+      "sha256": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5"
+    },
+    {
+      "path": "src/sec_research/schema.py",
+      "sha256": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5"
+    },
+    {
+      "path": "src/sec_research/capture_lock.py",
+      "sha256": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd"
+    },
+    {
+      "path": "tests/test_sec_research_document_store.py",
+      "sha256": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    {
+      "path": "tests/test_sec_research_document_service.py",
+      "sha256": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361"
+    },
+    {
+      "path": "tests/test_sec_research_document_queries.py",
+      "sha256": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-document-reading/task-2/test_review_probes.py",
+      "sha256": "a9ec18c7e68a1c576d6a8283851ff7c9013d9a269cef083a0cbf9391f7c3b483"
+    }
+  ],
+  "inverses": [
+    {
+      "name": "alias",
+      "selection": "tests/test_sec_research_document_queries.py -k 'pre_resolution_failure or first_interruption_marker'",
+      "result": "6 failed, 40 deselected",
+      "mutation": "omit previously established invalidation alias",
+      "evidence_directory": "task2-fix-r1-inverse-alias-01",
+      "mutated_snapshot": [
+        {
+          "path": "src/sec_research/document_service.py",
+          "sha256": "2c66ed565260bd99df1447ac1dbecd12d5816c65c852ac4e0c4412777a21443b"
+        }
+      ],
+      "all_nine_hashes_restored": true
+    },
+    {
+      "name": "report",
+      "selection": "tests/test_sec_research_document_service.py::test_invalid_reader_report_preserves_independent_dispatch",
+      "result": "2 failed",
+      "mutation": "discard operation evidence when report validation fails",
+      "evidence_directory": "task2-fix-r1-inverse-report-01",
+      "mutated_snapshot": [
+        {
+          "path": "src/sec_research/document_service.py",
+          "sha256": "abbc706e60f48e8e002c9882858311a19314a95de17bf27ecffd4c2b9235be31"
+        }
+      ],
+      "all_nine_hashes_restored": true
+    },
+    {
+      "name": "cleanup",
+      "selection": "tests/test_sec_research_document_service.py -k cleanup_failure",
+      "result": "7 failed, 32 deselected",
+      "mutation": "rewrite dispatch evidence to known zero after cleanup failure",
+      "evidence_directory": "task2-fix-r1-inverse-cleanup-01",
+      "mutated_snapshot": [
+        {
+          "path": "src/sec_research/document_service.py",
+          "sha256": "1b55c255c0f53f5b94b95541d62cbc3a0a286a86a528fdc201603fcb5ac589eb"
+        }
+      ],
+      "all_nine_hashes_restored": true
+    },
+    {
+      "name": "unknown",
+      "selection": "tests/test_sec_research_document_service.py::test_unreadable_request_count_is_unknown_not_zero -k directory",
+      "result": "1 failed, 1 deselected",
+      "mutation": "classify unknown-only dispatch evidence as no_dispatch",
+      "evidence_directory": "task2-fix-r1-inverse-unknown-01",
+      "mutated_snapshot": [
+        {
+          "path": "src/sec_research/document_store.py",
+          "sha256": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9"
+        },
+        {
+          "path": "src/sec_research/document_service.py",
+          "sha256": "0e646bc458b14bb423ecf7f0bdf3e577974caf59f3c0a453b2b47f9dc3c7b8f1"
+        },
+        {
+          "path": "src/sec_research/document_queries.py",
+          "sha256": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5"
+        },
+        {
+          "path": "src/sec_research/schema.py",
+          "sha256": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5"
+        },
+        {
+          "path": "src/sec_research/capture_lock.py",
+          "sha256": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd"
+        },
+        {
+          "path": "tests/test_sec_research_document_store.py",
+          "sha256": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+        },
+        {
+          "path": "tests/test_sec_research_document_service.py",
+          "sha256": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361"
+        },
+        {
+          "path": "tests/test_sec_research_document_queries.py",
+          "sha256": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87"
+        },
+        {
+          "path": ".superpowers/sdd/2026-09-12-sec-document-reading/task-2/test_review_probes.py",
+          "sha256": "a9ec18c7e68a1c576d6a8283851ff7c9013d9a269cef083a0cbf9391f7c3b483"
+        }
+      ],
+      "all_nine_hashes_restored": true
+    },
+    {
+      "name": "primary",
+      "selection": "tests/test_sec_research_document_service.py::test_only_receipt_bound_catalog_is_authority",
+      "result": "1 failed",
+      "mutation": "fabricate absence of the catalog's observed primary filename",
+      "evidence_directory": "task2-fix-r1-inverse-primary-01",
+      "mutated_file": {
+        "path": "src/sec_research/document_service.py",
+        "sha256": "8acefd2b23f5fa0082992156e9193ab10e37df0bee930742a56eb7ed1b30f479"
+      },
+      "all_nine_hashes_restored": true
+    },
+    {
+      "name": "truncated",
+      "selection": "tests/test_sec_research_document_service.py::test_incomplete_or_unsupported_capture_is_never_published[truncated]",
+      "result": "1 failed",
+      "mutation": "mark the truncated reader observation complete",
+      "evidence_directory": "task2-fix-r1-inverse-truncated-01",
+      "mutated_file": {
+        "path": "src/sec_research/document_service.py",
+        "sha256": "78f037355e7a7b3232c72d86d3617eb18b5071c7b757ed1f3f38bcc64d36e141"
+      },
+      "all_nine_hashes_restored": true
+    }
+  ],
+  "unchanged_query_inverses": {
+    "source_sha256": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+    "historical_manifest": "task-2/final-inverse-hashes.json",
+    "evidence_directories": [
+      "task2-inverse-latest-final-01",
+      "task2-inverse-query-binding-final-01"
+    ],
+    "note": "Query source unchanged in this fix; these inverses were not duplicated."
+  },
+  "fix_commit": "1f964efe305816641439926b4ede4473563056b2",
+  "postcommit_snapshot_matches_baseline": true
+}

@@ -1,0 +1,223 @@
+{
+  "refresh": {
+    "attempt_id": 3,
+    "filing_id": "0000320193:0000950170-26-000001",
+    "document_id": "primary",
+    "resolved_document_id": "file:actual.htm",
+    "primary_document": "actual.htm",
+    "capture_id": "secdoc_9cc130407524a5b67004d4f45465b302a16dacd2065513067c5c7830f476ee28",
+    "status": "ok",
+    "observed_at": "2026-09-12T12:00:00Z",
+    "acquisition_id": "633ae5713c3e485b961b1b28c711bee3",
+    "outcome": "complete",
+    "gaps": [],
+    "requests": [
+      {
+        "operation": "directory",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/index.json",
+        "report": {
+          "requests": 1,
+          "observations": [
+            {
+              "request_index": 1,
+              "status": 200,
+              "framing": "content_length",
+              "content_encoding": "identity",
+              "declared_body_bytes": 190,
+              "received_body_bytes": 190,
+              "decoded_body_bytes": 190,
+              "result_code": "complete"
+            }
+          ]
+        }
+      },
+      {
+        "operation": "document",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/actual.htm",
+        "report": {
+          "requests": 1,
+          "observations": [
+            {
+              "request_index": 1,
+              "status": 200,
+              "framing": "content_length",
+              "content_encoding": "identity",
+              "declared_body_bytes": 53,
+              "received_body_bytes": 53,
+              "decoded_body_bytes": 53,
+              "result_code": "complete"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "index": {
+    "status": "ok",
+    "data": {
+      "document": {
+        "capture_id": "secdoc_9cc130407524a5b67004d4f45465b302a16dacd2065513067c5c7830f476ee28",
+        "filing_id": "0000320193:0000950170-26-000001",
+        "document_id": "file:actual.htm",
+        "primary_document": "actual.htm",
+        "form": "10-K",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/actual.htm",
+        "original_sha256": "63aaffb1419acfc38f5a8cb09b65cacf721ed773db812bdc259542b9b2e9206c",
+        "text_sha256": "122d4716b6849e5891cbfe148581a437dbc1c11c4da64f09f33c9b6f2c3d3a38",
+        "extraction_version": "sec-document-text-v3",
+        "mime_type": "text/html",
+        "text_bytes": 38,
+        "original_bytes": 53,
+        "directory_sha256": "0dd9b5c8f43f213e809ab40880ec51d4be2cc239d61b31f2d870ced4960c48ad"
+      },
+      "documents": [
+        {
+          "name": "actual.htm",
+          "document_id": "file:actual.htm",
+          "url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/actual.htm",
+          "size_bytes": 1,
+          "source": {
+            "sha256": "0dd9b5c8f43f213e809ab40880ec51d4be2cc239d61b31f2d870ced4960c48ad",
+            "pointer": "/directory/item/0"
+          }
+        },
+        {
+          "name": "exhibit.xml",
+          "document_id": "file:exhibit.xml",
+          "url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/exhibit.xml",
+          "size_bytes": 1,
+          "source": {
+            "sha256": "0dd9b5c8f43f213e809ab40880ec51d4be2cc239d61b31f2d870ced4960c48ad",
+            "pointer": "/directory/item/1"
+          }
+        }
+      ],
+      "sections": [
+        {
+          "section_id": "item_1",
+          "label": "Item 1. Business",
+          "start_byte": 0,
+          "end_byte": 38
+        }
+      ],
+      "passages": [],
+      "text_start_cursor": "eyJjYXB0dXJlX2lkIjoic2VjZG9jXzljYzEzMDQwNzUyNGE1YjY3MDA0ZDRmNDU0NjViMzAyYTE2ZGFjZDIwNjU1MTMwNjdjNWM3ODMwZjQ3NmVlMjgiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDA5NTAxNzAtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ"
+    },
+    "gaps": [],
+    "observed_at": "2026-09-12T12:00:00Z",
+    "coverage": {
+      "capture_id": "secdoc_9cc130407524a5b67004d4f45465b302a16dacd2065513067c5c7830f476ee28",
+      "receipt_id": 1,
+      "mode": "index",
+      "catalog_complete": true,
+      "complete": true,
+      "index_total": 3,
+      "index_offset": 0
+    },
+    "next_cursor": null
+  },
+  "text": {
+    "status": "ok",
+    "data": {
+      "document": {
+        "capture_id": "secdoc_9cc130407524a5b67004d4f45465b302a16dacd2065513067c5c7830f476ee28",
+        "filing_id": "0000320193:0000950170-26-000001",
+        "document_id": "file:actual.htm",
+        "primary_document": "actual.htm",
+        "form": "10-K",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/actual.htm",
+        "original_sha256": "63aaffb1419acfc38f5a8cb09b65cacf721ed773db812bdc259542b9b2e9206c",
+        "text_sha256": "122d4716b6849e5891cbfe148581a437dbc1c11c4da64f09f33c9b6f2c3d3a38",
+        "extraction_version": "sec-document-text-v3",
+        "mime_type": "text/html",
+        "text_bytes": 38,
+        "original_bytes": 53,
+        "directory_sha256": "0dd9b5c8f43f213e809ab40880ec51d4be2cc239d61b31f2d870ced4960c48ad"
+      },
+      "documents": [],
+      "sections": [],
+      "passages": [
+        {
+          "text": "Item 1. Business\nneedle one needle two",
+          "citation": {
+            "filing_id": "0000320193:0000950170-26-000001",
+            "document_id": "file:actual.htm",
+            "capture_id": "secdoc_9cc130407524a5b67004d4f45465b302a16dacd2065513067c5c7830f476ee28",
+            "accession": "0000950170-26-000001",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/actual.htm",
+            "original_sha256": "63aaffb1419acfc38f5a8cb09b65cacf721ed773db812bdc259542b9b2e9206c",
+            "text_sha256": "122d4716b6849e5891cbfe148581a437dbc1c11c4da64f09f33c9b6f2c3d3a38",
+            "extraction_version": "sec-document-text-v3",
+            "start_byte": 0,
+            "end_byte": 38,
+            "match_start_byte": null,
+            "match_end_byte": null
+          }
+        }
+      ],
+      "text_start_cursor": "eyJjYXB0dXJlX2lkIjoic2VjZG9jXzljYzEzMDQwNzUyNGE1YjY3MDA0ZDRmNDU0NjViMzAyYTE2ZGFjZDIwNjU1MTMwNjdjNWM3ODMwZjQ3NmVlMjgiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDA5NTAxNzAtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ"
+    },
+    "gaps": [],
+    "observed_at": "2026-09-12T12:00:00Z",
+    "coverage": {
+      "capture_id": "secdoc_9cc130407524a5b67004d4f45465b302a16dacd2065513067c5c7830f476ee28",
+      "receipt_id": 1,
+      "mode": "text",
+      "catalog_complete": true,
+      "complete": true
+    },
+    "next_cursor": null
+  },
+  "search": {
+    "status": "ok",
+    "data": {
+      "document": {
+        "capture_id": "secdoc_9cc130407524a5b67004d4f45465b302a16dacd2065513067c5c7830f476ee28",
+        "filing_id": "0000320193:0000950170-26-000001",
+        "document_id": "file:actual.htm",
+        "primary_document": "actual.htm",
+        "form": "10-K",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/actual.htm",
+        "original_sha256": "63aaffb1419acfc38f5a8cb09b65cacf721ed773db812bdc259542b9b2e9206c",
+        "text_sha256": "122d4716b6849e5891cbfe148581a437dbc1c11c4da64f09f33c9b6f2c3d3a38",
+        "extraction_version": "sec-document-text-v3",
+        "mime_type": "text/html",
+        "text_bytes": 38,
+        "original_bytes": 53,
+        "directory_sha256": "0dd9b5c8f43f213e809ab40880ec51d4be2cc239d61b31f2d870ced4960c48ad"
+      },
+      "documents": [],
+      "sections": [],
+      "passages": [
+        {
+          "text": "Item 1. Business\nneedle one needle two",
+          "citation": {
+            "filing_id": "0000320193:0000950170-26-000001",
+            "document_id": "file:actual.htm",
+            "capture_id": "secdoc_9cc130407524a5b67004d4f45465b302a16dacd2065513067c5c7830f476ee28",
+            "accession": "0000950170-26-000001",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/actual.htm",
+            "original_sha256": "63aaffb1419acfc38f5a8cb09b65cacf721ed773db812bdc259542b9b2e9206c",
+            "text_sha256": "122d4716b6849e5891cbfe148581a437dbc1c11c4da64f09f33c9b6f2c3d3a38",
+            "extraction_version": "sec-document-text-v3",
+            "start_byte": 0,
+            "end_byte": 38,
+            "match_start_byte": 17,
+            "match_end_byte": 23
+          }
+        }
+      ],
+      "text_start_cursor": "eyJjYXB0dXJlX2lkIjoic2VjZG9jXzljYzEzMDQwNzUyNGE1YjY3MDA0ZDRmNDU0NjViMzAyYTE2ZGFjZDIwNjU1MTMwNjdjNWM3ODMwZjQ3NmVlMjgiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDA5NTAxNzAtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiOWI5OGI4M2E2MmEzYTVmMjk0N2EwMWE0MjRkZTcyZTIwZjE3M2ViOTJjYzQ5ODExM2I2N2RhMGEzNmE4NDBlNSIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ"
+    },
+    "gaps": [],
+    "observed_at": "2026-09-12T12:00:00Z",
+    "coverage": {
+      "capture_id": "secdoc_9cc130407524a5b67004d4f45465b302a16dacd2065513067c5c7830f476ee28",
+      "receipt_id": 1,
+      "mode": "search",
+      "catalog_complete": true,
+      "complete": false
+    },
+    "next_cursor": "eyJjYXB0dXJlX2lkIjoic2VjZG9jXzljYzEzMDQwNzUyNGE1YjY3MDA0ZDRmNDU0NjViMzAyYTE2ZGFjZDIwNjU1MTMwNjdjNWM3ODMwZjQ3NmVlMjgiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDA5NTAxNzAtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNzgwN2EyZDUxMTM3ZmNmY2NlOTBiNmY1MDk2MjYyMDA4OTI4MTUxMzg2MWVlYjIwNDNkZjMxNDNkZWU1Y2Q3MiIsIm1vZGUiOiJzZWFyY2giLCJvZmZzZXQiOjIzLCJ2IjoxfQ"
+  }
+}

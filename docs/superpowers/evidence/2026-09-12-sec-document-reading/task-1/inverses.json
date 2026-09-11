@@ -1,0 +1,43 @@
+{
+  "baseline_manifest": "task-1/source-before-inverses.sha256",
+  "restoration": "sha256sum -c passed for all five scoped files after each inverse, before applying the next inverse",
+  "mutations": [
+    {
+      "name": "accept unsafe directory name",
+      "file": "src/sec_research/documents.py",
+      "before": "name = _primary_document(item.get(\"name\"), pointer + \"/name\")",
+      "after": "name = item.get(\"name\")",
+      "mutated_sha256": "6b5edb4f311f7e7c7b6c47a0c6dcf419165a5c8b9de30a527e1c8e781cc47b7f",
+      "restored_sha256": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "owner": "tests/test_sec_research_documents.py::test_directory_rejects_escape_and_cross_accession",
+      "run": "task1-inverse-unsafe-name-01",
+      "failed": 13,
+      "passed": 3
+    },
+    {
+      "name": "ignore nesting limit",
+      "file": "src/sec_research/document_text.py",
+      "before": ["if tag not in self._VOID and len(self.stack) >= MAX_NESTING:", "if self.depth > MAX_NESTING:"],
+      "after": ["if False and tag not in self._VOID and len(self.stack) >= MAX_NESTING:", "if False and self.depth > MAX_NESTING:"],
+      "mutated_sha256": "c8da693cee21acbd7b7ec3b17ec1f2bfac3b2623c2e12ace7d6331b44c94c753",
+      "restored_sha256": "bedfc5c6795f0354040d7d4c1e0a729b0919ffac28943d010e1ef573471c020a",
+      "owner": "tests/test_sec_research_document_text.py::test_sec_parser_limits_fail_without_truncation",
+      "failed_parameters": ["html-nesting", "xml-nesting"],
+      "run": "task1-inverse-nesting-01",
+      "failed": 2,
+      "passed": 3
+    },
+    {
+      "name": "choose first duplicate Item heading",
+      "file": "src/sec_research/document_text.py",
+      "before": "if section_id in rows: ambiguous.add(section_id)",
+      "after": "if section_id in rows: ambiguous.discard(section_id)",
+      "mutated_sha256": "72654ee76a2e86ece3cf5a9d9dc058e40ad463a04ba92d854a0aa6b81f51da8e",
+      "restored_sha256": "bedfc5c6795f0354040d7d4c1e0a729b0919ffac28943d010e1ef573471c020a",
+      "owner": "tests/test_sec_research_document_text.py::test_ambiguous_toc_heading_does_not_fabricate_section",
+      "run": "task1-inverse-duplicate-item-01",
+      "failed": 1,
+      "passed": 0
+    }
+  ]
+}

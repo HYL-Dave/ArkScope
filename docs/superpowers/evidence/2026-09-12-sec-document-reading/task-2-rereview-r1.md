@@ -1,0 +1,22 @@
+# Spec Compliance
+
+- **Approved for Fix Round1. I1: ADDRESSED. I2: ADDRESSED.** No remaining findings or new blocking defects identified in `task-2-fix-r1-diff.txt:1` (`eeffb971..1f964efe`). This is a scoped fix review, not renewed whole-task or integration approval.
+
+## Finding Disposition
+
+- **I1 ADDRESSED:** `src/sec_research/document_service.py:171` obtains the remembered invalidation alias under the acquisition lease before the first interruption marker. It is separate from fresh `primary_document`/`resolved_document_id`, which still require catalog resolution. `src/sec_research/document_store.py:119` limits this memory to the most recently established primary relationship; `src/sec_research/document_store.py:136` matches both spellings against the invalidation field. Earlier attempt JSON remains readable with a null default at `src/sec_research/document_store.py:28`, without schema edits or mutation.
+- **I1 evidence:** `tests/test_sec_research_document_queries.py:278` covers conflict/cancellation in both directions and unchanged primary/resolved pinned passages; `tests/test_sec_research_document_queries.py:311` checks the first marker during interruption. The exhibit and superseded-primary isolation owners at `tests/test_sec_research_document_queries.py:332` and `tests/test_sec_research_document_queries.py:347` guard against unrelated invalidation. Fresh dispatch authority is not supplied by the remembered alias.
+- **I2 ADDRESSED:** `src/sec_research/document_service.py:111` registers operation evidence before the read; `src/sec_research/document_service.py:120` snapshots count/state before report validation and cleanup. Malformed/unreadable reports remain null with sanitized gaps; cleanup runs in its own finally block and cannot overwrite the captured count or original read exception. `src/sec_research/document_service.py:41` distinguishes dispatched, unknown and known-zero outcomes, and `src/sec_research/document_service.py:235` retains reporting/cleanup gaps alongside the original failure.
+- **I2 evidence:** `tests/test_sec_research_document_service.py:359` reproduces status-600 report rejection for directory and document operations, asserting independent counts/state, nullable report, original failure, durable readback and no published capture. The added cleanup, unknown-count, zero-dispatch and destructive-cleanup owners cover the exceptional paths. The parent-approved refined request shape is the contract; the original probe's nested `report.requests` assertion is not required when `report` is null.
+
+## Quality And Evidence
+
+- **Strengths:** the fixes keep invalidation separate from acquisition authority and dispatch evidence separate from validated reports. Changes remain in the two existing owners and their tests; no schema, parser, query pagination, worker-thread or integration expansion.
+- **Check:** read the 539-line fix artifact once, in nonoverlapping ranges 1-280 and 281-539. No changed source was separately reread and no outside-diff product inspection was needed. `sha256sum` matched all nine entries in `task-2/fix-r1-inverse-hashes.json:3`, including unchanged query/schema/lock/store-test files and the untouched historical reviewer probe.
+- **Worker checkpoints inspected, not rerun:** `task2-fix-r1-green-core-01/output.log:4` records **111 passed, 2 deselected**; `task2-fix-r1-regression-01/output.log:7` records **338 passed**; `task2-fix-r1-restored-01/output.log:3` records **20 passed, 65 deselected** after restoration. Command records confirm the scopes. The two core deselections are the old checkpoint hash assertion and superseded I2 request-shape probe, not omitted coverage of the repaired behavior. These logs contain no warnings.
+- **Inverse evidence inspected:** the six records in `task-2/fix-r1-inverse-hashes.json:41` and their referenced logs show intended failures for alias memory, report retention, cleanup counters, unknown dispatch, primary admission and truncated-report completion. The final nine-file hash comparison matches the recorded restored baseline; unchanged query inverse evidence remains historical.
+- **Safety/scope:** no tests or new probes run, product/index/Git edits, subagents, provider/data/config/token access, installation or restart. Only this rereview report was written. Full-suite and browser integration remain parent-owned; the earlier 1,292/87/4 checkpoints were not treated as Fix Round1 results.
+
+## Assessment
+
+- **Spec compliance: Approved within this fix scope. Code quality: Approved. Remaining findings: None.**

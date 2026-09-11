@@ -1,0 +1,26 @@
+{
+  "name": "parent-reader-browser-02",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/browser_check.py",
+    "--base",
+    "http://127.0.0.1:8457",
+    "--output",
+    "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/parent-reader-browser-02/browser"
+  ],
+  "cwd": "/tmp/arkscope-listing-sec-macro-convergence",
+  "exit_code": 1,
+  "seconds": 14.186,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/parent-reader-browser-02",
+    "HOME": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/parent-reader-browser-02/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "PLAYWRIGHT_BROWSERS_PATH": "/home/hyl/.cache/ms-playwright"
+  },
+  "log": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/parent-reader-browser-02/output.log"
+}

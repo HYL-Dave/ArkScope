@@ -1,0 +1,482 @@
+[
+  {
+    "change": "Lowercase original attribute name before namespace admission/binding/duplicate detection.",
+    "failed_testcases": [
+      ".superpowers.sdd.2026-09-12-sec-document-reading.task-1.test_rereview_r1_prefix_case_probe::test_case_distinct_namespace_declarations_are_not_conflicting",
+      ".superpowers.sdd.2026-09-12-sec-document-reading.task-1.test_rereview_r1_prefix_case_probe::test_case_distinct_nested_prefix_does_not_rebind_inline_namespace",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_namespace_declarations_are_not_conflicting[F-f]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_namespace_declarations_are_not_conflicting[fact-Fact]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_namespace_declarations_are_not_conflicting[ix-IX]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[F-f]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[fact-Fact]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[ix-IX]",
+      "tests.test_sec_research_document_text::test_xhtml_namespace_declaration_name_is_case_sensitive"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "579862c9f76c3d023ca70af17f8bea9d93d964ffb9796cea8b0933fa0891e1ee",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-declaration-case-01"
+  },
+  {
+    "change": "Lowercase original start QName before namespace lookup and stack identity.",
+    "failed_testcases": [
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[F-f]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[fact-Fact]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_prefix_does_not_rebind_inline_namespace[ix-IX]",
+      "tests.test_sec_research_document_text::test_xhtml_inline_local_name_is_case_sensitive"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "0a403448c1d1ca6e1cfdc22b562abbcc54d2fa34ad583bb24b9a7693cc6ddba4",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-start-qname-01"
+  },
+  {
+    "change": "Lowercase original closing QName before stack matching and scope restoration.",
+    "failed_testcases": [
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_qnames_restore_each_scope[Scope-scope]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_qnames_restore_each_scope[f:Box-f:box]",
+      "tests.test_sec_research_document_text::test_xhtml_case_distinct_nested_qnames_restore_each_scope[f:box-F:box]",
+      "tests.test_sec_research_document_text::test_xhtml_mismatched_case_close_does_not_restore_namespace_early"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "e90b0303d99248ec86341bb9b7455b1c82f2491aa8c94fddc64b172782cd20e1",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-end-qname-01"
+  },
+  {
+    "change": "Lowercase the synthetic closing QName for self-closing elements.",
+    "failed_testcases": [
+      "tests.test_sec_research_document_text::test_xhtml_case_preserving_empty_qname_restores_namespace[F:scope]",
+      "tests.test_sec_research_document_text::test_xhtml_case_preserving_empty_qname_restores_namespace[Scope]"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "fffed797f4e940365d1c95d777330f1199f624358dcdfef4dcd8032f31a80cb0",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-empty-qname-01"
+  },
+  {
+    "change": "Remove the per-attribute budget/cancellation tick when reading original source tokens.",
+    "failed_testcases": [
+      "tests.test_sec_research_document_text::test_xhtml_source_attribute_token_work_consumes_parser_budget",
+      "tests.test_sec_research_document_text::test_xhtml_source_attribute_token_work_is_cancellable"
+    ],
+    "mutated": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "0242b2f1dcab40f99925b00f1cad6f8c509135b07fd0d9020d00d1d89c3dc95f",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "record": "task-1/fix-r2-inverses.json",
+    "restored": {
+      "src/lifecycle_public_sources.py": "d17ae572c4081add9c1d55389bcf727c18318e61d5b49eac86cf403780f536f1",
+      "src/sec_research/document_text.py": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+      "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+      "tests/test_sec_research_document_text.py": "1a9c0eafa712633e55684eae27eb39a996db2790c6d615aafa0cd1403f19a0ec",
+      "tests/test_sec_research_documents.py": "bdbb96f5adccaae1ba05bb5516d89821a1abe6e6061539a89d3c7a35b36fd8a5"
+    },
+    "run": "task1-fix-r2-inverse-token-work-01"
+  },
+  {
+    "change": "omit previously established invalidation alias",
+    "failed_testcases": [
+      "tests.test_sec_research_document_queries::test_first_interruption_marker_invalidates_both_observed_aliases[file:actual.htm-primary]",
+      "tests.test_sec_research_document_queries::test_first_interruption_marker_invalidates_both_observed_aliases[primary-file:actual.htm]",
+      "tests.test_sec_research_document_queries::test_pre_resolution_failure_invalidates_both_observed_aliases[conflict-file:actual.htm-primary]",
+      "tests.test_sec_research_document_queries::test_pre_resolution_failure_invalidates_both_observed_aliases[conflict-primary-file:actual.htm]",
+      "tests.test_sec_research_document_queries::test_pre_resolution_failure_invalidates_both_observed_aliases[early_cancel-file:actual.htm-primary]",
+      "tests.test_sec_research_document_queries::test_pre_resolution_failure_invalidates_both_observed_aliases[early_cancel-primary-file:actual.htm]"
+    ],
+    "mutated": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "2c66ed565260bd99df1447ac1dbecd12d5816c65c852ac4e0c4412777a21443b",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "record": "task-2/fix-r1-inverse-hashes.json",
+    "restored": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "4e1b311d4b5483e49906b015bf9b3649142bf759309c6ea6e51255aef209d858",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "run": "task2-fix-r1-inverse-alias-01"
+  },
+  {
+    "change": "discard operation evidence when report validation fails",
+    "failed_testcases": [
+      "tests.test_sec_research_document_service::test_invalid_reader_report_preserves_independent_dispatch[directory]",
+      "tests.test_sec_research_document_service::test_invalid_reader_report_preserves_independent_dispatch[document]"
+    ],
+    "mutated": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "abbc706e60f48e8e002c9882858311a19314a95de17bf27ecffd4c2b9235be31",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "record": "task-2/fix-r1-inverse-hashes.json",
+    "restored": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "4e1b311d4b5483e49906b015bf9b3649142bf759309c6ea6e51255aef209d858",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "run": "task2-fix-r1-inverse-report-01"
+  },
+  {
+    "change": "rewrite dispatch evidence to known zero after cleanup failure",
+    "failed_testcases": [
+      "tests.test_sec_research_document_service::test_cleanup_failure_cannot_rewrite_captured_request_count",
+      "tests.test_sec_research_document_service::test_cleanup_failure_keeps_dispatch_reports_and_original_failure[200-directory]",
+      "tests.test_sec_research_document_service::test_cleanup_failure_keeps_dispatch_reports_and_original_failure[200-document]",
+      "tests.test_sec_research_document_service::test_cleanup_failure_keeps_dispatch_reports_and_original_failure[503-directory]",
+      "tests.test_sec_research_document_service::test_cleanup_failure_keeps_dispatch_reports_and_original_failure[503-document]",
+      "tests.test_sec_research_document_service::test_cleanup_failure_keeps_dispatch_reports_and_original_failure[600-directory]",
+      "tests.test_sec_research_document_service::test_cleanup_failure_keeps_dispatch_reports_and_original_failure[600-document]"
+    ],
+    "mutated": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "1b55c255c0f53f5b94b95541d62cbc3a0a286a86a528fdc201603fcb5ac589eb",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "record": "task-2/fix-r1-inverse-hashes.json",
+    "restored": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "4e1b311d4b5483e49906b015bf9b3649142bf759309c6ea6e51255aef209d858",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "run": "task2-fix-r1-inverse-cleanup-01"
+  },
+  {
+    "change": "classify unknown-only dispatch evidence as no_dispatch",
+    "failed_testcases": [
+      "tests.test_sec_research_document_service::test_unreadable_request_count_is_unknown_not_zero[directory]"
+    ],
+    "mutated": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "0e646bc458b14bb423ecf7f0bdf3e577974caf59f3c0a453b2b47f9dc3c7b8f1",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "record": "task-2/fix-r1-inverse-hashes.json",
+    "restored": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "4e1b311d4b5483e49906b015bf9b3649142bf759309c6ea6e51255aef209d858",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "run": "task2-fix-r1-inverse-unknown-01"
+  },
+  {
+    "change": "fabricate absence of the catalog's observed primary filename",
+    "failed_testcases": [
+      "tests.test_sec_research_document_service::test_only_receipt_bound_catalog_is_authority"
+    ],
+    "mutated": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "8acefd2b23f5fa0082992156e9193ab10e37df0bee930742a56eb7ed1b30f479",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "record": "task-2/fix-r1-inverse-hashes.json",
+    "restored": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "4e1b311d4b5483e49906b015bf9b3649142bf759309c6ea6e51255aef209d858",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "run": "task2-fix-r1-inverse-primary-01"
+  },
+  {
+    "change": "mark the truncated reader observation complete",
+    "failed_testcases": [
+      "tests.test_sec_research_document_service::test_incomplete_or_unsupported_capture_is_never_published[truncated]"
+    ],
+    "mutated": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "78f037355e7a7b3232c72d86d3617eb18b5071c7b757ed1f3f38bcc64d36e141",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "record": "task-2/fix-r1-inverse-hashes.json",
+    "restored": {
+      "src/sec_research/capture_lock.py": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd",
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "src/sec_research/document_service.py": "4e1b311d4b5483e49906b015bf9b3649142bf759309c6ea6e51255aef209d858",
+      "src/sec_research/document_store.py": "27f7e60d5ce0474db79671bdf9c0bfc86d3fad53928a812d238506e7dfa0fbc9",
+      "src/sec_research/schema.py": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87",
+      "tests/test_sec_research_document_service.py": "69510d74cb38c3558bd32f785d75083d592433e331ed52a06e36aa43def3a361",
+      "tests/test_sec_research_document_store.py": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    "run": "task2-fix-r1-inverse-truncated-01"
+  },
+  {
+    "failed_testcases": [
+      "tests.test_sec_research_document_queries::test_pinned_capture_survives_refresh_restart_and_relocation"
+    ],
+    "kind": "process_local_compiled_source",
+    "mutated": {
+      "src/sec_research/document_queries.py": "264d2c77ca546bbfbcc9c7aab0d804fbac44af12bcae91007d4ad0e308129ac5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87"
+    },
+    "record": "parent-inverse-pin-01/hashes.json",
+    "restored": {
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87"
+    },
+    "run": "parent-inverse-pin-01"
+  },
+  {
+    "failed_testcases": [
+      "tests.test_sec_research_document_queries::test_document_cursor_binds_capture_filter_and_size"
+    ],
+    "kind": "process_local_compiled_source",
+    "mutated": {
+      "src/sec_research/document_queries.py": "a4f67e93b8f2ab2c4f2d94deaac069338562d394313ce8954d035aafa2ca7705",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87"
+    },
+    "record": "parent-inverse-filter-01/hashes.json",
+    "restored": {
+      "src/sec_research/document_queries.py": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5",
+      "tests/test_sec_research_document_queries.py": "5ce76b7c910132580f02dd74baed17acdf07ed05627507fae692a17bd4205e87"
+    },
+    "run": "parent-inverse-filter-01"
+  },
+  {
+    "before": {
+      "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "errors": 0,
+    "failed_testcases": [
+      "tests.test_sec_research_document_routes::test_cursor_binding_rejected_before_absent_store",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params0-sec_research_query_invalid-absent]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params0-sec_research_query_invalid-corrupt]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params1-sec_research_query_invalid-absent]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params1-sec_research_query_invalid-corrupt]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params2-sec_research_query_invalid-absent]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params2-sec_research_query_invalid-corrupt]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params3-sec_research_query_invalid-absent]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params3-sec_research_query_invalid-corrupt]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params4-sec_research_query_invalid-absent]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params4-sec_research_query_invalid-corrupt]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params5-sec_research_cursor_invalid-absent]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params5-sec_research_cursor_invalid-corrupt]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params6-sec_research_cursor_invalid-absent]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params6-sec_research_cursor_invalid-corrupt]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params7-sec_research_cursor_invalid-absent]",
+      "tests.test_sec_research_document_routes::test_invalid_get_operands_precede_store_access[params7-sec_research_cursor_invalid-corrupt]"
+    ],
+    "failures": 17,
+    "kind": "process_local_compiled_source",
+    "mutated": {
+      "src/api/routes/sec_research.py": "def3ea1dd1897f55fffd391f93d1bb0dd42f1bb844cbd513bf8754ca1ce923aa",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "mutation": "task3-fix1-inverse-validation-order-01/mutation.py",
+    "passed": 16,
+    "record": "task3-fix1-inverse-validation-order-01/hashes.json",
+    "restored": {
+      "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "run": "task3-fix1-inverse-validation-order-01",
+    "skipped": 0
+  },
+  {
+    "before": {
+      "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "errors": 0,
+    "failed_testcases": [
+      "tests.test_sec_research_document_routes::test_corrupt_budget_does_not_block_existing_stored_document",
+      "tests.test_sec_research_document_routes::test_real_post_get_search_and_pinned_reread_keep_exact_bytes"
+    ],
+    "failures": 2,
+    "kind": "process_local_compiled_source",
+    "mutated": {
+      "src/api/routes/sec_research.py": "762f06c4ff8bf678f9a640a21d612e1aa4aaccb7728984cd6a02533c6b82163c",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "mutation": "task3-fix1-inverse-get-budget-01/mutation.py",
+    "passed": 0,
+    "record": "task3-fix1-inverse-get-budget-01/hashes.json",
+    "restored": {
+      "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "run": "task3-fix1-inverse-get-budget-01",
+    "skipped": 0
+  },
+  {
+    "before": {
+      "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "errors": 0,
+    "failed_testcases": [
+      "tests.test_sec_research_document_routes::test_email_only_profile_identity_is_normalized_on_both_actual_requests",
+      "tests.test_sec_research_document_routes::test_real_post_get_search_and_pinned_reread_keep_exact_bytes"
+    ],
+    "failures": 2,
+    "kind": "process_local_compiled_source",
+    "mutated": {
+      "src/api/routes/sec_research.py": "a93d6a93fd268f2972c9b703715b4a636495c13a246d85ede996988508055abf",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "mutation": "task3-fix1-inverse-profile-identity-01/mutation.py",
+    "passed": 0,
+    "record": "task3-fix1-inverse-profile-identity-01/hashes.json",
+    "restored": {
+      "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "run": "task3-fix1-inverse-profile-identity-01",
+    "skipped": 0
+  },
+  {
+    "before": {
+      "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "errors": 0,
+    "failed_testcases": [
+      "tests.test_sec_research_document_routes::test_shared_permission_denial_precedes_all_post_owners"
+    ],
+    "failures": 1,
+    "kind": "process_local_compiled_source",
+    "mutated": {
+      "src/api/routes/sec_research.py": "889b1d108a674b4225ffa145d12ccb8d06c607e1052baedc41c1c2734f63f3c3",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "mutation": "task3-fix1-inverse-permission-01/mutation.py",
+    "passed": 0,
+    "record": "task3-fix1-inverse-permission-01/hashes.json",
+    "restored": {
+      "src/api/routes/sec_research.py": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+      "tests/test_api.py": "b43bdbe284d1ba09db51568c75f9c52ee89701ca77a0e0d071aa62ec65af3e79",
+      "tests/test_sec_research_document_routes.py": "07c5dad958bd3167394bd7c8be375498772ca890489d08719ac3d3b225b43981",
+      "tests/test_security_lifecycle_routes.py": "63f5f1d2b435e0ad0cef5d2c5b56930ed481da099764f68056665871387c14ee"
+    },
+    "run": "task3-fix1-inverse-permission-01",
+    "skipped": 0
+  }
+]

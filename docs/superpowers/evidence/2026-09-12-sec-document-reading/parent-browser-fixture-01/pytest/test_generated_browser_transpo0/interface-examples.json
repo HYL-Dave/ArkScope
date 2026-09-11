@@ -1,0 +1,397 @@
+{
+  "attempt": {
+    "attempt_id": 3,
+    "filing_id": "0000320193:0000320193-26-000001",
+    "document_id": "primary",
+    "resolved_document_id": "file:fixture-1.htm",
+    "primary_document": "fixture-1.htm",
+    "capture_id": "secdoc_c5f3a796f86fd9a2fafb2862bfcdfbad6ac67643f113acbe4f141ee63233dda1",
+    "status": "partial",
+    "observed_at": "2026-09-11T19:09:04.394265Z",
+    "acquisition_id": "afd188a32a8a41b7825ef348fde291f6",
+    "outcome": "complete",
+    "gaps": [
+      {
+        "code": "catalog_source_gaps",
+        "count": 1
+      },
+      {
+        "code": "catalog_sources_pending",
+        "count": 1
+      }
+    ],
+    "requests": [
+      {
+        "operation": "directory",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/index.json",
+        "request_count": 1,
+        "dispatch_state": "dispatched",
+        "report": {
+          "requests": 1,
+          "observations": [
+            {
+              "request_index": 1,
+              "status": 200,
+              "framing": "content_length",
+              "content_encoding": "identity",
+              "declared_body_bytes": 205,
+              "received_body_bytes": 205,
+              "decoded_body_bytes": 205,
+              "result_code": "complete"
+            }
+          ]
+        },
+        "gaps": []
+      },
+      {
+        "operation": "document",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+        "request_count": 1,
+        "dispatch_state": "dispatched",
+        "report": {
+          "requests": 1,
+          "observations": [
+            {
+              "request_index": 1,
+              "status": 200,
+              "framing": "content_length",
+              "content_encoding": "identity",
+              "declared_body_bytes": 25268,
+              "received_body_bytes": 25268,
+              "decoded_body_bytes": 25268,
+              "result_code": "complete"
+            }
+          ]
+        },
+        "gaps": []
+      }
+    ],
+    "invalidation_primary_document": null
+  },
+  "index": {
+    "status": "partial",
+    "data": {
+      "document": {
+        "capture_id": "secdoc_c5f3a796f86fd9a2fafb2862bfcdfbad6ac67643f113acbe4f141ee63233dda1",
+        "filing_id": "0000320193:0000320193-26-000001",
+        "document_id": "file:fixture-1.htm",
+        "primary_document": "fixture-1.htm",
+        "form": "10-K",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+        "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+        "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+        "extraction_version": "sec-document-text-v3",
+        "mime_type": "text/html",
+        "text_bytes": 17438,
+        "original_bytes": 25268,
+        "directory_sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487"
+      },
+      "documents": [
+        {
+          "name": "fixture-1.htm",
+          "document_id": "file:fixture-1.htm",
+          "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+          "size_bytes": 25268,
+          "source": {
+            "sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487",
+            "pointer": "/directory/item/0"
+          }
+        },
+        {
+          "name": "exhibit.txt",
+          "document_id": "file:exhibit.txt",
+          "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/exhibit.txt",
+          "size_bytes": null,
+          "source": {
+            "sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487",
+            "pointer": "/directory/item/1"
+          }
+        }
+      ],
+      "sections": [
+        {
+          "section_id": "item_1",
+          "label": "ITEM 1. BUSINESS",
+          "start_byte": 0,
+          "end_byte": 17387
+        },
+        {
+          "section_id": "item_1a",
+          "label": "ITEM 1A. RISK FACTORS",
+          "start_byte": 17387,
+          "end_byte": 17438
+        }
+      ],
+      "passages": [],
+      "text_start_cursor": "eyJjYXB0dXJlX2lkIjoic2VjZG9jX2M1ZjNhNzk2Zjg2ZmQ5YTJmYWZiMjg2MmJmY2RmYmFkNmFjNjc2NDNmMTEzYWNiZTRmMTQxZWU2MzIzM2RkYTEiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ"
+    },
+    "gaps": [
+      {
+        "code": "catalog_source_gaps",
+        "count": 1
+      },
+      {
+        "code": "catalog_sources_pending",
+        "count": 1
+      }
+    ],
+    "observed_at": "2026-09-11T19:09:04.635314Z",
+    "coverage": {
+      "capture_id": "secdoc_c5f3a796f86fd9a2fafb2862bfcdfbad6ac67643f113acbe4f141ee63233dda1",
+      "receipt_id": 4,
+      "mode": "index",
+      "catalog_complete": false,
+      "complete": false,
+      "index_total": 4,
+      "index_offset": 0
+    },
+    "next_cursor": null
+  },
+  "page": {
+    "status": "partial",
+    "data": {
+      "document": {
+        "capture_id": "secdoc_c5f3a796f86fd9a2fafb2862bfcdfbad6ac67643f113acbe4f141ee63233dda1",
+        "filing_id": "0000320193:0000320193-26-000001",
+        "document_id": "file:fixture-1.htm",
+        "primary_document": "fixture-1.htm",
+        "form": "10-K",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+        "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+        "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+        "extraction_version": "sec-document-text-v3",
+        "mime_type": "text/html",
+        "text_bytes": 17438,
+        "original_bytes": 25268,
+        "directory_sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487"
+      },
+      "documents": [],
+      "sections": [],
+      "passages": [
+        {
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 4: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 5: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 6: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 7: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 8: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 9: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 10: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 11: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 12: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 13: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 14: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 15: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 16: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 17: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 18: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 19: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 20: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 21: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 22: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 23: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 24: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 25: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 26: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 27: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 28: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 29: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 30: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 31: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 32: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 33: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 34: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 35: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 36: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 37: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 38: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 39: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 40: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 41: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 42: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 43: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 44: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 45: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 46: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 47: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 48: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 49: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 50: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 51: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 52: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 53: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 54: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 55: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 56: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 57: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 58: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 59: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 60: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 61: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 62: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 63: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 64: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 65: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 66: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 67: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 68: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 69: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 70: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 71: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 72: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 73: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 74: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 75: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 76: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 77: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 78: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 79: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 80: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 81: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 82: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 83: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 84: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 85: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 86: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 87: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 88: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 89: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 90: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 91: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 92: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 93: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 94: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 95: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 96: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 97: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 98: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 99: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 100: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 101: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 102: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 103: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 104: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 105: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 106: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 107: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 108: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 109: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 110: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 111: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 112: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 113: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 114: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 115: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 116: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 117: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 118: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 119: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 120: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 121: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 122: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 123: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 124: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 125: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 126: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 127: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 128: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 129: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 130: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 131: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 132: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 133: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 134: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 135: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 136: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 137: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 138: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 139: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 140: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 141: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 142: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 143: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 144: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 145: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 146: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 147: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 148: Ca",
+          "citation": {
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "capture_id": "secdoc_c5f3a796f86fd9a2fafb2862bfcdfbad6ac67643f113acbe4f141ee63233dda1",
+            "accession": "0000320193-26-000001",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v3",
+            "start_byte": 0,
+            "end_byte": 6740,
+            "match_start_byte": null,
+            "match_end_byte": null
+          }
+        }
+      ],
+      "text_start_cursor": "eyJjYXB0dXJlX2lkIjoic2VjZG9jX2M1ZjNhNzk2Zjg2ZmQ5YTJmYWZiMjg2MmJmY2RmYmFkNmFjNjc2NDNmMTEzYWNiZTRmMTQxZWU2MzIzM2RkYTEiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ"
+    },
+    "gaps": [
+      {
+        "code": "catalog_source_gaps",
+        "count": 1
+      },
+      {
+        "code": "catalog_sources_pending",
+        "count": 1
+      }
+    ],
+    "observed_at": "2026-09-11T19:09:04.635314Z",
+    "coverage": {
+      "capture_id": "secdoc_c5f3a796f86fd9a2fafb2862bfcdfbad6ac67643f113acbe4f141ee63233dda1",
+      "receipt_id": 4,
+      "mode": "text",
+      "catalog_complete": false,
+      "complete": false
+    },
+    "next_cursor": "eyJjYXB0dXJlX2lkIjoic2VjZG9jX2M1ZjNhNzk2Zjg2ZmQ5YTJmYWZiMjg2MmJmY2RmYmFkNmFjNjc2NDNmMTEzYWNiZTRmMTQxZWU2MzIzM2RkYTEiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0Ijo2NzQwLCJ2IjoxfQ"
+  },
+  "failed": {
+    "attempt_id": 9,
+    "filing_id": "0000320193:0000320193-26-000001",
+    "document_id": "primary",
+    "resolved_document_id": "file:fixture-1.htm",
+    "primary_document": "fixture-1.htm",
+    "capture_id": null,
+    "status": "unavailable",
+    "observed_at": "2026-09-11T19:09:05.108497Z",
+    "acquisition_id": "459fe086f5e64a4fb7b27deeda97e0f3",
+    "outcome": "failed",
+    "gaps": [
+      {
+        "code": "catalog_source_gaps",
+        "count": 1
+      },
+      {
+        "code": "catalog_sources_pending",
+        "count": 1
+      },
+      {
+        "code": "source_unavailable"
+      }
+    ],
+    "requests": [
+      {
+        "operation": "directory",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/index.json",
+        "request_count": 1,
+        "dispatch_state": "dispatched",
+        "report": {
+          "requests": 1,
+          "observations": [
+            {
+              "request_index": 1,
+              "status": 200,
+              "framing": "content_length",
+              "content_encoding": "identity",
+              "declared_body_bytes": 205,
+              "received_body_bytes": 205,
+              "decoded_body_bytes": 205,
+              "result_code": "complete"
+            }
+          ]
+        },
+        "gaps": []
+      },
+      {
+        "operation": "document",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+        "request_count": 1,
+        "dispatch_state": "dispatched",
+        "report": {
+          "requests": 1,
+          "observations": [
+            {
+              "request_index": 1,
+              "status": 503,
+              "framing": null,
+              "content_encoding": null,
+              "declared_body_bytes": null,
+              "received_body_bytes": 0,
+              "decoded_body_bytes": 0,
+              "result_code": "source_unavailable"
+            }
+          ]
+        },
+        "gaps": []
+      }
+    ],
+    "invalidation_primary_document": "fixture-1.htm"
+  },
+  "pinned": {
+    "status": "partial",
+    "data": {
+      "document": {
+        "capture_id": "secdoc_c5f3a796f86fd9a2fafb2862bfcdfbad6ac67643f113acbe4f141ee63233dda1",
+        "filing_id": "0000320193:0000320193-26-000001",
+        "document_id": "file:fixture-1.htm",
+        "primary_document": "fixture-1.htm",
+        "form": "10-K",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+        "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+        "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+        "extraction_version": "sec-document-text-v3",
+        "mime_type": "text/html",
+        "text_bytes": 17438,
+        "original_bytes": 25268,
+        "directory_sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487"
+      },
+      "documents": [
+        {
+          "name": "fixture-1.htm",
+          "document_id": "file:fixture-1.htm",
+          "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+          "size_bytes": 25268,
+          "source": {
+            "sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487",
+            "pointer": "/directory/item/0"
+          }
+        },
+        {
+          "name": "exhibit.txt",
+          "document_id": "file:exhibit.txt",
+          "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/exhibit.txt",
+          "size_bytes": null,
+          "source": {
+            "sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487",
+            "pointer": "/directory/item/1"
+          }
+        }
+      ],
+      "sections": [
+        {
+          "section_id": "item_1",
+          "label": "ITEM 1. BUSINESS",
+          "start_byte": 0,
+          "end_byte": 17387
+        },
+        {
+          "section_id": "item_1a",
+          "label": "ITEM 1A. RISK FACTORS",
+          "start_byte": 17387,
+          "end_byte": 17438
+        }
+      ],
+      "passages": [],
+      "text_start_cursor": "eyJjYXB0dXJlX2lkIjoic2VjZG9jX2M1ZjNhNzk2Zjg2ZmQ5YTJmYWZiMjg2MmJmY2RmYmFkNmFjNjc2NDNmMTEzYWNiZTRmMTQxZWU2MzIzM2RkYTEiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ"
+    },
+    "gaps": [
+      {
+        "code": "catalog_source_gaps",
+        "count": 1
+      },
+      {
+        "code": "catalog_sources_pending",
+        "count": 1
+      }
+    ],
+    "observed_at": "2026-09-11T19:09:04.635314Z",
+    "coverage": {
+      "capture_id": "secdoc_c5f3a796f86fd9a2fafb2862bfcdfbad6ac67643f113acbe4f141ee63233dda1",
+      "receipt_id": 4,
+      "mode": "index",
+      "catalog_complete": false,
+      "complete": false,
+      "index_total": 4,
+      "index_offset": 0
+    },
+    "next_cursor": null
+  },
+  "citations_checked": [
+    {
+      "capture_id": "secdoc_c5f3a796f86fd9a2fafb2862bfcdfbad6ac67643f113acbe4f141ee63233dda1",
+      "document_id": "file:fixture-1.htm",
+      "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+      "start_byte": 0,
+      "end_byte": 6740
+    }
+  ],
+  "dispatches": [
+    {
+      "path": "/Archives/edgar/data/320193/000032019326000001/index.json",
+      "identity": "ArkScope research@arkscope.test"
+    },
+    {
+      "path": "/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+      "identity": "ArkScope research@arkscope.test"
+    },
+    {
+      "path": "/Archives/edgar/data/320193/000032019326000001/index.json",
+      "identity": "ArkScope research@arkscope.test"
+    },
+    {
+      "path": "/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+      "identity": "ArkScope research@arkscope.test"
+    },
+    {
+      "path": "/Archives/edgar/data/320193/000032019326000001/index.json",
+      "identity": "ArkScope research@arkscope.test"
+    },
+    {
+      "path": "/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+      "identity": "ArkScope research@arkscope.test"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "baseline": "docs/superpowers/evidence/2026-09-11-sec-query-settings/frontend-post-fix/output.log.gz",
+  "baseline_messages": {
+    "Warning: An update to AccountUsageView inside a test was not wrapped in act(...).": 6,
+    "Warning: An update to ConfirmDialog inside a test was not wrapped in act(...).": 12,
+    "Warning: An update to CredentialList inside a test was not wrapped in act(...).": 12,
+    "Warning: An update to Drawer inside a test was not wrapped in act(...).": 6,
+    "Warning: An update to PortfolioActivity inside a test was not wrapped in act(...).": 14,
+    "Warning: An update to ProviderSection inside a test was not wrapped in act(...).": 24,
+    "Warning: An update to SetupDisclosure inside a test was not wrapped in act(...).": 12,
+    "Warning: The current testing environment is not configured to support act(...)": 930
+  },
+  "baseline_warning_lines": 1016,
+  "current": "frontend-final-fixed/output.log",
+  "current_messages": {
+    "Warning: An update to AccountUsageView inside a test was not wrapped in act(...).": 6,
+    "Warning: An update to ConfirmDialog inside a test was not wrapped in act(...).": 12,
+    "Warning: An update to CredentialList inside a test was not wrapped in act(...).": 12,
+    "Warning: An update to Drawer inside a test was not wrapped in act(...).": 6,
+    "Warning: An update to PortfolioActivity inside a test was not wrapped in act(...).": 14,
+    "Warning: An update to ProviderSection inside a test was not wrapped in act(...).": 24,
+    "Warning: An update to SetupDisclosure inside a test was not wrapped in act(...).": 12,
+    "Warning: The current testing environment is not configured to support act(...)": 930
+  },
+  "current_warning_lines": 1016,
+  "new_warning_lines": {},
+  "removed_warning_lines": {},
+  "same_warning_multiset": true
+}

@@ -23,12 +23,24 @@ fresh frontend **1738 passed**, typecheck/i18n and four desktop/mobile fixture
 workflows pass. Backend source/tests remain byte-identical across that correction.
 Task reviews and the final scoped correction review are approved, with no
 remaining findings in this batch.
-This is still not the complete end-to-end workflow: issuer resolution,
-documents/citations, export, three tools/four transports and subagents, persisted
-Research citations and the default-disabled schedule remain open. Settings here
-is structured-storage administration, not complete Research admission. No
-unfinished replacement tool is registered; earlier foundations and all six SEC
-management/query routes have real consumers. No production activation occurred.
+The subsequent `2026-09-12-sec-document-reading.md` now implements bounded
+directory/HTML/XHTML/iXBRL extraction, immutable original/text captures, exact
+UTF-8 passage citations, capture/filter-bound pagination and a Settings filing
+reader through `02a0fff4`. Stored GET never acquires; explicit primary-document
+POST uses the managed SEC identity/pacing. Old pins survive new/failed refreshes;
+source faults and uncertain sections remain explicit rather than substituted text.
+All four task reviews and the integrated review approve this subsystem. Fresh
+frontend **1776 passed**, typecheck/i18n and all four actual-service/store browser
+fixtures pass. Fresh complete backend **9168 passed /12 unchanged skips** and
+exact reconciliation cover9180nodes,357added/zero removed;1102source/test hashes
+remain frozen and17current-source inverses each kill their named owners.
+This is still not the complete end-to-end workflow: issuer resolution, export,
+three tools/four transports and subagents, persisted Research citations and the
+default-disabled schedule remain open. Settings now includes a retained-document
+reader, not complete Research admission. No unfinished replacement tool is
+registered; earlier foundations and all eight SEC management/query routes have
+real consumers. No production activation occurred. Current document evidence is
+under `../evidence/2026-09-12-sec-document-reading/README.md`.
 Base inspected: `30bb31c7`. The user approved the product direction on September
 10, including useful tool access rather than collection without consumers.
 Original specification-tree review: `fef26dcf`; current query/Settings evidence

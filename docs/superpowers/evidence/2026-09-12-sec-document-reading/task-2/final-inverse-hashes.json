@@ -1,0 +1,49 @@
+{
+  "baseline": [
+    {
+      "path": "src/sec_research/document_store.py",
+      "sha256": "3941d53a94edd17c8f8e2c52e5a80091b66af5ae1e28769108bd44e613e10ab1"
+    },
+    {
+      "path": "src/sec_research/document_service.py",
+      "sha256": "257743fc5e5ac65f24619581ddb83b8b0c2e72730429cdae8f374dd42bfb19c9"
+    },
+    {
+      "path": "src/sec_research/document_queries.py",
+      "sha256": "71e00e4d4fc13a705569780cf6a9e39efc4041427b06fe8cb301c199565cf7c5"
+    },
+    {
+      "path": "src/sec_research/schema.py",
+      "sha256": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5"
+    },
+    {
+      "path": "src/sec_research/capture_lock.py",
+      "sha256": "c9a7451509030605dbe5729143099d234d54982620f1111fbfee6f6c223681dd"
+    },
+    {
+      "path": "tests/test_sec_research_document_store.py",
+      "sha256": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165"
+    },
+    {
+      "path": "tests/test_sec_research_document_service.py",
+      "sha256": "b02b019e4d87bbf95908f43cd8a0847780e53d843d4a974a91f6ca971469c867"
+    },
+    {
+      "path": "tests/test_sec_research_document_queries.py",
+      "sha256": "6cb0a66dc0e97662e2a8ef04583fd8e936d21c2fb3af786fe271d118de9daaba"
+    }
+  ],
+  "affected_inverses": [
+    {
+      "name": "latest",
+      "mutated_hash": "2634d9846fc846053df6a750b0e9737a46d634e063ab47f661f3bcf815aa63de  src/sec_research/document_queries.py",
+      "all_eight_files_restored": true
+    },
+    {
+      "name": "query",
+      "mutated_hash": "a4f67e93b8f2ab2c4f2d94deaac069338562d394313ce8954d035aafa2ca7705  src/sec_research/document_queries.py",
+      "all_eight_files_restored": true
+    }
+  ],
+  "unchanged_service_baseline": "257743fc5e5ac65f24619581ddb83b8b0c2e72730429cdae8f374dd42bfb19c9"
+}

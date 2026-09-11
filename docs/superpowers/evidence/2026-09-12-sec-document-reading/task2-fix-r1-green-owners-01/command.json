@@ -1,0 +1,27 @@
+{
+  "name": "task2-fix-r1-green-owners-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/offline_pytest.py",
+    "-q",
+    "tests/test_sec_research_document_queries.py",
+    "tests/test_sec_research_document_service.py",
+    "-k",
+    "pre_resolution or first_interruption or early_exhibit or old_primary_spelling or invalid_reader_report or cleanup_failure or valid_zero_dispatch or unreadable_request_count",
+    "--junitxml=/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task2-fix-r1-green-owners-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-listing-sec-macro-convergence",
+  "exit_code": 0,
+  "seconds": 2.618,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task2-fix-r1-green-owners-01",
+    "HOME": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task2-fix-r1-green-owners-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-listing-sec-macro-convergence/.superpowers/sdd/2026-09-12-sec-document-reading/task2-fix-r1-green-owners-01/output.log"
+}
