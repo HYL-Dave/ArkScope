@@ -500,3 +500,68 @@ def test_receipt_locators_have_one_unambiguous_state(store, completed, pending):
     with pytest.raises(ValueError, match="^sec_research_receipt_invalid$"):
         store.record_receipt(CIK, status="partial", completed=completed, pending=pending,
                              gaps=[], observed_at=WHEN)
+
+
+def insert_stored_receipt(store, **changes):
+    fields = dict(cik=CIK, status="ok", completed="[]", pending="[]", gaps="[]",
+                  observed_at=WHEN, recorded_at=WHEN, source_snapshots="{}")
+    fields.update(changes)
+    with store.connect() as conn:
+        columns = ", ".join(fields)
+        placeholders = ", ".join("?" for _ in fields)
+        return conn.execute(f"INSERT INTO sec_research_receipts ({columns}) VALUES ({placeholders})",
+                            tuple(fields.values())).lastrowid
+
+
+@pytest.mark.parametrize("field", ["source_snapshots", "completed", "pending", "gaps"])
+@pytest.mark.parametrize("value", ["null", "1", "true", '"PRIVATE"', "[]", "{}", "[null]", "[{}]"])
+def test_receipt_reads_validate_decoded_field_types(store, field, value):
+    receipt_id = insert_stored_receipt(store, **{field: value})
+    if (field == "source_snapshots" and value == "{}"
+            or field != "source_snapshots" and value == "[]"
+            or field == "gaps" and value == "[{}]"):
+        assert store.latest_receipt(CIK)[field] == json.loads(value)
+        assert store.receipt(CIK, receipt_id)[field] == json.loads(value)
+        return
+    before = store.paths.market_db_path.read_bytes()
+    for read in (lambda: store.latest_receipt(CIK), lambda: store.receipt(CIK, receipt_id)):
+        with pytest.raises(ValueError, match="^sec_research_receipt_binding_invalid$"):
+            read()
+    assert store.paths.market_db_path.read_bytes() == before
+
+
+@pytest.mark.parametrize("changes", [
+    {"completed": '["submissions", "submissions"]'},
+    {"pending": '["companyfacts", "companyfacts"]'},
+    {"completed": '["submissions"]', "pending": '["submissions"]'},
+    {"completed": '["../PRIVATE"]'},
+    {"pending": '["CIK0000789019-submissions-001.json"]'},
+    {"completed": '["submissions"]', "source_snapshots": '{"companyfacts": {}}'},
+    {"source_snapshots": '{"submissions": {}}'},
+    {"observed_at": "PRIVATE invalid time"},
+    {"recorded_at": "2026-09-11T00:00:00"},
+    {"receipt_id": 0},
+])
+def test_receipt_reads_reject_invalid_canonical_relationships(store, changes):
+    insert_stored_receipt(store, **changes)
+    with pytest.raises(ValueError, match="^sec_research_receipt_binding_invalid$"):
+        store.latest_receipt(CIK)
+
+
+@pytest.mark.parametrize("binding", [None, 1, [], {}, {"snapshot_id": "PRIVATE"},
+    {"snapshot_id": "secsnapshot_" + "0" * 64, "observed_at": None},
+    {"snapshot_id": "secsnapshot_" + "0" * 64, "observed_at": WHEN, "extra": 1}])
+def test_receipt_reads_validate_inner_snapshot_binding(store, binding):
+    receipt_id = insert_stored_receipt(store, completed='["submissions"]',
+                                      source_snapshots=json.dumps({"submissions": binding}))
+    with pytest.raises(ValueError, match="^sec_research_receipt_binding_invalid$"):
+        store.receipt(CIK, receipt_id)
+
+
+@pytest.mark.parametrize("completed", [[], ["submissions"]])
+def test_receipt_reads_preserve_explicit_unbound_mapping(store, completed):
+    receipt_id = insert_stored_receipt(store, completed=json.dumps(completed))
+    saved = store.latest_receipt(CIK)
+    assert saved["source_snapshots"] == {}
+    assert saved["completed"] == completed
+    assert store.receipt(CIK, receipt_id) == saved

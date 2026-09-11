@@ -53,12 +53,43 @@ def _timestamp(value) -> str:
         raise ValueError("sec_research_timestamp_invalid") from None
 
 
+def _receipt_fields(cik, status, completed, pending, gaps):
+    def locators(value):
+        return isinstance(value, list) and all(
+            isinstance(item, str) and (item in ("submissions", "companyfacts")
+            or re.fullmatch(r"CIK" + cik + r"-submissions-[0-9]+\.json", item))
+            for item in value)
+    if (status not in ("ok", "partial", "unavailable") or not locators(completed)
+            or not locators(pending) or not isinstance(gaps, list)
+            or len(set(completed)) != len(completed) or len(set(pending)) != len(pending)
+            or set(completed) & set(pending)
+            or any(not isinstance(gap, dict) for gap in gaps)):
+        raise ValueError("sec_research_receipt_invalid")
+
+
 def _receipt(row) -> dict | None:
     if row is None:
         return None
     result = dict(row)
-    for key in ("completed", "pending", "gaps", "source_snapshots"):
-        result[key] = json.loads(result[key])
+    try:
+        if (type(result["receipt_id"]) is not int or not 1 <= result["receipt_id"] <= 2**63 - 1
+                or normalize_cik(result["cik"]) != result["cik"]):
+            raise ValueError
+        for key in ("completed", "pending", "gaps", "source_snapshots"):
+            if not isinstance(result[key], str):
+                raise ValueError
+            result[key] = json.loads(result[key])
+        _receipt_fields(result["cik"], result["status"], result["completed"], result["pending"], result["gaps"])
+        for key in ("observed_at", "recorded_at"):
+            _timestamp(result[key])
+        bindings = result["source_snapshots"]
+        if (not isinstance(bindings, dict)
+                or bindings and set(bindings) != set(result["completed"])):
+            raise ValueError
+        for binding in bindings.values():
+            _binding_shape(binding)
+    except (ValueError, RecursionError):
+        raise ValueError("sec_research_receipt_binding_invalid") from None
     return result
 
 
@@ -265,17 +296,7 @@ class Store:
                        source_snapshots=None):
         """Append coverage; omitted bindings are explicitly unbound, not query authority."""
         cik = normalize_cik(cik)
-        def locators(value):
-            return isinstance(value, list) and all(
-                isinstance(item, str) and (item in ("submissions", "companyfacts")
-                or re.fullmatch(r"CIK" + cik + r"-submissions-[0-9]+\.json", item))
-                for item in value)
-        if (status not in ("ok", "partial", "unavailable") or not locators(completed)
-                or not locators(pending) or not isinstance(gaps, list)
-                or len(set(completed)) != len(completed) or len(set(pending)) != len(pending)
-                or set(completed) & set(pending)
-                or any(not isinstance(gap, dict) for gap in gaps)):
-            raise ValueError("sec_research_receipt_invalid")
+        _receipt_fields(cik, status, completed, pending, gaps)
         if len(completed) + len(pending) + len(gaps) > MAX_SNAPSHOT_ROWS:
             raise ValueError("sec_research_snapshot_rows_exceeded")
         observed_at = _timestamp(observed_at)

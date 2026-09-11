@@ -346,3 +346,33 @@ def test_budget_exhaustion_with_no_matching_rows_is_not_observed_empty(store, mo
     assert page["data"] == []
     assert page["status"] == "partial"
     assert page["next_cursor"] is None
+
+
+@pytest.mark.parametrize("bindings", ["{}", "PRIVATE invalid JSON", "null", "1", "[]", "true"])
+def test_invalid_stored_binding_shape_has_closed_envelope(store, bindings):
+    query = queries(store)
+    seed(store)
+    with store.connect() as conn:
+        conn.execute("""INSERT INTO sec_research_receipts
+            (cik, status, completed, pending, gaps, observed_at, recorded_at, source_snapshots)
+            VALUES (?, 'ok', '[]', '[]', '[]', ?, ?, ?)""", (CIK, WHEN, WHEN, bindings))
+    result = query.filings(CIK)
+    assert result["status"] == "unavailable"
+    assert result["data"] == []
+    assert "PRIVATE" not in json.dumps(result)
+    assert set(result) == {"status", "data", "gaps", "observed_at", "coverage", "next_cursor"}
+
+
+@pytest.mark.parametrize("field", ["completed", "pending", "gaps"])
+@pytest.mark.parametrize("value", ["null", "1", "{}", "[null]"])
+def test_invalid_stored_receipt_fields_have_closed_envelope(store, field, value):
+    query = queries(store)
+    fields = dict(completed="[]", pending="[]", gaps="[]")
+    fields[field] = value
+    with store.connect() as conn:
+        conn.execute("""INSERT INTO sec_research_receipts
+            (cik, status, completed, pending, gaps, observed_at, recorded_at, source_snapshots)
+            VALUES (?, 'ok', ?, ?, ?, ?, ?, '{}')""", (CIK, *fields.values(), WHEN, WHEN))
+    result = query.filings(CIK)
+    assert result["status"] == "unavailable"
+    assert result["data"] == []
