@@ -18,13 +18,134 @@ def extract(body, mime="text/html", check=lambda: None):
 
 @pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
 def test_sec_text_keeps_visible_ixbrl_and_hides_ix_hidden(mime):
-    body = (b'<!DOCTYPE html><html><head><title>discard</title></head><body>'
+    body = (b'<!DOCTYPE html><html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL">'
+            b'<head><title>discard</title></head><body>'
             b'<ix:header><ix:resources>context data</ix:resources></ix:header>'
             b'<ix:hidden><ix:nonNumeric>secret</ix:nonNumeric></ix:hidden>'
             b'<h1>ITEM 1. BUSINESS</h1><p>Revenue <ix:nonFraction>123</ix:nonFraction>'
             b' and <ix:nonNumeric>visible</ix:nonNumeric>.</p><div hidden>hidden</div>'
             b'<script>bad()</script><p>Tail &amp; end.</p></body></html>')
     assert extract(body, mime) == ("ITEM 1. BUSINESS\nRevenue 123 and visible.\nTail & end.", mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+@pytest.mark.parametrize("namespace", [
+    "http://www.xbrl.org/2013/inlineXBRL", "http://www.xbrl.org/2008/inlineXBRL",
+])
+def test_namespace_aliased_ixbrl_does_not_publish_hidden_facts(mime, namespace):
+    body = (
+        '<html xmlns="http://www.w3.org/1999/xhtml" '
+        f'xmlns:inl="{namespace}"><body>'
+        '<inl:header><inl:hidden>'
+        '<inl:nonNumeric name="Example" contextRef="c">HIDDEN FACT</inl:nonNumeric>'
+        '</inl:hidden></inl:header>'
+        '<p>Visible <inl:nonNumeric name="Example" contextRef="c">fact</inl:nonNumeric>.</p>'
+        '</body></html>'
+    ).encode()
+    assert extract(body, mime) == ("Visible fact.", mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+@pytest.mark.parametrize("local", ["header", "hidden", "references", "resources"])
+def test_ixbrl_hidden_elements_resolve_element_local_binding(mime, local):
+    body = (f'<inl:{local} xmlns:inl="http://www.xbrl.org/2013/inlineXBRL">HIDDEN</inl:{local}>'
+            f'<p><inl:{local}>Visible unbound sibling</inl:{local}></p>').encode()
+    assert extract(body, mime) == ("Visible unbound sibling", mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+@pytest.mark.parametrize("prefix", ["ix", "inl"])
+@pytest.mark.parametrize("local", ["header", "hidden", "references", "resources"])
+def test_unrelated_namespace_hidden_names_remain_visible(mime, prefix, local):
+    body = (f'<root xmlns:{prefix}="urn:unrelated"><{prefix}:{local}>'
+            f'Visible unrelated content</{prefix}:{local}></root>').encode()
+    assert extract(body, mime) == ("Visible unrelated content", mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+def test_namespace_rebinding_restores_enclosing_inline_binding(mime):
+    body = (b'<root xmlns:inl="http://www.xbrl.org/2013/inlineXBRL">'
+            b'<inl:hidden>HIDDEN before</inl:hidden>'
+            b'<p xmlns:inl="urn:unrelated"><inl:hidden>Visible rebound</inl:hidden></p>'
+            b'<inl:hidden>HIDDEN after</inl:hidden><p>Visible tail</p></root>')
+    assert extract(body, mime) == ("Visible rebound\nVisible tail", mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+def test_namespace_rebinding_restores_enclosing_unrelated_binding(mime):
+    body = (b'<root xmlns:ix="urn:unrelated"><p><ix:hidden>Visible before</ix:hidden></p>'
+            b'<div xmlns:ix="http://www.xbrl.org/2013/inlineXBRL">'
+            b'<ix:hidden>HIDDEN inner</ix:hidden></div>'
+            b'<p><ix:hidden>Visible after</ix:hidden></p></root>')
+    assert extract(body, mime) == ("Visible before\nVisible after", mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+@pytest.mark.parametrize("element", [
+    '<span xmlns:inl="urn:unrelated"/>', '<br xmlns:inl="urn:unrelated">',
+    '<div xmlns:inl="urn:unrelated"><span xmlns:inl="urn:also-unrelated"></div>',
+])
+def test_namespace_scope_follows_empty_and_unwound_elements(mime, element):
+    body = ('<root xmlns:inl="http://www.xbrl.org/2013/inlineXBRL">' + element
+            + '<inl:hidden>HIDDEN after scope</inl:hidden><p>Visible</p></root>').encode()
+    assert extract(body, mime) == ("Visible", mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+def test_default_inline_namespace_is_scoped_and_can_be_cleared(mime):
+    body = (b'<root xmlns="http://www.xbrl.org/2013/inlineXBRL">'
+            b'<hidden>HIDDEN default</hidden>'
+            b'<p xmlns=""><hidden>Visible unbound</hidden></p>'
+            b'<hidden>HIDDEN restored</hidden></root>'
+            b'<p><hidden>Visible sibling</hidden></p>')
+    assert extract(body, mime) == ("Visible unbound\nVisible sibling", mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+def test_namespace_uri_matching_is_exact_not_casefolded_or_prefix_matched(mime):
+    body = (b'<root xmlns:ix="http://www.xbrl.org/2013/inlinexbrl">'
+            b'<p><ix:hidden>Visible different case</ix:hidden></p>'
+            b'<p xmlns:ix="http://www.xbrl.org/2013/inlineXBRL-extra">'
+            b'<ix:hidden>Visible different URI</ix:hidden></p></root>')
+    assert extract(body, mime) == ("Visible different case\nVisible different URI", mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+def test_conflicting_namespace_declarations_are_not_canonical_text(mime):
+    body = (b'<root xmlns:inl="http://www.xbrl.org/2013/inlineXBRL" xmlns:inl="urn:unrelated">'
+            b'<inl:hidden>Ambiguous content</inl:hidden></root>')
+    with pytest.raises(public.SourceReadError, match="^source_document_invalid$"):
+        extract(body, mime)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+def test_undeclared_ix_compatibility_never_overrides_explicit_unbinding(mime):
+    body = (b'<ix:hidden>HIDDEN legacy</ix:hidden><div xmlns:ix="">'
+            b'<ix:hidden>Visible explicit unbinding</ix:hidden></div>'
+            b'<ix:hidden>HIDDEN restored legacy</ix:hidden>')
+    assert extract(body, mime) == ("Visible explicit unbinding", mime)
+
+
+def test_namespace_declarations_consume_parser_budget(monkeypatch):
+    monkeypatch.setattr(mod, "MAX_PARSER_EVENTS", 20)
+    attributes = " ".join(f'xmlns:n{index}="urn:scope:{index}"' for index in range(30))
+    with pytest.raises(public.SourceReadError, match="^source_document_complexity$"):
+        extract(f"<root {attributes}>Visible</root>".encode())
+
+
+def test_namespace_declaration_work_is_cancellable():
+    attributes = " ".join(f'xmlns:n{index}="urn:scope:{index}"' for index in range(100))
+    calls = 0
+
+    def check():
+        nonlocal calls
+        calls += 1
+        if calls == 20:
+            raise public.SourceReadError("source_read_cancelled")
+
+    with pytest.raises(public.SourceReadError, match="^source_read_cancelled$"):
+        extract(f"<root {attributes}>Visible</root>".encode(), check=check)
+    assert calls == 20
 
 
 @pytest.mark.parametrize("kind", ["html-nesting", "xml-nesting", "html-markup", "xml-markup", "events"])
@@ -96,7 +217,8 @@ def test_xml_rejects_dtd_entities_and_malformed_document(body):
     (b"\xff", "text/plain", "source_encoding_unsupported"),
     (b"x", "text/plain; charset=not-a-codec", "source_encoding_unsupported"),
     (b" ", "text/plain", "source_text_empty"),
-    (b"<ix:hidden>secret</ix:hidden>", "text/html", "source_text_empty"),
+    (b'<ix:hidden xmlns:ix="http://www.xbrl.org/2013/inlineXBRL">secret</ix:hidden>',
+     "text/html", "source_text_empty"),
 ])
 def test_unusable_formats_return_typed_content_free_errors(body, mime, code):
     with pytest.raises(public.SourceReadError, match=f"^{code}$"):
@@ -168,7 +290,40 @@ def test_ambiguous_toc_heading_does_not_fabricate_section():
     assert {"code": "section_ambiguous", "section_id": "item_1"} in gaps
     assert "item_1" not in [row["section_id"] for row in sections]
     assert "item_1a" not in [row["section_id"] for row in sections]
-    assert any(row["section_id"] == "item_2" for row in sections)
+    assert sections == []
+    assert {"code": "section_ambiguous", "section_id": "item_2"} in gaps
+
+
+def test_duplicate_inside_toc_does_not_authorize_later_toc_only_item():
+    text = ("TABLE OF CONTENTS\nITEM 1. BUSINESS\nITEM 1. BUSINESS\n"
+            "ITEM 1A. RISK FACTORS\n10\nITEM 2. PROPERTIES\n11\n")
+    sections, gaps = mod.index_sections(text, "10-K", check=lambda: None)
+    assert sections == []
+    assert gaps == [
+        {"code": "section_ambiguous", "section_id": "item_1"},
+        {"code": "section_ambiguous", "section_id": "item_1a"},
+        {"code": "section_ambiguous", "section_id": "item_2"},
+    ]
+
+
+def test_toc_uncertainty_retains_full_text_and_omits_later_current_report_items():
+    expected = ("TABLE OF CONTENTS\nItem 1.01 Agreement\nItem 1.01 Agreement\n"
+                "Item 9.01 Exhibits\n11\nComplete original tail.")
+    text, _ = extract(expected.encode(), "text/plain")
+    sections, gaps = mod.index_sections(text, "8-K", check=lambda: None)
+    assert text == expected
+    assert sections == []
+    assert gaps == [
+        {"code": "section_ambiguous", "section_id": "item_1_01"},
+        {"code": "section_ambiguous", "section_id": "item_9_01"},
+    ]
+
+
+def test_duplicate_without_toc_only_omits_the_ambiguous_item():
+    text = "ITEM 1. BUSINESS\nFirst\nITEM 1. BUSINESS\nSecond\nITEM 2. PROPERTIES\nOffices"
+    sections, gaps = mod.index_sections(text, "10-K", check=lambda: None)
+    assert [row["section_id"] for row in sections] == ["item_2"]
+    assert gaps == [{"code": "section_ambiguous", "section_id": "item_1"}]
 
 
 def test_section_offsets_are_exact_utf8():

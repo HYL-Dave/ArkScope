@@ -17,7 +17,7 @@ MAX_NESTING = 512
 MAX_PARSER_EVENTS = 2_000_000
 MAX_TEXT_BYTES = 128 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 128 * 1024 * 1024
-EXTRACTION_VERSION = "sec-document-text-v1"
+EXTRACTION_VERSION = "sec-document-text-v2"
 _CHUNK = 65536
 
 
@@ -103,16 +103,67 @@ class _TextParts:
 
 
 class _DocumentHTMLParser(_SourceTextParser):
-    _SKIP = _SourceTextParser._SKIP | {"ix:header", "ix:hidden", "ix:references", "ix:resources"}
+    _INLINE_NAMESPACES = frozenset({
+        "http://www.xbrl.org/2013/inlineXBRL", "http://www.xbrl.org/2008/inlineXBRL",
+    })
+    _INLINE_HIDDEN = frozenset({"header", "hidden", "references", "resources"})
 
     def __init__(self, budget, output):
         super().__init__(budget.tick)
         self.parts = output
+        self.namespaces: dict[str, str] = {}
+        self.namespace_scopes: list[dict[str, str | None]] = []
+
+    def _bind_namespaces(self, attrs):
+        previous = {}
+        for name, value in attrs:
+            if name == "xmlns":
+                prefix = ""
+            elif name.startswith("xmlns:"):
+                prefix = name.removeprefix("xmlns:")
+            else:
+                continue
+            self.check()
+            namespace = value or ""
+            if prefix in previous:
+                if self.namespaces[prefix] != namespace:
+                    raise SourceReadError("source_document_invalid")
+            else:
+                previous[prefix] = self.namespaces.get(prefix)
+                self.namespaces[prefix] = namespace
+        return previous
+
+    def _restore_namespaces(self, previous):
+        for prefix, namespace in previous.items():
+            self.check()
+            if namespace is None:
+                self.namespaces.pop(prefix, None)
+            else:
+                self.namespaces[prefix] = namespace
 
     def handle_starttag(self, tag, attrs):
         if tag not in self._VOID and len(self.stack) >= MAX_NESTING:
             raise SourceReadError("source_document_complexity")
+        previous = self._bind_namespaces(attrs)
+        prefix, separator, local = tag.partition(":")
+        if not separator:
+            prefix, local = "", tag
+        namespace = self.namespaces.get(prefix)
+        # Retain literal ix compatibility only when no declaration binds that prefix.
+        undeclared_ix = prefix == "ix" and prefix not in self.namespaces
+        if (namespace in self._INLINE_NAMESPACES or undeclared_ix) and local in self._INLINE_HIDDEN:
+            attrs = [*attrs, ("hidden", None)]
         super().handle_starttag(tag, attrs)
+        if tag in self._VOID:
+            self._restore_namespaces(previous)
+        else:
+            self.namespace_scopes.append(previous)
+
+    def handle_endtag(self, tag):
+        super().handle_endtag(tag)
+        # Follow the existing tolerant stack, including closing unclosed descendants.
+        while len(self.namespace_scopes) > len(self.stack):
+            self._restore_namespaces(self.namespace_scopes.pop())
 
     def handle_comment(self, data):
         self.check()
@@ -318,6 +369,7 @@ def index_sections(
         if label is None:
             continue
         if label.upper() == "TABLE OF CONTENTS":
+            # Repeated headings alone cannot establish a transition into body text.
             in_toc = True
         match = _HEADING.fullmatch(label)
         if match is None:
@@ -341,7 +393,6 @@ def index_sections(
             pending_part["end_byte"] = start_byte
         if section_id in rows:
             ambiguous.add(section_id)
-            in_toc = False
         row = Section(section_id=section_id, label=label, start_byte=start_byte, end_byte=end_byte)
         rows.setdefault(section_id, row)
         if in_toc or re.search(r"\.{2,}\s*\d+\s*$", label):
