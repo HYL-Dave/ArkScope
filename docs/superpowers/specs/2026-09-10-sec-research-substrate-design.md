@@ -512,6 +512,29 @@ SEC has no API-key requirement, but valid contact identification and fair-access
 pacing still apply. Read it through profile configuration, not a new `.env`
 fallback. No Massive/EODHD request or LLM spend belongs in this collector.
 
+### Open Recovery Owners (2026-09-12)
+
+- **SEC-RECOVERY-001, capture-store maintenance:** explicit orphan/unreferenced
+  object cleanup is not implemented. Recovery accounts interrupted objects and
+  can adopt identical content, but changed-content orphans remain charged.
+  Its owner must provide a dry-run, explicit confirmation and an audit receipt;
+  recheck all snapshot/document/citation/pin/export references under the root
+  lease before removal. Registered objects without a published snapshot are
+  distinct from unregistered filesystem orphans. No automatic cited/pinned
+  deletion, quota evasion or general filesystem cleanup is permitted.
+- **SEC-RECOVERY-002, schema administration:** reset/uninstall is not implemented.
+  Canonical shape mismatch deliberately rejects instead of repairing silently.
+  The operator workflow must inspect owned objects, preview impact, back up before
+  destructive work, coordinate live users, and preserve unrelated prices/news/SA,
+  financial caches and profile credentials. SQLite-owned shared objects are not
+  SEC-owned deletion targets. Fresh/populated fixture tests must prove the scope.
+  This is an explicit current-schema recovery operation, not a migration chain
+  or a startup DROP. No production installation/reset is implied or authorized.
+
+Both remain first-release operational work. The document-reading plan
+`2026-09-12-sec-document-reading.md` adds reference consumers but does not claim
+to complete either recovery path.
+
 ## 11. Acceptance And Rollout
 
 Before changing runtime code, write a RED-first implementation plan naming test

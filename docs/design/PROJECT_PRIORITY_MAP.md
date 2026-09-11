@@ -43,6 +43,16 @@ foundation work. The active resolver for "what next?" is now:
 | **Gated** | **Unified Runner Phase C** | Still paused. Resume only after workbench v1 ships, two weeks stable, and one verified cross-machine migration. | Internal infra win; premature before storage/profile/UI shape settles. |
 | **Deferred** | RL productionization, Reddit/StockTwits/X paid, MCP integration | No active work. | Prior pause/defer decisions still stand. |
 
+**SEC continuation (2026-09-12):**
+`docs/superpowers/plans/2026-09-12-sec-document-reading.md` implements selected
+original documents, pinned passages and a Settings reader next. The approved
+first-release scope still includes **SEC-RECOVERY-001** (explicit orphan cleanup,
+complete reference recheck and receipt) and **SEC-RECOVERY-002** (operator-owned
+schema reset/uninstall with backup and unrelated-data preservation). Both are
+open, not provided by recovery accounting or verify/install. Their operational
+owners and constraints are in SEC spec section10. No production schema install,
+reset, deletion or source call is authorized by this documentation update.
+
 Subscription strategy: see §10. Splits into **operational** (must-keep) vs
 **research** (evidence-gated). Paid IV/options data is research subscription work and
 therefore defaults to defer until the hypothesis gate exists.
