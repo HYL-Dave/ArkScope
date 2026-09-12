@@ -1,0 +1,10 @@
+{
+  "committed_files": 329,
+  "expected_files": 329,
+  "extra": [],
+  "hash_mismatches": [],
+  "manifest_sha256": "1e4ae0dcef2bc2b29b6c494fe7e21c8d8d54b943412a3186dc793b3ac325c112",
+  "missing": [],
+  "revision": "fe2f3cfaa7d1c25fb6d77554b0b28f66ec7baa9a",
+  "status": "verified"
+}
