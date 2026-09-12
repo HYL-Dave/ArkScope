@@ -5,8 +5,9 @@ Pydantic field normalization. Root strings require a text policy. Keys are
 ASCII-case folded with spaces, tabs, CR/LF, '-' and '_' removed ONLY for the
 credential-name check; successful data is never rewritten.
 
-Unknown-auth rejection recognizes case-insensitive Bearer plus an RFC6750
-token literal; sk-ant-api03-/sk-ant-oat01-/sk-proj- plus >=20 key characters;
+Unknown-auth rejection recognizes case-insensitive Authorization: or
+Proxy-Authorization: headers with Bearer plus an RFC6750 token literal;
+sk-ant-api03-/sk-ant-oat01-/sk-proj- plus >=20 key characters;
 legacy sk- plus >=32 alphanumerics; and gh[pousr]_ plus >=36 alphanumerics.
 These forms require a non-word left boundary. This is not an entropy/length
 heuristic for arbitrary data, nor detection of arbitrary unknown secrets.
@@ -47,7 +48,7 @@ _CREDENTIAL_KEYS = frozenset({
 })
 _AUTH_LITERAL = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
-    r"(?i:Bearer)[ \t]+[A-Za-z0-9._~+/-]+=*|"
+    r"(?i:(?:Proxy-)?Authorization:[ \t]*Bearer)[ \t]+[A-Za-z0-9._~+/-]+=*|"
     r"sk-(?:ant-(?:api03|oat01)-|proj-)[A-Za-z0-9_-]{20,}|"
     r"sk-[A-Za-z0-9]{32,}|gh[pousr]_[A-Za-z0-9]{36,})"
 )

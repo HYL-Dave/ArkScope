@@ -49,6 +49,11 @@ def function_tool(fn):
         try:
             return await invoke(context, arguments)
         except Exception as exc:
+            from agents.tracing import get_current_span
+
+            span = get_current_span()
+            if span is not None:
+                span.set_error({"message": "Tool execution failed", "data": None})
             return sanitize_tool_error(exc)
 
     # SDK handled-error logging includes its original exception and arguments.
