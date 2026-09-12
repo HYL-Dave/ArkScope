@@ -103,3 +103,25 @@ Receipts: `c09-inverse-export`, `c09-inverse-retained`, `c09-inverse-key` (one
 failure each); unmutated `c09-final-restore` returned 196 passed. The earlier
 worker's partial handoff is retained, not retrospectively described as completed.
 C09 is accepted within this scope; it is not cleanup-wide completion.
+
+## C10 Checkpoint
+
+Removed the whole orphan FileBackend and its unused construction/constructor
+argument through LocalMarketBackend, SACaptureBackend and DAL. The initial plan
+incorrectly assumed a retained raw-file import consumer. A full non-test source
+scan found none; keeping that reader after removing the unused construction
+would have created a new orphan. Raw files and actual database news/prices/SA/
+financial_cache are untouched. The new FileBackend file/import absence owners
+were RED before full deletion. Existing concrete SQLite news/search tests are
+the positive controls, not an invented empty reader.
+
+The SA routing stub was missing from initial constructor collateral. Its path
+assertions now test the actual retained DAL._base while preserving routing
+assertions. The old FileBackend nominal-protocol test is removed, replaced by
+the two named absence owners; temporary unshipped raw-reader tests are superseded.
+Task2's extra EOF blank is removed without changing its test assertions.
+
+Worker: initial 4 failed / 2 passed; corrected absence RED 2 failed / 2 passed;
+revised GREEN 350 passed / 1 skipped. Controller expanded regression:
+`c10-controller-green`, **467 passed / 1 skipped**. Independent review and whole
+backend verification remain pending at this checkpoint.

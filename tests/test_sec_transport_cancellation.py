@@ -53,4 +53,3 @@ def test_sec_cancel_never_dispatches_next_request_and_closes_response(tmp_path, 
     assert response.closed == bool(expected_calls)
     if stage == "before-governor":
         assert not transport._governor.state_path.exists()
-

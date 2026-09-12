@@ -181,7 +181,6 @@ def local_backend(sa_db, tmp_path):
     return SACaptureBackend(
         sa_db=sa_db,
         market_db=str(tmp_path / "market_data.db"),
-        base_path=tmp_path,
     )
 
 
@@ -204,7 +203,7 @@ def sa_enabled(monkeypatch):
 def test_absent_sa_db_refresh_meta_is_honest_empty(tmp_path):
     path = tmp_path / "missing.db"
     backend = SACaptureBackend(
-        sa_db=str(path), market_db=str(tmp_path / "market_data.db"), base_path=tmp_path
+        sa_db=str(path), market_db=str(tmp_path / "market_data.db")
     )
 
     assert backend.get_sa_refresh_meta() == {}
@@ -214,7 +213,7 @@ def test_absent_sa_db_refresh_meta_is_honest_empty(tmp_path):
 def test_absent_sa_db_market_news_query_is_honest_empty(tmp_path):
     path = tmp_path / "missing.db"
     backend = SACaptureBackend(
-        sa_db=str(path), market_db=str(tmp_path / "market_data.db"), base_path=tmp_path
+        sa_db=str(path), market_db=str(tmp_path / "market_data.db")
     )
 
     assert backend.query_sa_market_news(limit=5) == []

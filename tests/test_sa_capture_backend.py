@@ -21,7 +21,6 @@ def backend(tmp_path):
     return SACaptureBackend(
         sa_db=str(tmp_path / "sa_capture.db"),
         market_db=str(tmp_path / "market_data.db"),
-        base_path=tmp_path,
     )
 
 

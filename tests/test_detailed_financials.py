@@ -367,7 +367,6 @@ class TestFinancialCache:
 
         backend = LocalMarketBackend(
             market_db=str(tmp_path / "market_data.db"),
-            base_path=tmp_path,
         )
 
         assert backend.get_financial_cache("metrics_TEST_annual") is None

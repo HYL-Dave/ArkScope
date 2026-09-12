@@ -221,7 +221,6 @@ def test_positive_annual_sec_cache_is_the_shared_projection_authority(
     sqlite_backend = SqliteBackend(stored_sec_db)
     local_backend = LocalMarketBackend(
         market_db=str(stored_sec_db),
-        base_path=stored_sec_db.parent,
     )
     dal = DataAccessLayer(base_path=stored_sec_db.parent, backend=local_backend)
 

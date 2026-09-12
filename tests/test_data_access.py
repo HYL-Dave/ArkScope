@@ -1,9 +1,4 @@
-"""
-Integration tests for DataAccessLayer + FileBackend.
-
-These tests run against real data in the project's data/ directory.
-They verify that the DAL can read actual files and return correct schemas.
-"""
+"""Integration tests for current local DAL capabilities."""
 
 import sys
 from pathlib import Path
@@ -23,8 +18,6 @@ from src.tools.schemas import (
     PriceQueryResult,
     WatchlistResult,
 )
-from src.tools.backends import DataBackend
-from src.tools.backends.file_backend import FileBackend
 
 
 @pytest.fixture(scope="module")
@@ -33,21 +26,9 @@ def dal():
     return DataAccessLayer(base_path=project_root)
 
 
-@pytest.fixture(scope="module")
-def file_backend():
-    """Create a FileBackend instance."""
-    return FileBackend(base_path=project_root)
-
-
 # ============================================================
 # Backend Protocol
 # ============================================================
-
-class TestBackendProtocol:
-    def test_file_backend_is_data_backend(self, file_backend):
-        """FileBackend should satisfy DataBackend protocol."""
-        assert isinstance(file_backend, DataBackend)
-
 
 def test_local_capability_protocol_matches_inventory_method_set():
     import importlib
@@ -137,7 +118,6 @@ sys.path.insert(0, {str(project_root)!r})
 from src.tools.data_access import DataAccessLayer
 local = DataAccessLayer(base_path={str(tmp_path)!r})
 expected = {{
-    'src.tools.backends.file_backend',
     'src.tools.backends.local_capabilities',
     'src.tools.backends.local_market_backend',
     'src.tools.backends.provenance',
@@ -286,19 +266,18 @@ class TestFundamentals:
         assert result.market_cap is None
 
 # ============================================================
-# SEC Filings (FileBackend returns empty)
+# SEC Filings
 # ============================================================
 
 class TestSECFilings:
     def test_old_sec_dal_absent_and_new_catalog_is_live(self, dal, tmp_path, monkeypatch):
         from src.tools.backends import DataBackend
-        from src.tools.backends.file_backend import FileBackend
         from src.tools.backends.local_capabilities import LocalDataCapabilities
         from src.tools.backends.local_market_backend import LocalMarketBackend
         from src.tools.registry import create_default_registry
         from tests.test_sec_research_tool_adapters import tool_fixture, wire, CIK
         assert not hasattr(dal, "get_sec_filings")
-        for owner in (DataBackend, FileBackend, LocalDataCapabilities, LocalMarketBackend):
+        for owner in (DataBackend, LocalDataCapabilities, LocalMarketBackend):
             assert not hasattr(owner, "query_sec_filings")
         fixture = tool_fixture.__wrapped__(tmp_path)
         wire(monkeypatch, fixture.service)

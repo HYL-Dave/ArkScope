@@ -22,6 +22,16 @@ def test_abandoned_leaf_is_physically_absent(relative):
     assert not (ROOT / relative).exists(), f"abandoned leaf remains: {relative}"
 
 
+def test_file_backend_is_physically_absent():
+    assert not (ROOT / "src/tools/backends/file_backend.py").exists()
+
+
+def test_file_backend_is_not_importable():
+    import importlib.util
+
+    assert importlib.util.find_spec("src.tools.backends.file_backend") is None
+
+
 def test_data_source_package_does_not_import_abandoned_modules():
     code = """
 import importlib.abc

@@ -27,7 +27,6 @@ def _read(relative_path: str) -> str:
 def test_current_runtime_has_no_legacy_iv_storage_or_api_owner():
     runtime_owners = (
         "src/tools/backends/__init__.py",
-        "src/tools/backends/file_backend.py",
         "src/tools/backends/local_capabilities.py",
         "src/tools/backends/local_market_backend.py",
         "src/tools/backends/sa_capture_backend.py",
@@ -98,7 +97,6 @@ def test_non_migration_scripts_do_not_read_legacy_iv_store():
 def test_current_backends_have_no_legacy_iv_schema():
     owners = (
         "src/tools/backends/__init__.py",
-        "src/tools/backends/file_backend.py",
         "src/tools/backends/local_capabilities.py",
         "src/tools/backends/local_market_backend.py",
         "src/tools/backends/sa_capture_backend.py",
