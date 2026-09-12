@@ -292,13 +292,15 @@ class SecTransport:
         return seconds
 
     @staticmethod
-    def _read_bounded(response: Any, max_bytes: int) -> bytes:
+    def _read_bounded(response: Any, max_bytes: int, *, check=None) -> bytes:
         raw_length = str(getattr(response, "headers", {}).get("Content-Length", "")).strip()
         if raw_length.isdigit() and int(raw_length) > max_bytes:
             raise SecTransportFailure("sec_response_too_large")
         chunks: list[bytes] = []
         total = 0
         for chunk in response.iter_content(chunk_size=min(65_536, max_bytes + 1)):
+            if check is not None:
+                check()
             if not chunk:
                 continue
             if not isinstance(chunk, bytes):
@@ -307,6 +309,8 @@ class SecTransport:
             if total > max_bytes:
                 raise SecTransportFailure("sec_response_too_large")
             chunks.append(chunk)
+        if check is not None:
+            check()
         return b"".join(chunks)
 
     def get(
@@ -319,7 +323,19 @@ class SecTransport:
         document: bool = False,
         budget: SecRequestBudget | None = None,
         accept: str = "application/json, application/xml, text/html",
+        check: Callable[[], None] | None = None,
     ) -> SecResponse:
+        if check is not None and not callable(check):
+            raise ValueError("invalid_check")
+
+        def checkpoint():
+            if check is not None:
+                try:
+                    check()
+                except Exception:
+                    raise SecTransportFailure("sec_request_cancelled") from None
+
+        checkpoint()
         self._validate_identity()
         self._validate_url(url)
         if max_bytes is None:
@@ -335,12 +351,15 @@ class SecTransport:
         effective_max = budget.available_body_bytes(max_bytes) if budget is not None else max_bytes
 
         for attempt in range(self._max_rate_limit_retries + 1):
+            checkpoint()
             if budget is not None:
                 budget.reserve_attempt()
-            wait_ms = self._governor.reserve_request_start()
+            wait_ms = (self._governor.reserve_request_start() if check is None
+                       else self._governor.reserve_request_start(check=checkpoint))
             self._governor_wait_ms = min(
                 _MAX_DIAGNOSTIC_INTEGER, self._governor_wait_ms + max(0, wait_ms)
             )
+            checkpoint()
             try:
                 response = self._session.get(
                     url,
@@ -357,15 +376,25 @@ class SecTransport:
             except (requests.RequestException, OSError) as exc:
                 raise SecTransportFailure("sec_transport_unavailable") from exc
             try:
+                checkpoint()
                 if response.status_code == 429:
                     if attempt == self._max_rate_limit_retries:
                         raise SecTransportFailure("sec_rate_limited")
                     retry_after = self._retry_after_seconds(response.headers)
                     self._rate_limit_retries += 1
-                    self._sleep(retry_after)
+                    if check is None:
+                        self._sleep(retry_after)
+                    else:
+                        remaining = float(retry_after)
+                        while remaining > 0:
+                            checkpoint()
+                            interval = min(0.05, remaining)
+                            self._sleep(interval)
+                            remaining -= interval
+                        checkpoint()
                     continue
                 try:
-                    body = self._read_bounded(response, effective_max)
+                    body = self._read_bounded(response, effective_max, check=checkpoint)
                 except SecTransportFailure as exc:
                     if budget is not None and exc.code == "sec_response_too_large":
                         raise SecTransportFailure(

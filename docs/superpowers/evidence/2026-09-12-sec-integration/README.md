@@ -48,6 +48,9 @@ Python audit hook blocks production paths/providers but is not an OS sandbox.
 | integration-green-02 | 1133 passed | SEC, eight count files, skills/subagent, both OAuth drivers, output/key/card guards |
 | integration-timeout-red | 2 failed / 8 passed | Both OAuth timers lose closed SEC timeout; document bytes agree |
 | integration-timeout-green | 187 passed | Stop/join/timeout, adapters and OAuth regressions |
+| integration-review-red | 12 failed | Actual Anthropic SDK stream loses all three SEC results; governor-stop dispatches for both CIK and ticker; transport has no cancellation callback |
+| integration-review-green-01 | 2 failed / 233 passed | New owners pass; old in-flight fixture records dispatch after cancellation |
+| integration-review-green-02 | 994 passed | Actual native stream, governed cancellation, body/retry closure, SEC and security/agent regressions |
 
 Separate runs are not an additive total or a complete backend result. Successful
 runs contain no warnings. Unawaited-coroutine warnings remain in pre-fix evidence.
@@ -58,9 +61,15 @@ The shared security inventory is additional count collateral: 56 tools comprise
 
 Task2 review reproduced two defects after the adapter checks: nested
 `asyncio.run` in the actual Anthropic streaming caller and metadata dispatch
-after cancellation while waiting for the SEC governor. Both require actual
-producer/governor regression owners before acceptance. Tasks1/4 were already
-reviewed, not restarted.
+after cancellation while waiting for the SEC governor. Fixes now await the
+SEC worker in the actual stream and propagate the task's cancellation check
+through metadata/map acquisition to the existing cooperative governor, dispatch,
+body and retry boundaries. Legacy callers without a check keep their retry
+behavior. Actual producer tests compare the entire result sent back to the
+model with canonical service output. The old in-flight fixture now records
+its first request before waiting, retaining its one-request/context/stop/join
+assertions. Scoped re-review is pending. Tasks1/4 were already reviewed, not
+restarted.
 Tasks3/5/6/7 remain open: durable Research citations/reopening, operation leases
 and export/restore, orphan cleanup/schema reset, default-disabled scheduling.
 Settings and backend citations do not imply these workflows are complete.

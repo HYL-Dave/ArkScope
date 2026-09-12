@@ -256,7 +256,7 @@ async def run_query_stream(
             "Anthropic SDK not installed. Run: pip install anthropic"
         )
 
-    from .tools import execute_tool
+    from .tools import execute_tool_async
 
     # Get or create DAL
     if dal is None:
@@ -545,7 +545,7 @@ async def run_query_stream(
                 })
 
                 # Execute the tool
-                result = execute_tool(tool_name, tool_input, dal)
+                result = await execute_tool_async(tool_name, tool_input, dal)
                 check_output_value(result)
                 # P1.4 Layer 0: budget + overflow disk persist + observability
                 # metadata. compression dict carries raw/compressed digests +

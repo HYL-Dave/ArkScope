@@ -33,7 +33,9 @@ class Transport:
         self.responses, self.calls = responses, []
         self.before = None
 
-    def get(self, url):
+    def get(self, url, *, check=None):
+        if check is not None:
+            check()
         self.calls.append(url)
         if self.before:
             self.before(url)
