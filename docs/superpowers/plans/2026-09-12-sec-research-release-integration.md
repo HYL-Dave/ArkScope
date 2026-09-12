@@ -10,7 +10,7 @@ that service. Persist exact references before admitting maintenance operations.
 **Tech Stack:** Python/SQLite/FastAPI, existing SEC transports, React/TypeScript.
 **Spec:** `docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md`.
 
-Status: preflight complete; implementation authorized by the existing spec and
+Status: Task1 reviewed complete; Task2 next. Implementation authorized by the existing spec and
 the user's continuation. User asks to finish the remaining release,
 including TOC quality, four-channel wiring and both recovery workflows.
 
@@ -70,7 +70,7 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 ## Progress
 
 - [x] Preflight and exact task contracts
-- [ ] Task 1: issuer/tool service
+- [x] Task 1: issuer/tool service (2d54a482,38529e51; focused835P; independent review approved)
 - [ ] Task 2: four-channel replacement
 - [ ] Task 3: persistent Research citations
 - [ ] Task 4: TOC recognition
@@ -103,7 +103,9 @@ failure. Schema controls are in `test_sec_research_store.py`.
 modify `src/sec_research/schema.py`, `data_sources/sec_transport.py` and SEC route
 transport construction for the narrow retry option below; tests
 `tests/test_sec_research_issuers.py`, `test_sec_research_tool_service.py`,
-`test_sec_research_store.py`, `test_sec_transport.py`. Keep old tool registration
+`test_sec_research_store.py`, `test_sec_transport.py`, and the existing route
+constructor double in `test_sec_research_routes.py` (accept and assert the
+research no-retry option). Keep old tool registration
 until Task 2.
 
 **Interfaces:** `parse_issuer(value: str) -> tuple[str, str]` returns kind
@@ -233,10 +235,19 @@ ownership. Update seven skill files named in spec section 9 and
 `src/tools/sec_tools.py` in this same change, preserving get_insider_trades.
 Also remove the empty `/sec/{ticker}` route in `src/api/routes/fundamentals.py`
 and its unused forwarding chain in `src/tools/analysis_tools.py`, `data_access.py`
-and the backend protocol/FileBackend/LocalMarketBackend after exact consumer
-verification. Evolve their existing empty-stub tests to absence plus live new
-catalog controls. Preserve working price and financial-cache methods and the
-independent SECEdgarFinancials mapper. No compatibility alias/redirect/stub remains.
+and `src/tools/backends/{__init__,local_capabilities,file_backend,local_market_backend}.py`
+(`query_sec_filings`) after exact consumer verification. Remove the now-unused
+`src/tools/schemas.py::SECFiling` and its imports, not the distinct live
+`data_sources/base.py::SECFiling`. In `data_sources/sec_edgar_financials.py`,
+remove only the old `get_filings_list` method/module wrapper, its private
+`FilingInfo` record and examples once the direct tool is removed; the inspected
+full-tree references have no independent consumer. Preserve the working
+SECEdgarFinancials facts/statement mapper and SECEdgarDataSource.
+Update the current EDGAR section in `data_sources/API_SPECIFICATIONS.md` with
+the new tool entrypoints, not historical decision records. Evolve old empty-stub
+owners in `tests/test_api.py`, `test_data_access.py`, `test_tools.py` to absence
+plus live new catalog controls; retain backend protocol conformance coverage.
+No compatibility alias/redirect/stub remains.
 Tests: create `tests/test_sec_research_tool_adapters.py`,
 `test_sec_research_tool_results.py`; modify `test_subagent.py`, `test_sec_tools.py`
 and all eight count-collateral files in the table below.
