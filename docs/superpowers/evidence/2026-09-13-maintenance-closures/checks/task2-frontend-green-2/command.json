@@ -1,0 +1,26 @@
+{
+  "name": "task2-frontend-green-2",
+  "command": [
+    "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+    "test",
+    "--",
+    "src/SettingsNewsStorage.test.ts",
+    "src/SettingsLocalStorage.test.ts",
+    "src/marketDataDisplay.test.ts",
+    "src/i18n/resources.test.ts"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+  "exit_code": 0,
+  "seconds": 2.328,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-green-2",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-green-2/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_node.cjs"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-green-2/output.log"
+}

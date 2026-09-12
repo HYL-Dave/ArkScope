@@ -1,0 +1,40 @@
+{
+  "base": "eec66b9e129eb3383c1c6b136f6d10953a3568f8",
+  "head": "eec66b9e129eb3383c1c6b136f6d10953a3568f8",
+  "product": {
+    "apps/arkscope-web/src/api.ts": "d7db80d14e3ba887826130b59c19222e39d421a5c9758c414b407cb5253196af",
+    "apps/arkscope-web/src/i18n/resources/en/settings.ts": "65896d61bc771d2d07921dc464ae62eba4ef7ce17072aa3ca8611a4f3834daf6",
+    "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts": "f32db9f1d256973e700ccb3b1844aa5709b90cca97fb0bc1df9cf66f6b0e3db5",
+    "apps/arkscope-web/src/marketDataDisplay.ts": "aba74fc70787b78796a826efce1dfed7187ede9b237da4317c609a7238243b6b",
+    "src/api/routes/news.py": "ac574f3e7c551a22163a9322d1b2d67486a70e6267e12ff8876940346d22916d",
+    "src/news_direct.py": "86efa4af089e3baad7cd01514f7beaf400acb0b4b6c9977b693483850249373a",
+    "src/news_normalized/routing.py": "27631de243ff25021f1d786b6d806d18f87328342f93d16be9cf184b81e7c384",
+    "src/news_providers.py": "45c41f86deef25866cb00aa2a4427b9e1d8dc6bf40b10d3e3b72fdcc9b945f45",
+    "src/news_sync_status.py": "c8e2f478062e02714e645b3afdda9b41bee38a6e30dbb1077950c5bdcd5249e3",
+    "src/service/provider_health.py": "23e7abf4b72e634dff9b39c275cd2339153e44e0400133e07ed16c07d9b022ce"
+  },
+  "product_collection_sha256": "7d387cdd151c9170a37703545ab802147ac19a98d67389927b060f8ad092bbcd",
+  "runners": {
+    "offline_node.cjs": "35f45243a42cf069225ff91e726779333c33bb9a3abc4c1f694404c3810b728b",
+    "offline_pytest.py": "4c74153e1ef86c35f7bbc923586de624c0ffe3f577c2853e6e4c0a78426c95ff",
+    "run_checks.py": "53c4e6b20011ba2eb2787e2bbf67b54c4ba85d8c374f2582e8cdc595b0971694"
+  },
+  "tests": {
+    "apps/arkscope-web/src/SettingsLocalStorage.test.ts": "37f43bc9fb41f4ba9b5819ad35302ef78fb991d5c54da5bfc5120141a804de59",
+    "apps/arkscope-web/src/SettingsNewsStorage.test.ts": "60cdb7588e1cceb3ff3f648411ef2c212ff6aa1cd97dc9590007abb9446f909d",
+    "apps/arkscope-web/src/i18n/resources.test.ts": "c7b44b9bd73bd7a6fc123c58ecebdfd39bdd252274785301e834a5698ff0bf97",
+    "apps/arkscope-web/src/marketDataDisplay.test.ts": "f6b0ae24346419cb2c84e256d499f5cc0eb6eb427e314b9225d657fa7b13ca65",
+    "tests/test_api.py": "66043cdb6785aa10699b071aa37b1086aca32dbc07f25a4d7e835a3dd31320af",
+    "tests/test_data_coverage_tools.py": "8c4e5dc18edd55de3e989fdf2dc3918cdab22f0bb0c1bbf299577e5c0c2788e8",
+    "tests/test_data_scheduler.py": "cdd6b95fc7abb870fbcc36dadbdf1634c66d258c35d4fc005699a587e019c07a",
+    "tests/test_market_data_admin.py": "a02bb4b2fbbf786fd035030035677439f050861b5753f53875570551b785762f",
+    "tests/test_news_normalized_routing.py": "3419390a6fb0011fc9870c6a6055dc77add1609953db383640d359983876d83b",
+    "tests/test_news_providers.py": "0b5d4584881ca99552359d6f5cd7522fa954598953c984e0ba5fb28bc861e1e9",
+    "tests/test_news_routing_cleanup.py": "85272b1aa5e4b9bb43ebd9e51ec88596a916bb75fd103a49c24f51fbce02dcd5",
+    "tests/test_news_settings_route.py": "8fe11d3c4f06deeacff2e84fd6b74d44d10bbe9119135a8fdf5344639eafb370",
+    "tests/test_news_sync_status.py": "94f94a269622a579d5f76f513a76301c7cc4466e0529086e91881a56b4c0b6ae",
+    "tests/test_provider_health.py": "805db477b19797a22939e064eade4dcbf7fa915971834036dce6558371e935c4",
+    "tests/test_security_lifecycle_routes.py": "17bbfb74962a7fe4cc1a4113adc3b79dd6a1be6d60fe6cdf969c599609d07307",
+    "tests/test_stored_sec_projection.py": "56d3bbcd8e500f6c6fe55c4d1a7178571148c5dde3104601665b331c2fd94896"
+  }
+}

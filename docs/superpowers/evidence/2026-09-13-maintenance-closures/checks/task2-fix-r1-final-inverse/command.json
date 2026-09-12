@@ -1,0 +1,25 @@
+{
+  "name": "task2-fix-r1-final-inverse",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+    "-q",
+    "tests/test_provider_health.py::test_health_clears_legacy_news_when_current_telemetry_read_fails",
+    "tests/test_provider_health.py::test_health_clears_legacy_news_when_db_exists_check_fails",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-fix-r1-final-inverse/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 1.157,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-fix-r1-final-inverse",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-fix-r1-final-inverse/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-fix-r1-final-inverse/output.log"
+}

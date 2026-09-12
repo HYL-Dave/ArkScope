@@ -1,0 +1,570 @@
+{
+  "added": [
+    [
+      "tests.test_data_coverage_tools",
+      "test_ticker_coverage_uses_current_news_sync_and_preserves_prices"
+    ],
+    [
+      "tests.test_data_scheduler",
+      "test_run_source_news_direct_when_normalized_writes_unset"
+    ],
+    [
+      "tests.test_market_data_admin",
+      "test_status_uses_current_news_sync_and_preserves_price_authority"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_read_news_write_route_blocks_malformed_current_normalized_setting"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-False-legacy_local]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-None-legacy_local]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-True-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-False-blocked]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-None-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-True-normalized]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[env-false-false-legacy_local]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[env-false-true-normalized]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[env-malformed-false-legacy_local]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[env-malformed-true-normalized]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[env-true-false-legacy_local]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[env-true-true-normalized]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[stored-false-false-legacy_local]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[stored-false-true-normalized]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[stored-malformed-false-legacy_local]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_current_writer_ignores_obsolete_profile_and_environment[stored-malformed-true-normalized]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[env-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[env-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[env-true]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[stored-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[stored-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_malformed_current_normalized_setting_still_blocks[malformed-None]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_malformed_current_normalized_setting_still_blocks[true-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_normalized_setter_denies_before_writing_and_preserves_old_key"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_normalized_setter_writes_only_current_key"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_obsolete_helpers_and_resolver_parameters_are_physically_removed"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_obsolete_put_is_unmounted_and_returns_405_without_writing"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_clears_stale_news_when_current_store_is_absent[env-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_clears_stale_news_when_current_store_is_absent[env-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_clears_stale_news_when_current_store_is_absent[env-true]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_clears_stale_news_when_current_store_is_absent[stored-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_clears_stale_news_when_current_store_is_absent[stored-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[env-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[env-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[env-true]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[stored-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[stored-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_overlay_propagates_corrupt_telemetry_without_mutation"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_has_only_current_routing_fields[env-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_has_only_current_routing_fields[env-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_has_only_current_routing_fields[env-true]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_has_only_current_routing_fields[stored-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_has_only_current_routing_fields[stored-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_keeps_actual_ingest_telemetry_with_obsolete_settings[env-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_keeps_actual_ingest_telemetry_with_obsolete_settings[env-malformed]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_keeps_actual_ingest_telemetry_with_obsolete_settings[env-true]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_keeps_actual_ingest_telemetry_with_obsolete_settings[stored-false]"
+    ],
+    [
+      "tests.test_news_routing_cleanup",
+      "test_status_keeps_actual_ingest_telemetry_with_obsolete_settings[stored-malformed]"
+    ],
+    [
+      "tests.test_news_settings_route",
+      "test_status_reports_current_normalized_environment_override"
+    ],
+    [
+      "tests.test_news_settings_route",
+      "test_status_selects_direct_writer_when_normalized_writes_are_disabled"
+    ],
+    [
+      "tests.test_news_sync_status",
+      "test_missing_sync_store_with_uri_metacharacters_stays_uncreated[market#data.db]"
+    ],
+    [
+      "tests.test_news_sync_status",
+      "test_missing_sync_store_with_uri_metacharacters_stays_uncreated[market?data.db]"
+    ],
+    [
+      "tests.test_news_sync_status",
+      "test_sync_reader_encodes_sqlite_uri_metacharacters[market#data.db]"
+    ],
+    [
+      "tests.test_news_sync_status",
+      "test_sync_reader_encodes_sqlite_uri_metacharacters[market?data.db]"
+    ],
+    [
+      "tests.test_provider_health",
+      "test_direct_news_health_uses_provider_runs_and_current_ticker_errors[False-partial-2026-06-10T10:00:00+00:00]"
+    ],
+    [
+      "tests.test_provider_health",
+      "test_direct_news_health_uses_provider_runs_and_current_ticker_errors[True-failed-2026-06-10T11:00:00+00:00]"
+    ],
+    [
+      "tests.test_provider_health",
+      "test_health_clears_legacy_news_when_current_telemetry_read_fails[legacy-news-absent]"
+    ],
+    [
+      "tests.test_provider_health",
+      "test_health_clears_legacy_news_when_current_telemetry_read_fails[legacy-news-present]"
+    ],
+    [
+      "tests.test_provider_health",
+      "test_health_clears_legacy_news_when_db_exists_check_fails"
+    ],
+    [
+      "tests.test_provider_health",
+      "test_recent_publication_without_ingest_telemetry_is_no_signal[finnhub-finnhub-FINNHUB_API_KEY]"
+    ],
+    [
+      "tests.test_provider_health",
+      "test_recent_publication_without_ingest_telemetry_is_no_signal[massive-polygon-MASSIVE_API_KEY]"
+    ],
+    [
+      "tests.test_stored_sec_projection",
+      "test_fundamentals_sync_is_null_with_price_and_current_news_telemetry"
+    ]
+  ],
+  "backend": {
+    "errors": 0,
+    "failed": 1,
+    "passed": 10310,
+    "skipped": 12
+  },
+  "baseline": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 10279,
+    "skipped": 12
+  },
+  "baseline_junit_gzip_sha256": "86bad08c65943c40e39bebfa2c2d1a6323c361e22007e83de057ff84be5ac6ce",
+  "checks": {
+    "collected_equals_executed": true,
+    "complete_commands_succeeded": false,
+    "explicit_tests_directory": true,
+    "immutable_source_anchor_matches": true,
+    "news_regression_suites_ran": true,
+    "no_backend_failures_or_errors": false,
+    "no_duplicate_nodes": true,
+    "no_source_runtime_or_runner_drift": true,
+    "retained_safety_owners_ran": true,
+    "unchanged_skip_ids": true
+  },
+  "collected": 10323,
+  "collection_run": "backend-reviewed-collection",
+  "executed": 10323,
+  "junit_sha256": "84bb3bfabd843ef4d72be61e5a7837e88e09b1eeef84501cc4d27ae6132e989a",
+  "limit": "Frozen maintenance closure acceptance, not complete SEC release or SQLite activation.",
+  "new_suites": {
+    "test_news_normalized_routing": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 17,
+      "skipped": 0
+    },
+    "test_news_routing_cleanup": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 42,
+      "skipped": 0
+    },
+    "test_news_settings_route": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 5,
+      "skipped": 0
+    },
+    "test_news_sync_status": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 7,
+      "skipped": 0
+    },
+    "test_provider_health": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 27,
+      "skipped": 0
+    }
+  },
+  "removed": [
+    [
+      "tests.test_data_coverage_tools",
+      "test_ticker_coverage_news_sync_follows_active_writer_only"
+    ],
+    [
+      "tests.test_data_scheduler",
+      "test_run_source_news_direct_when_use_local_news_on"
+    ],
+    [
+      "tests.test_market_data_admin",
+      "test_status_news_sync_follows_active_writer_only"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_local_environment_value_overrides_profile_value"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_read_news_write_route_blocks_malformed_stored_exit_marker"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-False-False-legacy_local]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-False-None-legacy_local]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-False-True-legacy_local]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-None-False-legacy_local]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-None-None-legacy_local]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-None-True-legacy_local]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-True-False-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-True-None-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[False-True-True-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-False-False-blocked]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-False-None-blocked]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-False-True-blocked]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-None-False-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-None-None-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-None-True-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-True-False-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-True-None-normalized]"
+    ],
+    [
+      "tests.test_news_normalized_routing",
+      "test_route_matrix[True-True-True-normalized]"
+    ],
+    [
+      "tests.test_news_providers",
+      "test_use_local_news_default_on"
+    ],
+    [
+      "tests.test_news_providers",
+      "test_use_local_news_env_false_overrides_profile_true"
+    ],
+    [
+      "tests.test_news_providers",
+      "test_use_local_news_env_override_on"
+    ],
+    [
+      "tests.test_news_providers",
+      "test_use_local_news_env_true_overrides_profile_false"
+    ],
+    [
+      "tests.test_news_providers",
+      "test_use_local_news_profile_false_is_rollback"
+    ],
+    [
+      "tests.test_news_providers",
+      "test_use_local_news_profile_setting_on"
+    ],
+    [
+      "tests.test_news_settings_route",
+      "test_put_settings_persists_explicit_rollback"
+    ],
+    [
+      "tests.test_news_settings_route",
+      "test_status_and_http_409_after_completed_audit_marker"
+    ],
+    [
+      "tests.test_news_settings_route",
+      "test_status_reports_explicit_and_env_rollback"
+    ],
+    [
+      "tests.test_provider_health",
+      "test_direct_news_health_uses_provider_runs_and_current_ticker_errors"
+    ],
+    [
+      "tests.test_stored_sec_projection",
+      "test_fundamentals_sync_is_null_while_price_and_news_remain_unchanged"
+    ]
+  ],
+  "retained_safety_owners": {
+    "test_api_fixed_dispatch_pins_complete_selection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0
+    },
+    "test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_failed_generation_redacts_selected_key_after_activation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_openai_retry_key_echo_is_private_without_changing_retry_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_original_oauth_id_can_refresh_normally_without_reselection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    }
+  },
+  "seconds": 1316.167,
+  "skipped": [
+    [
+      "tests.test_detailed_financials.TestLiveTechMetrics",
+      "test_nvda_tech_metrics"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_basic_stock_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_connection"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_iv_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_filter"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_quote"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_volume_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_put_call_ratio_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_scanner_parameters"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_unusual_activity"
+    ],
+    [
+      "tests.test_option_chain_tools.TestLiveOptionChain",
+      "test_spy_option_chain"
+    ],
+    [
+      "tests.test_peer_comparison.TestLivePeerComparison",
+      "test_nvda_peer_comparison"
+    ]
+  ],
+  "source_anchor": "6cddc221c31ef6a1b21ac37e06273a2ef28b31ab",
+  "source_collection_sha256": "d8a839f45ff2e0e382434a9543100fca09ac6a886f1c627a56e87688f5e8868f",
+  "source_drift": [],
+  "source_files": 1132,
+  "source_snapshot_after": "source-reviewed-after.json",
+  "source_snapshot_before": "source-reviewed-before.json",
+  "sqlite": "3.37.2"
+}

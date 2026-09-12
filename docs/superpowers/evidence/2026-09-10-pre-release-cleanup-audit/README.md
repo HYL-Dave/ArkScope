@@ -1,6 +1,15 @@
 # Pre-Release Abandoned-Surface Audit
 
-September13 continuation: [SEC integration and C03/C09/C10 cleanup](../2026-09-12-sec-integration/README.md)
+Latest September 13 continuation: [C11 and EIR-001/C13 closures](../2026-09-13-maintenance-closures/README.md).
+Through `1304c96d`, the obsolete news switch/PUT/status vocabulary and false
+ingest-status fallbacks are removed, along with exactly five unused page-head
+CSS rules. Fresh complete backend 10,311P/12 unchanged S, frontend 1,779P,
+typecheck/build/i18n and independent reviews pass. Current writers, actual data
+and live header styles remain. C12, C15/C20, broader i18n/CSS/SQL queues and
+actual stored-data/schema/key disposition remain open; C21 stays deferred.
+SQLite admission is source-only preflight, not an installed engine upgrade.
+
+Previous September 13 continuation: [SEC integration and C03/C09/C10 cleanup](../2026-09-12-sec-integration/README.md)
 removes the old catalog tool/forwarders/empty HTTP route, unused standalone
 provider classes/factory and the orphan FileBackend. Fresh backend10279P/12S,
 frontend1776P and exact census deltas are recorded there. C11-C13, C15/C20,
@@ -64,6 +73,8 @@ C03/C09-C13 and data-disposition boundaries below still apply.
 | C03 | Old catalog tool and empty forwarders/HTTP route removed; three closed SEC tools use shared four-channel result admission | `3fef138d`, `88f0512e`, `5d979910`; [evidence](../2026-09-12-sec-integration/README.md) |
 | C09 | Unused standalone EODHD/Alpha Vantage/Finnhub source classes and unified factory deleted; live EODHD census/Settings, Finnhub news, Massive/EDGAR/IBKR retained | `f30ee8fc`; [evidence](../2026-09-12-sec-integration/README.md#c09-checkpoint) |
 | C10 | Entire orphan FileBackend and unused construction removed; current database/SA authorities and raw stored data retained | `885c2a2d`; [evidence](../2026-09-12-sec-integration/README.md#c10-checkpoint) |
+| C11 | Obsolete local-news switch, setter/status fields and false legacy/publication telemetry fallback removed; current writers, IBKR health, permissions and actual stored rows retained. Real failure and reserved-path controls pass; actual old-key disposal remains separate | `a4bf0a73`, `6cddc221`, `1304c96d`; [evidence](../2026-09-13-maintenance-closures/README.md#c11) |
+| C13 | EIR-001's five unused page-head rules removed; all retained declarations and ten responsive before/after cases unchanged. Wider CSS census is not closed | `eec66b9e`; [evidence](../2026-09-13-maintenance-closures/README.md#eir-001) |
 | C04 | Current execution owner and neutral codec extracted; old case-web execution/UI and five individually reviewed HTTP entries removed. Current shared history/confirmation readers and schema disposition remain | `83eeb5ef`, `302106d2`, `5d41f570`, `0c5896a5` |
 | C04 follow-up | Fixed two-call orchestrator physically deleted; current agent owns cancellable source reads and retains four-channel behavior. Shared journal readers/writers and disposition remain separate | `38319f16` |
 | C04 current journal | Old store/review/projection/schema/migration and orphan two-phase usage helpers removed; current review/history/source/usage owners transferred and verified. No actual-store disposal | `e2f77cb7`; [evidence](current-journal-cleanup/README.md) |

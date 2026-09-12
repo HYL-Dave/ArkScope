@@ -1,0 +1,95 @@
+{
+  "changed_product_test_paths": [
+    "apps/arkscope-web/src/SettingsLocalStorage.test.ts",
+    "apps/arkscope-web/src/SettingsNewsStorage.test.ts",
+    "apps/arkscope-web/src/api.ts",
+    "apps/arkscope-web/src/i18n/resources.test.ts",
+    "apps/arkscope-web/src/i18n/resources/en/settings.ts",
+    "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts",
+    "apps/arkscope-web/src/marketDataDisplay.test.ts",
+    "apps/arkscope-web/src/marketDataDisplay.ts",
+    "src/api/routes/news.py",
+    "src/news_direct.py",
+    "src/news_normalized/routing.py",
+    "src/news_providers.py",
+    "src/news_sync_status.py",
+    "src/service/provider_health.py",
+    "tests/test_api.py",
+    "tests/test_data_coverage_tools.py",
+    "tests/test_data_scheduler.py",
+    "tests/test_market_data_admin.py",
+    "tests/test_news_normalized_routing.py",
+    "tests/test_news_providers.py",
+    "tests/test_news_routing_cleanup.py",
+    "tests/test_news_settings_route.py",
+    "tests/test_news_sync_status.py",
+    "tests/test_provider_health.py",
+    "tests/test_security_lifecycle_routes.py",
+    "tests/test_stored_sec_projection.py"
+  ],
+  "diff_check": "passed",
+  "independent_mutation_files": {
+    "task2-inverse-telemetry-source": [
+      "src/news_sync_status.py",
+      "src/service/provider_health.py"
+    ],
+    "task2-inverse-validation-source": [
+      "src/news_normalized/routing.py"
+    ]
+  },
+  "product_collection_sha256": "864f232ce0fee471e31c8d206ef3fa9ff34d3e4062e84497b75c06ad097031f4",
+  "remaining_worktree_test_server_processes": [],
+  "restored_hashes_equal": {
+    "task2-restored-telemetry-source": true,
+    "task2-restored-validation-source": true
+  },
+  "source_scans": [
+    {
+      "command": [
+        "rg",
+        "-n",
+        "USE_LOCAL_NEWS|use_local_news|local_value|local_env|LocalNewsToggle|set_local_news|setUseLocalNews|newsRoutingLabel|direct_active|directEnvOn|directEnvOff|localCompatibility|directExplicit|directDefault",
+        "src",
+        "apps/arkscope-web/src",
+        "-g",
+        "*.py",
+        "-g",
+        "*.ts",
+        "-g",
+        "*.tsx",
+        "-g",
+        "!*.test.ts",
+        "-g",
+        "!*.test.tsx"
+      ],
+      "exit_code": 1,
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "rg",
+        "-n",
+        "USE_LOCAL_NEWS|use_local_news|/news/settings|newsRoutingLabel|setUseLocalNews",
+        "docs",
+        "README.md",
+        "-g",
+        "*.md",
+        "-g",
+        "!**/superpowers/**",
+        "-g",
+        "!**/history/**",
+        "-g",
+        "!**/archive/**",
+        "-g",
+        "!ENGINEERING_ISSUE_REGISTER.md",
+        "-g",
+        "!PROJECT_PRIORITY_MAP.md"
+      ],
+      "exit_code": 1,
+      "stderr": "",
+      "stdout": ""
+    }
+  ],
+  "staged_files": []
+}

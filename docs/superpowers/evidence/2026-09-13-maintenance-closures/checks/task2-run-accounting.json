@@ -1,0 +1,697 @@
+[
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_api.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-api/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-api",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-api/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-api/output.log",
+      "name": "task2-baseline-api",
+      "seconds": 7.415
+    },
+    "outcomes": {
+      "passed": 25
+    },
+    "run": "task2-baseline-api"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_settings_route.py",
+        "tests/test_news_providers.py",
+        "tests/test_news_normalized_routing.py",
+        "tests/test_news_sync_status.py",
+        "tests/test_provider_health.py",
+        "tests/test_data_coverage_tools.py",
+        "tests/test_stored_sec_projection.py",
+        "tests/test_market_data_admin.py",
+        "tests/test_data_scheduler.py",
+        "tests/test_security_lifecycle_routes.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-backend/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-backend",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-backend/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-backend/output.log",
+      "name": "task2-baseline-backend",
+      "seconds": 18.472
+    },
+    "outcomes": {
+      "passed": 275
+    },
+    "run": "task2-baseline-backend"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "test",
+        "--",
+        "src/SettingsNewsStorage.test.ts",
+        "src/SettingsLocalStorage.test.ts",
+        "src/marketDataDisplay.test.ts",
+        "src/i18n/resources.test.ts"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-frontend",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-frontend/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-baseline-frontend/output.log",
+      "name": "task2-baseline-frontend",
+      "seconds": 2.372
+    },
+    "run": "task2-baseline-frontend"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "--collect-only",
+        "-q",
+        "tests/test_news_settings_route.py",
+        "tests/test_news_providers.py",
+        "tests/test_news_normalized_routing.py",
+        "tests/test_news_sync_status.py",
+        "tests/test_provider_health.py",
+        "tests/test_data_coverage_tools.py",
+        "tests/test_stored_sec_projection.py",
+        "tests/test_market_data_admin.py",
+        "tests/test_data_scheduler.py",
+        "tests/test_security_lifecycle_routes.py",
+        "tests/test_news_routing_cleanup.py",
+        "tests/test_api.py"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-collect-after",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-collect-after/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-collect-after/output.log",
+      "name": "task2-collect-after",
+      "seconds": 2.188
+    },
+    "run": "task2-collect-after"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "--collect-only",
+        "-q",
+        "tests/test_api.py"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-collect-api-before",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-collect-api-before/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-collect-api-before/output.log",
+      "name": "task2-collect-api-before",
+      "seconds": 1.055
+    },
+    "run": "task2-collect-api-before"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "--collect-only",
+        "-q",
+        "tests/test_news_settings_route.py",
+        "tests/test_news_providers.py",
+        "tests/test_news_normalized_routing.py",
+        "tests/test_news_sync_status.py",
+        "tests/test_provider_health.py",
+        "tests/test_data_coverage_tools.py",
+        "tests/test_stored_sec_projection.py",
+        "tests/test_market_data_admin.py",
+        "tests/test_data_scheduler.py",
+        "tests/test_security_lifecycle_routes.py"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-collect-before",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-collect-before/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-collect-before/output.log",
+      "name": "task2-collect-before",
+      "seconds": 1.722
+    },
+    "run": "task2-collect-before"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_direct.py",
+        "tests/test_news_normalized_schema.py",
+        "tests/test_news_normalized_store.py",
+        "tests/test_news_normalized_identity.py",
+        "tests/test_news_normalized_tickers.py",
+        "tests/test_news_normalized_body_policy.py",
+        "tests/test_news_normalized_projection.py",
+        "tests/test_news_normalized_provider_adapters.py",
+        "tests/test_news_normalized_ibkr_adapter.py",
+        "tests/test_news_normalized_writer.py",
+        "tests/test_news_normalized_writer_locking.py",
+        "tests/test_news_normalized_retry_queue.py",
+        "tests/test_collector_adapters.py",
+        "tests/test_collector_load_env.py",
+        "tests/test_news_event_tools.py",
+        "tests/test_news_feed_content_route.py",
+        "tests/test_news_local_authority.py",
+        "tests/test_news_content_availability.py",
+        "tests/test_news_identity.py",
+        "tests/test_lifecycle_investigation_news.py",
+        "tests/test_security_lifecycle_news_evidence.py",
+        "tests/test_current_investigation_ownership.py",
+        "tests/test_tools.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-controls-green/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-controls-green",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-controls-green/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-controls-green/output.log",
+      "name": "task2-controls-green",
+      "seconds": 15.251
+    },
+    "outcomes": {
+      "passed": 303
+    },
+    "run": "task2-controls-green"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_settings_route.py",
+        "tests/test_news_providers.py",
+        "tests/test_news_normalized_routing.py",
+        "tests/test_news_sync_status.py",
+        "tests/test_provider_health.py",
+        "tests/test_data_coverage_tools.py",
+        "tests/test_stored_sec_projection.py",
+        "tests/test_market_data_admin.py",
+        "tests/test_data_scheduler.py",
+        "tests/test_security_lifecycle_routes.py",
+        "tests/test_news_routing_cleanup.py",
+        "tests/test_api.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-final-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-final-restored",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-final-restored/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-final-restored/output.log",
+      "name": "task2-final-restored",
+      "seconds": 23.327
+    },
+    "outcomes": {
+      "passed": 329
+    },
+    "run": "task2-final-restored"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_settings_route.py",
+        "tests/test_news_providers.py",
+        "tests/test_news_normalized_routing.py",
+        "tests/test_news_sync_status.py",
+        "tests/test_provider_health.py",
+        "tests/test_data_coverage_tools.py",
+        "tests/test_stored_sec_projection.py",
+        "tests/test_market_data_admin.py",
+        "tests/test_data_scheduler.py",
+        "tests/test_security_lifecycle_routes.py",
+        "tests/test_news_routing_cleanup.py",
+        "tests/test_api.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-first-green/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-first-green",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-first-green/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 1,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-first-green/output.log",
+      "name": "task2-first-green",
+      "seconds": 23.282
+    },
+    "outcomes": {
+      "failure": 2,
+      "passed": 326
+    },
+    "run": "task2-first-green"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "test",
+        "--",
+        "src/SettingsNewsStorage.test.ts",
+        "src/SettingsLocalStorage.test.ts",
+        "src/marketDataDisplay.test.ts",
+        "src/i18n/resources.test.ts"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-green",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-green/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 1,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-green/output.log",
+      "name": "task2-frontend-green",
+      "seconds": 2.317
+    },
+    "run": "task2-frontend-green"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "test",
+        "--",
+        "src/SettingsNewsStorage.test.ts",
+        "src/SettingsLocalStorage.test.ts",
+        "src/marketDataDisplay.test.ts",
+        "src/i18n/resources.test.ts"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-green-2",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-green-2/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-green-2/output.log",
+      "name": "task2-frontend-green-2",
+      "seconds": 2.328
+    },
+    "run": "task2-frontend-green-2"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "test",
+        "--",
+        "src/marketDataDisplay.test.ts"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-red",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-red/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 1,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-frontend-red/output.log",
+      "name": "task2-frontend-red",
+      "seconds": 1.378
+    },
+    "run": "task2-frontend-red"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "run",
+        "check:i18n-literals"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-i18n-literals",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-i18n-literals/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-i18n-literals/output.log",
+      "name": "task2-i18n-literals",
+      "seconds": 0.849
+    },
+    "run": "task2-i18n-literals"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_routing_cleanup.py::test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings",
+        "tests/test_news_routing_cleanup.py::test_overlay_clears_stale_news_when_current_store_is_absent",
+        "tests/test_news_routing_cleanup.py::test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings",
+        "tests/test_news_routing_cleanup.py::test_status_keeps_actual_ingest_telemetry_with_obsolete_settings",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-inverse-telemetry/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-inverse-telemetry",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-inverse-telemetry/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 1,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-inverse-telemetry/output.log",
+      "name": "task2-inverse-telemetry",
+      "seconds": 2.198
+    },
+    "outcomes": {
+      "failure": 6,
+      "passed": 14
+    },
+    "run": "task2-inverse-telemetry"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_routing_cleanup.py::test_current_writer_ignores_obsolete_profile_and_environment",
+        "tests/test_news_routing_cleanup.py::test_malformed_current_normalized_setting_still_blocks",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-inverse-validation/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-inverse-validation",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-inverse-validation/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 1,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-inverse-validation/output.log",
+      "name": "task2-inverse-validation",
+      "seconds": 1.729
+    },
+    "outcomes": {
+      "failure": 4,
+      "passed": 8
+    },
+    "run": "task2-inverse-validation"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_settings_route.py",
+        "tests/test_news_providers.py",
+        "tests/test_news_normalized_routing.py",
+        "tests/test_news_sync_status.py",
+        "tests/test_provider_health.py",
+        "tests/test_data_coverage_tools.py",
+        "tests/test_stored_sec_projection.py",
+        "tests/test_market_data_admin.py",
+        "tests/test_data_scheduler.py",
+        "tests/test_security_lifecycle_routes.py",
+        "tests/test_news_routing_cleanup.py",
+        "tests/test_api.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-owned-green/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-owned-green",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-owned-green/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-owned-green/output.log",
+      "name": "task2-owned-green",
+      "seconds": 23.244
+    },
+    "outcomes": {
+      "passed": 329
+    },
+    "run": "task2-owned-green"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_routing_cleanup.py",
+        "tests/test_news_sync_status.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-regression-assertion-red/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-regression-assertion-red",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-regression-assertion-red/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 1,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-regression-assertion-red/output.log",
+      "name": "task2-regression-assertion-red",
+      "seconds": 2.845
+    },
+    "outcomes": {
+      "failure": 19,
+      "passed": 30
+    },
+    "run": "task2-regression-assertion-red"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_routing_cleanup.py",
+        "tests/test_news_sync_status.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-regression-red/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-regression-red",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-regression-red/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 1,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-regression-red/output.log",
+      "name": "task2-regression-red",
+      "seconds": 2.802
+    },
+    "outcomes": {
+      "failure": 19,
+      "passed": 28
+    },
+    "run": "task2-regression-red"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+        "-q",
+        "tests/test_news_routing_cleanup.py::test_current_writer_ignores_obsolete_profile_and_environment",
+        "tests/test_news_routing_cleanup.py::test_malformed_current_normalized_setting_still_blocks",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-restored-validation/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-restored-validation",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-restored-validation/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-restored-validation/output.log",
+      "name": "task2-restored-validation",
+      "seconds": 1.639
+    },
+    "outcomes": {
+      "passed": 12
+    },
+    "run": "task2-restored-validation"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "run",
+        "typecheck"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-typecheck",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-typecheck/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 2,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-typecheck/output.log",
+      "name": "task2-typecheck",
+      "seconds": 11.144
+    },
+    "run": "task2-typecheck"
+  },
+  {
+    "command": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "run",
+        "typecheck"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-typecheck-2",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-typecheck-2/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-typecheck-2/output.log",
+      "name": "task2-typecheck-2",
+      "seconds": 11.011
+    },
+    "run": "task2-typecheck-2"
+  }
+]

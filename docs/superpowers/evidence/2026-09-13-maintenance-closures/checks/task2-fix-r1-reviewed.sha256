@@ -1,0 +1,5 @@
+1e94ef2aa93ce15a05e2da98bc1a1567476b36a8f4fbdc4284bfa74bee491cfd  src/service/provider_health.py
+ad65732ced2c64c8bca8766485855d102d6a4c88cb31b640ed1684f815ed4f7d  tests/test_provider_health.py
+53c4e6b20011ba2eb2787e2bbf67b54c4ba85d8c374f2582e8cdc595b0971694  .superpowers/sdd/2026-09-13-maintenance-closures/run_checks.py
+4c74153e1ef86c35f7bbc923586de624c0ffe3f577c2853e6e4c0a78426c95ff  .superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py
+35f45243a42cf069225ff91e726779333c33bb9a3abc4c1f694404c3810b728b  .superpowers/sdd/2026-09-13-maintenance-closures/offline_node.cjs

@@ -1,0 +1,4516 @@
+{
+  "base_revision": "ef5f7b48",
+  "base_source_digest": "3046a62939c5eaa8cf41735ee55d5e2f216731e6fa6a3b629bd49b23ed49b81d",
+  "base_totals": {
+    "candidates": 4345,
+    "coverage": {
+      "decode_failed": 3,
+      "documentation": 211,
+      "excluded_evidence": 8317,
+      "excluded_non_source": 23,
+      "excluded_plan_workspace": 7,
+      "excluded_private": 6,
+      "read": 1146
+    },
+    "uncertainties": 3471
+  },
+  "candidate_id_multiplicity_note": "Repeated CSS selectors in different media contexts can share an ID; use occurrence counts, not unique-ID counts, for raw candidate total reconciliation.",
+  "candidate_occurrences_added": {},
+  "candidate_occurrences_removed": {
+    "css:apps/arkscope-web/src/styles.css:.page-head": 2,
+    "css:apps/arkscope-web/src/styles.css:.page-head h1": 1,
+    "css:apps/arkscope-web/src/styles.css:.page-head-actions": 2,
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.directDefault": 1,
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.directEnvOff": 1,
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.directEnvOn": 1,
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.directExplicit": 1,
+    "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.localCompatibility": 1,
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.directDefault": 1,
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.directEnvOff": 1,
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.directEnvOn": 1,
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.directExplicit": 1,
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.localCompatibility": 1
+  },
+  "final_revision": "1304c96d",
+  "final_source_digest": "2b7f739eb92ac9bd28120759b5a4fc7912e4913fb3c89df05941b85dfb4f3cfd",
+  "final_totals": {
+    "candidates": 4330,
+    "coverage": {
+      "decode_failed": 3,
+      "documentation": 212,
+      "excluded_evidence": 8319,
+      "excluded_non_source": 23,
+      "excluded_plan_workspace": 7,
+      "excluded_private": 6,
+      "read": 1148
+    },
+    "uncertainties": 3463
+  },
+  "limit": "Metadata/location matches do not prove all code semantics or resolve scanner uncertainty. Raw review_required stays authoritative; unmatched rows require explicit review, never deletion by count.",
+  "matched_uncertainties": [
+    {
+      "new": {
+        "accessor": "store.get_setting",
+        "axis": "settings",
+        "id": "settings:554f96fc074963ad",
+        "line": 39,
+        "operation": "reads",
+        "path": "src/api/routes/news.py"
+      },
+      "old": {
+        "accessor": "store.get_setting",
+        "axis": "settings",
+        "id": "settings:6d96ddff2fdd2780",
+        "line": 51,
+        "operation": "reads",
+        "path": "src/api/routes/news.py"
+      },
+      "proof": "metadata_and_python_nodes",
+      "source_nodes_sha256": "eb3d39b326be376f434532638267b828bb61dea4bf7c80512e4080586c59d456"
+    },
+    {
+      "new": {
+        "accessor": "store.set_setting",
+        "axis": "settings",
+        "id": "settings:e59e9692d0a49f09",
+        "line": 69,
+        "operation": "writes",
+        "path": "src/api/routes/news.py"
+      },
+      "old": {
+        "accessor": "store.set_setting",
+        "axis": "settings",
+        "id": "settings:91cd4a2cb2a3527e",
+        "line": 99,
+        "operation": "writes",
+        "path": "src/api/routes/news.py"
+      },
+      "proof": "metadata_and_python_nodes",
+      "source_nodes_sha256": "f84b322e50563023b9fbc3bf631f8807eda54bd1dd70c412fca0c9a2c1c8119d"
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".investigation-runtime input[type=\"number\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:edf34907aa178f51",
+        "line": 3994,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".investigation-runtime input[type=\"number\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:0e9579a541ef1230",
+        "line": 4017,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-assessment-form > label:not(.lifecycle-citation)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:31f196a760d2b33f",
+        "line": 2161,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-assessment-form > label:not(.lifecycle-citation)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:965029ee17e953dd",
+        "line": 2184,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-advanced:not([open]) > .lifecycle-automation-fields",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:96b02e5a15c4a0a8",
+        "line": 1199,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-advanced:not([open]) > .lifecycle-automation-fields",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:36da8bbda3d06e3b",
+        "line": 1216,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-band[data-automation-state=\"incident\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:494d164f86b240d7",
+        "line": 2080,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-band[data-automation-state=\"incident\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:d3e183f99a569bc7",
+        "line": 2103,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-band[data-automation-state=\"running\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:e61acc2dd98edbca",
+        "line": 2083,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-band[data-automation-state=\"running\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:c4a1e6adfb9672f7",
+        "line": 2106,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-progress li[aria-current=\"step\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:419db38ec26f0f27",
+        "line": 2455,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-progress li[aria-current=\"step\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:67727b48cd8d17cc",
+        "line": 2478,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-schedule=\"disabled\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:cfee127d2fdf0759",
+        "line": 1091,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-schedule=\"disabled\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:a223916dbcbaa50d",
+        "line": 1108,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-schedule=\"due\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:847f9aa510dbf30f",
+        "line": 1088,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-schedule=\"due\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:e749b3c9d18d0fea",
+        "line": 1105,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-schedule=\"invalid\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:36af253f5cd92350",
+        "line": 1081,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-schedule=\"invalid\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:c19dc35f7d8436fd",
+        "line": 1098,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-schedule=\"scheduled\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:3dadef30c6f74912",
+        "line": 1087,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-schedule=\"scheduled\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:52cf1323807b7fbd",
+        "line": 1104,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-state=\"failed\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:d4638ad6c36dfcdd",
+        "line": 1079,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-state=\"failed\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:edfa2a5b5fb101a5",
+        "line": 1096,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-state=\"incident\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:4cb000f65b72d421",
+        "line": 1078,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-state=\"incident\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:57a35fa0d3f638b1",
+        "line": 1095,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-state=\"invalid\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:f2a05e4b318b893d",
+        "line": 1080,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-state=\"invalid\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:4282cea159aea163",
+        "line": 1097,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-state=\"running\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:2b35e6aa7deb6377",
+        "line": 1084,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-automation-status [data-automation-state=\"running\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:ddc33c7c4195cd65",
+        "line": 1101,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-evidence-item:not([open]) > .lifecycle-evidence-body",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:c89e85b51efa6fa5",
+        "line": 2679,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-evidence-item:not([open]) > .lifecycle-evidence-body",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:1d2bcbd34f75eb4d",
+        "line": 2702,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-evidence-mode-switch button[aria-pressed=\"true\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:41241af2ab14f9f8",
+        "line": 2699,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-evidence-mode-switch button[aria-pressed=\"true\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:699f086f9c6d5994",
+        "line": 2722,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-manual-supplement:not([open]) > .lifecycle-commands",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:e15462b765eefe7e",
+        "line": 2763,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-manual-supplement:not([open]) > .lifecycle-commands",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:cea61ff41dd12bd4",
+        "line": 2786,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-settings-diagnostics:not([open]) > :not(summary)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:747f063178b28d31",
+        "line": 1200,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-settings-diagnostics:not([open]) > :not(summary)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:c3fd7d4e16d7a630",
+        "line": 1217,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-view-switch button[aria-pressed=\"true\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:00067d3413e77282",
+        "line": 2325,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".lifecycle-view-switch button[aria-pressed=\"true\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:e2442efd12db6313",
+        "line": 2348,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-account-details .ui-data-table [data-align=\"right\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:7a856b4620ed5b4a",
+        "line": 3299,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-account-details .ui-data-table [data-align=\"right\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:5b0445bca6141929",
+        "line": 3322,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-activity .ui-data-table [data-align=\"right\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:1aca6ae77c6e6396",
+        "line": 3503,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-activity .ui-data-table [data-align=\"right\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:5c22c5010c927f45",
+        "line": 3526,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-capture .ui-data-table [data-align=\"right\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:09936a2f463ad692",
+        "line": 3369,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-capture .ui-data-table [data-align=\"right\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:b3eff63afc6b2333",
+        "line": 3392,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-capture-settings > label:not(.portfolio-capture-toggle)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:7c7fc2ec68ef686b",
+        "line": 3318,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-capture-settings > label:not(.portfolio-capture-toggle)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:52dd30740a6286dd",
+        "line": 3341,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-capture-settings input[type=\"number\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:71aab245c623786d",
+        "line": 3324,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-capture-settings input[type=\"number\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:2de29c798046f6b2",
+        "line": 3347,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-holdings-layout[data-has-recent=\"true\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:70eeddf44f679ec6",
+        "line": 3392,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-holdings-layout[data-has-recent=\"true\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:cdf6996d3ec98b34",
+        "line": 3415,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-view-tab[aria-selected=\"true\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:42f84aa80ada70ab",
+        "line": 3254,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".portfolio-view-tab[aria-selected=\"true\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:6f25a6c139702cd3",
+        "line": 3277,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-bubble[data-state=\"blocked\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:a83998e0ece581da",
+        "line": 3892,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-bubble[data-state=\"blocked\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:aa1267d8ec4b92ae",
+        "line": 3915,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-bubble[data-state=\"failed\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:1c2a761153740cfa",
+        "line": 3891,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-bubble[data-state=\"failed\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:2c83c1ca4238a110",
+        "line": 3914,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-bubble[data-state=\"interrupted\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:447ae006fd397885",
+        "line": 3893,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-bubble[data-state=\"interrupted\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:1948aa822438844b",
+        "line": 3916,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-history-select.ui-button:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:af3dc88f29c66bfa",
+        "line": 3816,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-history-select.ui-button:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:39f6cc0d2d6f5075",
+        "line": 3839,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-threaditem:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:0d9c8e6393fb3b85",
+        "line": 3686,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-threaditem:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:b3cb86107a7b2244",
+        "line": 3709,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 44,
+        "expression": ".research-threadmenu-btn:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:1cde694a7040c90f",
+        "line": 3686,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 44,
+        "expression": ".research-threadmenu-btn:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:b792289c96252923",
+        "line": 3709,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-threadmenu-btn:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:3ee3a4d9ac9ab085",
+        "line": 3696,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".research-threadmenu-btn:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:b9d37559124f33a9",
+        "line": 3719,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(1)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:d3f55d7efa6b2914",
+        "line": 1994,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(1)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:9db91285d891cbcd",
+        "line": 2017,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(2)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:2c9316e5eb17652b",
+        "line": 1995,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(2)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:dda0ec5688504a3f",
+        "line": 2018,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(3)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:2cb5f0f0dba4a62f",
+        "line": 1996,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(3)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:39f4baca7a562787",
+        "line": 2019,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(4)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:f13dbb67b4e719fc",
+        "line": 1997,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(4)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:63ba3e2831f0b74e",
+        "line": 2020,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(5)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:f4c60bf9ed131787",
+        "line": 1998,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".settings-schedule-table th:nth-child(5)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:a2b313fde9b4560f",
+        "line": 2021,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".wl-addrow:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:d8fca7383ef68168",
+        "line": 3073,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".wl-addrow:hover:not(:disabled)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:f13357939837a80a",
+        "line": 3096,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 3,
+        "expression": "table.lifecycle-current-table td[data-label]::before",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:1f7dfd4f7245342f",
+        "line": 2399,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 3,
+        "expression": "table.lifecycle-current-table td[data-label]::before",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:24410523eb963970",
+        "line": 2422,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": "table.lifecycle-current-table th:nth-child(1)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:4baef2d439492703",
+        "line": 2371,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": "table.lifecycle-current-table th:nth-child(1)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:7da1d42e9c3cdf23",
+        "line": 2394,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": "table.lifecycle-current-table th:nth-child(2)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:54fb6d61540d88cc",
+        "line": 2372,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": "table.lifecycle-current-table th:nth-child(2)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:f6f946267f86f4a5",
+        "line": 2395,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": "table.lifecycle-current-table th:nth-child(3)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:6987132a95662b54",
+        "line": 2373,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": "table.lifecycle-current-table th:nth-child(3)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:73ef7435a4930ae8",
+        "line": 2396,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": "table.lifecycle-current-table th:nth-child(5)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:c056ea70d5179983",
+        "line": 2374,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": "table.lifecycle-current-table th:nth-child(5)",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:e3b3004e67843832",
+        "line": 2397,
+        "reason": "unsupported-css-selector"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<NewsFeedResponse>(`/news/feed?${sp.toString()}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d7c0fdd9904a5ace",
+        "line": 4995,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<NewsFeedResponse>(`/news/feed?${sp.toString()}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4617dd55e288fca2",
+        "line": 5004,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SAFeedResponse>(`/sa/feed?${sp.toString()}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a5f53cb7b411ca4a",
+        "line": 5050,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SAFeedResponse>(`/sa/feed?${sp.toString()}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5008adc65c15fc38",
+        "line": 5059,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SecurityLifecycleCaseListResponse>(\n    `/security-lifecycle/cases${lifecycleQuery(filters)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7b513df923442e8f",
+        "line": 4375,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SecurityLifecycleCaseListResponse>(\n    `/security-lifecycle/cases${lifecycleQuery(filters)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5b6fdd79b501fb53",
+        "line": 4380,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SecurityLifecycleInvestigationRun>(\n    `/security-lifecycle/investigations/${encodeURIComponent(runId)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:735c2d1fec97843e",
+        "line": 4431,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SecurityLifecycleInvestigationRun>(\n    `/security-lifecycle/investigations/${encodeURIComponent(runId)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:169bcd1e44ce7d59",
+        "line": 4436,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<TickerIdentityTransitionPreview>(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/transition-preview${\n      tickerIdentityPreviewQuery(options)\n    }`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:cb9a7609e04a6837",
+        "line": 4541,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<TickerIdentityTransitionPreview>(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/transition-preview${\n      tickerIdentityPreviewQuery(options)\n    }`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8c75e66f0f82404a",
+        "line": 4546,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 24,
+        "expression": "getJSON<TradingDayCoverage>(\n    `/market-data/trading-days?lookback_days=${lookbackDays}&interval=${encodeURIComponent(interval)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9aac01cb57daf370",
+        "line": 4945,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 24,
+        "expression": "getJSON<TradingDayCoverage>(\n    `/market-data/trading-days?lookback_days=${lookbackDays}&interval=${encodeURIComponent(interval)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:287a95a0cba81ee3",
+        "line": 4954,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 11,
+        "expression": "getJSON<unknown>(\n      `/security-lifecycle/candidates${lifecycleQuery(filters)}`,\n    )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4dcbed896227c52e",
+        "line": 4387,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 11,
+        "expression": "getJSON<unknown>(\n      `/security-lifecycle/candidates${lifecycleQuery(filters)}`,\n    )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4dad19720599f9af",
+        "line": 4392,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 11,
+        "expression": "getJSON<unknown>(\n      `/security-lifecycle/cases/${encodeURIComponent(caseId)}`,\n    )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8b374bc19e546ec3",
+        "line": 4422,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 11,
+        "expression": "getJSON<unknown>(\n      `/security-lifecycle/cases/${encodeURIComponent(caseId)}`,\n    )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:cc8844c32687c797",
+        "line": 4427,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 41,
+        "expression": "getJSON<unknown>(\n    `/security-lifecycle/transition-activity${query ? `?${query}` : \"\"}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:40ab365434445619",
+        "line": 4602,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 41,
+        "expression": "getJSON<unknown>(\n    `/security-lifecycle/transition-activity${query ? `?${query}` : \"\"}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2c77484e0111c630",
+        "line": 4607,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 50,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/${repairId}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b768e5548ca69370",
+        "line": 4934,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 50,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/${repairId}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:45958114f6f2c25c",
+        "line": 4943,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 43,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/operations?limit=5&offset=${offset}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d39a33d2b17eb5d4",
+        "line": 4930,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 43,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/operations?limit=5&offset=${offset}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2a679890aa2b6cec",
+        "line": 4939,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 40,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/preview?lookback_days=${lookbackDays}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:6f37864f7ff15704",
+        "line": 4823,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 40,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/preview?lookback_days=${lookbackDays}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:94b6e7a041ec3ef0",
+        "line": 4832,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 43,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/review${lifecycleQuery(options)}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:61fe64373d94bdf9",
+        "line": 4341,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 43,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/review${lifecycleQuery(options)}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4db6e3615c619e6a",
+        "line": 4346,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 46,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:788d001908bc387a",
+        "line": 4333,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 46,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:dc44861bc1cfbe07",
+        "line": 4338,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 23,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/latest`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ef11d7c07d59bbab",
+        "line": 4325,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 23,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/latest`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:e0dc2ea07fa1baf6",
+        "line": 4330,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 52,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/preflight${lifecycleQuery({ language })}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:eb41dce0f005f833",
+        "line": 4321,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 52,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/preflight${lifecycleQuery({ language })}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:25bc35f895f10734",
+        "line": 4326,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 52,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:983a672647cd115a",
+        "line": 4358,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 52,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:f8e7bc5aa6921c7e",
+        "line": 4363,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/providers/config/${encodeURIComponent(provider)}/${encodeURIComponent(field)}/import-env`,\n    \"POST\",\n    { source_env_var: sourceEnvVar ?? null, confirm_guarded: confirmGuarded },\n  ",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d3aeadc16cf298f7",
+        "line": 5388,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/providers/config/${encodeURIComponent(provider)}/${encodeURIComponent(field)}/import-env`,\n    \"POST\",\n    { source_env_var: sourceEnvVar ?? null, confirm_guarded: confirmGuarded },\n  ",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a08509e914409818",
+        "line": 5397,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/providers/config/${encodeURIComponent(provider)}`,\n    \"PUT\",\n    { fields, confirm_guarded: confirmGuarded ?? {} },\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3b3fc027fea98b61",
+        "line": 5368,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/providers/config/${encodeURIComponent(provider)}`,\n    \"PUT\",\n    { fields, confirm_guarded: confirmGuarded ?? {} },\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:730fee020bd84ea0",
+        "line": 5377,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/acknowledgements/${encodeURIComponent(acknowledgementId)}/reopen`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:841110c23f610ac1",
+        "line": 4505,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/acknowledgements/${encodeURIComponent(acknowledgementId)}/reopen`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:86c8d9a132c068d4",
+        "line": 4510,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/action-proposals/${encodeURIComponent(proposalId)}/dismiss`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3ca24933ce2e1048",
+        "line": 4514,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/action-proposals/${encodeURIComponent(proposalId)}/dismiss`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a8b68a26d354238d",
+        "line": 4519,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/assessments/${encodeURIComponent(assessmentId)}/accept`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2f7fda911a99b7db",
+        "line": 4485,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/assessments/${encodeURIComponent(assessmentId)}/accept`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:47e91f8bf8799a6e",
+        "line": 4490,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/acknowledgements`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5415bb45d5a2fa06",
+        "line": 4495,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/acknowledgements`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:daa97393d9f79db5",
+        "line": 4500,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/assessments`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:fe02e2fa96500a10",
+        "line": 4475,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/assessments`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:f1bd1945708319e0",
+        "line": 4480,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/evidence`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:fcad02242facef34",
+        "line": 4440,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/evidence`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b8d126931e9ca31e",
+        "line": 4445,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 9,
+        "expression": "sendJSON(`/profile/alpha-picks-tracking/${encodeURIComponent(membershipId)}`, \"POST\", { action })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:10195304c8a6b4fd",
+        "line": 3023,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 9,
+        "expression": "sendJSON(`/profile/alpha-picks-tracking/${encodeURIComponent(membershipId)}`, \"POST\", { action })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9fe08ca5dc19cbf4",
+        "line": 3028,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/providers/test/${encodeURIComponent(provider)}`, \"POST\", undefined, 15_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7478579302fec980",
+        "line": 5405,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/providers/test/${encodeURIComponent(provider)}`, \"POST\", undefined, 15_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:c4d4b75248c4ae0d",
+        "line": 5414,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/schedule/${encodeURIComponent(source)}`, \"PUT\", body, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5f088b34772c660c",
+        "line": 5298,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/schedule/${encodeURIComponent(source)}`, \"PUT\", body, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ef777d0e9a8291bd",
+        "line": 5307,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/schedule/run/${encodeURIComponent(source)}`, \"POST\", undefined, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9abff64d8482afc2",
+        "line": 5304,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/schedule/run/${encodeURIComponent(source)}`, \"POST\", undefined, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:08c715b931d26521",
+        "line": 5313,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionAttemptResult>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/retry`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b2befb942a5bbbc3",
+        "line": 4577,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionAttemptResult>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/retry`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:373614a549a8d9f9",
+        "line": 4582,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionAttemptResult>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/reverse`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2f9a109f21e38dd1",
+        "line": 4587,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionAttemptResult>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/reverse`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7883372978cf5bd6",
+        "line": 4592,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionRecord>(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/approve-transition`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:03d920d3d6b6d5e7",
+        "line": 4557,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionRecord>(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/approve-transition`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:48f7df3536080b65",
+        "line": 4562,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionRecord>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/cancel`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d38d4562b7c08190",
+        "line": 4567,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionRecord>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/cancel`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:85e03cc82646cc14",
+        "line": 4572,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 57,
+        "expression": "sendJSON<unknown>(\n    `/security-lifecycle/cases/${encodeURIComponent(packet.case_id)}/confirm-review`, \"POST\",\n    { assessment_id: packet.assessment_id, packet_sha256: packet.packet_sha256, action:",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7cd666b9ca2da927",
+        "line": 4309,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 57,
+        "expression": "sendJSON<unknown>(\n    `/security-lifecycle/cases/${encodeURIComponent(packet.case_id)}/confirm-review`, \"POST\",\n    { assessment_id: packet.assessment_id, packet_sha256: packet.packet_sha256, action:",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:27169a9cccd76787",
+        "line": 4314,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 45,
+        "expression": "sendJSON<unknown>(\n    `/security-lifecycle/transition-activity/${encodeURIComponent(activityId)}/acknowledge`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9f60eb44396045dd",
+        "line": 4610,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 45,
+        "expression": "sendJSON<unknown>(\n    `/security-lifecycle/transition-activity/${encodeURIComponent(activityId)}/acknowledge`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:67bd36aa6340205f",
+        "line": 4615,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 49,
+        "expression": "sendJSON<unknown>(`/market-data/price-repair/${repairId}/resume`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:637c1c2cc2be81c5",
+        "line": 4839,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 49,
+        "expression": "sendJSON<unknown>(`/market-data/price-repair/${repairId}/resume`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:82b4f1245a31fd99",
+        "line": 4848,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 46,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/cancel`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:550d84b4e17f5e01",
+        "line": 4337,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 46,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/cancel`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7ae3ec767e360a14",
+        "line": 4342,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 57,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/confirm`, \"POST\",\n    { packet_sha256: packet.packet_sha256, action: packet.action, ...packet.options, acknowled",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:1da66402eb5958de",
+        "line": 4346,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 57,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/confirm`, \"POST\",\n    { packet_sha256: packet.packet_sha256, action: packet.action, ...packet.options, acknowled",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:c963db248140bbe6",
+        "line": 4351,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 52,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/check`, \"POST\", undefined, 300_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3545990dd00772f7",
+        "line": 4362,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 52,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/check`, \"POST\", undefined, 300_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b4335e389f79c5aa",
+        "line": 4367,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 51,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/prepare`,\n    \"POST\", { check_sha256: checkSha256, ...options })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9fb6fe13cbdea4c7",
+        "line": 4366,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 51,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/prepare`,\n    \"POST\", { check_sha256: checkSha256, ...options })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:847e8d4f88f9d5d0",
+        "line": 4371,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 40,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/runs`, \"POST\", body)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a9893c3b2ce0e80a",
+        "line": 4330,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 40,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/runs`, \"POST\", body)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:c27aff9622be28df",
+        "line": 4335,
+        "reason": "template-http-url"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 29,
+        "expression": "resources[locale]",
+        "file": "apps/arkscope-web/src/i18n/resources.test.ts",
+        "id": "frontend:63492f9506788e95",
+        "line": 1431,
+        "namespaces": null,
+        "reason": "resource-access"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 29,
+        "expression": "resources[locale]",
+        "file": "apps/arkscope-web/src/i18n/resources.test.ts",
+        "id": "frontend:0438beb7c548b9f2",
+        "line": 1426,
+        "namespaces": null,
+        "reason": "resource-access"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 24,
+        "expression": "resources[locale]",
+        "file": "apps/arkscope-web/src/i18n/resources.test.ts",
+        "id": "frontend:7f0d907bb6105f47",
+        "line": 1415,
+        "namespaces": null,
+        "reason": "resource-access"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 24,
+        "expression": "resources[locale]",
+        "file": "apps/arkscope-web/src/i18n/resources.test.ts",
+        "id": "frontend:4283c856ef04a2b9",
+        "line": 1410,
+        "namespaces": null,
+        "reason": "resource-access"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 48,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:039a64582a8fd146",
+        "line": 859,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 52,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:01c05ffb6a9ec2af",
+        "line": 878,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:2462454c1b43c515",
+        "line": 871,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:10f6f87c695c40b6",
+        "line": 872,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 74,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:27815334a410eafb",
+        "line": 877,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 74,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:2aeab06025678e95",
+        "line": 883,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:80cb7c59cc5db7bf",
+        "line": 911,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 50,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:4b5e4afda561ae15",
+        "line": 863,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 52,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:919be2ff84afb037",
+        "line": 872,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 52,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:54801071c32435ee",
+        "line": 866,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 53,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:bc0e8b7e54eb40b1",
+        "line": 862,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 53,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:5bcc30bf2a0be853",
+        "line": 868,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 52,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:bf926ea8a47ea74f",
+        "line": 860,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:664d82292d2f829a",
+        "line": 877,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 51,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:c6a9b3bf49b5ccf3",
+        "line": 861,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 51,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:9ced80a8b7f71ac0",
+        "line": 867,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:cb39cdd0449da6db",
+        "line": 866,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 46,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:bf321219942c82da",
+        "line": 865,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 50,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:eb27f87cf7d38df8",
+        "line": 858,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 48,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:bfe6a81dfe373131",
+        "line": 864,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:f44379a0b91e969d",
+        "line": 901,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+        "id": "frontend:d56e8fff613bcc55",
+        "line": 917,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 60,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:02b5e4eb01337bf8",
+        "line": 230,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 48,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:0d7ffa487294a55c",
+        "line": 161,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:03e8063c847a8dd1",
+        "line": 170,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 64,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:0e008a99a4b1ed3e",
+        "line": 377,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:14bdcb94ff0c4a2e",
+        "line": 89,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:15af858fe0fc1ac9",
+        "line": 182,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 64,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:2333eefa96864b2a",
+        "line": 365,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 81,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:29aeb807f8effc37",
+        "line": 210,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 36,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:3829e00373d2cf0b",
+        "line": 229,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 36,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:2c4377d6026a5f1e",
+        "line": 241,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:41b7fcde6aa2a7fc",
+        "line": 184,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:5224c8b2b6a3a732",
+        "line": 196,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 29,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:4901f5f2335d6faa",
+        "line": 324,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 60,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:5f61d001d8d571ea",
+        "line": 242,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 50,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:59c2e02dd7909cb6",
+        "line": 132,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:721f818d10d0be5f",
+        "line": 130,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:6cf6a35e72c9bc58",
+        "line": 216,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:74797e4c1aa2bde7",
+        "line": 348,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:6dabb33d570914bc",
+        "line": 99,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:80df4b9c1056a09e",
+        "line": 111,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:76884705232387c4",
+        "line": 233,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:8b3a7739ff961a4d",
+        "line": 245,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 48,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:7c2728f8bd1be7b7",
+        "line": 149,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:bcae715de7b9abdd",
+        "line": 228,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:7eb99bd785e3b73f",
+        "line": 336,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 65,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:c0f9d766dd33d3b4",
+        "line": 142,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 40,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:87f881760cb30068",
+        "line": 202,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 40,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:c90fe15890677b00",
+        "line": 214,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 65,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:b4609d65095aac2a",
+        "line": 130,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 37,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:d42a74571e6945b9",
+        "line": 211,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 37,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:b9a9d2e4e05f18af",
+        "line": 199,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 29,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:d7c4656033aeca3c",
+        "line": 336,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 21,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:da4b9d791a5fe2ae",
+        "line": 330,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:db1296b308d73042",
+        "line": 101,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 81,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:f0f0099b90e97ecd",
+        "line": 198,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 50,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:f5df5213db309094",
+        "line": 144,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 39,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:fbcbd7e5759ee743",
+        "line": 118,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 21,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:f9580f0602ce2530",
+        "line": 342,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 13,
+        "expression": "t(($) => $.dataSources.schedule.history.failed)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:f5e4f7025121c287",
+        "key": "dataSources.schedule.history.failed",
+        "line": 480,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 13,
+        "expression": "t(($) => $.dataSources.schedule.history.failed)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:7876fa0be5b25cf0",
+        "key": "dataSources.schedule.history.failed",
+        "line": 492,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 13,
+        "expression": "t(($) => $.dataSources.schedule.history.gatewayUnavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:cd1eb4999b1db26e",
+        "key": "dataSources.schedule.history.gatewayUnavailable",
+        "line": 479,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 13,
+        "expression": "t(($) => $.dataSources.schedule.history.gatewayUnavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:fd6cca21cbd92aba",
+        "key": "dataSources.schedule.history.gatewayUnavailable",
+        "line": 491,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 15,
+        "expression": "t(($) => $.dataSources.schedule.history.newsCoverageIncomplete_one, {\n              count: incompleteNewsTickers,\n            })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:91cbabe4b27b59b9",
+        "line": 422,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 15,
+        "expression": "t(($) => $.dataSources.schedule.history.newsCoverageIncomplete_one, {\n              count: incompleteNewsTickers,\n            })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:45bd86cb90990151",
+        "line": 434,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 15,
+        "expression": "t(($) => $.dataSources.schedule.history.newsCoverageIncomplete_other, {\n              count: incompleteNewsTickers,\n            })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:5f32b7822359a171",
+        "line": 425,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 15,
+        "expression": "t(($) => $.dataSources.schedule.history.newsCoverageIncomplete_other, {\n              count: incompleteNewsTickers,\n            })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:bedfff4ade4bb22a",
+        "line": 437,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataSources.schedule.history.notRun)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:ac1b3bb1491df4af",
+        "key": "dataSources.schedule.history.notRun",
+        "line": 505,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataSources.schedule.history.notRun)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:d8ce3dff3fa105ae",
+        "key": "dataSources.schedule.history.notRun",
+        "line": 517,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 30,
+        "expression": "t(($) => $.dataSources.schedule.history.partial)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:5bf53a04b2ad3a64",
+        "key": "dataSources.schedule.history.partial",
+        "line": 471,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 30,
+        "expression": "t(($) => $.dataSources.schedule.history.partial)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:0ebad3ac5b7b8621",
+        "key": "dataSources.schedule.history.partial",
+        "line": 483,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialActionable, {\n            count: actionable,\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:9172a944b8d6b2c3",
+        "line": 384,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialActionable, {\n            count: actionable,\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:1a0d2ad61887e5be",
+        "line": 396,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialBodies, { count: bodies })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:a96f92655bb46fdb",
+        "line": 449,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialBodies, { count: bodies })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:2711bddaeb8d90da",
+        "line": 461,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialCursor)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:80ef5afe2fdcb5b8",
+        "key": "dataSources.schedule.history.partialCursor",
+        "line": 465,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialCursor)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:309ebcd0a313ee70",
+        "key": "dataSources.schedule.history.partialCursor",
+        "line": 477,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialTickers, {\n            count: tickers,\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:86801356d2277cf4",
+        "line": 456,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialTickers, {\n            count: tickers,\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:3b388d53973bf8b2",
+        "line": 468,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialTickersAndBodies, {\n            count: tickers,\n            value: bodies,\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:a76d7a2729f4ed90",
+        "line": 439,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.partialTickersAndBodies, {\n            count: tickers,\n            value: bodies,\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:be059a182c037d6c",
+        "line": 451,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 13,
+        "expression": "t(($) => $.dataSources.schedule.history.priceUnresolved_one, {\n            count: unresolved,\n            tickers: unresolvedTickers.join(\", \"),\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:723bf4e4a7f47d11",
+        "line": 406,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 13,
+        "expression": "t(($) => $.dataSources.schedule.history.priceUnresolved_one, {\n            count: unresolved,\n            tickers: unresolvedTickers.join(\", \"),\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:dfcc273038e420a8",
+        "line": 418,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 13,
+        "expression": "t(($) => $.dataSources.schedule.history.priceUnresolved_other, {\n            count: unresolved,\n            tickers: unresolvedTickers.join(\", \"),\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:c927c73489cb77d5",
+        "line": 410,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 13,
+        "expression": "t(($) => $.dataSources.schedule.history.priceUnresolved_other, {\n            count: unresolved,\n            tickers: unresolvedTickers.join(\", \"),\n          })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:979882018066b169",
+        "line": 422,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataSources.schedule.history.running)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:8fd309e236ea07f0",
+        "key": "dataSources.schedule.history.running",
+        "line": 499,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataSources.schedule.history.running)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:949d45c5ed40838f",
+        "key": "dataSources.schedule.history.running",
+        "line": 511,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.runningStale)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:0d0f10bbe59e1c88",
+        "key": "dataSources.schedule.history.runningStale",
+        "line": 493,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 18,
+        "expression": "t(($) => $.dataSources.schedule.history.runningStale)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:e33338a56232a128",
+        "key": "dataSources.schedule.history.runningStale",
+        "line": 505,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataSources.schedule.history.skipped)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:29ce45656778021f",
+        "key": "dataSources.schedule.history.skipped",
+        "line": 486,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataSources.schedule.history.skipped)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:a6eb5fb3530730b1",
+        "key": "dataSources.schedule.history.skipped",
+        "line": 498,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataSources.schedule.history.succeeded)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:b1ea5b438843000e",
+        "key": "dataSources.schedule.history.succeeded",
+        "line": 376,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataSources.schedule.history.succeeded)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:1861d0df0d0ecf46",
+        "key": "dataSources.schedule.history.succeeded",
+        "line": 388,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.issueRecordedAt, { message, time })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:216080abce4140fd",
+        "key": "dataStorage.coverage.drilldown.issueRecordedAt",
+        "line": 304,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.issueRecordedAt, { message, time })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:65f4da316e532435",
+        "key": "dataStorage.coverage.drilldown.issueRecordedAt",
+        "line": 316,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 7,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.issueTimeUnknown)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:db900e47d039b091",
+        "key": "dataStorage.coverage.drilldown.issueTimeUnknown",
+        "line": 303,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 7,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.issueTimeUnknown)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:20d3140c566249f4",
+        "key": "dataStorage.coverage.drilldown.issueTimeUnknown",
+        "line": 315,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 7,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.partialDetail, {\n        ticker: ticker.ticker,\n        observed: ticker.observed_slot_count,\n        expected: ticker.expected_slot_count,\n      })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:e7dd48106a16f98c",
+        "key": "dataStorage.coverage.drilldown.partialDetail",
+        "line": 255,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 7,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.partialDetail, {\n        ticker: ticker.ticker,\n        observed: ticker.observed_slot_count,\n        expected: ticker.expected_slot_count,\n      })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:78e90fb306e62971",
+        "key": "dataStorage.coverage.drilldown.partialDetail",
+        "line": 267,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.partialTitle)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:931556280535fa75",
+        "key": "dataStorage.coverage.drilldown.partialTitle",
+        "line": 252,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.partialTitle)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:a87a9e365430d367",
+        "key": "dataStorage.coverage.drilldown.partialTitle",
+        "line": 264,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 36,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.priceUnresolvedReview, {\n      count: unresolved.length,\n      tickers: issueTickerList(unresolved),\n    })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:1379119b21d1208f",
+        "line": 327,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 36,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.priceUnresolvedReview, {\n      count: unresolved.length,\n      tickers: issueTickerList(unresolved),\n    })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:1f267d1f7727eff8",
+        "line": 339,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 36,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.providerAttemptFailed, {\n      count: other.length,\n      tickers: issueTickerList(other),\n    })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:6cc50a099b9ef45e",
+        "line": 333,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 36,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.providerAttemptFailed, {\n      count: other.length,\n      tickers: issueTickerList(other),\n    })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:1a5b6f9d1a5f3fbf",
+        "line": 345,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.providerIssues, {\n        count: providerIssueCount,\n      })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:39a9c353ed0506f3",
+        "line": 284,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.providerIssues, {\n        count: providerIssueCount,\n      })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:6db4eb2fa94e487f",
+        "line": 296,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 36,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.securityDefinition, {\n      count: securityDefinition.length,\n      tickers: issueTickerList(securityDefinition),\n    })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:e2c7c70d623f6098",
+        "line": 321,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 36,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.securityDefinition, {\n      count: securityDefinition.length,\n      tickers: issueTickerList(securityDefinition),\n    })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:2debae01ad170c48",
+        "line": 333,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.unknownDetail, {\n        count: row.unknown_tickers.length,\n      })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:5480fb4e72aaf5db",
+        "line": 264,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.unknownDetail, {\n        count: row.unknown_tickers.length,\n      })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:09bf06d46634ab4c",
+        "line": 276,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.unknownTitle)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:98a71382f9cd01aa",
+        "key": "dataStorage.coverage.drilldown.unknownTitle",
+        "line": 261,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.unknownTitle)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:7ada6e150584d03d",
+        "key": "dataStorage.coverage.drilldown.unknownTitle",
+        "line": 273,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.unmatched, {\n        count: unmatchedCount,\n      })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:065a01af364212f5",
+        "line": 279,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 9,
+        "expression": "t(($) => $.dataStorage.coverage.drilldown.unmatched, {\n        count: unmatchedCount,\n      })",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:d2a69f4ce7ef54cc",
+        "line": 291,
+        "namespaces": null,
+        "reason": "unsupported-translation-options"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.facts.marketScopeValue)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:9af613bd731ed426",
+        "key": "dataStorage.coverage.facts.marketScopeValue",
+        "line": 86,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.facts.marketScopeValue)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:194d0766339a1a93",
+        "key": "dataStorage.coverage.facts.marketScopeValue",
+        "line": 98,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.facts.sessionValue)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:53dedc049f8421cb",
+        "key": "dataStorage.coverage.facts.sessionValue",
+        "line": 96,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.facts.sessionValue)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:8196150e2c9138d1",
+        "key": "dataStorage.coverage.facts.sessionValue",
+        "line": 108,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.calendarUnavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:b6c219548a4e80af",
+        "key": "dataStorage.coverage.health.calendarUnavailable",
+        "line": 181,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.calendarUnavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:14fc07c9c27d1963",
+        "key": "dataStorage.coverage.health.calendarUnavailable",
+        "line": 193,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.dateUnreviewed)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:2da344bf3666a27e",
+        "key": "dataStorage.coverage.health.dateUnreviewed",
+        "line": 179,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.dateUnreviewed)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:990298cfc1d60aff",
+        "key": "dataStorage.coverage.health.dateUnreviewed",
+        "line": 191,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.fixtureHorizonLow)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:9f6cd18daee46fa6",
+        "key": "dataStorage.coverage.health.fixtureHorizonLow",
+        "line": 177,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.fixtureHorizonLow)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:eb9a6985d2c5aa4e",
+        "key": "dataStorage.coverage.health.fixtureHorizonLow",
+        "line": 189,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.marketDbMissing)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:9a271097c12e5d92",
+        "key": "dataStorage.coverage.health.marketDbMissing",
+        "line": 209,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.marketDbMissing)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:7534644196d6b5cf",
+        "key": "dataStorage.coverage.health.marketDbMissing",
+        "line": 221,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.marketDbUnreadable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:91101e6bc5392d68",
+        "key": "dataStorage.coverage.health.marketDbUnreadable",
+        "line": 211,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.marketDbUnreadable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:a0b1b0a32ba8df55",
+        "key": "dataStorage.coverage.health.marketDbUnreadable",
+        "line": 223,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.pricesSchemaMissing)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:371780700f52d019",
+        "key": "dataStorage.coverage.health.pricesSchemaMissing",
+        "line": 213,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.health.pricesSchemaMissing)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:1f04ca322e3bd841",
+        "key": "dataStorage.coverage.health.pricesSchemaMissing",
+        "line": 225,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.reasons.calendarUnavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:a71b55042c82492b",
+        "key": "dataStorage.coverage.reasons.calendarUnavailable",
+        "line": 159,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.reasons.calendarUnavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:b3e374d29dfa97f0",
+        "key": "dataStorage.coverage.reasons.calendarUnavailable",
+        "line": 171,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.reasons.dateUnreviewed)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:d678bf59f85e7736",
+        "key": "dataStorage.coverage.reasons.dateUnreviewed",
+        "line": 161,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.reasons.dateUnreviewed)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:6f51180fcaf279d0",
+        "key": "dataStorage.coverage.reasons.dateUnreviewed",
+        "line": 173,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.reasons.noObservations)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:fd832d1b752ea651",
+        "key": "dataStorage.coverage.reasons.noObservations",
+        "line": 165,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.reasons.noObservations)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:eab3e75e2dfb1533",
+        "key": "dataStorage.coverage.reasons.noObservations",
+        "line": 177,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.reasons.observationUnavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:fb4d7a448685099a",
+        "key": "dataStorage.coverage.reasons.observationUnavailable",
+        "line": 163,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.reasons.observationUnavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:1818c92c8fec4e5d",
+        "key": "dataStorage.coverage.reasons.observationUnavailable",
+        "line": 175,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 23,
+        "expression": "t(($) => $.dataStorage.coverage.status.complete)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:e6b1db354bd40aaf",
+        "key": "dataStorage.coverage.status.complete",
+        "line": 146,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 23,
+        "expression": "t(($) => $.dataStorage.coverage.status.complete)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:7cc45a4f2613101b",
+        "key": "dataStorage.coverage.status.complete",
+        "line": 158,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 23,
+        "expression": "t(($) => $.dataStorage.coverage.status.inProgress)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:ec4338ddd10d76fe",
+        "key": "dataStorage.coverage.status.inProgress",
+        "line": 137,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 23,
+        "expression": "t(($) => $.dataStorage.coverage.status.inProgress)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:324e2e9fcae137bd",
+        "key": "dataStorage.coverage.status.inProgress",
+        "line": 149,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataStorage.coverage.status.indeterminateTickers)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:dd0fdcf3915d6ec1",
+        "key": "dataStorage.coverage.status.indeterminateTickers",
+        "line": 142,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.dataStorage.coverage.status.indeterminateTickers)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:5b06fe9769e823f1",
+        "key": "dataStorage.coverage.status.indeterminateTickers",
+        "line": 154,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.status.marketClosed)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:f2afc191bdb0e851",
+        "key": "dataStorage.coverage.status.marketClosed",
+        "line": 113,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.status.marketClosed)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:fcb0f77c479d927a",
+        "key": "dataStorage.coverage.status.marketClosed",
+        "line": 125,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 23,
+        "expression": "t(($) => $.dataStorage.coverage.status.partial)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:cb3d0fbd5c504d09",
+        "key": "dataStorage.coverage.status.partial",
+        "line": 139,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 23,
+        "expression": "t(($) => $.dataStorage.coverage.status.partial)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:ecbd58cd9258b630",
+        "key": "dataStorage.coverage.status.partial",
+        "line": 151,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t(($) => $.dataStorage.coverage.status.unavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:7196d9feebcf7c09",
+        "key": "dataStorage.coverage.status.unavailable",
+        "line": 80,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t(($) => $.dataStorage.coverage.status.unavailable)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:0770ad99b538ded5",
+        "key": "dataStorage.coverage.status.unavailable",
+        "line": 92,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 23,
+        "expression": "t(($) => $.dataStorage.coverage.status.unknown)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:8d7d4d39a31dc65c",
+        "key": "dataStorage.coverage.status.unknown",
+        "line": 128,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 23,
+        "expression": "t(($) => $.dataStorage.coverage.status.unknown)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:f59ab2e213eb35ff",
+        "key": "dataStorage.coverage.status.unknown",
+        "line": 140,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.status.weekend)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:06394240b30620de",
+        "key": "dataStorage.coverage.status.weekend",
+        "line": 111,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.dataStorage.coverage.status.weekend)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:3f583355929da15c",
+        "key": "dataStorage.coverage.status.weekend",
+        "line": 123,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t(($) => $.newsStorage.routing.authority.current)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:5ad1ed6fce1d4e36",
+        "key": "newsStorage.routing.authority.current",
+        "line": 65,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t(($) => $.newsStorage.routing.authority.current)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:dde6c6ddd8c2f5a9",
+        "key": "newsStorage.routing.authority.current",
+        "line": 77,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t(($) => $.newsStorage.routing.read.compatibility)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:04ac2638af3dcad0",
+        "key": "newsStorage.routing.read.compatibility",
+        "line": 70,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t(($) => $.newsStorage.routing.read.compatibility)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:858c03adf59f1088",
+        "key": "newsStorage.routing.read.compatibility",
+        "line": 82,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t(($) => $.newsStorage.routing.read.localDirect)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:14f0dd0e1a3c73a1",
+        "key": "newsStorage.routing.read.localDirect",
+        "line": 72,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "t(($) => $.newsStorage.routing.read.localDirect)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:9e614cd096ccab4a",
+        "key": "newsStorage.routing.read.localDirect",
+        "line": 84,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.newsStorage.routing.write.blocked)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:31f42e800b517d57",
+        "key": "newsStorage.routing.write.blocked",
+        "line": 57,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.newsStorage.routing.write.blocked)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:106ee452e98ba4b4",
+        "key": "newsStorage.routing.write.blocked",
+        "line": 72,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.newsStorage.routing.write.blocked)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:357528fe733a32e5",
+        "key": "newsStorage.routing.write.blocked",
+        "line": 60,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.newsStorage.routing.write.blocked)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:f9d746ea5e7be5cd",
+        "key": "newsStorage.routing.write.blocked",
+        "line": 69,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.newsStorage.routing.write.legacyLocal)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:b63396f0016d5474",
+        "key": "newsStorage.routing.write.legacyLocal",
+        "line": 55,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.newsStorage.routing.write.legacyLocal)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:44513ba500828955",
+        "key": "newsStorage.routing.write.legacyLocal",
+        "line": 67,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.newsStorage.routing.write.normalized)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:e00310969ceb912f",
+        "key": "newsStorage.routing.write.normalized",
+        "line": 53,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 14,
+        "expression": "t(($) => $.newsStorage.routing.write.normalized)",
+        "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+        "id": "frontend:4d19e7ce9ccb0b5f",
+        "key": "newsStorage.routing.write.normalized",
+        "line": 65,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    },
+    {
+      "new": {
+        "axis": "python",
+        "id": "python:9e2b08cce87c85ff",
+        "kind": "dynamic_import",
+        "line": 1302,
+        "path": "tests/test_data_scheduler.py"
+      },
+      "old": {
+        "axis": "python",
+        "id": "python:96eb21a92454328e",
+        "kind": "dynamic_import",
+        "line": 1305,
+        "path": "tests/test_data_scheduler.py"
+      },
+      "proof": "metadata_only",
+      "source_nodes_sha256": null
+    }
+  ],
+  "new_candidates": [],
+  "proof_counts": {
+    "metadata_and_python_nodes": 2,
+    "metadata_only": 173
+  },
+  "raw_comparison": {
+    "coverage_reductions": [],
+    "dependency_metadata_changed": [],
+    "new_candidates": [],
+    "new_uncertainties": [
+      "frontend:00067d3413e77282",
+      "frontend:02b5e4eb01337bf8",
+      "frontend:039a64582a8fd146",
+      "frontend:03d920d3d6b6d5e7",
+      "frontend:03e8063c847a8dd1",
+      "frontend:04ac2638af3dcad0",
+      "frontend:06394240b30620de",
+      "frontend:065a01af364212f5",
+      "frontend:09936a2f463ad692",
+      "frontend:0d0f10bbe59e1c88",
+      "frontend:0d9c8e6393fb3b85",
+      "frontend:10195304c8a6b4fd",
+      "frontend:1379119b21d1208f",
+      "frontend:14bdcb94ff0c4a2e",
+      "frontend:14f0dd0e1a3c73a1",
+      "frontend:1aca6ae77c6e6396",
+      "frontend:1c2a761153740cfa",
+      "frontend:1cde694a7040c90f",
+      "frontend:1da66402eb5958de",
+      "frontend:1f7dfd4f7245342f",
+      "frontend:216080abce4140fd",
+      "frontend:2333eefa96864b2a",
+      "frontend:2462454c1b43c515",
+      "frontend:27815334a410eafb",
+      "frontend:29ce45656778021f",
+      "frontend:2b35e6aa7deb6377",
+      "frontend:2c9316e5eb17652b",
+      "frontend:2cb5f0f0dba4a62f",
+      "frontend:2da344bf3666a27e",
+      "frontend:2f7fda911a99b7db",
+      "frontend:2f9a109f21e38dd1",
+      "frontend:31f196a760d2b33f",
+      "frontend:31f42e800b517d57",
+      "frontend:3545990dd00772f7",
+      "frontend:357528fe733a32e5",
+      "frontend:36af253f5cd92350",
+      "frontend:371780700f52d019",
+      "frontend:3829e00373d2cf0b",
+      "frontend:39a9c353ed0506f3",
+      "frontend:3b3fc027fea98b61",
+      "frontend:3ca24933ce2e1048",
+      "frontend:3dadef30c6f74912",
+      "frontend:3ee3a4d9ac9ab085",
+      "frontend:40ab365434445619",
+      "frontend:41241af2ab14f9f8",
+      "frontend:419db38ec26f0f27",
+      "frontend:41b7fcde6aa2a7fc",
+      "frontend:42f84aa80ada70ab",
+      "frontend:447ae006fd397885",
+      "frontend:4901f5f2335d6faa",
+      "frontend:494d164f86b240d7",
+      "frontend:4baef2d439492703",
+      "frontend:4cb000f65b72d421",
+      "frontend:4dcbed896227c52e",
+      "frontend:53dedc049f8421cb",
+      "frontend:5415bb45d5a2fa06",
+      "frontend:5480fb4e72aaf5db",
+      "frontend:54fb6d61540d88cc",
+      "frontend:550d84b4e17f5e01",
+      "frontend:59c2e02dd7909cb6",
+      "frontend:5ad1ed6fce1d4e36",
+      "frontend:5bf53a04b2ad3a64",
+      "frontend:5f088b34772c660c",
+      "frontend:5f32b7822359a171",
+      "frontend:61fe64373d94bdf9",
+      "frontend:63492f9506788e95",
+      "frontend:637c1c2cc2be81c5",
+      "frontend:6987132a95662b54",
+      "frontend:6cc50a099b9ef45e",
+      "frontend:6cf6a35e72c9bc58",
+      "frontend:6dabb33d570914bc",
+      "frontend:6f37864f7ff15704",
+      "frontend:70eeddf44f679ec6",
+      "frontend:7196d9feebcf7c09",
+      "frontend:71aab245c623786d",
+      "frontend:723bf4e4a7f47d11",
+      "frontend:735c2d1fec97843e",
+      "frontend:7478579302fec980",
+      "frontend:747f063178b28d31",
+      "frontend:76884705232387c4",
+      "frontend:788d001908bc387a",
+      "frontend:7a856b4620ed5b4a",
+      "frontend:7b513df923442e8f",
+      "frontend:7c2728f8bd1be7b7",
+      "frontend:7c7fc2ec68ef686b",
+      "frontend:7cd666b9ca2da927",
+      "frontend:7eb99bd785e3b73f",
+      "frontend:7f0d907bb6105f47",
+      "frontend:80cb7c59cc5db7bf",
+      "frontend:80ef5afe2fdcb5b8",
+      "frontend:841110c23f610ac1",
+      "frontend:847f9aa510dbf30f",
+      "frontend:86801356d2277cf4",
+      "frontend:87f881760cb30068",
+      "frontend:8b374bc19e546ec3",
+      "frontend:8d7d4d39a31dc65c",
+      "frontend:8fd309e236ea07f0",
+      "frontend:91101e6bc5392d68",
+      "frontend:9172a944b8d6b2c3",
+      "frontend:919be2ff84afb037",
+      "frontend:91cbabe4b27b59b9",
+      "frontend:931556280535fa75",
+      "frontend:96b02e5a15c4a0a8",
+      "frontend:983a672647cd115a",
+      "frontend:98a71382f9cd01aa",
+      "frontend:9a271097c12e5d92",
+      "frontend:9aac01cb57daf370",
+      "frontend:9abff64d8482afc2",
+      "frontend:9af613bd731ed426",
+      "frontend:9f60eb44396045dd",
+      "frontend:9f6cd18daee46fa6",
+      "frontend:9fb6fe13cbdea4c7",
+      "frontend:a5f53cb7b411ca4a",
+      "frontend:a71b55042c82492b",
+      "frontend:a76d7a2729f4ed90",
+      "frontend:a83998e0ece581da",
+      "frontend:a96f92655bb46fdb",
+      "frontend:a9893c3b2ce0e80a",
+      "frontend:ac1b3bb1491df4af",
+      "frontend:af3dc88f29c66bfa",
+      "frontend:b1ea5b438843000e",
+      "frontend:b2befb942a5bbbc3",
+      "frontend:b4609d65095aac2a",
+      "frontend:b63396f0016d5474",
+      "frontend:b6c219548a4e80af",
+      "frontend:b768e5548ca69370",
+      "frontend:b9a9d2e4e05f18af",
+      "frontend:bc0e8b7e54eb40b1",
+      "frontend:bf926ea8a47ea74f",
+      "frontend:c056ea70d5179983",
+      "frontend:c6a9b3bf49b5ccf3",
+      "frontend:c89e85b51efa6fa5",
+      "frontend:c927c73489cb77d5",
+      "frontend:cb39cdd0449da6db",
+      "frontend:cb3d0fbd5c504d09",
+      "frontend:cb9a7609e04a6837",
+      "frontend:cd1eb4999b1db26e",
+      "frontend:cfee127d2fdf0759",
+      "frontend:d38d4562b7c08190",
+      "frontend:d39a33d2b17eb5d4",
+      "frontend:d3aeadc16cf298f7",
+      "frontend:d3f55d7efa6b2914",
+      "frontend:d4638ad6c36dfcdd",
+      "frontend:d678bf59f85e7736",
+      "frontend:d7c0fdd9904a5ace",
+      "frontend:d8fca7383ef68168",
+      "frontend:da4b9d791a5fe2ae",
+      "frontend:db900e47d039b091",
+      "frontend:dd0fdcf3915d6ec1",
+      "frontend:e00310969ceb912f",
+      "frontend:e15462b765eefe7e",
+      "frontend:e2c7c70d623f6098",
+      "frontend:e61acc2dd98edbca",
+      "frontend:e6b1db354bd40aaf",
+      "frontend:e7dd48106a16f98c",
+      "frontend:eb27f87cf7d38df8",
+      "frontend:eb41dce0f005f833",
+      "frontend:ec4338ddd10d76fe",
+      "frontend:edf34907aa178f51",
+      "frontend:ef11d7c07d59bbab",
+      "frontend:f0f0099b90e97ecd",
+      "frontend:f13dbb67b4e719fc",
+      "frontend:f2a05e4b318b893d",
+      "frontend:f2afc191bdb0e851",
+      "frontend:f44379a0b91e969d",
+      "frontend:f4c60bf9ed131787",
+      "frontend:f5e4f7025121c287",
+      "frontend:fb4d7a448685099a",
+      "frontend:fbcbd7e5759ee743",
+      "frontend:fcad02242facef34",
+      "frontend:fd832d1b752ea651",
+      "frontend:fe02e2fa96500a10",
+      "python:9e2b08cce87c85ff",
+      "settings:554f96fc074963ad",
+      "settings:e59e9692d0a49f09"
+    ],
+    "new_untracked_paths": [],
+    "review_required": true
+  },
+  "removed_candidates_by_id": [
+    {
+      "deletion_authorized": false,
+      "id": "css:apps/arkscope-web/src/styles.css:.page-head",
+      "kind": "unresolved",
+      "line": 1404,
+      "path": "apps/arkscope-web/src/styles.css"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "css:apps/arkscope-web/src/styles.css:.page-head h1",
+      "kind": "unresolved",
+      "line": 957,
+      "path": "apps/arkscope-web/src/styles.css"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "css:apps/arkscope-web/src/styles.css:.page-head-actions",
+      "kind": "unresolved",
+      "line": 1407,
+      "path": "apps/arkscope-web/src/styles.css"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.directDefault",
+      "kind": "unresolved",
+      "line": 983,
+      "path": "apps/arkscope-web/src/i18n/resources/en/settings.ts"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.directEnvOff",
+      "kind": "unresolved",
+      "line": 980,
+      "path": "apps/arkscope-web/src/i18n/resources/en/settings.ts"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.directEnvOn",
+      "kind": "unresolved",
+      "line": 979,
+      "path": "apps/arkscope-web/src/i18n/resources/en/settings.ts"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.directExplicit",
+      "kind": "unresolved",
+      "line": 982,
+      "path": "apps/arkscope-web/src/i18n/resources/en/settings.ts"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/settings.ts:en:settings:newsStorage.routing.localCompatibility",
+      "kind": "unresolved",
+      "line": 981,
+      "path": "apps/arkscope-web/src/i18n/resources/en/settings.ts"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.directDefault",
+      "kind": "unresolved",
+      "line": 982,
+      "path": "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.directEnvOff",
+      "kind": "unresolved",
+      "line": 979,
+      "path": "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.directEnvOn",
+      "kind": "unresolved",
+      "line": 978,
+      "path": "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.directExplicit",
+      "kind": "unresolved",
+      "line": 981,
+      "path": "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts"
+    },
+    {
+      "deletion_authorized": false,
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts:zh-Hant:settings:newsStorage.routing.localCompatibility",
+      "kind": "unresolved",
+      "line": 980,
+      "path": "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts"
+    }
+  ],
+  "unmatched_new_uncertainties": [],
+  "unmatched_removed_uncertainties": [
+    {
+      "axis": "i18n",
+      "column": 9,
+      "expression": "t(($) => $.newsStorage.routing.directEnvOff)",
+      "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+      "id": "frontend:56552c3525e01058",
+      "key": "newsStorage.routing.directEnvOff",
+      "line": 54,
+      "namespaces": null,
+      "reason": "dynamic-translation-namespace"
+    },
+    {
+      "axis": "i18n",
+      "column": 37,
+      "expression": "t(($) => $.newsStorage.routing.localCompatibility)",
+      "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+      "id": "frontend:7a5fa1d3933c82db",
+      "key": "newsStorage.routing.localCompatibility",
+      "line": 56,
+      "namespaces": null,
+      "reason": "dynamic-translation-namespace"
+    },
+    {
+      "axis": "i18n",
+      "column": 7,
+      "expression": "t(($) => $.newsStorage.routing.directDefault)",
+      "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+      "id": "frontend:d6c3c80fa8d36f9c",
+      "key": "newsStorage.routing.directDefault",
+      "line": 59,
+      "namespaces": null,
+      "reason": "dynamic-translation-namespace"
+    },
+    {
+      "axis": "i18n",
+      "column": 9,
+      "expression": "t(($) => $.newsStorage.routing.directEnvOn)",
+      "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+      "id": "frontend:e4fa5ee0344c9aab",
+      "key": "newsStorage.routing.directEnvOn",
+      "line": 53,
+      "namespaces": null,
+      "reason": "dynamic-translation-namespace"
+    },
+    {
+      "axis": "i18n",
+      "column": 7,
+      "expression": "t(($) => $.newsStorage.routing.directExplicit)",
+      "file": "apps/arkscope-web/src/marketDataDisplay.ts",
+      "id": "frontend:ecbba8101ca60b00",
+      "key": "newsStorage.routing.directExplicit",
+      "line": 58,
+      "namespaces": null,
+      "reason": "dynamic-translation-namespace"
+    },
+    {
+      "axis": "i18n",
+      "column": 10,
+      "expression": "t",
+      "file": "apps/arkscope-web/src/marketDataDisplay.test.ts",
+      "id": "frontend:fc2b95b97f4c874f",
+      "line": 907,
+      "namespaces": null,
+      "reason": "escaped-translation-binding"
+    },
+    {
+      "accessor": "store.set_setting",
+      "axis": "settings",
+      "id": "settings:041e0cd752cfca3b",
+      "line": 88,
+      "operation": "writes",
+      "path": "src/api/routes/news.py"
+    },
+    {
+      "accessor": "store.get_setting",
+      "axis": "settings",
+      "id": "settings:f49beb8545c93516",
+      "line": 48,
+      "operation": "reads",
+      "path": "src/api/routes/news.py"
+    }
+  ]
+}

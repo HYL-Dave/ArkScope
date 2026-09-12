@@ -1,0 +1,26 @@
+{
+  "name": "task2-r1-controller-green",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+    "-q",
+    "tests/test_provider_health.py",
+    "tests/test_news_sync_status.py",
+    "tests/test_news_routing_cleanup.py",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-r1-controller-green/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 3.152,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-r1-controller-green",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-r1-controller-green/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-r1-controller-green/output.log"
+}

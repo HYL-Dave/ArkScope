@@ -100,9 +100,16 @@ inventory/backup operation, not automatic startup cleanup.
   tests/typecheck/i18n and ensure the five locale leaves have no retained caller.
 - [x] Inverse-check telemetry suppression and old-value validation independently:
   each must fail its named owner. Restore and rerun the unmutated controls.
-- [ ] Independent review, frozen full backend and mechanical census before
+- [x] Independent review, frozen full backend and mechanical census before
   acceptance. No master merge/push, no installation or stored-data cleanup
   implied by source acceptance. C12 and SEC citation/export/recovery remain open.
+
+Accepted source `1304c96d`: complete backend 10,311P/12 unchanged S, exact 10,323
+nodes and unchanged runtime/source/runner identity; frontend 1,779P with
+typecheck/build/i18n. Task and whole-change reviews approve. The initial complete
+run failed one EIR-006 exact fixture-classification guard; its one-line test
+inventory correction has independent RED/inverse/restored checks and scoped
+review. The initial failure is retained, not combined into the passing result.
 
 ## Execution Clarifications
 

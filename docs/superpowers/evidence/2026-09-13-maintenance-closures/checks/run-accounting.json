@@ -1,0 +1,1037 @@
+{
+  "note": "Separate RED, inverse, intermediate failure, focused and full runs are not an additive passing-test total. Read phase reports for nonzero dispositions.",
+  "runs": [
+    {
+      "cases": 0,
+      "command_sha256": "952776c73649b58b9a3b244a1c7dfb482e5f1888c5045fe02473d93a8d4d3dec",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "52b296e1db8088a5d6974173cd280c77125c7029332a9d0e5df613a458d475bf",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "backend-accepted-collection",
+      "seconds": 8.157
+    },
+    {
+      "cases": 10323,
+      "command_sha256": "c800fcd7514698e7847eba68d31680f72e94b9d49be0d5e8da0926e32638ad22",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "dede988a32db769bbb8552d24ede8cde9842bc5d935b0bad10eba46c74a5140d",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 10311,
+        "skipped": 12
+      },
+      "run": "backend-accepted-full",
+      "seconds": 1120.439
+    },
+    {
+      "command_sha256": "74a7d24ce4482a332284ddd1e36c01db82b83a22fb1035910950d623b93a9069",
+      "exit_code": 0,
+      "run": "backend-final-collection",
+      "seconds": 7.87
+    },
+    {
+      "command_sha256": "e6efbae86144dcf5bdba5df393265eeaf308e12696f80b11f3cbca1ffba8248c",
+      "exit_code": 0,
+      "run": "backend-reviewed-collection",
+      "seconds": 7.882
+    },
+    {
+      "cases": 10323,
+      "command_sha256": "30bfdafd3fd9f970777faf69012dd98214bb897681d96f75a3f065bc20526b55",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_eir006_retired_data_boundaries",
+          "name": "test_current_runtime_consumer_census_is_closed_and_exact",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "84bb3bfabd843ef4d72be61e5a7837e88e09b1eeef84501cc4d27ae6132e989a",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 10310,
+        "skipped": 12
+      },
+      "run": "backend-reviewed-full",
+      "seconds": 1316.167
+    },
+    {
+      "command_sha256": "b72c0481a785ee025c73180f2349d7fd81961f4c109e696d31dbc8a92a0e32cf",
+      "exit_code": 2,
+      "run": "census-maintenance-accepted",
+      "seconds": 13.556
+    },
+    {
+      "command_sha256": "80612f74887aa62371b4a48d71cff8c2c0fcd9ac8bac9611cd24eef5aa9f14a1",
+      "exit_code": 0,
+      "run": "census-maintenance-base",
+      "seconds": 15.842
+    },
+    {
+      "command_sha256": "d5ed020bd37af55fe9aa9f21672570b2c94bd7b2f49105a9c8c9d6c9d12ef710",
+      "exit_code": 2,
+      "run": "census-maintenance-final",
+      "seconds": 13.431
+    },
+    {
+      "command_sha256": "2374e3bec493335427a43d0ec8206aef0352bf86546c9fdc0b839165c353f85c",
+      "exit_code": 2,
+      "run": "census-maintenance-reviewed",
+      "seconds": 13.551
+    },
+    {
+      "cases": 78,
+      "command_sha256": "2cc19900062276256228a5811ec9baed1514c939bdd2dceb20ef18cd9a9071c9",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "675afd7809019a6be5591da85eb77f902150795aa6d9c301c40c9fcda0c8210b",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 78,
+        "skipped": 0
+      },
+      "run": "collateral-eir006-green",
+      "seconds": 3.251
+    },
+    {
+      "cases": 2,
+      "command_sha256": "17a4a09e09f0cd38baf3c4cbe6ff7e8add9191561cfc22b3d83b2412066c78f5",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_eir006_retired_data_boundaries",
+          "name": "test_current_runtime_consumer_census_is_closed_and_exact",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "92f8bb06ac767e2dae3938307b4eda034f755463c8aabf9cab858a0defd02304",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 1,
+        "skipped": 0
+      },
+      "run": "collateral-eir006-inverse",
+      "seconds": 0.478
+    },
+    {
+      "cases": 2,
+      "command_sha256": "e6193f6bfd01d9bfd98aba66ab768e5a9af1c7ec58f4528d4392260acd8b282f",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_eir006_retired_data_boundaries",
+          "name": "test_current_runtime_consumer_census_is_closed_and_exact",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "e0221ca7722b816636ef4fe7ff8884afb7d4ffd33511a015f5be30df01d08e6b",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 1,
+        "skipped": 0
+      },
+      "run": "collateral-eir006-red",
+      "seconds": 0.473
+    },
+    {
+      "cases": 78,
+      "command_sha256": "495024126da878ed1084b66ad8ef413c5cf98472ec3d1159ade46c6e585e4e51",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "180b2ea7db6cdd5266fa77edd8f9646898980692e9b04220b7a1a8e2a3eb8d72",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 78,
+        "skipped": 0
+      },
+      "run": "collateral-eir006-restored",
+      "seconds": 3.287
+    },
+    {
+      "command_sha256": "dbbb4cc317724eb54c8f1f639b081698856987397f72fff0b7d44951c08bbf7a",
+      "exit_code": 0,
+      "run": "frontend-accepted",
+      "seconds": 13.699
+    },
+    {
+      "command_sha256": "9382f3f810de13289379f73c64e8e44845abc71b69cf579cde62d0aafe5ccaf1",
+      "exit_code": 0,
+      "run": "frontend-build-accepted",
+      "seconds": 14.157
+    },
+    {
+      "command_sha256": "e494743b1149749b38cf86b601479435602ada9d33d820f002cb6faca821fa53",
+      "exit_code": 0,
+      "run": "frontend-build-final",
+      "seconds": 14.343
+    },
+    {
+      "command_sha256": "5a5cecb0faa6f25b194306ef97ee6696fc603d8cb205f5e61474cf1a76e176aa",
+      "exit_code": 0,
+      "run": "frontend-build-reviewed",
+      "seconds": 14.255
+    },
+    {
+      "command_sha256": "174416c4131c0e6d9d796e1c0d079c65fcae151bb7ec9ada487134bbd73d936d",
+      "exit_code": 0,
+      "run": "frontend-final",
+      "seconds": 14.022
+    },
+    {
+      "command_sha256": "ab67c82ef79f519acb73e855680a1ea9e2bc6d5d100c9333bd3cb5bd4510458f",
+      "exit_code": 1,
+      "run": "frontend-i18n-accepted",
+      "seconds": 0.092
+    },
+    {
+      "command_sha256": "1e216e8cec84494eedf5c7594f380f12ce73189f52b2a9dfb7ef35be3073714d",
+      "exit_code": 0,
+      "run": "frontend-i18n-final",
+      "seconds": 0.829
+    },
+    {
+      "command_sha256": "e2193a0332f9929a13fdbd66427167a86e544249f012617b619839f113f507c9",
+      "exit_code": 0,
+      "run": "frontend-i18n-literals-accepted",
+      "seconds": 0.842
+    },
+    {
+      "command_sha256": "ddbeaee528f060dd6a132b76f1915d4a82c98a103dbc219eb4d20a77bff7538e",
+      "exit_code": 0,
+      "run": "frontend-reviewed",
+      "seconds": 13.829
+    },
+    {
+      "command_sha256": "4819d496ae007069b11a7892ba903fb61ca0852a736fedd819e26503a86298c8",
+      "exit_code": 0,
+      "run": "frontend-typecheck-accepted",
+      "seconds": 11.385
+    },
+    {
+      "command_sha256": "4aa74dbe9736aac4c5e3eda70b5e8126869dd0ce09b02812078b5891eeabb9a3",
+      "exit_code": 0,
+      "run": "frontend-typecheck-final",
+      "seconds": 11.439
+    },
+    {
+      "command_sha256": "337113c1e40275d6d0188e549418d0af7a1d8fbace6f1b63b219ce178fe958c3",
+      "exit_code": 0,
+      "run": "frontend-typecheck-reviewed",
+      "seconds": 11.126
+    },
+    {
+      "command_sha256": "9e623daa2e223df7833283abb89eba64c41dac20c0f2bad51697dd51ba20b20b",
+      "exit_code": 1,
+      "run": "task1-assertion-red",
+      "seconds": 1.245
+    },
+    {
+      "command_sha256": "25306fcf4b43176f4c78d87145d466da7586522513895c8310698bd9486bb705",
+      "exit_code": 1,
+      "run": "task1-assertion-red-2",
+      "seconds": 1.489
+    },
+    {
+      "command_sha256": "ad2d7a1144fbf4bccff124b0ebcc6fd7124073066ba4cebc6415b80050d52063",
+      "exit_code": 0,
+      "run": "task1-baseline-frontend",
+      "seconds": 13.952
+    },
+    {
+      "command_sha256": "4f70751b5a7bb09a179aff766b6013f63ba973f5be2bfa0e08fb39f4d615658a",
+      "exit_code": 0,
+      "run": "task1-browser-after",
+      "seconds": 9.097
+    },
+    {
+      "command_sha256": "b499a2e2706a5352094ceac9c2fc9a25e4455a8ce1eaa74b0ba139f8925cd91f",
+      "exit_code": 0,
+      "run": "task1-browser-before",
+      "seconds": 8.551
+    },
+    {
+      "command_sha256": "21cd90dd902384beb37172c51b964ffcf86a61f9261f5ed378559116fa75b6e1",
+      "exit_code": 0,
+      "run": "task1-build",
+      "seconds": 14.563
+    },
+    {
+      "command_sha256": "a53cfecb3f5639faec470dcfc2b833ffd8ef6c10718f0f7c36d69fb8a843263d",
+      "exit_code": 0,
+      "run": "task1-controller-green",
+      "seconds": 1.433
+    },
+    {
+      "command_sha256": "0d252fa9974f8e149b2a0d407d91e242cbccc12eaa26da7e675b88e313c178f8",
+      "exit_code": 0,
+      "run": "task1-full-frontend",
+      "seconds": 14.115
+    },
+    {
+      "command_sha256": "9cf6eff9f0700199820589958402aa021ba1fe36b944cde3f6477e386788e5ed",
+      "exit_code": 0,
+      "run": "task1-green-focused",
+      "seconds": 1.44
+    },
+    {
+      "command_sha256": "272b50941cdfa08d53a12077984a285845b6203714b14dbaa15442f6376fd844",
+      "exit_code": 1,
+      "run": "task1-inverse-desktop",
+      "seconds": 1.489
+    },
+    {
+      "command_sha256": "87f9a049ac41e039e228a59d5dd83f2d71d2266a98e1c65faa947935c2950877",
+      "exit_code": 1,
+      "run": "task1-inverse-media",
+      "seconds": 1.492
+    },
+    {
+      "command_sha256": "d714b54c867348d3463aaee6841de983be64be1592656948bc3ac782f4e0ddd1",
+      "exit_code": 1,
+      "run": "task1-red",
+      "seconds": 1.234
+    },
+    {
+      "command_sha256": "91de86881c68ef1bb7f7ad58d78c149545a8d2826a0c4ce93d2e3f94a95fa8ef",
+      "exit_code": 0,
+      "run": "task1-restored-focused",
+      "seconds": 1.401
+    },
+    {
+      "command_sha256": "daeccfdc617c38afc3c53b1494a56f0c71c6c055d99eff6bfab5c191e9796141",
+      "exit_code": 0,
+      "run": "task1-typecheck",
+      "seconds": 11.26
+    },
+    {
+      "cases": 25,
+      "command_sha256": "cc4047db3df855770cb2d131fc046d73a4449f56da87a17beb2054d96ce825b5",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "640293d2c95c96bf697823206ab2babb154ce65238b60c067f6cac673c4030ee",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 25,
+        "skipped": 0
+      },
+      "run": "task2-baseline-api",
+      "seconds": 7.415
+    },
+    {
+      "cases": 275,
+      "command_sha256": "5595e4e6317827cef6da0d323342921003a2387014fcddfe940a1783749bc421",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "d528d98e22f6f6d1852001c85670e6b144976f7b38ac9d1bd18276843d27ddab",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 275,
+        "skipped": 0
+      },
+      "run": "task2-baseline-backend",
+      "seconds": 18.472
+    },
+    {
+      "command_sha256": "fc6fcd5408ad7471a6593751c0883ecd98b559b9befee3118ab69769f2fe734b",
+      "exit_code": 0,
+      "run": "task2-baseline-frontend",
+      "seconds": 2.372
+    },
+    {
+      "command_sha256": "d874dfaf65a37bdad48be6e3ad3375f48be1ade3e47aa57f62b0abc8d4522846",
+      "exit_code": 0,
+      "run": "task2-collect-after",
+      "seconds": 2.188
+    },
+    {
+      "command_sha256": "5e0b83c21134eb9f64eabf468e18de272ecf2138288c9d139265f29e07ce29e6",
+      "exit_code": 0,
+      "run": "task2-collect-api-before",
+      "seconds": 1.055
+    },
+    {
+      "command_sha256": "e7d0e7a8dfb96ec24501c219fd586c521c8110d78efe820d2b3dde63910baab3",
+      "exit_code": 0,
+      "run": "task2-collect-before",
+      "seconds": 1.722
+    },
+    {
+      "cases": 329,
+      "command_sha256": "d7db5a730266278dbcc649585e59d7dd82463b058811d34b131bf2ae8603cb70",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "193bcff2ced522ccd2b7f20ad417950826cae71f4dc96deb2ef3c7a606fec16d",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 329,
+        "skipped": 0
+      },
+      "run": "task2-controller-green",
+      "seconds": 23.487
+    },
+    {
+      "cases": 303,
+      "command_sha256": "a6a0079914238a991ee021dc7f5b177e4643c43723985d2841344703cb8ed37b",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "2a206c4c61580ba0506e4cb849e00bed4b90c9533132e43750c5e5c3933e9cab",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 303,
+        "skipped": 0
+      },
+      "run": "task2-controls-green",
+      "seconds": 15.251
+    },
+    {
+      "cases": 329,
+      "command_sha256": "df3c09bacce5902a3b64e245338d440589bbc2119460a4fcb337c5cd7457e562",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "ff364691b9852ae483b6e76dcdeb2e7c0796765acd09dc8d3ce1e3c72a9f19d1",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 329,
+        "skipped": 0
+      },
+      "run": "task2-final-restored",
+      "seconds": 23.327
+    },
+    {
+      "cases": 328,
+      "command_sha256": "e086343610973dfa90d7834b91f027592c045aa0ef011c42ebd7a7372a568d1a",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_provider_health",
+          "name": "test_direct_news_health_uses_provider_runs_and_current_ticker_errors",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_market_data_admin",
+          "name": "test_status_uses_current_news_sync_and_preserves_price_authority",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "a2043acd97732b9aa742ac7e9e54b2e0bee7d444c4f8d28f7591ba62ff564db8",
+      "outcomes": {
+        "errors": 0,
+        "failed": 2,
+        "passed": 326,
+        "skipped": 0
+      },
+      "run": "task2-first-green",
+      "seconds": 23.282
+    },
+    {
+      "cases": 24,
+      "command_sha256": "886b19888aa915c1e0acce6c921162fa294afea9abedc69b4e0d9ddc8e2efcf5",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "3f0e9c49e8ef282a9028c2d0f3056e997fe4aaf577705cb0adae84ca1779095a",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 24,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-baseline",
+      "seconds": 1.62
+    },
+    {
+      "command_sha256": "2afb7d1686f6f6e09b3d73461168eda8f4d1d61f355484c71dc0a08b59d01059",
+      "exit_code": 0,
+      "run": "task2-fix-r1-collect",
+      "seconds": 2.206
+    },
+    {
+      "cases": 27,
+      "command_sha256": "a83774d483aa11068ab204d7c40d4bd10673a0142c8bd015db3c61396f67ee27",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "c38487bfbcfda387e2de5679d7261be7b45a64896c25b2e6f8a2eff355902e56",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 27,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-exists-health-green",
+      "seconds": 1.712
+    },
+    {
+      "cases": 1,
+      "command_sha256": "7533bb6814bb8ae4fffc6f98086574b7e96aef50552ea838cbbc1fffc96f02e5",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_provider_health",
+          "name": "test_health_clears_legacy_news_when_db_exists_check_fails",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "f910e118633ad2aae8667e460340daa2edc2b001834806770c751576e7b1794d",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-exists-red",
+      "seconds": 1.079
+    },
+    {
+      "command_sha256": "f2f81e90f0e6ad640bc2c49c19bf3c4e79ace32997323822b1613cf0ea56f246",
+      "exit_code": 0,
+      "run": "task2-fix-r1-final-collect",
+      "seconds": 2.156
+    },
+    {
+      "cases": 27,
+      "command_sha256": "e9a80e00c32f3accc53844532402fb1f462b49bc48728f987f206d81489a5061",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "2fa9ebfbd595e49e0cd3fb095d3d02d2879b6c2d08a1b4dbcd335c27efbadca5",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 27,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-final-health-restored",
+      "seconds": 1.707
+    },
+    {
+      "cases": 3,
+      "command_sha256": "c73e21b44485c22ca9759d8499347d4687961e2d619367983b542e7927e15a7f",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_provider_health",
+          "name": "test_health_clears_legacy_news_when_current_telemetry_read_fails[legacy-news-present]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_provider_health",
+          "name": "test_health_clears_legacy_news_when_db_exists_check_fails",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "fcc8fd0674d3b11cd07f7c307814de6068c7619cd7167a55281852e9b7a33c66",
+      "outcomes": {
+        "errors": 0,
+        "failed": 2,
+        "passed": 1,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-final-inverse",
+      "seconds": 1.157
+    },
+    {
+      "cases": 332,
+      "command_sha256": "75d17d56e760fccbc93b71b7ef1c6460a55db14c0ab0cb228d71e81c51978e29",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "2e590b97977aea0bfdb3de74f41f5013edb3ef2f8656d7241b08de5497c472e9",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 332,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-final-owned-restored",
+      "seconds": 23.638
+    },
+    {
+      "cases": 26,
+      "command_sha256": "aab6fc7c255a652d7e2ff9aec1958acf750903c636abddb6c77de5631356bc1a",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "930abd52e30fc9f55babc87ab6dc14fedff71a04c61d6e1128e96bdfdd6da0bf",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 26,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-focused-green",
+      "seconds": 1.731
+    },
+    {
+      "cases": 2,
+      "command_sha256": "6116e023949b1843d3b4a89658d74774a0e78a15a509e8baffefffdfd65c5c9e",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_provider_health",
+          "name": "test_health_clears_legacy_news_when_current_telemetry_read_fails[legacy-news-present]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "915a771ff5c9553955eb643eb8fca3f0898a847bef36e3da9f28981279a8f57b",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 1,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-inverse",
+      "seconds": 1.143
+    },
+    {
+      "cases": 331,
+      "command_sha256": "ed7c70acd8157b0f841aea3f793c3e7b560770c0362ad9954e1962ef2dd19085",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "bec79587d500bb7bc7fe90e3807015481fbd4271dbb36163088ee3ef16b370c0",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 331,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-owned-green",
+      "seconds": 23.36
+    },
+    {
+      "cases": 2,
+      "command_sha256": "93657b8fb0109afa0a9e19f2ea10df65227da14839502ce682e34a3a6c33d185",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_provider_health",
+          "name": "test_health_clears_legacy_news_when_current_telemetry_read_fails[legacy-news-present]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "c9aa3ca749233ae5fbbd34e2567df2ac98afbf3089e44d5fd5800a352350f5df",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 1,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-red",
+      "seconds": 1.12
+    },
+    {
+      "cases": 331,
+      "command_sha256": "288aab72dc74e7c5bc3555575973ae3313e8ca867da686e4e1352e1aab36b33b",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "6ad31096fcfbfb43c510b05007e3dc60a92310ec0e8a723c6d0d6a905b7b4344",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 331,
+        "skipped": 0
+      },
+      "run": "task2-fix-r1-restored",
+      "seconds": 23.514
+    },
+    {
+      "command_sha256": "f42ad461097fb3329775955c95cb878890415887c007fe41a2873537212aefcc",
+      "exit_code": 1,
+      "run": "task2-frontend-green",
+      "seconds": 2.317
+    },
+    {
+      "command_sha256": "714e98afb1ca76cb020b058bec7f0d8609632d1648996205f3dfeebe02aa91e2",
+      "exit_code": 0,
+      "run": "task2-frontend-green-2",
+      "seconds": 2.328
+    },
+    {
+      "command_sha256": "9f4dc41cb1f1d3566f965b3dead283f9ecd078a79c90f4a992055d7444779c41",
+      "exit_code": 1,
+      "run": "task2-frontend-red",
+      "seconds": 1.378
+    },
+    {
+      "command_sha256": "3470957f9c9130867c19f4b291db2325f0bcdbe29ade43ba539114f06b7a91fc",
+      "exit_code": 0,
+      "run": "task2-i18n-literals",
+      "seconds": 0.849
+    },
+    {
+      "cases": 20,
+      "command_sha256": "ae3a072a6a8b1cf10abc1537d903ba9e663401bbbf56b3c2f436a0e351136226",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_clears_stale_news_when_current_store_is_absent[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_clears_stale_news_when_current_store_is_absent[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[env-false]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "9bf190c20e1ef997e969a652647e023541e7502369dd435ba6f9c410c8fa624e",
+      "outcomes": {
+        "errors": 0,
+        "failed": 6,
+        "passed": 14,
+        "skipped": 0
+      },
+      "run": "task2-inverse-telemetry",
+      "seconds": 2.198
+    },
+    {
+      "cases": 12,
+      "command_sha256": "f971227e02a9387cdaf66164f8054ddb2ac11ed829a79712b399b07ab5d5efcd",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[stored-malformed-false-legacy_local]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[stored-malformed-true-normalized]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[env-malformed-false-legacy_local]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[env-malformed-true-normalized]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "8ac2529503fc9f711cacc9744bfe18eea1f029a0ce18c9a3be8eab6ac3c97e20",
+      "outcomes": {
+        "errors": 0,
+        "failed": 4,
+        "passed": 8,
+        "skipped": 0
+      },
+      "run": "task2-inverse-validation",
+      "seconds": 1.729
+    },
+    {
+      "cases": 329,
+      "command_sha256": "34f2ef7df63107889e977556598ea41968ce4ca5074ddb2dc450b992b62d9c59",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "59d66eba615bf0de9fb406f066ff0e9b37c35c7fb4c7055c81ff40c08d76eb78",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 329,
+        "skipped": 0
+      },
+      "run": "task2-owned-green",
+      "seconds": 23.244
+    },
+    {
+      "cases": 76,
+      "command_sha256": "8df3efab5ed31ce0d0cfbf09baa3b3a9ffbf9719a643c625dda5d0daf0d6ee86",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "d19c44a8fc42fcb1b3671668624b1657354625382c125b367b7298e5a8d68b78",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 76,
+        "skipped": 0
+      },
+      "run": "task2-r1-controller-green",
+      "seconds": 3.152
+    },
+    {
+      "cases": 49,
+      "command_sha256": "7184ed3890eaad8aa2d1b9f1187ac4ac33ed63c91a3ff8ae7f8437a6e638de89",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[stored-malformed-false-legacy_local]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[stored-malformed-true-normalized]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[env-malformed-false-legacy_local]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[env-malformed-true-normalized]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[stored-malformed]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[env-malformed]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[env-true]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_clears_stale_news_when_current_store_is_absent[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_clears_stale_news_when_current_store_is_absent[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_obsolete_helpers_and_resolver_parameters_are_physically_removed",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_obsolete_put_is_unmounted_and_returns_405_without_writing",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_sync_status",
+          "name": "test_sync_reader_encodes_sqlite_uri_metacharacters[market?data.db]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_sync_status",
+          "name": "test_sync_reader_encodes_sqlite_uri_metacharacters[market#data.db]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "c022a003b2b3a3946890f3d17b3721101f1f497967e49a597b29b20c129ba160",
+      "outcomes": {
+        "errors": 0,
+        "failed": 19,
+        "passed": 30,
+        "skipped": 0
+      },
+      "run": "task2-regression-assertion-red",
+      "seconds": 2.845
+    },
+    {
+      "cases": 47,
+      "command_sha256": "af829bb307d56285793ece163b34ad1c8e50a14c84ed150500a4b98c0f03f16a",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[stored-malformed-false-legacy_local]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[stored-malformed-true-normalized]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[env-malformed-false-legacy_local]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_current_writer_ignores_obsolete_profile_and_environment[env-malformed-true-normalized]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[stored-malformed]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[env-malformed]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_status_has_only_current_routing_fields[env-true]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_keeps_actual_ingest_telemetry_with_obsolete_settings[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_clears_stale_news_when_current_store_is_absent[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_overlay_clears_stale_news_when_current_store_is_absent[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[stored-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_health_keeps_ingest_success_errors_and_counters_with_obsolete_settings[env-false]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_obsolete_helpers_and_resolver_parameters_are_physically_removed",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_routing_cleanup",
+          "name": "test_obsolete_put_is_unmounted_and_returns_405_without_writing",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_sync_status",
+          "name": "test_sync_reader_encodes_sqlite_uri_metacharacters[market?data.db]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_news_sync_status",
+          "name": "test_sync_reader_encodes_sqlite_uri_metacharacters[market#data.db]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "478c93494ddb811913e3d5e7443a5891086450d071c774c7cac2dad9348c1734",
+      "outcomes": {
+        "errors": 0,
+        "failed": 19,
+        "passed": 28,
+        "skipped": 0
+      },
+      "run": "task2-regression-red",
+      "seconds": 2.802
+    },
+    {
+      "cases": 12,
+      "command_sha256": "2371d2ca739624af7b780cb4a32ade9ff4a3edb1395fb6ccccafe1fa6a5ec3ab",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "23479d8d1637c315083a15d82c87e38561cc9cd8a182ba3b7ceedf61190bce76",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 12,
+        "skipped": 0
+      },
+      "run": "task2-restored-validation",
+      "seconds": 1.639
+    },
+    {
+      "command_sha256": "c01d0d6158c7ae680f91f8459689879144e7559515ab3902d8d6e808278fd7ca",
+      "exit_code": 2,
+      "run": "task2-typecheck",
+      "seconds": 11.144
+    },
+    {
+      "command_sha256": "12761a25058c2d67e606b3c18d604ef922d2736d5e5dbf7b12659a49f7f5400c",
+      "exit_code": 0,
+      "run": "task2-typecheck-2",
+      "seconds": 11.011
+    }
+  ],
+  "unfinished": []
+}

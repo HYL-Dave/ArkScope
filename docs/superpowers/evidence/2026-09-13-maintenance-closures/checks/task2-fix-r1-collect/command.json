@@ -1,0 +1,35 @@
+{
+  "name": "task2-fix-r1-collect",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/offline_pytest.py",
+    "--collect-only",
+    "-q",
+    "tests/test_news_settings_route.py",
+    "tests/test_news_providers.py",
+    "tests/test_news_normalized_routing.py",
+    "tests/test_news_sync_status.py",
+    "tests/test_provider_health.py",
+    "tests/test_data_coverage_tools.py",
+    "tests/test_stored_sec_projection.py",
+    "tests/test_market_data_admin.py",
+    "tests/test_data_scheduler.py",
+    "tests/test_security_lifecycle_routes.py",
+    "tests/test_news_routing_cleanup.py",
+    "tests/test_api.py"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 2.206,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-fix-r1-collect",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-fix-r1-collect/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-maintenance-closures/task2-fix-r1-collect/output.log"
+}
