@@ -18,17 +18,12 @@ class _FakeProfileStore:
 def test_status_is_read_only_and_reports_default_direct(tmp_path, monkeypatch):
     db = tmp_path / "market_data.db"
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(db))
-    monkeypatch.delenv("ARKSCOPE_USE_LOCAL_NEWS", raising=False)
     monkeypatch.delenv("ARKSCOPE_USE_NORMALIZED_NEWS_WRITES", raising=False)
 
     out = routes.news_status(store=_FakeProfileStore())
 
     assert out["exists"] is False
     assert out["news"]["row_count"] == 0
-    assert out["use_local_news_setting"] is True
-    assert out["setting_explicit"] is False
-    assert out["env_override"] is False
-    assert out["direct_active"] is True
     assert out["normalized_writes_setting"] is False
     assert out["normalized_writes_setting_explicit"] is False
     assert out["normalized_writes_env_override"] is False
@@ -39,37 +34,18 @@ def test_status_is_read_only_and_reports_default_direct(tmp_path, monkeypatch):
     assert not db.exists()
 
 
-def test_status_reports_explicit_and_env_rollback(tmp_path, monkeypatch):
+def test_status_reports_current_normalized_environment_override(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "absent.db"))
-    store = _FakeProfileStore({"use_local_news": "true"})
-    monkeypatch.setenv("ARKSCOPE_USE_LOCAL_NEWS", "false")
+    store = _FakeProfileStore()
     monkeypatch.setenv("ARKSCOPE_USE_NORMALIZED_NEWS_WRITES", "true")
 
     out = routes.news_status(store=store)
 
-    assert out["use_local_news_setting"] is True
-    assert out["setting_explicit"] is True
-    assert out["env_override"] is True
-    assert out["env_value"] is False
-    assert out["direct_active"] is False
     assert out["normalized_writes_setting"] is False
     assert out["normalized_writes_setting_explicit"] is False
     assert out["normalized_writes_env_override"] is True
     assert out["normalized_writes_env_value"] is True
     assert out["write_route"] == "normalized"
-
-
-def test_put_settings_persists_explicit_rollback(tmp_path, monkeypatch):
-    calls = []
-    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "absent.db"))
-    monkeypatch.setattr(routes, "require_profile_state_write", lambda action, detail: calls.append((action, detail)))
-    store = _FakeProfileStore()
-
-    out = routes.set_local_news(routes.LocalNewsToggle(enabled=False), store=store)
-
-    assert out == {"use_local_news_setting": False}
-    assert store.get_setting("use_local_news") == "false"
-    assert calls == [("set_use_local_news", {"enabled": False})]
 
 
 def test_put_normalized_writes_persists_with_permission(monkeypatch):
@@ -83,9 +59,8 @@ def test_put_normalized_writes_persists_with_permission(monkeypatch):
     assert store.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY) == "true"
     assert calls == [("set_normalized_news_writes", {"enabled": True})]
 
-def test_status_and_http_409_after_completed_audit_marker(tmp_path, monkeypatch):
+def test_status_selects_direct_writer_when_normalized_writes_are_disabled(tmp_path, monkeypatch):
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "market_data.db"))
-    monkeypatch.delenv("ARKSCOPE_USE_LOCAL_NEWS", raising=False)
     monkeypatch.delenv("ARKSCOPE_USE_NORMALIZED_NEWS_WRITES", raising=False)
     monkeypatch.setattr(routes, "require_profile_state_write", lambda action, detail: None)
     store = _FakeProfileStore()
@@ -94,18 +69,15 @@ def test_status_and_http_409_after_completed_audit_marker(tmp_path, monkeypatch)
         routes.NormalizedNewsWritesToggle(enabled=False),
         store=store,
     )
-    routes.set_local_news(routes.LocalNewsToggle(enabled=False), store=store)
     body = routes.news_status(store=store)
 
     assert body["write_route"] == "legacy_local"
     assert body["normalized_writes_setting"] is False
     assert body["normalized_writes_setting_explicit"] is True
     assert store.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY) == "false"
-    assert store.get_setting("use_local_news") == "false"
 
 
 def test_static_status_route_is_declared_before_dynamic_ticker_route():
     paths = [route.path for route in routes.router.routes]
     assert paths.index("/news/status") < paths.index("/news/{ticker}")
-    assert paths.index("/news/settings") < paths.index("/news/{ticker}")
     assert paths.index("/news/settings/normalized-writes") < paths.index("/news/{ticker}")

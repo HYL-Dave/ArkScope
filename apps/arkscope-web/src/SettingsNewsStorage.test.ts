@@ -37,7 +37,6 @@ vi.mock("./api", async (importOriginal) => {
       return mocked.newsStatus;
     }),
     setNormalizedNewsWrites: vi.fn(),
-    setUseLocalNews: vi.fn(),
   };
 });
 
@@ -60,11 +59,6 @@ const newsStatus = (over: Partial<NewsStatus> = {}): NewsStatus => ({
   market_db: "/tmp/market.db",
   exists: true,
   news: { row_count: 10, source_count: 2, latest_published: "2026-06-27T00:00:00+00:00" },
-  use_local_news_setting: true,
-  setting_explicit: true,
-  env_override: true,
-  env_value: true,
-  direct_active: true,
   normalized_writes_setting: false,
   normalized_writes_setting_explicit: false,
   normalized_writes_env_override: false,
@@ -205,15 +199,14 @@ describe("SettingsView news storage copy", () => {
     expect(host!.textContent).not.toMatch(/market_data\.db|direct-local|strict DB-first/);
   });
 
-  it("hides_both_migration_controls_even_for_a_pre_exit_compatibility_response", async () => {
-    mocked.newsStatus = newsStatus({ direct_active: false });
+  it("keeps_news_storage_read_only_for_the_current_direct_writer", async () => {
+    mocked.newsStatus = newsStatus({ write_route: "legacy_local" });
     await renderNewsSection();
     const newsAnchor = host!.querySelector('[data-settings-anchor="news_storage"]')!;
     expect(newsAnchor.querySelectorAll("input[type='checkbox']")).toHaveLength(0);
     expect(host!.textContent).not.toContain("Legacy local writer");
     expect(host!.textContent).not.toContain("Normalized news writes");
     const api = await import("./api");
-    expect(api.setUseLocalNews).not.toHaveBeenCalled();
     expect(api.setNormalizedNewsWrites).not.toHaveBeenCalled();
   });
 

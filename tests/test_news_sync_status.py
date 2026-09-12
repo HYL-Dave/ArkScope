@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sqlite3
 
+import pytest
+
 from src.market_data_direct import _ensure_provider_sync_tables
 
 
@@ -17,6 +19,39 @@ def test_absent_db_is_read_only_and_has_no_direct_status(tmp_path):
     path = tmp_path / "absent.db"
     assert read_news_sync_status(path) is None
     assert not path.exists()
+
+
+@pytest.mark.parametrize("filename", ["market?data.db", "market#data.db"])
+def test_sync_reader_encodes_sqlite_uri_metacharacters(tmp_path, filename):
+    from src.news_sync_status import read_news_sync_status
+
+    path = tmp_path / filename
+    conn = _db(path)
+    conn.execute(
+        "INSERT INTO provider_sync_runs "
+        "(provider,domain,interval,started_at,finished_at,tickers_scanned,rows_added,status) "
+        "VALUES ('polygon','news','news','2026-06-10T10:00:00Z','2026-06-10T10:01:00Z',2,7,'succeeded')"
+    )
+    conn.commit()
+    conn.close()
+    before = path.read_bytes()
+
+    out = read_news_sync_status(path)
+
+    assert out is not None
+    assert out["last_success"] == "2026-06-10T10:01:00Z"
+    assert out["rows_added"] == 7
+    assert out["providers"]["polygon"]["tickers_scanned"] == 2
+    assert path.read_bytes() == before
+    assert sorted(p.name for p in tmp_path.iterdir()) == [filename]
+
+
+@pytest.mark.parametrize("filename", ["market?data.db", "market#data.db"])
+def test_missing_sync_store_with_uri_metacharacters_stays_uncreated(tmp_path, filename):
+    from src.news_sync_status import read_news_sync_status
+
+    assert read_news_sync_status(tmp_path / filename) is None
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_combines_latest_provider_runs_with_current_ticker_errors(tmp_path):

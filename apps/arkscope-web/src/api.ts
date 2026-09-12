@@ -2706,11 +2706,6 @@ export interface NewsStatus {
   market_db: string;
   exists: boolean;
   news: { row_count: number; source_count: number; latest_published: string | null };
-  use_local_news_setting: boolean;
-  setting_explicit: boolean;
-  env_override: boolean;
-  env_value: boolean | null;
-  direct_active: boolean;
   normalized_writes_setting: boolean;
   normalized_writes_setting_explicit: boolean;
   normalized_writes_env_override: boolean;
@@ -4622,10 +4617,6 @@ export async function acknowledgeTickerIdentityTransitionActivity(
 
 export function getNewsStatus(): Promise<NewsStatus> {
   return getJSON<NewsStatus>("/news/status");
-}
-
-export function setUseLocalNews(enabled: boolean): Promise<{ use_local_news_setting: boolean }> {
-  return sendJSON("/news/settings", "PUT", { enabled });
 }
 
 export function setNormalizedNewsWrites(enabled: boolean): Promise<{ normalized_writes_setting: boolean }> {

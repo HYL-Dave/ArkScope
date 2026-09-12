@@ -14,7 +14,7 @@ here, so the writer can't double-index. The incremental cursor is the newest loc
 ``published_at`` for THIS source (source-scoped, optionally ticker-scoped) so Massive/Finnhub
 don't clobber each other's frontier.
 
-NO scheduler routing yet (use_local_news = 2c). Schema (UNIQUE article_hash + fts triggers) is
+The scheduler selects this writer via the current news routing policy. Schema (UNIQUE article_hash + fts triggers) is
 ensured here for the temp/local DB via the shared ``market_data_admin`` helpers; applying the
 additive migration to the live 371k-row DB is the gated 2b-live step.
 """

@@ -217,7 +217,6 @@ def test_positive_annual_sec_cache_is_the_shared_projection_authority(
     stored_sec_db, monkeypatch,
 ):
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(stored_sec_db))
-    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
     sqlite_backend = SqliteBackend(stored_sec_db)
     local_backend = LocalMarketBackend(
         market_db=str(stored_sec_db),
@@ -284,11 +283,23 @@ def test_nonpositive_and_nonannual_cache_rows_do_not_project_as_stored(stored_se
     }
 
 
-def test_fundamentals_sync_is_null_while_price_and_news_remain_unchanged(
+def test_fundamentals_sync_is_null_with_price_and_current_news_telemetry(
     stored_sec_db, monkeypatch,
 ):
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(stored_sec_db))
-    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
+    from src.market_data_direct import _ensure_provider_sync_tables
+
+    conn = sqlite3.connect(stored_sec_db)
+    try:
+        _ensure_provider_sync_tables(conn)
+        conn.execute(
+            "INSERT INTO provider_sync_runs "
+            "(provider,domain,interval,started_at,finished_at,tickers_scanned,rows_added,status) "
+            "VALUES ('polygon','news','news','2026-07-31T20:00:00Z','2026-07-31T20:01:00Z',1,7,'succeeded')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
     admin_sync = mda.read_sync_meta(str(stored_sec_db))
     assert admin_sync == {
@@ -298,8 +309,9 @@ def test_fundamentals_sync_is_null_while_price_and_news_remain_unchanged(
     }
 
     coverage_sync = get_ticker_data_coverage("AAPL")["sync"]
-    assert coverage_sync == {
-        "prices": _PRICE_SYNC,
-        "news": _NEWS_SYNC,
-        "fundamentals": None,
-    }
+    assert set(coverage_sync) == {"prices", "news", "fundamentals"}
+    assert coverage_sync["prices"] == _PRICE_SYNC
+    assert coverage_sync["fundamentals"] is None
+    assert coverage_sync["news"]["last_success"] == "2026-07-31T20:01:00Z"
+    assert coverage_sync["news"]["rows_added"] == 7
+    assert coverage_sync["news"]["providers"]["polygon"]["tickers_scanned"] == 1

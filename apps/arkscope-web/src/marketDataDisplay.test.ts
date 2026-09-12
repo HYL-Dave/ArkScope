@@ -10,7 +10,6 @@ import {
   marketRoutingLabel as localizedMarketRoutingLabel,
   newsAuthorityLabel as localizedNewsAuthorityLabel,
   newsReadSurfaceLabel as localizedNewsReadSurfaceLabel,
-  newsRoutingLabel as localizedNewsRoutingLabel,
   newsWriteRouteLabel as localizedNewsWriteRouteLabel,
   providerHealthStatusLabel as localizedProviderHealthStatusLabel,
   schedulerStateLabel as localizedSchedulerStateLabel,
@@ -37,7 +36,6 @@ const macroRoutingLabel = (value: MacroStatus) => localizedMacroRoutingLabel(val
 const marketRoutingLabel = (value: MarketDataStatus) => localizedMarketRoutingLabel(value, zhT);
 const newsAuthorityLabel = (value: NewsStatus) => localizedNewsAuthorityLabel(value, zhT);
 const newsReadSurfaceLabel = (value: NewsStatus) => localizedNewsReadSurfaceLabel(value, zhT);
-const newsRoutingLabel = (value: NewsStatus) => localizedNewsRoutingLabel(value, zhT);
 const newsWriteRouteLabel = (value: NewsStatus) => localizedNewsWriteRouteLabel(value, zhT);
 const providerHealthStatusLabel = (
   value: Parameters<typeof localizedProviderHealthStatusLabel>[0] & Record<string, unknown>,
@@ -114,11 +112,6 @@ const newsStatus = (over: Partial<NewsStatus>): NewsStatus => ({
   market_db: "/tmp/market.db",
   exists: true,
   news: { row_count: 10, source_count: 2, latest_published: "2026-06-27T00:00:00+00:00" },
-  use_local_news_setting: true,
-  setting_explicit: false,
-  env_override: false,
-  env_value: null,
-  direct_active: true,
   normalized_writes_setting: false,
   normalized_writes_setting_explicit: false,
   normalized_writes_env_override: false,
@@ -129,19 +122,25 @@ const newsStatus = (over: Partial<NewsStatus>): NewsStatus => ({
   ...over,
 });
 
-describe("newsRoutingLabel", () => {
-  it("distinguishes default direct routing from explicit rollback", () => {
-    expect(newsRoutingLabel(newsStatus({}))).toBe("直寫本地（預設）");
-    expect(newsRoutingLabel(newsStatus({ setting_explicit: true }))).toBe("直寫本地（已設定）");
-    expect(newsRoutingLabel(newsStatus({ direct_active: false, use_local_news_setting: false, setting_explicit: true })))
-      .toBe("本地相容寫入");
+describe("current news contract", () => {
+  it("does not export the obsolete news setter or routing label", async () => {
+    expect(await import("./api")).not.toHaveProperty("setUseLocalNews");
+    expect(marketDataDisplay).not.toHaveProperty("newsRoutingLabel");
   });
 
-  it("makes env override direction explicit", () => {
-    expect(newsRoutingLabel(newsStatus({ env_override: true, env_value: true })))
-      .toBe("直寫本地（env 強制開啟）");
-    expect(newsRoutingLabel(newsStatus({ direct_active: false, env_override: true, env_value: false })))
-      .toBe("本地相容寫入（env 強制關閉）");
+  it("keeps current routing locale subtrees without obsolete switch copy", () => {
+    for (const locale of ["en", "zh-Hant"] as const) {
+      const instance = createInstance();
+      initializeI18n(instance, locale);
+      const routing = instance.getResource(locale, "settings", "newsStorage.routing");
+      expect(Object.keys(routing).sort()).toEqual(["authority", "read", "write"]);
+      expect(routing.write.normalized).toBeTruthy();
+      expect(routing.write.legacyLocal).toBeTruthy();
+      expect(routing.write.blocked).toBeTruthy();
+      expect(routing.read.compatibility).toBeTruthy();
+      expect(routing.read.localDirect).toBeTruthy();
+      expect(routing.authority.current).toBeTruthy();
+    }
   });
 });
 
@@ -154,7 +153,6 @@ describe("news cutover labels", () => {
     expect(newsWriteRouteLabel(postExit)).toBe("Normalized SQLite + legacy local projection");
     expect(newsAuthorityLabel(postExit)).toBe("目前的本地資料");
     expect(newsReadSurfaceLabel(postExit)).toBe("Legacy local compatibility surface (N8b pending)");
-    expect(newsRoutingLabel(postExit)).toBe("直寫本地（預設）");
   });
 });
 
@@ -830,7 +828,6 @@ describe("localized Settings market-data presentations", () => {
         locale: "zh-Hant" as const,
         market: "本地資料",
         macro: "啟用中（本地 · env 強制）",
-        news: "直寫本地（env 強制開啟）",
         write: "Normalized SQLite + legacy local projection",
         authority: "目前的本地資料",
         read: "Legacy local compatibility surface (N8b pending)",
@@ -843,7 +840,6 @@ describe("localized Settings market-data presentations", () => {
         locale: "en" as const,
         market: "Local data authority",
         macro: "Active (local · forced by environment)",
-        news: "Direct local writes (forced on by environment)",
         write: "Normalized SQLite + legacy local projection",
         authority: "Current local authority",
         read: "Legacy local compatibility surface (N8b pending)",
@@ -858,11 +854,9 @@ describe("localized Settings market-data presentations", () => {
       const t = settingsT(expected.locale);
       const market = status({ routing_enabled: true });
       const macro = macroStatus({ local_first_active: true, exists: true, env_override: true });
-      const news = newsStatus({ env_override: true, env_value: true });
       const current = newsStatus({ write_route: "normalized" });
       expect(localizedMarketRoutingLabel(market, t)).toBe(expected.market);
       expect(localizedMacroRoutingLabel(macro, t)).toBe(expected.macro);
-      expect(localizedNewsRoutingLabel(news, t)).toBe(expected.news);
       expect(localizedNewsWriteRouteLabel(current, t)).toBe(expected.write);
       expect(localizedNewsAuthorityLabel(current, t)).toBe(expected.authority);
       expect(localizedNewsReadSurfaceLabel(current, t)).toBe(expected.read);

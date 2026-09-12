@@ -28,6 +28,7 @@ Signal sources merged (all already persisted; each degrades independently):
   - job_runs (get_job_runs_store(...).latest_runs_by_name) — latest run per job
   - market_sync_meta (read_sync_meta)     — legacy sync telemetry; prices is marked
     retired/local-authority after P0-C
+  - provider_sync_runs/meta (read_news_sync_status) - current news ingest telemetry
 """
 
 from __future__ import annotations
@@ -225,7 +226,6 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
 
     sync: Dict[str, Any] = {}
     direct_news: Optional[Dict[str, Any]] = None
-    direct_news_enabled = False
     db_exists = False
     try:
         from src.market_data_admin import (
@@ -233,17 +233,14 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
             read_sync_meta,
             resolve_market_db_path,
         )
-        from src.news_providers import use_local_news_enabled
         from src.news_sync_status import read_news_sync_status
 
         db_path = resolve_market_db_path()
         sync = overlay_price_authority(read_sync_meta(db_path))
         db_exists = Path(db_path).exists()
-        direct_news_enabled = use_local_news_enabled()
-        if direct_news_enabled:
-            direct_news = read_news_sync_status(db_path)
-            sync = dict(sync)
-            sync["news"] = direct_news
+        direct_news = read_news_sync_status(db_path)
+        sync = dict(sync)
+        sync["news"] = direct_news
     except Exception as e:
         notes.append(f"market sync meta failed: {e}")
 
@@ -360,11 +357,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         ("finnhub", "finnhub", "Finnhub"),
     ):
         n = news_by_src.get(source_pid, {})
-        direct = (
-            (direct_news or {}).get("providers", {}).get(source_pid)
-            if direct_news_enabled
-            else None
-        )
+        direct = (direct_news or {}).get("providers", {}).get(source_pid)
         key = (
             _first_key_info(
                 loaded_file_keys,
@@ -378,8 +371,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
             pid, label, "news",
             key,
             config_error=_config_error(pid),
-            last_success=(_to_dt(direct.get("last_success")) if direct else None)
-            if direct_news_enabled else n.get("latest"),
+            last_success=(_to_dt(direct.get("last_success")) if direct else None),
             last_attempt=(_to_dt(direct.get("last_attempt")) if direct else None),
             last_error=(direct.get("last_error") if direct else None),
             detail=f"news latest {_iso(n.get('latest')) or '—'} · 7d {n.get('recent_7d', 0)}",

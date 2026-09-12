@@ -142,40 +142,46 @@ def test_fresh_profile_uses_local_market_backend(tmp_path, monkeypatch):
     assert dal.get_prices("NVDA").bars == []
 
 
-def test_status_news_sync_follows_active_writer_only(store, tmp_path, monkeypatch):
+def test_status_uses_current_news_sync_and_preserves_price_authority(store, tmp_path, monkeypatch):
     from src.api.routes.market_data import market_data_status
+    from src.market_data_direct import _ensure_provider_sync_tables
 
     db = tmp_path / "market_data.db"
-    db.write_bytes(b"")
+    _create_local_market_db(str(db))
+    conn = sqlite3.connect(db)
+    try:
+        _ensure_provider_sync_tables(conn)
+        conn.execute(
+            "INSERT INTO provider_sync_runs "
+            "(provider,domain,interval,started_at,finished_at,tickers_scanned,rows_added,status,error) "
+            "VALUES ('polygon','news','news','2026-06-10T10:00:00Z','2026-06-10T10:01:00Z',2,3,'succeeded',NULL)"
+        )
+        conn.execute(
+            "INSERT INTO provider_sync_meta (provider,ticker,interval,last_error,rows_added,updated_at) "
+            "VALUES ('polygon','BAD','news','403',0,'2026-06-10T10:01:00Z')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
     stored = {
         "prices": {"last_success": "p", "last_error": None, "rows_added": 1, "updated_at": "p"},
         "news": {"last_success": "stored", "last_error": None, "rows_added": 2, "updated_at": "stored"},
     }
-    direct = {
-        "status": "partial", "last_success": "direct", "last_attempt": "now",
-        "last_error": "polygon: BAD: 403", "rows_added": 3, "updated_at": "now",
-        "providers": {},
-    }
     monkeypatch.setattr("src.api.routes.market_data.resolve_market_db_path", lambda: str(db))
-    monkeypatch.setattr("src.api.routes.market_data.local_market_stats", lambda path: {
-        "exists": True, "prices": {}, "news": {}, "iv": {}, "fundamentals": {},
-        "financial_cache": {},
-    })
     monkeypatch.setattr("src.api.routes.market_data.read_sync_meta", lambda path: stored)
-    monkeypatch.setattr("src.news_sync_status.read_news_sync_status", lambda path: direct)
 
-    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
-    off = market_data_status(store=store)
-    assert off["fundamentals_mode"] == "local_cache_refetch"
-    assert off["sync"]["news"] == stored["news"]
-    assert off["sync"]["prices"]["last_success"] == "p"
-    assert off["sync"]["prices"]["authority"] == "local"
-
-    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
-    on = market_data_status(store=store)
-    assert on["sync"]["news"] == direct
-    assert on["sync"]["prices"]["last_success"] == "p"
-    assert on["sync"]["prices"]["authority"] == "local"
+    out = market_data_status(store=store)
+    assert out["fundamentals_mode"] == "local_cache_refetch"
+    assert out["news"]["row_count"] == 1
+    assert out["prices"]["row_count"] == 1
+    assert out["sync"]["news"]["status"] == "partial"
+    assert out["sync"]["news"]["last_success"] == "2026-06-10T10:01:00Z"
+    assert out["sync"]["news"]["last_attempt"] == "2026-06-10T10:01:00Z"
+    assert out["sync"]["news"]["last_error"] == "polygon: BAD: 403"
+    assert out["sync"]["news"]["rows_added"] == 3
+    assert out["sync"]["news"]["providers"]["polygon"]["tickers_scanned"] == 2
+    assert out["sync"]["prices"]["last_success"] == "p"
+    assert out["sync"]["prices"]["authority"] == "local"
 
 
 def test_p0c_market_status_reports_prices_local_authority(monkeypatch):

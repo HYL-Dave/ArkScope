@@ -6,9 +6,7 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from src.news_normalized.routing import (
-    ENV_USE_LOCAL_NEWS,
     ENV_USE_NORMALIZED_NEWS_WRITES,
-    USE_LOCAL_NEWS_KEY,
     USE_NORMALIZED_NEWS_WRITES_KEY,
     NewsWriteMode,
     NewsWriteRoute,
@@ -18,33 +16,20 @@ from src.news_normalized.routing import (
 
 
 @pytest.mark.parametrize(
-    ("normalized_required", "normalized", "local", "expected"),
+    ("normalized_required", "normalized", "expected"),
     [
-        (False, True, True, NewsWriteMode.NORMALIZED),
-        (False, True, False, NewsWriteMode.NORMALIZED),
-        (False, True, None, NewsWriteMode.NORMALIZED),
-        (False, False, True, NewsWriteMode.LEGACY_LOCAL),
-        (False, False, False, NewsWriteMode.LEGACY_LOCAL),
-        (False, False, None, NewsWriteMode.LEGACY_LOCAL),
-        (False, None, True, NewsWriteMode.LEGACY_LOCAL),
-        (False, None, False, NewsWriteMode.LEGACY_LOCAL),
-        (False, None, None, NewsWriteMode.LEGACY_LOCAL),
-        (True, True, True, NewsWriteMode.NORMALIZED),
-        (True, True, False, NewsWriteMode.NORMALIZED),
-        (True, True, None, NewsWriteMode.NORMALIZED),
-        (True, False, True, NewsWriteMode.BLOCKED),
-        (True, False, False, NewsWriteMode.BLOCKED),
-        (True, False, None, NewsWriteMode.BLOCKED),
-        (True, None, True, NewsWriteMode.NORMALIZED),
-        (True, None, False, NewsWriteMode.NORMALIZED),
-        (True, None, None, NewsWriteMode.NORMALIZED),
+        (False, True, NewsWriteMode.NORMALIZED),
+        (False, False, NewsWriteMode.LEGACY_LOCAL),
+        (False, None, NewsWriteMode.LEGACY_LOCAL),
+        (True, True, NewsWriteMode.NORMALIZED),
+        (True, False, NewsWriteMode.BLOCKED),
+        (True, None, NewsWriteMode.NORMALIZED),
     ],
 )
-def test_route_matrix(normalized_required, normalized, local, expected):
+def test_route_matrix(normalized_required, normalized, expected):
     route = resolve_news_write_route(
         normalized_required=normalized_required,
         normalized_value=normalized,
-        local_value=local,
     )
 
     assert route.mode is expected
@@ -55,7 +40,6 @@ def test_route_reuses_news_toggle_string_semantics():
     route = resolve_news_write_route(
         normalized_required=False,
         normalized_value="YES",
-        local_value="0",
     )
 
     assert route.mode is NewsWriteMode.NORMALIZED
@@ -65,30 +49,16 @@ def test_environment_values_override_profile_values():
     route = resolve_news_write_route(
         normalized_required=False,
         normalized_value=False,
-        local_value=False,
         normalized_env="on",
-        local_env="off",
     )
 
     assert route.mode is NewsWriteMode.NORMALIZED
-
-
-def test_local_environment_value_overrides_profile_value():
-    route = resolve_news_write_route(
-        normalized_required=False,
-        normalized_value=None,
-        local_value=True,
-        local_env="false",
-    )
-
-    assert route.mode is NewsWriteMode.LEGACY_LOCAL
 
 
 def test_explicit_normalized_environment_false_blocks_after_exit():
     route = resolve_news_write_route(
         normalized_required=True,
         normalized_value=True,
-        local_value=True,
         normalized_env="false",
     )
 
@@ -100,7 +70,6 @@ def test_malformed_exit_marker_blocks_pure_route():
     route = resolve_news_write_route(
         normalized_required="garbage",
         normalized_value=None,
-        local_value=False,
     )
 
     assert route.mode is NewsWriteMode.BLOCKED
@@ -122,7 +91,6 @@ def test_read_news_write_route_uses_profile_and_environment(tmp_path):
         "INSERT INTO profile_settings VALUES (?, ?)",
         [
             (USE_NORMALIZED_NEWS_WRITES_KEY, "true"),
-            (USE_LOCAL_NEWS_KEY, "true"),
         ],
     )
     conn.commit()
@@ -132,7 +100,6 @@ def test_read_news_write_route_uses_profile_and_environment(tmp_path):
         profile_db=db,
         environ={
             ENV_USE_NORMALIZED_NEWS_WRITES: "false",
-            ENV_USE_LOCAL_NEWS: "false",
         },
         normalized_required=True,
     )
@@ -170,13 +137,13 @@ def test_read_news_write_route_blocks_when_profile_database_is_corrupt(tmp_path)
     assert "read" in route.reason.lower()
 
 
-def test_read_news_write_route_blocks_malformed_stored_exit_marker(tmp_path):
+def test_read_news_write_route_blocks_malformed_current_normalized_setting(tmp_path):
     db = tmp_path / "profile_state.db"
     conn = sqlite3.connect(db)
     conn.execute("CREATE TABLE profile_settings (key TEXT PRIMARY KEY, value TEXT)")
     conn.execute(
         "INSERT INTO profile_settings VALUES (?, ?)",
-        (USE_LOCAL_NEWS_KEY, "garbage"),
+        (USE_NORMALIZED_NEWS_WRITES_KEY, "garbage"),
     )
     conn.commit()
     conn.close()
@@ -184,7 +151,7 @@ def test_read_news_write_route_blocks_malformed_stored_exit_marker(tmp_path):
     route = read_news_write_route(profile_db=db, environ={})
 
     assert route.mode is NewsWriteMode.BLOCKED
-    assert "direct-local writer setting" in route.reason.lower()
+    assert "normalized-writer setting" in route.reason.lower()
 
 
 def test_read_news_write_route_encodes_sqlite_uri_metacharacters(tmp_path):
