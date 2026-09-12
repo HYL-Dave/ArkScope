@@ -93,14 +93,15 @@ Each entry records:
 
 ### EIR-001 - Retire unreachable `.page-head*` CSS
 
-- `status`: `open`
+- `status`: `closed`
 - `observed_at`: `2026-07-25`
 - `impact`: Dead selectors preserve a second, obsolete page-header vocabulary
   beside the shipped `.ui-page-header*` primitive and make responsive CSS
   audits noisier.
 - `evidence`:
-  - definitions remain in `apps/arkscope-web/src/styles.css:923-938` and
-    `apps/arkscope-web/src/styles.css:1119-1125`;
+  - original observation: definitions remained in desktop/mobile rules;
+    revalidation at `5526bc40` located five rules at `styles.css:950` and
+    `styles.css:1404`, with no live exact-class consumer;
   - reproduce the live-owner census with:
 
     ```bash
@@ -110,11 +111,19 @@ Each entry records:
 
     Expected on the observation date: no output. `detailpage-head` and
     `.ui-page-header*` are different owners and do not count.
-- `owner`: future frontend CSS hygiene batch.
-- `next_action`: RED-first selector-absence coverage, remove both desktop and
-  `max-width:760px` rules, then run frontend tests/build and the affected
-  responsive visual gate.
-- `closure_evidence`: none.
+- `owner`: September13 maintenance closures, product commit `eec66b9e`.
+- `next_action`: none for this scope. The broader CSS census is separate.
+- `closure_evidence`: `retiredPageHeader.test.tsx` records desktop/media
+  absence and real PageHeader/detail-header positive controls. Five rules,
+  23 lines removed; all908 retained rules/2857 declarations unchanged. Actual
+  assertion RED and two independent restored-rule failures precede final GREEN.
+  Commands from `apps/arkscope-web`: `npm test` ->1779P/124files,
+  `npm run typecheck` ->0, `npm run build` ->0 (existing chunk-size warning).
+  Controller focused rerun38P; ten real-component Chromium before/after pairs
+  at320/390/760/761/1440px have identical pixels/geometry and no overlap.
+  Independent task review approved. Exact commands, environments, source hashes,
+  screenshots and failed-run dispositions are sealed in
+  `docs/superpowers/evidence/2026-09-13-maintenance-closures/`.
 
 ### EIR-002 - Eliminate the environment-dependent non-green backend baseline
 

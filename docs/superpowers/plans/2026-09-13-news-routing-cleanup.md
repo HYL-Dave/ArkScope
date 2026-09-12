@@ -65,6 +65,9 @@ inventory/backup operation, not automatic startup cleanup.
   useful assertions to current behavior; retain their actual data/price owners.
 - Route-count collateral: `test_security_lifecycle_routes.py`, count223->222
   for the one deleted PUT route, with explicit absence and exact retained sets.
+  Source follow-up also identifies the same route count in `test_api.py` and
+  locale accounting in frontend `i18n/resources.test.ts`; update exact counts
+  with retained route/locale checks, not loose bounds.
 - Frontend tests: `SettingsNewsStorage.test.ts`, `SettingsLocalStorage.test.ts`,
   `marketDataDisplay.test.ts`; remove old mock/fields and obsolete display-only
   cases while keeping real normalized-write and authority controls.
@@ -73,29 +76,29 @@ inventory/backup operation, not automatic startup cleanup.
 
 ## RED-First Acceptance
 
-- [ ] Baseline these scoped tests using the current plan's disposable offline
+- [x] Baseline these scoped tests using the current plan's disposable offline
   runner. No provider, real DB/config, external CLI session, schema disposal or
   App restart. Record exact collected/pass/skip counts rather than predicting.
-- [ ] Add named current-writer/status owners before product edits. With an
+- [x] Add named current-writer/status owners before product edits. With an
   actual disposable profile holding old false or malformed values, require
   current normalized/direct route selection and real provider_sync timestamps,
   errors and counters to remain visible through status, overlay and health.
   Expected RED: stale fields, suppressed telemetry or an old-value BLOCKED route.
-- [ ] Add physical API/helper absence owners and require the old PUT setter to
+- [x] Add physical API/helper absence owners and require the old PUT setter to
   be unmounted. The surviving GET `/news/{ticker}` also matches the literal
   path `/news/settings`, so Starlette returns405 for PUT, not404; do not add a
   compatibility stub or remove the useful ticker route to force404. The
   current normalized setter retains permission checks and writes only its key.
   Expected RED: old PUT still mounted or obsolete helper still importable.
-- [ ] Preserve nonempty current-news/price/SA/cache controls, normalized-required
+- [x] Preserve nonempty current-news/price/SA/cache controls, normalized-required
   rejection, malformed-current-setting rejection, corrupted DB failure and
   missing-store noncreation. Do not substitute empty fixtures for real reads.
-- [ ] Implement the bounded changes. Transfer old rollback-only tests to the
+- [x] Implement the bounded changes. Transfer old rollback-only tests to the
   current contract, enumerate every removed/added node and re-scan call sites.
-- [ ] GREEN all owned backend tests plus direct/normalized news, collector adapter,
+- [x] GREEN all owned backend tests plus direct/normalized news, collector adapter,
   current investigation-news, API and SEC projection controls. Run frontend
   tests/typecheck/i18n and ensure the five locale leaves have no retained caller.
-- [ ] Inverse-check telemetry suppression and old-value validation independently:
+- [x] Inverse-check telemetry suppression and old-value validation independently:
   each must fail its named owner. Restore and rerun the unmutated controls.
 - [ ] Independent review, frozen full backend and mechanical census before
   acceptance. No master merge/push, no installation or stored-data cleanup
@@ -110,3 +113,9 @@ switch and is not redesigned here. Retain its current tests. Health fixtures
 that intentionally selected old rollback must instead supply actual disposable
 provider_sync run telemetry; preserve their stale/error/key-precedence checks,
 and add a missing-telemetry control rather than merely weakening expectations.
+
+The current telemetry reader builds a raw SQLite URI from a filesystem path.
+Verify reserved `?`/`#` path characters with a disposable DB. If they misdirect
+the read, fix only this owned reader using the existing resolved-as_uri pattern
+and retain read-only/noncreation controls. This is a bounded read-boundary fix,
+not permission to redesign other stores or ignore acquisition errors.
