@@ -1023,11 +1023,16 @@ def test_lifecycle_tools_are_in_both_research_driver_allowlists():
     from src.auth_drivers.chatgpt_oauth_driver import _RESEARCH_READONLY_TOOLS as openai
     from src.auth_drivers.claude_code_sdk_driver import _RESEARCH_READONLY_TOOLS as anthropic
 
-    expected = {"list_security_lifecycle_reviews", "get_security_lifecycle_review"}
+    expected = {
+        "list_security_lifecycle_reviews", "get_security_lifecycle_review",
+        "list_sec_filings", "get_sec_financial_facts", "read_sec_filing",
+    }
     assert expected <= openai
     assert expected <= anthropic
-    assert len(openai) == 15
-    assert len(anthropic) == 15
+    assert "get_sec_filings" not in openai
+    assert "get_sec_filings" not in anthropic
+    assert len(openai) == 17
+    assert len(anthropic) == 17
 
 
 def test_read_service_exposes_derived_final_check_date_in_list_and_detail(
