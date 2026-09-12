@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import copy
+from concurrent.futures import ThreadPoolExecutor
 import importlib
 import importlib.util
 import json
 import pickle
 import random
+import threading
 from urllib.parse import quote, quote_plus
 
 import pytest
@@ -566,3 +568,58 @@ def test_feed_accepts_full_provider_text_blocks_above_64_kib():
     output = stream.feed(prefix + SECRET + suffix)
     assert len(stream._pending) <= max(map(len, representations(SECRET).values())) - 1
     assert output + stream.finish() == prefix + MARKER + suffix
+
+
+@pytest.mark.parametrize("race", ["registration", "matcher-publication"])
+def test_concurrent_registration_cannot_lose_secrets_or_publish_stale_matcher(monkeypatch, race):
+    api = boundary()
+    paused = threading.Event()
+    resume = threading.Event()
+
+    class ObservedLock:
+        def __init__(self):
+            self.lock = threading.RLock()
+
+        def __enter__(self):
+            if threading.current_thread().name.endswith("_1"):
+                resume.set()
+            return self.lock.__enter__()
+
+        def __exit__(self, *args):
+            return self.lock.__exit__(*args)
+
+    # Signal an attempted acquisition, not a sleep or a probabilistic race.
+    # Without locking, the second registration instead completes before resume.
+    monkeypatch.setattr(api, "RLock", ObservedLock, raising=False)
+    first_secret = "first-thread-secret"
+    second_secret = "second-thread-secret"
+    guard = api.OutputGuard([first_secret] if race == "matcher-publication" else [])
+    original = api._Matcher if race == "matcher-publication" else api._representations
+
+    def pause_first(value):
+        if threading.current_thread().name.endswith("_0"):
+            paused.set()
+            assert resume.wait(5), "thread rendezvous timed out"
+        return original(value)
+
+    monkeypatch.setattr(api, "_Matcher" if race == "matcher-publication" else "_representations", pause_first)
+
+    def register_second():
+        try:
+            guard.add_secret(second_secret)
+        finally:
+            resume.set()
+
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="output-boundary") as pool:
+        first = pool.submit(guard.check, "public!") if race == "matcher-publication" else pool.submit(guard.add_secret, first_secret)
+        try:
+            assert paused.wait(5), "first operation did not reach rendezvous"
+            second = pool.submit(register_second)
+            first.result(timeout=5)
+            second.result(timeout=5)
+        finally:
+            resume.set()
+    for secret in (first_secret, second_secret):
+        for encoded in representations(secret).values():
+            with pytest.raises(api.OutputBoundaryError, match="known_secret"):
+                guard.check(encoded)

@@ -21,9 +21,12 @@ redaction_marker_conflict, never emits an unsafe marker. Trusted error codes
 can themselves coincide with extremely short synthetic secrets; codes are not
 derived from rejected content and are not an unknown-secret safety guarantee.
 
-Register credentials BEFORE provider use. Streams rescan their bounded pending
-suffix with current guard patterns, not snapshots. Newly registered secrets
-cannot retroactively protect already emitted text or discarded history.
+Register credentials BEFORE provider use. Each check/internal stream slice
+takes a lock-protected pattern snapshot; streams rescan their bounded pending
+suffix, never freezing patterns at creation. Newly registered secrets cannot
+retroactively protect already emitted text or discarded history. Registration
+and matcher publication support shared guards across threads; each stream is
+single-consumer and its owner must sequence feed/finish/abort.
 Context managers are synchronous and must exit before yielding to a consumer.
 activate_output_guard borrows a retained guard; output_scope owns root stream
 cleanup. ContextVar propagation to child tasks is normal Python propagation;
@@ -39,6 +42,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 import json
 import math
+from threading import RLock
 from urllib.parse import quote, quote_plus
 from weakref import WeakSet
 
@@ -180,9 +184,10 @@ class _Matcher(_Ephemeral):
 class OutputGuard(_Ephemeral):
     """Execution-local captured credentials. No store, environment or I/O access."""
 
-    __slots__ = ("_secrets", "_patterns", "_longest", "_marker_safe", "_matcher", "_streams")
+    __slots__ = ("_secrets", "_patterns", "_longest", "_marker_safe", "_matcher", "_streams", "_lock")
 
     def __init__(self, secrets: Iterable[str | None] = ()):
+        self._lock = RLock()
         self._secrets: set[str] = set()
         self._patterns: frozenset[str] = frozenset()
         self._longest = 0
@@ -200,26 +205,30 @@ class OutputGuard(_Ephemeral):
             return
         if type(secret) is not str:
             raise OutputBoundaryError("invalid_secret")
-        if not secret or secret in self._secrets:
+        if not secret:
             return
-        if len(secret) > MAX_SECRET_CHARS or len(self._secrets) >= MAX_SECRETS:
-            raise OutputBoundaryError("secret_limit")
-        patterns = self._patterns | _representations(secret)
-        longest = max(map(len, patterns))
-        if (len(patterns) > MAX_REPRESENTATIONS
-                or longest > MAX_REPRESENTATION_CHARS
-                or sum(map(len, patterns)) > MAX_TOTAL_REPRESENTATION_CHARS):
-            raise OutputBoundaryError("representation_limit")
-        self._secrets.add(secret)
-        self._patterns = patterns
-        self._longest = longest
-        self._marker_safe = _safe_marker(patterns)
-        self._matcher = None
+        with self._lock:
+            if secret in self._secrets:
+                return
+            if len(secret) > MAX_SECRET_CHARS or len(self._secrets) >= MAX_SECRETS:
+                raise OutputBoundaryError("secret_limit")
+            patterns = self._patterns | _representations(secret)
+            longest = max(map(len, patterns))
+            if (len(patterns) > MAX_REPRESENTATIONS
+                    or longest > MAX_REPRESENTATION_CHARS
+                    or sum(map(len, patterns)) > MAX_TOTAL_REPRESENTATION_CHARS):
+                raise OutputBoundaryError("representation_limit")
+            self._secrets.add(secret)
+            self._patterns = patterns
+            self._longest = longest
+            self._marker_safe = _safe_marker(patterns)
+            self._matcher = None
 
     def _get_matcher(self) -> _Matcher:
-        if self._matcher is None:
-            self._matcher = _Matcher(self._patterns)
-        return self._matcher
+        with self._lock:
+            if self._matcher is None:
+                self._matcher = _Matcher(self._patterns)
+            return self._matcher
 
     def check(self, value: object) -> None:
         """Read-only recursive exact check of bounded strict JSON; returns None."""
@@ -286,7 +295,9 @@ class OutputGuard(_Ephemeral):
         return SecretStream(self)
 
     def _abort_streams(self) -> None:
-        for stream in tuple(self._streams):
+        with self._lock:
+            streams = tuple(self._streams)
+        for stream in streams:
             stream.abort()
 
 
@@ -301,7 +312,8 @@ class SecretStream(_Ephemeral):
         self._covered = 0
         self._redacting = False
         self._closed = False
-        guard._streams.add(self)
+        with guard._lock:
+            guard._streams.add(self)
 
     def feed(self, text: str) -> str:
         if self._closed:
@@ -336,15 +348,20 @@ class SecretStream(_Ephemeral):
         self._covered = 0
         self._redacting = False
         self._closed = True
-        self._guard._streams.discard(self)
+        with self._guard._lock:
+            self._guard._streams.discard(self)
 
     def _process(self, text: str, *, final: bool) -> str:
         data = self._pending + text
-        matches = self._guard._get_matcher().scan(data)
+        with self._guard._lock:
+            matcher = self._guard._get_matcher()
+            longest = self._guard._longest
+            marker_safe = self._guard._marker_safe
+        matches = matcher.scan(data)
         spans = [(0, self._covered)] if self._covered else []
         for start, end in matches:
             _merge_span(spans, start, end)
-        cut = len(data) if final else max(0, len(data) - max(0, self._guard._longest - 1))
+        cut = len(data) if final else max(0, len(data) - max(0, longest - 1))
         if not cut:
             self._pending = data
             return ""
@@ -357,7 +374,7 @@ class SecretStream(_Ephemeral):
                 break
             parts.append(data[position:start])
             if start or not self._redacting:
-                if not self._guard._marker_safe:
+                if not marker_safe:
                     raise OutputBoundaryError("redaction_marker_conflict")
                 parts.append(REDACTION_MARKER)
             position = min(end, cut)
