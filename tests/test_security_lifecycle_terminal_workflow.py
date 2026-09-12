@@ -94,7 +94,7 @@ def test_reviewed_legacy_delisting_stops_shared_scope_and_sa_sync_cannot_resurre
         conn.execute("UPDATE prices SET ticker=?", (ticker,))
         prices = conn.execute("SELECT * FROM prices ORDER BY ticker,datetime").fetchall()
         news = conn.execute("SELECT * FROM news ORDER BY id").fetchall()
-    backend = SACaptureBackend(sa_db=str(c["sa"]), market_db=str(c["market"]), base_path=tmp_path)
+    backend = SACaptureBackend(sa_db=str(c["sa"]), market_db=str(c["market"]))
     pick = {"symbol": ticker, "picked_date": "2023-01-01", "closed_date": ended}
     assert backend.apply_sa_refresh("closed", [pick], NOW, NOW) == 1
     assert reconcile_sa_tracking(profile_db=c["profile"], sa_db=c["sa"], at=NOW)

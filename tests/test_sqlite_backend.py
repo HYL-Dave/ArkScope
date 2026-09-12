@@ -651,7 +651,7 @@ def test_sa_capture_backend_threads_strict(market_db, tmp_path, monkeypatch):
     db, _ = market_db
     sa_db = tmp_path / "sa.db"  # empty SA db is fine; we exercise the market path
     sqlite3.connect(sa_db).close()
-    b = SACaptureBackend(sa_db=str(sa_db), market_db=db, base_path=tmp_path)
+    b = SACaptureBackend(sa_db=str(sa_db), market_db=db)
     assert len(b.query_prices("AAPL", days=30)) == 8
     assert b.query_prices("ZZZZ", days=30).empty
 

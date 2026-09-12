@@ -46,7 +46,6 @@ _REWIRED_CURRENT = {
 _RETIRED_CURRENT = {
     "data_sources/financial_metrics_calculator.py",
     "src/daily_update.py",
-    "src/tools/backends/file_backend.py",
 }
 _LOW_LEVEL_CURRENT = {
     "src/tools/backends/__init__.py",
@@ -178,8 +177,6 @@ def test_current_docs_training_and_tool_copy_name_only_current_authorities():
         assert expected_tool_claim in text, path
 
     assert not (_ROOT / "training").exists()
-    file_backend = _read("src/tools/backends/file_backend.py")
-    assert "retired empty compatibility" in file_backend.lower()
 
 
 def test_current_runtime_consumer_census_is_closed_and_exact():

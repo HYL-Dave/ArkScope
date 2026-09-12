@@ -339,8 +339,8 @@ def _prepare_comments_for_upsert(
 class SACaptureBackend(LocalMarketBackend):
     """Local composition whose SA domain lives in ``sa_capture.db``."""
 
-    def __init__(self, *, sa_db: str, market_db: str, base_path: Optional[Path] = None):
-        super().__init__(market_db=market_db, base_path=base_path)
+    def __init__(self, *, sa_db: str, market_db: str):
+        super().__init__(market_db=market_db)
         self._sa_db = sa_db
 
     # ------------------------------------------------------------------

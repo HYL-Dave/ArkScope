@@ -199,7 +199,6 @@ class DataAccessLayer:
             self._backend = SACaptureBackend(
                 sa_db=sa_db,
                 market_db=market_db,
-                base_path=self._base,
             )
 
         # Config cache

@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 
 from src.news_content_availability import ContentFilter, empty_content_counts
 
 from . import provenance
-from .file_backend import FileBackend
 from .sqlite_backend import (
     SqliteBackend,
     _NEWS_COLS,
@@ -25,10 +22,9 @@ logger = logging.getLogger(__name__)
 class LocalMarketBackend:
     """Direct composition of the current local market data authorities."""
 
-    def __init__(self, *, market_db: str, base_path: Optional[Path] = None):
+    def __init__(self, *, market_db: str):
         self._market = SqliteBackend(market_db)
         self._market_db = market_db
-        self._files = FileBackend(base_path=base_path)
 
     def query_prices(
         self, ticker: str, interval: str = "15min", days: int = 30

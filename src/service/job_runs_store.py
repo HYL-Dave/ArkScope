@@ -13,8 +13,6 @@ Design contract:
   - **Persistence is best-effort**: a DB outage must NOT fail the job.
     Store methods catch database errors, log, and return ``None`` /
     empty results so callers can degrade to process-local state.
-  - **FileBackend is a no-op**: when the DAL is on FileBackend the store
-    reports ``is_available() == False`` and methods return early.
   - **No general same-name concurrency control**: ordinary jobs may overlap.
     The audited ``sa_market_news_repair`` domain is the explicit exception and
     uses one ``BEGIN IMMEDIATE`` start-or-return-running transaction.

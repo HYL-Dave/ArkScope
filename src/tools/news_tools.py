@@ -82,7 +82,6 @@ def search_news_by_keyword(
     Search news articles by keyword using DB-level full-text search.
 
     Uses the local search capability for matching.
-    Falls back to Python-level filtering for FileBackend.
 
     Args:
         dal: DataAccessLayer instance

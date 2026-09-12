@@ -285,7 +285,6 @@ def test_get_reconciliation_queue_action_is_read_only_and_sanitized(
     backend = SACaptureBackend(
         sa_db=str(path),
         market_db=str(tmp_path / "market_data.db"),
-        base_path=tmp_path,
     )
     dal = _dal_with_backend(backend)
     monkeypatch.setattr(

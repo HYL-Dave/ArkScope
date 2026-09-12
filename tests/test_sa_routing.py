@@ -12,10 +12,9 @@ from src.tools.data_access import DataAccessLayer
 
 
 class _StubSABackend:
-    def __init__(self, *, sa_db, market_db, base_path=None):
+    def __init__(self, *, sa_db, market_db):
         self._sa_db = sa_db
         self.market_db = market_db
-        self.base_path = Path(base_path) if base_path is not None else None
 
 
 @pytest.fixture()
@@ -35,9 +34,8 @@ def env(tmp_path, monkeypatch):
     )
 
 
-def _make(env, *, base_path=True):
-    base = env.base if base_path else None
-    return DataAccessLayer(base_path=base)._backend
+def _make(env):
+    return DataAccessLayer(base_path=env.base)._backend
 
 
 def _assert_current_owner(env, backend):
@@ -63,9 +61,9 @@ def test_sa_only_still_threads_local_market(env):
 def test_both_on_one_instance_serves_both(env):
     env.profile.set_setting("use_local_sa", "true")
     env.profile.set_setting("use_local_market", "true")
-    backend = _make(env)
-    _assert_current_owner(env, backend)
-    assert backend.base_path == env.base
+    dal = DataAccessLayer(base_path=env.base)
+    _assert_current_owner(env, dal._backend)
+    assert dal._base == env.base
 
 
 def test_legacy_market_strict_setting_does_not_change_local_owner(env):
@@ -103,6 +101,6 @@ def test_explicit_false_is_provenance_only(env):
 
 
 def test_baseless_dal_constructs_current_local_owner(env):
-    backend = _make(env, base_path=False)
-    _assert_current_owner(env, backend)
-    assert backend.base_path is not None
+    dal = DataAccessLayer()
+    _assert_current_owner(env, dal._backend)
+    assert dal._base == Path(__file__).resolve().parents[1]

@@ -511,7 +511,6 @@ def test_provider_marked_former_pick_merges_with_manual_identity_for_consumers(
     backend = SACaptureBackend(
         sa_db=str(databases.sa_path),
         market_db=str(tmp_path / "market_data.db"),
-        base_path=tmp_path,
     )
     backend.apply_sa_refresh(
         "closed",
