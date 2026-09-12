@@ -84,7 +84,13 @@ receipt remains separate from final acceptance.
   current news/UI/data controls. Finish all servers/test processes owned here.
 - [x] Full suites run serially on frozen product/test source, not a union of
   partial successes. Record source/runner identity and unchanged skip IDs.
-- [ ] Seal selected receipts only; verify manifest membership and hashes from
+- [x] Seal selected receipts only; verify manifest membership and hashes from
   Git, including log files ignored by default. No fixture data/binaries in Git.
-- [ ] Close only completed issue scopes, list real remaining work and SQLite
+- [x] Close only completed issue scopes, list real remaining work and SQLite
   admission findings. Keep the branch/worktree; no merge or push.
+
+Archive commit `ac0743ef`: 277 selected payloads plus manifest, 278/278 paths
+verified directly from Git; no missing/extra files or hash mismatches. Receipt
+is outside the sealed payload to avoid recursive manifest updates. The actual
+Git branch/worktree remains for review; only this plan's disposable scratch is
+removed after verification. No production or main-worktree mutation occurred.

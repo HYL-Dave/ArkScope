@@ -12,7 +12,8 @@ bounded finished items, not completion of every SEC or cleanup task.
 - Final frozen backend: **10,311 passed / 12 unchanged skipped**, zero failures.
   Frontend: **1,779 passed**, typecheck/build/i18n passed. Task, whole-change and
   collateral reviews are approved. The first full failure remains recorded below.
-- Git archive verification is the remaining publication gate; no merge or push.
+- Git archive verification passed: 278 committed paths, no missing/extra files
+  or hash mismatches. All work remains on the branch; no merge or push.
 - SQLite: source-only admission path reviewed; no build/install/activation here.
 
 ## EIR-001
@@ -128,6 +129,22 @@ product commands. The standalone Git verifier can run directly from this folder:
 ```bash
 python -B docs/superpowers/evidence/2026-09-13-maintenance-closures/verify_archive.py HEAD
 ```
+
+The [Git verification receipt](archive-verification.json) reads commit
+`ac0743ef59bdd7368ddde58553757ddb5ab371a0`, not just the working directory.
+It verifies all 277 payloads plus the manifest, including explicitly staged
+ignored logs and 20 browser screenshots. Manifest SHA-256:
+`84f7debaba96e010199323834946ade3ad9628e4da1c7d4978b3d92c4a955e60`.
+Later closure-document commits leave these sealed bytes unchanged. The archived
+progress ledger is the pre-seal snapshot; this receipt and completed plan own
+the final delivery status. Disposable DBs, homes and runtime binaries are not
+archived; only this plan's scratch is removed after Git verification.
+
+Raw `checks/task-1-brief.md` retains its original extra newline at EOF, so a
+whole-range `git diff --check` flags that one archived-brief whitespace item.
+It is deliberately preserved as historical bytes, not silently reformatted.
+The product/test diff passes the whitespace check; no runtime exception or test
+expectation is involved.
 
 ## Census
 
