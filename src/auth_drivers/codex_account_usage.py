@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import re
@@ -10,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
+from src.agents.shared.output_boundary import OutputBoundaryError, OutputGuard
 from src.auth_drivers.codex_app_server_runtime import (
     ALLOWED_CODEX_APP_SERVER_VERSIONS,
     CodexAppServerRuntimeError,
@@ -29,7 +31,6 @@ from src.auth_drivers.oauth_status import (
     OAuthSpendControlLimit,
     OAuthUsageSummary,
 )
-from src.auth_drivers.probe_harness import redact
 
 
 _MAX_STDOUT_BYTES = 256 * 1024
@@ -47,6 +48,7 @@ _ALLOWED_SERVER_NOTIFICATIONS = frozenset(
 )
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _MODEL_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:\-]{0,79}$")
+_JWT_ID_RE = re.compile(r"([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
 _EFFORT_RE = re.compile(r"[a-z][a-z0-9_-]{0,31}$")
 _INPUT_MODALITIES = frozenset({"text", "image", "audio"})
 _T = TypeVar("_T")
@@ -246,8 +248,20 @@ def _usage_payload(value: Any) -> tuple[OAuthUsageSummary, list[OAuthDailyUsageB
 def _model_identifier(value: Any) -> str:
     model = _bounded_string(value, optional=False, maximum=80)
     assert model is not None
-    if not _MODEL_ID_RE.fullmatch(model) or redact(model) != model:
+    if not _MODEL_ID_RE.fullmatch(model):
         raise _fail()
+    # A JWT is not a model ID; ordinary long/dotted identifiers remain valid.
+    jwt = _JWT_ID_RE.fullmatch(model)
+    if jwt is not None:
+        header = jwt.group(1)
+        try:
+            decoded = json.loads(base64.b64decode(
+                header + "=" * (-len(header) % 4), altchars=b"-_", validate=True,
+            ))
+        except (ValueError, UnicodeError):
+            decoded = None
+        if isinstance(decoded, dict) and isinstance(decoded.get("alg"), str):
+            raise _fail()
     return model
 
 
@@ -462,7 +476,14 @@ class CodexAccountUsageAdapter:
     def read_model_catalog_with_plan(
         self, *, record
     ) -> tuple[list[CodexSubscriptionModel], str | None]:
+        guard = OutputGuard()
+
         def read(session: CodexJsonlSession) -> list[CodexSubscriptionModel]:
+            # Authentication has validated this supplied record; do not look up
+            # another credential or borrow an unrelated research execution.
+            guard.add_secret(record.access_token)
+            guard.add_secret(record.refresh_token)
+            guard.add_secret(record.metadata.get("id_token"))
             cursor: str | None = None
             seen_cursors: set[str] = set()
             models: list[CodexSubscriptionModel] = []
@@ -473,6 +494,7 @@ class CodexAccountUsageAdapter:
                     "model/list",
                     {"cursor": cursor, "includeHidden": False, "limit": 100},
                 )
+                guard.check(result)
                 page, next_cursor = _model_catalog_page(result)
                 for model in page:
                     if model.model in seen_models:
@@ -490,7 +512,11 @@ class CodexAccountUsageAdapter:
                 cursor = next_cursor
             raise _fail()
 
-        context, models = self._run_authenticated(record=record, operation=read)
+        try:
+            context, models = self._run_authenticated(record=record, operation=read)
+            guard.check(context.plan_type)
+        except OutputBoundaryError:
+            raise _fail() from None
         if not models:
             raise _fail()
         return models, context.plan_type

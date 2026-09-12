@@ -113,3 +113,19 @@ their existing bounded answer/capture accumulation separately.
 - Fresh focused and complete-backend verification, independent task reviews and
   whole-branch review before claiming completion. The parked SEC failures are
   not relabeled as pre-existing baseline failures or hidden by this result.
+
+## Confirmed Catalog Residual
+
+Final source scanning found the same heuristic used as a model-ID validator in
+`codex_account_usage._model_identifier`. Include this concrete sibling in the
+security slice, independently from SEC wiring. Keep its 80-character lexical
+contract and explicit JWT-as-model-ID rejection, without guessing secrecy from
+length or entropy. A syntactic JWT with a decoded algorithm header is not a
+model ID; this domain check is not a general ban on public encoded cursors.
+
+At the authenticated catalog operation, register only the supplied record's
+already-captured access, refresh and ID tokens in a local OutputGuard. Reject
+credential-bearing pages before parsing or following their cursor, and check
+the returned plan diagnostic. Preserve authentication admission order, pagination,
+hidden-row filtering, RPC budget and the existing bounded failure code. No
+token-store lookup, ambient credential enumeration or changes to usage reads.

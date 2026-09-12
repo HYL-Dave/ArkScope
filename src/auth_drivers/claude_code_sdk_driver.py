@@ -143,10 +143,9 @@ _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
 # Diagnostics retain exact-secret projection followed by the bounded heuristic.
 # ===========================================================================
 def _redact_bridge(text: Any, token: Optional[str]) -> str:
-    """Scrub the live OAuth token (exact) then any token/secret/PII shape (regex).
+    """Diagnostic-only exact-secret projection plus lossy shape redaction.
 
-    Order matters: the exact-token replace guarantees *this* token is gone with
-    zero false positives; the regex is the safety net for unknown secrets.
+    Never use this helper for successful tool data or research prose.
     """
     from src.auth_drivers.runtime_binding import sanitize_runtime_error
 

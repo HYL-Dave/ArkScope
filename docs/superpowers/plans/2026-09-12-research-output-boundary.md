@@ -123,6 +123,12 @@ After Task 2 review, both native `tools.py` modules also belong to this task's
 pre-handler input boundary. OpenAI SDK dispatch precedes run-item extraction,
 so producer-side post-call trace checks cannot prevent tool writes or SDK
 argument logging. No concurrent edits of those modules are permitted.
+Confirmed existing-test collateral also includes the ChatGPT timeout owner in
+`tests/test_chatgpt_oauth_driver.py` (safe-prefix/tail chunking, unchanged joined
+answer and nontext event order) and retained-entrypoint owner in
+`tests/test_openai_sync_surface_cleanup.py` (wrapped generator identity plus
+the real iterator/lifetime owners). Preserve their behavioral guarantees;
+do not retain representation-only assumptions incompatible with the new iterator.
 
 **Consumes:** Task 1 scope/matcher and Task 2 result admission. Produces common
 event protection prior to emission, with selected-client and refreshed-bearer
@@ -147,6 +153,20 @@ against the already-approved core, without modifying any Task 2-owned file.
 **Files:** This plan, matching evidence directory, security design and priority map;
 tests only for findings discovered by final verification with a separate RED cycle.
 **Consumes:** All preceding commits and task review records.
+
+Confirmed residual scope: coordinator owns
+`src/auth_drivers/codex_account_usage.py` and new
+`tests/test_model_catalog_output_boundary.py`. Model IDs currently use the
+diagnostic heuristic as a validator. Write RED public-ID and captured-secret
+page/cursor owners, replace that use with lexical/JWT-domain validation plus the
+shared local exact guard, retain the existing JWT rejection test unchanged, then
+run inverse checks and subscription controls. This is separate from the immutable
+Task 3 review and must finish before the final source freeze.
+
+Runner correction: `backend-full-01` omitted the explicit `tests` path and
+collected archived evidence test modules. It stopped with eight collection
+errors before test execution. Retain this invocation failure; retry the complete
+backend as `backend -q tests`, not as a product failure or baseline waiver.
 
 - [ ] Freeze code identity; run all new tests and complete backend under the offline runner. Parse JUnit exact pass/skip/fail/error totals; no inferred aggregate counts.
 - [ ] Run repository census comparison and unbounded residual scans for generic redaction on successful research outputs. Classify diagnostic exceptions, not grep-count assertions.
