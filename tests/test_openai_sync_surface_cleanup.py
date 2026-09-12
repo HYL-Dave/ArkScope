@@ -31,7 +31,7 @@ def test_retained_research_entrypoints_are_available():
     from src.agents.openai_agent import agent as openai
 
     assert inspect.iscoroutinefunction(openai.run_query)
-    assert inspect.isasyncgenfunction(openai.run_query_stream)
+    assert inspect.isasyncgenfunction(inspect.unwrap(openai.run_query_stream))
     assert callable(anthropic.run_query)
     assert not inspect.iscoroutinefunction(anthropic.run_query)
-    assert inspect.isasyncgenfunction(anthropic.run_query_stream)
+    assert inspect.isasyncgenfunction(inspect.unwrap(anthropic.run_query_stream))

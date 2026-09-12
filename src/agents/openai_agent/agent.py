@@ -14,10 +14,12 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set
 
-from src.auth_drivers.runtime_binding import sanitize_runtime_error
+from src.auth_drivers.runtime_binding import register_output_api_key, sanitize_runtime_error
 
 from ..config import get_agent_config, ReasoningEffort
 from ..shared.events import AgentEvent, EventType
+from ..shared.output_boundary import output_scope
+from ..shared.output_events import check_output_value, protect_event_stream, protect_output_text
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.replay import (
     ReplayCapture,
@@ -150,8 +152,7 @@ def _extract_tool_info(
                 # Tool call item
                 call_id = getattr(item, "call_id", None) or getattr(item, "id", None)
                 args = getattr(item, "arguments", {})
-                ext.tools_used.append(item.name)
-                pad.log_tool_call(item.name, args if isinstance(args, dict) else {"raw": args})
+                check_output_value({"tool": item.name, "call_id": call_id, "input": args})
 
                 # Parse arguments
                 if isinstance(args, str):
@@ -161,6 +162,10 @@ def _extract_tool_info(
                         args_dict = {"raw": args}
                 else:
                     args_dict = args or {}
+
+                check_output_value(args_dict)
+                ext.tools_used.append(item.name)
+                pad.log_tool_call(item.name, args_dict)
 
                 # Extract tickers from params
                 for k in ("ticker", "tickers"):
@@ -191,8 +196,10 @@ def _extract_tool_info(
                 item_type is None and hasattr(item, "output")
             ):
                 # Tool result item — match by call_id, fallback to positional
-                output_str = str(item.output) if item.output else ""
+                output = check_output_value(item.output)
+                output_str = output if isinstance(output, str) else json.dumps(output, ensure_ascii=False)
                 result_call_id = getattr(item, "call_id", None)
+                check_output_value(result_call_id)
                 target_idx = call_id_map.get(result_call_id) if result_call_id else None
                 if target_idx is not None:
                     target_detail = ext.tool_calls_detail[target_idx]
@@ -231,7 +238,7 @@ def _extract_tool_info(
                         )
                     except Exception as exc:
                         logger.warning(
-                            "Replay capture record_tool_call failed: %s", exc,
+                            "Replay capture record_tool_call failed: %s", sanitize_runtime_error(exc),
                         )
 
     if unmatched_results:
@@ -333,6 +340,7 @@ def _build_agent(
 
     from src.auth_drivers.live_resolver import live_openai_async_client
     client = live_openai_async_client()
+    register_output_api_key(client)
 
     # Build full tool list including any hosted server tools (single
     # wiring point — see ``_build_openai_all_tools`` docstring).
@@ -364,6 +372,21 @@ def _agent_error_detail(agent, error) -> str:
 
 
 async def run_query(
+    question: str,
+    model: Optional[str] = None,
+    dal: Optional[Any] = None,
+    reasoning_effort: Optional[ReasoningEffort] = None,
+    max_tool_calls: Optional[int] = None,
+    personalization_context: str = "",
+) -> Dict[str, Any]:
+    with output_scope(inherit=True):
+        return await _run_query(
+            question, model=model, dal=dal, reasoning_effort=reasoning_effort,
+            max_tool_calls=max_tool_calls, personalization_context=personalization_context,
+        )
+
+
+async def _run_query(
     question: str,
     model: Optional[str] = None,
     dal: Optional[Any] = None,
@@ -490,7 +513,7 @@ async def run_query(
         ext = _extract_tool_info(result, pad, tracker, model_name, capture=capture)
         tools_used = ext.tools_used
 
-        answer = str(result.final_output) if result.final_output else ""
+        answer = protect_output_text(result.final_output if result.final_output is not None else "")
         logger.debug("Extraction done: %d unique tools, tokens=%s", len(set(tools_used)), tracker.summary())
         pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
@@ -534,6 +557,7 @@ def _compose_stream_input(history: list, question: str):
     return [*history, {"role": "user", "content": question}] if history else question
 
 
+@protect_event_stream
 async def run_query_stream(
     question: str,
     model: Optional[str] = None,
@@ -677,7 +701,7 @@ async def run_query_stream(
         for detail in ext.tool_calls_detail:
             yield AgentEvent(EventType.tool_end, {"tool": detail["name"]})
 
-        answer = str(result.final_output) if result.final_output else ""
+        answer = protect_output_text(result.final_output if result.final_output is not None else "")
         logger.debug("Extraction done: %d unique tools, tokens=%s", len(set(tools_used)), tracker.summary())
         pad.log_final_answer(answer, token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
@@ -713,6 +737,8 @@ async def run_query_stream(
             "error": f"{type(exc).__name__}: {detail}"[:500],
             "scratchpad": str(pad.filepath) if pad.filepath else None,
         })
+    finally:
+        pad.close()
 
 
 # ── Freshness prompt helper ──────────────────────────────────

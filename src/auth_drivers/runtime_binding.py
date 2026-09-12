@@ -11,6 +11,7 @@ from typing import Any
 
 from src.auth_drivers.probe_harness import redact
 from src.model_credentials import CredentialStore
+from src.agents.shared.output_boundary import OutputBoundaryError, OutputGuard, current_output_guard
 
 
 class RuntimeAuthUnavailable(ValueError):
@@ -95,6 +96,14 @@ class RuntimeAuthBinding:
 _CURRENT: ContextVar[RuntimeAuthBinding | None] = ContextVar("runtime_auth", default=None)
 
 
+def register_output_api_key(client) -> None:
+    """Remember only the already-selected client's concrete key, never resolve auth."""
+    guard = current_output_guard()
+    key = getattr(client, "api_key", None)
+    if guard is not None and type(key) is str:
+        guard.add_secret(key)
+
+
 def sanitize_runtime_error(
     value: Any, *, binding: RuntimeAuthBinding | None = None, api_key: str | None = None,
 ) -> str:
@@ -108,9 +117,14 @@ def sanitize_runtime_error(
         detail = value if isinstance(value, str) else str(value) if value is not None else ""
     except Exception:
         return "unavailable error detail"
-    for secret in (binding._api_key if binding is not None else None, api_key):
-        if isinstance(secret, str) and secret:
-            detail = detail.replace(secret, "[REDACTED]")
+    guard = current_output_guard() or OutputGuard()
+    try:
+        for secret in (binding._api_key if binding is not None else None, api_key):
+            if type(secret) is str and secret:
+                guard.add_secret(secret)
+        detail = guard.prose(detail)
+    except OutputBoundaryError as exc:
+        return exc.code
     return redact(detail)[:500]
 
 
@@ -126,6 +140,9 @@ def activate_runtime_auth(binding: RuntimeAuthBinding):
     """Activate across client construction AND async iteration; resets on exit."""
     if not isinstance(binding, RuntimeAuthBinding):
         raise RuntimeAuthUnavailable("runtime_auth_binding_missing")
+    guard = current_output_guard()
+    if guard is not None and binding.auth_mode == "api_key":
+        guard.add_secret(binding._api_key)
     token = _CURRENT.set(binding)
     try:
         yield binding

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+from contextvars import copy_context
 import json
 import logging
 from datetime import datetime, timezone
@@ -27,6 +28,8 @@ from typing import Any, AsyncIterator, Optional
 
 from src.agents.shared.compressor.reducers import get_reducer
 from src.agents.shared.events import AgentEvent, EventType
+from src.agents.shared.output_boundary import remember_output_secret
+from src.agents.shared.output_events import check_output_value, protect_events
 # MissingCredentialError raise removed (S3 D4): early exits yield classified error events.
 from src.auth_drivers.protocol import LLMRequest, LLMResponse, TokenUsage
 from src.model_credentials import DiscoveredModel, ModelDiscoveryResult, ModelTestResult, _seed_models
@@ -111,11 +114,9 @@ def _err(exc: BaseException) -> str:
 
 
 def _redact_token(text: Any, token: Optional[str]) -> str:
-    if not isinstance(text, str):
-        text = "" if text is None else str(text)
-    if token and token in text:
-        text = text.replace(token, "[REDACTED]")
-    return redact(text)
+    from src.auth_drivers.runtime_binding import sanitize_runtime_error
+
+    return sanitize_runtime_error(text, api_key=token)
 
 
 def _int_token(value: Any) -> int:
@@ -454,7 +455,7 @@ class OpenAIChatGPTOAuthDriver:
         return LLMResponse(text=text, usage=usage)
 
     def stream_llm(self, request: Any):
-        return self._managed_stream(request)
+        return protect_events(self._managed_stream(request))
 
     async def _managed_stream(self, request: LLMRequest) -> AsyncIterator[AgentEvent]:
         clients: list[Any] = []
@@ -484,6 +485,9 @@ class OpenAIChatGPTOAuthDriver:
             tool_def = self._registry.get(name) if self._registry is not None else None
             if tool_def is None:
                 return False, "invalid_value: tool is not registered"
+            from src.tools.result_policy import tool_output_guard
+
+            args = check_output_value(args, guard=tool_output_guard(token))
             fn = tool_def.function
             requires_dal = getattr(tool_def, "requires_dal", True)
 
@@ -494,7 +498,7 @@ class OpenAIChatGPTOAuthDriver:
                 loop = asyncio.get_running_loop()
                 pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="ark-openai-oauth")
                 try:
-                    return await loop.run_in_executor(pool, call)
+                    return await loop.run_in_executor(pool, copy_context().run, call)
                 finally:
                     pool.shutdown(wait=False, cancel_futures=True)
 
@@ -550,6 +554,7 @@ class OpenAIChatGPTOAuthDriver:
             yield AgentEvent(EventType.error, payload)
             return
 
+        remember_output_secret(token)
         client = _execution_client(token)
         if client_sink is not None:
             client_sink(client)
@@ -616,7 +621,7 @@ class OpenAIChatGPTOAuthDriver:
                         delta = raw.get("delta")
                         if isinstance(delta, str) and delta:
                             text_parts.append(delta)
-                            yield AgentEvent(EventType.text, {"content": _redact_token(delta, token)})
+                            yield AgentEvent(EventType.text, {"content": delta})
                     elif etype == "response.function_call_arguments.done":
                         call_id = raw.get("call_id") or raw.get("item_id") or current_call_id
                         args = raw.get("arguments")
@@ -641,6 +646,8 @@ class OpenAIChatGPTOAuthDriver:
                     "model": request.model,
                 })
                 return
+            except GeneratorExit:
+                raise
             except BaseException as exc:  # noqa: BLE001
                 payload = {
                     "error": _redact_token(str(exc), token)[:500],
@@ -662,10 +669,11 @@ class OpenAIChatGPTOAuthDriver:
                 for call in calls:
                     name = call["name"]
                     args = call["args"]
+                    check_output_value(call)
                     if name not in _RESEARCH_READONLY_TOOLS:
                         yield AgentEvent(EventType.error, {"error": f"tool '{name}' is not allowed (allowlist veto)", "provider": "openai", "model": request.model})
                         return
-                    yield AgentEvent(EventType.tool_start, {"tool": name, "input": _redact_jsonish(args, token)})
+                    yield AgentEvent(EventType.tool_start, {"tool": name, "input": args})
                     ok, result = await self._invoke_tool(name=name, args=args, token=token)
                     summary = result[:_SUMMARY_CAP]
                     yield AgentEvent(EventType.tool_end, {"tool": name, "summary": summary, "chars": len(result), "is_error": not ok})
@@ -686,7 +694,7 @@ class OpenAIChatGPTOAuthDriver:
 
             answer = _text_from_output_items(output_items) or "".join(text_parts)
             yield AgentEvent(EventType.done, {
-                "answer": _redact_token(answer, token),
+                "answer": answer,
                 "tools_used": sorted(set(used)),
                 "provider": "openai",
                 "model": request.model,
@@ -699,13 +707,3 @@ class OpenAIChatGPTOAuthDriver:
             "provider": "openai",
             "model": request.model,
         })
-
-
-def _redact_jsonish(obj: Any, token: Optional[str]) -> Any:
-    if isinstance(obj, dict):
-        return {k: _redact_jsonish(v, token) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_redact_jsonish(v, token) for v in obj]
-    if isinstance(obj, str):
-        return _redact_token(obj, token)
-    return obj

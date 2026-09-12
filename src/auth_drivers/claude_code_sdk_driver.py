@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+from contextvars import copy_context
 import hashlib
 import json
 import logging
@@ -69,7 +70,7 @@ from src.auth_drivers.oauth_status import (
     OAuthRateLimitWindow,
     OAuthUsageSummary,
 )
-from src.auth_drivers.probe_harness import redact as _regex_redact
+from src.agents.shared.output_boundary import OutputBoundaryError
 from src.auth_drivers.protocol import LLMRequest
 from src.model_credentials import ModelDiscoveryResult, ModelTestResult, _seed_models
 
@@ -139,8 +140,7 @@ _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
 
 
 # ===========================================================================
-# Redaction (§4 §b — load-bearing). Exact-token scrub FIRST, then the project
-# fail-closed regex. Applied to args, results, AND errors.
+# Diagnostics retain exact-secret projection followed by the bounded heuristic.
 # ===========================================================================
 def _redact_bridge(text: Any, token: Optional[str]) -> str:
     """Scrub the live OAuth token (exact) then any token/secret/PII shape (regex).
@@ -148,12 +148,9 @@ def _redact_bridge(text: Any, token: Optional[str]) -> str:
     Order matters: the exact-token replace guarantees *this* token is gone with
     zero false positives; the regex is the safety net for unknown secrets.
     """
-    if not isinstance(text, str):
-        # _regex_redact reduces non-strings to a type name; coerce defensively.
-        text = "" if text is None else str(text)
-    if token and token in text:
-        text = text.replace(token, "[REDACTED]")
-    return _regex_redact(text)
+    from src.auth_drivers.runtime_binding import sanitize_runtime_error
+
+    return sanitize_runtime_error(text, api_key=token)
 
 
 def _int_token(value: Any) -> int:
@@ -207,28 +204,6 @@ def _result_token_usage(msg: ResultMessage) -> dict[str, Any]:
     return token_usage
 
 
-def _scrub_token(text: Any, token: Optional[str]) -> str:
-    """Exact-token scrub ONLY (zero false positives) — for model-authored prose
-    (intermediate text / thinking / the final answer) where the heavier
-    fail-closed regex would over-redact legitimate output. Guarantees the OAuth
-    token is gone without mangling a base64 chart or a CUSIP in the answer.
-    """
-    if not isinstance(text, str):
-        text = "" if text is None else str(text)
-    return text.replace(token, "[REDACTED]") if (token and token in text) else text
-
-
-def _redact_bridge_dict(obj: Any, token: Optional[str]) -> Any:
-    """Recursively redact string values in a dict/list (for tool-arg echoes)."""
-    if isinstance(obj, dict):
-        return {k: _redact_bridge_dict(v, token) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_redact_bridge_dict(v, token) for v in obj]
-    if isinstance(obj, str):
-        return _redact_bridge(obj, token)
-    return obj
-
-
 # ===========================================================================
 # ToolRegistry → SDK-tool BRIDGE (§4)
 # ===========================================================================
@@ -270,6 +245,10 @@ async def _invoke_bridged_tool(
                 "is_error": True,
             }
 
+        from src.agents.shared.output_events import check_output_value
+        from src.tools.result_policy import tool_output_guard
+
+        args = check_output_value(args, guard=tool_output_guard(token))
         fn = tool_def.function
         requires_dal = getattr(tool_def, "requires_dal", True)
 
@@ -289,7 +268,7 @@ async def _invoke_bridged_tool(
             loop = asyncio.get_running_loop()
             pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="ark-bridge")
             try:
-                return await loop.run_in_executor(pool, call)
+                return await loop.run_in_executor(pool, copy_context().run, call)
             finally:
                 pool.shutdown(wait=False, cancel_futures=True)
 
@@ -496,7 +475,9 @@ class AnthropicClaudeCodeSdkDriver:
     def stream_llm(self, request: LLMRequest) -> AsyncIterator[AgentEvent]:
         # sync def returning an async generator (per the AuthDriver contract —
         # do NOT await this; ``async for`` over it).
-        return self._stream(request)
+        from src.agents.shared.output_events import protect_events
+
+        return protect_events(self._stream(request))
 
     def _build_options(
         self,
@@ -548,6 +529,10 @@ class AnthropicClaudeCodeSdkDriver:
             raise MissingCredentialError(
                 "no Claude setup-token stored for this credential -- import it in Settings"
             )
+
+        from src.agents.shared.output_boundary import remember_output_secret
+
+        remember_output_secret(token)
 
         server, _sdk_tools = build_ark_mcp_server(
             registry=self._registry, dal=self._dal, token=token,
@@ -632,6 +617,8 @@ class AnthropicClaudeCodeSdkDriver:
                     "malformed; refusing to continue the model call."
                 )
                 yield _err(request, message, code="provider_call_failed")
+        except OutputBoundaryError as exc:
+            yield _err(request, exc.code, code="provider_call_failed")
         finally:
             # cancel / GeneratorExit / any exit -> tear down the SDK session FIRST
             # (the subprocess uses CLAUDE_CONFIG_DIR), then remove the per-call temp
@@ -656,25 +643,28 @@ class AnthropicClaudeCodeSdkDriver:
         if isinstance(msg, AssistantMessage):
             for block in msg.content or []:
                 if isinstance(block, TextBlock):
-                    txt = (block.text or "").strip()
+                    txt = block.text or ""
                     if txt:
-                        # Intermediate model prose: exact-token scrub (a model that
-                        # echoes the token into text would otherwise leak it via
-                        # this event — hard security rule, never in any event).
-                        # Token-only (not the full regex) to avoid mangling prose.
-                        out.append(AgentEvent(EventType.text, {"content": _scrub_token(txt, token)}))
+                        out.append(AgentEvent(EventType.text, {"content": txt}))
                 elif isinstance(block, ThinkingBlock):
                     out.append(
-                        AgentEvent(EventType.thinking_content, {"thinking": _scrub_token(block.thinking, token)})
+                        AgentEvent(EventType.thinking_content, {"thinking": block.thinking})
                     )
                 elif isinstance(block, (ToolUseBlock, ServerToolUseBlock)):
+                    from src.agents.shared.output_events import check_output_value
+                    from src.tools.result_policy import tool_output_guard
+
+                    check_output_value(
+                        {"tool": block.name, "input": block.input, "call_id": block.id},
+                        guard=tool_output_guard(token),
+                    )
                     name = block.name or "tool"
                     if getattr(block, "id", None):
                         tool_names[block.id] = name
                     out.append(
                         AgentEvent(
                             EventType.tool_start,
-                            {"tool": name, "input": _redact_bridge_dict(block.input or {}, token)},
+                            {"tool": name, "input": block.input or {}},
                         )
                     )
                 elif isinstance(block, ServerToolResultBlock):
@@ -716,7 +706,7 @@ class AnthropicClaudeCodeSdkDriver:
                 AgentEvent(
                     EventType.done,
                     {
-                        "answer": _scrub_token(msg.result or "", token),
+                        "answer": msg.result or "",
                         "tools_used": sorted(set(tool_names.values())),
                         "provider": "anthropic",
                         "model": request.model,
@@ -816,10 +806,17 @@ class AnthropicClaudeCodeSdkDriver:
         tool_names: dict[str, str],
     ) -> AgentEvent:
         name = tool_names.get(tool_use_id, "tool")
-        as_str = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False, default=str)
-        # size FIRST then redact the preview (redacting then sizing risks the
-        # marker splitting a [REDACTED]).
-        preview = _redact_bridge(as_str[:_SUMMARY_CAP], token)
+        from src.agents.shared.output_events import check_output_value
+        from src.tools.result_policy import tool_output_guard
+
+        guard = tool_output_guard(token)
+        check_output_value({"tool": name, "call_id": tool_use_id}, guard=guard)
+        if is_error:
+            as_str = _redact_bridge(content, token)
+        else:
+            admitted = check_output_value(content, guard=guard)
+            as_str = admitted if isinstance(admitted, str) else json.dumps(admitted, ensure_ascii=False)
+        preview = as_str[:_SUMMARY_CAP]
         data = {"tool": name, "summary": preview, "chars": len(as_str)}
         if is_error is not None:
             data["is_error"] = bool(is_error)
