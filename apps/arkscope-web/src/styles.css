@@ -947,23 +947,6 @@ table.wl tbody tr.archived td {
 }
 
 /* ---- Settings: model routing ---- */
-.page-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-.page-head h1 {
-  margin: 0;
-  font-size: 24px;
-}
-.page-head-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  flex-shrink: 0;
-}
 .eyebrow,
 .label {
   margin: 0;
@@ -1400,12 +1383,6 @@ table.wl tbody tr.archived td {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-  }
-  .page-head {
-    flex-direction: column;
-  }
-  .page-head-actions {
-    width: 100%;
   }
   .settings-grid {
     grid-template-columns: minmax(0, 1fr);
