@@ -13,6 +13,7 @@ provider/session behavior or translate upstream exceptions into public errors.
 
 from __future__ import annotations
 
+import asyncio
 from collections import deque
 from collections.abc import AsyncIterator
 from functools import wraps
@@ -167,11 +168,31 @@ class ProtectedEventStream(AsyncIterator[AgentEvent]):
         if self._closed:
             return
         self._closed = True
-        upstream, self._upstream = self._upstream, None
-        close = getattr(upstream, "aclose", None)
-        if close is not None:
-            with activate_output_guard(self._guard):
-                await close()
+        try:
+            close = getattr(self._upstream, "aclose", None)
+            if close is not None:
+                async def close_with_guard():
+                    with activate_output_guard(self._guard):
+                        await close()
+
+                closing = asyncio.create_task(close_with_guard())
+                try:
+                    await asyncio.shield(closing)
+                except asyncio.CancelledError:
+                    # Own this same finalizer until it settles, including after
+                    # repeated cancellation; never detach it or retry aclose.
+                    while not closing.done():
+                        try:
+                            await asyncio.shield(closing)
+                        except asyncio.CancelledError:
+                            pass
+                        except BaseException:
+                            break
+                    if not closing.cancelled():
+                        closing.exception()
+                    raise
+        finally:
+            self._upstream = None
 
     def _abort_channels(self) -> None:
         for stream in self._streams.values():

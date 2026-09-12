@@ -385,6 +385,92 @@ def test_oauth_terminal_releases_client_or_config_before_consumer_resumes(make_p
     asyncio.run(drive())
 
 
+@pytest.mark.parametrize("cancellations", [0, 1, 2], ids=["normal-close", "cancel-during-close", "cancel-again-during-close"])
+def test_chatgpt_terminal_cleanup_is_owned_until_settled(make_producer, monkeypatch, cancellations):
+    from src.auth_drivers import chatgpt_oauth_driver as driver_module
+
+    producer = make_producer("chatgpt", chunks=[SECRET[:3]], answer="Public answer")
+    execution_client = driver_module._execution_client
+    observed, close_guards = [], []
+
+    async def drive():
+        entered, release = asyncio.Event(), asyncio.Event()
+        original_closes = []
+
+        def client_factory(token):
+            client = execution_client(token)
+            close = client.close
+            original_closes.append(close)
+
+            async def delayed_close():
+                close_guards.append(("start", current_output_guard()))
+                entered.set()
+                await release.wait()
+                await close()
+                close_guards.append(("finish", current_output_guard()))
+
+            client.close = delayed_close
+            return client
+
+        monkeypatch.setattr(driver_module, "_execution_client", client_factory)
+        stream = producer.stream()
+        with output_scope("consumer-only-key") as consumer_guard:
+            async def consume():
+                try:
+                    async for event in stream:
+                        assert current_output_guard() is consumer_guard
+                        observed.append(event)
+                finally:
+                    assert current_output_guard() is consumer_guard
+                    await stream.aclose()
+                    assert current_output_guard() is consumer_guard
+
+            consumer = asyncio.create_task(consume())
+            try:
+                await asyncio.wait_for(entered.wait(), timeout=2)
+                assert not producer.closed
+                assert current_output_guard() is consumer_guard
+                with pytest.raises(RuntimeError, match="^event_stream_busy$"):
+                    await anext(stream)
+                with pytest.raises(RuntimeError, match="^event_stream_busy$"):
+                    await stream.aclose()
+                for _ in range(cancellations):
+                    consumer.cancel()
+                    await asyncio.sleep(0)
+                    assert not consumer.done(), "cancellation returned before in-flight cleanup settled"
+                    with pytest.raises(RuntimeError, match="^event_stream_busy$"):
+                        await stream.aclose()
+                release.set()
+                outcome = await asyncio.wait_for(asyncio.gather(consumer, return_exceptions=True), timeout=2)
+                if cancellations:
+                    assert isinstance(outcome[0], asyncio.CancelledError)
+                    assert event_text(observed) == "", "cancellation flushed a pending credential prefix"
+                    assert not any(event.type in (EventType.done, EventType.error) for event in observed)
+                else:
+                    assert outcome == [None]
+                    assert event_text(observed) == SECRET[:3]
+                    assert terminal(observed)["answer"] == "Public answer"
+                assert producer.closed
+                assert close_guards == [("start", stream.guard), ("finish", stream.guard)]
+                assert len(original_closes) == 1
+                await stream.aclose()
+                with pytest.raises(StopAsyncIteration):
+                    await anext(stream)
+                assert current_output_guard() is consumer_guard
+            finally:
+                release.set()
+                if not consumer.done():
+                    consumer.cancel()
+                await asyncio.gather(consumer, return_exceptions=True)
+                await stream.aclose()
+                if not producer.closed:
+                    for close in original_closes:
+                        await close()
+
+    asyncio.run(drive())
+    assert current_output_guard() is None
+
+
 @pytest.mark.parametrize("channel", ["chatgpt", "claude"])
 def test_actual_oauth_cancel_drops_pending_prefix_and_cleans_up(make_producer, channel):
     observed = []

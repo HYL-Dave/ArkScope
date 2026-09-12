@@ -360,6 +360,42 @@ def test_refreshed_bearer_is_registered_before_chatgpt_response_consumption(make
     assert producer.closed
 
 
+def test_chatgpt_cleanup_failure_logs_no_raw_exception_and_preserves_answer(make_producer, monkeypatch, caplog):
+    from src.auth_drivers import chatgpt_oauth_driver as driver_module
+
+    producer = make_producer("chatgpt", answer="Public answer")
+    execution_client = driver_module._execution_client
+    close_guards = []
+
+    def client_factory(token):
+        client = execution_client(token)
+        close = client.close
+
+        async def failed_close():
+            close_guards.append(current_output_guard())
+            await close()
+            raise RuntimeError("synthetic cleanup error: " + SECRET)
+
+        client.close = failed_close
+        return client
+
+    monkeypatch.setattr(driver_module, "_execution_client", client_factory)
+    stream = producer.stream()
+    with caplog.at_level("WARNING", logger=driver_module.__name__):
+        events = asyncio.run(collect(stream))
+    assert terminal(events)["answer"] == "Public answer"
+    assert producer.closed
+    assert close_guards == [stream.guard]
+    assert current_output_guard() is None
+    assert SECRET not in caplog.text
+    assert SECRET_JSON not in caplog.text
+    records = [record for record in caplog.records if record.name == driver_module.__name__]
+    assert len(records) == 1
+    assert records[0].getMessage() == "failed to close ChatGPT OAuth execution client"
+    assert records[0].exc_info is None
+    assert records[0].exc_text is None
+
+
 @pytest.mark.parametrize("channel", ["openai", "anthropic"])
 def test_native_final_is_protected_before_real_scratchpad_and_replay(make_producer, isolated, monkeypatch, channel):
     monkeypatch.setenv("ARKSCOPE_REPLAY_CAPTURE", "1")

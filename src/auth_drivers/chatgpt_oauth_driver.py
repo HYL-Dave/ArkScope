@@ -209,7 +209,7 @@ async def _close_execution_client(client: Any) -> None:
     try:
         await _maybe_await(close())
     except Exception:  # noqa: BLE001 - cleanup must not replace the provider result
-        logger.warning("failed to close ChatGPT OAuth execution client", exc_info=True)
+        logger.warning("failed to close ChatGPT OAuth execution client")
 
 
 def _response_output_items(response: Any) -> list[dict]:
