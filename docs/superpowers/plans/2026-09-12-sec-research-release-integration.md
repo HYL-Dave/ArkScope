@@ -10,8 +10,8 @@ that service. Persist exact references before admitting maintenance operations.
 **Tech Stack:** Python/SQLite/FastAPI, existing SEC transports, React/TypeScript.
 **Spec:** `docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md`.
 
-Status: Tasks1/4 reviewed complete; Task2 integrating on the approved shared
-output boundary. Its former SEC-specific redaction proposal is superseded, not
+Status: Tasks1/2/4 reviewed complete; Task2 uses the approved shared output
+boundary. Its former SEC-specific redaction proposal is superseded, not
 an outstanding authorization request. Source checkpoint `ba4f2619` is preserved;
 integration proceeds on `codex/sec-research-integration` from security `41682675`.
 See [integration evidence](../evidence/2026-09-12-sec-integration/README.md).
@@ -106,9 +106,13 @@ intact, and no source implementation remains solely in an untracked checkpoint.
 The remaining release work is still Tasks3/5/6/7/8. In particular, persistent
 Research references, portable export/restore, orphan cleanup, schema recovery
 and the new default-disabled schedule are not completed by the tool/parser work.
-No final full-suite run, production change, merge or push has occurred in this
-integration checkpoint. The separate wider repository cleanup and SQLite upgrade
-are not represented as finished.
+The integration checkpoint passed a fresh complete backend run at `ae2055e3`:
+10279 passed/12 unchanged skips, exactly10291 collected/executed,123 added and10
+removed against the security base. The first complete attempt's two stale-count
+failures and their RED-first correction remain in evidence. Frontend1776 passed
+and typecheck passed. This verifies completed changes, not unfinished release
+Tasks3/5/6/7. No production change, merge or push occurred. Wider repository
+cleanup and production SQLite upgrade are not represented as finished.
 
 ## Verification Commands
 

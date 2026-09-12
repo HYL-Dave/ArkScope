@@ -1,0 +1,36 @@
+{
+  "name": "c10-impl-baseline-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+    "-q",
+    "tests/test_data_access.py",
+    "tests/test_eir006_retired_data_boundaries.py",
+    "tests/test_sqlite_backend.py",
+    "tests/test_detailed_financials.py",
+    "tests/test_stored_sec_projection.py",
+    "tests/test_fundamentals_sec_cache.py",
+    "tests/test_active_universe.py",
+    "tests/test_sa_local_readers.py",
+    "tests/test_security_lifecycle_terminal_workflow.py",
+    "tests/test_sa_capture_backend.py",
+    "tests/test_sa_reconciliation_native_host.py",
+    "tests/test_sa_article_reconciliation_backend.py",
+    "tests/test_sa_tools.py",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/c10-impl-baseline-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 13.639,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/c10-impl-baseline-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/c10-impl-baseline-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/c10-impl-baseline-01/output.log"
+}

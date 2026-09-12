@@ -1,0 +1,26 @@
+{
+  "name": "c09-resume-baseline-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+    "-q",
+    "tests/test_abandoned_surface_cleanup.py::test_data_source_package_has_no_abandoned_exports",
+    "tests/test_abandoned_surface_cleanup.py::test_data_source_package_preserves_current_exports",
+    "tests/test_data_provider_config.py::test_polygon_data_source_constructors_prefer_massive_then_legacy",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/c09-resume-baseline-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 0.903,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/c09-resume-baseline-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/c09-resume-baseline-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/c09-resume-baseline-01/output.log"
+}

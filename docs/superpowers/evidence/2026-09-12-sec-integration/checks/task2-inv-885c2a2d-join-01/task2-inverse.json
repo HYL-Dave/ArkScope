@@ -1,0 +1,152 @@
+{
+  "mode": "omit-worker-join",
+  "exit_code": 1,
+  "collected": [
+    "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[cancel]",
+    "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[timeout]",
+    "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[cancel]",
+    "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[timeout]",
+    "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[repeat_cancel]"
+  ],
+  "items": [
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[cancel]",
+      "mode": "omit-worker-join",
+      "injected": true,
+      "owned_pools_reaped": 1,
+      "owned_threads_reaped": 1,
+      "owned_threads_alive": 0,
+      "restored_attributes": 2,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[timeout]",
+      "mode": "omit-worker-join",
+      "injected": true,
+      "owned_pools_reaped": 1,
+      "owned_threads_reaped": 1,
+      "owned_threads_alive": 0,
+      "restored_attributes": 2,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[cancel]",
+      "mode": "omit-worker-join",
+      "injected": true,
+      "owned_pools_reaped": 1,
+      "owned_threads_reaped": 1,
+      "owned_threads_alive": 0,
+      "restored_attributes": 2,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[timeout]",
+      "mode": "omit-worker-join",
+      "injected": true,
+      "owned_pools_reaped": 1,
+      "owned_threads_reaped": 1,
+      "owned_threads_alive": 0,
+      "restored_attributes": 2,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[repeat_cancel]",
+      "mode": "omit-worker-join",
+      "injected": true,
+      "owned_pools_reaped": 1,
+      "owned_threads_reaped": 1,
+      "owned_threads_alive": 0,
+      "restored_attributes": 2,
+      "restored": true
+    }
+  ],
+  "reports": [
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[cancel]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[cancel]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:104: in test_sec_cancel_awaits_worker_and_prevents_later_dispatch\n    asyncio.run(run())\n/usr/lib/python3.10/asyncio/runners.py:44: in run\n    return loop.run_until_complete(main)\n/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete\n    return future.result()\ntests/test_sec_research_tool_results.py:99: in run\n    assert finished.is_set(), \"SEC returned before its owned worker completed\"\nE   AssertionError: SEC returned before its owned worker completed\nE   assert False\nE    +  where False = is_set()\nE    +    where is_set = <threading.Event object at 0x7ac4b35cb9a0>.is_set"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[cancel]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[timeout]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[timeout]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:104: in test_sec_cancel_awaits_worker_and_prevents_later_dispatch\n    asyncio.run(run())\n/usr/lib/python3.10/asyncio/runners.py:44: in run\n    return loop.run_until_complete(main)\n/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete\n    return future.result()\ntests/test_sec_research_tool_results.py:99: in run\n    assert finished.is_set(), \"SEC returned before its owned worker completed\"\nE   AssertionError: SEC returned before its owned worker completed\nE   assert False\nE    +  where False = is_set()\nE    +    where is_set = <threading.Event object at 0x7ac4ae37a920>.is_set"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_awaits_worker_and_prevents_later_dispatch[timeout]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[cancel]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[cancel]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:182: in test_sec_cancel_stops_actual_document_reader_before_next_source\n    asyncio.run(run())\n/usr/lib/python3.10/asyncio/runners.py:44: in run\n    return loop.run_until_complete(main)\n/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete\n    return future.result()\ntests/test_sec_research_tool_results.py:180: in run\n    assert finished.is_set(), \"returned before document worker completed\"\nE   AssertionError: returned before document worker completed\nE   assert False\nE    +  where False = is_set()\nE    +    where is_set = <threading.Event object at 0x7ac4ae3b77c0>.is_set"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[cancel]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[timeout]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[timeout]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:182: in test_sec_cancel_stops_actual_document_reader_before_next_source\n    asyncio.run(run())\n/usr/lib/python3.10/asyncio/runners.py:44: in run\n    return loop.run_until_complete(main)\n/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete\n    return future.result()\ntests/test_sec_research_tool_results.py:180: in run\n    assert finished.is_set(), \"returned before document worker completed\"\nE   AssertionError: returned before document worker completed\nE   assert False\nE    +  where False = is_set()\nE    +    where is_set = <threading.Event object at 0x7ac4bbe80340>.is_set"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[timeout]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[repeat_cancel]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[repeat_cancel]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:182: in test_sec_cancel_stops_actual_document_reader_before_next_source\n    asyncio.run(run())\n/usr/lib/python3.10/asyncio/runners.py:44: in run\n    return loop.run_until_complete(main)\n/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete\n    return future.result()\ntests/test_sec_research_tool_results.py:180: in run\n    assert finished.is_set(), \"returned before document worker completed\"\nE   AssertionError: returned before document worker completed\nE   assert False\nE    +  where False = is_set()\nE    +    where is_set = <threading.Event object at 0x7ac4ae31c670>.is_set"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_cancel_stops_actual_document_reader_before_next_source[repeat_cancel]",
+      "when": "teardown",
+      "outcome": "passed"
+    }
+  ],
+  "pytest_main_restored": true,
+  "all_items_restored": true,
+  "all_collected_called": true,
+  "remaining_patches": 0,
+  "remaining_pools": 0,
+  "call_failures": 5,
+  "skipped_reports": 0
+}

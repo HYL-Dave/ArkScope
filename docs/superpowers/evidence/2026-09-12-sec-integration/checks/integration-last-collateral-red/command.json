@@ -1,0 +1,25 @@
+{
+  "name": "integration-last-collateral-red",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+    "-q",
+    "tests/test_security_lifecycle_routes.py::test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes",
+    "tests/test_security_lifecycle_tools.py::test_lifecycle_tools_are_in_both_research_driver_allowlists",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/integration-last-collateral-red/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 4.829,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/integration-last-collateral-red",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/integration-last-collateral-red/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/integration-last-collateral-red/output.log"
+}

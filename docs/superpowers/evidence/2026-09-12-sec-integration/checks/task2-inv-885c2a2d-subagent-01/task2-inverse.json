@@ -1,0 +1,200 @@
+{
+  "mode": "omit-subagent-guard",
+  "exit_code": 1,
+  "collected": [
+    "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[openai]",
+    "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[anthropic]",
+    "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[openai]",
+    "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[anthropic]",
+    "tests/test_subagent.py::test_all_subagent_tool_names_exist_in_registry",
+    "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[openai]",
+    "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[anthropic]"
+  ],
+  "items": [
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[openai]",
+      "mode": "omit-subagent-guard",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[anthropic]",
+      "mode": "omit-subagent-guard",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[openai]",
+      "mode": "omit-subagent-guard",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[anthropic]",
+      "mode": "omit-subagent-guard",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_all_subagent_tool_names_exist_in_registry",
+      "mode": "omit-subagent-guard",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[openai]",
+      "mode": "omit-subagent-guard",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[anthropic]",
+      "mode": "omit-subagent-guard",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    }
+  ],
+  "reports": [
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[openai]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[openai]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_adapters.py:111: in test_required_sec_omission_is_explicit\n    with pytest.raises(ValueError, match=\"required.*SEC|SEC.*required\"):\nE   Failed: DID NOT RAISE <class 'ValueError'>"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[openai]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[anthropic]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[anthropic]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit[anthropic]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[openai]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[openai]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[openai]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[anthropic]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[anthropic]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics[anthropic]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_all_subagent_tool_names_exist_in_registry",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_all_subagent_tool_names_exist_in_registry",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_all_subagent_tool_names_exist_in_registry",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[openai]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[openai]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[openai]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[anthropic]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[anthropic]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory[anthropic]",
+      "when": "teardown",
+      "outcome": "passed"
+    }
+  ],
+  "pytest_main_restored": true,
+  "all_items_restored": true,
+  "all_collected_called": true,
+  "remaining_patches": 0,
+  "remaining_pools": 0,
+  "call_failures": 1,
+  "skipped_reports": 0
+}

@@ -34,8 +34,19 @@ actual-store integrity assessment.
 
 ## Verification
 
-Commands/JUnit are in this plan's scratch workspace:
-`.superpowers/sdd/2026-09-12-sec-research-release-integration/`.
+Commands/JUnit, review reports, source snapshots and the exact local harness are
+sealed under [checks/manifest.json](checks/manifest.json). The
+[final reconciliation](checks/integration-validation.json) checks actual test
+identities and source/runtime stability; [run-accounting.json](checks/run-accounting.json)
+records each of the65 completed run receipts separately, including32 nonzero
+RED, inverse, intermediate-failure, invocation-error and census results.
+No run receipt is unfinished. The SQLite build has its own per-step receipts.
+Original scratch location and command paths remain provenance:
+`.superpowers/sdd/2026-09-12-sec-research-release-integration/`. Restage the
+archived harness into that layout to rerun it with fresh create-only run names;
+do not execute the copied scripts from their evidence directory or overwrite
+historical receipts. Fixture databases, HOME trees and compiled artifacts are
+not included in the archive.
 The copied offline runner uses disposable stores and a closed environment. Its
 Python audit hook blocks production paths/providers but is not an OS sandbox.
 
@@ -54,9 +65,14 @@ Python audit hook blocks production paths/providers but is not an OS sandbox.
 | backend-full-final | 10277 passed / 2 failed / 12 skipped | First complete integration attempt; three stale count assertions in two previously unlisted lifecycle files |
 | integration-last-collateral-red | 2 failed | Both full-run failures independently reproduced before changes |
 | integration-last-collateral-green | 126 passed | Correct counts, exact retained routes/tools and old route/name absence; four whole affected test files |
+| backend-full-reconciled | **10279 passed / 12 skipped** | Fresh complete run on frozen `ae2055e3`; zero failures/errors/warnings, 10291 exact collected/executed nodes |
+| frontend-regression | **1776 passed / 123 files** | Full frontend regression; no later frontend source changes |
+| frontend-typecheck | exit 0 | Existing TypeScript check |
+| sqlite-application-stores | **330 passed** | Separate isolated SQLite3.53.4 candidate; not the runtime of the full backend run |
 
-Separate runs are not an additive total or a complete backend result. Successful
-runs contain no warnings. Unawaited-coroutine warnings remain in pre-fix evidence.
+Separate focused runs are not an additive total or a complete backend result.
+The final complete backend run contains no warnings. Unawaited-coroutine
+warnings remain in pre-fix evidence.
 The shared security inventory is additional count collateral: 56 tools comprise
 49 ordinary JSON, 3 closed SEC JSON and 4 text policies.
 
@@ -65,8 +81,17 @@ after removing GET /sec/{ticker}; both OAuth allowlists15->17 after one old tool
 is replaced with three. Required lifecycle entries remain, all three SEC names
 are required and the old route/name must be absent. The full-run failures were
 an integration inventory omission, not preexisting failures or a runner defect.
-A complete rerun `backend-full-reconciled` is in progress on frozen product/test
-source. The initial attempt is not combined with126P to claim a passing suite.
+A complete rerun `backend-full-reconciled` passed on frozen product/test source:
+10279P/12S in1386.65s (runner1390.703s). The initial attempt is not combined
+with126P to claim that result. There are123 added and10 removed test IDs against
+the sealed security run, no duplicate IDs and the same12 skip IDs. All retained
+credential/auth/tracing guards and new SEC regression suites ran without skips.
+The before/after snapshots agree on1130 source files, runner, packages and
+Python3.10.12/SQLite3.37.2. Source collection SHA-256:
+`4f41b72c83ff98606944bae71ca8b4a8ea1afe7df8700f28cc1137d62a55129d`.
+Eight removed IDs belong to the replaced old SEC catalog surfaces, one to the
+orphan FileBackend nominal interface test, and one to the renamed tool-count
+test. The exact IDs and all new-suite results are in the final reconciliation.
 
 Eight process-local Task2 inverses independently removed each transport entry,
 selected generic truncation, omitted worker join, removed the subagent guard,
@@ -118,8 +143,16 @@ Controller supplemental inverses used process-local injection, not on-disk
 mutations: restoring an obsolete export, removing a retained export, and forcing
 legacy-over-Massive key precedence each failed exactly its existing named owner.
 Receipts: `c09-inverse-export`, `c09-inverse-retained`, `c09-inverse-key` (one
-failure each); unmutated `c09-final-restore` returned 196 passed. The earlier
-worker's partial handoff is retained, not retrospectively described as completed.
+failure each); unmutated `c09-final-restore` returned 196 passed.
+
+Ledger correction at sealing: the worker's final `c09-report.md` also contains
+completed `c09-resume-*` inverses, not only its earlier partial handoff. Raw
+JUnit confirms three named1F inverses, their1P restorations and a196P final run.
+Those receipts predate the controller's process-local replications and both
+complete-backend runs; all possible mutated paths match the frozen source.
+The controller had misread the completion status, so its extra inverses are
+independent repeat checks, not completion of missing worker work. Both receipt
+sets are preserved and their pass totals must not be added together.
 C09 is accepted within this scope; it is not cleanup-wide completion.
 
 ## C10 Checkpoint
@@ -145,7 +178,8 @@ revised GREEN 350 passed / 1 skipped. Controller expanded regression:
 `fc3c4668..885c2a2d` found no issues and returned32 passed, including exact
 nonempty SQLite news/FTS/prices/cache, SA and routing controls. No provider or
 actual data was read. The complete rerun after the separate lifecycle count
-collateral correction is still running.
+collateral correction passed as recorded above; no C10 product change followed
+its independent review.
 
 ## Census Checkpoint
 
@@ -162,6 +196,23 @@ GET /sec/{ticker} candidate disappears; sec_research_tools is no longer
 test-only because it is now wired. Scanner exit2 remains honest review_required,
 not a zero-debt claim or a production-data deletion manifest.
 
+The delivery census at `6caed84e` independently repeats4345 candidates/3471
+uncertainties/1146 source files, zero new candidates/dependency/untracked drift
+and the same five deletions and34 AST-identical line moves. It observes211
+documentation files rather than210 at the earlier checkpoint. Subsequent
+sealing/status-document edits are not retroactively part of that observation.
+
+## SQLite And Deployment
+
+The [SQLite candidate report](sqlite-candidate.md) records the verified3.53.4
+source, actual mapped library, unchanged UPSERT reproducer and standalone plus
+application-store tests. It is not an installed upgrade: the App runtime remains
+3.37.2. Full production integrity assessment, WAL-consistent backup, coordinated
+runtime/launcher activation and rollback are still required before any stored
+schema disposition. Python3.13 is a separate numerical-dependency decision,
+not a prerequisite for SQLite-only preparation. No production database, private
+selector, running App, master branch or remote was changed in this batch.
+
 ## Next Bounded Cleanup
 
 [C11 news routing plan](../../plans/2026-09-13-news-routing-cleanup.md) is prepared,
@@ -170,3 +221,12 @@ does not select a writer but malformed values can still block collection, as
 well as hide current telemetry. Removing obsolete value validation must retain
 current normalized-setting/source-requirement validation. C12's real collector
 CLI consumers are deliberately not treated as unreachable modules.
+
+## Seal Readback
+
+Readback verified all328 manifest entries,187 compressed files and3,829,670
+stored bytes against both their source and stored SHA-256 values. No extra
+files, fixture stores/HOME trees or compiled binaries are admitted. All65 run
+receipts are complete and all ten final integration checks pass. Manifest
+SHA-256: `1e4ae0dcef2bc2b29b6c494fe7e21c8d8d54b943412a3186dc793b3ac325c112`.
+Later status documentation is outside the create-only checks archive.

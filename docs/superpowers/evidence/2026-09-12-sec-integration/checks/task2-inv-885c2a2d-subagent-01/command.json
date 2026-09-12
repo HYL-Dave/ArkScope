@@ -1,0 +1,28 @@
+{
+  "name": "task2-inv-885c2a2d-subagent-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task2_inverse.py",
+    "omit-subagent-guard",
+    "-q",
+    "tests/test_sec_research_tool_adapters.py::test_required_sec_omission_is_explicit",
+    "tests/test_sec_research_tool_adapters.py::test_non_sec_optional_omission_keeps_existing_semantics",
+    "tests/test_subagent.py::test_all_subagent_tool_names_exist_in_registry",
+    "tests/test_subagent.py::test_required_sec_tools_survive_actual_subagent_inventory",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task2-inv-885c2a2d-subagent-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 2.934,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task2-inv-885c2a2d-subagent-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task2-inv-885c2a2d-subagent-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task2-inv-885c2a2d-subagent-01/output.log"
+}

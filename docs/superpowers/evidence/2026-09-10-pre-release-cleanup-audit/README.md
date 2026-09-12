@@ -1,5 +1,13 @@
 # Pre-Release Abandoned-Surface Audit
 
+September13 continuation: [SEC integration and C03/C09/C10 cleanup](../2026-09-12-sec-integration/README.md)
+removes the old catalog tool/forwarders/empty HTTP route, unused standalone
+provider classes/factory and the orphan FileBackend. Fresh backend10279P/12S,
+frontend1776P and exact census deltas are recorded there. C11-C13, C15/C20,
+i18n/CSS/SQL scanner queues and actual data disposition remain open; C21 stays
+explicitly deferred. SQLite3.53.4 is an isolated verified candidate, not an
+installed runtime upgrade. The dated observations below are not rewritten.
+
 Observed: 2026-09-10. Source tree: `fef26dcf` on
 `codex/listing-sec-macro-convergence`; main worktree remains separate.
 Status updated September 11: **first leaf batch, bounded SEC intake/execution/UI,
@@ -53,6 +61,9 @@ C03/C09-C13 and data-disposition boundaries below still apply.
 | --- | --- | --- |
 | C01 | Company-event collector, scheduler registration and Settings source removed; current admission is unconditional; actual stored settings/schema disposition remains open | `06511f44` |
 | C02 | Dormant edgartools module physically deleted; active SEC clients retained | `300b7400` |
+| C03 | Old catalog tool and empty forwarders/HTTP route removed; three closed SEC tools use shared four-channel result admission | `3fef138d`, `88f0512e`, `5d979910`; [evidence](../2026-09-12-sec-integration/README.md) |
+| C09 | Unused standalone EODHD/Alpha Vantage/Finnhub source classes and unified factory deleted; live EODHD census/Settings, Finnhub news, Massive/EDGAR/IBKR retained | `f30ee8fc`; [evidence](../2026-09-12-sec-integration/README.md#c09-checkpoint) |
+| C10 | Entire orphan FileBackend and unused construction removed; current database/SA authorities and raw stored data retained | `885c2a2d`; [evidence](../2026-09-12-sec-integration/README.md#c10-checkpoint) |
 | C04 | Current execution owner and neutral codec extracted; old case-web execution/UI and five individually reviewed HTTP entries removed. Current shared history/confirmation readers and schema disposition remain | `83eeb5ef`, `302106d2`, `5d41f570`, `0c5896a5` |
 | C04 follow-up | Fixed two-call orchestrator physically deleted; current agent owns cancellable source reads and retains four-channel behavior. Shared journal readers/writers and disposition remain separate | `38319f16` |
 | C04 current journal | Old store/review/projection/schema/migration and orphan two-phase usage helpers removed; current review/history/source/usage owners transferred and verified. No actual-store disposal | `e2f77cb7`; [evidence](current-journal-cleanup/README.md) |

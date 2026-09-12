@@ -176,13 +176,19 @@ run() {
 environment, user Python site, curl config, or existing user HOME is used.
 Default cwd is `$R`; `--cwd "$S"` is explicit for configure/build/staging.
 
-The [complete evidence audit](../../../../.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/logs/evidence-audit.stdout)
+The [complete evidence audit](checks/sqlite-candidate/logs/evidence-audit.stdout.gz)
 contains the 28 preceding command receipts: exact argv, shell-quoted command,
 cwd, full allowlisted environment, UTC start, elapsed time, timeout setting,
 expected and actual exit, and SHA-256 of full stdout/stderr. Audit exited 0.
 Every receipt stream hash was read back and verified. The per-step raw files
 are `$R/logs/<label>.json`, `.stdout`, `.stderr`; console truncation does not
 truncate those files.
+
+These scripts and exact per-step streams are sealed in
+[checks/manifest.json](checks/manifest.json); command paths below are historical
+scratch provenance, not a claim that build binaries are committed. Application
+store checks are separately recorded in
+[their command receipt](checks/sqlite-application-stores/command.json).
 
 Core sequence actually executed, including retained failed commands:
 

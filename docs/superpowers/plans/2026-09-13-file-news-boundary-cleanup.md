@@ -81,6 +81,9 @@ DAL._base; it is not reported as a passing baseline.
 
 - [x] Preserve the implementation in a scoped commit.
 - [x] Independent C10 review: no findings,32 focused tests passed; all reviewer sessions ended.
-- [ ] Whole backend verification on frozen product/test source.
+- [x] Whole backend verification on frozen `ae2055e3`:10279P/12 unchanged S,
+  exactly10291 collected/executed and zero source/runtime/runner drift. The
+  earlier full run's two missed lifecycle-count assertions are corrected and
+  independently reviewed, not ignored or counted as preexisting failures.
 
 This is not C11 news-writer convergence, C12 collector CLI retirement, stored-data disposition or completion of SEC's remaining workflows.

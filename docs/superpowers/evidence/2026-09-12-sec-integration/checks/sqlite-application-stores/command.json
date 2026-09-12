@@ -1,0 +1,33 @@
+{
+  "name": "sqlite-application-stores",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite_pytest.py",
+    "-q",
+    "tests/test_sec_research_store.py",
+    "tests/test_sec_research_captures.py",
+    "tests/test_profile_state.py",
+    "tests/test_sa_capture_store.py",
+    "tests/test_news_normalized_schema.py",
+    "tests/test_news_normalized_store.py",
+    "tests/test_news_normalized_writer_locking.py",
+    "tests/test_sqlite_backup.py",
+    "tests/test_market_data_direct.py",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-application-stores/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 10.075,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-application-stores",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-application-stores/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "LD_LIBRARY_PATH": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/prefix/lib"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-application-stores/output.log"
+}

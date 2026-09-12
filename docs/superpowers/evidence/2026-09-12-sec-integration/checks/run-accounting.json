@@ -1,0 +1,1528 @@
+{
+  "note": "Separate RED, inverse, intermediate failure, focused and full runs are not an additive passing-test total. Read phase reports for nonzero dispositions.",
+  "runs": [
+    {
+      "command_sha256": "0437d1a637b17ff3d24c8d032296fabb758ee24e7fbfccaf55e018038e0a8989",
+      "exit_code": 0,
+      "run": "backend-final-collection",
+      "seconds": 8.91
+    },
+    {
+      "cases": 10291,
+      "command_sha256": "035581a8349da31eebc8f81855f9fb1cc7c5615139aa6beb5b0bf3208bbd7bb2",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_security_lifecycle_routes",
+          "name": "test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_security_lifecycle_tools",
+          "name": "test_lifecycle_tools_are_in_both_research_driver_allowlists",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "7c0f3fc0d7fd40602871e2141a48b6a84dbb6949ffeca847daee985ae07becb7",
+      "outcomes": {
+        "errors": 0,
+        "failed": 2,
+        "passed": 10277,
+        "skipped": 12
+      },
+      "run": "backend-full-final",
+      "seconds": 1395.253
+    },
+    {
+      "cases": 10291,
+      "command_sha256": "0c94c7d42b5b6fede2492a938b8bbc7617ce28025fca5928fd130105d7c3ff7a",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "676d349fe6d0d74685d53aea6a456e26748997d79257af87533d88cfa2fb19b8",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 10279,
+        "skipped": 12
+      },
+      "run": "backend-full-reconciled",
+      "seconds": 1390.703
+    },
+    {
+      "cases": 196,
+      "command_sha256": "38f7c670c77105a0ccac855a04d924d54058aee38cc5122db2f1bffc02a6f581",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "e3bece5044d280a35398279ea866170e78005c45da119fe73a1c08def39c7ade",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 196,
+        "skipped": 0
+      },
+      "run": "c09-controller-green",
+      "seconds": 3.264
+    },
+    {
+      "cases": 196,
+      "command_sha256": "644353a1e67440dd99b3be23cf5c11feecfef16f2809ee546c6e1ff8ff8663c1",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "165d5502c366a806a2e162c15e09057df374aa0fb834ebcf473a0dd6796a749b",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 196,
+        "skipped": 0
+      },
+      "run": "c09-final-restore",
+      "seconds": 3.319
+    },
+    {
+      "cases": 189,
+      "command_sha256": "c6b7778b4177e18e7ddaf59a63567eb4dc8db7d20f7a0fce135445d65b1d8fa0",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "dab0e620ba8f59e825b133f8d8427909d20411f1658bacfd375cce94c36b3fcb",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 189,
+        "skipped": 0
+      },
+      "run": "c09-impl-baseline-01",
+      "seconds": 3.016
+    },
+    {
+      "command_sha256": "540fd3edac4b28335ec76786f3582410e8cc2aa26d0d6f324903b7b008e9d721",
+      "exit_code": 0,
+      "run": "c09-impl-collect-after-01",
+      "seconds": 0.977
+    },
+    {
+      "command_sha256": "b15f6f6d9e655e41b351948013957ccb508e53972de010d438d35509f3b2440c",
+      "exit_code": 0,
+      "run": "c09-impl-collect-before-01",
+      "seconds": 0.898
+    },
+    {
+      "cases": 196,
+      "command_sha256": "ce1981c9238ac928e22e48bb672dba9ccf610c55828500095795a67b93218f2a",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "cee1b41d8260e438113257b6d2a46f624f54a8da43cbcfcbe97243e4775736dd",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 196,
+        "skipped": 0
+      },
+      "run": "c09-impl-green-01",
+      "seconds": 3.344
+    },
+    {
+      "cases": 1,
+      "command_sha256": "dab2e6d1617e9e0df2dd2a592f7f25f36c3c6a5ec47dfc99fb5bffa0d193dd20",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_abandoned_leaf_is_physically_absent[data_sources/eodhd_source.py]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "e8ffb73b7b573354fd07dc1165d1139f168e236cbb2c0d9413627ed175c2afde",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "c09-impl-m1-leaf-01",
+      "seconds": 0.465
+    },
+    {
+      "cases": 196,
+      "command_sha256": "44f4e54c4296a3600f15fcdfbf7820d59cef828f2ff81e83dde5c7e9b6bd51ae",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "5ce0dc4bcd18d6ad78d6157fe0c2643f53bddee4f7c17c44f1346f946b731cc0",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 196,
+        "skipped": 0
+      },
+      "run": "c09-impl-m1-restored-01",
+      "seconds": 3.315
+    },
+    {
+      "cases": 196,
+      "command_sha256": "f55b480f3a1ca3e79d6613e08053919f06080e0b1cbd2958202be3887b746add",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_abandoned_leaf_is_physically_absent[data_sources/eodhd_source.py]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_abandoned_leaf_is_physically_absent[data_sources/alpha_vantage_source.py]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_abandoned_leaf_is_physically_absent[data_sources/finnhub_source.py]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_abandoned_leaf_is_physically_absent[data_sources/source_factory.py]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_data_source_package_does_not_import_abandoned_modules",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_data_source_package_has_no_abandoned_exports",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "3f4526287d6dc1692300a4acb80a25e5ffb2980fc268248c702199e58f648742",
+      "outcomes": {
+        "errors": 0,
+        "failed": 6,
+        "passed": 190,
+        "skipped": 0
+      },
+      "run": "c09-impl-red-01",
+      "seconds": 3.057
+    },
+    {
+      "cases": 1,
+      "command_sha256": "5d024dab66d229e9c470835971182faa61739b3fecd731303072ae8c3b3103ef",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_data_source_package_has_no_abandoned_exports",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "f30bef015dab0c1f92134402e87f73230bc84adfbc18f7a39f45a53f447c0b4e",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "c09-inverse-export",
+      "seconds": 0.66
+    },
+    {
+      "cases": 1,
+      "command_sha256": "bf77779624b9a1513d853251c7e3cbe98415f42c792000233a2766d1d8360f38",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_data_provider_config",
+          "name": "test_polygon_data_source_constructors_prefer_massive_then_legacy",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "27de2b0ab8a144fe4c9a2020d3f532f4168d5de571cb702c4dcf334e70134477",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "c09-inverse-key",
+      "seconds": 0.912
+    },
+    {
+      "cases": 1,
+      "command_sha256": "ad4589ec09ff1de8c4b2cda272b5de70399ed598d4dd32c8c95e44e995766b64",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_data_source_package_preserves_current_exports",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "1c49320c57df3843e21f87c04bf132f5adac7256c54f35372cc38cdf1c9b74e1",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "c09-inverse-retained",
+      "seconds": 0.701
+    },
+    {
+      "cases": 3,
+      "command_sha256": "ba6313ecc602af57c136be3afb9e477bc2c860206c79f5c55ce6b5b21f8ed212",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "bb19ce2d6581c07ba01170802f58bc0f8d9d473b687b0da39281090ccf8ba819",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 3,
+        "skipped": 0
+      },
+      "run": "c09-resume-baseline-01",
+      "seconds": 0.903
+    },
+    {
+      "cases": 196,
+      "command_sha256": "aedb4270dadf6b042a89516945dd7d1b3b7f4eb8ac2c5da9336f3ca88e81886b",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "29f47115393db69eea72584e32cf6875afe5c83dfc01626f5e03de04e373c286",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 196,
+        "skipped": 0
+      },
+      "run": "c09-resume-final-01",
+      "seconds": 3.32
+    },
+    {
+      "cases": 1,
+      "command_sha256": "7bdcf164ff16f0c3d2f8038c78dde0e78fea41fd0fabd4aeba3465c138063cac",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_data_source_package_has_no_abandoned_exports",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "f4abca7c94c6b80d1712bcd2c77030080a3574ca42eac176fa9d28134c6e7acf",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "c09-resume-m2-obsolete-export-01",
+      "seconds": 0.672
+    },
+    {
+      "cases": 1,
+      "command_sha256": "078c92250c25432e90c32a28c5c15b8c2ac84d7ea2dedea1c768ec5d1f38dd45",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "93e2ff7f91290dfe469c94757097df09163aec3f4e15d0a33fc687f9bef6bbc6",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 1,
+        "skipped": 0
+      },
+      "run": "c09-resume-m2-restored-01",
+      "seconds": 0.64
+    },
+    {
+      "cases": 1,
+      "command_sha256": "31503c9c4655301b0995110076b37c986abc1d130d7ed3b1ffe1ea08066ab7cd",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_data_provider_config",
+          "name": "test_polygon_data_source_constructors_prefer_massive_then_legacy",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "ccf86052531e2f232fe2395cfc54373a841f80c6231867a5288589220962a5f2",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "c09-resume-m3-key-01",
+      "seconds": 0.942
+    },
+    {
+      "cases": 1,
+      "command_sha256": "58d32c44bc14de0c0fbb556a3c032841ef15c00cef910d76aa667e3e31905a97",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "97eff8cdf92eed9a0e5288e7c273905f382d3028399dbf2b11713ba594123f63",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 1,
+        "skipped": 0
+      },
+      "run": "c09-resume-m3-restored-01",
+      "seconds": 0.867
+    },
+    {
+      "cases": 1,
+      "command_sha256": "191e42d3db746fc6e66cfd073cb45add719e53d3e952c41513e09f5a23a4b297",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "9e219eeb62c5e49301d079b03235912db41118d3d8f0b994edb9cb110efc74a7",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 1,
+        "skipped": 0
+      },
+      "run": "c09-resume-m4-restored-01",
+      "seconds": 0.643
+    },
+    {
+      "cases": 1,
+      "command_sha256": "94d05021cd6e6155abc55ed0aa49e9b0b9708b5e7f516fe6f4602959a1f603e1",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_data_source_package_preserves_current_exports",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "8a5c8be30543d61b968130b9a8d8308c32546a57166bc4b190f345d541ab890a",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "c09-resume-m4-retained-export-01",
+      "seconds": 0.672
+    },
+    {
+      "cases": 468,
+      "command_sha256": "208aa9d5dd99a8d7f217b3a2c8826c590f8c8f1647b283b558855df071439b99",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "6e773870a5743676411b9ce0aac276a929f138d6112d7ae20bce4fd7792cedd5",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 467,
+        "skipped": 1
+      },
+      "run": "c10-controller-green",
+      "seconds": 16.892
+    },
+    {
+      "cases": 5,
+      "command_sha256": "59af9d8bc6cfdf6ea27d05ffabea3e2479479cf2f77120d7071b6cc541f75689",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "62c9f04c843667d9acbde1e01f4e9d9b010dd58f4edcd7fdd758bdaba6df9a82",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 5,
+        "skipped": 0
+      },
+      "run": "c10-cosmetic-green-01",
+      "seconds": 0.667
+    },
+    {
+      "cases": 312,
+      "command_sha256": "e78ef2dc49e7cb9dae6e942da9b82fa40283b90cf12862361e14ba943d86929d",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "15d9601c37c3afe29fc2e3fcfda752b6c506e484995a10a5e259d63798bcd63a",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 311,
+        "skipped": 1
+      },
+      "run": "c10-impl-baseline-01",
+      "seconds": 13.639
+    },
+    {
+      "cases": 316,
+      "command_sha256": "fde1240df44e5be82caa9e0c685f8dcd0d5b1b6a0964660cc080b0e1f82ff1cb",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "f2016151171c8a38041e9b30697efa5e6844f49bb9630a0e9e26b93fd4a75168",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 315,
+        "skipped": 1
+      },
+      "run": "c10-impl-green-01",
+      "seconds": 14.101
+    },
+    {
+      "cases": 6,
+      "command_sha256": "fdafd8557b83e98562ef0ef02032616402dc30d3a7a31222a905ccef7158f7c2",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_data_access.TestBackendProtocol",
+          "name": "test_file_backend_has_no_price_authority",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_data_access.TestBackendProtocol",
+          "name": "test_file_backend_has_no_fundamentals_authority",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_data_access.TestBackendProtocol",
+          "name": "test_file_backend_is_not_data_backend",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_data_access",
+          "name": "test_runtime_backend_module_graph_matches_current_local_modules",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "8fb6c8ee1a4c00591619535c4de4a2710ef99ea85d54fe621795bb0af404dee4",
+      "outcomes": {
+        "errors": 0,
+        "failed": 4,
+        "passed": 2,
+        "skipped": 0
+      },
+      "run": "c10-impl-red-01",
+      "seconds": 1.29
+    },
+    {
+      "cases": 32,
+      "command_sha256": "0f3c90317b8760f9eb3592cf73c567569abfbe1c5f9623148f5eb797df892eb1",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "ac2f1fd8c061e01a015416b9f7c3c9c65ff7692e39d4f479862d83ee699e4c24",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 32,
+        "skipped": 0
+      },
+      "run": "c10-independent-review-885c2a2d-focused-a1",
+      "seconds": 125.666
+    },
+    {
+      "cases": 33,
+      "command_sha256": "709e14b630d31b3ae19de9d491977690300b244ef4b52c8c6690a1e4a6c27c4d",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sa_routing",
+          "name": "test_both_on_one_instance_serves_both",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sa_routing",
+          "name": "test_baseless_dal_constructs_current_local_owner",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "1e0078b72334d642d21f9316a105b75bd269e2e2632b2f44f14c1866dad95641",
+      "outcomes": {
+        "errors": 0,
+        "failed": 2,
+        "passed": 31,
+        "skipped": 0
+      },
+      "run": "c10-revised-baseline-01",
+      "seconds": 1.584
+    },
+    {
+      "cases": 351,
+      "command_sha256": "956ad14568c0d79755440875288bbe87541584d2d630923b43e4f48506b8926a",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "7c649cba04387a6173d6434966260ebe18f49a4fb92554b002686fc01a41fd73",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 350,
+        "skipped": 1
+      },
+      "run": "c10-revised-green-01",
+      "seconds": 14.742
+    },
+    {
+      "cases": 4,
+      "command_sha256": "8ed0c7634ef18379047a7271325763c13a631bc921222051922a9577138fe678",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_file_backend_is_physically_absent",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_abandoned_surface_cleanup",
+          "name": "test_file_backend_is_not_importable",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "2c18e1afd593af2cd01fdd5b7e3018c2458f99c5c35178f90a787dba112cce65",
+      "outcomes": {
+        "errors": 0,
+        "failed": 2,
+        "passed": 2,
+        "skipped": 0
+      },
+      "run": "c10-revised-red-01",
+      "seconds": 0.94
+    },
+    {
+      "command_sha256": "77736e704f773c17c9122a8a3a5bbfecd384ded04236d25ba3d6946b4ee50d66",
+      "exit_code": 0,
+      "run": "census-integration-base",
+      "seconds": 15.64
+    },
+    {
+      "command_sha256": "d613d17b6fc5c8e6c9b42454d66bd6e8550431c35a597ee5c5a13637d32d5e8b",
+      "exit_code": 2,
+      "run": "census-integration-delivery",
+      "seconds": 13.602
+    },
+    {
+      "command_sha256": "c4c971420ee29c03d67ae9e9e1739d4cb102bbd786a933722af87011ffc6b671",
+      "exit_code": 2,
+      "run": "census-integration-final",
+      "seconds": 14.17
+    },
+    {
+      "cases": 2,
+      "command_sha256": "2e0673b01561c2000bacd5cb59a9abae1fa044a2bc17b0ebd8285456b9d2ee30",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "4a00ffb6158cf3e438ee379a0ca60e1b46d0a9e71cbb38e2867c503cf83dcb69",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 2,
+        "skipped": 0
+      },
+      "run": "final-collateral-review-ae2055e3-20260913-01",
+      "seconds": 4.653
+    },
+    {
+      "command_sha256": "378e1a3d85d3e7f2ecc99e2cb5216d4cf2d516e4f09b31fd257b5361b27efe04",
+      "exit_code": 0,
+      "run": "frontend-regression",
+      "seconds": 14.016
+    },
+    {
+      "command_sha256": "0639344aaff1ceaaa446c28f7bdaf8ef8bc3bb9671df38134df193b3aaf8abab",
+      "exit_code": 0,
+      "run": "frontend-typecheck",
+      "seconds": 11.845
+    },
+    {
+      "cases": 418,
+      "command_sha256": "cd15ab5f7f842b5e4fab3bff29a71f9f02564e4b77b66cd6173c50f481c527a2",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_oauth_sec_boundary_rejects_serialization_corruption[chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_oauth_sec_boundary_rejects_serialization_corruption[claude]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_tool_output_policy",
+          "name": "test_registry_matches_the_complete_54_tool_source_inventory",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_tool_output_policy",
+          "name": "test_every_builtin_declares_and_uses_its_reviewed_policy[get_sec_filings]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "0e2eb9af421e07bb33157277efb3fd72af8e47756b6c1e0c6df805861ce14876",
+      "outcomes": {
+        "errors": 0,
+        "failed": 4,
+        "passed": 414,
+        "skipped": 0
+      },
+      "run": "integration-green-01",
+      "seconds": 22.038
+    },
+    {
+      "cases": 1133,
+      "command_sha256": "faff2416420821bdfb371a4658fe7a2d16c9957231ee1c7952e3f9827347c5f3",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "e5fbec4861dbbda253ecb44b60e8ac657034cd63cde1d45caaff686ad0a55a69",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 1133,
+        "skipped": 0
+      },
+      "run": "integration-green-02",
+      "seconds": 53.662
+    },
+    {
+      "cases": 126,
+      "command_sha256": "e4fd7126cd7611c10549acb79091ef80686ab480d2ee605daca627541ac22364",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "4b5f58881c81200c709f1f14f27489775c50ed6133edf76d91063e18a1906835",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 126,
+        "skipped": 0
+      },
+      "run": "integration-last-collateral-green",
+      "seconds": 18.541
+    },
+    {
+      "cases": 2,
+      "command_sha256": "c2f0c5e014b1ea2ae7ca637dffe8c02afd1ddd6ca58454dc8716fe52844108b7",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_security_lifecycle_routes",
+          "name": "test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_security_lifecycle_tools",
+          "name": "test_lifecycle_tools_are_in_both_research_driver_allowlists",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "c7bfae7b8403161d9d1702da1f7c7ec165b98e8f3fef4c4ac85b12e6544df1dd",
+      "outcomes": {
+        "errors": 0,
+        "failed": 2,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "integration-last-collateral-red",
+      "seconds": 4.829
+    },
+    {
+      "cases": 0,
+      "command_sha256": "302936edf4d0f54ad87f091624df44bf3a78e605d620727252fbb6933302a68d",
+      "exit_code": 4,
+      "failures": [],
+      "junit_sha256": "fccb57618f009ef6999b4cbd8dbe4b7447d6b8417a06308f12e7ccde05f1eda4",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "integration-red-01",
+      "seconds": 0.275
+    },
+    {
+      "cases": 78,
+      "command_sha256": "f7bf4933ec272489826d62e8052d134eba8405e6c100b3b8a04a5dd51894c573",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_research_transport_dispatches_three_real_sec_tools[openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_research_transport_dispatches_three_real_sec_tools[anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_research_transport_dispatches_three_real_sec_tools[chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_research_transport_dispatches_three_real_sec_tools[claude]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[list_sec_filings-openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[list_sec_filings-anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[list_sec_filings-chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[list_sec_filings-claude]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[get_sec_financial_facts-openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[get_sec_financial_facts-anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[get_sec_financial_facts-chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[get_sec_financial_facts-claude]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[read_sec_filing-openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[read_sec_filing-anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[read_sec_filing-chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_transport_dispatches_closed_invalid_sec_query[read_sec_filing-claude]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_oauth_sec_boundary_rejects_serialization_corruption[chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_oauth_sec_boundary_rejects_serialization_corruption[claude]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_sec_worker_preserves_permission_rejection_before_acquisition[openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_sec_worker_preserves_permission_rejection_before_acquisition[anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_sec_worker_preserves_permission_rejection_before_acquisition[chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_sec_worker_preserves_permission_rejection_before_acquisition[claude]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_whole_pages_use_active_layer0_budget_without_changing_filters[openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_whole_pages_use_active_layer0_budget_without_changing_filters[anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_whole_pages_use_active_layer0_budget_without_changing_filters[chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_whole_pages_use_active_layer0_budget_without_changing_filters[claude]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_whole_document_size_gap_advances_with_original_max_chars[text-openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_whole_document_size_gap_advances_with_original_max_chars[text-anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_whole_document_size_gap_advances_with_original_max_chars[search-openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_whole_document_size_gap_advances_with_original_max_chars[search-anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_exact_facts_page_by_wrapped_budget_with_unchanged_limit[openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_exact_facts_page_by_wrapped_budget_with_unchanged_limit[anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_non_ascii_passages_keep_exact_citations_through_transport[openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_non_ascii_passages_keep_exact_citations_through_transport[anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_default_sec_document_budget_returns_usable_text_without_skips[ascii-openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_default_sec_document_budget_returns_usable_text_without_skips[ascii-anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_default_sec_document_budget_returns_usable_text_without_skips[utf8-openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_default_sec_document_budget_returns_usable_text_without_skips[utf8-anthropic]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_default_search_returns_complete_matches_with_bounded_context[openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_default_search_returns_complete_matches_with_bounded_context[anthropic]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "9eb56dd15d10a4841a643bc9037b22688c3c7182896d40d04d2e50671c35ba45",
+      "outcomes": {
+        "errors": 0,
+        "failed": 40,
+        "passed": 38,
+        "skipped": 0
+      },
+      "run": "integration-red-02",
+      "seconds": 9.687
+    },
+    {
+      "cases": 7,
+      "command_sha256": "99813c2b817a9c068a006d6dc0eface8e084c816ef7012c3ace5d4a610133340",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_output_integration",
+          "name": "test_sec_registration_uses_closed_common_policy[list_sec_filings]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_output_integration",
+          "name": "test_sec_registration_uses_closed_common_policy[get_sec_financial_facts]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_output_integration",
+          "name": "test_sec_registration_uses_closed_common_policy[read_sec_filing]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_output_integration",
+          "name": "test_four_sec_transports_return_identical_canonical_bytes[list_sec_filings]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_output_integration",
+          "name": "test_four_sec_transports_return_identical_canonical_bytes[get_sec_financial_facts]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_output_integration",
+          "name": "test_openai_wrapper_awaits_async_handler_inside_error_boundary[result]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_output_integration",
+          "name": "test_openai_wrapper_awaits_async_handler_inside_error_boundary[sanitized-error]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "610c1c46e61449d2abe0cd43299c13d285f27a46a51518d058c55579d1fbc20a",
+      "outcomes": {
+        "errors": 0,
+        "failed": 7,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "integration-red-03",
+      "seconds": 3.329
+    },
+    {
+      "cases": 235,
+      "command_sha256": "730177a91383e563dee9d2e0363a1f5f370d38a232106b0760a02535cfb95483",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_cancel_awaits_worker_and_prevents_later_dispatch[cancel]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_cancel_awaits_worker_and_prevents_later_dispatch[timeout]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "f347280f119dccdd762186267823c1913c717445ce61890c46a8212328b4e46c",
+      "outcomes": {
+        "errors": 0,
+        "failed": 2,
+        "passed": 233,
+        "skipped": 0
+      },
+      "run": "integration-review-green-01",
+      "seconds": 22.459
+    },
+    {
+      "cases": 994,
+      "command_sha256": "3b77849b17c3200fe574912cdd0fa8c4727e85b1cc1616ac2fcef2f375e569d9",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "15f1802e89561f83b3da0936537debead095e3c054b8c5a6e34efa5ba3992151",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 994,
+        "skipped": 0
+      },
+      "run": "integration-review-green-02",
+      "seconds": 54.336
+    },
+    {
+      "cases": 12,
+      "command_sha256": "1471eaa0fe2c4c7f5f1c7c246ae66c6b5b8e4ceadb24585df299cfa45eebc88c",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_native_dispatch",
+          "name": "test_anthropic_actual_stream_returns_exact_sec_result_to_model[list_sec_filings]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_native_dispatch",
+          "name": "test_anthropic_actual_stream_returns_exact_sec_result_to_model[get_sec_financial_facts]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_native_dispatch",
+          "name": "test_anthropic_actual_stream_returns_exact_sec_result_to_model[read_sec_filing]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_native_dispatch",
+          "name": "test_owned_metadata_worker_never_dispatches_after_governor_stop[timeout-submissions]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_native_dispatch",
+          "name": "test_owned_metadata_worker_never_dispatches_after_governor_stop[timeout-issuer-map]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_native_dispatch",
+          "name": "test_owned_metadata_worker_never_dispatches_after_governor_stop[cancel-submissions]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_native_dispatch",
+          "name": "test_owned_metadata_worker_never_dispatches_after_governor_stop[cancel-issuer-map]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_transport_cancellation",
+          "name": "test_sec_cancel_never_dispatches_next_request_and_closes_response[before-governor]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_transport_cancellation",
+          "name": "test_sec_cancel_never_dispatches_next_request_and_closes_response[pacing]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_transport_cancellation",
+          "name": "test_sec_cancel_never_dispatches_next_request_and_closes_response[after-governor]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_transport_cancellation",
+          "name": "test_sec_cancel_never_dispatches_next_request_and_closes_response[body]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_transport_cancellation",
+          "name": "test_sec_cancel_never_dispatches_next_request_and_closes_response[retry]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "69b52d539122dddbd2a6bf5e55bafcc5f165a49d531cea6572f3a33e174b12df",
+      "outcomes": {
+        "errors": 0,
+        "failed": 12,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "integration-review-red",
+      "seconds": 5.219
+    },
+    {
+      "cases": 187,
+      "command_sha256": "d9a70fafa465afbda34cdee08f917f838deb2f72fca400497804d336b8a90797",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "d87ec762aab328e44199b018a7a759a6e90f2d3bfe2b37587a0319102ec779c9",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 187,
+        "skipped": 0
+      },
+      "run": "integration-timeout-green",
+      "seconds": 14.816
+    },
+    {
+      "cases": 10,
+      "command_sha256": "6148123abd885316caeb606cb3e1dd908194a5b78bb811cdb6c913d73e3601fa",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_output_integration",
+          "name": "test_oauth_sec_timeout_returns_closed_result_after_owned_worker_stops[chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_output_integration",
+          "name": "test_oauth_sec_timeout_returns_closed_result_after_owned_worker_stops[claude]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "594d5c6535fb237ca0f485c89975e6df54f644fec92c792ebaf9cd7df226c01f",
+      "outcomes": {
+        "errors": 0,
+        "failed": 2,
+        "passed": 8,
+        "skipped": 0
+      },
+      "run": "integration-timeout-red",
+      "seconds": 4.203
+    },
+    {
+      "cases": 330,
+      "command_sha256": "f9955d222e946168b7af16e7b274b6882ffa1e3a6379a1638585e76512deed86",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "972be5d3b52597f4f41c54225de6caf798ad6c987c316b0c17219d69cea142e4",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 330,
+        "skipped": 0
+      },
+      "run": "sqlite-application-stores",
+      "seconds": 10.075
+    },
+    {
+      "cases": 4,
+      "command_sha256": "d44a5364447ab71f4f1545964aa5212916e41d69b4b5662f541325d23b209be6",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_research_transport_dispatches_three_real_sec_tools[anthropic]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "0336a9c9a2388f4cabf0935fde2cdb617f548f157dd8ed1965b0fbc761c5b9f5",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 3,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-anthropic-01",
+      "seconds": 4.278
+    },
+    {
+      "cases": 27,
+      "command_sha256": "6e85145eb7fe0aa4b317762f46a05adc1749371cec0e923aa7c77e2fb63b693f",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "8a109168d2c07a27cb8c14c375335741e5fc08991f9e8747278345097423a451",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 27,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-baseline-01",
+      "seconds": 31.938
+    },
+    {
+      "cases": 4,
+      "command_sha256": "488313a8c996304eda425ebc768db4da41bef87763eb74f15e75978fef74488e",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_research_transport_dispatches_three_real_sec_tools[chatgpt]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "3cfc80f9da948b5eeb94d07bfff75e9b0a01eb7e16bf243789cff2c7e361bc05",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 3,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-chatgpt-01",
+      "seconds": 4.057
+    },
+    {
+      "cases": 4,
+      "command_sha256": "38fa47df51c76dffc64d476fc0ac5ffc312459eeb5a46845982d10ac58a3bb78",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_research_transport_dispatches_three_real_sec_tools[claude]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "74fd4066d1ba4ac76189e93401a9478f1f1c771bd496a65cac3604b631b6218b",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 3,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-claude-01",
+      "seconds": 4.155
+    },
+    {
+      "cases": 5,
+      "command_sha256": "eaabf23f7a347ad1bc644e653659e712b977cfd628147fd55c2f53061376fa00",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_cancel_awaits_worker_and_prevents_later_dispatch[cancel]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_cancel_awaits_worker_and_prevents_later_dispatch[timeout]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_cancel_stops_actual_document_reader_before_next_source[cancel]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_cancel_stops_actual_document_reader_before_next_source[timeout]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_cancel_stops_actual_document_reader_before_next_source[repeat_cancel]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "aef5c237baa60fe5cda972d0ec8853d5eae1841c7dfe62d83bdd6286ec25eb2f",
+      "outcomes": {
+        "errors": 0,
+        "failed": 5,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-join-01",
+      "seconds": 2.162
+    },
+    {
+      "cases": 4,
+      "command_sha256": "32a78feb3a1ce5ca7583babebb93380afb684b1ccce68c245a48d6b3cfe2bb70",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_each_research_transport_dispatches_three_real_sec_tools[openai]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "bed23f664a3c1d8189a1d4cfb88458618c45be8968bf34cf61ce5e7856178395",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 3,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-openai-01",
+      "seconds": 3.923
+    },
+    {
+      "cases": 30,
+      "command_sha256": "0190bd8da1182257af8e07816a96a3cf513032f28609e3f73ae9e19c84382943",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "1c8bd9b31f889210b79b3049a2e50ef39d10f4cd47ac1fffc661756b4c70e0d3",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 30,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-restored-green-01",
+      "seconds": 6.235
+    },
+    {
+      "cases": 7,
+      "command_sha256": "1ea8fde7b9a9a2fa4966702c7683867df37d866f7dee97249501751f1b3dd7c3",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_required_sec_omission_is_explicit[openai]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "d2ad5bcf6b8699922d558a98b8e2f48319b951c2cf03a448844d0b50054861b2",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 6,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-subagent-01",
+      "seconds": 2.934
+    },
+    {
+      "cases": 7,
+      "command_sha256": "a53ee4492d029c2caee9965cc196f11fa1555ccbad6622778aa595ba5b8113b6",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_subagent",
+          "name": "test_required_sec_tools_survive_actual_subagent_inventory[openai]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_subagent",
+          "name": "test_required_sec_tools_survive_actual_subagent_inventory[anthropic]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "862912a5abe070946cc6f1f2abe25febf827769b61504a1418ef266c1e7d04dd",
+      "outcomes": {
+        "errors": 0,
+        "failed": 2,
+        "passed": 5,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-subagent-required-tool-01",
+      "seconds": 1.255
+    },
+    {
+      "cases": 30,
+      "command_sha256": "82d683422ed6d91a7f6c5664a887c956b1c48499121652eca026bf7fda2f7c72",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "9be9b9ab69d4d1f7e733ccf306aa1aadaf935a43497b174b7cfa9aea1dbb2527",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 30,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-supplement-restored-green-01",
+      "seconds": 6.516
+    },
+    {
+      "cases": 14,
+      "command_sha256": "7ae210afaa651d38b132e6672b7527870c61c27d3df71585cc9befa84bdb7a1b",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-list_sec_filings]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-get_sec_financial_facts]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-read_sec_filing]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-list_sec_filings]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-get_sec_financial_facts]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-read_sec_filing]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_layers_select_whole_envelope_reduction[oversized-layer0]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_layers_select_whole_envelope_reduction[oversized-layer5]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_layers_select_whole_envelope_reduction[malformed-layer0]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_sec_layers_select_whole_envelope_reduction[malformed-layer5]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_oauth_sec_boundary_rejects_serialization_corruption[chatgpt]",
+          "state": "failed"
+        },
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_oauth_sec_boundary_rejects_serialization_corruption[claude]",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "3265fa727973400e030344fe6c8740204db32c54051318d2afc8b96374c65e30",
+      "outcomes": {
+        "errors": 0,
+        "failed": 12,
+        "passed": 2,
+        "skipped": 0
+      },
+      "run": "task2-inv-885c2a2d-truncation-01",
+      "seconds": 2.465
+    },
+    {
+      "cases": 51,
+      "command_sha256": "f1250bf1eda21d99c4107e7d1ff1100b378734c41c8638c93b68c764f697f546",
+      "exit_code": 0,
+      "failures": [],
+      "junit_sha256": "a398c972cfdc41bd949585f06b77c1d6d3a2bb9073f4186e90e33934a0a5cc5a",
+      "outcomes": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 51,
+        "skipped": 0
+      },
+      "run": "task2-rereview-5d979910-db4df4d9",
+      "seconds": 10.731
+    },
+    {
+      "cases": 1,
+      "command_sha256": "ad86b3b17e0fab7b96c78fda7f2fe8e564e52a16a4c74ffb34592538047366f0",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_adapters",
+          "name": "test_task2_anthropic_dispatch_in_actual_stream_loop_context",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "fe80a8d44443193d8c65fb8688da1a33592cddb278549904ce47ab4d728e609c",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "task2-review-anthropic-loop-88f0512e-b6c67939",
+      "seconds": 1.181
+    },
+    {
+      "cases": 1,
+      "command_sha256": "3747958373fd4d97de7ae3d95db0b4f2153f5a09fa1c7c3a8d0081756aca54ee",
+      "exit_code": 1,
+      "failures": [
+        {
+          "class": "tests.test_sec_research_tool_results",
+          "name": "test_task2_real_metadata_transport_must_not_dispatch_after_timeout",
+          "state": "failed"
+        }
+      ],
+      "junit_sha256": "03dbdaa30a9c60d6ea007366a0506d62e5eead431f409ed2f5b5bb735815e6f3",
+      "outcomes": {
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "run": "task2-review-governor-stop-88f0512e-477c16af",
+      "seconds": 1.088
+    }
+  ],
+  "unfinished": []
+}

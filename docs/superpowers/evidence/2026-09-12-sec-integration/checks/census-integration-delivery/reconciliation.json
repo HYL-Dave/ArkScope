@@ -1,0 +1,379 @@
+{
+  "base_revision": "41682675",
+  "base_source_digest": "b131ae4c803ea43ba8b9a0856a731345c011a506487917ebc661fee23dc71625",
+  "by_kind": {
+    "dynamic_sql": 14,
+    "sql_prepare_failed": 7,
+    "unmodeled_sql_statement": 13
+  },
+  "by_path": {
+    "src/agents/anthropic_agent/tools.py": 1,
+    "src/agents/openai_agent/tools.py": 2,
+    "src/agents/shared/compressor/layers.py": 3,
+    "src/service/job_runs_store.py": 24,
+    "src/tools/data_access.py": 2,
+    "src/tools/registry.py": 2
+  },
+  "classification": "unchanged_ast_at_shifted_locations",
+  "coverage_reductions": [
+    "data_sources/alpha_vantage_source.py",
+    "data_sources/eodhd_source.py",
+    "data_sources/finnhub_source.py",
+    "data_sources/source_factory.py",
+    "src/tools/backends/file_backend.py"
+  ],
+  "final_revision": "6caed84e",
+  "final_source_digest": "d0a03f469130036f811f6a29aa950d34c15253589222a254c98a7ed664670489",
+  "limit": "Line movement does not resolve the underlying SQL scanner uncertainties or authorize data deletion.",
+  "matches": [
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "kind": "sql_prepare_failed",
+      "new_id": "sql:1e006ad969dfb905",
+      "new_line": 880,
+      "old_id": "sql:4f199461bb80b247",
+      "old_line": 906,
+      "path": "src/agents/anthropic_agent/tools.py",
+      "source_nodes_sha256": "6456a74891f3eaccfb92829c323688725e7527bae54742aa35e0dbd5155d5c90"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "kind": "sql_prepare_failed",
+      "new_id": "sql:29622a4126bc460b",
+      "new_line": 850,
+      "old_id": "sql:246c66c35be22d9b",
+      "old_line": 838,
+      "path": "src/agents/openai_agent/tools.py",
+      "source_nodes_sha256": "5fc089ffbfaa07319a168d0d52b33cb2a5f55235df0394c61d522663a322ca0f"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "kind": "sql_prepare_failed",
+      "new_id": "sql:284a5b9bb10b3c95",
+      "new_line": 338,
+      "old_id": "sql:ecb4ee55730935e5",
+      "old_line": 325,
+      "path": "src/agents/shared/compressor/layers.py",
+      "source_nodes_sha256": "1213b8a198cafe4fd88a43b6f4209443edf65ce11ceac7858b86b0c9f03cdb52"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "kind": "sql_prepare_failed",
+      "new_id": "sql:59506f6b697d1fa7",
+      "new_line": 403,
+      "old_id": "sql:3ae64a6e96f34fa5",
+      "old_line": 390,
+      "path": "src/agents/shared/compressor/layers.py",
+      "source_nodes_sha256": "b139afe618b0d6041a25cbce000b71fc1d1a02b85dbef1822e69cd8cf9d38e20"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "kind": "sql_prepare_failed",
+      "new_id": "sql:090f6465d5f9cdaf",
+      "new_line": 1177,
+      "old_id": "sql:9f52e4585caff182",
+      "old_line": 1200,
+      "path": "src/tools/data_access.py",
+      "source_nodes_sha256": "3fc7e499706a5b744ac120d13cd4e54574753fb247e363ac26d60a79b131c894"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "kind": "sql_prepare_failed",
+      "new_id": "sql:08662bb643c92527",
+      "new_line": 990,
+      "old_id": "sql:62f396490cd81409",
+      "old_line": 1013,
+      "path": "src/tools/data_access.py",
+      "source_nodes_sha256": "596f4cdcdacaefdd80acb5e15889277c71b93723d5b9e9cea8dcf57b8b8318e4"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "kind": "sql_prepare_failed",
+      "new_id": "sql:513aaf8dd508b444",
+      "new_line": 941,
+      "old_id": "sql:5e20d64398f7d40e",
+      "old_line": 934,
+      "path": "src/tools/registry.py",
+      "source_nodes_sha256": "ea12e72c71879e0b7f440caa205a484e6faff296332662c5187739d38ad524e3"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:765bcb56f2985c5f",
+      "new_line": 158,
+      "old_id": "sql:8fe36460f230ed87",
+      "old_line": 160,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "044c46381a2e4b1377f031ecbd56f112a54e19bb1ced0c2d66df1d13e762c4fd"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:f4d444438fd7f94d",
+      "new_line": 316,
+      "old_id": "sql:0d5bdb45ddc234f2",
+      "old_line": 318,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "10c654765b2e27debba8e5737019016f7817e12ce42aa49d5eff5c5bcffc77e2"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:2b28eea28d3a0f6c",
+      "new_line": 860,
+      "old_id": "sql:9a422f1969825fde",
+      "old_line": 862,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "26244d6aef268d03e4d1a4f39f82769ef922657a15f21f1b1aaf5ec502955f34"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:d2685a81dcf173d7",
+      "new_line": 894,
+      "old_id": "sql:db86b611252d7d34",
+      "old_line": 896,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "50717fcfcc8ba24045364d2e2ed8fcc6a0265ff1b6ea2c090863058281ff067a"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:f1fa1c34073675d6",
+      "new_line": 810,
+      "old_id": "sql:f5ca7c87c749ccf4",
+      "old_line": 812,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "51d38eacb983b397155af509c21ce8336203e5482c085d1bd790b024ff213e8b"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:4952ed109a8b284b",
+      "new_line": 315,
+      "old_id": "sql:bc8eabb5fec82266",
+      "old_line": 317,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "7224183a4871fdfa8a66ee7b841659bff0c1ae2047c085f4367ff6bd1e88b599"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:39652d0c35058bc9",
+      "new_line": 779,
+      "old_id": "sql:3bd1991f709f9b67",
+      "old_line": 781,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "778e4f03302a57fa9084d9164bfb1661494a16dd9f82aa5bedebd8cc43a5c09f"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:2a1954b9c1ff26dc",
+      "new_line": 463,
+      "old_id": "sql:22464e783c4a18d6",
+      "old_line": 465,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "8f106d19fa2fa78afc93dc40f43235167e28aa1bacdb4115e07cc8d961fd21eb"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:24543556713ea908",
+      "new_line": 462,
+      "old_id": "sql:1cd9b2c29f5f46b8",
+      "old_line": 464,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "a07fac7c87064a644acfbead6792eb1836bb9c47ac247253fd1e340bd241ef45"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:1f449114708c96dc",
+      "new_line": 159,
+      "old_id": "sql:575d06d2a21e06a5",
+      "old_line": 161,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "bf6af4df82b20870c60d2fc294ce1fc7e8faa77c3e709188b5b36f9ab5e75ab4"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:e4839509c89bea98",
+      "new_line": 893,
+      "old_id": "sql:4be201631e45d94f",
+      "old_line": 895,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "c9d5b4c236b046a20f73b5c1d7699c5c8689482e95901907a75a840097f994cd"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:e640bd8f16623d69",
+      "new_line": 859,
+      "old_id": "sql:6e6e541431a9a73d",
+      "old_line": 861,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "cadce35a68b69c8c305355828110132bb7b6c71542a42853a0eece0b41dc5bde"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:aa0e0e8e20f7dfd0",
+      "new_line": 811,
+      "old_id": "sql:215dc1c1488f3249",
+      "old_line": 813,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "d0775575cd83dc6c7b436c3d069988586444f11438685566fc64cd4c8b093d3d"
+    },
+    {
+      "axis": "sql",
+      "kind": "dynamic_sql",
+      "new_id": "sql:fc55a09e49ecc15d",
+      "new_line": 778,
+      "old_id": "sql:d9071de677734716",
+      "old_line": 780,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "ed4de20e14622c79137db3a94c6f5d0154d9de6d0fd962be119447026ff9847e"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:90c2aac071bb66e6",
+      "new_line": 91,
+      "old_id": "sql:404fbdb97d6bf10c",
+      "old_line": 80,
+      "path": "src/agents/openai_agent/tools.py",
+      "source_nodes_sha256": "a64a4be4563fc3d48b5ab9935a8ddf15359fd31a0ebea0470b9b927cfe135b72"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:8f21c0d2de41eeb7",
+      "new_line": 338,
+      "old_id": "sql:6886cd17b90c2f6a",
+      "old_line": 325,
+      "path": "src/agents/shared/compressor/layers.py",
+      "source_nodes_sha256": "1213b8a198cafe4fd88a43b6f4209443edf65ce11ceac7858b86b0c9f03cdb52"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:da66c7947377733c",
+      "new_line": 460,
+      "old_id": "sql:c1d21419ee532f1e",
+      "old_line": 462,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "0804ce05a94c544fae50ff21a82114d92eff26b6c90f1c4196e80c60759c7c59"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:4c2b9f04a7ed440a",
+      "new_line": 187,
+      "old_id": "sql:6e2d2ba118993748",
+      "old_line": 189,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "50bfeac84ee510ed4137ebf0d1ba6b244f9bc32399422f9712353fc6c5320412"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:3b93e98e0daaeef1",
+      "new_line": 49,
+      "old_id": "sql:64cef8c5303db958",
+      "old_line": 51,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "5e83396dbec34c05c14708e314a5d26d5feef7676fb50379e33cdea9eb3aa2ba"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:7cb8906acc3db4c4",
+      "new_line": 181,
+      "old_id": "sql:6c2860416d78bd90",
+      "old_line": 183,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "77329dccb93e86bcf2bd249ee824fccc4f00b81c567c00db7eb4409d50fccabf"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:249d8b58505016b1",
+      "new_line": 379,
+      "old_id": "sql:449cbf29edc63be1",
+      "old_line": 381,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "93a20d29ff4e237f3b0d6b3b56b68ad95832615e089a6759281924d8f50df8e5"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:fc46a6f79b415e62",
+      "new_line": 499,
+      "old_id": "sql:762149b0868b3b00",
+      "old_line": 501,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "93a20d29ff4e237f3b0d6b3b56b68ad95832615e089a6759281924d8f50df8e5"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:6447688a3bcec7eb",
+      "new_line": 599,
+      "old_id": "sql:074f51ae9417273e",
+      "old_line": 601,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "93a20d29ff4e237f3b0d6b3b56b68ad95832615e089a6759281924d8f50df8e5"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:e2c6fdd92ee35748",
+      "new_line": 660,
+      "old_id": "sql:440244d34854d5e3",
+      "old_line": 662,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "93a20d29ff4e237f3b0d6b3b56b68ad95832615e089a6759281924d8f50df8e5"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:bbd0e145f299fc68",
+      "new_line": 709,
+      "old_id": "sql:b31992fba7c6f0d8",
+      "old_line": 711,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "93a20d29ff4e237f3b0d6b3b56b68ad95832615e089a6759281924d8f50df8e5"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:46521155b5596c2d",
+      "new_line": 190,
+      "old_id": "sql:29f34ebb73a968a0",
+      "old_line": 192,
+      "path": "src/service/job_runs_store.py",
+      "source_nodes_sha256": "f8e4b3005592de5a4d4d4be6768cd9513b42ab087fba4439b406c9a03b791ad9"
+    },
+    {
+      "axis": "sql",
+      "kind": "unmodeled_sql_statement",
+      "new_id": "sql:4d80f03fcb2eef61",
+      "new_line": 1398,
+      "old_id": "sql:e7af2819cd902f86",
+      "old_line": 1391,
+      "path": "src/tools/registry.py",
+      "source_nodes_sha256": "c172014092ebcfadb3cbabff6fc4acba78b1f4e47aad37315f10766bd71310f2"
+    }
+  ],
+  "new_candidates": [],
+  "review_required": true
+}

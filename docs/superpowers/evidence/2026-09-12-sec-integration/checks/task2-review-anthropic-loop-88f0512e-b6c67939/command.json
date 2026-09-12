@@ -1,0 +1,26 @@
+{
+  "name": "task2-review-anthropic-loop-88f0512e-b6c67939",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "-c",
+    "\nimport runpy\nimport pytest\n\ndef test_task2_anthropic_dispatch_in_actual_stream_loop_context(tool_fixture, monkeypatch):\n    import asyncio\n    import json\n    from src.agents.anthropic_agent.tools import execute_tool\n    from tests.test_sec_research_tool_adapters import wire, unwrap\n    from tests.test_sec_research_tool_service import CIK\n\n    wire(monkeypatch, tool_fixture.service)\n    async def call_like_run_query_stream():\n        # agent.py:224 is async; agent.py:548 calls execute_tool inline.\n        return execute_tool('list_sec_filings', {'issuer': CIK}, None)\n\n    payload = asyncio.run(call_like_run_query_stream())\n    result = unwrap(payload)\n    print(json.dumps({'result': result, 'fixture_dispatches': tool_fixture.transport.calls}))\n    assert result.get('status') == 'ok', 'SEC tool failed inside the actual Anthropic stream loop context'\n    assert len(result['data']) == 2\n\nclass ProbePlugin:\n    def pytest_collection_modifyitems(self, session, config, items):\n        items[:] = [pytest.Function.from_parent(items[0].parent,\n            name='test_task2_anthropic_dispatch_in_actual_stream_loop_context',\n            callobj=test_task2_anthropic_dispatch_in_actual_stream_loop_context)]\n\noriginal_main = pytest.main\ndef probe_main(args):\n    return original_main(args, plugins=[ProbePlugin()])\npytest.main = probe_main\nrunpy.run_path('.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py',\n               run_name='__main__')\n",
+    "-q",
+    "-s",
+    "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[anthropic]",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task2-review-anthropic-loop-88f0512e-b6c67939/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 1.181,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task2-review-anthropic-loop-88f0512e-b6c67939",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task2-review-anthropic-loop-88f0512e-b6c67939/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task2-review-anthropic-loop-88f0512e-b6c67939/output.log"
+}

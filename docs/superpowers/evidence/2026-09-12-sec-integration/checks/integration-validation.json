@@ -1,0 +1,701 @@
+{
+  "added": [
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_abandoned_leaf_is_physically_absent[data_sources/alpha_vantage_source.py]"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_abandoned_leaf_is_physically_absent[data_sources/eodhd_source.py]"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_abandoned_leaf_is_physically_absent[data_sources/finnhub_source.py]"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_abandoned_leaf_is_physically_absent[data_sources/source_factory.py]"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_data_source_package_does_not_import_abandoned_modules"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_data_source_package_has_no_abandoned_exports"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_data_source_package_preserves_current_exports"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_file_backend_is_not_importable"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_file_backend_is_physically_absent"
+    ],
+    [
+      "tests.test_api.TestFundamentalsEndpoints",
+      "test_old_sec_route_absent_and_new_catalog_is_live"
+    ],
+    [
+      "tests.test_chatgpt_oauth_driver",
+      "test_tool_free_driver_call_preserves_calibration_and_canary_contract"
+    ],
+    [
+      "tests.test_claude_code_sdk_driver",
+      "test_tool_free_driver_call_preserves_canary_contract"
+    ],
+    [
+      "tests.test_data_access.TestSECFilings",
+      "test_old_sec_dal_absent_and_new_catalog_is_live"
+    ],
+    [
+      "tests.test_sec_research_native_dispatch",
+      "test_anthropic_actual_stream_returns_exact_sec_result_to_model[get_sec_financial_facts]"
+    ],
+    [
+      "tests.test_sec_research_native_dispatch",
+      "test_anthropic_actual_stream_returns_exact_sec_result_to_model[list_sec_filings]"
+    ],
+    [
+      "tests.test_sec_research_native_dispatch",
+      "test_anthropic_actual_stream_returns_exact_sec_result_to_model[read_sec_filing]"
+    ],
+    [
+      "tests.test_sec_research_native_dispatch",
+      "test_owned_metadata_worker_never_dispatches_after_governor_stop[cancel-issuer-map]"
+    ],
+    [
+      "tests.test_sec_research_native_dispatch",
+      "test_owned_metadata_worker_never_dispatches_after_governor_stop[cancel-submissions]"
+    ],
+    [
+      "tests.test_sec_research_native_dispatch",
+      "test_owned_metadata_worker_never_dispatches_after_governor_stop[timeout-issuer-map]"
+    ],
+    [
+      "tests.test_sec_research_native_dispatch",
+      "test_owned_metadata_worker_never_dispatches_after_governor_stop[timeout-submissions]"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_four_sec_transports_return_identical_canonical_bytes[get_sec_financial_facts]"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_four_sec_transports_return_identical_canonical_bytes[list_sec_filings]"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_four_sec_transports_return_identical_document_citations"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_oauth_sec_timeout_returns_closed_result_after_owned_worker_stops[chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_oauth_sec_timeout_returns_closed_result_after_owned_worker_stops[claude]"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_openai_wrapper_awaits_async_handler_inside_error_boundary[result]"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_openai_wrapper_awaits_async_handler_inside_error_boundary[sanitized-error]"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_sec_registration_uses_closed_common_policy[get_sec_financial_facts]"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_sec_registration_uses_closed_common_policy[list_sec_filings]"
+    ],
+    [
+      "tests.test_sec_research_output_integration",
+      "test_sec_registration_uses_closed_common_policy[read_sec_filing]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_chatgpt_absent_registry_is_intentionally_tool_free"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_chatgpt_optional_non_sec_inventory_omission_remains_optional"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_current_sec_skills_require_three_registered_tools"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_research_transport_dispatches_three_real_sec_tools[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_research_transport_dispatches_three_real_sec_tools[chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_research_transport_dispatches_three_real_sec_tools[claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_research_transport_dispatches_three_real_sec_tools[openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[get_sec_financial_facts-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[get_sec_financial_facts-chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[get_sec_financial_facts-claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[get_sec_financial_facts-openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[list_sec_filings-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[list_sec_filings-chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[list_sec_filings-claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[list_sec_filings-openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[read_sec_filing-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[read_sec_filing-chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[read_sec_filing-claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_each_transport_dispatches_closed_invalid_sec_query[read_sec_filing-openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_non_sec_optional_omission_keeps_existing_semantics[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_non_sec_optional_omission_keeps_existing_semantics[openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_oauth_inventory_requires_every_sec_tool[get_sec_financial_facts-chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_oauth_inventory_requires_every_sec_tool[get_sec_financial_facts-claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_oauth_inventory_requires_every_sec_tool[list_sec_filings-chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_oauth_inventory_requires_every_sec_tool[list_sec_filings-claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_oauth_inventory_requires_every_sec_tool[read_sec_filing-chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_oauth_inventory_requires_every_sec_tool[read_sec_filing-claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_oauth_sec_boundary_rejects_serialization_corruption[chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_oauth_sec_boundary_rejects_serialization_corruption[claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_old_catalog_tool_absent_from_all_current_skills"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_required_sec_omission_is_explicit[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_required_sec_omission_is_explicit[openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_sec_transport_schemas_keep_exact_parameters_and_array_items[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_sec_transport_schemas_keep_exact_parameters_and_array_items[chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_sec_transport_schemas_keep_exact_parameters_and_array_items[claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_sec_transport_schemas_keep_exact_parameters_and_array_items[openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_sec_worker_preserves_permission_rejection_before_acquisition[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_sec_worker_preserves_permission_rejection_before_acquisition[chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_sec_worker_preserves_permission_rejection_before_acquisition[claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_adapters",
+      "test_sec_worker_preserves_permission_rejection_before_acquisition[openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_default_search_returns_complete_matches_with_bounded_context[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_default_search_returns_complete_matches_with_bounded_context[openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_default_sec_document_budget_returns_usable_text_without_skips[ascii-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_default_sec_document_budget_returns_usable_text_without_skips[ascii-openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_default_sec_document_budget_returns_usable_text_without_skips[utf8-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_default_sec_document_budget_returns_usable_text_without_skips[utf8-openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_document_pager_measures_final_status_with_each_candidate"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_domain_row_size_gap_advances_and_envelope_alone_fails_closed"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_exact_facts_page_by_wrapped_budget_with_unchanged_limit[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_exact_facts_page_by_wrapped_budget_with_unchanged_limit[openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_non_ascii_passages_keep_exact_citations_through_transport[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_non_ascii_passages_keep_exact_citations_through_transport[openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_cancel_awaits_worker_and_prevents_later_dispatch[cancel]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_cancel_awaits_worker_and_prevents_later_dispatch[timeout]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_cancel_stops_actual_document_reader_before_next_source[cancel]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_cancel_stops_actual_document_reader_before_next_source[repeat_cancel]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_cancel_stops_actual_document_reader_before_next_source[timeout]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_layers_select_whole_envelope_reduction[complete-layer0]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_layers_select_whole_envelope_reduction[complete-layer5]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_layers_select_whole_envelope_reduction[malformed-layer0]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_layers_select_whole_envelope_reduction[malformed-layer5]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_layers_select_whole_envelope_reduction[oversized-layer0]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_layers_select_whole_envelope_reduction[oversized-layer5]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-get_sec_financial_facts]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-list_sec_filings]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-read_sec_filing]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-get_sec_financial_facts]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-list_sec_filings]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-read_sec_filing]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_sec_runtime_setup_failure_is_closed"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_whole_document_size_gap_advances_with_original_max_chars[search-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_whole_document_size_gap_advances_with_original_max_chars[search-openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_whole_document_size_gap_advances_with_original_max_chars[text-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_whole_document_size_gap_advances_with_original_max_chars[text-openai]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_whole_pages_use_active_layer0_budget_without_changing_filters[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_whole_pages_use_active_layer0_budget_without_changing_filters[chatgpt]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_whole_pages_use_active_layer0_budget_without_changing_filters[claude]"
+    ],
+    [
+      "tests.test_sec_research_tool_results",
+      "test_whole_pages_use_active_layer0_budget_without_changing_filters[openai]"
+    ],
+    [
+      "tests.test_sec_tools.TestSecReplacement",
+      "test_catalog_only_api_removed_but_facts_mapper_remains"
+    ],
+    [
+      "tests.test_sec_tools.TestSecReplacement",
+      "test_new_catalog_uses_real_tool_service"
+    ],
+    [
+      "tests.test_sec_transport_cancellation",
+      "test_sec_cancel_never_dispatches_next_request_and_closes_response[after-governor]"
+    ],
+    [
+      "tests.test_sec_transport_cancellation",
+      "test_sec_cancel_never_dispatches_next_request_and_closes_response[before-governor]"
+    ],
+    [
+      "tests.test_sec_transport_cancellation",
+      "test_sec_cancel_never_dispatches_next_request_and_closes_response[body]"
+    ],
+    [
+      "tests.test_sec_transport_cancellation",
+      "test_sec_cancel_never_dispatches_next_request_and_closes_response[pacing]"
+    ],
+    [
+      "tests.test_sec_transport_cancellation",
+      "test_sec_cancel_never_dispatches_next_request_and_closes_response[retry]"
+    ],
+    [
+      "tests.test_subagent",
+      "test_all_subagent_tool_names_exist_in_registry"
+    ],
+    [
+      "tests.test_subagent",
+      "test_required_sec_tools_survive_actual_subagent_inventory[anthropic]"
+    ],
+    [
+      "tests.test_subagent",
+      "test_required_sec_tools_survive_actual_subagent_inventory[openai]"
+    ],
+    [
+      "tests.test_tool_output_policy",
+      "test_every_builtin_declares_and_uses_its_reviewed_policy[get_sec_financial_facts]"
+    ],
+    [
+      "tests.test_tool_output_policy",
+      "test_every_builtin_declares_and_uses_its_reviewed_policy[list_sec_filings]"
+    ],
+    [
+      "tests.test_tool_output_policy",
+      "test_every_builtin_declares_and_uses_its_reviewed_policy[read_sec_filing]"
+    ],
+    [
+      "tests.test_tool_output_policy",
+      "test_registry_matches_the_complete_56_tool_source_inventory"
+    ],
+    [
+      "tests.test_tools.TestAnalysisTools",
+      "test_old_sec_analysis_tool_absent_and_new_catalog_is_live"
+    ]
+  ],
+  "backend": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 10279,
+    "skipped": 12
+  },
+  "baseline": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 10166,
+    "skipped": 12
+  },
+  "baseline_junit_gzip_sha256": "3cba93ffa404c6096e38d97a4361e046a9002c451fc44f62c5429ad99caaef6e",
+  "checks": {
+    "collected_equals_executed": true,
+    "complete_commands_succeeded": true,
+    "explicit_tests_directory": true,
+    "immutable_source_anchor_matches": true,
+    "new_regression_suites_ran": true,
+    "no_backend_failures_or_errors": true,
+    "no_duplicate_nodes": true,
+    "no_source_runtime_or_runner_drift": true,
+    "retained_safety_owners_ran": true,
+    "unchanged_skip_ids": true
+  },
+  "collected": 10291,
+  "executed": 10291,
+  "junit_sha256": "676d349fe6d0d74685d53aea6a456e26748997d79257af87533d88cfa2fb19b8",
+  "limit": "Read source snapshot filenames for observation timing; this is not full SEC release acceptance.",
+  "new_suites": {
+    "test_sec_research_native_dispatch": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 7,
+      "skipped": 0
+    },
+    "test_sec_research_output_integration": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 10,
+      "skipped": 0
+    },
+    "test_sec_research_tool_adapters": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 40,
+      "skipped": 0
+    },
+    "test_sec_research_tool_results": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 38,
+      "skipped": 0
+    },
+    "test_sec_transport_cancellation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 5,
+      "skipped": 0
+    }
+  },
+  "removed": [
+    [
+      "tests.test_api.TestFundamentalsEndpoints",
+      "test_sec_filings"
+    ],
+    [
+      "tests.test_data_access.TestBackendProtocol",
+      "test_file_backend_is_data_backend"
+    ],
+    [
+      "tests.test_data_access.TestSECFilings",
+      "test_get_sec_filings_empty"
+    ],
+    [
+      "tests.test_sec_tools.TestGetSecFilings",
+      "test_basic"
+    ],
+    [
+      "tests.test_sec_tools.TestGetSecFilings",
+      "test_default_limit"
+    ],
+    [
+      "tests.test_sec_tools.TestGetSecFilings",
+      "test_error_returns_empty"
+    ],
+    [
+      "tests.test_sec_tools.TestGetSecFilings",
+      "test_returns_list"
+    ],
+    [
+      "tests.test_tool_output_policy",
+      "test_every_builtin_declares_and_uses_its_reviewed_policy[get_sec_filings]"
+    ],
+    [
+      "tests.test_tool_output_policy",
+      "test_registry_matches_the_complete_54_tool_source_inventory"
+    ],
+    [
+      "tests.test_tools.TestAnalysisTools",
+      "test_get_sec_filings"
+    ]
+  ],
+  "retained_safety_owners": {
+    "test_api_fixed_dispatch_pins_complete_selection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0
+    },
+    "test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_failed_generation_redacts_selected_key_after_activation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_openai_retry_key_echo_is_private_without_changing_retry_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_original_oauth_id_can_refresh_normally_without_reselection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    }
+  },
+  "seconds": 1390.703,
+  "skipped": [
+    [
+      "tests.test_detailed_financials.TestLiveTechMetrics",
+      "test_nvda_tech_metrics"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_basic_stock_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_connection"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_iv_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_filter"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_quote"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_volume_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_put_call_ratio_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_scanner_parameters"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_unusual_activity"
+    ],
+    [
+      "tests.test_option_chain_tools.TestLiveOptionChain",
+      "test_spy_option_chain"
+    ],
+    [
+      "tests.test_peer_comparison.TestLivePeerComparison",
+      "test_nvda_peer_comparison"
+    ]
+  ],
+  "source_anchor": "ae2055e3a6750edd0322f2c405964cbb0e5ad741",
+  "source_collection_sha256": "4f41b72c83ff98606944bae71ca8b4a8ea1afe7df8700f28cc1137d62a55129d",
+  "source_drift": [],
+  "source_files": 1130,
+  "source_snapshot_after": "source-after-reconciled-full.json",
+  "source_snapshot_before": "source-before-reconciled-full.json",
+  "sqlite": "3.37.2"
+}

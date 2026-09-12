@@ -1,0 +1,393 @@
+{
+  "mode": "generic-truncation",
+  "exit_code": 1,
+  "collected": [
+    "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-list_sec_filings]",
+    "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-get_sec_financial_facts]",
+    "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-read_sec_filing]",
+    "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-list_sec_filings]",
+    "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-get_sec_financial_facts]",
+    "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-read_sec_filing]",
+    "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer0]",
+    "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer5]",
+    "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer0]",
+    "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer5]",
+    "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer0]",
+    "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer5]",
+    "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[chatgpt]",
+    "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[claude]"
+  ],
+  "items": [
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-list_sec_filings]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-get_sec_financial_facts]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-read_sec_filing]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-list_sec_filings]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-get_sec_financial_facts]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-read_sec_filing]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer0]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer5]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer0]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer5]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer0]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer5]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[chatgpt]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[claude]",
+      "mode": "generic-truncation",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    }
+  ],
+  "reports": [
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-list_sec_filings]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-list_sec_filings]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:18: in test_sec_pages_remain_complete_json_through_bridge_reduction\n    envelope = unwrap(result)\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:355: in raw_decode\n    raise JSONDecodeError(\"Expecting value\", s, err.value) from None\nE   json.decoder.JSONDecodeError: Expecting value: line 1 column 11 (char 10)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-list_sec_filings]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-get_sec_financial_facts]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-get_sec_financial_facts]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:18: in test_sec_pages_remain_complete_json_through_bridge_reduction\n    envelope = unwrap(result)\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:355: in raw_decode\n    raise JSONDecodeError(\"Expecting value\", s, err.value) from None\nE   json.decoder.JSONDecodeError: Expecting value: line 1 column 11 (char 10)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-get_sec_financial_facts]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-read_sec_filing]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-read_sec_filing]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:18: in test_sec_pages_remain_complete_json_through_bridge_reduction\n    envelope = unwrap(result)\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:355: in raw_decode\n    raise JSONDecodeError(\"Expecting value\", s, err.value) from None\nE   json.decoder.JSONDecodeError: Expecting value: line 1 column 11 (char 10)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[malformed-read_sec_filing]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-list_sec_filings]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-list_sec_filings]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:18: in test_sec_pages_remain_complete_json_through_bridge_reduction\n    envelope = unwrap(result)\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:353: in raw_decode\n    obj, end = self.scan_once(s, idx)\nE   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 5489 (char 5488)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-list_sec_filings]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-get_sec_financial_facts]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-get_sec_financial_facts]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:18: in test_sec_pages_remain_complete_json_through_bridge_reduction\n    envelope = unwrap(result)\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:353: in raw_decode\n    obj, end = self.scan_once(s, idx)\nE   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 5489 (char 5488)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-get_sec_financial_facts]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-read_sec_filing]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-read_sec_filing]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:18: in test_sec_pages_remain_complete_json_through_bridge_reduction\n    envelope = unwrap(result)\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:353: in raw_decode\n    obj, end = self.scan_once(s, idx)\nE   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 5489 (char 5488)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_pages_remain_complete_json_through_bridge_reduction[oversized-read_sec_filing]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer0]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer0]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer0]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer5]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer5]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[complete-layer5]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer0]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer0]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:136: in test_sec_layers_select_whole_envelope_reduction\n    assert unwrap(result)[\"status\"] == \"unavailable\"\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:353: in raw_decode\n    obj, end = self.scan_once(s, idx)\nE   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 5451 (char 5450)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer0]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer5]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer5]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:136: in test_sec_layers_select_whole_envelope_reduction\n    assert unwrap(result)[\"status\"] == \"unavailable\"\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:353: in raw_decode\n    obj, end = self.scan_once(s, idx)\nE   json.decoder.JSONDecodeError: Invalid control character at: line 1 column 8251 (char 8250)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[oversized-layer5]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer0]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer0]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:129: in test_sec_layers_select_whole_envelope_reduction\n    assert record is not None\nE   assert None is not None"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer0]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer5]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer5]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_results.py:136: in test_sec_layers_select_whole_envelope_reduction\n    assert unwrap(result)[\"status\"] == \"unavailable\"\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:353: in raw_decode\n    obj, end = self.scan_once(s, idx)\nE   json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_results.py::test_sec_layers_select_whole_envelope_reduction[malformed-layer5]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[chatgpt]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[chatgpt]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_adapters.py:202: in test_oauth_sec_boundary_rejects_serialization_corruption\n    result = unwrap(asyncio.run(dispatch(channel, registry, \"list_sec_filings\", dict(issuer=CIK))))\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:355: in raw_decode\n    raise JSONDecodeError(\"Expecting value\", s, err.value) from None\nE   json.decoder.JSONDecodeError: Expecting value: line 1 column 11 (char 10)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[chatgpt]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[claude]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[claude]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_adapters.py:202: in test_oauth_sec_boundary_rejects_serialization_corruption\n    result = unwrap(asyncio.run(dispatch(channel, registry, \"list_sec_filings\", dict(issuer=CIK))))\ntests/test_sec_research_tool_adapters.py:33: in unwrap\n    return json.loads(payload)\n/usr/lib/python3.10/json/__init__.py:346: in loads\n    return _default_decoder.decode(s)\n/usr/lib/python3.10/json/decoder.py:337: in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n/usr/lib/python3.10/json/decoder.py:355: in raw_decode\n    raise JSONDecodeError(\"Expecting value\", s, err.value) from None\nE   json.decoder.JSONDecodeError: Expecting value: line 1 column 11 (char 10)"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_oauth_sec_boundary_rejects_serialization_corruption[claude]",
+      "when": "teardown",
+      "outcome": "passed"
+    }
+  ],
+  "pytest_main_restored": true,
+  "all_items_restored": true,
+  "all_collected_called": true,
+  "remaining_patches": 0,
+  "remaining_pools": 0,
+  "call_failures": 12,
+  "skipped_reports": 0
+}

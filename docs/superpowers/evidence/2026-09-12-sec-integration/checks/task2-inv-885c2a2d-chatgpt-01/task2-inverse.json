@@ -1,0 +1,122 @@
+{
+  "mode": "omit-chatgpt",
+  "exit_code": 1,
+  "collected": [
+    "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[openai]",
+    "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[anthropic]",
+    "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[chatgpt]",
+    "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[claude]"
+  ],
+  "items": [
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[openai]",
+      "mode": "omit-chatgpt",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[anthropic]",
+      "mode": "omit-chatgpt",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[chatgpt]",
+      "mode": "omit-chatgpt",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[claude]",
+      "mode": "omit-chatgpt",
+      "injected": true,
+      "owned_pools_reaped": 0,
+      "owned_threads_reaped": 0,
+      "owned_threads_alive": 0,
+      "restored_attributes": 1,
+      "restored": true
+    }
+  ],
+  "reports": [
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[openai]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[openai]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[openai]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[anthropic]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[anthropic]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[anthropic]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[chatgpt]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[chatgpt]",
+      "when": "call",
+      "outcome": "failed",
+      "longrepr": "tests/test_sec_research_tool_adapters.py:80: in test_each_research_transport_dispatches_three_real_sec_tools\n    filings = unwrap(asyncio.run(dispatch(channel, registry, NAMES[0], dict(issuer=CIK))))\n/usr/lib/python3.10/asyncio/runners.py:44: in run\n    return loop.run_until_complete(main)\n/usr/lib/python3.10/asyncio/base_events.py:649: in run_until_complete\n    return future.result()\ntests/test_sec_research_tool_adapters.py:54: in dispatch\n    assert ok, result\nE   AssertionError: invalid_value: tool is not allowed (allowlist veto)\nE   assert False"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[chatgpt]",
+      "when": "teardown",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[claude]",
+      "when": "setup",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[claude]",
+      "when": "call",
+      "outcome": "passed"
+    },
+    {
+      "nodeid": "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[claude]",
+      "when": "teardown",
+      "outcome": "passed"
+    }
+  ],
+  "pytest_main_restored": true,
+  "all_items_restored": true,
+  "all_collected_called": true,
+  "remaining_patches": 0,
+  "remaining_pools": 0,
+  "call_failures": 1,
+  "skipped_reports": 0
+}
