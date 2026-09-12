@@ -133,7 +133,7 @@ class DocumentQueries:
         return (record, canonical), None
 
     def read(self, filing_id, *, document_id="primary", capture_id=None, section_id=None,
-             query=None, cursor=None, max_chars=6000):
+             query=None, cursor=None, max_chars=6000, result_fits=None):
         validate_document_query(filing_id, document_id=document_id, capture_id=capture_id,
             section_id=section_id, query=query, cursor=cursor, max_chars=max_chars)
         token = _decode(cursor) if cursor is not None else None
@@ -145,13 +145,15 @@ class DocumentQueries:
                 return unavailable
             record, canonical = opened
             return self._page(record, canonical, document_id=document_id, section_id=section_id,
-                              query=query, token=token, max_chars=max_chars)
+                              query=query, token=token, max_chars=max_chars, result_fits=result_fits)
         except Exception as error:
             if str(error) in {"sec_research_cursor_invalid", "sec_research_cursor_mismatch"}:
                 raise
             return _unavailable()
 
-    def _page(self, record, canonical, *, document_id, section_id, query, token, max_chars):
+    def _page(self, record, canonical, *, document_id, section_id, query, token, max_chars, result_fits=None):
+        def fits(envelope):
+            return _fits(envelope) and (result_fits is None or result_fits(envelope))
         metadata = record["metadata"]
         capture_id, filing_id = record["capture_id"], record["filing_id"]
         mode = token["mode"] if token else "search" if query is not None else "text" if section_id else "index"
@@ -176,11 +178,15 @@ class DocumentQueries:
         result = {"status": "ok", "data": data, "gaps": gaps, "observed_at": record["observed_at"],
                   "coverage": coverage, "next_cursor": None}
 
-        def finish(*, available=True, empty=False):
+        def prepare(*, available=True, empty=False):
             coverage["complete"] = available and not gaps and result["next_cursor"] is None
             result["status"] = ("unavailable" if not available else "partial" if gaps
                                 else "empty" if empty else "ok")
-            return result if _fits(result) else _unavailable("document_envelope_too_large")
+            return result
+
+        def finish(*, available=True, empty=False):
+            prepare(available=available, empty=empty)
+            return result if fits(result) else _unavailable("document_envelope_too_large")
 
         if section_id is not None:
             selected = next((s for s in sections if s["section_id"] == section_id), None)
@@ -206,7 +212,7 @@ class DocumentQueries:
                     break
                 target.append(item)
                 result["next_cursor"] = cursor_at(offset + 1) if offset + 1 < total else None
-                if not _fits(result):
+                if not fits(prepare()):
                     target.pop()
                     if not used:
                         gaps.append({"code": "document_index_entry_too_large"})
@@ -235,13 +241,39 @@ class DocumentQueries:
                 "extraction_version": metadata["extraction_version"], "start_byte": left, "end_byte": right,
                 "match_start_byte": match_start, "match_end_byte": match_end}}
 
+        def admit_passage(build, minimum, maximum):
+            # The user cap remains in every cursor's filter identity. Only the
+            # complete cited passage is sized against its final wrapped result.
+            if build(maximum):
+                return True
+            low, high, best = minimum, maximum - 1, None
+            while low <= high:
+                middle = (low + high) // 2
+                if build(middle):
+                    best, low = middle, middle + 1
+                else:
+                    high = middle - 1
+            if best is not None:
+                build(best)
+                return True
+            build(maximum)
+            return False
+
         if mode == "text":
-            page_text = text[:max_chars]
-            next_offset = offset + len(page_text.encode("utf-8"))
-            if page_text:
+            if not text:
+                return finish(empty=True)
+            def build_text(chars):
+                next_offset = offset + len(text[:chars].encode("utf-8"))
                 data["passages"] = [passage(offset, next_offset)]
-            result["next_cursor"] = cursor_at(next_offset) if next_offset < end else None
-            return finish(empty=not page_text)
+                result["next_cursor"] = cursor_at(next_offset) if next_offset < end else None
+                return fits(prepare())
+            if not admit_passage(build_text, 1, min(max_chars, len(text))):
+                skipped = data["passages"][0]["citation"]
+                data["passages"] = []
+                gaps.append({"code": "document_passage_too_large",
+                             "start_byte": skipped["start_byte"], "end_byte": skipped["end_byte"]})
+                return finish(available=False)
+            return finish()
         if len(query) > max_chars:
             gaps.append({"code": "document_page_size_insufficient"})
             return finish(available=False)
@@ -251,12 +283,18 @@ class DocumentQueries:
             return finish(empty=True)
         match_start = offset + len(text[:match].encode("utf-8"))
         match_end = match_start + len(query.encode("utf-8"))
-        context = max_chars - len(query)
-        left_char = max(0, match - context // 2)
-        right_char = min(len(text), left_char + max_chars)
-        left = offset + len(text[:left_char].encode("utf-8"))
-        right = offset + len(text[:right_char].encode("utf-8"))
-        data["passages"] = [passage(left, right, match_start, match_end)]
         if text.find(query, match + len(query)) >= 0:
             result["next_cursor"] = cursor_at(match_end)
+        def build_match(chars):
+            context = chars - len(query)
+            left_char = max(0, match - context // 2)
+            right_char = min(len(text), left_char + chars)
+            left = offset + len(text[:left_char].encode("utf-8"))
+            right = offset + len(text[:right_char].encode("utf-8"))
+            data["passages"] = [passage(left, right, match_start, match_end)]
+            return fits(prepare())
+        if not admit_passage(build_match, len(query), min(max_chars, len(text))):
+            data["passages"] = []
+            gaps.append({"code": "document_passage_too_large", "start_byte": match_start, "end_byte": match_end})
+            return finish(available=False)
         return finish()

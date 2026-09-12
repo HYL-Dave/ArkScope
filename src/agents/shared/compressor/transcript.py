@@ -113,7 +113,14 @@ def format_messages_as_transcript(messages: Iterable[ProjectedMessage]) -> str:
             parts.append(f"[TOOL CALL: {tool}]: {content[:300]}")
         elif role == "tool_result":
             tool = str(msg.get("tool_name") or "?")
-            parts.append(f"[TOOL RESULT: {tool}]: {content[:500]}")
+            from src.sec_research.tool_results import SEC_TOOL_NAMES
+            if tool.removeprefix("tool_") in SEC_TOOL_NAMES:
+                from .reducers import get_reducer
+                from .summary_prompt import LAYER_5_CHAR_CAP
+                content, _meta = get_reducer(tool)(content, budget=LAYER_5_CHAR_CAP)
+            else:
+                content = content[:500]
+            parts.append(f"[TOOL RESULT: {tool}]: {content}")
         elif role == "user":
             parts.append(f"[USER]: {content}")
         elif role == "assistant":

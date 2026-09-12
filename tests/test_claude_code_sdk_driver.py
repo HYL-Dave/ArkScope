@@ -482,6 +482,7 @@ def test_options_config_posture(monkeypatch):
     assert opts.resume is None
     assert opts.continue_conversation is False
     assert opts.session_id is None
+
     assert opts.fork_session is False
     assert opts.session_store is None
     assert opts.add_dirs == []
@@ -1159,3 +1160,18 @@ def test_stream_folds_multi_turn_prompt_into_query(monkeypatch):
     )
     asyncio.run(_collect(_make_driver(), req))
     assert "first question" in capture["prompt"] and "second question" in capture["prompt"]
+
+
+def test_tool_free_driver_call_preserves_canary_contract(monkeypatch):
+    capture = {}
+    _install_fake_query(monkeypatch, [_result_msg(result="OK")], capture)
+    driver = AnthropicClaudeCodeSdkDriver(credential=_FakeCredential(id=1),
+        token_store=_FakeTokenStore(TOKEN), registry=None, dal=None, max_turns=1)
+    request = LLMRequest(model=_REQ.model, instructions=_REQ.instructions,
+                         input_messages=[{"role": "user", "content": "Reply OK"}], tools=[])
+    events = asyncio.run(_collect(driver, request))
+    assert events[-1].type == EventType.done and events[-1].data["answer"] == "OK"
+    options = capture["options"]
+    assert options.tools == [] and options.allowed_tools == [] and options.mcp_servers == {}
+    assert options.permission_mode == "dontAsk" and options.strict_mcp_config
+    assert options.setting_sources == [] and options.max_turns == 1

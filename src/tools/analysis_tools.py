@@ -2,7 +2,6 @@
 Analysis tool functions (6 tools).
 
 14. get_fundamentals_analysis — Fundamental data with derived metrics
-15. get_sec_filings           — SEC filing metadata
 16. get_watchlist_overview    — Summary of all watchlist tickers
 17. get_morning_brief         — Personalized morning briefing
 18. get_detailed_financials   — Comprehensive valuation + tech metrics
@@ -21,7 +20,7 @@ import pandas as pd
 if TYPE_CHECKING:
     from .data_access import DataAccessLayer
 
-from .schemas import DetailedFinancials, FinancialStatement, FundamentalsResult, SECFiling
+from .schemas import DetailedFinancials, FinancialStatement, FundamentalsResult
 
 logger = logging.getLogger(__name__)
 
@@ -296,28 +295,6 @@ def get_fundamentals_analysis(
 
     return result
 
-
-def get_sec_filings(
-    dal: DataAccessLayer,
-    ticker: str,
-    filing_types: Optional[List[str]] = None,
-) -> List[SECFiling]:
-    """
-    Get SEC filing metadata for a ticker.
-
-    Returns filing metadata (type, date, URL), not full text content.
-    The current local capability returns an honest empty list when no filing
-    metadata has been stored.
-
-    Args:
-        dal: DataAccessLayer instance
-        ticker: Stock ticker symbol
-        filing_types: Filter by type (10-K, 10-Q, 8-K, etc.)
-
-    Returns:
-        List of SECFiling with metadata
-    """
-    return dal.get_sec_filings(ticker, filing_types)
 
 
 def get_watchlist_overview(

@@ -119,7 +119,6 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         get_morning_brief,
     )
     from src.tools.sec_tools import (
-        get_sec_filings,
         get_insider_trades,
     )
     from src.tools.analyst_tools import get_analyst_consensus
@@ -521,21 +520,23 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = get_peer_comparison(dal, ticker=ticker, tickers=tickers, sector=sector)
         return _serialize_result(result, "get_peer_comparison")
 
-    @function_tool
-    def tool_get_sec_filings(
-        ticker: str,
-        filing_types: Optional[List[str]] = None,
-        limit: int = 10,
-    ) -> str:
-        """Get SEC filing metadata (10-K, 10-Q, 8-K, etc.) for a ticker. Returns filing type, date, and URL — metadata only, not content.
+    def sec_function_tool(public):
+        from functools import wraps
+        from inspect import signature
+        from src.sec_research.tool_execution import invoke_sec_tool
+        parameters = signature(public)
 
-        Args:
-            ticker: Stock ticker symbol
-            filing_types: Filter by filing types (e.g. ['10-K', '10-Q'])
-            limit: Maximum number of filings to return (default: 10)
-        """
-        result = get_sec_filings(ticker, filing_types=filing_types, limit=limit)
-        return _serialize_result(result, "get_sec_filings")
+        @wraps(public)
+        async def invoke(*args, **kwargs):
+            arguments = parameters.bind(*args, **kwargs)
+            arguments.apply_defaults()
+            result = await invoke_sec_tool(public.__name__, dict(arguments.arguments))
+            return _serialize_result(result, public.__name__)
+
+        invoke.__name__ = "tool_" + public.__name__
+        return function_tool(invoke)
+
+    from src.tools.sec_research_tools import list_sec_filings, get_sec_financial_facts, read_sec_filing
 
     @function_tool
     def tool_get_insider_trades(
@@ -1155,7 +1156,9 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_fundamentals_analysis,
         tool_get_detailed_financials,
         tool_get_peer_comparison,
-        tool_get_sec_filings,
+        sec_function_tool(list_sec_filings),
+        sec_function_tool(get_sec_financial_facts),
+        sec_function_tool(read_sec_filing),
         tool_get_insider_trades,
         tool_get_watchlist_overview,
         tool_get_morning_brief,

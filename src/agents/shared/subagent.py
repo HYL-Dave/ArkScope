@@ -74,6 +74,8 @@ def _filter_anthropic_tools(
 ) -> List[Dict[str, Any]]:
     """Filter Anthropic tool schemas to only include allowed names."""
     allowed = set(allowed_names)
+    from src.sec_research.tool_results import require_sec_inventory
+    require_sec_inventory((t["name"] for t in all_tools), allowed)
     return [t for t in all_tools if t["name"] in allowed]
 
 
@@ -83,6 +85,8 @@ def _filter_openai_tools(all_tools: List, allowed_names: List[str]) -> List:
     Handles the tool_ prefix convention used by OpenAI SDK wrappers.
     """
     allowed = set(allowed_names)
+    from src.sec_research.tool_results import require_sec_inventory
+    require_sec_inventory((getattr(t, "name", "").removeprefix("tool_") for t in all_tools), allowed)
     allowed_prefixed = {f"tool_{n}" for n in allowed_names}
     return [
         t for t in all_tools
@@ -229,7 +233,9 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "detect_news_volume_anomaly",
             "detect_event_chains",
             "get_fundamentals_analysis",
-            "get_sec_filings",
+            "list_sec_filings",
+            "get_sec_financial_facts",
+            "read_sec_filing",
             "web_browse",
         ],
         max_turns=10,

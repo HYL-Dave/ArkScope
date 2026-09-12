@@ -6,8 +6,8 @@ required_params: [ticker]
 aliases: [competitive, moat]
 category: financial-analysis
 data_sources:
-  required: [get_fundamentals_analysis, get_peer_comparison, get_ticker_news]
-  optional: [get_detailed_financials, get_sec_filings]
+  required: [get_fundamentals_analysis, get_peer_comparison, get_ticker_news, list_sec_filings, get_sec_financial_facts, read_sec_filing]
+  optional: [get_detailed_financials]
 output: report
 ---
 
@@ -24,7 +24,7 @@ durability of competitive advantages (moat), and identify emerging threats.
 2. **get_peer_comparison** — Quantitative peer benchmarking
 3. **get_ticker_news** — Company-specific competitive developments in ArkScope's local news store
 4. **get_detailed_financials** — Margin trends, R&D intensity, SBC
-5. **get_sec_filings** — Management commentary on competition, risk factors
+5. **list_sec_filings + read_sec_filing** — Management commentary on competition, risk factors
 
 ## Workflow
 
@@ -85,3 +85,13 @@ For top 3-5 competitors:
 7. **Investment implications**: How competitive position affects valuation
 
 AFTER ANALYSIS: Save as a research report using save_report() with report_type="competitive_analysis".
+
+SEC EVIDENCE:
+- Call list_sec_filings(issuer="{ticker}") to select observed filing IDs, then
+  read_sec_filing(filing_id=...) for document indexes and complete cited passages.
+- Use get_sec_financial_facts(issuer="{ticker}") for exact decimal observations;
+  preserve units, periods, revisions, source hashes, and provenance.
+- Keep the same filters, limit, and max_chars on cursor continuation. Stored or
+  pinned reads acquire nothing; freshness="refresh" cannot replace a pin.
+- Report status, gaps, coverage, and whole-record size gaps. Missing required SEC
+  tools or unavailable evidence is a research gap, not an empty successful result.

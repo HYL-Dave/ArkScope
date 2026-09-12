@@ -22,9 +22,6 @@ Usage:
     # Get cash flow statement (NEW - 100% match with Financial Datasets)
     cash_flow = sec_fin.get_cash_flow_statement('AAPL', years=5)
 
-    # Get SEC filings list (with proper filtering)
-    filings = sec_fin.get_filings_list('AAPL', filing_types=['10-K'], limit=5)
-
     # Get all financials as DataFrame
     df = sec_fin.get_financials_dataframe('AAPL', statement='cashflow')
 
@@ -33,7 +30,6 @@ Convenience functions:
         get_income_statement,
         get_balance_sheet,
         get_cash_flow_statement,
-        get_filings_list,
     )
 """
 
@@ -144,18 +140,6 @@ class CashFlowStatement:
     ending_cash_balance: Optional[float] = None
     # Calculated
     free_cash_flow: Optional[float] = None
-
-
-@dataclass
-class FilingInfo:
-    """SEC Filing metadata matching Financial Datasets format."""
-    cik: int
-    accession_number: str
-    filing_type: str
-    report_date: str  # YYYY-MM-DD
-    ticker: str
-    url: str
-    xbrl_url: Optional[str] = None
 
 
 # SEC EDGAR concept mappings
@@ -743,88 +727,6 @@ class SECEdgarFinancials:
 
         return statements
 
-    def get_filings_list(
-        self,
-        ticker: str,
-        filing_types: Optional[List[str]] = None,
-        limit: int = 10,
-    ) -> List[FilingInfo]:
-        """
-        Get list of SEC filings for a ticker.
-
-        Args:
-            ticker: Stock symbol
-            filing_types: List of filing types to filter (e.g., ['10-K', '10-Q', '8-K'])
-                         If None, returns all types
-            limit: Maximum number of filings to return
-
-        Returns:
-            List of FilingInfo objects (newest first)
-        """
-        cik = self._sec.get_cik(ticker)
-        if not cik:
-            logger.warning(f"Could not find CIK for {ticker}")
-            return []
-
-        # Fetch submissions
-        submissions = self._sec._make_request(
-            f"{self._sec.SUBMISSIONS_URL}/CIK{cik}.json"
-        )
-
-        if not submissions:
-            return []
-
-        # Parse filings
-        recent = submissions.get('filings', {}).get('recent', {})
-        if not recent:
-            return []
-
-        forms = recent.get('form', [])
-        filing_dates = recent.get('filingDate', [])
-        accession_numbers = recent.get('accessionNumber', [])
-        primary_documents = recent.get('primaryDocument', [])
-
-        filings = []
-        cik_int = int(cik.lstrip('0'))
-
-        for i in range(min(len(forms), limit * 3)):  # Fetch more to allow filtering
-            form_type = forms[i]
-
-            # Filter by filing type if specified
-            if filing_types and form_type not in filing_types:
-                continue
-
-            accession = accession_numbers[i]
-            accession_clean = accession.replace('-', '')
-            primary_doc = primary_documents[i] if i < len(primary_documents) else ''
-
-            # Build URLs
-            base_url = f"https://www.sec.gov/Archives/edgar/data/{cik_int}/{accession_clean}"
-            doc_url = f"{base_url}/{primary_doc}" if primary_doc else base_url
-
-            # Check for XBRL
-            xbrl_url = None
-            if primary_doc.endswith('.htm') or primary_doc.endswith('.html'):
-                xbrl_candidate = primary_doc.replace('.htm', '_htm.xml').replace('.html', '_htm.xml')
-                xbrl_url = f"{base_url}/{xbrl_candidate}"
-
-            filing = FilingInfo(
-                cik=cik_int,
-                accession_number=accession,
-                filing_type=form_type,
-                report_date=filing_dates[i] if i < len(filing_dates) else '',
-                ticker=ticker,
-                url=doc_url,
-                xbrl_url=xbrl_url,
-            )
-
-            filings.append(filing)
-
-            if len(filings) >= limit:
-                break
-
-        return filings
-
     def get_financials_dataframe(
         self,
         ticker: str,
@@ -947,13 +849,3 @@ def get_cash_flow_statement(ticker: str, years: int = 5) -> List[Dict]:
     """Get cash flow statement as list of dicts."""
     sec = SECEdgarFinancials()
     return [asdict(s) for s in sec.get_cash_flow_statement(ticker, years)]
-
-
-def get_filings_list(
-    ticker: str,
-    filing_types: Optional[List[str]] = None,
-    limit: int = 10,
-) -> List[Dict]:
-    """Get SEC filings list as list of dicts."""
-    sec = SECEdgarFinancials()
-    return [asdict(f) for f in sec.get_filings_list(ticker, filing_types, limit)]

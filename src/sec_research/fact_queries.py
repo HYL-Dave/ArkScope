@@ -189,7 +189,7 @@ def _selection(rows, filters, gaps):
 
 def query_facts(store, cik, *, metrics=None, concepts=None, fact_ids=None, accession=None,
                 as_of=None, period="all", start=None, end=None, revisions="latest",
-                cursor=None, limit=40):
+                cursor=None, limit=40, result_fits=None):
     cik = normalize_cik(cik)
     filters = validate_query(cik, "facts", metrics=metrics, concepts=concepts, fact_ids=fact_ids,
                              accession=accession, as_of=as_of, period=period, start=start, end=end,
@@ -239,4 +239,5 @@ def query_facts(store, cik, *, metrics=None, concepts=None, fact_ids=None, acces
         coverage["catalog_pending"] = sum(source != "companyfacts" for source in receipt["pending"]) if receipt else 0
         coverage["catalog_source_gaps"] = sum(gap.get("source") not in (None, "companyfacts") for gap in receipt["gaps"]) if receipt else 0
     selection = _selection(rows, filters, gaps)
-    return page_envelope(context, selection, limit=limit, gaps=gaps, available=bool(bound.sources), coverage=coverage)
+    return page_envelope(context, selection, limit=limit, gaps=gaps, available=bool(bound.sources),
+                         coverage=coverage, result_fits=result_fits)

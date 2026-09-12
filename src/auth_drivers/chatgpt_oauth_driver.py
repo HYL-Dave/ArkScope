@@ -62,7 +62,9 @@ _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
         "get_price_change",
         "get_ticker_data_coverage",
         "get_fundamentals_analysis",
-        "get_sec_filings",
+        "list_sec_filings",
+        "get_sec_financial_facts",
+        "read_sec_filing",
         "get_economic_calendar",
         "get_security_lifecycle_review",
         "list_security_lifecycle_reviews",
@@ -164,6 +166,8 @@ def _ark_input_schema(tool_def: Any) -> dict:
             prop["description"] = p.description
         if getattr(p, "enum", None):
             prop["enum"] = p.enum
+        if getattr(p, "items", None) is not None:
+            prop["items"] = p.items
         properties[p.name] = prop
         if getattr(p, "required", True):
             required.append(p.name)
@@ -472,6 +476,9 @@ class OpenAIChatGPTOAuthDriver:
         if self._registry is None:
             return []
         tools: list[dict] = []
+        from src.sec_research.tool_results import require_sec_inventory
+        require_sec_inventory(n for n in _RESEARCH_READONLY_TOOLS
+                              if self._registry is not None and self._registry.get(n) is not None)
         for name in sorted(_RESEARCH_READONLY_TOOLS):
             tool_def = self._registry.get(name)
             if tool_def is not None:
@@ -492,6 +499,10 @@ class OpenAIChatGPTOAuthDriver:
             requires_dal = getattr(tool_def, "requires_dal", True)
 
             async def _run():
+                from src.sec_research.tool_results import SEC_TOOL_NAMES
+                if name in SEC_TOOL_NAMES:
+                    from src.sec_research.tool_execution import invoke_sec_tool
+                    return await invoke_sec_tool(name, args, timeout_s=self._per_tool_timeout_s)
                 if asyncio.iscoroutinefunction(fn):
                     return await (fn(self._dal, **args) if requires_dal else fn(**args))
                 call = (lambda: fn(self._dal, **args)) if requires_dal else (lambda: fn(**args))

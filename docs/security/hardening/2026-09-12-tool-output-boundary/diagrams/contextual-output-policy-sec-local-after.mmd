@@ -1,0 +1,13 @@
+flowchart LR
+  Source[Tool and external data] --> API[API-key serializers]
+  Source --> OAuth[OAuth serializers]
+  Auth[Execution auth] --> Sec[SEC schema and exact-secret check]
+  OAuth --> Sec
+  OAuth --> Regex[Lossy diagnostic regex]
+  Sec --> Sink[Model and Research trace]
+  API --> Sink
+  Regex --> Sink
+  Prose[Model prose] --> Split[Channel-specific prose filtering]
+  Split --> User[User stream and stored answer]
+  Error[Provider errors and probes] --> Regex
+  Regex --> Log[Diagnostics]

@@ -556,32 +556,6 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             }
         },
         {
-            "name": "get_sec_filings",
-            "description": (
-                "Get SEC filing metadata (10-K, 10-Q, 8-K, etc.) for a ticker. "
-                "Returns filing type, date, and URL — metadata only, not content."
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "ticker": {
-                        "type": "string",
-                        "description": "Stock ticker symbol"
-                    },
-                    "filing_types": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Filter by filing types (e.g. ['10-K', '10-Q'])"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of filings to return (default: 10)"
-                    }
-                },
-                "required": ["ticker"]
-            }
-        },
-        {
             "name": "get_insider_trades",
             "description": (
                 "Get recent insider trades (SEC Form 4) for a ticker. Fully parsed: "
@@ -1280,6 +1254,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         },
     ])
 
+    from src.tools.registry import ToolRegistry
+    sec = ToolRegistry()
+    sec._register_sec_research_tools()
+    tools.extend(sec.to_anthropic_schema())
     return tools
 
 
@@ -1342,6 +1320,11 @@ def execute_tool(
     Returns:
         JSON string result
     """
+    from src.sec_research.tool_results import SEC_TOOL_NAMES
+    if tool_name in SEC_TOOL_NAMES:
+        import asyncio
+        from src.sec_research.tool_execution import invoke_sec_tool
+        return _serialize_result(asyncio.run(invoke_sec_tool(tool_name, tool_input)), tool_name)
     from src.tools.news_tools import (
         get_ticker_news,
         search_news_by_keyword,
@@ -1379,7 +1362,6 @@ def execute_tool(
         get_morning_brief,
     )
     from src.tools.sec_tools import (
-        get_sec_filings,
         get_insider_trades,
     )
     from src.tools.web_tools import web_browse
@@ -1523,11 +1505,6 @@ def execute_tool(
             ticker=tool_input.get("ticker"),
             tickers=tool_input.get("tickers"),
             sector=tool_input.get("sector"),
-        ),
-        "get_sec_filings": lambda: get_sec_filings(
-            ticker=tool_input["ticker"],
-            filing_types=tool_input.get("filing_types"),
-            limit=tool_input.get("limit", 10),
         ),
         "get_insider_trades": lambda: get_insider_trades(
             ticker=tool_input["ticker"],

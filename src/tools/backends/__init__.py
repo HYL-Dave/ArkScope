@@ -66,25 +66,6 @@ class DataBackend(Protocol):
         """
         ...
 
-    def query_sec_filings(
-        self,
-        ticker: str,
-        filing_types: Optional[List[str]] = None,
-    ) -> pd.DataFrame:
-        """
-        Query SEC filing metadata.
-
-        Args:
-            ticker: Company ticker
-            filing_types: Filter by type (10-K, 10-Q, 8-K, etc.)
-
-        Returns:
-            DataFrame with columns:
-                ticker, filing_type, filed_date, url,
-                accession_number, description, period_of_report
-        """
-        ...
-
     def get_available_tickers(self, data_type: str) -> List[str]:
         """
         List tickers with available data of a given type.

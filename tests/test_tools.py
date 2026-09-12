@@ -20,7 +20,6 @@ from src.tools.schemas import (
     FundamentalsResult,
     NewsQueryResult,
     PriceQueryResult,
-    SECFiling,
 )
 from src.tools.registry import ToolRegistry, create_default_registry
 
@@ -193,7 +192,7 @@ def registry():
 class TestRegistry:
     def test_register_all(self, registry):
         """All tools should be registered (incl. P1.2 macro_calendar)."""
-        assert len(registry.list_all()) == 54
+        assert len(registry.list_all()) == 56
 
     def test_tool_names(self, registry):
         """All expected tool names should exist."""
@@ -207,7 +206,7 @@ class TestRegistry:
             "calculate_implied_valuation", "calculate_peer_statistics",
             "calculate_weighted_scenarios",
             "detect_news_volume_anomaly", "detect_event_chains",
-            "get_fundamentals_analysis", "get_sec_filings",
+            "get_fundamentals_analysis", "list_sec_filings", "get_sec_financial_facts", "read_sec_filing",
             "get_watchlist_overview", "get_morning_brief",
             "get_portfolio_holdings",
             "get_security_lifecycle_review",
@@ -224,14 +223,14 @@ class TestRegistry:
         assert len(registry.list_by_category("options")) == 3
         assert len(registry.list_by_category("calculation")) == 5
         assert len(registry.list_by_category("signals")) == 0
-        assert len(registry.list_by_category("analysis")) == 15
+        assert len(registry.list_by_category("analysis")) == 17
         assert len(registry.list_by_category("portfolio")) == 7
         assert len(registry.list_by_category("execution")) == 0
 
     def test_openai_schema(self, registry):
         """OpenAI schema export should produce valid function definitions."""
         schema = registry.to_openai_schema()
-        assert len(schema) == 54
+        assert len(schema) == 56
         for tool in schema:
             assert tool["type"] == "function"
             assert "name" in tool["function"]
@@ -242,7 +241,7 @@ class TestRegistry:
     def test_anthropic_schema(self, registry):
         """Anthropic schema export should produce valid tool definitions."""
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 54
+        assert len(schema) == 56
         for tool in schema:
             assert "name" in tool
             assert "description" in tool
@@ -425,11 +424,17 @@ class TestAnalysisTools:
         assert result.market_cap is None
         assert result.pe_ratio is None
 
-    def test_get_sec_filings(self, dal):
-        from src.tools.analysis_tools import get_sec_filings
-        result = get_sec_filings(dal, ticker="NVDA")
-        assert isinstance(result, list)
-        # FileBackend returns empty
+    def test_old_sec_analysis_tool_absent_and_new_catalog_is_live(self, tmp_path, monkeypatch):
+        from src.tools import analysis_tools, schemas
+        from src.tools.registry import create_default_registry
+        from tests.test_sec_research_tool_adapters import tool_fixture, wire, CIK
+        assert not hasattr(analysis_tools, "get_sec_filings")
+        assert not hasattr(schemas, "SECFiling")
+        fixture = tool_fixture.__wrapped__(tmp_path)
+        wire(monkeypatch, fixture.service)
+        tool = create_default_registry().get("list_sec_filings")
+        assert not tool.requires_dal
+        assert len(tool.function(issuer=CIK)["data"]) == 2
 
     def test_get_watchlist_overview(self, dal):
         from src.tools.analysis_tools import get_watchlist_overview

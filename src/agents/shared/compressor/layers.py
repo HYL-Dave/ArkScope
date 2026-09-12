@@ -103,6 +103,19 @@ def apply_layer_0(
         except Exception:
             return "", None
 
+    from src.sec_research.tool_results import SEC_TOOL_NAMES
+    if tool_name.removeprefix("tool_") in SEC_TOOL_NAMES:
+        summary, _meta = get_reducer(tool_name, registry)(payload, budget=budget_chars)
+        if summary == payload:
+            return payload, None
+        # Retain the complete input as evidence; a storage failure must not
+        # re-admit malformed/oversized SEC JSON into the model context.
+        try:
+            record = overflow_store.write(tool_name, args or {}, payload)
+        except Exception:
+            record = None
+        return summary, record
+
     if len(payload) <= budget_chars:
         return payload, None
 

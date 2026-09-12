@@ -1,0 +1,124 @@
+{
+  "targetRevision": "18d46062c30da87b30666b1ba0f290872a28fa7f",
+  "sourceDrift": "present",
+  "identities": {
+    ".superpowers/sdd/2026-09-12-sec-research-release-integration/redaction-architecture-checkpoint-01/output.log": "7c3a2997fa0731aa9cadba0afc35eb526a4297f91fc466a877687e95683b0c91",
+    ".superpowers/sdd/2026-09-12-sec-research-release-integration/redaction-architecture-checkpoint-01/results.xml": "1b2dc90e746006a8653ff4cc8f7cc6994cc46c56d85cb865f72255be653284d7",
+    ".superpowers/sdd/2026-09-12-sec-research-release-integration/redaction-architecture-controls-01/output.log": "20968b7b4a467336e72b9474a340bcf71be6aab16b552c4c0dc9576b12e53554",
+    ".superpowers/sdd/2026-09-12-sec-research-release-integration/redaction-architecture-controls-01/results.xml": "ce3a0a521739796f811a40f22c67d84e56d6f28c146a26675c92bd08b2c3e76d",
+    "src/agents/anthropic_agent/tools.py": "2e45480bf09d6718a2bfb1721806e0d1bb88beee74a15a3c67e73e5564ccd0e8",
+    "src/agents/openai_agent/tools.py": "38f7ddf53c9f911efc7894770ae767fc76ddd36623118a88d11fa98851cf936e",
+    "src/agents/shared/security.py": "7445e40f72eb8ff218140a3ce3dcfd5174f52685d4a8a9b3cfbe52a8d881f647",
+    "src/api/routes/query.py": "202408e1ed053b1bcaac98e5a5966d3217d5d57eefddf1f5a12bb1e5855bad87",
+    "src/auth_drivers/chatgpt_oauth_driver.py": "1200a4d47fbfd7692f3fbfe2d5f0ba825b1381cb95c1f033405754ff507e7bf2",
+    "src/auth_drivers/claude_code_sdk_driver.py": "7437f08f693b5ffb91345e4c2d5c73f0d6fdef9e3f239ef2668b8179295c0871",
+    "src/auth_drivers/probe_harness.py": "207191804f44161d3480f0f13b75080b2846645f679c659595d3dbeab1a806f6",
+    "src/auth_drivers/runtime_binding.py": "11c7f73309966b52088cb3b815cbdae4a03c1763c9128730e96142495657db04",
+    "src/sec_research/common.py": "46354d9b83987b73faf12a89361bdb90ad41040512622b60fc1314e4c8906db2",
+    "src/sec_research/document_queries.py": "da1444d5d3a89bf76b6c528cf4f23ea220d1c34f5108a4a1473e778c61b8fc0a",
+    "src/sec_research/documents.py": "7a6da567f0d69db19f09cd464d76f86cb41e5f88d1367d3b150851adee8d8ee6",
+    "src/sec_research/facts.py": "d91a2e8897762c332d244f4998f44f6c58aa2770fda3d0b5645852dde6946c0a",
+    "src/sec_research/queries.py": "98bd0f6da0ec1a09d892c1c37e2fe586b7432c0506da18f021572150c19fd2a4",
+    "src/sec_research/tool_results.py": "44720871c44d04ac0560893e7b051cc82b932eb2f67c4c85dbed2fa8f0f997c2",
+    "src/tools/registry.py": "bae27749eff6e55646ee46c3d37c481f70408e25beb0d1b7b00e2e3df3f9d992",
+    "tests/test_probe_harness.py": "13a09ce4a8402bb94fea16c41a529eaf1a0c5bcea38f5f357a5e87782fa57420",
+    "tests/test_sec_research_tool_adapters.py": "82a8a10cc4c79ba649f56fd066b0d8bd9d9bc9cc6526e42c7e5aced1df4f44b5",
+    "tests/test_sec_research_tool_results.py": "8a1bdb28ac48cfddd55930935d544253d6e3ca0de676db160adff587b55f61f3",
+    "tests/test_task_runtime_binding.py": "e9c504230da55685916e9af4fde64c88ca8a773da2a6ef576659826655a53318"
+  },
+  "collectionSha256": "47fd62991101838a0618cb9545c4a9016fd72d99094912d68252afa0d63db682",
+  "artifactCount": 23,
+  "probeBasis": "AST-extracted exact redactor functions; no product imports, network, live stores or credentials",
+  "samples": {
+    "sha256": {
+      "input": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "probe": "[REDACTED]",
+      "chatgpt_prose": "[REDACTED]",
+      "claude_prose": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    },
+    "fact_id": {
+      "input": "secfact_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "probe": "secfact_[REDACTED]",
+      "chatgpt_prose": "secfact_[REDACTED]",
+      "claude_prose": "secfact_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    },
+    "capture_id": {
+      "input": "secdoc_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "probe": "secdoc_[REDACTED]",
+      "chatgpt_prose": "secdoc_[REDACTED]",
+      "claude_prose": "secdoc_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    },
+    "accession": {
+      "input": "0000320193-24-000123",
+      "probe": "[REDACTED]",
+      "chatgpt_prose": "[REDACTED]",
+      "claude_prose": "0000320193-24-000123"
+    },
+    "primary_url": {
+      "input": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm",
+      "probe": "https:[REDACTED]",
+      "chatgpt_prose": "https:[REDACTED]",
+      "claude_prose": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm"
+    },
+    "revenue": {
+      "input": "391035000000",
+      "probe": "[REDACTED]",
+      "chatgpt_prose": "[REDACTED]",
+      "claude_prose": "391035000000"
+    },
+    "exact_decimal": {
+      "input": "1234567890123456789.123",
+      "probe": "[REDACTED].123",
+      "chatgpt_prose": "[REDACTED].123",
+      "claude_prose": "1234567890123456789.123"
+    },
+    "ordinary_word": {
+      "input": "Consolidated",
+      "probe": "[REDACTED]",
+      "chatgpt_prose": "[REDACTED]",
+      "claude_prose": "Consolidated"
+    },
+    "scientific_decimal": {
+      "input": "1E+3",
+      "probe": "1E+3",
+      "chatgpt_prose": "1E+3",
+      "claude_prose": "1E+3"
+    }
+  },
+  "fragmentCheck": {
+    "syntheticSecret": "A1b2C3d4E5f6",
+    "chunks": [
+      "A1b",
+      "2C3",
+      "d4E",
+      "5f6"
+    ],
+    "whole_chatgpt_redacted": true,
+    "whole_claude_redacted": true,
+    "joined_chatgpt_chunks_reproduce_secret": true,
+    "joined_claude_chunks_reproduce_secret": true,
+    "limitation": "String-function check only; not an end-to-end provider or production disclosure"
+  },
+  "testRun": {
+    "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/redaction-architecture-checkpoint-01",
+    "tests": 8,
+    "failures": [
+      "tests.test_sec_research_tool_adapters::test_each_research_transport_dispatches_three_real_sec_tools[chatgpt]",
+      "tests.test_sec_research_tool_adapters::test_each_research_transport_dispatches_three_real_sec_tools[claude]",
+      "tests.test_sec_research_tool_results::test_whole_pages_use_active_layer0_budget_without_changing_filters[chatgpt]",
+      "tests.test_sec_research_tool_results::test_whole_pages_use_active_layer0_budget_without_changing_filters[claude]"
+    ],
+    "errors": 0,
+    "skipped": 0,
+    "limitations": "8 selected cases, 70 deselected; no complete suite rerun"
+  },
+  "diagnosticControls": {
+    "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/redaction-architecture-controls-01",
+    "passed": 35,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "deselected": 133,
+    "scope": "Existing probe and captured API-key error controls; no product edits"
+  }
+}

@@ -192,26 +192,6 @@ class FileBackend:
         return {}
 
     # --------------------------------------------------------
-    # SEC Filings (limited — no local file store)
-    # --------------------------------------------------------
-
-    def query_sec_filings(
-        self,
-        ticker: str,
-        filing_types: Optional[List[str]] = None,
-    ) -> pd.DataFrame:
-        """
-        SEC filing metadata.
-
-        FileBackend returns an empty DataFrame since SEC filings are API-based.
-        The DataAccessLayer may supplement this via SECEdgarDataSource.
-        """
-        return pd.DataFrame(columns=[
-            "ticker", "filing_type", "filed_date", "url",
-            "accession_number", "description", "period_of_report",
-        ])
-
-    # --------------------------------------------------------
     # Available tickers
     # --------------------------------------------------------
 

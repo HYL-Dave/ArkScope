@@ -25,6 +25,7 @@ class ToolParameter:
     required: bool = True
     default: Any = None
     enum: Optional[List[str]] = None
+    items: Optional[dict] = None
 
 
 @dataclass
@@ -101,6 +102,8 @@ class ToolRegistry:
                 }
                 if p.enum:
                     prop["enum"] = p.enum
+                if p.items is not None:
+                    prop["items"] = p.items
                 properties[p.name] = prop
                 if p.required:
                     required.append(p.name)
@@ -137,6 +140,8 @@ class ToolRegistry:
                 }
                 if p.enum:
                     prop["enum"] = p.enum
+                if p.items is not None:
+                    prop["items"] = p.items
                 properties[p.name] = prop
                 if p.required:
                     required.append(p.name)
@@ -164,6 +169,7 @@ class ToolRegistry:
         self._register_financial_calculation_tools()
         self._register_news_event_tools()
         self._register_analysis_tools()
+        self._register_sec_research_tools()
         self._register_security_lifecycle_tools()
         self._register_portfolio_tools()
         self._register_report_tools()
@@ -532,6 +538,29 @@ class ToolRegistry:
             ],
         ))
 
+    def _register_sec_research_tools(self) -> None:
+        from typing import get_args, get_origin, get_type_hints
+        from .sec_research_tools import list_sec_filings, get_sec_financial_facts, read_sec_filing
+
+        for function in (list_sec_filings, get_sec_financial_facts, read_sec_filing):
+            hints = get_type_hints(function)
+            parameters = []
+            for name, parameter in inspect.signature(function).parameters.items():
+                annotation = hints[name]
+                variants = get_args(annotation)
+                if type(None) in variants:
+                    annotation = next(t for t in variants if t is not type(None))
+                kind = "array" if get_origin(annotation) is list else {str: "string", int: "integer", bool: "boolean"}[annotation]
+                required = parameter.default is inspect.Parameter.empty
+                parameters.append(ToolParameter(name, kind, name.replace("_", " "),
+                    required=required, default=None if required else parameter.default,
+                    enum={"freshness": ["auto", "stored", "refresh"],
+                          "period": ["all", "instant", "annual", "quarterly", "ytd"],
+                          "revisions": ["latest", "all"]}.get(name),
+                    items={"type": "string"} if kind == "array" else None))
+            self.register(ToolDefinition(name=function.__name__, description=inspect.getdoc(function),
+                function=function, category="analysis", requires_dal=False, parameters=parameters))
+
     def _register_analysis_tools(self) -> None:
         from .analysis_tools import (
             get_fundamentals_analysis,
@@ -540,10 +569,7 @@ class ToolRegistry:
             get_watchlist_overview,
             get_morning_brief,
         )
-        from .sec_tools import (
-            get_sec_filings,
-            get_insider_trades,
-        )
+        from .sec_tools import get_insider_trades
 
         self.register(ToolDefinition(
             name="get_fundamentals_analysis",
@@ -576,27 +602,6 @@ class ToolRegistry:
             category="analysis",
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
-            ],
-        ))
-
-        self.register(ToolDefinition(
-            name="get_sec_filings",
-            result_policy=PUBLIC_JSON,
-            description=(
-                "Get SEC filing metadata (10-K, 10-Q, 8-K, etc.) for a ticker. "
-                "Returns filing type, date, and URL — metadata only, not content."
-            ),
-            function=get_sec_filings,
-            category="analysis",
-            requires_dal=False,
-            parameters=[
-                ToolParameter("ticker", "string", "Stock ticker symbol"),
-                ToolParameter("filing_types", "array",
-                              "Filter by filing types (e.g. ['10-K', '10-Q'])",
-                              required=False),
-                ToolParameter("limit", "integer",
-                              "Maximum number of filings to return (default: 10)",
-                              required=False),
             ],
         ))
 

@@ -332,7 +332,8 @@ revenue = facts['facts']['us-gaap']['Revenues']['units']['USD']
 | 現行 owner | 程式碼 | 責任 |
 |-----------|--------|------|
 | `SECEdgarDataSource` | `data_sources/sec_edgar_source.py` | CIK 解析、submissions、filing metadata、Company Facts 與受限的文件文字讀取 |
-| `SECEdgarFinancials` | `data_sources/sec_edgar_financials.py` | 使用 `SECEdgarDataSource` 將財務事實映射為損益表、資產負債表與現金流量表，並提供 filing 列表 |
+| `SECEdgarFinancials` | `data_sources/sec_edgar_financials.py` | 使用 `SECEdgarDataSource` 將財務事實映射為損益表、資產負債表與現金流量表 |
+| `ToolService` | `src/sec_research/tool_service.py` | 持久化 SEC 目錄、精確財務事實、文件擷取及固定快照查詢 |
 | `SecTransport` | `data_sources/sec_transport.py` | 共用 SEC HTTP 邊界，檢查身份、限制回應大小並執行有界重試 |
 | `SecRequestGovernor` | `data_sources/sec_transport.py` | 共用跨程序節流，協調 SEC 請求的起始間隔 |
 
@@ -340,16 +341,22 @@ revenue = facts['facts']['us-gaap']['Revenues']['units']['USD']
 
 `SECEdgarDataSource.get_cik`、`fetch_submissions` 與 `fetch_company_facts`
 直接讀取 SEC 資料；`SECEdgarFinancials` 提供上層財報映射。
-`src/tools/sec_tools.py::get_sec_filings` 是目前可用的直接 EDGAR metadata 工具。
-現有 filing 讀取以 `filings.recent` 為主，不能視為完整歷史目錄；
-`fetch_filing_document_text` 的受限文字讀取也不等同持久化章節擷取與可重現引用。
 
-### 尚未實作的持久化研究服務
+### 持久化研究工具
 
-持久化 filing catalog、具來源追溯的財務事實、文件快照與引用，以及三個新研究工具，
-屬於 [SEC 研究規格](../docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md)
-中的獨立新功能，由規劃中的 `src/sec_research/` 負責，並非現有 client 已完成的能力。
-現有 `get_sec_filings` 在三工具原子替換完成前維持運作。
+`src/tools/sec_research_tools.py` 提供三個 `analysis` 工具，皆不需要 DAL 參數：
+
+- `list_sec_filings(issuer, forms=None, filed_from=None, filed_to=None, include_amendments=True, cursor=None, limit=20, freshness="auto")`
+- `get_sec_financial_facts(issuer, metrics=None, concepts=None, fact_ids=None, accession=None, as_of=None, period="all", start=None, end=None, revisions="latest", cursor=None, limit=40, freshness="auto")`
+- `read_sec_filing(filing_id, document_id="primary", section_id=None, query=None, capture_id=None, cursor=None, max_chars=6000, freshness="auto")`
+
+回傳固定 envelope：`status`、`data`、`gaps`、`observed_at`、`coverage`、`next_cursor`。
+保留精確 Decimal TEXT、來源 SHA-256、完整引用及 UTF-8 半開位元組範圍。
+歷史來源未完成時必須呈現 gaps，不能將 recent 目錄宣稱為完整歷史。
+`stored` 與固定 fact/capture/cursor 查詢不擷取外部資料；`refresh` 不可覆寫 pin。
+續頁保留原始 filters、`limit`、`max_chars`；模型通道以實際包裝後大小分配完整記錄，
+無法容納的單筆記錄以明確 size gap 和可前進 cursor 表示，不截斷 JSON。
+`get_insider_trades`、既有財報 mapper 與 `SECEdgarDataSource` 保留。
 
 ---
 

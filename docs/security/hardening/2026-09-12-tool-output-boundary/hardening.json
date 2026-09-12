@@ -1,0 +1,411 @@
+{
+  "documentType": "codex-security.hardening-analysis",
+  "schemaVersion": "1.0",
+  "analysisId": "hardening_20260912_tool_output_boundary",
+  "sourceEvidence": {
+    "kind": "source_and_experiment_collection",
+    "label": "Research output source and offline synthetic evidence",
+    "collectionSha256": "47fd62991101838a0618cb9545c4a9016fd72d99094912d68252afa0d63db682",
+    "artifactCount": 23,
+    "sourceDrift": "present",
+    "targetRevision": "18d46062c30da87b30666b1ba0f290872a28fa7f",
+    "identityPath": "observations.json"
+  },
+  "assessment": {
+    "outcome": "opportunities_identified",
+    "summary": "Lossy diagnostic filtering is reused as research-data policy; a shared contextual output boundary is proposed, not implemented."
+  },
+  "constraints": {
+    "profile": "preserve_research_integrity_and_diagnostic_secrecy",
+    "changeHorizons": [
+      "incremental",
+      "structural"
+    ],
+    "nonNegotiables": [
+      "No production data/config/token access or provider calls",
+      "No merge, push, restart or maintenance",
+      "Preserve selected auth and known-secret protections",
+      "Four-channel canonical data equality, not identical SDK envelopes",
+      "No broad regex relaxation or per-subsystem bypass proliferation"
+    ],
+    "assumptions": [
+      "Existing bounded output limits remain",
+      "No CPU/RSS/stream-latency benchmarks have been measured",
+      "The current user message is not approval of the SEC-local exemption"
+    ]
+  },
+  "opportunities": [
+    {
+      "opportunityId": "contextual-output-policy",
+      "title": "Own Research output policy by type and destination",
+      "summary": "Separate admitted public research data/prose from lossy diagnostics.",
+      "diagnosis": "Transport-specific serializers reused a probe safety net as an incompatible data integrity and secrecy policy.",
+      "evidence": [
+        {
+          "evidenceId": "E1",
+          "claimType": "observed",
+          "sourceKind": "source",
+          "path": "src/auth_drivers/probe_harness.py",
+          "claim": "A deliberately over-redacting diagnostic safety net uses generic opaque-string rules."
+        },
+        {
+          "evidenceId": "E2",
+          "claimType": "observed",
+          "sourceKind": "source",
+          "path": "src/auth_drivers/chatgpt_oauth_driver.py",
+          "claim": "Tool results, answer deltas and final answers share generic redaction; Claude uses exact-only prose replacement."
+        },
+        {
+          "evidenceId": "E3",
+          "claimType": "observed",
+          "sourceKind": "source",
+          "path": "src/auth_drivers/runtime_binding.py",
+          "claim": "API-key runtime errors have captured-key and generic redaction despite no redact call in tool serializers."
+        },
+        {
+          "evidenceId": "E4",
+          "claimType": "observed",
+          "sourceKind": "source",
+          "path": "src/sec_research/document_queries.py",
+          "claim": "Capture IDs are prefixed and cursors have canonical, request-bound semantics; facts.py stores finite Decimal via str."
+        },
+        {
+          "evidenceId": "E5",
+          "claimType": "observed",
+          "sourceKind": "experiment",
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/redaction-architecture-checkpoint-01/results.xml",
+          "claim": "Eight selected real adapter cases: four API-key passes, four OAuth assertion failures, no setup errors."
+        },
+        {
+          "evidenceId": "E6",
+          "claimType": "observed",
+          "sourceKind": "experiment",
+          "path": "observations.json",
+          "claim": "Synthetic exact-function probes corrupt public text and show split-token replacement limitations; not a production disclosure."
+        },
+        {
+          "evidenceId": "E7",
+          "claimType": "inferred",
+          "sourceKind": "source",
+          "path": "src/tools/registry.py",
+          "claim": "Input-only registry and channel-specific result handling lack one accountable output-policy boundary."
+        }
+      ],
+      "desiredInvariants": [
+        "Credentials remain in ephemeral auth-owned state",
+        "Registered complete result policies are revalidated at emission",
+        "Canonical safe payloads remain equal across four transports",
+        "Known secrets and invalid structures fail closed without corrupted identifiers",
+        "Public prose is not filtered solely by length or entropy",
+        "Streaming protection holds across fragment boundaries",
+        "Modified quotes never claim exact source bytes"
+      ],
+      "proposalPath": "proposals/contextual-output-policy.md",
+      "options": [
+        {
+          "optionId": "sec-local",
+          "title": "SEC-local validated exception",
+          "kind": "baseline",
+          "summary": "Preserve adapter ownership and special-case complete validated SEC results.",
+          "diagramPaths": {
+            "before": "diagrams/contextual-output-policy-before.mmd",
+            "after": "diagrams/contextual-output-policy-sec-local-after.mmd"
+          },
+          "evidenceCoverage": [
+            {
+              "evidenceId": "E1",
+              "effect": "unaffected",
+              "tacticalFixRequired": true,
+              "rationale": "Preserve the diagnostic scrubber and its regression owners."
+            },
+            {
+              "evidenceId": "E2",
+              "effect": "mitigates",
+              "tacticalFixRequired": true,
+              "rationale": "SEC-only scope leaves other tools and prose unchanged."
+            },
+            {
+              "evidenceId": "E3",
+              "effect": "unaffected",
+              "tacticalFixRequired": true,
+              "rationale": "Preserve existing API-key error guards; success policy integration remains required."
+            },
+            {
+              "evidenceId": "E4",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "Domain validation must preserve precise values, prefixed IDs and request-bound cursors."
+            },
+            {
+              "evidenceId": "E5",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "The actual four failing adapter cases must become positive controls."
+            },
+            {
+              "evidenceId": "E6",
+              "effect": "unaffected",
+              "tacticalFixRequired": true,
+              "rationale": "A local SEC field exception does not fix prose or fragment boundaries."
+            },
+            {
+              "evidenceId": "E7",
+              "effect": "unaffected",
+              "tacticalFixRequired": true,
+              "rationale": "Retain current adapter ownership."
+            }
+          ],
+          "tradeoffs": [
+            {
+              "dimension": "security",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Exact SEC data can survive, but non-SEC/prose/fragment behavior remains divergent.",
+              "validationPlan": "Real adapter, stream, persistence and adversarial matrix."
+            },
+            {
+              "dimension": "performance",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "A SEC-only closed-schema walk adds bounded CPU work.",
+              "validationPlan": "Compare CPU and first-visible-text delay for identical small/maximum fixtures; declare threshold before candidate measurement."
+            },
+            {
+              "dimension": "memory",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Additional bounded SEC validation state.",
+              "validationPlan": "Compare peak RSS and enforce existing result caps plus a declared stream-state bound."
+            },
+            {
+              "dimension": "reliability",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Narrower patch, with remaining inconsistent caller policies.",
+              "validationPlan": "Malformed result, partial output, cancellation and existing caller positive controls."
+            },
+            {
+              "dimension": "operability",
+              "direction": "regresses",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "One more subsystem-specific policy must be maintained.",
+              "validationPlan": "Verify code/status-only diagnostic records and absence of payload secrets."
+            },
+            {
+              "dimension": "migration",
+              "direction": "regresses",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "A smaller SEC-specific patch still changes a security boundary.",
+              "validationPlan": "Registry completeness and actual live-caller shapes in offline fixtures."
+            },
+            {
+              "dimension": "developer_ergonomics",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "Quick SEC integration, with likely later per-subsystem exceptions.",
+              "validationPlan": "Require a new-tool contract owner and inventory missing policies."
+            },
+            {
+              "dimension": "reversibility",
+              "direction": "neutral",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Revert the narrow SEC batch or keep the unsupported path explicitly unavailable.",
+              "validationPlan": "Rollback must preserve diagnostics and never emit corrupted provenance."
+            }
+          ],
+          "residualRisks": [
+            "Other tools and ChatGPT prose remain lossy",
+            "Stateless fragment filtering is unchanged",
+            "Unknown encoded secrets remain outside guarantees"
+          ],
+          "implementationReadiness": {
+            "affectedComponents": [
+              "src/sec_research/tool_results.py",
+              "Both OAuth result handlers"
+            ],
+            "workPackages": [
+              "Complete SEC schema boundary and exact-secret checks",
+              "Actual adapter positive/negative matrix"
+            ],
+            "acceptanceCriteria": [
+              "Precise SEC data and continuation survive without leaking known secrets"
+            ],
+            "migrationNotes": [
+              "Temporary delivery option only; not selected"
+            ],
+            "rollback": "Revert unshipped SEC integration or keep affected tools explicitly unavailable."
+          }
+        },
+        {
+          "optionId": "contextual-shared",
+          "title": "Shared contextual output boundary",
+          "kind": "structural",
+          "summary": "Registered result policies, ephemeral secret guard, separate diagnostics and stateful answer emission.",
+          "diagramPaths": {
+            "before": "diagrams/contextual-output-policy-before.mmd",
+            "after": "diagrams/contextual-output-policy-contextual-shared-after.mmd"
+          },
+          "evidenceCoverage": [
+            {
+              "evidenceId": "E1",
+              "effect": "unaffected",
+              "tacticalFixRequired": true,
+              "rationale": "Preserve the diagnostic scrubber and its regression owners."
+            },
+            {
+              "evidenceId": "E2",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "Requires result and prose wiring through the shared owner."
+            },
+            {
+              "evidenceId": "E3",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "Preserve existing API-key error guards; success policy integration remains required."
+            },
+            {
+              "evidenceId": "E4",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "Domain validation must preserve precise values, prefixed IDs and request-bound cursors."
+            },
+            {
+              "evidenceId": "E5",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "The actual four failing adapter cases must become positive controls."
+            },
+            {
+              "evidenceId": "E6",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "Requires stateful stream matching and non-SEC public-prose positive controls."
+            },
+            {
+              "evidenceId": "E7",
+              "effect": "addresses",
+              "tacticalFixRequired": true,
+              "rationale": "Introduce explicit common result-policy ownership."
+            }
+          ],
+          "tradeoffs": [
+            {
+              "dimension": "security",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Shared result/prose policy and bounded streaming state address covered paths; unknown secret encodings remain a limit.",
+              "validationPlan": "Real adapter, stream, persistence and adversarial matrix."
+            },
+            {
+              "dimension": "performance",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Validation, scanning and stream matching add bounded CPU work without new I/O.",
+              "validationPlan": "Compare CPU and first-visible-text delay for identical small/maximum fixtures; declare threshold before candidate measurement."
+            },
+            {
+              "dimension": "memory",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Additional per-result validation and bounded pending-prefix state per stream.",
+              "validationPlan": "Compare peak RSS and enforce existing result caps plus a declared stream-state bound."
+            },
+            {
+              "dimension": "reliability",
+              "direction": "unknown",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Fewer policy owners but a larger integration surface during migration.",
+              "validationPlan": "Malformed result, partial output, cancellation and existing caller positive controls."
+            },
+            {
+              "dimension": "operability",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "One typed diagnostic owner; no additional deployed service.",
+              "validationPlan": "Verify code/status-only diagnostic records and absence of payload secrets."
+            },
+            {
+              "dimension": "migration",
+              "direction": "regresses",
+              "confidence": "high",
+              "basis": "source-derived",
+              "assessment": "Inventory result shapes and migrate covered producers across all four adapters.",
+              "validationPlan": "Registry completeness and actual live-caller shapes in offline fixtures."
+            },
+            {
+              "dimension": "developer_ergonomics",
+              "direction": "improves",
+              "confidence": "medium",
+              "basis": "hypothetical",
+              "assessment": "Tool authors declare an output contract consumed by one enforcement owner.",
+              "validationPlan": "Require a new-tool contract owner and inventory missing policies."
+            },
+            {
+              "dimension": "reversibility",
+              "direction": "neutral",
+              "confidence": "medium",
+              "basis": "source-derived",
+              "assessment": "Revert an unreleased producer group or disable the affected new capability.",
+              "validationPlan": "Rollback must preserve diagnostics and never emit corrupted provenance."
+            }
+          ],
+          "residualRisks": [
+            "Unknown secrets and arbitrary encoding cannot be inferred reliably",
+            "Schema validity is not proof of nonsecret content or prompt safety",
+            "Transition requires complete result and sink inventories"
+          ],
+          "implementationReadiness": {
+            "affectedComponents": [
+              "src/tools/registry.py",
+              "Both API-key tool adapters",
+              "Both OAuth drivers",
+              "Shared Research event and persistence boundaries",
+              "Runtime auth binding and domain result validators"
+            ],
+            "workPackages": [
+              "Inventory result contracts and sinks",
+              "Design shared admission and ephemeral credential lifetime",
+              "Migrate each covered producer across four adapters",
+              "Stateful answer emission and durable trace gates",
+              "Adversarial, integrity and existing regression evidence"
+            ],
+            "acceptanceCriteria": [
+              "Safe canonical payload equality",
+              "No known protected sequence in concatenated stream or persisted trace",
+              "Diagnostic guards preserved",
+              "No long-public-string corruption",
+              "No malformed result silently repaired"
+            ],
+            "migrationNotes": [
+              "Await explicit approval and a written implementation plan",
+              "Preserve old protections until replacement owners pass",
+              "Do not rewrite stored sources or conversations"
+            ],
+            "rollback": "Revert unreleased producer groups or disable the affected capability without weakening diagnostic protection."
+          }
+        }
+      ],
+      "recommendedOptionId": "contextual-shared",
+      "recommendation": "Prefer the shared boundary under the user's root-cause and clean-ownership priorities; local repair only as explicitly temporary delivery."
+    }
+  ],
+  "openQuestions": [
+    "Does the user approve the shared public-content policy and larger integration scope?",
+    "Concrete result inventories and bounded streaming budgets must be specified before implementation."
+  ],
+  "status": "proposal_only_pending_approval"
+}

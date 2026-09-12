@@ -133,8 +133,13 @@ class _ToolDef:
 
 
 class _Registry:
+    def __init__(self):
+        from src.tools.registry import ToolRegistry
+        self.sec = ToolRegistry()
+        self.sec._register_sec_research_tools()
+
     def get(self, name):
-        return _ToolDef() if name == "get_price_change" else None
+        return _ToolDef() if name == "get_price_change" else self.sec.get(name)
 
 
 class _VerboseToolDef:
@@ -153,9 +158,9 @@ class _VerboseToolDef:
         }
 
 
-class _VerboseRegistry:
+class _VerboseRegistry(_Registry):
     def get(self, name):
-        return _VerboseToolDef() if name == "get_price_change" else None
+        return _VerboseToolDef() if name == "get_price_change" else self.sec.get(name)
 
 
 class _SlowNewsBriefToolDef:
@@ -171,9 +176,9 @@ class _SlowNewsBriefToolDef:
         return {"ok": True}
 
 
-class _SlowNewsRegistry:
+class _SlowNewsRegistry(_Registry):
     def get(self, name):
-        return _SlowNewsBriefToolDef() if name == "get_news_brief" else None
+        return _SlowNewsBriefToolDef() if name == "get_news_brief" else self.sec.get(name)
 
 
 def _run(coro):
@@ -500,6 +505,20 @@ def test_call_llm_collects_done_text(monkeypatch):
     assert res.usage.total_tokens == 3
 
 
+def test_tool_free_driver_call_preserves_calibration_and_canary_contract(monkeypatch):
+    client = _ExecClient([[
+        {"type": "response.completed", "response": {"output": [
+            {"type": "message", "content": [{"type": "output_text", "text": "OK"}]},
+        ]}},
+    ]])
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+    driver = OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(),
+                                    registry=None, max_turns=1)
+    result = _run(driver.call_llm(_req(tools=[])))
+    assert result.text == "OK"
+    assert client.responses.calls[0].get("tools", []) == []
+
+
 def test_stream_llm_streams_text_done_and_strips_max_output_tokens(monkeypatch):
     client = _ExecClient([[
         {"type": "response.output_text.delta", "delta": "OK"},
@@ -737,11 +756,11 @@ def test_stream_llm_off_allowlist_tool_errors_without_calling_registry(monkeypat
     ]])
     monkeypatch.setattr(mod, "_execution_client", lambda token: client)
 
-    class BoomRegistry:
+    class BoomRegistry(_Registry):
         def get(self, name):
             if name == "delete_files":  # pragma: no cover - allowlist veto should fire first
                 raise AssertionError("off-allowlist tool must not be looked up")
-            return None
+            return self.sec.get(name)
 
     d = OpenAIChatGPTOAuthDriver(credential=_Cred(7), token_store=_TokStore(), registry=BoomRegistry(), dal=object())
     events = _run(_collect(d.stream_llm(_req())))

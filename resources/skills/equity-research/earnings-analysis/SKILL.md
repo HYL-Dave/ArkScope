@@ -6,8 +6,8 @@ required_params: [ticker]
 aliases: [earnings_review, er]
 category: equity-research
 data_sources:
-  required: [get_detailed_financials, get_analyst_consensus]
-  optional: [get_sec_filings, get_earnings_impact, get_ticker_news]
+  required: [get_detailed_financials, get_analyst_consensus, list_sec_filings, get_sec_financial_facts, read_sec_filing]
+  optional: [get_earnings_impact, get_ticker_news]
 output: report
 ---
 
@@ -23,7 +23,7 @@ identify trends, and evaluate forward guidance against expectations.
 1. **get_detailed_financials** — Comprehensive financial metrics from SEC EDGAR
 2. **get_analyst_consensus** — Consensus estimates and earnings surprise history
 3. **get_earnings_impact** — Price reaction and historical earnings patterns
-4. **get_sec_filings** — Actual 10-Q/10-K for detailed segment data
+4. **list_sec_filings + read_sec_filing** — Actual 10-Q/10-K for detailed segment data
 5. **get_ticker_news** — Post-earnings analyst commentary
 
 ## Workflow
@@ -88,3 +88,13 @@ result as unavailable rather than inventing a precise value.
 6. **Investment implications**: Does this report change the thesis? How?
 
 AFTER ANALYSIS: Save as a research report using save_report() with report_type="earnings_analysis".
+
+SEC EVIDENCE:
+- Call list_sec_filings(issuer="{ticker}") to select observed filing IDs, then
+  read_sec_filing(filing_id=...) for document indexes and complete cited passages.
+- Use get_sec_financial_facts(issuer="{ticker}") for exact decimal observations;
+  preserve units, periods, revisions, source hashes, and provenance.
+- Keep the same filters, limit, and max_chars on cursor continuation. Stored or
+  pinned reads acquire nothing; freshness="refresh" cannot replace a pin.
+- Report status, gaps, coverage, and whole-record size gaps. Missing required SEC
+  tools or unavailable evidence is a research gap, not an empty successful result.

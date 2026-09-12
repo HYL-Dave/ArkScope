@@ -21,7 +21,6 @@ from src.tools.schemas import (
     NewsQueryResult,
     PriceBar,
     PriceQueryResult,
-    SECFiling,
     WatchlistResult,
 )
 from src.tools.backends import DataBackend
@@ -85,7 +84,6 @@ def test_local_capability_protocol_matches_inventory_method_set():
         "query_sa_market_news_recent_ids",
         "query_sa_market_news_recovery_rows",
         "query_sa_picks",
-        "query_sec_filings",
         "reconcile_sa_articles",
         "record_sa_refresh_failure",
         "reject_sa_article_candidate",
@@ -292,12 +290,20 @@ class TestFundamentals:
 # ============================================================
 
 class TestSECFilings:
-    def test_get_sec_filings_empty(self, dal):
-        """FileBackend SEC returns empty list (API-based data)."""
-        filings = dal.get_sec_filings("NVDA")
-        assert isinstance(filings, list)
-        # FileBackend has no local SEC data
-        assert len(filings) == 0
+    def test_old_sec_dal_absent_and_new_catalog_is_live(self, dal, tmp_path, monkeypatch):
+        from src.tools.backends import DataBackend
+        from src.tools.backends.file_backend import FileBackend
+        from src.tools.backends.local_capabilities import LocalDataCapabilities
+        from src.tools.backends.local_market_backend import LocalMarketBackend
+        from src.tools.registry import create_default_registry
+        from tests.test_sec_research_tool_adapters import tool_fixture, wire, CIK
+        assert not hasattr(dal, "get_sec_filings")
+        for owner in (DataBackend, FileBackend, LocalDataCapabilities, LocalMarketBackend):
+            assert not hasattr(owner, "query_sec_filings")
+        fixture = tool_fixture.__wrapped__(tmp_path)
+        wire(monkeypatch, fixture.service)
+        result = create_default_registry().get("list_sec_filings").function(issuer=CIK)
+        assert len(result["data"]) == 2
 
 
 # ============================================================
