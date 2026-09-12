@@ -449,6 +449,13 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 
 ## 新聞來源內容比較 (2026-01-03)
 
+以下保留 2026-01-03 的歷史比較與當時觀察，不代表現行產品 adapter、
+現行價格或重新驗證的 API 能力。C09 已移除舊 unified-source classes/factory；
+現行 Finnhub 新聞由 `src/collectors/finnhub_news.py` 提供 fetch/parse，日曆由
+`data_sources/finnhub_calendar_client.py` 提供。EODHD 保留的是
+`data_sources/lifecycle_provider_census_transport.py` 的 lifecycle census 與
+Settings 金鑰支援，不是下表的舊新聞 adapter。已收集資料不因原始碼清理而刪除。
+
 ### 各來源內容類型 (2026-01-03 驗證)
 
 | 來源 | 內容類型 | 欄位名稱 | 平均長度 | 歷史深度 | 月費 | 備註 |
@@ -466,17 +473,17 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 | Provider | 驗證方式 | 檔案位置 |
 |----------|----------|----------|
 | IBKR | 實測數據 | `data/news/raw/ibkr/*.parquet` |
-| EODHD | 程式碼確認 | `data_sources/eodhd_source.py:234` |
+| EODHD | 歷史原始碼觀察（C09 前） | `88f0512e:data_sources/eodhd_source.py` |
 | Massive | 實測數據 | `data/news/raw/polygon/*.parquet` |
-| Finnhub | 現行產品 adapter | `data_sources/finnhub_source.py` |
-| Alpha Vantage | 現行產品 adapter | `data_sources/alpha_vantage_source.py` |
+| Finnhub | 歷史 standalone adapter（非現行 collector） | `88f0512e:data_sources/finnhub_source.py` |
+| Alpha Vantage | 歷史 standalone adapter（已移除） | `88f0512e:data_sources/alpha_vantage_source.py` |
 | Tiingo | QuantConnect 文檔 | [Tiingo News](https://www.quantconnect.com/docs/v2/our-platform/user-guides/alternative-data/tiingo-news) |
 
 ### 關鍵發現
 
 1. **EODHD 是 IBKR 外唯一提供完整文章的數據源**
    - 欄位: `content` (映射至 `description`)
-   - 驗證: `eodhd_source.py` line 234: `description=item.get('content', '')`
+   - 歷史原始碼觀察: `88f0512e:data_sources/eodhd_source.py` 中的 `description=item.get('content', '')` 映射；不是現行新聞能力的驗證
    - 免費層限制: 20 calls/day，**每次新聞查詢消耗 5 calls**
 
 2. **Massive 付費版不提供完整文章**

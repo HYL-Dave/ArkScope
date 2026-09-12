@@ -1,5 +1,7 @@
 import ast
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -11,9 +13,73 @@ ROOT = Path(__file__).resolve().parents[1]
     "data_sources/sec_earnings_releases.py",
     "src/security_lifecycle_news_evidence.py",
     "src/news_identity_repair.py",
+    "data_sources/eodhd_source.py",
+    "data_sources/alpha_vantage_source.py",
+    "data_sources/finnhub_source.py",
+    "data_sources/source_factory.py",
 ])
 def test_abandoned_leaf_is_physically_absent(relative):
     assert not (ROOT / relative).exists(), f"abandoned leaf remains: {relative}"
+
+
+def test_data_source_package_does_not_import_abandoned_modules():
+    code = """
+import importlib.abc
+import sys
+
+class RejectAbandonedProviderImport(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in {
+            'data_sources.eodhd_source',
+            'data_sources.alpha_vantage_source',
+            'data_sources.finnhub_source',
+            'data_sources.source_factory',
+        }:
+            raise AssertionError(f'abandoned provider import requested: {fullname}')
+        return None
+
+sys.meta_path.insert(0, RejectAbandonedProviderImport())
+import data_sources
+"""
+    result = subprocess.run(
+        [sys.executable, "-B", "-c", code],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_data_source_package_has_no_abandoned_exports():
+    import data_sources
+
+    abandoned = {
+        "EODHDDataSource", "AlphaVantageDataSource", "FinnhubDataSource",
+        "get_data_source", "list_available_sources", "register_source",
+        "get_multi_source_news", "eodhd_source", "alpha_vantage_source",
+        "finnhub_source", "source_factory",
+    }
+    assert not abandoned.intersection(data_sources.__all__)
+    assert not abandoned.intersection(vars(data_sources))
+
+
+def test_data_source_package_preserves_current_exports():
+    import data_sources
+    from data_sources import base, ibkr_source, polygon_source, sec_edgar_source
+
+    for module, names in (
+        (base, ("BaseDataSource", "NewsArticle", "StockPrice", "SECFiling")),
+        (polygon_source, ("PolygonDataSource",)),
+        (sec_edgar_source, ("SECEdgarDataSource",)),
+        (ibkr_source, (
+            "IBKRDataSource", "IntradayBar", "OptionChainParams", "OptionQuote",
+            "OptionFilter", "OptionHistoricalBar", "ScannerResult",
+        )),
+    ):
+        for name in names:
+            assert name in data_sources.__all__, f"current export missing: {name}"
+            assert getattr(data_sources, name, None) is getattr(module, name)
 
 
 def test_factory_has_no_placeholder_class_or_export():
