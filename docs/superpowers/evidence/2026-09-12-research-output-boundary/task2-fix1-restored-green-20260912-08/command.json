@@ -1,0 +1,37 @@
+{
+  "name": "task2-fix1-restored-green-20260912-08",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/offline_pytest.py",
+    "tests/test_tool_output_policy.py",
+    "tests/test_tool_output_channels.py",
+    "tests/test_agents.py",
+    "tests/test_subagent.py",
+    "tests/test_tool_calling.py",
+    "tests/test_financial_calculation_tools.py",
+    "tests/test_security.py",
+    "tests/test_chatgpt_oauth_driver.py",
+    "tests/test_claude_code_sdk_driver.py",
+    "tests/test_macro_calendar_read.py",
+    "tests/test_task_runtime_binding.py",
+    "tests/test_probe_harness.py",
+    "-q",
+    "--show-capture=no",
+    "-rN",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-fix1-restored-green-20260912-08/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 26.238,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-fix1-restored-green-20260912-08",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-fix1-restored-green-20260912-08/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-fix1-restored-green-20260912-08/output.log"
+}

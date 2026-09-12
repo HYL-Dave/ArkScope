@@ -1,0 +1,180 @@
+{
+  "backend": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 10166,
+    "skipped": 12
+  },
+  "checks": {
+    "all_new_suites_executed_without_skip": true,
+    "command_exit_zero": true,
+    "explicit_tests_directory": true,
+    "no_backend_failure_or_error": true,
+    "retained_safety_owners_executed_without_skip": true,
+    "source_and_runtime_unchanged": true
+  },
+  "head": "ff7c4d753ab0868aaa07a330841e0dd1de96f72c",
+  "junit_sha256": "d0c9a9d978603a0c2f7d2fb94cfef345ff41aa03695bf1e1f69f06f8acf170ea",
+  "new_suite_counts": {
+    "test_model_catalog_output_boundary": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 59,
+      "skipped": 0
+    },
+    "test_output_boundary": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 83,
+      "skipped": 0
+    },
+    "test_research_output_compaction": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 17,
+      "skipped": 0
+    },
+    "test_research_output_events": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 330,
+      "skipped": 0
+    },
+    "test_research_output_lifetimes": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 35,
+      "skipped": 0
+    },
+    "test_tool_output_channels": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 146,
+      "skipped": 0
+    },
+    "test_tool_output_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 187,
+      "skipped": 0
+    }
+  },
+  "note": "Complete backend totals include the new suites; do not add them twice.",
+  "retained_owner_counts": {
+    "test_api_fixed_dispatch_pins_complete_selection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0
+    },
+    "test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_failed_generation_redacts_selected_key_after_activation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_openai_retry_key_echo_is_private_without_changing_retry_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_original_oauth_id_can_refresh_normally_without_reselection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    }
+  },
+  "seconds": 1097.131,
+  "skipped": [
+    {
+      "class": "tests.test_detailed_financials.TestLiveTechMetrics",
+      "name": "test_nvda_tech_metrics",
+      "reason": "Live SEC EDGAR test \u2014 run manually"
+    },
+    {
+      "class": "tests.test_ibkr_scanner",
+      "name": "test_connection",
+      "reason": "manual test script \u2014 requires IBKR TWS"
+    },
+    {
+      "class": "tests.test_ibkr_scanner",
+      "name": "test_scanner_parameters",
+      "reason": "manual test script \u2014 requires IBKR TWS"
+    },
+    {
+      "class": "tests.test_ibkr_scanner",
+      "name": "test_basic_stock_scan",
+      "reason": "manual test script \u2014 requires IBKR TWS"
+    },
+    {
+      "class": "tests.test_ibkr_scanner",
+      "name": "test_option_volume_scan",
+      "reason": "manual test script \u2014 requires IBKR TWS"
+    },
+    {
+      "class": "tests.test_ibkr_scanner",
+      "name": "test_iv_scan",
+      "reason": "manual test script \u2014 requires IBKR TWS"
+    },
+    {
+      "class": "tests.test_ibkr_scanner",
+      "name": "test_put_call_ratio_scan",
+      "reason": "manual test script \u2014 requires IBKR TWS"
+    },
+    {
+      "class": "tests.test_ibkr_scanner",
+      "name": "test_unusual_activity",
+      "reason": "manual test script \u2014 requires IBKR TWS"
+    },
+    {
+      "class": "tests.test_ibkr_scanner",
+      "name": "test_option_filter",
+      "reason": "manual test script \u2014 requires IBKR TWS"
+    },
+    {
+      "class": "tests.test_ibkr_scanner",
+      "name": "test_option_quote",
+      "reason": "manual test script \u2014 requires IBKR TWS"
+    },
+    {
+      "class": "tests.test_option_chain_tools.TestLiveOptionChain",
+      "name": "test_spy_option_chain",
+      "reason": "Live IBKR test \u2014 run manually"
+    },
+    {
+      "class": "tests.test_peer_comparison.TestLivePeerComparison",
+      "name": "test_nvda_peer_comparison",
+      "reason": "Live SEC EDGAR test \u2014 run manually"
+    }
+  ],
+  "source_collection_sha256": "36af98c16502f53a9f96a90e8f86b35921a723b98c4ead5a87bf3ec0c47f86e8",
+  "source_drift": [],
+  "test_command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/offline_pytest.py",
+    "-q",
+    "tests",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/backend-full-04/results.xml"
+  ]
+}

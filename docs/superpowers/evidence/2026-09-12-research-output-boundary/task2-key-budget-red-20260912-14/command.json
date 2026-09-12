@@ -1,0 +1,28 @@
+{
+  "name": "task2-key-budget-red-20260912-14",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/offline_pytest.py",
+    "tests/test_tool_output_policy.py",
+    "-k",
+    "oversized_key_is_bounded",
+    "-q",
+    "--show-capture=no",
+    "-rN",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-key-budget-red-20260912-14/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 0.736,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-key-budget-red-20260912-14",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-key-budget-red-20260912-14/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-key-budget-red-20260912-14/output.log"
+}

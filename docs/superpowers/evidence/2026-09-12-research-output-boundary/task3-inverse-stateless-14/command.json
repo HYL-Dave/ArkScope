@@ -1,0 +1,27 @@
+{
+  "name": "task3-inverse-stateless-14",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/offline_pytest.py",
+    "-q",
+    "tests/test_research_output_events.py",
+    "-k",
+    "(incremental_producers_protect_known_secret_at_every_split and raw-3 and chatgpt) or (four_producers_preserve_public_prose_and_final and chatgpt)",
+    "--tb=short",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-inverse-stateless-14/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 3.231,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-inverse-stateless-14",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-inverse-stateless-14/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-inverse-stateless-14/output.log"
+}

@@ -1,0 +1,624 @@
+{
+  "registered": 54,
+  "tools": [
+    {
+      "name": "calculate_compound_growth",
+      "symbol": "calculate_compound_growth",
+      "registry_line": 398,
+      "source": "src/tools/financial_calculation_tools.py",
+      "source_line": 73,
+      "annotation": "dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "calculate_dcf",
+      "symbol": "calculate_dcf",
+      "registry_line": 413,
+      "source": "src/tools/financial_calculation_tools.py",
+      "source_line": 99,
+      "annotation": "dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "calculate_greeks",
+      "symbol": "calculate_greeks",
+      "registry_line": 319,
+      "source": "src/tools/options_tools.py",
+      "source_line": 8,
+      "annotation": "Dict[str, float]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "calculate_implied_valuation",
+      "symbol": "calculate_implied_valuation",
+      "registry_line": 447,
+      "source": "src/tools/financial_calculation_tools.py",
+      "source_line": 238,
+      "annotation": "dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "calculate_peer_statistics",
+      "symbol": "calculate_peer_statistics",
+      "registry_line": 433,
+      "source": "src/tools/financial_calculation_tools.py",
+      "source_line": 180,
+      "annotation": "dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "calculate_weighted_scenarios",
+      "symbol": "calculate_weighted_scenarios",
+      "registry_line": 471,
+      "source": "src/tools/financial_calculation_tools.py",
+      "source_line": 299,
+      "annotation": "dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "check_data_freshness",
+      "symbol": "check_data_freshness",
+      "registry_line": 950,
+      "source": "src/tools/freshness.py",
+      "source_line": 342,
+      "annotation": "str",
+      "return_shapes": [
+        "Call",
+        "Constant"
+      ]
+    },
+    {
+      "name": "delete_memory",
+      "symbol": "delete_memory",
+      "registry_line": 891,
+      "source": "src/tools/memory_tools.py",
+      "source_line": 315,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "detect_event_chains",
+      "symbol": "detect_event_chains",
+      "registry_line": 503,
+      "source": "src/tools/news_event_tools.py",
+      "source_line": 10,
+      "annotation": "list[dict[str, Any]]",
+      "return_shapes": [
+        "Call"
+      ]
+    },
+    {
+      "name": "detect_news_volume_anomaly",
+      "symbol": "detect_news_volume_anomaly",
+      "registry_line": 491,
+      "source": "src/tools/news_event_tools.py",
+      "source_line": 16,
+      "annotation": "dict[str, Any]",
+      "return_shapes": [
+        "Call"
+      ]
+    },
+    {
+      "name": "get_analyst_consensus",
+      "symbol": "get_analyst_consensus",
+      "registry_line": 665,
+      "source": "src/tools/analyst_tools.py",
+      "source_line": 196,
+      "annotation": "Dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_current_quote",
+      "symbol": "get_current_quote",
+      "registry_line": 263,
+      "source": "src/tools/current_quote.py",
+      "source_line": 120,
+      "annotation": "CurrentQuoteResult",
+      "return_shapes": [
+        "Call",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_detailed_financials",
+      "symbol": "get_detailed_financials",
+      "registry_line": 543,
+      "source": "src/tools/analysis_tools.py",
+      "source_line": 589,
+      "annotation": "DetailedFinancials",
+      "return_shapes": [
+        "Call"
+      ]
+    },
+    {
+      "name": "get_earnings_impact",
+      "symbol": "get_earnings_impact",
+      "registry_line": 643,
+      "source": "src/tools/earnings_tools.py",
+      "source_line": 93,
+      "annotation": "Dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_economic_calendar",
+      "symbol": "get_economic_calendar",
+      "registry_line": 1249,
+      "source": "src/tools/macro_calendar_tools.py",
+      "source_line": 48,
+      "annotation": "str",
+      "return_shapes": [
+        "Call",
+        "JoinedStr",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_fundamentals_analysis",
+      "symbol": "get_fundamentals_analysis",
+      "registry_line": 527,
+      "source": "src/tools/analysis_tools.py",
+      "source_line": 192,
+      "annotation": "FundamentalsResult",
+      "return_shapes": [
+        "Call",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_insider_trades",
+      "symbol": "get_insider_trades",
+      "registry_line": 579,
+      "source": "src/tools/sec_tools.py",
+      "source_line": 48,
+      "annotation": "Dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_iv_skew_analysis",
+      "symbol": "get_iv_skew_analysis",
+      "registry_line": 368,
+      "source": "src/tools/iv_skew_tools.py",
+      "source_line": 139,
+      "annotation": "Dict[str, Any]",
+      "return_shapes": [
+        "Dict",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_macro_value",
+      "symbol": "get_macro_value",
+      "registry_line": 1300,
+      "source": "src/tools/macro_calendar_tools.py",
+      "source_line": 115,
+      "annotation": "str",
+      "return_shapes": [
+        "Constant",
+        "JoinedStr",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_morning_brief",
+      "symbol": "get_morning_brief",
+      "registry_line": 606,
+      "source": "src/tools/analysis_tools.py",
+      "source_line": 499,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_news_brief",
+      "symbol": "get_news_brief",
+      "registry_line": 222,
+      "source": "src/tools/news_tools.py",
+      "source_line": 107,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_option_chain",
+      "symbol": "get_option_chain",
+      "registry_line": 343,
+      "source": "src/tools/option_chain_tools.py",
+      "source_line": 171,
+      "annotation": "Dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_peer_comparison",
+      "symbol": "get_peer_comparison",
+      "registry_line": 615,
+      "source": "src/tools/analysis_tools.py",
+      "source_line": 776,
+      "annotation": "Dict[str, Any]",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_portfolio_analysis",
+      "symbol": "get_portfolio_analysis",
+      "registry_line": 740,
+      "source": "src/tools/portfolio_tools.py",
+      "source_line": 245,
+      "annotation": "Dict[str, Any]",
+      "return_shapes": [
+        "Dict",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_portfolio_holdings",
+      "symbol": "get_portfolio_holdings",
+      "registry_line": 760,
+      "source": "src/tools/portfolio_holdings_tools.py",
+      "source_line": 13,
+      "annotation": "dict[str, Any]",
+      "return_shapes": [
+        "Name"
+      ]
+    },
+    {
+      "name": "get_price_change",
+      "symbol": "get_price_change",
+      "registry_line": 292,
+      "source": "src/tools/price_tools.py",
+      "source_line": 83,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_report",
+      "symbol": "get_report",
+      "registry_line": 813,
+      "source": "src/tools/report_tools.py",
+      "source_line": 233,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_sa_alpha_picks",
+      "symbol": "get_sa_alpha_picks",
+      "registry_line": 989,
+      "source": "src/tools/sa_tools.py",
+      "source_line": 66,
+      "annotation": "Dict",
+      "return_shapes": [
+        "Dict",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_sa_article_detail",
+      "symbol": "get_sa_article_detail",
+      "registry_line": 1069,
+      "source": "src/tools/sa_tools.py",
+      "source_line": 198,
+      "annotation": "Dict",
+      "return_shapes": [
+        "Dict",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_sa_articles",
+      "symbol": "get_sa_articles",
+      "registry_line": 1042,
+      "source": "src/tools/sa_tools.py",
+      "source_line": 172,
+      "annotation": "Dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_sa_comment_focus",
+      "symbol": "get_sa_comment_focus",
+      "registry_line": 1176,
+      "source": "src/tools/sa_tools.py",
+      "source_line": 443,
+      "annotation": "Dict",
+      "return_shapes": [
+        "Call",
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_sa_digest",
+      "symbol": "get_sa_digest",
+      "registry_line": 1107,
+      "source": "src/tools/sa_digest_tools.py",
+      "source_line": 73,
+      "annotation": "Dict[str, Any]",
+      "return_shapes": [
+        "Call",
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_sa_feed",
+      "symbol": "get_sa_feed",
+      "registry_line": 1208,
+      "source": "src/tools/sa_tools.py",
+      "source_line": 733,
+      "annotation": "Dict",
+      "return_shapes": [
+        "Call",
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_sa_market_news",
+      "symbol": "get_sa_market_news",
+      "registry_line": 1084,
+      "source": "src/tools/sa_tools.py",
+      "source_line": 216,
+      "annotation": "Dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_sa_pick_detail",
+      "symbol": "get_sa_pick_detail",
+      "registry_line": 1010,
+      "source": "src/tools/sa_tools.py",
+      "source_line": 114,
+      "annotation": "Dict",
+      "return_shapes": [
+        "Dict",
+        "Name"
+      ]
+    },
+    {
+      "name": "get_sec_filings",
+      "symbol": "get_sec_filings",
+      "registry_line": 559,
+      "source": "src/tools/sec_tools.py",
+      "source_line": 20,
+      "annotation": "List[Dict[str, Any]]",
+      "return_shapes": [
+        "Call",
+        "List"
+      ]
+    },
+    {
+      "name": "get_sector_performance",
+      "symbol": "get_sector_performance",
+      "registry_line": 303,
+      "source": "src/tools/price_tools.py",
+      "source_line": 144,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_security_lifecycle_review",
+      "symbol": "get_security_lifecycle_review",
+      "registry_line": 721,
+      "source": "src/tools/security_lifecycle_tools.py",
+      "source_line": 1338,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_ticker_data_coverage",
+      "symbol": "get_ticker_data_coverage",
+      "registry_line": 963,
+      "source": "src/tools/data_coverage_tools.py",
+      "source_line": 214,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "get_ticker_news",
+      "symbol": "get_ticker_news",
+      "registry_line": 182,
+      "source": "src/tools/news_tools.py",
+      "source_line": 43,
+      "annotation": "NewsQueryResult",
+      "return_shapes": [
+        "Name"
+      ]
+    },
+    {
+      "name": "get_ticker_prices",
+      "symbol": "get_ticker_prices",
+      "registry_line": 279,
+      "source": "src/tools/price_tools.py",
+      "source_line": 62,
+      "annotation": "PriceQueryResult",
+      "return_shapes": [
+        "Call"
+      ]
+    },
+    {
+      "name": "get_watchlist_overview",
+      "symbol": "get_watchlist_overview",
+      "registry_line": 597,
+      "source": "src/tools/analysis_tools.py",
+      "source_line": 323,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "list_high_value_comments",
+      "symbol": "list_high_value_comments",
+      "registry_line": 1146,
+      "source": "src/tools/sa_tools.py",
+      "source_line": 240,
+      "annotation": "Dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "list_memories",
+      "symbol": "list_memories",
+      "registry_line": 875,
+      "source": "src/tools/memory_tools.py",
+      "source_line": 246,
+      "annotation": "List[dict]",
+      "return_shapes": [
+        "Call",
+        "List",
+        "Name"
+      ]
+    },
+    {
+      "name": "list_reports",
+      "symbol": "list_reports",
+      "registry_line": 800,
+      "source": "src/tools/report_tools.py",
+      "source_line": 154,
+      "annotation": "List[dict]",
+      "return_shapes": [
+        "Call",
+        "List",
+        "Name"
+      ]
+    },
+    {
+      "name": "list_security_lifecycle_reviews",
+      "symbol": "list_security_lifecycle_reviews",
+      "registry_line": 686,
+      "source": "src/tools/security_lifecycle_tools.py",
+      "source_line": 1325,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "recall_memories",
+      "symbol": "recall_memories",
+      "registry_line": 850,
+      "source": "src/tools/memory_tools.py",
+      "source_line": 149,
+      "annotation": "List[dict]",
+      "return_shapes": [
+        "Call",
+        "List",
+        "Name"
+      ]
+    },
+    {
+      "name": "refresh_sa_alpha_picks",
+      "symbol": "refresh_sa_alpha_picks",
+      "registry_line": 1028,
+      "source": "src/tools/sa_tools.py",
+      "source_line": 151,
+      "annotation": "Dict",
+      "return_shapes": [
+        "Call",
+        "Dict"
+      ]
+    },
+    {
+      "name": "save_memory",
+      "symbol": "save_memory",
+      "registry_line": 827,
+      "source": "src/tools/memory_tools.py",
+      "source_line": 47,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "save_report",
+      "symbol": "save_report",
+      "registry_line": 778,
+      "source": "src/tools/report_tools.py",
+      "source_line": 47,
+      "annotation": "dict",
+      "return_shapes": [
+        "Dict"
+      ]
+    },
+    {
+      "name": "scan_alerts",
+      "symbol": "scan_alerts",
+      "registry_line": 927,
+      "source": "src/tools/monitor_tools.py",
+      "source_line": 19,
+      "annotation": "str",
+      "return_shapes": [
+        "Call"
+      ]
+    },
+    {
+      "name": "search_news_advanced",
+      "symbol": "search_news_advanced",
+      "registry_line": 238,
+      "source": "src/tools/news_tools.py",
+      "source_line": 166,
+      "annotation": "NewsQueryResult",
+      "return_shapes": [
+        "Call"
+      ]
+    },
+    {
+      "name": "search_news_by_keyword",
+      "symbol": "search_news_by_keyword",
+      "registry_line": 206,
+      "source": "src/tools/news_tools.py",
+      "source_line": 74,
+      "annotation": "NewsQueryResult",
+      "return_shapes": [
+        "Name"
+      ]
+    },
+    {
+      "name": "web_browse",
+      "symbol": "web_browse",
+      "registry_line": 904,
+      "source": "src/tools/web_tools.py",
+      "source_line": 12,
+      "annotation": "Dict[str, Any]",
+      "return_shapes": [
+        "Dict",
+        "Name"
+      ]
+    }
+  ]
+}

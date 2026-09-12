@@ -1,0 +1,27 @@
+{
+  "name": "task1-red-normal-eof-08",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/offline_pytest.py",
+    "-q",
+    "tests/test_output_boundary.py::test_normal_finish_preserves_every_unmatched_partial_prefix",
+    "tests/test_output_boundary.py::test_normal_prose_preserves_public_word_ending_in_jwt_prefix",
+    "tests/test_output_boundary.py::test_abort_discards_every_pending_partial_prefix",
+    "tests/test_output_boundary.py::test_stream_matches_independent_raw_mask_oracle_under_varied_chunking",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task1-red-normal-eof-08/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 4,
+  "seconds": 0.401,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task1-red-normal-eof-08",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task1-red-normal-eof-08/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task1-red-normal-eof-08/output.log"
+}

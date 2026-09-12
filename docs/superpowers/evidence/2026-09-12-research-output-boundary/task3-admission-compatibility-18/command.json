@@ -1,0 +1,28 @@
+{
+  "name": "task3-admission-compatibility-18",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/offline_pytest.py",
+    "-q",
+    "tests/test_tool_output_channels.py",
+    "tests/test_research_output_events.py",
+    "-k",
+    "tool_arguments_are_checked_before_write_or_acquisition_callback or unknown_tool_rejection_cannot_echo_an_untrusted_name or openai_parse_errors_are_sanitized_before_sdk_failure_logging or openai_handled_tool_failure_marks_local_span_without_raw_detail",
+    "--tb=short",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-admission-compatibility-18/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 4.096,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-admission-compatibility-18",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-admission-compatibility-18/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-admission-compatibility-18/output.log"
+}

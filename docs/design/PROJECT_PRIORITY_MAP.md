@@ -59,7 +59,7 @@ open, not provided by recovery accounting or verify/install. Their operational
 owners and constraints are in SEC spec section10. No production schema install,
 reset, deletion or source call is authorized by this documentation update.
 
-**Shared research output security (2026-09-12, in progress):**
+**Shared research output security (2026-09-12, implemented; final review open):**
 The user approved a shared mechanism, not a SEC exemption. The independent
 `codex/research-output-boundary` slice starts from `18d46062`; its spec/plan is
 `docs/superpowers/specs/2026-09-12-research-output-boundary-design.md` and
@@ -71,10 +71,15 @@ including cleanup diagnostics and cancellation ownership. `49491831` also
 removes the same heuristic from model-catalog ID validation; 171 catalog and
 subscription/core controls pass. These overlapping counts are not a full-suite
 total. Final verification additionally found a compaction diagnostic/context
-sink, now covered by a separate local RED-first follow-up. The complete backend
-will be rerun on the resulting frozen source. The fresh whole-branch reviewer
+sink, fixed by a separate local RED-first follow-up in `ff7c4d75`. The single
+complete backend passes 10,166 tests with 12 unchanged manual-live skips; all
+857 new cases and seven retained safety-owner families run without skips.
+The 1,111 source/test/frontend files and runner/runtime are unchanged across
+the final run. Frontend 1,776 tests and typecheck pass. The fresh whole-branch reviewer
 terminated with a platform safety error and no verdict; the final independent
-gate remains open for external review, not silently approved by focused tests.
+gate remains open for external review, not silently approved by automatic tests.
+Sealed, hash-verified commands/results/review packets are at
+`docs/superpowers/evidence/2026-09-12-research-output-boundary/README.md`.
 The other worktree's SEC Task 2 is parked with four OAuth failures, explicitly
 blocked on this boundary. Those feature nodes are absent from this independent
 branch and are not claimed fixed. SEC feature completion and remaining cleanup

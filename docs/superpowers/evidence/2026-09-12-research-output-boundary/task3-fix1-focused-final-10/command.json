@@ -1,0 +1,40 @@
+{
+  "name": "task3-fix1-focused-final-10",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/offline_pytest.py",
+    "-q",
+    "tests/test_research_output_events.py",
+    "tests/test_research_output_lifetimes.py",
+    "tests/test_tool_output_channels.py",
+    "tests/test_task_runtime_binding.py",
+    "tests/test_chatgpt_oauth_driver.py",
+    "tests/test_claude_code_sdk_driver.py",
+    "tests/test_claude_agent_sdk_runtime.py",
+    "tests/test_card_execution_authority.py",
+    "tests/test_research_runs.py",
+    "tests/test_research_routes.py",
+    "tests/test_research_threads.py",
+    "tests/test_subagent.py",
+    "tests/test_server_compaction.py",
+    "tests/test_replay_openai.py",
+    "tests/test_openai_transport.py",
+    "tests/test_openai_sync_surface_cleanup.py",
+    "--tb=short",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-fix1-focused-final-10/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 53.387,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-fix1-focused-final-10",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-fix1-focused-final-10/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task3-fix1-focused-final-10/output.log"
+}

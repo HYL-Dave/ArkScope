@@ -1,0 +1,34 @@
+{
+  "baseline_identity": {
+    "base": "18d46062c30da87b30666b1ba0f290872a28fa7f",
+    "mismatches": [],
+    "plan_workspace_contents_read": false,
+    "source_files_checked": 1134
+  },
+  "candidate_count": 4347,
+  "comparison_counts": {
+    "coverage_reductions": 0,
+    "dependency_metadata_changed": 0,
+    "new_candidates": 0,
+    "new_uncertainties": 11,
+    "new_untracked_paths": 0,
+    "review_required": true
+  },
+  "coverage": {
+    "decode_failed": 3,
+    "documentation": 201,
+    "excluded_evidence": 7540,
+    "excluded_non_source": 23,
+    "excluded_plan_workspace": 7,
+    "excluded_private": 6,
+    "read": 1143
+  },
+  "coverage_reductions": [],
+  "new_candidates": [],
+  "new_uncertainty_kinds": {
+    "python": 6,
+    "sql": 5
+  },
+  "status": "review_required_not_a_deletion_list",
+  "uncertainty_count": 3471
+}

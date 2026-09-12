@@ -1,0 +1,29 @@
+{
+  "name": "task2-review-bearer-prose-20260912-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/offline_pytest.py",
+    "--doctest-glob=task-2-review.md",
+    "--doctest-continue-on-failure",
+    ".superpowers/sdd/2026-09-12-research-output-boundary/task-2-review.md",
+    "tests/test_claude_code_sdk_driver.py::test_bridge_sk_ant_secret_in_result_is_rejected",
+    "-q",
+    "--show-capture=no",
+    "-rN",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-review-bearer-prose-20260912-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 0.93,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-review-bearer-prose-20260912-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-review-bearer-prose-20260912-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-research-output-boundary/task2-review-bearer-prose-20260912-01/output.log"
+}

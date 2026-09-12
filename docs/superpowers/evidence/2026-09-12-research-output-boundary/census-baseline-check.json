@@ -1,0 +1,54 @@
+{
+  "baseline_identity": {
+    "base": "18d46062c30da87b30666b1ba0f290872a28fa7f",
+    "mismatches": [
+      {
+        "archived": "e0a6a284cede9c011d2f9da8bbe1d2c1a3e4b3e57f2362d8dd37ac6492bb33f6",
+        "base": "1b991f73bc8015e6f95c0d2d87a09a12e9ff005ac928eb941ecc6b6dd462d14d",
+        "path": "data_sources/sec_transport.py"
+      },
+      {
+        "archived": "bcefb3040c18809967acd58a56fbb8e641848883a999d3b954c11a8a33076bde",
+        "base": "0e2570dc795b7d14bbc954783fd79bbff010a931a46dd11f63c3734d080a40ab",
+        "path": "src/api/routes/sec_research.py"
+      },
+      {
+        "archived": "4e1b311d4b5483e49906b015bf9b3649142bf759309c6ea6e51255aef209d858",
+        "base": "a01790c4e19b2bc59efdb6172067eac1d0de4f6e4a910cd795661cdc57f069a7",
+        "path": "src/sec_research/document_service.py"
+      },
+      {
+        "archived": "2c61f2804360c67300963ece25caf4bf50b6df8734d048c22ff59d18ec385361",
+        "base": "f411645d2bac720c65c6d878773b083c8ced3a285925e2342eebd4ba1e3cd979",
+        "path": "src/sec_research/document_text.py"
+      },
+      {
+        "archived": "19966ef196efc8c03c9eecc325ad78cedaba9735f26a8d6ecc0b6569327d4bd5",
+        "base": "05a1e79e5672976e8a2dfb7a4a05e04b57eb0e45d131f4c7b924839f42977539",
+        "path": "src/sec_research/schema.py"
+      },
+      {
+        "archived": "d2c4896bfe3ac906a1c90b926b41263c811a5aac137fe7fe7b1d6805cee0e165",
+        "base": "7e855b73c883d647d8c0d49f74f1326bf2f5ca4d631a40307fae0b5749aac948",
+        "path": "tests/test_sec_research_document_store.py"
+      },
+      {
+        "archived": "e38cd7c555d480dfbfb1b2f538b0b441c39e00612466be7b6ea08735e24bd451",
+        "base": "fe653a80a4993d93be741c5d6c75349f6ebfdfb04c05af88a1421f77515f1e43",
+        "path": "tests/test_sec_research_routes.py"
+      },
+      {
+        "archived": "ce81b03079f809f8f30d6d2ad37e74f980d8fdfb29464d66202f53379ffe5c91",
+        "base": "780a6108c2eed30d9298828c6b6b734177ae11059a60cc679d7fd4a13c2ba1cf",
+        "path": "tests/test_sec_research_store.py"
+      },
+      {
+        "archived": "7a8043a27adb49a89c2b14cae15ce8fe841107531c8af752fab0c1f242650ba3",
+        "base": "613b1344cf983520ae6aafa754a303de71b0fe4e70060cf08b75bc3bf90955f6",
+        "path": "tests/test_sec_transport.py"
+      }
+    ],
+    "plan_workspace_contents_read": false,
+    "source_files_checked": 1126
+  }
+}

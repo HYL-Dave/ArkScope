@@ -1,0 +1,678 @@
+{
+  "files": {
+    "src/agents/shared/output_boundary.py": "409d4814e92b906039b2f74abd7b9b4314162e418cd48b43bf3e85229131af3b",
+    "tests/test_output_boundary.py": "b3c4543d4da40b74df2c9b06d32f83eae5e94e3af1396142c69e628ad655685c"
+  },
+  "restoration_files": {
+    "src/agents/shared/output_boundary.py": "aa8f32cae417f79f26081a00d6114e1c6ab2c1eab40904295f8997354e7e174d",
+    "tests/test_output_boundary.py": "7a7109c66af7a187421cac05f5457f0e135b3cb4ecbc3d4dedfe44f1df23049b"
+  },
+  "runs": [
+    {
+      "run": "task1-red-01",
+      "passed": 0,
+      "failed": 62,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "bc2802fc21163172ae6c8511c92ea7b836b81185c1b3f760c637c9fe54694f6f",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_shared_output_boundary_exists",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_public_business_values_are_unchanged",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[raw]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[json-unicode]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[json-ascii]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[url-default]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[url-all]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[url-plus]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[base64]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[base64-unpadded]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[base64-url]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[base64-url-unpadded]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[raw]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[json-unicode]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[json-ascii]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[url-default]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[url-all]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[url-plus]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[base64]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[base64-unpadded]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[base64-url]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[base64-url-unpadded]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_overlapping_matches_use_raw_offsets_across_every_split[secrets0-!abcdef!-![REDACTED]!]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_overlapping_matches_use_raw_offsets_across_every_split[secrets1-!abcdefg!-![REDACTED]!]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_overlapping_matches_use_raw_offsets_across_every_split[secrets2-!abababa!-![REDACTED]!]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_overlapping_matches_use_raw_offsets_across_every_split[secrets3-!xyzxyz!-![REDACTED]!]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_overlapping_matches_use_raw_offsets_across_every_split[secrets4-!xy!xy!-![REDACTED]![REDACTED]!]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_overlapping_matches_use_raw_offsets_across_every_split[secrets5-!\\u5bc6\\U0001f512\\u6587!-![REDACTED]!]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_finish_redacts_every_partial_prefix_and_abort_discards_it",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_stream_retains_only_a_bounded_suffix_and_makes_progress",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_very_short_secrets_are_not_ignored[x]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_very_short_secrets_are_not_ignored[xy]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_very_short_secrets_are_not_ignored[\\u5bc6]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_very_short_secrets_are_not_ignored[ ]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_marker_and_marker_edge_collisions_fail_closed[E]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_marker_and_marker_edge_collisions_fail_closed[[REDACTED]]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_marker_and_marker_edge_collisions_fail_closed[a[]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_marker_and_marker_edge_collisions_fail_closed[]b]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_raw_matching_does_not_guess_unknown_credentials_or_recursive_encodings",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_empty_secrets_are_absent_and_registration_is_deduplicated",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_late_registration_protects_pending_and_future_text",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_default_scopes_are_isolated_and_explicit_inheritance_keeps_child_secrets",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_interleaved_async_scopes_are_isolated",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_cancellation_aborts_partial_suffix_and_restores_scope",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_inherited_scope_exit_does_not_abort_parent_streams",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_activate_borrows_retained_guard_and_restores_context_before_public_yield",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_guards_and_streams_have_safe_repr_and_refuse_serialization[dumps]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_guards_and_streams_have_safe_repr_and_refuse_serialization[copy]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_guards_and_streams_have_safe_repr_and_refuse_serialization[deepcopy]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_non_json_values_fail_without_repr_coercion[value0]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_non_json_values_fail_without_repr_coercion[fake-secret]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_non_json_values_fail_without_repr_coercion[value2]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_non_json_values_fail_without_repr_coercion[value3]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_non_json_values_fail_without_repr_coercion[value4]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_non_json_values_fail_without_repr_coercion[nan]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_non_json_values_fail_without_repr_coercion[inf]",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_errors_cannot_store_arbitrary_rejected_details",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_secret_bounds_and_invalid_secret_registration_fail_atomically",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_total_representation_budget_rejects_without_partial_registration",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_json_depth_nodes_strings_cycles_and_shared_references_are_bounded",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_invalid_or_oversized_feed_aborts_without_releasing_pending_text",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        },
+        {
+          "node": "tests.test_output_boundary::test_prose_chunks_large_values_and_closed_streams_cannot_resume",
+          "kind": "failure",
+          "message": "AssertionError: missing shared output boundary\nassert None is not None\n +  where None = <function find_spec at 0x7ad7d0807370>('src.agents.shared.output_boundary')\n +    where <function find_spec at 0x7ad7d0807370> = <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'>.find_spec\n +      where <module 'importlib.util' from '/usr/lib/python3.10/importlib/util.py'> = importlib.util"
+        }
+      ]
+    },
+    {
+      "run": "task1-red-naive-02",
+      "passed": 0,
+      "failed": 1,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "3e9596d5c1254bd4c25fa27a286ea54bb2bddd666c146b224ed0c05ec1d7e943",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[raw]",
+          "kind": "failure",
+          "message": "AssertionError: ('raw', 1)\nassert 'fake-密#x1F512 /+?\"\\\\\\n-end' == '[REDACTED]'\n  \n  - [REDACTED]\n  + fake-密#x1F512 /+?\"\\\n  + -end"
+        }
+      ]
+    },
+    {
+      "run": "task1-green-attempt-03",
+      "passed": 62,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "072215b7a40d54a4bb1b78322d2dfd543d50a2663cd27454a0995fabf7879dea",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-review-04",
+      "passed": 67,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "5b8d2195c6dd761fafe110c64eaf95deeeca17664a0151e20d2196bc647cd2e7",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-red-aligned-bounds-05",
+      "passed": 0,
+      "failed": 3,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "120efe1a77b7889db6232c9bfbcd6edb07f56420161ca0e81ad48157873d2c4f",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_shared_json_policy_accepts_one_million_nodes",
+          "kind": "failure",
+          "message": "src.agents.shared.output_boundary.OutputBoundaryError: value_limit"
+        },
+        {
+          "node": "tests.test_output_boundary::test_shared_text_policy_accepts_32_mib_ascii_without_reduction",
+          "kind": "failure",
+          "message": "src.agents.shared.output_boundary.OutputBoundaryError: value_limit"
+        },
+        {
+          "node": "tests.test_output_boundary::test_feed_accepts_full_provider_text_blocks_above_64_kib",
+          "kind": "failure",
+          "message": "src.agents.shared.output_boundary.OutputBoundaryError: value_limit"
+        }
+      ]
+    },
+    {
+      "run": "task1-green-aligned-06",
+      "passed": 69,
+      "failed": 1,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "3d18dc4bce38eedc34d668a8f6432e566277492192caf159194d276d2cc1aed0",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_prose_chunks_large_values_and_closed_streams_cannot_resume",
+          "kind": "failure",
+          "message": "src.agents.shared.output_boundary.OutputBoundaryError: value_limit"
+        }
+      ]
+    },
+    {
+      "run": "task1-green-07",
+      "passed": 70,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "3f10680d3ca0b86281ba2119cb00926fd01b9ee7f57f98c94d3357fe7532d9bd",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-red-normal-eof-08",
+      "passed": 0,
+      "failed": 0,
+      "errors": 1,
+      "skipped": 0,
+      "exit_code": 4,
+      "junit_sha256": "371d86f051c460a7b1c8d9a4635b4d59a45b1894d398854673bb6239b05235c2",
+      "failed_nodes": [
+        {
+          "node": "::tests.test_output_boundary",
+          "kind": "error",
+          "message": "collection failure"
+        }
+      ]
+    },
+    {
+      "run": "task1-red-normal-eof-09",
+      "passed": 1,
+      "failed": 3,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "a3238a4aa833ce5c01cc5b761c6e612f19af2981162a2606c2310555b68cf3fb",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_normal_finish_preserves_every_unmatched_partial_prefix",
+          "kind": "failure",
+          "message": "AssertionError: assert 'public![REDACTED]' == 'public!f'\n  \n  - public!f\n  + public![REDACTED]"
+        },
+        {
+          "node": "tests.test_output_boundary::test_normal_prose_preserves_public_word_ending_in_jwt_prefix",
+          "kind": "failure",
+          "message": "AssertionError: assert 'sourc[REDACTED]' == 'source'\n  \n  - source\n  + sourc[REDACTED]"
+        },
+        {
+          "node": "tests.test_output_boundary::test_stream_matches_independent_raw_mask_oracle_under_varied_chunking",
+          "kind": "failure",
+          "message": "AssertionError: assert '!affef!effcc...D]e[REDACTED]' == '!affef!effcc...c[REDACTED]ea'\n  \n  Skipping 66 identical leading characters in diff, use -v to show\n  - REDACTED]ea\n  + REDACTED]e[REDACTED]"
+        }
+      ]
+    },
+    {
+      "run": "task1-green-normal-eof-10",
+      "passed": 72,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "44afdfd1be2940bffdd62f79f442fd5f2d36c2e1f2affb0e6899a0a2efcd095d",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-inverse-known-match-11",
+      "passed": 0,
+      "failed": 1,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "3957b93ffa956e2a71c1abcce141a747a6d28c2724481fb67219e1bb06f9fe0c",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_known_representations_in_values_and_keys_are_rejected[raw]",
+          "kind": "failure",
+          "message": "Failed: DID NOT RAISE <class 'src.agents.shared.output_boundary.OutputBoundaryError'>"
+        }
+      ]
+    },
+    {
+      "run": "task1-restored-known-match-12",
+      "passed": 72,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "c77cb751e92fa2ae5d0426c7ba944317630ffa66eb62fcd6b179d01e46c9a8f2",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-inverse-emit-suffix-13",
+      "passed": 0,
+      "failed": 1,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "459d3eee34ec59a2f45f8295f280584520928d8bf4784f5ee2960534a037daac",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_every_split_and_single_character_feeds_protect_encoded_secrets[raw]",
+          "kind": "failure",
+          "message": "AssertionError: ('raw', 1)\nassert 'fake-密#x1F512 /+?\"\\\\\\n-end' == '[REDACTED]'\n  \n  - [REDACTED]\n  + fake-密#x1F512 /+?\"\\\n  + -end"
+        }
+      ]
+    },
+    {
+      "run": "task1-restored-emit-suffix-14",
+      "passed": 72,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "bea25e502ff12e54a511120d54536b55a1ce2d7e201bd32dc86591c7e8a7ad9e",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-inverse-share-scopes-15",
+      "passed": 0,
+      "failed": 1,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "e71fbd0de921bd395ddfaa258c16ce006710e21fbd819819c87a8c167a1dcda7",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_default_scopes_are_isolated_and_explicit_inheritance_keeps_child_secrets",
+          "kind": "failure",
+          "message": "assert <OutputGuard> is not <OutputGuard>"
+        }
+      ]
+    },
+    {
+      "run": "task1-restored-share-scopes-16",
+      "passed": 72,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "d7ee516397253807ca626435f1fe28953d602ce9f81610d6339d11c5cf654b63",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-inverse-abort-tail-17",
+      "passed": 0,
+      "failed": 2,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "9bf592b1ecd59f6415d262c7f29b43e830c4583d946c357ddf4e78a8eeb72187",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_abort_discards_every_pending_partial_prefix",
+          "kind": "failure",
+          "message": "AssertionError: assert 'f' == ''\n  \n  + f"
+        },
+        {
+          "node": "tests.test_output_boundary::test_cancellation_aborts_partial_suffix_and_restores_scope",
+          "kind": "failure",
+          "message": "AssertionError: assert 'fake-sec' == ''\n  \n  + fake-sec"
+        }
+      ]
+    },
+    {
+      "run": "task1-restored-abort-tail-18",
+      "passed": 72,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "da1f769a9d96d455000f78d5bca5d5f1a5abf6fae44d2e03023d1abb57ad1453",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-inverse-stale-patterns-19",
+      "passed": 0,
+      "failed": 1,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "839f700a0b7be8213cc66a47b833f0ee0cab3e071b0a39ed0f74dacae71237af",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_late_registration_protects_pending_and_future_text",
+          "kind": "failure",
+          "message": "AssertionError: assert 'child-secret-captured!' == '[REDACTED]!'\n  \n  - [REDACTED]!\n  + child-secret-captured!"
+        }
+      ]
+    },
+    {
+      "run": "task1-restored-stale-patterns-20",
+      "passed": 72,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "6cd07a34bd992b20fc71795589b70f830ea1116af47441d8635c584b2cec0fdd",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-final-21",
+      "passed": 110,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "0ae8f89cf05f8ad1b7251d5d3cc55049bc0980274f2b24350265279aefa97706",
+      "failed_nodes": []
+    },
+    {
+      "run": "task1-red-concurrency-22",
+      "passed": 0,
+      "failed": 2,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "junit_sha256": "a2192478bd6b0078dc31bae2040f5c11b3bd289eab0f499713f00df02e2130f5",
+      "failed_nodes": [
+        {
+          "node": "tests.test_output_boundary::test_concurrent_registration_cannot_lose_secrets_or_publish_stale_matcher[registration]",
+          "kind": "failure",
+          "message": "Failed: DID NOT RAISE <class 'src.agents.shared.output_boundary.OutputBoundaryError'>"
+        },
+        {
+          "node": "tests.test_output_boundary::test_concurrent_registration_cannot_lose_secrets_or_publish_stale_matcher[matcher-publication]",
+          "kind": "failure",
+          "message": "Failed: DID NOT RAISE <class 'src.agents.shared.output_boundary.OutputBoundaryError'>"
+        }
+      ],
+      "by_class": {
+        "tests.test_output_boundary": 2
+      }
+    },
+    {
+      "run": "task1-green-concurrency-23",
+      "passed": 112,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "3f836af34cfbbe2f5d471418e419ca98fed2cb84a67edb6604380a1b0a48996d",
+      "failed_nodes": [],
+      "by_class": {
+        "tests.test_output_boundary": 74,
+        "tests.test_probe_harness": 27,
+        "tests.test_security.TestWrapToolResult": 6,
+        "tests.test_security.TestAnthropicBridgeWrapping": 2,
+        "tests.test_security.TestOpenAIBridgeWrapping": 2,
+        "tests.test_security.TestPromptBoundary": 1
+      }
+    },
+    {
+      "run": "task1-final-concurrency-24",
+      "passed": 112,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "junit_sha256": "950f015cd226af1ca39ea57b138e8d98e1d5f5fccdac4e5ac043c6bc80776c8a",
+      "failed_nodes": [],
+      "by_class": {
+        "tests.test_output_boundary": 74,
+        "tests.test_probe_harness": 27,
+        "tests.test_security.TestWrapToolResult": 6,
+        "tests.test_security.TestAnthropicBridgeWrapping": 2,
+        "tests.test_security.TestOpenAIBridgeWrapping": 2,
+        "tests.test_security.TestPromptBoundary": 1
+      }
+    }
+  ]
+}

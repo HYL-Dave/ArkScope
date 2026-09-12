@@ -1,0 +1,136 @@
+{
+  "base": "18d46062c30da87b30666b1ba0f290872a28fa7f",
+  "note": "Source explanation only; no candidate deletion or scanner waiver.",
+  "review_required_preserved": true,
+  "revision": "ff7c4d753ab0868aaa07a330841e0dd1de96f72c",
+  "uncertainties": [
+    {
+      "axis": "python",
+      "classification": "test_only_dynamic_import",
+      "expressions": [
+        "importlib.import_module(f'src.agents.{channel}_agent.tools')"
+      ],
+      "id": "python:2f452d7969d4481c",
+      "kind": "dynamic_import",
+      "line": 501,
+      "path": "tests/test_tool_output_channels.py"
+    },
+    {
+      "axis": "python",
+      "classification": "test_only_dynamic_import",
+      "expressions": [
+        "importlib.import_module(name)"
+      ],
+      "id": "python:450b31f0cf38e0a7",
+      "kind": "dynamic_import",
+      "line": 28,
+      "path": "tests/test_research_output_lifetimes.py"
+    },
+    {
+      "axis": "python",
+      "classification": "test_only_dynamic_import",
+      "expressions": [
+        "importlib.import_module(f'src.agents.{channel}_agent.tools')"
+      ],
+      "id": "python:9994096896010114",
+      "kind": "dynamic_import",
+      "line": 493,
+      "path": "tests/test_tool_output_channels.py"
+    },
+    {
+      "axis": "python",
+      "classification": "test_only_dynamic_import",
+      "expressions": [
+        "importlib.import_module(path)"
+      ],
+      "id": "python:c956863314ef99ef",
+      "kind": "dynamic_import",
+      "line": 431,
+      "path": "tests/test_tool_output_channels.py"
+    },
+    {
+      "axis": "python",
+      "classification": "test_only_dynamic_import",
+      "expressions": [
+        "importlib.import_module(module_name)"
+      ],
+      "id": "python:c95d056e58bb516c",
+      "kind": "dynamic_import",
+      "line": 116,
+      "path": "tests/test_tool_output_channels.py"
+    },
+    {
+      "axis": "python",
+      "classification": "test_only_dynamic_import",
+      "expressions": [
+        "importlib.import_module(f'src.agents.{channel}_agent.tools')"
+      ],
+      "id": "python:f42b942e5dfa0d10",
+      "kind": "dynamic_import",
+      "line": 478,
+      "path": "tests/test_tool_output_channels.py"
+    },
+    {
+      "axis": "sql",
+      "classification": "unchanged_literal_relocated",
+      "error_type": "OperationalError",
+      "id": "sql:246c66c35be22d9b",
+      "kind": "sql_prepare_failed",
+      "line": 838,
+      "literal_sha256": "0635f3e294bf2f1c7c8dc8f2deb6b8ea3172e6cc6ffb0ac5cc9a7b02f66de95b",
+      "matching_base_lines": [
+        806
+      ],
+      "path": "src/agents/openai_agent/tools.py"
+    },
+    {
+      "axis": "sql",
+      "classification": "unchanged_literal_relocated",
+      "id": "sql:404fbdb97d6bf10c",
+      "kind": "unmodeled_sql_statement",
+      "line": 80,
+      "literal_sha256": "ae302c17d67719cb8b9e28bbbdae3e5aa8648d01284cea8a93adf158e7578333",
+      "matching_base_lines": [
+        50
+      ],
+      "path": "src/agents/openai_agent/tools.py"
+    },
+    {
+      "axis": "sql",
+      "classification": "unchanged_literal_relocated",
+      "error_type": "OperationalError",
+      "id": "sql:5e20d64398f7d40e",
+      "kind": "sql_prepare_failed",
+      "line": 934,
+      "literal_sha256": "8cf1d64e90d8abf6c8300be85b3a9540ce1e6485f8281765475988091d285b87",
+      "matching_base_lines": [
+        893
+      ],
+      "path": "src/tools/registry.py"
+    },
+    {
+      "axis": "sql",
+      "classification": "unchanged_literal_relocated",
+      "id": "sql:6d9cff91174c3e1e",
+      "kind": "unmodeled_sql_statement",
+      "line": 88,
+      "literal_sha256": "9b18730db873ec0bdc38116d2b6f1188ffd789dcf72b30ab8cadba61e368b122",
+      "matching_base_lines": [
+        86
+      ],
+      "path": "src/agents/openai_agent/agent.py"
+    },
+    {
+      "axis": "sql",
+      "classification": "unchanged_literal_relocated",
+      "id": "sql:e7af2819cd902f86",
+      "kind": "unmodeled_sql_statement",
+      "line": 1391,
+      "literal_sha256": "e3ad62be59829b44de43164c41d6805b911cd7e1b65a255654183f57c65427dc",
+      "matching_base_lines": [
+        1334
+      ],
+      "path": "src/tools/registry.py"
+    }
+  ]
+}
