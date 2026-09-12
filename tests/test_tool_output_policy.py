@@ -273,11 +273,26 @@ def test_recursive_explicit_credential_keys_reject_even_without_known_secret(key
     reject(api, {"rows": [{key: "not-a-secret"}]}, policy=api.PUBLIC_JSON)
 
 
-@pytest.mark.parametrize("literal", [
+@pytest.mark.parametrize("text", [
+    "Bearer shares remain outstanding", "bearer shares remain outstanding",
     "Bearer fixture.auth-value_1234567890", "bearer fixture.auth-value_1234567890",
+], ids=["financial-prose", "lowercase-financial-prose", "bare-token", "lowercase-bare-token"])
+@pytest.mark.parametrize("location", ["text", "value", "key"])
+def test_bare_bearer_without_authorization_header_is_public(text, location):
+    api = policy_api()
+    if location == "text":
+        assert api.admit_tool_result(text, policy=api.PUBLIC_TEXT) == text
+    else:
+        value = {"note": text} if location == "value" else {text: "public"}
+        assert json.loads(api.admit_tool_result(value, policy=api.PUBLIC_JSON)) == value
+
+
+@pytest.mark.parametrize("literal", [
+    "Authorization: Bearer fixture.auth-value_1234567890",
+    "pRoXy-AuThOrIzAtIoN:\tbeARer\tfixture.auth-value_1234567890+/.~==",
     "sk-ant-api03-" + "a" * 40, "sk-ant-oat01-" + "b" * 40,
     "sk-proj-" + "C2d" * 20, "sk-" + "E3f" * 16, "ghp_" + "a" * 36,
-], ids=["bearer", "lowercase-bearer", "anthropic-key", "anthropic-oauth", "openai-project", "openai-key", "github-key"])
+], ids=["authorization-header", "mixed-case-proxy-header", "anthropic-key", "anthropic-oauth", "openai-project", "openai-key", "github-key"])
 @pytest.mark.parametrize("location", ["text", "value", "key"])
 def test_narrow_known_auth_syntax_rejects_whole_result_without_rewriting(literal, location):
     api = policy_api()

@@ -214,6 +214,37 @@ def test_each_adapter_preserves_full_public_payload_without_lossy_diagnostics(ch
 
 
 @pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("name", ["get_news_brief", "get_economic_calendar"], ids=["json", "text"])
+def test_bare_bearer_financial_prose_survives_every_adapter(channel, name, invoke):
+    text = "Bearer shares remain outstanding"
+    value = {"note": text} if name == "get_news_brief" else text
+    with output_scope(SECRET):
+        observed = invoke(channel, value, name=name)
+    assert observed.success, observed.body
+    assert (json.loads(observed.body) if name == "get_news_brief" else observed.body) == value
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("header", ["Authorization", "pRoXy-AuThOrIzAtIoN"])
+def test_authorization_header_bearer_is_rejected_by_every_adapter(channel, header, invoke):
+    literal = header + ":\tbeARer\tfixture.auth-value_1234567890+/.~=="
+    with output_scope():
+        observed = invoke(channel, {"note": literal})
+    assert_rejected(observed, "invalid_value", literal, "fixture.auth-value_1234567890")
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("name", ["get_news_brief", "get_economic_calendar"], ids=["json", "text"])
+def test_captured_bare_bearer_is_still_rejected_by_every_adapter(channel, name, invoke):
+    captured = "fixture.captured-bearer_1234567890"
+    text = "Bearer " + captured
+    value = {"note": text} if name == "get_news_brief" else text
+    with output_scope(captured):
+        observed = invoke(channel, value, name=name)
+    assert_rejected(observed, "known_secret", captured)
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
 def test_result_list_is_canonical_json_not_python_list_repr(channel, invoke):
     expected = [{"value": "1234567890123456789.123", "ok": True}, {"value": None, "rows": []}]
     with output_scope():
@@ -494,6 +525,49 @@ def test_openai_parse_errors_are_sanitized_before_sdk_failure_logging(case, monk
     assert SECRET not in result
     assert SECRET not in caplog.text
     assert len(result) <= 600
+
+
+@pytest.mark.parametrize("case", ["tool-exception", "sdk-arguments"])
+def test_openai_handled_tool_failure_marks_local_span_without_raw_detail(case, invoke, monkeypatch, caplog):
+    from agents import _debug
+    from agents.tool_context import ToolContext
+    from agents.tracing import function_span, get_current_span, get_trace_provider, set_trace_provider, trace
+    from agents.tracing.provider import DefaultTraceProvider
+    from src.agents.openai_agent.tools import create_openai_tools
+
+    monkeypatch.setattr(_debug, "DONT_LOG_TOOL_DATA", False)
+    caplog.set_level(logging.ERROR)
+    previous = get_trace_provider()
+    provider = DefaultTraceProvider()
+    provider.set_processors([])
+    provider.set_disabled(False)
+    set_trace_provider(provider)
+    try:
+        with output_scope(SECRET), trace("task2-local-tool-errors"):
+            with function_span("public-control") as public_span:
+                public = invoke("openai", {"note": "public"})
+            assert public.success
+            assert public_span.error is None
+            with function_span("handled-failure") as failed_span:
+                assert get_current_span() is failed_span
+                if case == "tool-exception":
+                    observed = invoke("openai", error=RuntimeError("unreviewed failure detail " + SECRET))
+                    assert observed.success is False
+                    result = observed.body
+                else:
+                    tool = next(tool for tool in create_openai_tools(ForbiddenDAL()) if tool.name == "tool_get_news_brief")
+                    arguments = "{unreviewed argument detail " + SECRET
+                    context = ToolContext(
+                        context=None, tool_name=tool.name, tool_call_id="span-error", tool_arguments=arguments,
+                    )
+                    result = asyncio.run(tool.on_invoke_tool(context, arguments))
+                assert failed_span.error == {"message": "Tool execution failed", "data": None}
+        assert SECRET not in result
+        assert SECRET not in caplog.text
+        assert len(result) <= 600
+    finally:
+        provider.shutdown()
+        set_trace_provider(previous)
 
 
 @pytest.mark.parametrize("channel", ["anthropic", "chatgpt", "claude"])
