@@ -65,10 +65,16 @@ The user approved a shared mechanism, not a SEC exemption. The independent
 `docs/superpowers/specs/2026-09-12-research-output-boundary-design.md` and
 `docs/superpowers/plans/2026-09-12-research-output-boundary.md`. Exact captured
 credentials govern successful content; heuristic redaction remains diagnostic.
-The core and four-tool-channel policies passed independent review. Through
-`41b9f2b5`, 754 focused tests pass; header-context rejection preserves legitimate
-Bearer financial prose and safe failed-tool span metadata is retained. Stateful
-producer/event/persistence integration is still RED-first work in progress.
+The core, four-tool-channel policies and producer/event/persistence integration
+passed independent task review. Through `fdc947d2`, 1,026 focused tests pass,
+including cleanup diagnostics and cancellation ownership. `49491831` also
+removes the same heuristic from model-catalog ID validation; 171 catalog and
+subscription/core controls pass. These overlapping counts are not a full-suite
+total. Final verification additionally found a compaction diagnostic/context
+sink, now covered by a separate local RED-first follow-up. The complete backend
+will be rerun on the resulting frozen source. The fresh whole-branch reviewer
+terminated with a platform safety error and no verdict; the final independent
+gate remains open for external review, not silently approved by focused tests.
 The other worktree's SEC Task 2 is parked with four OAuth failures, explicitly
 blocked on this boundary. Those feature nodes are absent from this independent
 branch and are not claimed fixed. SEC feature completion and remaining cleanup

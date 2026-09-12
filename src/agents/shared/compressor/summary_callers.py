@@ -23,6 +23,9 @@ from __future__ import annotations
 import logging
 from typing import Optional, Protocol
 
+from src.agents.shared.output_boundary import output_scope
+from src.auth_drivers.runtime_binding import register_output_api_key, sanitize_runtime_error
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,6 +43,7 @@ class SummaryCaller(Protocol):
       - apply NO content transformations beyond what the LLM produced
         (caller is dumb pipe; the prompt + cap_summary in
         :mod:`summary_prompt` handle policy)
+      - reject credential-bearing output as failure, without repairing it
     """
 
     def __call__(
@@ -103,39 +107,44 @@ class AnthropicSummaryCaller:
         system_prompt: str,
         user_prompt: str,
     ) -> Optional[str]:
-        try:
-            from src.model_capabilities import model_execution_admission_detail
+        with output_scope(inherit=True) as guard:
+            try:
+                from src.model_capabilities import model_execution_admission_detail
 
-            execution_detail = model_execution_admission_detail(self.model)
-            if execution_detail is not None:
-                raise ValueError(execution_detail)
-            client = self._get_client()
-            with client.messages.stream(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
-            ) as stream:
-                response = stream.get_final_message()
-        except Exception as exc:
-            logger.warning(
-                "Layer 5 Anthropic summary call failed (model=%s): %s",
-                self.model, exc,
-            )
-            return None
+                execution_detail = model_execution_admission_detail(self.model)
+                if execution_detail is not None:
+                    raise ValueError(execution_detail)
+                client = self._get_client()
+                register_output_api_key(client)
+                with client.messages.stream(
+                    model=self.model,
+                    max_tokens=self.max_tokens,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}],
+                ) as stream:
+                    response = stream.get_final_message()
 
-        # Concatenate all text blocks. Thinking blocks (if any) are
-        # ignored — the summarizer's reasoning is not the summary.
-        parts = []
-        for block in getattr(response, "content", []) or []:
-            text = getattr(block, "text", None)
-            if isinstance(text, str):
-                parts.append(text)
-        result = "".join(parts).strip()
-        if not result:
-            logger.warning("Layer 5 summary call returned empty text")
-            return None
-        return result
+                # Reasoning blocks are not summary text. Check the whole result
+                # before any trimming, cap or installation in the next context.
+                parts = []
+                for block in getattr(response, "content", []) or []:
+                    text = getattr(block, "text", None)
+                    if isinstance(text, str):
+                        parts.append(text)
+                result = "".join(parts)
+                guard.check(result)
+            except Exception as exc:
+                logger.warning(
+                    "Layer 5 Anthropic summary call failed (model=%s): %s",
+                    sanitize_runtime_error(self.model), sanitize_runtime_error(exc),
+                )
+                return None
+
+            result = result.strip()
+            if not result:
+                logger.warning("Layer 5 summary call returned empty text")
+                return None
+            return result
 
 
 # ---------------------------------------------------------------------------
