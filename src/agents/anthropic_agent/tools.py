@@ -1321,10 +1321,6 @@ def execute_tool(
         JSON string result
     """
     from src.sec_research.tool_results import SEC_TOOL_NAMES
-    if tool_name in SEC_TOOL_NAMES:
-        import asyncio
-        from src.sec_research.tool_execution import invoke_sec_tool
-        return _serialize_result(asyncio.run(invoke_sec_tool(tool_name, tool_input)), tool_name)
     from src.tools.news_tools import (
         get_ticker_news,
         search_news_by_keyword,
@@ -1684,7 +1680,7 @@ def execute_tool(
         "get_macro_value": lambda: _macro_get_macro_value(dal, tool_input),
     }
 
-    if tool_name not in tool_map:
+    if tool_name not in tool_map and tool_name not in SEC_TOOL_NAMES:
         return json.dumps({"error": "Unknown tool", "code": "invalid_value"})
 
     from src.agents.shared.output_boundary import OutputBoundaryError
@@ -1696,7 +1692,12 @@ def execute_tool(
         return json.dumps({"error": exc.code})
 
     try:
-        result = tool_map[tool_name]()
+        if tool_name in SEC_TOOL_NAMES:
+            import asyncio
+            from src.sec_research.tool_execution import invoke_sec_tool
+            result = asyncio.run(invoke_sec_tool(tool_name, tool_input))
+        else:
+            result = tool_map[tool_name]()
         return _serialize_result(result, tool_name=tool_name)
     except Exception as e:
         from src.tools.result_policy import sanitize_tool_error

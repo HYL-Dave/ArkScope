@@ -10,7 +10,11 @@ that service. Persist exact references before admitting maintenance operations.
 **Tech Stack:** Python/SQLite/FastAPI, existing SEC transports, React/TypeScript.
 **Spec:** `docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md`.
 
-Status: Tasks1/4 reviewed complete; Task2 paused on OAuth redaction approval.
+Status: Tasks1/4 reviewed complete; Task2 integrating on the approved shared
+output boundary. Its former SEC-specific redaction proposal is superseded, not
+an outstanding authorization request. Source checkpoint `ba4f2619` is preserved;
+integration proceeds on `codex/sec-research-integration` from security `41682675`.
+See [integration evidence](../evidence/2026-09-12-sec-integration/README.md).
 Implementation authorized by the existing spec and
 the user's continuation. User asks to finish the remaining release,
 including TOC quality, four-channel wiring and both recovery workflows.
@@ -317,8 +321,10 @@ are per-call, no mutable module-global limit. No new result cap on unrelated too
 The SEC reducer validates/returns a whole envelope. On malformed or oversized SEC
 input it emits a small typed failure, never generic head/tail truncation. Ensure
 Layer0/Layer5 and both OAuth bridges select it for SEC names. Existing security
-wrapping/redaction remains; model/provider secret-like errors never enter output.
-Do not claim JSON citations are exact if redaction modified their quoted passage.
+wrapping remains. Shared exact-secret/result-policy admission replaces diagnostic
+redaction on successful data. Credential-bearing or invalid structures fail with
+typed errors; a cited passage is never silently rewritten. Diagnostics retain
+their separately reviewed strict redaction policy.
 Keep optional non-SEC omissions separate from required-SEC inventory failures.
 An OAuth driver with `registry=None` is an existing intentional tool-free mode
 used by model-task canaries and investor-profile calibration, not a broken
