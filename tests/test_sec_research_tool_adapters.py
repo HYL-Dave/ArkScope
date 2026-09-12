@@ -190,9 +190,15 @@ def test_oauth_sec_boundary_rejects_serialization_corruption(channel, registry, 
     # The service remains real. Corrupt only the final bridge serialization to
     # prove the defensive reducer is selected even if an upstream boundary fails.
     import src.sec_research.tool_execution
-    from src.sec_research import tool_results
+    from src.sec_research.tool_results import SEC_RESULT_POLICY
+    from src.tools import result_policy
     wire(monkeypatch, tool_fixture.service)
-    monkeypatch.setattr(tool_results, "serialize_sec_result", lambda *args: '{"broken":')
+    original = result_policy.admit_tool_result
+    def corrupt_success(result, *, policy, **kwargs):
+        if policy == SEC_RESULT_POLICY and result["status"] == "ok":
+            return '{"broken":'
+        return original(result, policy=policy, **kwargs)
+    monkeypatch.setattr(result_policy, "admit_tool_result", corrupt_success)
     result = unwrap(asyncio.run(dispatch(channel, registry, "list_sec_filings", dict(issuer=CIK))))
     assert result["status"] == "unavailable"
     assert result["gaps"] == [{"code": "sec_result_invalid"}]

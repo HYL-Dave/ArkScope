@@ -252,9 +252,9 @@ async def _invoke_bridged_tool(
         args = check_output_value(args, guard=tool_output_guard(token))
         fn = tool_def.function
         requires_dal = getattr(tool_def, "requires_dal", True)
+        from src.sec_research.tool_results import SEC_TOOL_NAMES, active_budget
 
         async def _run() -> Any:
-            from src.sec_research.tool_results import SEC_TOOL_NAMES
             if name in SEC_TOOL_NAMES:
                 from src.sec_research.tool_execution import invoke_sec_tool
                 return await invoke_sec_tool(name, args, timeout_s=per_tool_timeout_s)
@@ -279,7 +279,9 @@ async def _invoke_bridged_tool(
 
         # (2) per-tool wall-clock.
         try:
-            raw = await asyncio.wait_for(_run(), timeout=per_tool_timeout_s)
+            # SEC owns deadline, stop and worker join; preserve its typed result.
+            raw = (await _run() if name in SEC_TOOL_NAMES else
+                   await asyncio.wait_for(_run(), timeout=per_tool_timeout_s))
         except asyncio.TimeoutError:
             return {
                 "content": [{"type": "text", "text": f"tool '{name}' timed out after {per_tool_timeout_s}s"}],
@@ -292,8 +294,13 @@ async def _invoke_bridged_tool(
         as_str = admit_tool_result(
             raw, policy=getattr(tool_def, "result_policy", None), guard=tool_output_guard(token),
         )
+        budget = _BRIDGE_RESULT_BUDGET
+        if name in SEC_TOOL_NAMES:
+            from src.agents.shared.security import wrap_tool_result
+            as_str = wrap_tool_result(as_str, name)
+            budget = active_budget()
         reducer = get_reducer(name)
-        sized, _meta = reducer(as_str, budget=_BRIDGE_RESULT_BUDGET)
+        sized, _meta = reducer(as_str, budget=budget)
         return {"content": [{"type": "text", "text": sized}], "is_error": False}
     except BaseException as exc:  # noqa: BLE001 — §4 CRITICAL: NEVER let it escape.
         from src.tools.result_policy import sanitize_tool_error

@@ -540,6 +540,7 @@ class ToolRegistry:
 
     def _register_sec_research_tools(self) -> None:
         from typing import get_args, get_origin, get_type_hints
+        from src.sec_research.tool_results import SEC_RESULT_POLICY
         from .sec_research_tools import list_sec_filings, get_sec_financial_facts, read_sec_filing
 
         for function in (list_sec_filings, get_sec_financial_facts, read_sec_filing):
@@ -559,7 +560,8 @@ class ToolRegistry:
                           "revisions": ["latest", "all"]}.get(name),
                     items={"type": "string"} if kind == "array" else None))
             self.register(ToolDefinition(name=function.__name__, description=inspect.getdoc(function),
-                function=function, category="analysis", requires_dal=False, parameters=parameters))
+                function=function, category="analysis", requires_dal=False, parameters=parameters,
+                result_policy=SEC_RESULT_POLICY))
 
     def _register_analysis_tools(self) -> None:
         from .analysis_tools import (

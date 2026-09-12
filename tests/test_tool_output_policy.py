@@ -28,6 +28,7 @@ MAX_BYTES = 32 * 1024**2
 TEXT_TOOLS = (
     "check_data_freshness", "scan_alerts", "get_economic_calendar", "get_macro_value",
 )
+SEC_TOOLS = ("list_sec_filings", "get_sec_financial_facts", "read_sec_filing")
 # Independent, source-inventoried names; do not derive expectations from the registry.
 JSON_TOOLS = (
     "calculate_compound_growth", "calculate_dcf", "calculate_greeks",
@@ -39,7 +40,7 @@ JSON_TOOLS = (
     "get_peer_comparison", "get_portfolio_analysis", "get_portfolio_holdings",
     "get_price_change", "get_report", "get_sa_alpha_picks", "get_sa_article_detail",
     "get_sa_articles", "get_sa_comment_focus", "get_sa_digest", "get_sa_feed",
-    "get_sa_market_news", "get_sa_pick_detail", "get_sec_filings", "get_sector_performance",
+    "get_sa_market_news", "get_sa_pick_detail", "get_sector_performance",
     "get_security_lifecycle_review", "get_ticker_data_coverage", "get_ticker_news",
     "get_ticker_prices", "get_watchlist_overview", "list_high_value_comments",
     "list_memories", "list_reports", "list_security_lifecycle_reviews", "recall_memories",
@@ -120,14 +121,14 @@ def test_new_registration_has_explicit_none_default_and_is_not_admitted():
     reject(api, {"value": 1}, policy=tool.result_policy)
 
 
-def test_registry_matches_the_complete_54_tool_source_inventory():
+def test_registry_matches_the_complete_56_tool_source_inventory():
     registry = create_default_registry()
-    assert len(registry.list_all()) == 54
-    assert set(registry.list_names()) == set(JSON_TOOLS) | set(TEXT_TOOLS)
+    assert len(registry.list_all()) == 56
+    assert set(registry.list_names()) == set(JSON_TOOLS) | set(TEXT_TOOLS) | set(SEC_TOOLS)
     assert registry.get("delegate_to_subagent") is None
 
 
-@pytest.mark.parametrize("name", JSON_TOOLS + TEXT_TOOLS)
+@pytest.mark.parametrize("name", JSON_TOOLS + TEXT_TOOLS + SEC_TOOLS)
 def test_every_builtin_declares_and_uses_its_reviewed_policy(name):
     tool = create_default_registry().get(name)
     assert getattr(tool, "result_policy", None) is not None, f"unclassified result policy: {name}"
@@ -137,6 +138,13 @@ def test_every_builtin_declares_and_uses_its_reviewed_policy(name):
         text = '{"value": "JSON-looking public prose"}\nnot a JSON document'
         assert api.admit_tool_result(text, policy=tool.result_policy) == text
         reject(api, {"value": 1}, policy=tool.result_policy)
+    elif name in SEC_TOOLS:
+        from src.sec_research.tool_results import SEC_RESULT_POLICY
+        assert tool.result_policy == SEC_RESULT_POLICY
+        envelope = dict(status="empty", data=[], gaps=[], observed_at=None,
+                        coverage={}, next_cursor=None)
+        assert json.loads(api.admit_tool_result(envelope, policy=tool.result_policy)) == envelope
+        reject(api, dict(envelope, extra=True), policy=tool.result_policy)
     else:
         assert tool.result_policy == api.PUBLIC_JSON
         admitted = api.admit_tool_result({"value": "1234567890123456789.123"}, policy=tool.result_policy)

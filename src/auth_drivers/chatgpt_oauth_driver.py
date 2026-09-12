@@ -497,9 +497,9 @@ class OpenAIChatGPTOAuthDriver:
             args = check_output_value(args, guard=tool_output_guard(token))
             fn = tool_def.function
             requires_dal = getattr(tool_def, "requires_dal", True)
+            from src.sec_research.tool_results import SEC_TOOL_NAMES, active_budget
 
             async def _run():
-                from src.sec_research.tool_results import SEC_TOOL_NAMES
                 if name in SEC_TOOL_NAMES:
                     from src.sec_research.tool_execution import invoke_sec_tool
                     return await invoke_sec_tool(name, args, timeout_s=self._per_tool_timeout_s)
@@ -514,7 +514,10 @@ class OpenAIChatGPTOAuthDriver:
                     pool.shutdown(wait=False, cancel_futures=True)
 
             try:
-                raw = await asyncio.wait_for(_run(), timeout=self._per_tool_timeout_s)
+                # SEC owns its deadline and waits for stopped acquisition before
+                # returning a complete timeout envelope. Do not race a second timer.
+                raw = (await _run() if name in SEC_TOOL_NAMES else
+                       await asyncio.wait_for(_run(), timeout=self._per_tool_timeout_s))
             except asyncio.TimeoutError:
                 return False, f"tool '{name}' timed out after {self._per_tool_timeout_s}s"
             from src.tools.result_policy import admit_tool_result, tool_output_guard
@@ -522,7 +525,12 @@ class OpenAIChatGPTOAuthDriver:
             result = admit_tool_result(
                 raw, policy=getattr(tool_def, "result_policy", None), guard=tool_output_guard(token),
             )
-            sized, _meta = get_reducer(name)(result, budget=_BRIDGE_RESULT_BUDGET)
+            budget = _BRIDGE_RESULT_BUDGET
+            if name in SEC_TOOL_NAMES:
+                from src.agents.shared.security import wrap_tool_result
+                result = wrap_tool_result(result, name)
+                budget = active_budget()
+            sized, _meta = get_reducer(name)(result, budget=budget)
             return True, sized
         except BaseException as exc:  # noqa: BLE001
             from src.tools.result_policy import sanitize_tool_error

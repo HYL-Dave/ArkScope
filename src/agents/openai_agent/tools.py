@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def function_tool(fn):
+    from inspect import iscoroutinefunction
     from src.agents.shared.output_boundary import OutputBoundaryError
     from src.tools.result_policy import sanitize_tool_error
 
@@ -39,7 +40,17 @@ def function_tool(fn):
         except Exception as exc:
             raise RuntimeError(sanitize_tool_error(exc)) from None
 
-    tool = _sdk_function_tool(guarded, failure_error_function=None)
+    @wraps(fn)
+    async def guarded_async(*args, **kwargs):
+        try:
+            return await fn(*args, **kwargs)
+        except OutputBoundaryError as exc:
+            raise OutputBoundaryError(exc.code) from None
+        except Exception as exc:
+            raise RuntimeError(sanitize_tool_error(exc)) from None
+
+    handler = guarded_async if iscoroutinefunction(fn) else guarded
+    tool = _sdk_function_tool(handler, failure_error_function=None)
     if not hasattr(tool, "on_invoke_tool"):
         return tool
     invoke = tool.on_invoke_tool
