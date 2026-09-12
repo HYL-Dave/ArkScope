@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import json
 import logging
+from functools import wraps
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 
 try:
-    from agents import function_tool, RunContextWrapper
+    from agents import function_tool as _sdk_function_tool, RunContextWrapper
 except ImportError:
     # Fallback for when openai-agents is not installed
-    def function_tool(fn):
+    def _sdk_function_tool(fn, **kwargs):
         return fn
     RunContextWrapper = Any
 
@@ -25,25 +26,44 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def function_tool(fn):
+    from src.agents.shared.output_boundary import OutputBoundaryError
+    from src.tools.result_policy import sanitize_tool_error
+
+    @wraps(fn)
+    def guarded(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except OutputBoundaryError as exc:
+            raise OutputBoundaryError(exc.code) from None
+        except Exception as exc:
+            raise RuntimeError(sanitize_tool_error(exc)) from None
+
+    tool = _sdk_function_tool(guarded, failure_error_function=None)
+    if not hasattr(tool, "on_invoke_tool"):
+        return tool
+    invoke = tool.on_invoke_tool
+
+    @wraps(invoke)
+    async def safe_invoke(context, arguments):
+        try:
+            return await invoke(context, arguments)
+        except Exception as exc:
+            return sanitize_tool_error(exc)
+
+    # SDK handled-error logging includes its original exception and arguments.
+    # Let it propagate directly here, before either logging or formatting it.
+    tool.on_invoke_tool = safe_invoke
+    return tool
+
+
 def _serialize_result(result: Any, tool_name: str = "") -> str:
-    """Serialize result to JSON string for LLM consumption.
+    """Admit by trusted result policy before adding the API boundary tags."""
+    from src.agents.shared.security import wrap_tool_result
+    from src.tools.result_policy import serialize_tool_result
 
-    Wraps output in <tool_output> boundary tags when tool_name is provided
-    to prevent prompt injection from external data sources.
-    """
-    if hasattr(result, "model_dump"):
-        content = json.dumps(result.model_dump(), default=str)
-    elif isinstance(result, list) and result and hasattr(result[0], "model_dump"):
-        content = json.dumps([r.model_dump() for r in result], default=str)
-    elif isinstance(result, dict):
-        content = json.dumps(result, default=str)
-    else:
-        content = str(result)
-
-    if tool_name:
-        from src.agents.shared.security import wrap_tool_result
-        return wrap_tool_result(content, tool_name)
-    return content
+    content = serialize_tool_result(result, tool_name=tool_name)
+    return wrap_tool_result(content, tool_name)
 
 
 def create_openai_tools(dal: "DataAccessLayer") -> List:
@@ -569,7 +589,9 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             try:
                 holdings = json.loads(holdings_json)
             except (json.JSONDecodeError, TypeError):
-                return json.dumps({"error": f"Invalid holdings_json: {holdings_json}"})
+                from src.agents.shared.output_boundary import OutputBoundaryError
+
+                raise OutputBoundaryError("invalid_value") from None
         result = _get_portfolio_analysis(dal, tickers=tickers, holdings=holdings)
         return _serialize_result(result, "get_portfolio_analysis")
 
@@ -1045,7 +1067,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         accept CSV (e.g. "US,CN").
         """
         from src.tools.macro_calendar_tools import get_economic_calendar
-        return get_economic_calendar(
+        result = get_economic_calendar(
             dal,
             country=country or None,
             importance=importance or None,
@@ -1054,6 +1076,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             as_of=as_of or None,
             limit=limit,
         )
+        return _serialize_result(result, "get_economic_calendar")
 
     @function_tool
     def tool_get_macro_value(
@@ -1069,12 +1092,13 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         lookahead-safe backtesting.
         """
         from src.tools.macro_calendar_tools import get_macro_value
-        return get_macro_value(
+        result = get_macro_value(
             dal,
             series_id=series_id,
             observation_date=observation_date,
             as_of=as_of or None,
         )
+        return _serialize_result(result, "get_macro_value")
 
     @function_tool
     def tool_list_security_lifecycle_reviews(

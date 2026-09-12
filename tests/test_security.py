@@ -11,6 +11,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from src.agents.shared.security import wrap_tool_result
+from src.agents.shared.output_boundary import OutputBoundaryError
 
 
 # ============================================================
@@ -67,14 +68,13 @@ class TestAnthropicBridgeWrapping:
         result = _serialize_result({"ticker": "NVDA"}, tool_name="get_ticker_news")
         assert '<tool_output tool="get_ticker_news">' in result
         assert "</tool_output>" in result
-        assert '"ticker": "NVDA"' in result
+        assert json.loads(result.split("\n", 1)[1].rsplit("\n", 1)[0]) == {"ticker": "NVDA"}
 
     def test_serialize_without_tool_name(self):
-        """Anthropic _serialize_result returns plain when no tool_name."""
+        """An unnamed result has no trusted policy and is rejected."""
         from src.agents.anthropic_agent.tools import _serialize_result
-        result = _serialize_result({"ticker": "NVDA"})
-        assert "<tool_output" not in result
-        assert '"ticker": "NVDA"' in result
+        with pytest.raises(OutputBoundaryError, match="^invalid_value$"):
+            _serialize_result({"ticker": "NVDA"})
 
 
 class TestOpenAIBridgeWrapping:
@@ -84,14 +84,13 @@ class TestOpenAIBridgeWrapping:
         result = _serialize_result({"ticker": "NVDA"}, tool_name="get_ticker_news")
         assert '<tool_output tool="get_ticker_news">' in result
         assert "</tool_output>" in result
-        assert '"ticker": "NVDA"' in result
+        assert json.loads(result.split("\n", 1)[1].rsplit("\n", 1)[0]) == {"ticker": "NVDA"}
 
     def test_serialize_without_tool_name(self):
-        """OpenAI _serialize_result returns plain when no tool_name."""
+        """An unnamed result has no trusted policy and is rejected."""
         from src.agents.openai_agent.tools import _serialize_result
-        result = _serialize_result({"ticker": "NVDA"})
-        assert "<tool_output" not in result
-        assert '"ticker": "NVDA"' in result
+        with pytest.raises(OutputBoundaryError, match="^invalid_value$"):
+            _serialize_result({"ticker": "NVDA"})
 
 
 # ============================================================

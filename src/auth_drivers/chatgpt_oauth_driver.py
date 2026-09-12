@@ -118,22 +118,6 @@ def _redact_token(text: Any, token: Optional[str]) -> str:
     return redact(text)
 
 
-def _coerce_result_str(result: Any) -> str:
-    if isinstance(result, str):
-        return result
-    if hasattr(result, "model_dump"):
-        try:
-            return json.dumps(result.model_dump(), ensure_ascii=False, default=str)
-        except Exception:
-            return str(result)
-    if isinstance(result, (dict, list)):
-        try:
-            return json.dumps(result, ensure_ascii=False, default=str)
-        except Exception:
-            return str(result)
-    return str(result)
-
-
 def _int_token(value: Any) -> int:
     try:
         return int(value or 0)
@@ -496,10 +480,10 @@ class OpenAIChatGPTOAuthDriver:
     async def _invoke_tool(self, *, name: str, args: dict, token: Optional[str]) -> tuple[bool, str]:
         try:
             if name not in _RESEARCH_READONLY_TOOLS:
-                return False, f"tool '{name}' is not allowed (allowlist veto)"
+                return False, "invalid_value: tool is not allowed (allowlist veto)"
             tool_def = self._registry.get(name) if self._registry is not None else None
             if tool_def is None:
-                return False, f"tool '{name}' is not registered"
+                return False, "invalid_value: tool is not registered"
             fn = tool_def.function
             requires_dal = getattr(tool_def, "requires_dal", True)
 
@@ -518,11 +502,17 @@ class OpenAIChatGPTOAuthDriver:
                 raw = await asyncio.wait_for(_run(), timeout=self._per_tool_timeout_s)
             except asyncio.TimeoutError:
                 return False, f"tool '{name}' timed out after {self._per_tool_timeout_s}s"
-            result = _coerce_result_str(raw)
+            from src.tools.result_policy import admit_tool_result, tool_output_guard
+
+            result = admit_tool_result(
+                raw, policy=getattr(tool_def, "result_policy", None), guard=tool_output_guard(token),
+            )
             sized, _meta = get_reducer(name)(result, budget=_BRIDGE_RESULT_BUDGET)
-            return True, _redact_token(sized, token)
+            return True, sized
         except BaseException as exc:  # noqa: BLE001
-            return False, _redact_token(str(exc), token)[:500]
+            from src.tools.result_policy import sanitize_tool_error
+
+            return False, sanitize_tool_error(exc, token=token)
 
     async def _stream(
         self,

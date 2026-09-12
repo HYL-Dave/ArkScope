@@ -1284,24 +1284,12 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
 
 
 def _serialize_result(result: Any, tool_name: str = "") -> str:
-    """Serialize result to JSON string for LLM consumption.
+    """Admit by trusted result policy before adding the API boundary tags."""
+    from src.agents.shared.security import wrap_tool_result
+    from src.tools.result_policy import serialize_tool_result
 
-    Wraps output in <tool_output> boundary tags when tool_name is provided
-    to prevent prompt injection from external data sources.
-    """
-    if hasattr(result, "model_dump"):
-        content = json.dumps(result.model_dump(), default=str)
-    elif isinstance(result, list) and result and hasattr(result[0], "model_dump"):
-        content = json.dumps([r.model_dump() for r in result], default=str)
-    elif isinstance(result, dict):
-        content = json.dumps(result, default=str)
-    else:
-        content = str(result)
-
-    if tool_name:
-        from src.agents.shared.security import wrap_tool_result
-        return wrap_tool_result(content, tool_name)
-    return content
+    content = serialize_tool_result(result, tool_name=tool_name)
+    return wrap_tool_result(content, tool_name)
 
 
 def _dispatch_subagent(tool_input: Dict[str, Any], dal: "DataAccessLayer") -> Dict:
@@ -1720,11 +1708,14 @@ def execute_tool(
     }
 
     if tool_name not in tool_map:
-        return json.dumps({"error": f"Unknown tool: {tool_name}"})
+        return json.dumps({"error": "Unknown tool", "code": "invalid_value"})
 
     try:
         result = tool_map[tool_name]()
         return _serialize_result(result, tool_name=tool_name)
     except Exception as e:
-        logger.error(f"Tool {tool_name} failed: {e}")
-        return json.dumps({"error": str(e)})
+        from src.tools.result_policy import sanitize_tool_error
+
+        detail = sanitize_tool_error(e)
+        logger.error("Tool %s failed: %s", tool_name, detail)
+        return json.dumps({"error": detail})
