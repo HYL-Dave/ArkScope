@@ -250,7 +250,11 @@ class SecTransport:
         governor: SecRequestGovernor | None = None,
         lock_dir: str | Path | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        max_rate_limit_retries: int = 1,
     ):
+        if type(max_rate_limit_retries) is not int or max_rate_limit_retries not in (0, 1):
+            raise ValueError("invalid_sec_rate_limit_retries")
+        self._max_rate_limit_retries = max_rate_limit_retries
         self.user_agent = str(user_agent if user_agent is not None else get_sec_user_agent()).strip()
         self._session = session or requests.Session()
         self._governor = governor or SecRequestGovernor(lock_dir=lock_dir, sleep=sleep)
@@ -330,7 +334,7 @@ class SecTransport:
             budget.reserve_document(max_bytes)
         effective_max = budget.available_body_bytes(max_bytes) if budget is not None else max_bytes
 
-        for attempt in range(2):
+        for attempt in range(self._max_rate_limit_retries + 1):
             if budget is not None:
                 budget.reserve_attempt()
             wait_ms = self._governor.reserve_request_start()
@@ -354,7 +358,7 @@ class SecTransport:
                 raise SecTransportFailure("sec_transport_unavailable") from exc
             try:
                 if response.status_code == 429:
-                    if attempt == 1:
+                    if attempt == self._max_rate_limit_retries:
                         raise SecTransportFailure("sec_rate_limited")
                     retry_after = self._retry_after_seconds(response.headers)
                     self._rate_limit_retries += 1

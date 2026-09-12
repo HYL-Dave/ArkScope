@@ -85,7 +85,8 @@ def test_refresh_persists_real_sources_and_resume_uses_no_request(route, monkeyp
         get_all=lambda: {"sec_edgar": {"user_agent": "research@arkscope.test"}}))
     calls, closed, identities = [], [], []
     class Transport:
-        def __init__(self, *, user_agent):
+        def __init__(self, *, user_agent, max_rate_limit_retries):
+            assert max_rate_limit_retries == 0
             identities.append(user_agent)
 
         def get(self, url, **kwargs):

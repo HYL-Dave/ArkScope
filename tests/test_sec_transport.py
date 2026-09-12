@@ -76,6 +76,66 @@ def _transport(tmp_path, *, session=None, clock=None, governor=None):
     )
 
 
+def test_research_rate_limit_is_one_attempt_with_no_sleep_retry(tmp_path):
+    import inspect
+    from data_sources.sec_transport import SecRequestGovernor, SecTransport, SecTransportFailure
+    assert "max_rate_limit_retries" in inspect.signature(SecTransport).parameters, "missing research no-retry transport contract"
+    clock = _Clock()
+    response = _Response(429, headers={"Retry-After": "3"})
+    session = _Session([response, _Response()])
+    transport = SecTransport(user_agent="ArkScope tests@example.test", session=session,
+        governor=SecRequestGovernor(lock_dir=tmp_path / "locks", clock=clock.time, sleep=clock.sleep),
+        sleep=clock.sleep, max_rate_limit_retries=0)
+    with pytest.raises(SecTransportFailure, match="sec_rate_limited"):
+        transport.get("https://www.sec.gov/files/company_tickers.json")
+    assert len(session.calls) == 1 and clock.sleeps == [] and response.closed
+
+
+def test_existing_transport_default_keeps_reviewed_retry(tmp_path):
+    clock = _Clock()
+    first, second = _Response(429, headers={"Retry-After": "3"}), _Response()
+    session = _Session([first, second])
+    assert _transport(tmp_path, session=session, clock=clock).get("https://www.sec.gov/files/company_tickers.json").body == b"{}"
+    assert len(session.calls) == 2 and clock.sleeps == [3]
+    assert first.closed and second.closed
+
+
+@pytest.mark.parametrize("value", [True, False, -1, 2, 0.0, "0", None])
+def test_retry_control_rejects_non_integer_or_unbounded_values(value):
+    import inspect
+    from data_sources.sec_transport import SecTransport
+    assert "max_rate_limit_retries" in inspect.signature(SecTransport).parameters, "missing research no-retry transport contract"
+    with pytest.raises(ValueError):
+        SecTransport(user_agent="ArkScope tests@example.test", max_rate_limit_retries=value)
+
+
+def test_research_route_429_dispatches_once_without_retry(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from data_sources import sec_transport
+    from src.api.routes import sec_research as route
+    from src.profile_state import ProfileStateStore
+    from src.sec_research.paths import SecResearchPaths
+
+    profile = ProfileStateStore(tmp_path / "profile" / "state.db")
+    monkeypatch.setattr(route.SecResearchPaths, "resolve", lambda: SecResearchPaths(tmp_path / "market.db"))
+    monkeypatch.setattr(route, "get_profile_store", lambda: profile)
+    monkeypatch.setattr(route, "get_data_provider_store", lambda: SimpleNamespace(
+        get_all=lambda: {"sec_edgar": {"user_agent": "tests@example.test"}}))
+    clock, closed = _Clock(), []
+    response = _Response(429, headers={"Retry-After": "3"})
+    session = _Session([response, _Response()])
+    session.close = lambda: closed.append(True)
+    monkeypatch.setattr(sec_transport.requests, "Session", lambda: session)
+    governor = sec_transport.SecRequestGovernor(lock_dir=tmp_path / "governor", clock=clock.time, sleep=clock.sleep)
+    monkeypatch.setattr(sec_transport, "SecRequestGovernor", lambda **kwargs: governor)
+
+    result = route.refresh("320193", route.RefreshRequest(max_sources=1))
+    assert result["gaps"] == [{"source": "submissions", "code": "sec_rate_limited"}]
+    assert len(session.calls) == 1
+    assert session.calls[0]["url"] == "https://data.sec.gov/submissions/CIK0000320193.json"
+    assert clock.sleeps == [] and response.closed and closed == [True]
+
+
 def test_strict_sec_identity_rejects_missing_or_placeholder_before_session(
     tmp_path, monkeypatch
 ):
