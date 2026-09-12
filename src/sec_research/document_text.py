@@ -142,7 +142,8 @@ class _TOCStructure:
         frame = {"tag": tag, "local": local, "candidate": candidate, "role": role,
                  "title": labelled if local == "nav" else adjacent, "links": set(),
                  "start": title[0] if adjacent else None, "text": "", "hidden": hidden,
-                 "html": html, "href": attributes.get("href") or "", "linked": False,
+                 "html": html, "href": attributes.get("href") or "", "linked": None,
+                 "pending_heading": None,
                  "invalid": len(attributes) != len(attrs) or local in {"html", "body"}}
         self.stack.append(frame)
 
@@ -174,23 +175,40 @@ class _TOCStructure:
             heading = frame["html"] and frame["local"] in {"h1", "h2", "h3", "h4", "h5", "h6", "caption"}
             title = heading and label.lower() == "table of contents"
             match = _HEADING.fullmatch(label)
-            item_link = (frame["html"] and frame["local"] == "a" and match is not None
-                         and match.group(1).upper() == "ITEM" and frame["href"].startswith("#")
-                         and len(frame["href"]) > 1)
+            heading_link = (exact and not frame["invalid"] and frame["html"]
+                            and frame["local"] == "a" and match is not None
+                            and frame["href"].startswith("#") and len(frame["href"]) > 1
+                            and frame["pending_heading"] in {None, label})
+            if frame["pending_heading"] is not None and not heading_link:
+                frame["invalid"] = True
+            item_link = heading_link and match.group(1).upper() == "ITEM"
             if not frame["hidden"]:
+                if heading and match and frame["linked"] != label:
+                    # An enclosing anchor is evidence only after its complete close.
+                    anchor = None
+                    for ancestor in reversed(self.stack):
+                        self.budget.tick()
+                        if ancestor["local"] == "a":
+                            anchor = ancestor
+                            break
+                    if anchor is None:
+                        frame["invalid"] = True
+                    elif anchor["pending_heading"] is not None:
+                        anchor["invalid"] = True
+                    else:
+                        anchor["pending_heading"] = label
                 for parent in self.stack:
                     self.budget.tick()
                     if title:
                         parent["title"] = True
+                    if frame["invalid"]:
+                        parent["invalid"] = True
+                    if heading_link:
+                        parent["linked"] = label
                     if item_link:
-                        parent["linked"] = True
                         if len(parent["links"]) < 2:
                             parent["links"].add(frame["href"])
-                    # Body headings inside the proposed region make exclusion unsafe.
-                    if heading and match and not frame["linked"] and not any(
-                            ancestor["local"] == "a" for ancestor in self.stack):
-                        parent["invalid"] = True
-            if title and exact and frame["start"] is not None:
+            if title and exact and not frame["invalid"] and frame["start"] is not None:
                 self.previous_title = (frame["start"], self.output.size_bytes, len(self.stack))
             if frame["candidate"] and (frame["role"] or frame["title"]):
                 valid = (exact and not frame["invalid"] and frame["start"] is not None

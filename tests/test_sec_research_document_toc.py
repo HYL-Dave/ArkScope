@@ -237,3 +237,128 @@ def test_structural_observation_keeps_parser_bounds(monkeypatch, failure):
     with pytest.raises(SourceReadError, match=code):
         text_owner.extract_document_text(body, "text/html", check=check, structure_observer=observed.append)
     assert observed == []
+
+
+def linked_heading(label, href, direction):
+    anchor = b'<a href="' + href + b'">'
+    if direction == "anchor-heading":
+        return anchor + b'<h2>' + label + b'</h2></a>'
+    return b'<h2>' + anchor + label + b'</a></h2>'
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+@pytest.mark.parametrize("direction", ["anchor-heading", "heading-anchor"])
+def test_external_heading_link_keeps_body_duplicate_ambiguous(rig, mime, direction):
+    wrapped = linked_heading(b'Item 1. Business', b'https://example.invalid/body', direction)
+    body = TOC[:-6] + wrapped + b'<p>Actual operations.</p></nav>' + BODY.replace(
+        b'Actual operations.', b'Duplicate body.')
+    record = capture(rig, body, mime)
+    page = read_section(rig, record)
+    assert page["status"] == "unavailable" and not page["data"]["passages"], page
+    assert record["metadata"]["toc_ranges"] == []
+    assert record["metadata"]["structure_gaps"]
+    assert {"code": "section_ambiguous", "section_id": "item_1"} in record["metadata"]["section_gaps"]
+    whole = queries(rig).read(FILING_ID, cursor=page["data"]["text_start_cursor"])
+    expected = ('Table of Contents\nItem 1. Business\nItem 1. Business\n'
+                'Actual operations.\nItem 1. Business\nDuplicate body.')
+    assert whole["data"]["passages"][0]["text"] == expected
+    assert rig.captures.read(record["original_sha256"]) == body
+    assert_citations(rig, record, whole)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+@pytest.mark.parametrize("invalid_link", [
+    b'<a href="https://example.invalid/one" href="#one">Item 1. Business</a>',
+    b'<a href="#one" href="https://example.invalid/one">Item 1. Business</a>',
+    b'<a href="#one"><span id="a" id="b">Item 1. Business</span></a>',
+    b'<span id="a" id="b"><a href="#one">Item 1. Business</a></span>',
+])
+def test_invalid_descendant_attributes_cannot_certify_table(rig, mime, invalid_link):
+    toc = (b'<table><caption>Table of Contents</caption><tr><td>' + invalid_link
+           + b'</td></tr><tr><td><a href="#two">Item 2. Properties</a></td></tr>'
+           b'<tr><td><a href="#three">Item 3. Legal Proceedings</a></td></tr></table>')
+    record = capture(rig, toc + BODY, mime)
+    assert record["metadata"]["toc_ranges"] == [], record["metadata"]
+    assert record["metadata"]["structure_gaps"]
+    page = read_section(rig, record)
+    assert page["status"] == "unavailable" and not page["data"]["passages"]
+    assert {"code": "section_ambiguous", "section_id": "item_1"} in record["metadata"]["section_gaps"]
+    whole = queries(rig).read(FILING_ID, cursor=page["data"]["text_start_cursor"])
+    assert whole["data"]["passages"][0]["text"] == (
+        'Table of Contents\nItem 1. Business\nItem 2. Properties\n'
+        'Item 3. Legal Proceedings\nItem 1. Business\nActual operations.')
+    assert_citations(rig, record, whole)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+@pytest.mark.parametrize("direction", ["anchor-heading", "heading-anchor"])
+@pytest.mark.parametrize("kind", ["Item 1. Business", "Part I"])
+def test_valid_local_heading_link_membership(rig, mime, direction, kind):
+    toc = (b'<nav role="doc-toc"><h2>Table of Contents</h2>'
+           + linked_heading(kind.encode(), b'#target', direction) + b'</nav>')
+    body = b'<h2>Part I</h2>' + BODY
+    record = capture(rig, toc + body, mime)
+    page = read_section(rig, record)
+    assert page["data"]["passages"], page
+    assert page["data"]["passages"][0]["text"] == 'Item 1. Business\nActual operations.'
+    assert record["metadata"]["structure_gaps"] == []
+    assert len(record["metadata"]["toc_ranges"]) == 1
+    part = read_section(rig, record, "part_i")
+    assert part["data"]["passages"][0]["text"] == 'Part I\nItem 1. Business\nActual operations.'
+    assert_citations(rig, record, page)
+    assert_citations(rig, record, part)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+@pytest.mark.parametrize("item_count", [1, 2])
+def test_part_membership_does_not_replace_table_item_threshold(rig, mime, item_count):
+    toc = (b'<table><caption>Table of Contents</caption><tr><td>'
+           + linked_heading(b'Part I', b'#part', "heading-anchor")
+           + b'</td></tr><tr><td><a href="#one">Item 1. Business</a></td></tr>')
+    if item_count == 2:
+        toc += b'<tr><td><a href="#two">Item 2. Properties</a></td></tr>'
+    record = capture(rig, toc + b'</table><h2>Part I</h2>' + BODY, mime)
+    page = read_section(rig, record)
+    if item_count == 1:
+        assert record["metadata"]["toc_ranges"] == []
+        assert record["metadata"]["structure_gaps"]
+        assert page["status"] == "unavailable" and not page["data"]["passages"]
+    else:
+        assert page["data"]["passages"], page
+        assert page["data"]["passages"][0]["text"] == 'Item 1. Business\nActual operations.'
+        assert record["metadata"]["structure_gaps"] == []
+        assert_citations(rig, record, page)
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+def test_linked_part_toc_preserves_body_duplicate_veto(rig, mime):
+    toc = (b'<nav role="doc-toc"><h2>Table of Contents</h2>'
+           b'<h3><a href="#part">Part I</a></h3><div>'
+           b'<a href="#one">Item 1. Business</a></div></nav>')
+    record = capture(rig, toc + b'<h2>Part I</h2>' + BODY + b'<h2>Part I</h2>' + BODY, mime)
+    assert record["metadata"]["toc_ranges"], record["metadata"]
+    for section in ("part_i", "item_1"):
+        page = read_section(rig, record, section)
+        assert page["status"] == "unavailable" and not page["data"]["passages"]
+        assert {"code": "section_ambiguous", "section_id": section} in record["metadata"]["section_gaps"]
+
+
+@pytest.mark.parametrize("mime", ["text/html", "application/xhtml+xml"])
+@pytest.mark.parametrize("wrapped", [
+    b'<a href="#one"><h2>Item 1. Business</h2><p>Actual operations.</p></a>',
+    b'<h2><a href="#one">Item 1.</a> Business</h2><p>Actual operations.</p>',
+    b'<a href="#one"><h2>Item 1. Business</h2><h2>Item 1. Business</h2></a>'
+    b'<p>Actual operations.</p>',
+])
+def test_local_link_must_match_complete_single_heading(rig, mime, wrapped):
+    record = capture(rig, TOC[:-6] + wrapped + b'</nav>' + BODY.replace(
+        b'Actual operations.', b'Duplicate body.'), mime)
+    page = read_section(rig, record)
+    assert page["status"] == "unavailable" and not page["data"]["passages"], page
+    assert record["metadata"]["toc_ranges"] == []
+    assert record["metadata"]["structure_gaps"]
+    assert {"code": "section_ambiguous", "section_id": "item_1"} in record["metadata"]["section_gaps"]
+    whole = queries(rig).read(FILING_ID, cursor=page["data"]["text_start_cursor"])
+    assert 'Actual operations.' in whole["data"]["passages"][0]["text"]
+    assert 'Duplicate body.' in whole["data"]["passages"][0]["text"]
+    assert_citations(rig, record, whole)
