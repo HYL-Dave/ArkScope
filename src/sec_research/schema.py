@@ -9,6 +9,12 @@ _TABLES = {
     "sec_research_objects": "sha256 TEXT PRIMARY KEY, object_key TEXT UNIQUE NOT NULL, size_bytes INTEGER NOT NULL CHECK(size_bytes>=0)",
     "sec_research_reservations": "reservation_id TEXT PRIMARY KEY, size_bytes INTEGER NOT NULL CHECK(size_bytes>=0)",
     "sec_research_orphans": "object_key TEXT PRIMARY KEY, size_bytes INTEGER NOT NULL CHECK(size_bytes>=0)",
+    "sec_research_issuer_maps": """observation_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status TEXT NOT NULL CHECK(status IN ('ok','unavailable')),
+        object_sha256 TEXT REFERENCES sec_research_objects(sha256),
+        observed_at TEXT NOT NULL, source_url TEXT NOT NULL,
+        symbols TEXT NOT NULL, gaps TEXT NOT NULL,
+        CHECK(status!='ok' OR object_sha256 IS NOT NULL)""",
     "sec_research_snapshots": """snapshot_id TEXT PRIMARY KEY NOT NULL,
         cik TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('catalog','facts')),
         object_sha256 TEXT NOT NULL REFERENCES sec_research_objects(sha256),
@@ -66,7 +72,7 @@ for _table, _columns in (
     _owner = f"sec_research_{_table}"
     _DDL[_name] = ("index", _owner, f"CREATE INDEX {_name} ON {_owner}({_columns})")
 
-for _table in ("objects", "snapshots", "filings", "facts", "receipts",
+for _table in ("objects", "issuer_maps", "snapshots", "filings", "facts", "receipts",
                "document_directories", "documents", "document_sources", "document_attempts"):
     for _operation in ("UPDATE", "DELETE"):
         _name = f"sec_research_{_table}_no_{_operation.lower()}"
@@ -78,6 +84,7 @@ for _table in ("objects", "snapshots", "filings", "facts", "receipts",
 # REPLACE's implicit deletion does not fire DELETE triggers by default.
 for _table, _conflict in (
     ("objects", "sha256=NEW.sha256 OR object_key=NEW.object_key"),
+    ("issuer_maps", "observation_id=NEW.observation_id"),
     ("snapshots", "snapshot_id=NEW.snapshot_id"),
     ("filings", "(snapshot_id=NEW.snapshot_id AND ordinal=NEW.ordinal)"),
     ("facts", "(snapshot_id=NEW.snapshot_id AND ordinal=NEW.ordinal)"),

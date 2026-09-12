@@ -196,7 +196,7 @@ def refresh(cik: str, request: RefreshRequest):
         store = Store(SecResearchPaths.resolve())
         store.install()
         captures = CaptureStore(store, budget=budget)
-        transport = SecTransport(user_agent=identity)
+        transport = SecTransport(user_agent=identity, max_rate_limit_retries=0)
         result = ResearchService(store, captures, transport).refresh(
             cik, max_sources=request.max_sources, resume=request.resume)
         return result
