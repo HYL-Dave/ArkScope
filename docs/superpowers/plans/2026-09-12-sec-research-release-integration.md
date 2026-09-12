@@ -281,7 +281,10 @@ plus live new catalog controls; retain backend protocol conformance coverage.
 No compatibility alias/redirect/stub remains.
 Tests: create `tests/test_sec_research_tool_adapters.py`,
 `test_sec_research_tool_results.py`; modify `test_subagent.py`, `test_sec_tools.py`
-and all eight count-collateral files in the table below.
+and the original eight count-collateral files plus the additional lifecycle and
+shared-policy owners in the table below. The first complete integration run
+exposed three previously missed count assertions in the two lifecycle files;
+the original eight-file inventory was incomplete, not an existing test failure.
 
 **Interfaces:** Consume Task 1's three public functions and ToolService. All use
 `category="analysis"`, no DAL argument (`requires_dal=False`). The common
@@ -327,6 +330,9 @@ Research registry lacking the new required tools must still fail explicitly.
 | tests/test_sa_tools.py | 54->56 four times, 55->57 once |
 | tests/test_sec_tools.py | 54->56, analysis15->17; move old owners to new contracts |
 | tests/test_tools.py | 54->56 three times, analysis15->17; exact names |
+| tests/test_security_lifecycle_routes.py | Entire App route count224->223 after old /sec/{ticker} removal; retain exact lifecycle/SEC route sets and assert old route absent |
+| tests/test_security_lifecycle_tools.py | Both Research OAuth allowlist counts15->17; retain lifecycle tools, require three SEC names, reject old get_sec_filings |
+| tests/test_tool_output_policy.py | Shared inventory56 =49 ordinary JSON +3 closed SEC JSON +4 text; no SEC redaction exception |
 
 - [x] Write RED `test_each_research_transport_dispatches_three_real_sec_tools`
   parameterized for the actual OpenAI FunctionTool invocation, Anthropic dispatch,
@@ -351,10 +357,13 @@ Name `test_sec_pages_remain_complete_json_through_bridge_reduction`,
   present, or JSON boundary corruption. Record exact failing owner.
 - [x] Replace all surfaces atomically and implement bounded whole pages and SEC
   cancellation. Preserve model/auth/effort selection and all other tools.
-- [ ] Focused GREEN runs new tests, subagent/skill owners, auth bridge owners and
+- [x] Focused GREEN runs new tests, subagent/skill owners, auth bridge owners and
   all eight count files. Inverses: omit each transport's new name; select generic
   truncation; omit worker wait; remove one subagent required tool. Named owners
   must fail for each affected boundary; do not merely assert schema counts.
+  Eight process-only modes caught24 expected failures, with25 unchanged controls
+  passing. Fresh union GREEN30P; no product/test bytes changed by mutations.
+  Full-suite count collateral above still needs its final re-verification.
 - [x] Commit the complete replacement; record changed/removed tests and exact
   route-count collateral. Do not leave an alias for the old model-facing tool.
 

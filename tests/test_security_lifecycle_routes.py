@@ -462,7 +462,8 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 224
+    assert len(rows) == 223
+    assert ("GET", "/sec/{ticker}") not in rows
     assert {row for row in rows if row[1].startswith("/sec-research/")} == {
         ("GET", "/sec-research/{cik}"),
         ("POST", "/sec-research/{cik}/refresh"),
