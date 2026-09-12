@@ -54,6 +54,11 @@ conversations or token stores were read for this decision.
    never replace an identifier/cursor inside an apparently successful result.
    Deny explicit credential-bearing JSON keys recursively, including mapping
    keys themselves in exact-secret scans. No fallback to arbitrary `str(obj)`.
+   Explicit authentication literals (Bearer or established provider-key
+   prefixes) may also reject a tool result. This is a credential syntax rule,
+   not a generic length/entropy/PII heuristic and not prose rewriting. Its
+   exact supported forms need tests; arbitrary unknown secrets remain outside
+   the guarantee. This retains the existing unrelated sk-ant key-result guard.
 6. Valid public payloads have equal canonical business data in OpenAI API,
    Anthropic API, ChatGPT OAuth and Claude OAuth. SDK wrappers, call IDs and
    channel-specific size budgets need not have identical wire bytes. Lossless
@@ -65,7 +70,10 @@ conversations or token stores were read for this decision.
    and emission use raw offsets, not replacement-string offsets. Every split
    position, one-character chunks, overlapping secrets and multiple encodings
    have named tests. Pending partial-secret suffixes are withheld on abnormal
-   exit. Normal finish must not emit a partial secret prefix as plaintext.
+   exit. On normal, explicit finish an unmatched suffix is safe to flush: a
+   complete public word ending in the first letter of a JWT is not a credential.
+   Full known credentials are still blocked at every split. Interrupted streams
+   discard undecided suffixes instead of pretending normal completion.
 8. Protection precedes public events, durable event append, scratchpad and
    replay capture. It covers text, thinking text, final answers and tool traces.
    No raw secret in error details or rejected-value repr. Stream state is scoped
