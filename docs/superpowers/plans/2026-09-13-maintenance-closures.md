@@ -68,14 +68,21 @@ binding task brief. Mark its checkboxes as work is verified, not preemptively.
   protection, missing-store noncreation, real data controls and frontend checks.
 - [x] Inverses independently restore telemetry suppression and old-value
   validation; both named owners fail. Restore and rerun.
-- [ ] Independent review, commit, and final frozen full backend/frontend/census.
+- [x] Independent review, commit, and final frozen full backend/frontend/census.
   Reconcile exact test additions/removals and any new scanner uncertainties.
+
+Task2 commits `a4bf0a73`/`6cddc221`, test-only collateral `1304c96d`; all task,
+whole-change and collateral reviews approved. Final full backend 10,311P/12
+unchanged S, exact 10,323 nodes (+66/-34); frontend 1,779P/typecheck/build/i18n.
+The initial full run's one missing fixture classification was reproduced and
+fixed without relaxing discovery, then a new complete suite passed. Its failed
+receipt remains separate from final acceptance.
 
 ### Task 3: Verification And Delivery
 
-- [ ] Verify no remaining EIR-001 selectors or C11 product consumers, and retain
+- [x] Verify no remaining EIR-001 selectors or C11 product consumers, and retain
   current news/UI/data controls. Finish all servers/test processes owned here.
-- [ ] Full suites run serially on frozen product/test source, not a union of
+- [x] Full suites run serially on frozen product/test source, not a union of
   partial successes. Record source/runner identity and unchanged skip IDs.
 - [ ] Seal selected receipts only; verify manifest membership and hashes from
   Git, including log files ignored by default. No fixture data/binaries in Git.
