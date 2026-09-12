@@ -260,9 +260,11 @@ run --label candidate-synthetic-repeat-03 --timeout 180 --library-path "$R/prefi
   session, column-metadata and related flags differ. The complete option diff is
   retained in the evidence audit. Absence of `ENABLE_JSON1` is not absent JSON;
   behavioral JSON tests passed. Production build options require separate review.
-- Actual App stores, app-specific lock wrappers, backup wrapper, launch selectors,
-  schedulers, native messaging, dependency imports and provider integrations were
-  not exercised. All eight tests are standalone synthetic checks.
+- At the worker handoff, no application store or wrapper was exercised; all
+  eight matrix tests above were standalone. The controller later added330
+  disposable application-store tests, as recorded below. Actual stores, launch
+  selectors, schedulers, native messaging and live provider integration remain
+  untested on this candidate.
 - No Windows/macOS build, launcher, filesystem-lock, packaging or signing checks.
   No sustained production workload or deterministic upstream WAL-reset test.
 - No existing-data health assessment or repair claim. Any production backup,
@@ -286,3 +288,25 @@ This adds actual SEC capture/store, profile, SA, normalized-news schema/store/
 writer-locking, SQLite backup-wrapper and direct-market tests to the earlier
 standalone probes. It is not the full application suite, a claim that every
 test-created subprocess uses the override, or a production/platform admission.
+
+## Python Scope Correction
+
+Python3.13 is not a prerequisite for the SQLite fix. The earlier Python scope
+question must be evaluated with the existing `numpy==1.26.4` pin in
+`requirements.txt`: its [official release notes](https://numpy.org/doc/2.3/release/1.26.4-notes.html)
+support Python3.9-3.12. Therefore3.13 also requires a separately reviewed
+numerical dependency change, not just a new interpreter. No such change is
+assumed or implemented here. Recommended sequencing is SQLite admission first,
+then a separate Python/numerical-stack upgrade; the pending Python question
+does not block SQLite-only preparation.
+
+Source-only launcher inventory also shows two distinct runtime selectors:
+Electron `apps/arkscope-desktop/main.js` uses ARKSCOPE_PYTHON or PATH's python;
+the SA native launcher uses the persisted python_path selected by its installer.
+Neither actual private selector was read or updated. Changing a shell's loader
+environment would not establish that both entrypoints use the same new engine.
+Production admission must verify the actual entrypoints and child processes,
+coordinate writers, create WAL-consistent backups and full integrity baselines,
+and retain a tested rollback path before any stored-schema disposal. The
+current pinned private build and process-scoped override are probe artifacts,
+not that deployment implementation.

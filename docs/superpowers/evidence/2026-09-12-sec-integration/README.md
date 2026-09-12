@@ -51,11 +51,29 @@ Python audit hook blocks production paths/providers but is not an OS sandbox.
 | integration-review-red | 12 failed | Actual Anthropic SDK stream loses all three SEC results; governor-stop dispatches for both CIK and ticker; transport has no cancellation callback |
 | integration-review-green-01 | 2 failed / 233 passed | New owners pass; old in-flight fixture records dispatch after cancellation |
 | integration-review-green-02 | 994 passed | Actual native stream, governed cancellation, body/retry closure, SEC and security/agent regressions |
+| backend-full-final | 10277 passed / 2 failed / 12 skipped | First complete integration attempt; three stale count assertions in two previously unlisted lifecycle files |
+| integration-last-collateral-red | 2 failed | Both full-run failures independently reproduced before changes |
+| integration-last-collateral-green | 126 passed | Correct counts, exact retained routes/tools and old route/name absence; four whole affected test files |
 
 Separate runs are not an additive total or a complete backend result. Successful
 runs contain no warnings. Unawaited-coroutine warnings remain in pre-fix evidence.
 The shared security inventory is additional count collateral: 56 tools comprise
 49 ordinary JSON, 3 closed SEC JSON and 4 text policies.
+
+`ae2055e3` corrects only test collateral and its plan: total App routes224->223
+after removing GET /sec/{ticker}; both OAuth allowlists15->17 after one old tool
+is replaced with three. Required lifecycle entries remain, all three SEC names
+are required and the old route/name must be absent. The full-run failures were
+an integration inventory omission, not preexisting failures or a runner defect.
+A complete rerun `backend-full-reconciled` is in progress on frozen product/test
+source. The initial attempt is not combined with126P to claim a passing suite.
+
+Eight process-local Task2 inverses independently removed each transport entry,
+selected generic truncation, omitted worker join, removed the subagent guard,
+and removed an actual required subagent tool. All eight were detected:24
+expected failures,25 controls passed; fresh unmutated union30P. The worker reaped
+all five intentionally detached cancellation workers and restored every mutated
+attribute. Source files and the concurrent full-suite process were not modified.
 
 ## Remaining Work
 
@@ -77,7 +95,7 @@ Tasks3/5/6/7 remain open: durable Research citations/reopening, operation leases
 and export/restore, orphan cleanup/schema reset, default-disabled scheduling.
 Settings and backend citations do not imply these workflows are complete.
 
-C03 old catalog tool/forwarders/empty HTTP route are removed here. C10-C13,
+C03 old catalog tool/forwarders/empty HTTP route are removed here. C11-C13,
 C15/C20 data disposition, i18n/CSS/SQL census queues and production SQLite
 admission are not marked complete. C21 remains an explicit deferred capability.
 Actual data deletion still requires bounded inventory, backup and approval.
@@ -123,5 +141,32 @@ Task2's extra EOF blank is removed without changing its test assertions.
 
 Worker: initial 4 failed / 2 passed; corrected absence RED 2 failed / 2 passed;
 revised GREEN 350 passed / 1 skipped. Controller expanded regression:
-`c10-controller-green`, **467 passed / 1 skipped**. Independent review and whole
-backend verification remain pending at this checkpoint.
+`c10-controller-green`, **467 passed / 1 skipped**. Independent review of
+`fc3c4668..885c2a2d` found no issues and returned32 passed, including exact
+nonempty SQLite news/FTS/prices/cache, SA and routing controls. No provider or
+actual data was read. The complete rerun after the separate lifecycle count
+collateral correction is still running.
+
+## Census Checkpoint
+
+Baseline `41682675` against frozen product `885c2a2d`:4345 candidates,3471
+uncertainties,1146 source files read. Zero new candidates, dependency metadata
+changes or untracked-path drift. Five coverage reductions are precisely C09's
+four removed source/factory modules and C10's FileBackend.
+
+34 new SQL uncertainty IDs replace34 old IDs. `reconcile_census.py` pairs every
+entry by equal ASTs at the old/new line locations and identical metadata,
+not merely matching totals. These are line moves across six source files;
+CENSUS-SQL-001 remains open, not repaired by this classification. The old empty
+GET /sec/{ticker} candidate disappears; sec_research_tools is no longer
+test-only because it is now wired. Scanner exit2 remains honest review_required,
+not a zero-debt claim or a production-data deletion manifest.
+
+## Next Bounded Cleanup
+
+[C11 news routing plan](../../plans/2026-09-13-news-routing-cleanup.md) is prepared,
+not implemented. It corrects the earlier narrow diagnosis: the obsolete toggle
+does not select a writer but malformed values can still block collection, as
+well as hide current telemetry. Removing obsolete value validation must retain
+current normalized-setting/source-requirement validation. C12's real collector
+CLI consumers are deliberately not treated as unreachable modules.
