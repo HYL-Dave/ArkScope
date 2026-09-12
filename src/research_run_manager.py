@@ -8,11 +8,14 @@ provider stream lifecycle.
 from __future__ import annotations
 
 import asyncio
+from contextlib import aclosing
 import logging
 import time
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
 from src.agents.shared.events import AgentEvent
+from src.agents.shared.output_boundary import output_scope
+from src.agents.shared.output_events import protect_events
 from src.anthropic_refusal import safe_refusal_details
 from src.auth_drivers.runtime_binding import (
     RuntimeAuthBinding, RuntimeAuthUnavailable, activate_runtime_auth,
@@ -81,6 +84,23 @@ async def execute_research_run(
     stream_factory: Optional[StreamFactory] = None,
 ) -> None:
     """Execute one run and persist both replay events and terminal transcript."""
+    with output_scope(inherit=True):
+        await _execute_research_run(
+            run_id=run_id, run_store=run_store, thread_store=thread_store,
+            dal=dal, history=history, auth_binding=auth_binding, stream_factory=stream_factory,
+        )
+
+
+async def _execute_research_run(
+    *,
+    run_id: str,
+    run_store: ResearchRunStore,
+    thread_store: ResearchThreadStore,
+    dal: Any,
+    history: list[dict],
+    auth_binding: RuntimeAuthBinding | None = None,
+    stream_factory: Optional[StreamFactory] = None,
+) -> None:
     run = run_store.get_run(run_id)
     if run is None or run.status != "queued":
         return
@@ -134,53 +154,54 @@ async def execute_research_run(
                 history=history,
                 **_pctx,
             ))
-            async for event in stream:
-                etype = _etype(event)
-                data = dict(event.data or {})
-                if etype in ("tool_start", "tool_end"):
-                    run_store.append_event(run_id, etype, data)
-                    collected.append((etype, data))
-                    continue
-                if etype == "done" and data.get("answer") == MAX_TOOL_CALLS_SENTINEL:
-                    failure = classify_research_failure(data.get("answer"))
-                    terminal_token_usage = data.get("token_usage")
-                    run_store.append_event(
-                        run_id,
-                        "error",
-                        _typed_error_event_data(
-                            data,
-                            failure,
-                            personalization=personalization,
+            async with aclosing(protect_events(stream)) as stream:
+                async for event in stream:
+                    etype = _etype(event)
+                    data = dict(event.data or {})
+                    if etype in ("tool_start", "tool_end"):
+                        run_store.append_event(run_id, etype, data)
+                        collected.append((etype, data))
+                        continue
+                    if etype == "done" and data.get("answer") == MAX_TOOL_CALLS_SENTINEL:
+                        failure = classify_research_failure(data.get("answer"))
+                        terminal_token_usage = data.get("token_usage")
+                        run_store.append_event(
+                            run_id,
+                            "error",
+                            _typed_error_event_data(
+                                data,
+                                failure,
+                                personalization=personalization,
+                                binding=auth_binding,
+                            ),
+                        )
+                        break
+                    if etype == "done":
+                        # Replay and transcript carry the same prompt trace.
+                        data = {**data, "personalization": dict(personalization)}
+                        run_store.append_event(run_id, etype, data)
+                        done_data = data
+                        break
+                    if etype == "error":
+                        raw_detail = data.get("error") or data.get("message") or "research run failed"
+                        failure = classify_research_failure(
+                            raw_detail,
+                            explicit_code=data.get("code"),
                             binding=auth_binding,
-                        ),
-                    )
-                    break
-                if etype == "done":
-                    # Replay and transcript carry the same prompt trace.
-                    data = {**data, "personalization": dict(personalization)}
+                        )
+                        terminal_token_usage = data.get("token_usage")
+                        run_store.append_event(
+                            run_id,
+                            "error",
+                            _typed_error_event_data(
+                                data,
+                                failure,
+                                personalization=personalization,
+                                binding=auth_binding,
+                            ),
+                        )
+                        break
                     run_store.append_event(run_id, etype, data)
-                    done_data = data
-                    break
-                if etype == "error":
-                    raw_detail = data.get("error") or data.get("message") or "research run failed"
-                    failure = classify_research_failure(
-                        raw_detail,
-                        explicit_code=data.get("code"),
-                        binding=auth_binding,
-                    )
-                    terminal_token_usage = data.get("token_usage")
-                    run_store.append_event(
-                        run_id,
-                        "error",
-                        _typed_error_event_data(
-                            data,
-                            failure,
-                            personalization=personalization,
-                            binding=auth_binding,
-                        ),
-                    )
-                    break
-                run_store.append_event(run_id, etype, data)
     except asyncio.CancelledError:
         cancelled = classify_research_failure(
             "research run cancelled",

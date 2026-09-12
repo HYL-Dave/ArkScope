@@ -13,6 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from src.api.personalization import resolve_personalization as _resolve_personalization
+from src.agents.shared.output_boundary import OutputBoundaryError, OutputGuard, activate_output_guard, current_output_guard
+from src.agents.shared.output_events import protect_events
 from src.anthropic_refusal import safe_refusal_details
 from src.auth_drivers.runtime_binding import (
     activate_runtime_auth, capture_runtime_auth, current_runtime_auth, sanitize_runtime_error,
@@ -544,18 +546,24 @@ async def query_agent_stream(
         collected: list[tuple[str, dict]] = []  # (#3) tool_start/tool_end trace
         done_data: Optional[dict] = None
         error_content: Optional[str] = None  # set on a non-done terminal (MUST-FIX 2)
+        error_code: Optional[str] = None
+        guard = current_output_guard() or OutputGuard()
+        stream = None
         t0 = _time.monotonic()
         try:
             with activate_runtime_auth(auth_binding):
-                stream = _research_provider_stream(
-                    provider=provider,
-                    question=agent_question,
-                    model=res_model,
-                    effort=res_effort,
-                    dal=dal,
-                    history=history,
-                    personalization_context=personalization_context,
-                )
+                with activate_output_guard(guard):
+                    guard.add_secret(auth_binding._api_key)
+                    stream = _research_provider_stream(
+                        provider=provider,
+                        question=agent_question,
+                        model=res_model,
+                        effort=res_effort,
+                        dal=dal,
+                        history=history,
+                        personalization_context=personalization_context,
+                    )
+                    stream = protect_events(stream, guard=guard)
 
                 async for event in stream:
                     etype = getattr(event.type, "value", event.type)
@@ -582,10 +590,17 @@ async def query_agent_stream(
                     yield event.to_sse()
         except Exception as e:
             from src.agents.shared.events import AgentEvent, EventType
-            error_content = sanitize_runtime_error(e, binding=auth_binding)
+            with activate_output_guard(guard):
+                error_content = sanitize_runtime_error(e, binding=auth_binding)
             logger.error("Stream error: %s", error_content)
-            yield AgentEvent(EventType.error, {"message": error_content}).to_sse()
+            if isinstance(e, OutputBoundaryError):
+                error_code = "provider_call_failed"
+                yield AgentEvent(EventType.error, {"error": error_content, "code": error_code}).to_sse()
+            else:
+                yield AgentEvent(EventType.error, {"message": error_content}).to_sse()
         finally:
+            if stream is not None:
+                await stream.aclose()
             # Persist the terminal turn. done → assistant; a non-done terminal
             # (agent error / stream exception) → an is_error turn so reload never
             # shows a dangling user question (MUST-FIX 2). Both best-effort (#4).
@@ -596,7 +611,7 @@ async def query_agent_stream(
                 if done_data is not None:
                     _persist_assistant_turn(store, thread_id=request.thread_id, done_data=done_data, collected=collected, elapsed=elapsed, effort=res_effort, personalization=personalization)
                 elif error_content is not None:
-                    _persist_error_turn(store, thread_id=request.thread_id, content=error_content, collected=collected, provider=provider, model=res_model, effort=res_effort, elapsed=elapsed, personalization=personalization)
+                    _persist_error_turn(store, thread_id=request.thread_id, content=error_content, collected=collected, provider=provider, model=res_model, effort=res_effort, elapsed=elapsed, personalization=personalization, error_code=error_code)
 
     return StreamingResponse(
         event_generator(),

@@ -16,6 +16,10 @@ from copy import copy
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from .output_boundary import output_scope
+from .output_events import check_output_value, protect_output_text
+from src.auth_drivers.runtime_binding import register_output_api_key
+
 logger = logging.getLogger(__name__)
 
 # ── 1M context ─────────────────────────────────────────────────
@@ -354,6 +358,8 @@ def dispatch_subagent(
 
     provider = _detect_provider(config.model)
 
+    check_output_value({"subagent": subagent_name, "task": task, "context": context_json})
+
     # Build subagent input
     subagent_input = f"Task: {task}"
     if context_json:
@@ -374,11 +380,13 @@ def dispatch_subagent(
     child_auth = None
     try:
         child_auth = capture_child_runtime_auth(provider)
-        with activate_runtime_auth(child_auth):
+        with output_scope(inherit=True), activate_runtime_auth(child_auth):
             if provider == "openai":
                 result = _run_openai_subagent(config, subagent_input, dal)
             else:
                 result = _run_anthropic_subagent(config, subagent_input, dal)
+            result = {**result, "answer": protect_output_text(result.get("answer", ""))}
+            check_output_value(result)
 
         return {
             "subagent": subagent_name,
@@ -429,6 +437,7 @@ def _run_anthropic_subagent(
     agent_config = get_agent_config()
     from src.auth_drivers.live_resolver import live_anthropic_client
     client = live_anthropic_client()
+    register_output_api_key(client)
 
     # Filter tools to subagent's allowed subset
     all_tools = get_anthropic_tools()
@@ -508,6 +517,7 @@ def _run_anthropic_subagent(
         tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
         tool_results = []
         for tool_use in tool_use_blocks:
+            check_output_value({"tool": tool_use.name, "input": tool_use.input, "call_id": tool_use.id})
             tools_used.append(tool_use.name)
             logger.debug(f"Subagent tool call: {tool_use.name}")
             result = execute_tool(tool_use.name, tool_use.input, dal)
@@ -557,10 +567,12 @@ def _run_openai_subagent(
     else:
         effective_max_tokens = _get_openai_max_output(config.model)
 
+    client = live_openai_async_client()
+    register_output_api_key(client)
     agent = Agent(
         name=f"ArkScope Subagent: {config.name}",
         instructions=config.system_prompt,
-        model=OpenAIResponsesModel(model=config.model, openai_client=live_openai_async_client()),
+        model=OpenAIResponsesModel(model=config.model, openai_client=client),
         tools=tools,
         model_settings=ModelSettings(
             reasoning=Reasoning(effort=effort),

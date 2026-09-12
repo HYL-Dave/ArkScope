@@ -47,6 +47,11 @@ def function_tool(fn):
     @wraps(invoke)
     async def safe_invoke(context, arguments):
         try:
+            from src.agents.shared.output_events import check_output_value
+
+            # The SDK parses/logs arguments before calling the Python handler.
+            check_output_value(arguments)
+            check_output_value(json.loads(arguments) if arguments else {})
             return await invoke(context, arguments)
         except Exception as exc:
             from agents.tracing import get_current_span

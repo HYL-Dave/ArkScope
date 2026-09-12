@@ -19,6 +19,8 @@ from ..shared.compressor import (
 )
 from ..shared.context_manager import ContextManager, build_anchor_from_messages
 from ..shared.events import AgentEvent, EventType
+from ..shared.output_boundary import current_output_guard
+from ..shared.output_events import check_output_value, protect_event_stream, protect_output_text
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.replay import ReplayCapture, is_capture_enabled
 from ..shared.server_tools import anthropic_server_tools
@@ -27,6 +29,7 @@ from ..shared.subagent import _EXTENDED_CONTEXT_BETA, _use_extended_context_beta
 from ..shared.token_tracker import TokenTracker
 
 from src.anthropic_refusal import AnthropicRefusalError, is_refusal
+from src.auth_drivers.runtime_binding import register_output_api_key
 from src.model_capabilities import (
     all_models,
     capability_for,
@@ -217,6 +220,7 @@ def _build_thinking_param(model: str, thinking_enabled: bool, config) -> tuple:
     }, effective_max_tokens
 
 
+@protect_event_stream
 async def run_query_stream(
     question: str,
     model: Optional[str] = None,
@@ -279,6 +283,7 @@ async def run_query_stream(
     # falls back to env ANTHROPIC_API_KEY with an explicit log — Slice 6).
     from src.auth_drivers.live_resolver import live_anthropic_client
     client = live_anthropic_client()
+    register_output_api_key(client)
 
     # Build tool list including any hosted server tools (single wiring
     # point — see ``_build_anthropic_tools_list`` docstring).
@@ -307,6 +312,11 @@ async def run_query_stream(
     tools_used: List[str] = []
     tracker = TokenTracker()
     pad = Scratchpad(query=question, provider="anthropic", model=model_name)
+    thinking_output = current_output_guard().stream()
+
+    def save_thinking(text: str) -> None:
+        if text:
+            pad.log_thinking(preview=text[:500], full_length=len(text))
 
     capture: Optional[ReplayCapture] = None
     if is_capture_enabled():
@@ -435,13 +445,10 @@ async def run_query_stream(
             # Emit thinking content events (extended thinking blocks)
             for block in response.content:
                 if block.type == "thinking":
+                    save_thinking(thinking_output.feed(block.thinking))
                     yield AgentEvent(EventType.thinking_content, {
                         "thinking": block.thinking,
                     })
-                    pad.log_thinking(
-                        preview=block.thinking[:500],
-                        full_length=len(block.thinking),
-                    )
 
             # Handle pause_turn (Claude web search server tool mid-turn pause)
             if response.stop_reason == "pause_turn":
@@ -484,6 +491,8 @@ async def run_query_stream(
                 for block in response.content:
                     if hasattr(block, "text"):
                         final_text += block.text
+                final_text = protect_output_text(final_text)
+                save_thinking(thinking_output.finish())
                 pad.log_final_answer(
                     final_text,
                     token_usage=tracker.summary(),
@@ -516,8 +525,8 @@ async def run_query_stream(
 
             # Emit intermediate text (model thinking before tool calls)
             for block in response.content:
-                if hasattr(block, "text") and block.text.strip():
-                    yield AgentEvent(EventType.text, {"content": block.text.strip()})
+                if hasattr(block, "text") and block.text:
+                    yield AgentEvent(EventType.text, {"content": block.text})
 
             # Execute tools and collect results
             tool_results = []
@@ -525,6 +534,7 @@ async def run_query_stream(
                 tool_name = tool_use.name
                 tool_input = tool_use.input
                 tool_id = tool_use.id
+                check_output_value({"tool": tool_name, "input": tool_input, "call_id": tool_id})
 
                 logger.info(f"Executing tool: {tool_name}")
                 tools_used.append(tool_name)
@@ -536,6 +546,7 @@ async def run_query_stream(
 
                 # Execute the tool
                 result = execute_tool(tool_name, tool_input, dal)
+                check_output_value(result)
                 # P1.4 Layer 0: budget + overflow disk persist + observability
                 # metadata. compression dict carries raw/compressed digests +
                 # bytes + overflow_record_id so audit pipelines can reconcile
@@ -589,6 +600,7 @@ async def run_query_stream(
 
         # Max turns reached
         logger.warning(f"Max tool calls ({effective_max_turns}) reached")
+        save_thinking(thinking_output.finish())
         pad.log_max_turns(token_usage=tracker.summary(), tools_used=list(set(tools_used)))
         pad.close()
         if capture is not None:
@@ -630,6 +642,9 @@ async def run_query_stream(
             "scratchpad": str(pad.filepath) if pad.filepath else None,
         })
         return
+    finally:
+        thinking_output.abort()
+        pad.close()
 
 
 def run_query(

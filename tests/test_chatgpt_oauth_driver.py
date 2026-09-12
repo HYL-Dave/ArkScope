@@ -676,11 +676,15 @@ def test_stream_llm_returns_tool_timeout_to_model_instead_of_terminal_error(monk
 
     events = _run(_collect(d.stream_llm(_req())))
 
-    assert [e.type for e in events] == [
-        EventType.thinking, EventType.tool_start, EventType.tool_end, EventType.text, EventType.done,
+    assert [e.type for e in events if e.type != EventType.text] == [
+        EventType.thinking, EventType.tool_start, EventType.tool_end, EventType.done,
     ]
+    assert events[-1].type == EventType.done
+    text = "".join(e.data["content"] for e in events if e.type == EventType.text)
+    assert text == events[-1].data["answer"] == "I could not read the news brief in time."
     assert events[2].data["is_error"] is True
     assert "tool 'get_news_brief' timed out after 0.001s" in events[2].data["summary"]
+    assert len(client.responses.calls) == 2
     followup = client.responses.calls[1]
     assert {"type": "function_call_output", "call_id": "call_1", "output": events[2].data["summary"]} in followup["input"]
 

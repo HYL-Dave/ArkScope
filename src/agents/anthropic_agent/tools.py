@@ -1710,6 +1710,14 @@ def execute_tool(
     if tool_name not in tool_map:
         return json.dumps({"error": "Unknown tool", "code": "invalid_value"})
 
+    from src.agents.shared.output_boundary import OutputBoundaryError
+    from src.agents.shared.output_events import check_output_value
+
+    try:
+        check_output_value({"tool": tool_name, "input": tool_input})
+    except OutputBoundaryError as exc:
+        return json.dumps({"error": exc.code})
+
     try:
         result = tool_map[tool_name]()
         return _serialize_result(result, tool_name=tool_name)
