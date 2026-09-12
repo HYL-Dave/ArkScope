@@ -281,7 +281,7 @@ def unavailable_envelope():
             "observed_at": None, "coverage": {"receipt_id": None, "complete": False}, "next_cursor": None}
 
 
-def page_envelope(context, rows, *, limit, gaps, available, coverage=None):
+def page_envelope(context, rows, *, limit, gaps, available, coverage=None, result_fits=None):
     """Page already filtered/sorted whole rows within count and encoded byte bounds.
 
     Domain callers provide bounded typed gaps and coverage metadata. A record
@@ -304,7 +304,11 @@ def page_envelope(context, rows, *, limit, gaps, available, coverage=None):
                 "coverage": {**base_coverage, "complete": complete},
                 "next_cursor": _cursor(context, offset) if offset < len(rows) else None}
 
-    data, used, skipped = [], 0, 0
+    def fits(value):
+        return (len(json.dumps(value, ensure_ascii=True, allow_nan=False).encode("ascii")) <= MAX_ENVELOPE_BYTES
+                and (result_fits is None or result_fits(value)))
+
+    data, skipped = [], 0
     offset = context.offset
 
     def page_gaps():
@@ -312,23 +316,18 @@ def page_envelope(context, rows, *, limit, gaps, available, coverage=None):
 
     while offset < len(rows) and len(data) < limit:
         row = rows[offset]
-        size = len(json.dumps(row, ensure_ascii=True, allow_nan=False).encode("ascii"))
-        candidate = envelope([], page_gaps(), offset + 1)
-        candidate["status"] = "unavailable" if not available else "partial" if page_gaps() else "ok"
-        overhead = len(json.dumps(candidate, ensure_ascii=True).encode("ascii"))
-        addition = size + (2 if data else 0)
-        if overhead + used + addition > MAX_ENVELOPE_BYTES:
+        if not fits(envelope([*data, row], page_gaps(), offset + 1)):
             if data:
                 break
             skipped += 1
             offset += 1
-            continue
+            break
         data.append(row)
-        used += addition
         offset += 1
     result = envelope(data, page_gaps(), offset)
-    if len(json.dumps(result, ensure_ascii=True).encode("ascii")) > MAX_ENVELOPE_BYTES:
-        return unavailable_envelope()
+    if not fits(result):
+        from .tool_results import unavailable
+        return unavailable("sec_result_too_large")
     return result
 
 
@@ -338,15 +337,15 @@ class StoredQueries:
 
     def facts(self, cik, *, metrics=None, concepts=None, fact_ids=None, accession=None,
               as_of=None, period="all", start=None, end=None, revisions="latest",
-              cursor=None, limit=40):
+              cursor=None, limit=40, result_fits=None):
         from .fact_queries import query_facts
 
         return query_facts(self.store, cik, metrics=metrics, concepts=concepts, fact_ids=fact_ids,
                            accession=accession, as_of=as_of, period=period, start=start, end=end,
-                           revisions=revisions, cursor=cursor, limit=limit)
+                           revisions=revisions, cursor=cursor, limit=limit, result_fits=result_fits)
 
     def filings(self, cik, *, forms=None, filed_from=None, filed_to=None,
-                include_amendments=True, cursor=None, limit=20):
+                include_amendments=True, cursor=None, limit=20, result_fits=None):
         cik = normalize_cik(cik)
         filters = validate_query(cik, "filings", forms=forms, filed_from=filed_from, filed_to=filed_to,
                                  include_amendments=include_amendments, cursor=cursor, limit=limit)
@@ -414,4 +413,4 @@ class StoredQueries:
         selection.sort(key=lambda row: row["filed_date"], reverse=True)
         return page_envelope(context, selection, limit=limit, gaps=gaps, available=bool(sources),
                              coverage={"catalog_sources": len(sources), "admitted_rows": bound.row_count,
-                                       "admitted_bytes": bound.encoded_bytes})
+                                       "admitted_bytes": bound.encoded_bytes}, result_fits=result_fits)

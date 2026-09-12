@@ -131,7 +131,9 @@ _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
         "get_price_change",
         "get_ticker_data_coverage",
         "get_fundamentals_analysis",
-        "get_sec_filings",
+        "list_sec_filings",
+        "get_sec_financial_facts",
+        "read_sec_filing",
         "get_economic_calendar",
         "get_security_lifecycle_review",
         "list_security_lifecycle_reviews",
@@ -252,6 +254,10 @@ async def _invoke_bridged_tool(
         requires_dal = getattr(tool_def, "requires_dal", True)
 
         async def _run() -> Any:
+            from src.sec_research.tool_results import SEC_TOOL_NAMES
+            if name in SEC_TOOL_NAMES:
+                from src.sec_research.tool_execution import invoke_sec_tool
+                return await invoke_sec_tool(name, args, timeout_s=per_tool_timeout_s)
             # Async handlers: await directly (wait_for cancels the coroutine cleanly).
             if asyncio.iscoroutinefunction(fn):
                 return await (fn(dal, **args) if requires_dal else fn(**args))
@@ -321,6 +327,8 @@ def _ark_input_schema(tool_def: Any) -> dict:
             prop["description"] = p.description
         if getattr(p, "enum", None):
             prop["enum"] = p.enum
+        if getattr(p, "items", None) is not None:
+            prop["items"] = p.items
         properties[p.name] = prop
         if getattr(p, "required", True):
             required.append(p.name)
@@ -490,13 +498,13 @@ class AnthropicClaudeCodeSdkDriver:
         # §1/§2/§5/§7. The token + empty API key + isolated config dir go via
         # options.env (NEVER os.environ). dontAsk + tools=[] + allowed_tools +
         # setting_sources=[] is the validated locked posture.
-        allowed = [_MCP_PREFIX + n for n in sorted(_RESEARCH_READONLY_TOOLS)]
+        allowed = [_MCP_PREFIX + n for n in sorted(_RESEARCH_READONLY_TOOLS)] if server is not None else []
         max_turns = self._max_turns if self._max_turns > 0 else None
         return ClaudeAgentOptions(
             model=request.model,
             effort=request.reasoning_effort,
             system_prompt=request.instructions,
-            mcp_servers={_MCP_SERVER_NAME: server},
+            mcp_servers={_MCP_SERVER_NAME: server} if server is not None else {},
             allowed_tools=allowed,
             tools=[],                       # disable ALL built-ins (--tools "")
             disallowed_tools=list(REVIEWED_DISALLOWED_TOOLS),
@@ -533,10 +541,12 @@ class AnthropicClaudeCodeSdkDriver:
 
         remember_output_secret(token)
 
-        server, _sdk_tools = build_ark_mcp_server(
-            registry=self._registry, dal=self._dal, token=token,
-            per_tool_timeout_s=self._per_tool_timeout_s,
-        )
+        server = None
+        if self._registry is not None:
+            server, _sdk_tools = build_ark_mcp_server(
+                registry=self._registry, dal=self._dal, token=token,
+                per_tool_timeout_s=self._per_tool_timeout_s,
+            )
         config_dir = tempfile.mkdtemp(prefix="ark_claude_cfg_")
         options = self._build_options(
             request,

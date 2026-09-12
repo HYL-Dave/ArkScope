@@ -166,7 +166,8 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
 ):
     observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
 
-    assert len(observed["routes"]) == 224
+    assert len(observed["routes"]) == 223
+    assert not any(route.startswith("GET\t/sec/{ticker}\t") for route in observed["routes"])
     assert {
         "GET\t/security-lifecycle/automation\t"
         "src.api.routes.security_lifecycle\tget_automation_config",
@@ -428,7 +429,7 @@ class TestHealth:
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "ok"
-        assert data["tools_registered"] == 54
+        assert data["tools_registered"] == 56
         assert data["data_sources"] == {
             "news_tickers": 2,
             "price_tickers": 2,
@@ -571,11 +572,15 @@ class TestFundamentalsEndpoints:
         assert data["market_cap"] is None
         assert data["pe_ratio"] is None
 
-    def test_sec_filings(self, client):
+    def test_old_sec_route_absent_and_new_catalog_is_live(self, client, tmp_path, monkeypatch):
         r = client.get("/sec/NVDA")
-        assert r.status_code == 200
-        data = r.json()
-        assert isinstance(data, list)
+        assert r.status_code == 404
+        from src.tools.registry import create_default_registry
+        from tests.test_sec_research_tool_adapters import tool_fixture, wire, CIK
+        fixture = tool_fixture.__wrapped__(tmp_path)
+        wire(monkeypatch, fixture.service)
+        result = create_default_registry().get("list_sec_filings").function(issuer=CIK)
+        assert len(result["data"]) == 2
 
 
 # ============================================================

@@ -142,10 +142,5 @@ class LocalMarketBackend:
             logger.warning("local get_available_tickers failed (%s)", exc)
             return []
 
-    def query_sec_filings(
-        self, ticker: str, filing_types: Optional[List[str]] = None
-    ) -> pd.DataFrame:
-        return self._files.query_sec_filings(ticker, filing_types)
-
     def close(self) -> None:
         self._market.close()

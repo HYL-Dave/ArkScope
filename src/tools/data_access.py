@@ -28,7 +28,6 @@ from .schemas import (
     NewsQueryResult,
     PriceBar,
     PriceQueryResult,
-    SECFiling,
     WatchlistInfo,
     WatchlistResult,
 )
@@ -490,27 +489,6 @@ class DataAccessLayer:
             beta=_safe_float(snapshot.get("beta")),
             snapshot=snapshot if snapshot else None,
         )
-
-    def get_sec_filings(
-        self,
-        ticker: str,
-        filing_types: Optional[List[str]] = None,
-    ) -> List[SECFiling]:
-        """Query SEC filing metadata."""
-        df = self._backend.query_sec_filings(ticker, filing_types)
-
-        filings = []
-        for _, row in df.iterrows():
-            filings.append(SECFiling(
-                ticker=str(row.get("ticker", ticker.upper())),
-                filing_type=str(row.get("filing_type", "")),
-                filed_date=str(row.get("filed_date", "")),
-                period_of_report=row.get("period_of_report"),
-                url=row.get("url"),
-                accession_number=row.get("accession_number"),
-                description=row.get("description"),
-            ))
-        return filings
 
     def get_available_tickers(self, data_type: str) -> List[str]:
         """List tickers with available data."""

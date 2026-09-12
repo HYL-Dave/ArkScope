@@ -182,21 +182,6 @@ class FundamentalsResult(BaseModel):
 
 
 # ============================================================
-# SEC Filings
-# ============================================================
-
-class SECFiling(BaseModel):
-    """SEC filing metadata (not full text)."""
-    ticker: str
-    filing_type: str = Field(description="10-K, 10-Q, 8-K, etc.")
-    filed_date: str
-    period_of_report: Optional[str] = None
-    url: Optional[str] = None
-    accession_number: Optional[str] = None
-    description: Optional[str] = None
-
-
-# ============================================================
 # Watchlist / Config
 # ============================================================
 

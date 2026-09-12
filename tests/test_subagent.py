@@ -41,6 +41,34 @@ from src.agents.shared.subagent import (
 # ============================================================
 
 
+@pytest.fixture
+def registry():
+    from src.tools.registry import create_default_registry
+    return create_default_registry()
+
+
+def test_all_subagent_tool_names_exist_in_registry(registry):
+    for spec in SUBAGENT_REGISTRY.values():
+        assert set(spec.tool_names) <= set(registry.list_names())
+
+
+@pytest.mark.parametrize("channel", ["openai", "anthropic"])
+def test_required_sec_tools_survive_actual_subagent_inventory(channel):
+    from tests.test_sec_research_tool_adapters import NAMES
+    spec = SUBAGENT_REGISTRY["deep_researcher"]
+    assert set(NAMES) <= set(spec.tool_names)
+    if channel == "openai":
+        from src.agents.openai_agent.tools import create_openai_tools
+        filtered = _filter_openai_tools(create_openai_tools(None), spec.tool_names)
+        names = {t.name.removeprefix("tool_") for t in filtered}
+    else:
+        from src.agents.anthropic_agent.tools import get_anthropic_tools
+        filtered = _filter_anthropic_tools(get_anthropic_tools(), spec.tool_names)
+        names = {t["name"] for t in filtered}
+    assert set(NAMES) <= names
+    assert "get_sec_filings" not in names
+
+
 def test_builtin_subagents_use_current_generation_runtime_defaults():
     assert SUBAGENT_REGISTRY["code_analyst"].model == "gpt-5.6-sol"
     assert SUBAGENT_REGISTRY["deep_researcher"].model == "gpt-5.6-sol"
@@ -126,18 +154,12 @@ class TestSubagentRegistry:
         assert "delegate_to_subagent" not in cfg.tool_names
 
     def test_code_analyst_uses_existing_data_tools_without_python_execution(self):
-        from src.tools.registry import create_default_registry
-
-        registry_names = {
-            tool.name for tool in create_default_registry().list_all()
-        }
         configured_names = {
             tool_name
             for config in SUBAGENT_REGISTRY.values()
             for tool_name in config.tool_names
         }
         assert {"tavily_search", "tavily_fetch"}.isdisjoint(configured_names)
-        assert configured_names <= registry_names
 
         cfg = SUBAGENT_REGISTRY["code_analyst"]
         assert "execute_python_analysis" not in cfg.tool_names

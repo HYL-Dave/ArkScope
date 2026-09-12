@@ -6,8 +6,8 @@ required_params: [ticker]
 aliases: [dcf, valuation]
 category: financial-analysis
 data_sources:
-  required: [get_detailed_financials, get_fundamentals_analysis, calculate_compound_growth, calculate_dcf, calculate_weighted_scenarios]
-  optional: [get_sec_filings, get_analyst_consensus]
+  required: [get_detailed_financials, get_fundamentals_analysis, calculate_compound_growth, calculate_dcf, calculate_weighted_scenarios, list_sec_filings, get_sec_financial_facts, read_sec_filing]
+  optional: [get_analyst_consensus]
 output: report
 ---
 
@@ -25,7 +25,7 @@ to estimate intrinsic value and margin of safety.
 3. **calculate_compound_growth** — Auditable historical growth from cited endpoints
 4. **calculate_dcf** — Discount projections and bridge enterprise value to equity value
 5. **calculate_weighted_scenarios** — Combine explicit scenario values and probabilities
-6. **get_sec_filings** — Management guidance, segment data, capex plans
+6. **list_sec_filings + read_sec_filing** — Management guidance, segment data, capex plans
 7. **get_analyst_consensus** — Consensus estimates for revenue/earnings growth
 
 ## Workflow
@@ -97,3 +97,13 @@ a precise result.
 8. **Key risks**: What breaks the model
 
 AFTER ANALYSIS: Save as a research report using save_report() with report_type="dcf_valuation".
+
+SEC EVIDENCE:
+- Call list_sec_filings(issuer="{ticker}") to select observed filing IDs, then
+  read_sec_filing(filing_id=...) for document indexes and complete cited passages.
+- Use get_sec_financial_facts(issuer="{ticker}") for exact decimal observations;
+  preserve units, periods, revisions, source hashes, and provenance.
+- Keep the same filters, limit, and max_chars on cursor continuation. Stored or
+  pinned reads acquire nothing; freshness="refresh" cannot replace a pin.
+- Report status, gaps, coverage, and whole-record size gaps. Missing required SEC
+  tools or unavailable evidence is a research gap, not an empty successful result.

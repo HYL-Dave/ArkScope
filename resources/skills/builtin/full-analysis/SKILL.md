@@ -6,8 +6,8 @@ required_params: [ticker]
 aliases: [analyze, fa]
 category: builtin
 data_sources:
-  required: [get_ticker_news, get_price_change, get_fundamentals_analysis, get_analyst_consensus]
-  optional: [get_iv_analysis, get_sec_filings, get_insider_trades, get_sa_digest]
+  required: [get_ticker_news, get_price_change, get_fundamentals_analysis, get_analyst_consensus, list_sec_filings, get_sec_financial_facts, read_sec_filing]
+  optional: [get_iv_analysis, get_insider_trades, get_sa_digest]
 output: report
 ---
 
@@ -39,3 +39,13 @@ REQUIRED OUTPUT:
 7. Actionable conclusion
 
 AFTER ANALYSIS: Save as a research report using save_report() with report_type="entry_analysis".
+
+SEC EVIDENCE:
+- Call list_sec_filings(issuer="{ticker}") to select observed filing IDs, then
+  read_sec_filing(filing_id=...) for document indexes and complete cited passages.
+- Use get_sec_financial_facts(issuer="{ticker}") for exact decimal observations;
+  preserve units, periods, revisions, source hashes, and provenance.
+- Keep the same filters, limit, and max_chars on cursor continuation. Stored or
+  pinned reads acquire nothing; freshness="refresh" cannot replace a pin.
+- Report status, gaps, coverage, and whole-record size gaps. Missing required SEC
+  tools or unavailable evidence is a research gap, not an empty successful result.

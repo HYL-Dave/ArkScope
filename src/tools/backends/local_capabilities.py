@@ -112,10 +112,6 @@ class LocalDataCapabilities(Protocol):
         include_stale: bool = False,
     ) -> list: ...
 
-    def query_sec_filings(
-        self, ticker: str, filing_types: Optional[List[str]] = None
-    ) -> pd.DataFrame: ...
-
     def reconcile_sa_articles(
         self,
         *,

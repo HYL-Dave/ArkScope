@@ -1,8 +1,8 @@
 # ArkScope Tool Catalog (canonical)
 
-**Updated**: 2026-08-24
+**Updated**: 2026-09-12
 **Status**: CANONICAL current registry authority
-**Live registry**: 50 tools; agent bridges add `delegate_to_subagent` for 51
+**Live registry**: 56 tools; agent bridges add `delegate_to_subagent` for 57
 
 This document describes the current `ToolRegistry`, not removed implementations
 or possible future products. Historical catalog versions remain recoverable from
@@ -27,7 +27,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 
 ## 1. Live registry
 
-### 1.1 All 50 tools
+### 1.1 All 56 tools
 
 | Tool | Category | Parameters | Current role |
 |---|---|---|---|
@@ -56,7 +56,9 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `calculate_weighted_scenarios` | calculation | values*, weights*, labels?, current_price? | pure caller-supplied scenario weighting |
 | `get_fundamentals_analysis` | analysis | ticker*, period? | cached SEC facts with qualified local price |
 | `get_detailed_financials` | analysis | ticker* | normalized SEC/provider financial facts |
-| `get_sec_filings` | analysis | ticker*, filing_types?, limit? | SEC filings |
+| `list_sec_filings` | analysis | issuer*, forms?, filed_from?, filed_to?, include_amendments?, cursor?, limit?, freshness? | receipt-bound whole filing observations with full sources |
+| `get_sec_financial_facts` | analysis | issuer*, metrics?, concepts?, fact_ids?, accession?, as_of?, period?, start?, end?, revisions?, cursor?, limit?, freshness? | exact decimal facts, revisions and immutable source provenance |
+| `read_sec_filing` | analysis | filing_id*, document_id?, section_id?, query?, capture_id?, cursor?, max_chars?, freshness? | stored document indexes and whole cited UTF-8 passages |
 | `get_insider_trades` | analysis | ticker*, limit? | SEC insider transactions |
 | `get_watchlist_overview` | analysis | none | watchlist price and raw-news overview |
 | `get_morning_brief` | analysis | none | deterministic raw-news activity brief |

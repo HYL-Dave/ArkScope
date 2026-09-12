@@ -9,59 +9,29 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from src.tools.sec_tools import get_sec_filings, get_insider_trades
+from src.tools.sec_tools import get_insider_trades
 
 
-# ============================================================
-# get_sec_filings
-# ============================================================
+class TestSecReplacement:
+    def test_catalog_only_api_removed_but_facts_mapper_remains(self):
+        from src.tools import sec_tools
+        from data_sources import sec_edgar_financials, base
+        assert not hasattr(sec_tools, "get_sec_filings")
+        assert not hasattr(sec_edgar_financials, "get_filings_list")
+        assert not hasattr(sec_edgar_financials, "FilingInfo")
+        assert not hasattr(sec_edgar_financials.SECEdgarFinancials, "get_filings_list")
+        assert callable(sec_edgar_financials.SECEdgarFinancials.get_income_statement)
+        assert base.SECFiling
 
-class TestGetSecFilings:
-    @patch("src.tools.sec_tools.get_filings_list", create=True)
-    def test_basic(self, mock_get):
-        """Delegates to sec_edgar_financials.get_filings_list()."""
-        # We need to patch at the point of import inside the function
-        with patch("data_sources.sec_edgar_financials.get_filings_list") as mock_fn:
-            mock_fn.return_value = [
-                {
-                    "cik": 1045810,
-                    "accession_number": "0001045810-25-000012",
-                    "filing_type": "10-K",
-                    "report_date": "2025-01-28",
-                    "ticker": "NVDA",
-                    "url": "https://www.sec.gov/...",
-                    "xbrl_url": None,
-                },
-            ]
-            result = get_sec_filings("NVDA", filing_types=["10-K"], limit=5)
-            assert isinstance(result, list)
-            assert len(result) == 1
-            assert result[0]["filing_type"] == "10-K"
-            mock_fn.assert_called_once_with(
-                "NVDA", filing_types=["10-K"], limit=5
-            )
-
-    def test_returns_list(self):
-        """Return type is always a list."""
-        with patch("data_sources.sec_edgar_financials.get_filings_list") as mock_fn:
-            mock_fn.return_value = []
-            result = get_sec_filings("FAKE")
-            assert isinstance(result, list)
-            assert len(result) == 0
-
-    def test_error_returns_empty(self):
-        """Exceptions are caught and return empty list."""
-        with patch("data_sources.sec_edgar_financials.get_filings_list") as mock_fn:
-            mock_fn.side_effect = Exception("Network error")
-            result = get_sec_filings("NVDA")
-            assert result == []
-
-    def test_default_limit(self):
-        """Default limit is 10."""
-        with patch("data_sources.sec_edgar_financials.get_filings_list") as mock_fn:
-            mock_fn.return_value = []
-            get_sec_filings("NVDA")
-            mock_fn.assert_called_once_with("NVDA", filing_types=None, limit=10)
+    def test_new_catalog_uses_real_tool_service(self, tmp_path, monkeypatch):
+        from tests.test_sec_research_tool_adapters import tool_fixture, wire, CIK
+        from src.tools.registry import create_default_registry
+        fixture = tool_fixture.__wrapped__(tmp_path)
+        wire(monkeypatch, fixture.service)
+        registry = create_default_registry()
+        result = registry.get("list_sec_filings").function(issuer=CIK, forms=["10-Q"])
+        assert len(result["data"]) == 1 and result["data"][0]["form"] == "10-Q"
+        assert result["data"][0]["sources"][0]["source"]["pointer"]
 
 
 # ============================================================
@@ -147,13 +117,13 @@ class TestBridgeIntegration:
         """Registry includes SEC plus macro/calendar, SA, and coverage tools."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_all()) == 54
+        assert len(registry.list_all()) == 56
 
     def test_analysis_category_6(self):
         """Analysis category has 13 tools (incl. macro snapshot + coverage diagnostics)."""
         from src.tools.registry import create_default_registry
         registry = create_default_registry()
-        assert len(registry.list_by_category("analysis")) == 15
+        assert len(registry.list_by_category("analysis")) == 17
 
     def test_anthropic_includes_insider_trades(self):
         """Anthropic bridge includes get_insider_trades."""

@@ -89,6 +89,14 @@ HEAD; since Task2 has no earlier commit, its entire patch remains in that range.
 
 ### Pending Security Decision
 
+The latest user response questions the root mechanism rather than approving the
+SEC-only exception. [Derived architectural analysis](../../security/hardening/2026-09-12-tool-output-boundary/hardening.md)
+now recommends a shared contextual result/prose boundary with separate diagnostic
+policy. That proposal is not an approved specification or implementation plan.
+The local treatment described below remains the original paused option, not an
+instruction to implement it. Do not resume Task2's security change until this
+larger design decision is settled and the task contract is revised accordingly.
+
 The real OAuth bridge tests show that the generic credential-pattern scrubber
 also matches legitimate SEC decimal values, content hashes and encoded cursors.
 The frozen Task2 checkpoint has 758 passing and four failing cases: successful

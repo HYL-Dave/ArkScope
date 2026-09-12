@@ -6,8 +6,8 @@ required_params: [ticker]
 aliases: [comps, comp]
 category: financial-analysis
 data_sources:
-  required: [get_fundamentals_analysis, get_detailed_financials, calculate_peer_statistics, calculate_implied_valuation]
-  optional: [get_sec_filings, get_peer_comparison]
+  required: [get_fundamentals_analysis, get_detailed_financials, calculate_peer_statistics, calculate_implied_valuation, list_sec_filings, get_sec_financial_facts, read_sec_filing]
+  optional: [get_peer_comparison]
 output: report
 ---
 
@@ -23,7 +23,7 @@ and comparing valuation multiples to determine relative value.
 1. **get_detailed_financials** — SEC EDGAR fundamentals (EV/EBITDA, EV/Revenue, PEG, ROIC, margins)
 2. **get_fundamentals_analysis** — IBKR snapshot (P/E, P/B, P/S, market cap, real-time)
 3. **get_peer_comparison** — Pre-built peer group with comparative metrics
-4. **get_sec_filings** — Recent 10-K/10-Q for segment data and guidance
+4. **list_sec_filings + read_sec_filing** — Recent 10-K/10-Q for segment data and guidance
 5. **calculate_peer_statistics** — Auditable peer aggregates and outlier flags
 6. **calculate_implied_valuation** — Explicit multiple-to-value calculations
 
@@ -92,3 +92,13 @@ and comparing valuation multiples to determine relative value.
 6. **Key risks to the comparison**: Why peers may not be truly comparable
 
 AFTER ANALYSIS: Save as a research report using save_report() with report_type="comps_analysis".
+
+SEC EVIDENCE:
+- Call list_sec_filings(issuer="{ticker}") to select observed filing IDs, then
+  read_sec_filing(filing_id=...) for document indexes and complete cited passages.
+- Use get_sec_financial_facts(issuer="{ticker}") for exact decimal observations;
+  preserve units, periods, revisions, source hashes, and provenance.
+- Keep the same filters, limit, and max_chars on cursor continuation. Stored or
+  pinned reads acquire nothing; freshness="refresh" cannot replace a pin.
+- Report status, gaps, coverage, and whole-record size gaps. Missing required SEC
+  tools or unavailable evidence is a research gap, not an empty successful result.

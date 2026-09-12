@@ -6,8 +6,8 @@ required_params: [ticker]
 aliases: [earnings, ep]
 category: builtin
 data_sources:
-  required: [get_analyst_consensus, get_option_chain, get_earnings_impact, get_sa_digest, calculate_weighted_scenarios]
-  optional: [get_sec_filings, get_insider_trades]
+  required: [get_analyst_consensus, get_option_chain, get_earnings_impact, get_sa_digest, calculate_weighted_scenarios, list_sec_filings, get_sec_financial_facts, read_sec_filing]
+  optional: [get_insider_trades]
 output: report
 ---
 
@@ -39,3 +39,13 @@ REQUIRED OUTPUT:
 7. Strategy recommendation (hold/trim/hedge/avoid)
 
 AFTER ANALYSIS: Save as a research report using save_report() with report_type="earnings_review".
+
+SEC EVIDENCE:
+- Call list_sec_filings(issuer="{ticker}") to select observed filing IDs, then
+  read_sec_filing(filing_id=...) for document indexes and complete cited passages.
+- Use get_sec_financial_facts(issuer="{ticker}") for exact decimal observations;
+  preserve units, periods, revisions, source hashes, and provenance.
+- Keep the same filters, limit, and max_chars on cursor continuation. Stored or
+  pinned reads acquire nothing; freshness="refresh" cannot replace a pin.
+- Report status, gaps, coverage, and whole-record size gaps. Missing required SEC
+  tools or unavailable evidence is a research gap, not an empty successful result.

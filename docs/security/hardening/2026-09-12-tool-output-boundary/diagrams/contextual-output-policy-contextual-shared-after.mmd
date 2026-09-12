@@ -1,0 +1,16 @@
+flowchart LR
+  Source[Tool and external data] --> Policy[Registered result and content policy]
+  Auth[Execution auth] --> Guard[Ephemeral secret guard]
+  Policy --> Common[Shared admission and projection]
+  Guard --> Common
+  Common --> API[API-key serializers]
+  Common --> OAuth[OAuth serializers]
+  API --> Sink[Model and Research trace]
+  OAuth --> Sink
+  Prose[Model prose] --> Stream[Shared stateful prose guard]
+  Guard --> Stream
+  Stream --> User[User stream and stored answer]
+  Error[Provider errors and probes] --> Diagnostic[Shape and status projection]
+  Guard --> Diagnostic
+  Diagnostic --> Regex[Lossy diagnostic regex]
+  Regex --> Log[Diagnostics]

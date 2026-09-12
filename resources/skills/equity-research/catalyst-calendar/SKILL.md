@@ -6,8 +6,8 @@ required_params: [ticker]
 aliases: [catalysts, cat]
 category: equity-research
 data_sources:
-  required: [get_analyst_consensus, get_ticker_news]
-  optional: [get_sec_filings, get_iv_analysis, get_earnings_impact]
+  required: [get_analyst_consensus, get_ticker_news, list_sec_filings, get_sec_financial_facts, read_sec_filing]
+  optional: [get_iv_analysis, get_earnings_impact]
 output: report
 ---
 
@@ -22,7 +22,7 @@ assess their potential impact, and provide a timeline for monitoring.
 
 1. **get_analyst_consensus** — Earnings dates, estimate revisions, price target changes
 2. **get_ticker_news** — Corroborate recent announcements, product launches, regulatory decisions, conferences, and other dated events in ArkScope's local news store
-3. **get_sec_filings** — Scheduled filings, shareholder meetings, proxy events
+3. **list_sec_filings + read_sec_filing** — Scheduled filings, shareholder meetings, proxy events
 4. **get_iv_analysis** — Options market pricing of upcoming events
 5. **get_earnings_impact** — Historical earnings reaction patterns
 
@@ -78,3 +78,13 @@ Create a calendar view sorted by date with impact ratings.
 6. **Strategic implications**: How to position around the catalyst calendar
 
 AFTER ANALYSIS: Save as a research report using save_report() with report_type="catalyst_calendar".
+
+SEC EVIDENCE:
+- Call list_sec_filings(issuer="{ticker}") to select observed filing IDs, then
+  read_sec_filing(filing_id=...) for document indexes and complete cited passages.
+- Use get_sec_financial_facts(issuer="{ticker}") for exact decimal observations;
+  preserve units, periods, revisions, source hashes, and provenance.
+- Keep the same filters, limit, and max_chars on cursor continuation. Stored or
+  pinned reads acquire nothing; freshness="refresh" cannot replace a pin.
+- Report status, gaps, coverage, and whole-record size gaps. Missing required SEC
+  tools or unavailable evidence is a research gap, not an empty successful result.

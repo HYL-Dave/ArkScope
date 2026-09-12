@@ -84,6 +84,8 @@ class ToolService:
 
     def invoke(self, name: str, arguments: dict, *, check=None) -> dict:
         """Validate first, then read or perform one bounded additive acquisition."""
+        from .tool_results import result_fits
+        fits = result_fits.get()
         try:
             kind, identifier, params, freshness, pinned = _validate(name, arguments, check)
         except (ValueError, TypeError) as exc:
@@ -108,11 +110,21 @@ class ToolService:
                         from .runtime import require_acquisition
                         require_acquisition(name)
                         acquisition = stack.enter_context(self.acquisition_factory())
+                        if hasattr(check, "track"):
+                            captures, transport, reader_factory = acquisition
+                            check.track(transport)
+                            def tracked_reader(*args, **kwargs):
+                                check()
+                                reader = reader_factory(*args, **kwargs)
+                                check.track(reader)
+                                check()
+                                return reader
+                            acquisition = captures, transport, tracked_reader
                         installed = True
                     return acquisition
 
                 if kind == "document":
-                    return self._document(identifier, params, freshness, stored_only, installed, acquire, check)
+                    return self._document(identifier, params, freshness, stored_only, installed, acquire, check, fits)
                 issuer_kind, value = parse_issuer(identifier)
                 issuers = IssuerStore(self.store)
                 if issuer_kind == "cik":
@@ -136,19 +148,19 @@ class ToolService:
                     captures, transport, _ = acquire()
                     ResearchService(self.store, captures, transport, clock=self.clock).refresh(
                         cik, max_sources=4, resume=freshness == "auto" and recent, check=check)
-                return getattr(StoredQueries(self.store), kind)(cik, **params)
+                return getattr(StoredQueries(self.store), kind)(cik, **params, result_fits=fits)
         except Exception as exc:
             code = getattr(exc, "code", str(exc))
             return _unavailable(code if code in _FAILURE_CODES else "sec_research_store_unavailable")
 
-    def _document(self, filing_id, params, freshness, stored_only, installed, acquire, check):
+    def _document(self, filing_id, params, freshness, stored_only, installed, acquire, check, fits):
         captures = CaptureStore(self.store, budget=None)
         queries = DocumentQueries(self.store, captures)
         if stored_only:
-            return queries.read(filing_id, **params)
+            return queries.read(filing_id, **params, result_fits=fits)
         attempt = DocumentStore(self.store).latest_attempt(filing_id, params["document_id"]) if installed else None
         if freshness == "auto" and attempt is not None and attempt["capture_id"] is not None:
-            return queries.read(filing_id, **params)
+            return queries.read(filing_id, **params, result_fits=fits)
         cik, _ = parse_filing_id(filing_id)
         receipt = self.store.latest_receipt(cik) if installed else None
         recent = receipt is not None and _recent(receipt["observed_at"], self.clock())
@@ -163,4 +175,4 @@ class ToolService:
         if observation["capture_id"] is None:
             from .document_queries import _unavailable as document_unavailable
             return document_unavailable(gaps=observation["gaps"], observed_at=observation["observed_at"])
-        return queries.read(filing_id, **params)
+        return queries.read(filing_id, **params, result_fits=fits)
