@@ -49,6 +49,7 @@ from src.auth_drivers.claude_code_sdk_driver import (
     build_ark_mcp_server,
 )
 from src.auth_drivers.protocol import LLMRequest
+from src.tools.result_policy import PUBLIC_JSON, PUBLIC_TEXT, ResultPolicy
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +95,7 @@ class _FakeToolDef:
     function: Any
     parameters: list = field(default_factory=list)
     requires_dal: bool = True
+    result_policy: ResultPolicy | None = None
 
 
 class _FakeRegistry:
@@ -117,12 +119,15 @@ def _full_fake_registry(handler_overrides: Optional[dict] = None) -> _FakeRegist
         fn = overrides.get(name)
         if fn is None:
             def fn(dal, _n=name, **kwargs):  # default: small echo
+                if _n == "get_economic_calendar":
+                    return "Public calendar fixture."
                 return {"tool": _n, "args": kwargs, "ok": True}
         tools[name] = _FakeToolDef(
             name=name,
             description=f"{name} (fake)",
             function=fn,
             parameters=[_FakeParam(name="ticker")],
+            result_policy=PUBLIC_TEXT if name == "get_economic_calendar" else PUBLIC_JSON,
         )
     return _FakeRegistry(tools)
 
@@ -689,14 +694,16 @@ def test_bridge_fail_fast_on_missing_registry_tool():
         build_ark_mcp_server(registry=reg, dal=_FakeDAL(), token=TOKEN)
 
 
-def test_bridge_happy_invoke_returns_content():
-    name = "get_sa_feed"
+@pytest.mark.parametrize("name,expected", [
+    ("get_sa_feed", "AAPL"), ("get_economic_calendar", "Public calendar fixture."),
+])
+def test_bridge_happy_invoke_returns_content(name, expected):
     _, _, handlers = _build_server_and_handlers(_full_fake_registry(), _FakeDAL())
     out = asyncio.run(handlers[name]({"ticker": "AAPL"}))
     assert "content" in out
     assert out["content"][0]["type"] == "text"
     assert not out.get("is_error")
-    assert "AAPL" in out["content"][0]["text"]
+    assert expected in out["content"][0]["text"]
 
 
 def test_bridge_handler_raises_with_token_is_redacted():
@@ -769,7 +776,7 @@ def test_bridge_per_tool_timeout():
     out = asyncio.run(
         mod._invoke_bridged_tool(
             name=name,
-            registry=_FakeRegistry({name: _FakeToolDef(name, "x", slow)}),
+            registry=_FakeRegistry({name: _FakeToolDef(name, "x", slow, result_policy=PUBLIC_TEXT)}),
             dal=_FakeDAL(),
             token=TOKEN,
             per_tool_timeout_s=0.05,
@@ -780,11 +787,15 @@ def test_bridge_per_tool_timeout():
     assert "timed out" in out["content"][0]["text"].lower()
 
 
-def test_bridge_sk_ant_secret_in_result_is_redacted():
-    # OQ-5 STRICT: a non-OAuth secret (sk-ant...) in the FULL model-facing body
-    # must be regex-redacted too.
+def test_bridge_sk_ant_secret_in_result_is_rejected():
+    # Unknown sk-ant credentials still cannot cross the model-facing boundary.
+    # A positive control ensures this is not merely an unclassified-tool veto.
     name = "get_fundamentals_analysis"
     leaked = "sk-ant-api03-" + "a" * 40
+    _, _, public_handlers = _build_server_and_handlers(_full_fake_registry(), _FakeDAL())
+    public = asyncio.run(public_handlers[name]({"ticker": "X"}))
+    assert public["is_error"] is False
+    assert json.loads(public["content"][0]["text"])["ok"] is True
 
     def leaker(dal, **kwargs):
         return {"note": "here is a secret " + leaked}
@@ -792,6 +803,8 @@ def test_bridge_sk_ant_secret_in_result_is_redacted():
     reg = _full_fake_registry({name: leaker})
     _, _, handlers = _build_server_and_handlers(reg, _FakeDAL())
     out = asyncio.run(handlers[name]({"ticker": "X"}))
+    assert out["is_error"] is True
+    assert out["content"][0]["text"] == "invalid_value"
     assert leaked not in out["content"][0]["text"]
 
 
@@ -879,6 +892,7 @@ def test_bridge_input_schema_preserves_optional_args():
         name=name,
         description="x",
         function=lambda dal, **kw: {"ok": True},
+        result_policy=PUBLIC_JSON,
         parameters=[
             _FakeParam(name="ticker", required=True),
             _FakeParam(name="days", type="integer", required=False),

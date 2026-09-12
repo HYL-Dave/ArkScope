@@ -27,6 +27,7 @@ from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
 from src.auth_drivers.chatgpt_oauth_login import ChatGPTOAuthLoginError
 from src.auth_drivers.protocol import LLMRequest
 from src.auth_drivers.token_store import StoredTokenRecord
+from src.tools.result_policy import PUBLIC_JSON
 
 
 class _Boom(Exception):
@@ -120,6 +121,7 @@ def _req(**kw):
 
 
 class _ToolDef:
+    result_policy = PUBLIC_JSON
     name = "get_price_change"
     description = "Get price change."
     parameters = []
@@ -136,6 +138,7 @@ class _Registry:
 
 
 class _VerboseToolDef:
+    result_policy = PUBLIC_JSON
     name = "get_price_change"
     description = "Get price change."
     parameters = []
@@ -156,6 +159,7 @@ class _VerboseRegistry:
 
 
 class _SlowNewsBriefToolDef:
+    result_policy = PUBLIC_JSON
     name = "get_news_brief"
     description = "Slow news brief."
     parameters = []

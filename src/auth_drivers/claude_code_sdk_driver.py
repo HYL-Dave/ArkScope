@@ -31,8 +31,8 @@ SECURITY (load-bearing, §4/§5/§6):
   the SDK at ``query.py:716-721``).
 - A Python-side in-process veto (allowlist check co-located with execution) is the
   ONE control independent of the bundled CLI.
-- args / results / errors are redacted (exact-token scrub ∘ project-standard
-  fail-closed regex), and results are SIZE-capped FIRST then redacted.
+- Successful results require trusted output-policy admission BEFORE reduction.
+  Errors retain diagnostic redaction; invalid results are rejected, not rewritten.
 """
 
 from __future__ import annotations
@@ -229,28 +229,6 @@ def _redact_bridge_dict(obj: Any, token: Optional[str]) -> Any:
     return obj
 
 
-def _coerce_result_str(result: Any) -> str:
-    """Stringify a tool result for sizing/redaction (mirrors the agent bridges)."""
-    if isinstance(result, str):
-        return result
-    if hasattr(result, "model_dump"):
-        try:
-            return json.dumps(result.model_dump(), default=str, ensure_ascii=False)
-        except Exception:  # noqa: BLE001 — fall through to str()
-            return str(result)
-    if isinstance(result, list) and result and hasattr(result[0], "model_dump"):
-        try:
-            return json.dumps([r.model_dump() for r in result], default=str, ensure_ascii=False)
-        except Exception:  # noqa: BLE001
-            return str(result)
-    if isinstance(result, (dict, list)):
-        try:
-            return json.dumps(result, default=str, ensure_ascii=False)
-        except Exception:  # noqa: BLE001
-            return str(result)
-    return str(result)
-
-
 # ===========================================================================
 # ToolRegistry → SDK-tool BRIDGE (§4)
 # ===========================================================================
@@ -273,22 +251,22 @@ async def _invoke_bridged_tool(
     Ordering of guarantees:
       1. Python-side veto: name must be in the allowlist (CLI-independent gate).
       2. ``asyncio.wait_for(per_tool_timeout_s)`` bounds a hung tool.
-      3. Result is SIZE-capped first (``get_reducer``/``truncate_with_marker``)
-         THEN redacted (OQ-5 STRICT: regex+token over the full model-facing body).
+      3. Trusted result policy validates and checks the complete value, then
+         ``get_reducer`` applies the existing independent channel size budget.
     """
     args = args or {}
     try:
         # (1) Python-side in-process veto — fail-closed, CLI-independent (§4).
         if name not in _RESEARCH_READONLY_TOOLS:
             return {
-                "content": [{"type": "text", "text": f"tool '{name}' is not allowed (allowlist veto)"}],
+                "content": [{"type": "text", "text": "invalid_value: tool is not allowed (allowlist veto)"}],
                 "is_error": True,
             }
 
         tool_def = registry.get(name) if registry is not None else None
         if tool_def is None:
             return {
-                "content": [{"type": "text", "text": f"tool '{name}' is not registered"}],
+                "content": [{"type": "text", "text": "invalid_value: tool is not registered"}],
                 "is_error": True,
             }
 
@@ -324,17 +302,20 @@ async def _invoke_bridged_tool(
                 "is_error": True,
             }
 
-        # (3) size FIRST, then redact the full model-facing body (OQ-5 STRICT).
-        as_str = _coerce_result_str(raw)
+        # Admit the whole value before the independently bounded channel reducer.
+        from src.tools.result_policy import admit_tool_result, tool_output_guard
+
+        as_str = admit_tool_result(
+            raw, policy=getattr(tool_def, "result_policy", None), guard=tool_output_guard(token),
+        )
         reducer = get_reducer(name)
         sized, _meta = reducer(as_str, budget=_BRIDGE_RESULT_BUDGET)
-        safe = _redact_bridge(sized, token)
-        return {"content": [{"type": "text", "text": safe}], "is_error": False}
+        return {"content": [{"type": "text", "text": sized}], "is_error": False}
     except BaseException as exc:  # noqa: BLE001 — §4 CRITICAL: NEVER let it escape.
-        # An escaping exception would be echoed VERBATIM into model context
-        # (query.py:716-721). Redact str(exc) (token + regex) and cap to 500.
+        from src.tools.result_policy import sanitize_tool_error
+
         return {
-            "content": [{"type": "text", "text": _redact_bridge(str(exc), token)[:500]}],
+            "content": [{"type": "text", "text": sanitize_tool_error(exc, token=token)}],
             "is_error": True,
         }
 

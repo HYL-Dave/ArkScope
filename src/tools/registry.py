@@ -13,6 +13,8 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
+from .result_policy import PUBLIC_JSON, PUBLIC_TEXT, ResultPolicy
+
 
 @dataclass
 class ToolParameter:
@@ -34,6 +36,7 @@ class ToolDefinition:
     parameters: List[ToolParameter] = field(default_factory=list)
     category: str = "general"
     requires_dal: bool = True  # Whether first arg is DataAccessLayer
+    result_policy: ResultPolicy | None = None
 
 
 class ToolRegistry:
@@ -181,6 +184,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_ticker_news",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get recent news articles for a stock ticker. "
                 "Returns up to `limit` most recent articles (default 20). "
@@ -205,6 +209,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="search_news_by_keyword",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Search news articles by keyword in titles and descriptions using "
                 "full-text search. Returns up to `limit` most recent matches."
@@ -221,6 +226,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_news_brief",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get a lightweight news overview for multiple tickers: "
                 "article count and date range. "
@@ -237,6 +243,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="search_news_advanced",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Advanced news search combining full-text search + multi-ticker + "
                 "date range. Use for cross-ticker theme searches "
@@ -262,6 +269,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_current_quote",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get a read-through current quote for a stock ticker. Uses IBKR snapshot "
                 "when available; source='auto' may fall back to the latest local bar, "
@@ -278,6 +286,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_ticker_prices",
+            result_policy=PUBLIC_JSON,
             description="Get OHLCV price bars for a stock ticker.",
             function=get_ticker_prices,
             category="prices",
@@ -291,6 +300,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_price_change",
+            result_policy=PUBLIC_JSON,
             description="Calculate price change percentage and high/low range for a ticker over a period.",
             function=get_price_change,
             category="prices",
@@ -302,6 +312,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sector_performance",
+            result_policy=PUBLIC_JSON,
             description="Calculate average performance of all tickers in a sector.",
             function=get_sector_performance,
             category="prices",
@@ -318,6 +329,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="calculate_greeks",
+            result_policy=PUBLIC_JSON,
             description="Calculate option Greeks (delta, gamma, theta, vega, rho). Supports American (Bjerksund-Stensland 2002) and European (Black-Scholes) pricing models.",
             function=calculate_greeks,
             category="options",
@@ -342,6 +354,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_option_chain",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get live option chain from IBKR with analysis: "
                 "call/put quotes around ATM, P/C ratio (volume + OI), max pain, "
@@ -367,6 +380,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_iv_skew_analysis",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Analyze IV skew from live option chain: call-put skew, "
                 "smile/smirk shape classification, 25-delta skew, skew gradient, "
@@ -397,6 +411,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="calculate_compound_growth",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Calculate total change and compound annual or period growth "
                 "from explicit positive start/end values."
@@ -412,6 +427,7 @@ class ToolRegistry:
         ))
         self.register(ToolDefinition(
             name="calculate_dcf",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Discount an explicit free-cash-flow projection, calculate a "
                 "perpetuity-growth terminal value, and bridge enterprise value "
@@ -432,6 +448,7 @@ class ToolRegistry:
         ))
         self.register(ToolDefinition(
             name="calculate_peer_statistics",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Calculate auditable peer mean, median, range, quartiles, "
                 "dispersion, and population-z-score outliers."
@@ -446,6 +463,7 @@ class ToolRegistry:
         ))
         self.register(ToolDefinition(
             name="calculate_implied_valuation",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Apply explicit peer multiples to a target metric while keeping "
                 "enterprise-value and equity-value bases distinct."
@@ -470,6 +488,7 @@ class ToolRegistry:
         ))
         self.register(ToolDefinition(
             name="calculate_weighted_scenarios",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Calculate a probability-weighted value from explicit scenario "
                 "values and weights that sum to one."
@@ -490,6 +509,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="detect_news_volume_anomaly",
+            result_policy=PUBLIC_JSON,
             description="Detect a raw news-volume anomaly for a ticker.",
             function=detect_news_volume_anomaly,
             category="news",
@@ -502,6 +522,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="detect_event_chains",
+            result_policy=PUBLIC_JSON,
             description="Detect deterministic event sequences from raw news titles.",
             function=detect_event_chains,
             category="news",
@@ -526,6 +547,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_fundamentals_analysis",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get fundamental analysis (P/E, ROE, margins, financial statements) for a ticker. "
                 "Use period='quarterly' for recent quarterly trends (QoQ/YoY growth)."
@@ -542,6 +564,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_detailed_financials",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get comprehensive financial metrics for valuation: "
                 "EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, "
@@ -558,6 +581,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sec_filings",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get SEC filing metadata (10-K, 10-Q, 8-K, etc.) for a ticker. "
                 "Returns filing type, date, and URL — metadata only, not content."
@@ -578,6 +602,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_insider_trades",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get recent insider trades (SEC Form 4) for a ticker. Fully parsed: "
                 "insider name, title, transaction date, shares (negative=sale), "
@@ -596,6 +621,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_watchlist_overview",
+            result_policy=PUBLIC_JSON,
             description="Get a summary of all watchlist tickers' current status (price, sentiment, IV).",
             function=get_watchlist_overview,
             category="analysis",
@@ -605,6 +631,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_morning_brief",
+            result_policy=PUBLIC_JSON,
             description="Generate a personalized morning briefing with holdings, sector highlights, and notable news.",
             function=get_morning_brief,
             category="analysis",
@@ -614,6 +641,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_peer_comparison",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Compare a ticker vs sector peers on key metrics: "
                 "PE, EV/EBITDA, margins, growth, ROE, ROIC, Rule of 40. "
@@ -642,6 +670,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_earnings_impact",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Analyze historical earnings price reactions: earnings-day moves, "
                 "average absolute move, directional bias, surprise correlation, "
@@ -664,6 +693,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_analyst_consensus",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get analyst consensus for a ticker: recommendation distribution "
                 "(buy/hold/sell), earnings history (last 4 quarters actual vs estimate), "
@@ -685,6 +715,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="list_security_lifecycle_reviews",
+            result_policy=PUBLIC_JSON,
             description=(
                 "List current tracking exceptions or their history, with actual collection "
                 "state, listing/continuation findings, missing checks and next actions. "
@@ -720,6 +751,7 @@ class ToolRegistry:
         ))
         self.register(ToolDefinition(
             name="get_security_lifecycle_review",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Read one current review by review_id from the review list, including "
                 "source checks and current application state. Reading is not approval. "
@@ -739,6 +771,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_portfolio_analysis",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Analyze portfolio or watchlist: P&L (if holdings provided), "
                 "beta vs SPY, pairwise correlation matrix, and portfolio-level "
@@ -759,6 +792,7 @@ class ToolRegistry:
         ))
         self.register(ToolDefinition(
             name="get_portfolio_holdings",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Read the user's local portfolio holdings from profile_state.db. "
                 "This is a local read-only snapshot; it never calls IBKR and never syncs."
@@ -777,6 +811,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="save_report",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Save a research report (Markdown + DB metadata). "
                 "Call this after completing a thorough analysis to persist results."
@@ -799,6 +834,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="list_reports",
+            result_policy=PUBLIC_JSON,
             description="List saved research reports, optionally filtered by ticker or type.",
             function=list_reports,
             category="reports",
@@ -812,6 +848,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_report",
+            result_policy=PUBLIC_JSON,
             description="Retrieve a saved research report by ID or file path.",
             function=get_report,
             category="reports",
@@ -826,6 +863,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="save_memory",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Save a piece of knowledge to long-term memory for future recall. "
                 "Use after completing analyses, discovering insights, or when the user "
@@ -849,6 +887,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="recall_memories",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Search long-term memory for relevant past knowledge. "
                 "Use when the user references past analyses, asks 'what did we discuss about X', "
@@ -874,6 +913,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="list_memories",
+            result_policy=PUBLIC_JSON,
             description="List saved memories (metadata only, no full content).",
             function=list_memories,
             category="memory",
@@ -890,6 +930,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="delete_memory",
+            result_policy=PUBLIC_JSON,
             description="Delete a memory by its ID.",
             function=delete_memory,
             category="memory",
@@ -903,6 +944,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="web_browse",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Browse a URL with headless Chromium browser (Playwright). "
                 "Reads a known JavaScript-rendered page. "
@@ -926,6 +968,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="scan_alerts",
+            result_policy=PUBLIC_TEXT,
             description=(
                 "Scan watchlist or specific tickers for price, sentiment, signal, "
                 "and sector alerts based on configured thresholds. "
@@ -949,6 +992,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="check_data_freshness",
+            result_policy=PUBLIC_TEXT,
             description=(
                 "Check health and freshness of all data sources (news, prices, "
                 "IV history, fundamentals cache). Returns staleness status, "
@@ -962,6 +1006,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_ticker_data_coverage",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Explain local market-data coverage for one ticker. Reports latest "
                 "local price/news/IV/fundamentals dates and, for a target date, "
@@ -988,6 +1033,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sa_alpha_picks",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get Seeking Alpha Alpha Picks portfolio. Returns current and/or "
                 "closed picks with return %, sector, rating, and freshness metadata. "
@@ -1009,6 +1055,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sa_pick_detail",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get detail report for a specific Alpha Pick. "
                 "If picked_date is omitted, returns the latest current (non-stale) pick. "
@@ -1027,6 +1074,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="refresh_sa_alpha_picks",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Return the cached Seeking Alpha Alpha Picks state (current + "
                 "closed picks, freshness) plus a refresh_hint. Read-only status: "
@@ -1041,6 +1089,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sa_articles",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Search SA Alpha Picks articles. Returns article list with title, "
                 "date, ticker, type (analysis/recap/webinar/commentary/removal), "
@@ -1068,6 +1117,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sa_article_detail",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Get full SA Alpha Picks article content + comments. "
                 "Returns body as Markdown + nested comment tree."
@@ -1083,6 +1133,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sa_market_news",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Search recent Seeking Alpha market-news feed items captured by the "
                 "Chrome extension. Returns metadata only: title, URL, publish time, "
@@ -1106,6 +1157,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sa_digest",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Return a deterministic SA evidence pack for one ticker — composes "
                 "sa_articles (Alpha Picks articles) + sa_market_news (feed items "
@@ -1145,6 +1197,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="list_high_value_comments",
+            result_policy=PUBLIC_JSON,
             description=(
                 "List high-scoring SA comments within a time window. "
                 "Reads sa_comment_signals (rule-based extraction). "
@@ -1175,6 +1228,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sa_comment_focus",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Cross-ticker view of what the Seeking Alpha COMMENT crowd is "
                 "focused on lately — a deterministic, rule-based aggregation over "
@@ -1207,6 +1261,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_sa_feed",
+            result_policy=PUBLIC_JSON,
             description=(
                 "Unified Seeking Alpha evidence feed — SA analysis articles + "
                 "market-news items in ONE newest-first, paginated list with "
@@ -1248,6 +1303,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_economic_calendar",
+            result_policy=PUBLIC_TEXT,
             description=(
                 "List recent + upcoming economic-calendar events (CPI, FOMC, "
                 "GDP, unemployment, etc.) from Finnhub's free economic "
@@ -1299,6 +1355,7 @@ class ToolRegistry:
 
         self.register(ToolDefinition(
             name="get_macro_value",
+            result_policy=PUBLIC_TEXT,
             description=(
                 "Point-in-time macro lookup. Returns the value of a FRED "
                 "series for a specific observation_date, optionally "
