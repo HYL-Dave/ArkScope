@@ -59,6 +59,21 @@ open, not provided by recovery accounting or verify/install. Their operational
 owners and constraints are in SEC spec section10. No production schema install,
 reset, deletion or source call is authorized by this documentation update.
 
+**Shared research output security (2026-09-12, in progress):**
+The user approved a shared mechanism, not a SEC exemption. The independent
+`codex/research-output-boundary` slice starts from `18d46062`; its spec/plan is
+`docs/superpowers/specs/2026-09-12-research-output-boundary-design.md` and
+`docs/superpowers/plans/2026-09-12-research-output-boundary.md`. Exact captured
+credentials govern successful content; heuristic redaction remains diagnostic.
+The core passed independent review; four-tool-channel policies through
+`3e73d2aa` have 716 focused passing tests and await independent review. Stateful
+producer/event/persistence integration is still RED-first work in progress.
+The other worktree's SEC Task 2 is parked with four OAuth failures, explicitly
+blocked on this boundary. Those feature nodes are absent from this independent
+branch and are not claimed fixed. SEC feature completion and remaining cleanup
+retain their existing owners. No production access, provider call, install,
+schema change, merge, push or restart is part of this security slice.
+
 Subscription strategy: see §10. Splits into **operational** (must-keep) vs
 **research** (evidence-gated). Paid IV/options data is research subscription work and
 therefore defaults to defer until the hypothesis gate exists.

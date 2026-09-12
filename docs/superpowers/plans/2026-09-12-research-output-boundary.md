@@ -46,11 +46,12 @@ for split in range(1, len(secret)):
 - [x] Run `tests/test_output_boundary.py`; expected RED is a named missing-boundary assertion, then split leakage under an exact-only naive implementation. Record actual nodes and messages.
 - [x] Implement bounded raw-offset matching and explicit finish/abort rules. No broad shape regex on prose; no arbitrary repr coercion.
 - [x] Run GREEN plus inverse mutations: bypass a known match, emit pending suffix, share scopes. Record each owner turning red, restore and rerun.
-- [ ] Commit scoped files and independent task review.
+- [x] Commit scoped files and independent task review.
 
-Core commits `2f0cedeb`, `f2068c75`; final core check 112 passed. Review resolved
-the shared-thread registration race; marker-composition fix round 1 is ongoing.
-This is not yet an approved integration gate or a complete release.
+Core commits `2f0cedeb`, `f2068c75`, `5f22762d`; final marker-fix check 83 primitive
+tests passed. Independent re-review closes both findings and approves Task 1.
+The earlier 112-test run included 38 unchanged controls; it is not combined with
+the final 83 count. This is not a complete integration or release gate.
 
 ## Task 2: Registered Result Policies And Four Tool Adapters
 
@@ -81,18 +82,22 @@ bounds at depth 64, 1,000,000 nodes and 32 MiB serialized output; preserve
 existing smaller channel budgets. Closed validators must return literal True;
 their exceptions or mutations cannot leak rejected values or bypass validation.
 
-- [ ] Inventory return annotations and actual serialization paths without invoking tools or DAL; settle JSON/text/model/datetime/Decimal handling before implementation.
-- [ ] Write RED tests invoking real four adapters with a registered synthetic public result containing long words, numeric TEXT, accession, URL, hash and cursor. After unwrapping channel envelopes:
+- [x] Inventory return annotations and actual serialization paths without invoking tools or DAL; settle JSON/text/model/datetime/Decimal handling before implementation.
+- [x] Write RED tests invoking real four adapters with a registered synthetic public result containing long words, numeric TEXT, accession, URL, hash and cursor. After unwrapping channel envelopes:
 
 ```python
 assert canonical(openai_data) == canonical(anthropic_data) == canonical(chatgpt_data) == canonical(claude_data)
 assert json.loads(admitted)["value"] == "1234567890123456789.123"
 ```
 
-- [ ] Add invalid JSON/NaN/foreign object/cycle/depth/unknown policy/closed-validator-extra-field and secrets in values AND keys; expect typed failure and no rejected value or repr.
-- [ ] Watch RED, implement shared policy with admission before reducer/preview, retain diagnostic handling for exceptions. Normalize known native date/Decimal/Pydantic values explicitly, not `default=str`.
-- [ ] Run all adapter/registry/subagent positives and inverse checks for bypassed policy, known-secret and credential-field checks. Unknown registered policy must not silently fall through.
+- [x] Add invalid JSON/NaN/foreign object/cycle/depth/unknown policy/closed-validator-extra-field and secrets in values AND keys; expect typed failure and no rejected value or repr.
+- [x] Watch RED, implement shared policy with admission before reducer/preview, retain diagnostic handling for exceptions. Normalize known native date/Decimal/Pydantic values explicitly, not `default=str`.
+- [x] Run all adapter/registry/subagent positives and inverse checks for bypassed policy, known-secret and credential-field checks. Unknown registered policy must not silently fall through.
 - [ ] Commit and independent task review. SEC feature task remains parked and its four failed nodes are listed, not executed as this branch's tests.
+
+Implementation commit `3e73d2aa` has 716 focused tests passing and six inverse
+groups caught then restored. The original RED suite was 279 failed/9 passed.
+Independent task review is pending; event/lifetime integration is not claimed.
 
 ## Task 3: Execution Lifetimes, Prose, Events And Durable Traces
 
@@ -116,13 +121,17 @@ tools, not repaired after they may have persisted a secret.
 event protection prior to emission, with selected-client and refreshed-bearer
 registration before any response is consumed. Helpers never recapture credentials.
 
-- [ ] Add real-adapter synthetic text/thinking/final-answer split tests and disposable managed-run replay tests; final-only redaction must fail the durable-event assertion.
-- [ ] Test parent/child, refresh, cancellation, completion and exception lifetime, direct API-key entry without ambient runtime binding, plus SDK trace/scratchpad guards.
-- [ ] Run RED; expected failures are damaged public prose, reconstructed fake secrets or unsafe durable event data, not provider/network/setup failures.
+- [x] Add real-adapter synthetic text/thinking/final-answer split tests and disposable managed-run replay tests; final-only redaction must fail the durable-event assertion.
+- [x] Test parent/child, refresh, cancellation, completion and exception lifetime, direct API-key entry without ambient runtime binding, plus SDK trace/scratchpad guards.
+- [x] Run RED; expected failures are damaged public prose, reconstructed fake secrets or unsafe durable event data, not provider/network/setup failures.
 - [ ] Wire common output scopes across async iteration and tool callbacks. Register captured client secrets/OAuth bearers, sanitize before public/durable yields, redact full values before preview truncation. Always close upstream on cancellation; no retry/session changes.
 - [ ] Verify existing owners including `test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors`, runtime binding, card execution authority, retry/tracing, OAuth cancellation/environment and session continuity.
 - [ ] Inverse: replace matcher by per-fragment replace; skip active client capture; move protection after durable append. Each has a named RED owner; restore GREEN.
 - [ ] Commit and independent task review.
+
+RED preparation `task3-red-final-04`: 339 failed/22 passed, no errors/skips.
+318 failures exercise existing behavior; 21 are named missing-wrapper assertions.
+Product edits are gated on Task 2 review because both tasks own the OAuth files.
 
 ## Task 4: Frozen Verification And Integration Record
 
