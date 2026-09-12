@@ -129,3 +129,18 @@ credential-bearing pages before parsing or following their cursor, and check
 the returned plan diagnostic. Preserve authentication admission order, pagination,
 hidden-row filtering, RPC budget and the existing bounded failure code. No
 token-store lookup, ambient credential enumeration or changes to usage reads.
+
+## Confirmed Compaction Residual
+
+A completed synthetic native-agent probe also found a raw exception log in
+`compressor/summary_callers.py`; its sibling in `compressor/layers.py` logs
+caller failures and installs returned summaries in the next context. The
+summary call is part of the same execution, even when it selects a different
+client. Register that already-selected client's concrete key before use and
+inherit the parent guard. Direct standalone callers create an isolated scope.
+Diagnostics must be sanitized while that scope is active. Validate complete
+summary text before capping or context replacement; a credential-bearing result
+is a failed compaction, not an edited summary. Original messages and existing
+failure/circuit behavior remain intact, as do prompts, model and request policy.
+The final review agent supplied this completed probe but no overall verdict
+before a platform safety error; this is not independent approval of the fix.

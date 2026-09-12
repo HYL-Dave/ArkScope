@@ -407,7 +407,7 @@ def apply_layer_5(
     Outcomes:
       - ``noop``: empty messages, boundary at 0, or only a prior summary
         was old — no body to compact. Caller is NOT invoked.
-      - ``failed``: caller returned None / empty / raised. Increments
+      - ``failed``: caller returned None / empty / raised / unsafe text. Increments
         consecutive-failure counter.
       - ``success``: caller returned non-empty text and replacement happened.
 
@@ -461,14 +461,22 @@ def apply_layer_5(
         body[:boundary], prior_summary=prior_summary,
     )
 
-    try:
-        raw_summary = summary_caller(
-            system_prompt=build_layer_5_system_prompt(),
-            user_prompt=build_layer_5_user_prompt(transcript),
-        )
-    except Exception as exc:
-        logger.warning("Layer 5 summary_caller raised %s — treating as failure", exc)
-        raw_summary = None
+    from src.agents.shared.output_boundary import output_scope
+    from src.auth_drivers.runtime_binding import sanitize_runtime_error
+
+    with output_scope(inherit=True) as guard:
+        try:
+            raw_summary = summary_caller(
+                system_prompt=build_layer_5_system_prompt(),
+                user_prompt=build_layer_5_user_prompt(transcript),
+            )
+            if isinstance(raw_summary, str):
+                guard.check(raw_summary)
+        except Exception as exc:
+            logger.warning(
+                "Layer 5 summary caller failed: %s", sanitize_runtime_error(exc),
+            )
+            raw_summary = None
 
     if not isinstance(raw_summary, str) or not raw_summary.strip():
         # LLM was actually invoked but produced nothing usable — this is

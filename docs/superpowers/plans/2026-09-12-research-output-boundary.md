@@ -137,16 +137,24 @@ registration before any response is consumed. Helpers never recapture credential
 - [x] Add real-adapter synthetic text/thinking/final-answer split tests and disposable managed-run replay tests; final-only redaction must fail the durable-event assertion.
 - [x] Test parent/child, refresh, cancellation, completion and exception lifetime, direct API-key entry without ambient runtime binding, plus SDK trace/scratchpad guards.
 - [x] Run RED; expected failures are damaged public prose, reconstructed fake secrets or unsafe durable event data, not provider/network/setup failures.
-- [ ] Wire common output scopes across async iteration and tool callbacks. Register captured client secrets/OAuth bearers, sanitize before public/durable yields, redact full values before preview truncation. Always close upstream on cancellation; no retry/session changes.
-- [ ] Verify existing owners including `test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors`, runtime binding, card execution authority, retry/tracing, OAuth cancellation/environment and session continuity.
-- [ ] Inverse: replace matcher by per-fragment replace; skip active client capture; move protection after durable append. Each has a named RED owner; restore GREEN.
-- [ ] Commit and independent task review.
+- [x] Wire common output scopes across async iteration and tool callbacks. Register captured client secrets/OAuth bearers, sanitize before public/durable yields, redact full values before preview truncation. Always close upstream on cancellation; no retry/session changes.
+- [x] Verify existing owners including `test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors`, runtime binding, card execution authority, retry/tracing, OAuth cancellation/environment and session continuity.
+- [x] Inverse: replace matcher by per-fragment replace; skip active client capture; move protection after durable append. Each has a named RED owner; restore GREEN.
+- [x] Commit and independent task review.
 
 RED preparation `task3-red-final-04`: 339 failed/22 passed, no errors/skips.
 318 failures exercise existing behavior; 21 are named missing-wrapper assertions.
 Existing-file integration is gated on Task 2 review because both tasks own the
 OAuth files. The new shared event iterator may be implemented independently
 against the already-approved core, without modifying any Task 2-owned file.
+
+Implementation `29f18ca7` passed 1,022 focused tests. Independent review found
+raw cleanup traceback logging and lost cleanup ownership when cancelled during
+terminal close. Fix `fdc947d2` has 1,026 focused tests passing, three additional
+inverse checks restored, and a scoped independent approval with six fresh
+cleanup-outcome probes. The admitted SDK's task/cleanup compatibility was
+inspected separately. Task 3 is complete; the full-backend/whole-branch gate is
+still separate from these focused counts.
 
 ## Task 4: Frozen Verification And Integration Record
 
@@ -168,8 +176,31 @@ collected archived evidence test modules. It stopped with eight collection
 errors before test execution. Retain this invocation failure; retry the complete
 backend as `backend -q tests`, not as a product failure or baseline waiver.
 
+Full-run collateral: `backend-full-02` reached 10,148 passed/12 skipped/1 failed.
+The closed EIR-006 consumer census has no category for the new tool-policy test's
+tool-name roster. Coordinator owns the exact `_TEST_FIXTURES` addition in
+`tests/test_eir006_retired_data_boundaries.py`; preserve all search roots,
+patterns and unknown-reference rejection. Watch the existing owner RED, add the
+specific classification, rerun GREEN/inverse and then the complete backend.
+This is missing test-manifest maintenance in this slice, not a pre-existing
+failure or permission to exempt all tests.
+
+Final-verification finding: the completed synthetic compaction probe showed a
+raw credential echo in `compressor/summary_callers.py` diagnostics. Its probe
+passes demonstrate the unsafe behavior, not a clean review. A second concrete
+sink exists in `compressor/layers.py` (caller exceptions and summary installation).
+Coordinator owns these two modules plus `tests/test_research_output_compaction.py`:
+inherit the execution guard, capture the actual summary client's key before use,
+sanitize errors in-scope, and reject credential-bearing summaries before any
+cap or context replacement. No changes to model, prompts, retry, budgets or
+failure/circuit semantics. Add RED/GREEN/inverse owners and unchanged compressor
+controls. `backend-full-03` was stopped before editing (partial 8,068 passed,
+12 skipped, exit 2); a fresh complete run is required. The fresh final reviewer
+terminated with a platform safety error and no verdict; keep that independent
+gate open for external review rather than treating the probe as approval.
+
 - [ ] Freeze code identity; run all new tests and complete backend under the offline runner. Parse JUnit exact pass/skip/fail/error totals; no inferred aggregate counts.
-- [ ] Run repository census comparison and unbounded residual scans for generic redaction on successful research outputs. Classify diagnostic exceptions, not grep-count assertions.
+- [x] Run repository census comparison and unbounded residual scans for generic redaction on successful research outputs. Classify diagnostic exceptions, not grep-count assertions.
 - [ ] Dispatch whole-branch independent review with explicit base SHA, not `HEAD~1`; resolve findings with fresh tests and reverify changed surfaces.
 - [ ] Archive commands, RED/GREEN/inverse results and source digests; mark task statuses incrementally.
 - [ ] State independent security-slice status and parked SEC integration status separately. Do not merge or claim complete SEC delivery.
