@@ -27,12 +27,13 @@
 `guard.add_secret(secret)`, `guard.check(value)` (raises on known credential),
 `guard.prose(text) -> str`, `guard.stream() -> SecretStream`,
 `stream.feed(text) -> str`, `stream.finish() -> str`, `stream.abort() -> None`,
-`output_scope(*secrets)` context manager, `current_output_guard()`,
+`output_scope(*secrets, inherit=False)` context manager,
+`activate_output_guard(guard)` context manager, `current_output_guard()`,
 `remember_output_secret(secret)`. Guards are nonserializable and redact repr.
 The scope is independent from auth lookup and never reads tokens itself.
 
-- [ ] Write tests first for intact public data, exact matches, bounded raw/URL/base64 representations, repr/pickle safety and scope isolation.
-- [ ] Exhaust all split points and single-character feeds, including overlapping secrets and interleaved unrelated scopes:
+- [x] Write tests first for intact public data, exact matches, bounded raw/URL/base64 representations, repr/pickle safety and scope isolation.
+- [x] Exhaust all split points and single-character feeds, including overlapping secrets and interleaved unrelated scopes:
 
 ```python
 for split in range(1, len(secret)):
@@ -42,10 +43,14 @@ for split in range(1, len(secret)):
     assert output == "[REDACTED]"
 ```
 
-- [ ] Run `tests/test_output_boundary.py`; expected RED is a named missing-boundary assertion, then split leakage under an exact-only naive implementation. Record actual nodes and messages.
-- [ ] Implement bounded raw-offset matching and explicit finish/abort rules. No broad shape regex on prose; no arbitrary repr coercion.
-- [ ] Run GREEN plus inverse mutations: bypass a known match, emit pending suffix, share scopes. Record each owner turning red, restore and rerun.
+- [x] Run `tests/test_output_boundary.py`; expected RED is a named missing-boundary assertion, then split leakage under an exact-only naive implementation. Record actual nodes and messages.
+- [x] Implement bounded raw-offset matching and explicit finish/abort rules. No broad shape regex on prose; no arbitrary repr coercion.
+- [x] Run GREEN plus inverse mutations: bypass a known match, emit pending suffix, share scopes. Record each owner turning red, restore and rerun.
 - [ ] Commit scoped files and independent task review.
+
+Core commits `2f0cedeb`, `f2068c75`; final core check 112 passed. Review resolved
+the shared-thread registration race; marker-composition fix round 1 is ongoing.
+This is not yet an approved integration gate or a complete release.
 
 ## Task 2: Registered Result Policies And Four Tool Adapters
 
@@ -64,6 +69,17 @@ lossless JSON or declared text, or `OutputBoundaryError` with closed codes;
 policies must not be selected by result content. Domain validator support has
 no SEC import/branch. A source-only inventory decides existing public result
 shapes and records every registered name plus bridge-only delegation.
+
+Source inventory resolved all 54 definitions: 50 public JSON and four text
+tools (`check_data_freshness`, `scan_alerts`, `get_economic_calendar`,
+`get_macro_value`); bridge-only `delegate_to_subagent` returns public JSON.
+Declare policies explicitly on each registration, leaving unknown policies
+unadmitted. The four text functions are not JSON-string producers. Handle
+native Pydantic/date/datetime/finite Decimal explicitly; arbitrary object
+coercion and raw strings returned under JSON policy are errors. Set progressive
+bounds at depth 64, 1,000,000 nodes and 32 MiB serialized output; preserve
+existing smaller channel budgets. Closed validators must return literal True;
+their exceptions or mutations cannot leak rejected values or bypass validation.
 
 - [ ] Inventory return annotations and actual serialization paths without invoking tools or DAL; settle JSON/text/model/datetime/Decimal handling before implementation.
 - [ ] Write RED tests invoking real four adapters with a registered synthetic public result containing long words, numeric TEXT, accession, URL, hash and cursor. After unwrapping channel envelopes:
@@ -86,6 +102,15 @@ create `src/agents/shared/output_events.py`, `tests/test_research_output_events.
 `tests/test_research_output_lifetimes.py`. Modify managed/legacy route boundaries
 and shared scratchpad/capture consumers only where necessary to protect actual
 pre-persistence sinks. Enumerate additional exact paths in the ledger before editing.
+
+The source inventory additionally owns `src/agents/shared/subagent.py`,
+`src/research_run_manager.py`, `src/api/routes/query.py` and, only if required,
+`src/auth_drivers/live_resolver.py`. Guard complete producer values before
+scratchpad/replay/preview truncation. Activate the retained OutputGuard around
+each upstream iterator advance/close and reset before public yields; do not
+leave a ContextVar token installed in the consumer across generator yields.
+Tool arguments must be admitted before handler execution, including write
+tools, not repaired after they may have persisted a secret.
 
 **Consumes:** Task 1 scope/matcher and Task 2 result admission. Produces common
 event protection prior to emission, with selected-client and refreshed-bearer
