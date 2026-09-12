@@ -1,4 +1,4 @@
-# Retained Raw-News Boundary Cleanup
+# Orphan File Backend Cleanup
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Execute RED-first and stop at a verified reviewable commit.
 
@@ -53,8 +53,8 @@ path on DataAccessLayer._base instead of dropping that useful assertion.
 
 **Interfaces:** LocalMarketBackend(*, market_db); SACaptureBackend(*, sa_db, market_db); DataAccessLayer(base_path, backend) retains its current useful arguments. No FileBackend interface remains.
 
-- [ ] Collect scoped baseline before edits. No existing semantic assertion may disappear merely to make cleanup pass.
-- [ ] Add corrected RED owners before module deletion:
+- [x] Collect scoped baseline before edits. No existing semantic assertion may disappear merely to make cleanup pass.
+- [x] Add corrected RED owners before module deletion:
   ```python
   assert not (ROOT / "src/tools/backends/file_backend.py").exists()
   assert importlib.util.find_spec("src.tools.backends.file_backend") is None
@@ -62,16 +62,25 @@ path on DataAccessLayer._base instead of dropping that useful assertion.
   Use existing real SQLite news fixtures as positive controls and require
   nonempty exact query results. Do not read main repo data or accept a vacuous
   empty-reader assertion. Retained price/facts/SA controls remain unchanged.
-- [ ] Change the subprocess module-graph owner to exclude file_backend. RED must fail on its loaded-module assertion before removing the unused construction.
-- [ ] Preserve the initial four missing-behavior failures as historical evidence. Run the corrected absence owners before full module deletion: physical file and import remain, so both must fail. Current SQLite news controls must pass.
-- [ ] Remove only the product surfaces above and adjust exact constructor keyword collateral. Re-scan all SACaptureBackend/LocalMarketBackend callers so no keyword remains hidden in a fixture.
-- [ ] Run focused regressions with the current-plan runner:
+- [x] Change the subprocess module-graph owner to exclude file_backend. RED must fail on its loaded-module assertion before removing the unused construction.
+- [x] Preserve the initial four missing-behavior failures as historical evidence. Run the corrected absence owners before full module deletion: physical file and import remain, so both must fail. Current SQLite news controls must pass.
+- [x] Remove only the product surfaces above and adjust exact constructor keyword collateral. Re-scan all SACaptureBackend/LocalMarketBackend callers so no keyword remains hidden in a fixture.
+- [x] Run focused regressions with the current-plan runner:
   ```text
   backend -q tests/test_data_access.py tests/test_eir006_retired_data_boundaries.py tests/test_sqlite_backend.py tests/test_detailed_financials.py tests/test_stored_sec_projection.py tests/test_fundamentals_sec_cache.py tests/test_active_universe.py tests/test_sa_local_readers.py tests/test_security_lifecycle_terminal_workflow.py tests/test_sa_capture_backend.py tests/test_sa_reconciliation_native_host.py tests/test_sa_article_reconciliation_backend.py tests/test_sa_tools.py
   ```
   Also run test_sa_routing.py, test_abandoned_surface_cleanup.py and
   test_legacy_iv_retirement_boundaries.py. Require zero failures; report exact
   collected/pass/skip totals rather than assuming them.
-- [ ] Self-review source diff and retained-owner hashes, report command receipts and any new dependency. Controller handles commit and independent review. Do not start C11 or mutate a reviewed prior task.
+- [x] Self-review source diff and retained-owner hashes, report command receipts and any new dependency. Controller handles commit and independent review. Do not start C11 or mutate a reviewed prior task.
+
+Implementation checkpoint: `885c2a2d`. Worker350P/1S; controller467P/1S. Both
+initial RED4F/2P and corrected absence RED2F/2P are retained. The revised routing
+baseline failed two obsolete stub-path assertions before their approved move to
+DAL._base; it is not reported as a passing baseline.
+
+- [x] Preserve the implementation in a scoped commit.
+- [x] Independent C10 review: no findings,32 focused tests passed; all reviewer sessions ended.
+- [ ] Whole backend verification on frozen product/test source.
 
 This is not C11 news-writer convergence, C12 collector CLI retirement, stored-data disposition or completion of SEC's remaining workflows.
