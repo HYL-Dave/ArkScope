@@ -230,3 +230,18 @@ files, fixture stores/HOME trees or compiled binaries are admitted. All65 run
 receipts are complete and all ten final integration checks pass. Manifest
 SHA-256: `1e4ae0dcef2bc2b29b6c494fe7e21c8d8d54b943412a3186dc793b3ac325c112`.
 Later status documentation is outside the create-only checks archive.
+
+Git readback correction: the first seal commit `97f9c96e` included only168 of
+329 required paths because existing `logs/` and `*.log.*` ignore rules omitted
+65 compressed test logs and96 SQLite step receipts/streams. The local hash
+check above did not prove Git coverage. [verify_archive.py](verify_archive.py)
+now checks exact committed membership plus every stored/decoded content hash;
+its [RED receipt](archive-git-red.json) rejects that commit with161 missing paths.
+Only those manifest-bound paths are force-added; no global ignore rule, source
+file, fixture data or sealed content is changed. The [GREEN receipt](archive-git-green.json)
+records the corrected Git archive. This check can be repeated without scratch
+or opening any application store:
+
+```bash
+env -i PATH=/usr/bin:/bin /home/hyl/.virtualenvs/llm_app/bin/python -I -S -B docs/superpowers/evidence/2026-09-12-sec-integration/verify_archive.py HEAD
+```

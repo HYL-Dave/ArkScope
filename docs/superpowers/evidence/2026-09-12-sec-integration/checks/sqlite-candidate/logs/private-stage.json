@@ -1,0 +1,28 @@
+{
+  "label": "private-stage",
+  "started_utc": "2026-09-12T15:36:44.143720+00:00",
+  "argv": [
+    "/usr/bin/make",
+    "-j4",
+    "install-dll",
+    "install-shell"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/sqlite-autoconf-3530400",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/home",
+    "TMPDIR": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/tmp",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "shell_command": "env -i PATH=/usr/bin:/bin HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/home TMPDIR=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/tmp LC_ALL=C PYTHONDONTWRITEBYTECODE=1 /usr/bin/make -j4 install-dll install-shell",
+  "stdin_path": null,
+  "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "expected_exit": 0,
+  "timeout_seconds": 180,
+  "exit_code": 2,
+  "timed_out": false,
+  "elapsed_seconds": 0.004434,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "0c6e35e2913754c3ea6fd5d584d18ad3cf8b5d57e2f04e985953b233687ce784"
+}

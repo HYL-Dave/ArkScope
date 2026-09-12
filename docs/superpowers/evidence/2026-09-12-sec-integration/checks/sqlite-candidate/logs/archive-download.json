@@ -1,0 +1,40 @@
+{
+  "label": "archive-download",
+  "started_utc": "2026-09-12T15:32:26.812145+00:00",
+  "argv": [
+    "/usr/bin/curl",
+    "--disable",
+    "--fail",
+    "--show-error",
+    "--silent",
+    "--proto",
+    "=https",
+    "--connect-timeout",
+    "20",
+    "--max-time",
+    "120",
+    "--output",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/sqlite-autoconf-3530400.tar.gz",
+    "--write-out",
+    "%{http_code}\\n%{url_effective}\\n%{size_download}\\n",
+    "https://www.sqlite.org/2026/sqlite-autoconf-3530400.tar.gz"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/home",
+    "TMPDIR": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/tmp",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "shell_command": "env -i PATH=/usr/bin:/bin HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/home TMPDIR=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/tmp LC_ALL=C PYTHONDONTWRITEBYTECODE=1 /usr/bin/curl --disable --fail --show-error --silent --proto =https --connect-timeout 20 --max-time 120 --output /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/sqlite-autoconf-3530400.tar.gz --write-out '%{http_code}\\n%{url_effective}\\n%{size_download}\\n' https://www.sqlite.org/2026/sqlite-autoconf-3530400.tar.gz",
+  "stdin_path": null,
+  "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "expected_exit": 0,
+  "timeout_seconds": 150,
+  "exit_code": 0,
+  "timed_out": false,
+  "elapsed_seconds": 2.247217,
+  "stdout_sha256": "6a6a2a5cb2300c8a2aa37e6547c4e793c339af4e2ef9e2ca612c09b4dab1fe28",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

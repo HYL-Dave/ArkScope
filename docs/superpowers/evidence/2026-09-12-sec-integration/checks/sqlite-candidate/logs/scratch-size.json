@@ -1,0 +1,27 @@
+{
+  "label": "scratch-size",
+  "started_utc": "2026-09-12T15:45:16.749525+00:00",
+  "argv": [
+    "/usr/bin/du",
+    "-sh",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/home",
+    "TMPDIR": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/tmp",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "shell_command": "env -i PATH=/usr/bin:/bin HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/home TMPDIR=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/tmp LC_ALL=C PYTHONDONTWRITEBYTECODE=1 /usr/bin/du -sh /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate",
+  "stdin_path": null,
+  "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "expected_exit": 0,
+  "timeout_seconds": 180,
+  "exit_code": 0,
+  "timed_out": false,
+  "elapsed_seconds": 0.002352,
+  "stdout_sha256": "e5b138d2869fdc0d9c26687740a3e8e5e4a4626b1f60549a7dd3678e62662cb8",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

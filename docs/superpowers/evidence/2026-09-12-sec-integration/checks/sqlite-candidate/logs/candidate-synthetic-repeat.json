@@ -1,0 +1,35 @@
+{
+  "label": "candidate-synthetic-repeat",
+  "started_utc": "2026-09-12T15:44:04.589349+00:00",
+  "argv": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-I",
+    "-S",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/synthetic_probe.py",
+    "suite",
+    "--expected-version",
+    "3.53.4",
+    "--run-name",
+    "candidate-02"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/home",
+    "TMPDIR": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/tmp",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "LD_LIBRARY_PATH": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/prefix/lib"
+  },
+  "shell_command": "env -i PATH=/usr/bin:/bin HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/home TMPDIR=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/tmp LC_ALL=C PYTHONDONTWRITEBYTECODE=1 LD_LIBRARY_PATH=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/prefix/lib /home/hyl/.virtualenvs/llm_app/bin/python -I -S -B /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/sqlite-candidate/synthetic_probe.py suite --expected-version 3.53.4 --run-name candidate-02",
+  "stdin_path": null,
+  "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "expected_exit": 0,
+  "timeout_seconds": 180,
+  "exit_code": 0,
+  "timed_out": false,
+  "elapsed_seconds": 1.475523,
+  "stdout_sha256": "b0d1d697ddd95a2681cef0c53452f73dd0736f33d0dfce50d8acb85ea23c458a",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
