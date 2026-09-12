@@ -68,8 +68,11 @@ body and retry boundaries. Legacy callers without a check keep their retry
 behavior. Actual producer tests compare the entire result sent back to the
 model with canonical service output. The old in-flight fixture now records
 its first request before waiting, retaining its one-request/context/stop/join
-assertions. Scoped re-review is pending. Tasks1/4 were already reviewed, not
-restarted.
+assertions. Independent scoped re-review found no correctness issues and ran
+51 tests successfully without warnings, including all 12 new regression cases.
+Its receipt is `task2-rereview-5d979910-db4df4d9`; it pinned the unchanged C09
+imports to avoid concurrent mutation interference. This is not a security-wide
+or full-release review. Tasks1/4 were already reviewed, not restarted.
 Tasks3/5/6/7 remain open: durable Research citations/reopening, operation leases
 and export/restore, orphan cleanup/schema reset, default-disabled scheduling.
 Settings and backend citations do not imply these workflows are complete.
@@ -90,5 +93,13 @@ No stored data or keys were inspected or changed.
 The worker observed 6 failed / 190 passed before product deletion, then
 196 passed; restoring a removed leaf made its named owner fail. Controller
 run `c09-controller-green` independently returned 196 passed. Seven test IDs
-were added and none removed. This commit preserves the implementation; remaining
-inverse checks and independent review are pending, not cleanup-wide acceptance.
+were added and none removed. Independent source review of `f30ee8fc` found no
+lost live consumer or key-precedence regression.
+
+Controller supplemental inverses used process-local injection, not on-disk
+mutations: restoring an obsolete export, removing a retained export, and forcing
+legacy-over-Massive key precedence each failed exactly its existing named owner.
+Receipts: `c09-inverse-export`, `c09-inverse-retained`, `c09-inverse-key` (one
+failure each); unmutated `c09-final-restore` returned 196 passed. The earlier
+worker's partial handoff is retained, not retrospectively described as completed.
+C09 is accepted within this scope; it is not cleanup-wide completion.

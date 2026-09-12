@@ -76,7 +76,7 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 
 - [x] Preflight and exact task contracts
 - [x] Task 1: issuer/tool service (2d54a482,38529e51; focused835P; independent review approved)
-- [ ] Task 2: four-channel replacement (implemented through 5d979910; review fixes 994P, re-review pending)
+- [x] Task 2: four-channel replacement (5d979910; focused994P, independent scoped re-review51P; full-release gate remains Task8)
 - [ ] Task 3: persistent Research citations
 - [x] Task 4: TOC recognition (ba5a3356,5518ae21; focused338P; independent review approved)
 - [ ] Task 5: export/restore
@@ -99,7 +99,8 @@ deadline. Review found two additional actual execution defects, repaired in
 `asyncio.run`, and metadata/map cancellation must reach governor waiting and
 dispatch/body/retry checkpoints. Tests now exercise the actual SDK tool-result
 roundtrip and both ticker/CIK cancellation paths. The latest focused run is
-994 passed; scoped re-review remains required. Original source branches stay
+994 passed; independent scoped re-review returned 51 passed with no correctness
+findings. Original source branches stay
 intact, and no source implementation remains solely in an untracked checkpoint.
 
 The remaining release work is still Tasks3/5/6/7/8. In particular, persistent
