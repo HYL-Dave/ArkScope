@@ -81,7 +81,10 @@ inventory/backup operation, not automatic startup cleanup.
   current normalized/direct route selection and real provider_sync timestamps,
   errors and counters to remain visible through status, overlay and health.
   Expected RED: stale fields, suppressed telemetry or an old-value BLOCKED route.
-- [ ] Add physical API/helper absence owners and require old setter404, while
+- [ ] Add physical API/helper absence owners and require the old PUT setter to
+  be unmounted. The surviving GET `/news/{ticker}` also matches the literal
+  path `/news/settings`, so Starlette returns405 for PUT, not404; do not add a
+  compatibility stub or remove the useful ticker route to force404. The
   current normalized setter retains permission checks and writes only its key.
   Expected RED: old PUT still mounted or obsolete helper still importable.
 - [ ] Preserve nonempty current-news/price/SA/cache controls, normalized-required
@@ -97,3 +100,13 @@ inventory/backup operation, not automatic startup cleanup.
 - [ ] Independent review, frozen full backend and mechanical census before
   acceptance. No master merge/push, no installation or stored-data cleanup
   implied by source acceptance. C12 and SEC citation/export/recovery remain open.
+
+## Execution Clarifications
+
+September13 source preflight distinguishes two health signals. C11 removes the
+obsolete switch and the Massive/Finnhub fallback from publication time to ingest
+success. The IBKR market-health combination of prices/news is unchanged by this
+switch and is not redesigned here. Retain its current tests. Health fixtures
+that intentionally selected old rollback must instead supply actual disposable
+provider_sync run telemetry; preserve their stale/error/key-precedence checks,
+and add a missing-telemetry control rather than merely weakening expectations.
