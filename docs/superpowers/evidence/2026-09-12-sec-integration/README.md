@@ -56,12 +56,30 @@ The shared security inventory is additional count collateral: 56 tools comprise
 
 ## Remaining Work
 
-Task2 awaits integration review. Tasks1/4 were already reviewed, not restarted.
+Task2 review reproduced two defects after the adapter checks: nested
+`asyncio.run` in the actual Anthropic streaming caller and metadata dispatch
+after cancellation while waiting for the SEC governor. Both require actual
+producer/governor regression owners before acceptance. Tasks1/4 were already
+reviewed, not restarted.
 Tasks3/5/6/7 remain open: durable Research citations/reopening, operation leases
 and export/restore, orphan cleanup/schema reset, default-disabled scheduling.
 Settings and backend citations do not imply these workflows are complete.
 
-C03 old catalog tool/forwarders/empty HTTP route are removed here. C09-C13,
+C03 old catalog tool/forwarders/empty HTTP route are removed here. C10-C13,
 C15/C20 data disposition, i18n/CSS/SQL census queues and production SQLite
 admission are not marked complete. C21 remains an explicit deferred capability.
 Actual data deletion still requires bounded inventory, backup and approval.
+
+## C09 Checkpoint
+
+The unused EODHD/Alpha Vantage/Finnhub standalone source classes and unified
+factory are physically removed. Current Polygon/EDGAR/IBKR exports, Finnhub
+news/calendar and EODHD census/Settings credentials remain. Current docs no
+longer advertise removed adapters; dated provider comparisons are historical.
+No stored data or keys were inspected or changed.
+
+The worker observed 6 failed / 190 passed before product deletion, then
+196 passed; restoring a removed leaf made its named owner fail. Controller
+run `c09-controller-green` independently returned 196 passed. Seven test IDs
+were added and none removed. This commit preserves the implementation; remaining
+inverse checks and independent review are pending, not cleanup-wide acceptance.

@@ -148,21 +148,24 @@ admitted separately as task capabilities, not presumed data foundations.
 
 ### 3.2 Finnhub
 
+News and calendar acquisition remain current. Commercial/history observations
+below are the dated December 2025 provider evaluation, not a fresh provider check.
+
 | Field | Value |
 |-------|-------|
 | **provider** | Finnhub. |
 | **implementation_status** | **live**. |
-| **connected_via** | `data_sources/finnhub_source.py` (news/quotes) + `data_sources/finnhub_calendar_client.py` (calendar). REST. |
+| **connected_via** | `src/collectors/finnhub_news.py` (news fetch/parse used by `src/news_providers.py` and normalized adapters) + `data_sources/finnhub_calendar_client.py` (calendar). REST. |
 | **asset_classes** | US equities. |
-| **data_types** | Real-time quote; news; **economic / earnings / IPO calendar** (`/calendar/economic` with `actual`/`estimate`/`prev`, UTC-stamped); basic fundamentals (paid). |
+| **data_types** | News; **economic / earnings / IPO calendar** (`/calendar/economic` with `actual`/`estimate`/`prev`, UTC-stamped). The standalone quote/fundamentals source class is not a current integration. |
 | **history_depth** | **News ~7 days in practice** (despite a documented 1-year claim — verified 2025-12-14). Calendar covers upcoming + historical. |
-| **latency** | Quote real-time; news near-real-time. |
-| **streaming** | `realtime_quote` (quote endpoint is real-time) but **no bar stream** — not charting-grade. |
+| **latency** | News/calendar fetched on demand or by the scheduler. |
+| **streaming** | `none` in the current news/calendar adapters. |
 | **cost** | Free tier (news + calendar + quote). Paid **Fundamental** tiers for deeper financials. |
 | **auth/config** | `FINNHUB_API_KEY`. REST. Wired as free news source in `data_preferences`. |
 | **limits** | Free ≈ **60 calls/min**. |
 | **known_quirks** | ⚠️ **Biggest spec-vs-reality gap in the stack**: free news history is ~7 days, not 1 year — use Massive for news archive. |
-| **best_for** | **Earnings / IPO / economic calendar** (free, well-structured); quick real-time quotes. |
+| **best_for** | **Earnings / IPO / economic calendar** and recent news. |
 | **not_good_for** | News backtesting / history (~7 days only). |
 | **verified_at** | 2025-12. |
 | **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §Finnhub, `data_sources/DATA_SOURCE_QUIRKS.md`, `src/macro_calendar/finnhub_ingestion.py`. |
@@ -181,49 +184,57 @@ and truthful-partial fit; and an explicit enable/spend switch with honest usage
 visibility. Pricing and limits must be re-verified when that future slice opens;
 dated evaluations and git history are context, not runnable integration assets.
 
-### 3.4 Alpha Vantage
+### 3.4 Alpha Vantage (historical evaluation; not connected)
+
+The abandoned standalone adapter was removed by C09. Provider capabilities and
+commercial terms below remain the December 2025 evaluation, not current ArkScope
+features or a fresh API verification.
 
 | Field | Value |
 |-------|-------|
 | **provider** | Alpha Vantage. |
-| **implementation_status** | **live**. |
-| **connected_via** | `data_sources/alpha_vantage_source.py` (REST). |
+| **implementation_status** | **not connected**. |
+| **connected_via** | None; the standalone adapter and unified-source factory are removed. |
 | **asset_classes** | US equities, FX, **commodities**. |
 | **data_types** | EOD + intraday prices; **news with AI sentiment** (50 articles, title+summary+URL — most detailed but mixed relevance); **commodity series** (WTI/Brent/NatGas/metals/agri). |
 | **history_depth** | EOD long; **intraday only ~7 days**. |
 | **latency** | Delayed. |
 | **streaming** | `none` (delayed). |
 | **cost** | Free **25 requests/day** (very restrictive). Paid tiers lift the cap. |
-| **auth/config** | `ALPHAVANTAGE_API_KEY`. REST. |
+| **auth/config** | Historical REST API-key evaluation only; no current app-managed Alpha Vantage credential field. |
 | **limits** | Free **25 req/day** — effectively unusable for bulk; news returns 50 articles/query. |
 | **known_quirks** | News is **mixed-relevance** — must post-filter on `relevance_score` (>0.7–0.8); returns all articles mentioning a ticker, not ticker-primary. |
 | **best_for** | **Commodity series** mapping 1:1 to IBKR futures (CL/GC/NG/SI/ZC/ZW/ZS/KC/SB/CT); supplementary AI-sentiment news. |
 | **not_good_for** | Anything high-volume (25/day); real-time. |
 | **verified_at** | 2025-12. |
 | **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §Alpha Vantage, `data_sources/IBKR_INVESTOR_DATA_VALUE.md` (commodity→futures mapping), `data_sources/API_SPECIFICATIONS.md`. |
-| **app_settings_fields** | `alpha_vantage.enabled` (toggle), `alpha_vantage.api_key` (secret). |
+| **app_settings_fields** | None in the current `src/data_provider_config.py::PROVIDER_FIELDS`. |
 
 ### 3.5 EODHD (EOD Historical Data)
+
+Current wiring is the bounded lifecycle census transport. The linked December
+2025 global-price/fundamentals/news evaluations remain historical comparisons;
+those standalone acquisition paths are not current application capabilities.
 
 | Field | Value |
 |-------|-------|
 | **provider** | EODHD. |
-| **implementation_status** | **optional-live** (paid). |
-| **connected_via** | `data_sources/eodhd_source.py` (REST). |
-| **asset_classes** | **Global** equities + fundamentals. |
-| **data_types** | EOD prices; fundamentals; dividend/split (corporate-actions) calendar; news API. |
-| **history_depth** | Long EOD history; broad global symbol coverage. |
-| **latency** | EOD. |
+| **implementation_status** | **live lifecycle census transport**; standalone news/price/fundamentals adapter removed. |
+| **connected_via** | `data_sources/lifecycle_provider_census_transport.py::LifecycleProviderCensusTransport.fetch_eodhd_symbol_sets`, consumed by `src/security_lifecycle_provider_scan.py`. |
+| **asset_classes** | US stock listings in the current census. |
+| **data_types** | Exact requested-symbol accounting against active and delisted US symbol lists. |
+| **history_depth** | Current symbol-list snapshot, not historical price/news acquisition. |
+| **latency** | On-demand census snapshot. |
 | **streaming** | `none`. |
-| **cost** | Paid **$19.99–$99/mo** by tier. |
-| **auth/config** | `EODHD_API_KEY`. REST. |
-| **limits** | Per-tier request caps. |
-| **known_quirks** | Value is **breadth** (global markets) rather than US-depth; overlaps Massive and other US EOD sources. |
-| **best_for** | Global EOD + fundamentals breadth; dividend/split calendar. |
-| **not_good_for** | Real-time; US-only users may not need it (free options cover US EOD). |
-| **verified_at** | 2025-12. |
+| **cost** | Historical December 2025 comparison: paid **$19.99–$99/mo** by tier; not reverified by source cleanup. |
+| **auth/config** | Profile-backed `eodhd.api_key` through `src/security_lifecycle_provider_census_credentials.py`; the census does not fall back to ambient `EODHD_API_KEY`. |
+| **limits** | Two US symbol-list requests (active/delisted), with request/response bounds enforced by `CensusRequestBudget` and the transport. |
+| **known_quirks** | Rejects unexpected, duplicate, or overlapping active/delisted codes. |
+| **best_for** | Bounded lifecycle listing-status evidence. |
+| **not_good_for** | Generic price, fundamentals, or news ingestion through the removed standalone adapter. |
+| **verified_at** | Current source ownership: 2026-09-12, offline only. Provider evaluation: 2025-12. |
 | **source_links** | `data_sources/DATA_SOURCES_EVALUATION.md` §7 EODHD, `docs/data/US_STOCKS_OPTIONS_DATA_SUBSCRIPTIONS.md`. |
-| **app_settings_fields** | `eodhd.enabled` (toggle), `eodhd.api_key` (secret). |
+| **app_settings_fields** | `eodhd.api_key` (secret); current Settings/key support is retained. |
 
 ### 3.6 SEC EDGAR
 

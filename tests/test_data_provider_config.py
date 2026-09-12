@@ -760,19 +760,15 @@ def test_massive_connection_test_prefers_massive_key_over_legacy_alias(monkeypat
 
 def test_polygon_data_source_constructors_prefer_massive_then_legacy(monkeypatch):
     from data_sources.polygon_source import PolygonDataSource
-    from data_sources.source_factory import get_data_source
 
     monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
     monkeypatch.setenv("POLYGON_API_KEY", "polygon-legacy")
 
     direct = PolygonDataSource()
-    factory = get_data_source("polygon")
     try:
         assert direct.api_key == "massive-primary"
-        assert factory.api_key == "massive-primary"
     finally:
         direct._session.close()
-        factory._session.close()
 
 
 def test_market_data_transport_builds_requests_on_the_current_massive_api_host(monkeypatch):
