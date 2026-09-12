@@ -34,20 +34,24 @@ Files: `apps/arkscope-web/src/styles.css`, a focused
 `apps/arkscope-web/src/retiredPageHeader.test.tsx`; existing PageHeader/primitives
 only as read-only controls. Controller owns issue-register/evidence updates.
 
-- [ ] Recount exact obsolete class selectors and search all actual frontend class
+- [x] Recount exact obsolete class selectors and search all actual frontend class
   consumers, including dynamic strings. `detailpage-head` is not `page-head`.
-- [ ] Add a named selector-absence test before CSS deletion. Assert no exact
+- [x] Add a named selector-absence test before CSS deletion. Assert no exact
   `.page-head`/`.page-head-actions` selector in desktop or media rules, while
   rendering the real PageHeader and retaining `.detailpage-head` and current
   `.ui-page-header*` styles as nonempty positive controls.
-- [ ] Record assertion RED, then delete only the obsolete desktop/mobile rules.
-- [ ] Run focused and full frontend tests, typecheck/build, and desktop/mobile
+- [x] Record assertion RED, then delete only the obsolete desktop/mobile rules.
+- [x] Run focused and full frontend tests, typecheck/build, and desktop/mobile
   responsive visual checks with the real primitive and local CSS. No live App
   or provider; screenshots use a disposable browser and isolated fixture server.
-- [ ] Restore an obsolete rule temporarily to prove the absence owner fails;
+- [x] Restore an obsolete rule temporarily to prove the absence owner fails;
   restore reviewed bytes and rerun. Preserve declarations of all retained rules.
-- [ ] Commit and independently review; controller closes EIR-001 with exact
+- [x] Commit and independently review; controller closes EIR-001 with exact
   commit/results. Do not claim the whole CSS census queue closed.
+
+Task1 product commit `eec66b9e`; independent review approved. Controller focused
+38P; full frontend1779P, typecheck/build and10 pixel-identical responsive pairs.
+Exact closure receipt will be sealed with Task3, not a wider CSS-clean claim.
 
 ### Task 2: Close C11
 
@@ -56,13 +60,13 @@ Execute the complete owned-file and RED-first acceptance sections in
 scope, names, positive controls and expected route223->222 collateral are the
 binding task brief. Mark its checkboxes as work is verified, not preemptively.
 
-- [ ] Baseline; add actual persisted false/malformed-old-setting routing and
+- [x] Baseline; add actual persisted false/malformed-old-setting routing and
   telemetry owners, plus obsolete-helper/PUT absence owners, then record RED.
-- [ ] Implement all backend/frontend removals, current documentation and exact
+- [x] Implement all backend/frontend removals, current documentation and exact
   caller/monkeypatch collateral. No actual persisted key deletion.
-- [ ] GREEN current normalized/direct writers, status/overlay/health and API
+- [x] GREEN current normalized/direct writers, status/overlay/health and API
   protection, missing-store noncreation, real data controls and frontend checks.
-- [ ] Inverses independently restore telemetry suppression and old-value
+- [x] Inverses independently restore telemetry suppression and old-value
   validation; both named owners fail. Restore and rerun.
 - [ ] Independent review, commit, and final frozen full backend/frontend/census.
   Reconcile exact test additions/removals and any new scanner uncertainties.
