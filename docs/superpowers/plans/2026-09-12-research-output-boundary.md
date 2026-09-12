@@ -93,11 +93,14 @@ assert json.loads(admitted)["value"] == "1234567890123456789.123"
 - [x] Add invalid JSON/NaN/foreign object/cycle/depth/unknown policy/closed-validator-extra-field and secrets in values AND keys; expect typed failure and no rejected value or repr.
 - [x] Watch RED, implement shared policy with admission before reducer/preview, retain diagnostic handling for exceptions. Normalize known native date/Decimal/Pydantic values explicitly, not `default=str`.
 - [x] Run all adapter/registry/subagent positives and inverse checks for bypassed policy, known-secret and credential-field checks. Unknown registered policy must not silently fall through.
-- [ ] Commit and independent task review. SEC feature task remains parked and its four failed nodes are listed, not executed as this branch's tests.
+- [x] Commit and independent task review. SEC feature task remains parked and its four failed nodes are listed, not executed as this branch's tests.
 
-Implementation commit `3e73d2aa` has 716 focused tests passing and six inverse
+Implementation commit `3e73d2aa` had 716 focused tests passing and six inverse
 groups caught then restored. The original RED suite was 279 failed/9 passed.
-Independent task review is pending; event/lifetime integration is not claimed.
+Review found bare-Bearer financial prose rejection and lost safe span metadata.
+Fix `41b9f2b5` narrows header context and restores content-free failure spans;
+754 focused tests pass after three additional inverse checks were restored.
+Independent re-review approves Task 2. Event/lifetime integration is not claimed.
 
 ## Task 3: Execution Lifetimes, Prose, Events And Durable Traces
 
@@ -116,6 +119,10 @@ each upstream iterator advance/close and reset before public yields; do not
 leave a ContextVar token installed in the consumer across generator yields.
 Tool arguments must be admitted before handler execution, including write
 tools, not repaired after they may have persisted a secret.
+After Task 2 review, both native `tools.py` modules also belong to this task's
+pre-handler input boundary. OpenAI SDK dispatch precedes run-item extraction,
+so producer-side post-call trace checks cannot prevent tool writes or SDK
+argument logging. No concurrent edits of those modules are permitted.
 
 **Consumes:** Task 1 scope/matcher and Task 2 result admission. Produces common
 event protection prior to emission, with selected-client and refreshed-bearer
@@ -131,7 +138,9 @@ registration before any response is consumed. Helpers never recapture credential
 
 RED preparation `task3-red-final-04`: 339 failed/22 passed, no errors/skips.
 318 failures exercise existing behavior; 21 are named missing-wrapper assertions.
-Product edits are gated on Task 2 review because both tasks own the OAuth files.
+Existing-file integration is gated on Task 2 review because both tasks own the
+OAuth files. The new shared event iterator may be implemented independently
+against the already-approved core, without modifying any Task 2-owned file.
 
 ## Task 4: Frozen Verification And Integration Record
 
