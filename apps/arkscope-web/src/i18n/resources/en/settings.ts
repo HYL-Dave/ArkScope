@@ -976,11 +976,6 @@ const settings = {
     neverRun: "Not run yet",
     loadFailed: "Could not load News Data status.",
     routing: {
-      directEnvOn: "Direct local writes (forced on by environment)",
-      directEnvOff: "Local compatibility writer (forced by environment)",
-      localCompatibility: "Local compatibility writer",
-      directExplicit: "Direct local writes (configured)",
-      directDefault: "Direct local writes (default)",
       write: {
         normalized: "Normalized SQLite + legacy local projection",
         normalizedCurrent: "Normalized local writer",

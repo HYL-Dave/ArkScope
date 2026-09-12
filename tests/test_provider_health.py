@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from src.service.provider_health import compute_provider_health
+from src.market_data_direct import _ensure_provider_sync_tables
 
 # Fixed clocks: 2026-06-10 = Wednesday; 2026-06-13 = Saturday (NY weekend).
 _WEDNESDAY = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
@@ -43,7 +45,7 @@ def _stats(news_rows=(), prices_latest=None, fin_rows=()):
 
 
 @pytest.fixture(autouse=True)
-def hermetic(monkeypatch):
+def hermetic(monkeypatch, tmp_path):
     """Isolate from the real machine: env keys, config/.env scan, local market DB."""
     # ensure_env_loaded is set-if-absent from the REAL config/.env — neutralize it
     # (mark already-loaded, empty loader-tracking) so the delenv below cannot be
@@ -53,19 +55,39 @@ def hermetic(monkeypatch):
     for var in ("MASSIVE_API_KEY", "POLYGON_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY",
                 "FINANCIAL_DATASETS_API_KEY", "IBKR_HOST", "IBKR_PORT"):
         monkeypatch.delenv(var, raising=False)
-    # Existing health tests exercise mirrored content timestamps. S3.2 default is direct;
-    # pin rollback here and opt direct tests in explicitly.
-    monkeypatch.setenv("ARKSCOPE_USE_LOCAL_NEWS", "false")
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "market.db"))
     monkeypatch.setattr("src.market_data_admin.read_sync_meta", lambda *a, **k: {})
     monkeypatch.setattr("src.tools.analysis_tools._is_fd_enabled", lambda dal: False)
+
+
+@pytest.fixture
+def news_runs(tmp_path):
+    def record(provider, finished_at, *, status="succeeded", error=None,
+               rows_added=0, tickers_scanned=1):
+        if isinstance(finished_at, datetime):
+            finished_at = finished_at.isoformat()
+        conn = sqlite3.connect(tmp_path / "market.db")
+        try:
+            _ensure_provider_sync_tables(conn)
+            conn.execute(
+                "INSERT INTO provider_sync_runs "
+                "(provider,domain,interval,started_at,finished_at,status,error,rows_added,tickers_scanned) "
+                "VALUES (?,'news','news',?,?,?,?,?,?)",
+                (provider, finished_at, finished_at, status, error, rows_added, tickers_scanned),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return record
 
 
 def _by_id(out, pid):
     return next(p for p in out["providers"] if p["id"] == pid)
 
 
-def test_connected_when_signal_recent(monkeypatch):
+def test_connected_when_signal_recent(monkeypatch, news_runs):
     monkeypatch.setenv("MASSIVE_API_KEY", "k")
+    news_runs("polygon", _WEDNESDAY - timedelta(hours=2))
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=2), 50)])))
     p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "massive")
@@ -73,8 +95,9 @@ def test_connected_when_signal_recent(monkeypatch):
     assert p["last_success_at"] is not None and p["signals"]["news_recent_7d"] == 50
 
 
-def test_massive_health_uses_primary_name_and_rejects_legacy_fallback(monkeypatch):
+def test_massive_health_uses_primary_name_and_rejects_legacy_fallback(monkeypatch, news_runs):
     monkeypatch.setenv("MASSIVE_API_KEY", "massive-primary")
+    news_runs("polygon", _WEDNESDAY - timedelta(hours=2))
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=2), 50)])))
 
@@ -90,8 +113,9 @@ def test_massive_health_uses_primary_name_and_rejects_legacy_fallback(monkeypatc
     assert legacy["status"] == "not_configured"
 
 
-def test_connected_when_local_sqlite_timestamp_uses_compact_utc_offset(monkeypatch):
+def test_connected_when_local_sqlite_timestamp_uses_compact_utc_offset(monkeypatch, news_runs):
     monkeypatch.setenv("FINNHUB_API_KEY", "k")
+    news_runs("finnhub", "2026-06-10T10:30:00+0000")
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("finnhub", "2026-06-10T10:30:00+0000", 12)])))
     p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "finnhub")
@@ -99,14 +123,15 @@ def test_connected_when_local_sqlite_timestamp_uses_compact_utc_offset(monkeypat
     assert p["last_success_at"] == "2026-06-10T10:30:00+00:00"
 
 
-def test_stale_when_signal_old_on_weekday(monkeypatch):
+def test_stale_when_signal_old_on_weekday(monkeypatch, news_runs):
     monkeypatch.setenv("MASSIVE_API_KEY", "k")
+    news_runs("polygon", _WEDNESDAY - timedelta(hours=100))
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=100), 0)])))
     assert _by_id(compute_provider_health(dal, now=_WEDNESDAY), "massive")["status"] == "stale"
 
 
-def test_ibkr_weekend_is_maintenance_not_stale(monkeypatch):
+def test_ibkr_weekend_is_maintenance_not_stale(monkeypatch, news_runs):
     # The SAME old-signal condition: IBKR on a NY weekend → maintenance (gateway
     # weekend maintenance ≠ error, per the locked F1+F2 directive); a non-IBKR
     # provider stays stale.
@@ -114,6 +139,7 @@ def test_ibkr_weekend_is_maintenance_not_stale(monkeypatch):
     monkeypatch.setenv("IBKR_PORT", "4001")
     monkeypatch.setenv("MASSIVE_API_KEY", "k")
     old = _SATURDAY - timedelta(hours=100)
+    news_runs("polygon", old)
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", old, 0)], prices_latest=old)))
     out = compute_provider_health(dal, now=_SATURDAY)
@@ -126,8 +152,9 @@ def test_ibkr_weekend_is_maintenance_not_stale(monkeypatch):
     assert _by_id(out2, "ibkr")["status"] == "stale"
 
 
-def test_provider_health_missing_managed_key_is_not_configured():
+def test_provider_health_missing_managed_key_is_not_configured(news_runs):
     # no MASSIVE_API_KEY in env (hermetic fixture) — even with a fresh signal
+    news_runs("polygon", _WEDNESDAY - timedelta(hours=1))
     dal = _FakeDAL(_FakeBackend(stats=_stats(
         news_rows=[("polygon", _WEDNESDAY - timedelta(hours=1), 9)])))
     p = _by_id(compute_provider_health(dal, now=_WEDNESDAY), "massive")
@@ -401,26 +428,27 @@ def test_section_failure_degrades_not_raises():
     assert _by_id(out, "sec_edgar")["status"] == "no_signal"
 
 
-def test_direct_news_health_uses_provider_runs_and_current_ticker_errors(monkeypatch):
+@pytest.mark.parametrize(("later_failure", "expected_status", "expected_attempt"), [
+    (False, "partial", "2026-06-10T10:00:00+00:00"),
+    (True, "failed", "2026-06-10T11:00:00+00:00"),
+])
+def test_direct_news_health_uses_provider_runs_and_current_ticker_errors(
+    monkeypatch, tmp_path, news_runs, later_failure, expected_status, expected_attempt,
+):
     monkeypatch.setenv("MASSIVE_API_KEY", "k")
     monkeypatch.setenv("FINNHUB_API_KEY", "k")
-    direct = {
-        "status": "partial",
-        "last_success": "2026-06-10T10:00:00+00:00",
-        "last_attempt": "2026-06-10T11:00:00+00:00",
-        "last_error": "polygon: BAD: 403",
-        "rows_added": 0,
-        "updated_at": "2026-06-10T11:00:00+00:00",
-        "providers": {
-            "polygon": {
-                "status": "partial", "last_success": "2026-06-10T10:00:00+00:00",
-                "last_attempt": "2026-06-10T11:00:00+00:00", "last_error": "BAD: 403",
-                "rows_added": 0, "tickers_scanned": 2, "ticker_errors": [],
-            }
-        },
-    }
-    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: True)
-    monkeypatch.setattr("src.news_sync_status.read_news_sync_status", lambda path: direct)
+    news_runs("polygon", "2026-06-10T10:00:00+00:00", tickers_scanned=2)
+    if later_failure:
+        news_runs("polygon", "2026-06-10T11:00:00+00:00", status="failed", tickers_scanned=2)
+    conn = sqlite3.connect(tmp_path / "market.db")
+    try:
+        conn.execute(
+            "INSERT INTO provider_sync_meta (provider,ticker,interval,last_error,rows_added,updated_at) "
+            "VALUES ('polygon','BAD','news','403',0,'2026-06-10T11:00:00+00:00')"
+        )
+        conn.commit()
+    finally:
+        conn.close()
     dal = _FakeDAL(_FakeBackend(stats=_stats(news_rows=[
         ("polygon", _WEDNESDAY - timedelta(hours=1), 50),
         ("finnhub", _WEDNESDAY - timedelta(hours=1), 50),
@@ -429,11 +457,43 @@ def test_direct_news_health_uses_provider_runs_and_current_ticker_errors(monkeyp
     out = compute_provider_health(dal, now=_WEDNESDAY)
 
     massive = _by_id(out, "massive")
+    assert massive["status"] == "connected"
     assert massive["last_success_at"] == "2026-06-10T10:00:00+00:00"
-    assert massive["last_attempt_at"] == "2026-06-10T11:00:00+00:00"
+    assert massive["last_attempt_at"] == expected_attempt
     assert massive["last_error"] == "BAD: 403"
     assert _by_id(out, "finnhub")["status"] == "no_signal"
-    assert out["local_market"]["sync"]["news"] == direct
+    direct = out["local_market"]["sync"]["news"]
+    assert direct["status"] == expected_status
+    assert direct["last_success"] == "2026-06-10T10:00:00+00:00"
+    assert direct["last_attempt"] == expected_attempt
+    assert direct["last_error"] == "polygon: BAD: 403"
+    assert direct["rows_added"] == 0
+    assert direct["providers"]["polygon"]["tickers_scanned"] == 2
+    assert direct["providers"]["polygon"]["ticker_errors"] == [{
+        "ticker": "BAD", "error": "403", "updated_at": "2026-06-10T11:00:00+00:00",
+    }]
+
+
+@pytest.mark.parametrize(("pid", "source", "key"), [
+    ("massive", "polygon", "MASSIVE_API_KEY"),
+    ("finnhub", "finnhub", "FINNHUB_API_KEY"),
+])
+def test_recent_publication_without_ingest_telemetry_is_no_signal(monkeypatch, tmp_path, pid, source, key):
+    monkeypatch.setenv(key, "disposable-key")
+    dal = _FakeDAL(_FakeBackend(stats=_stats(
+        news_rows=[(source, _WEDNESDAY - timedelta(hours=1), 50)])))
+
+    out = compute_provider_health(dal, now=_WEDNESDAY)
+    provider = _by_id(out, pid)
+
+    assert provider["status"] == "no_signal"
+    assert provider["last_success_at"] is None
+    assert provider["last_attempt_at"] is None
+    assert provider["signals"]["news_recent_7d"] == 50
+    assert provider["signals"]["news_latest"] == "2026-06-10T11:00:00+00:00"
+    assert provider["signals"]["direct_sync"] is None
+    assert out["local_market"]["sync"]["news"] is None
+    assert not (tmp_path / "market.db").exists()
 
 
 def test_p0c_provider_health_marks_price_sync_retired(monkeypatch):

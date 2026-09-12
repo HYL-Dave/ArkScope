@@ -29,7 +29,7 @@ def read_news_sync_status(db_path: str | Path) -> Optional[dict[str, Any]]:
     if not path.exists():
         return None
 
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
         has_runs = _table_exists(conn, "provider_sync_runs")
@@ -133,11 +133,7 @@ def read_news_sync_status(db_path: str | Path) -> Optional[dict[str, Any]]:
 def overlay_news_sync_status(
     mirror_sync: dict[str, Any], db_path: str | Path
 ) -> dict[str, Any]:
-    """Replace only the news slice when the direct writer is active."""
-    from src.news_providers import use_local_news_enabled
-
-    if not use_local_news_enabled():
-        return mirror_sync
+    """Replace only news with current ingest telemetry, including absent telemetry."""
     out = dict(mirror_sync)
     out["news"] = read_news_sync_status(db_path)
     return out

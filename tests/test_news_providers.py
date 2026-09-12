@@ -1,12 +1,10 @@
-"""2c: Parquet-free news provider adapters + the use_local_news toggle (hermetic).
+"""Parquet-free news provider adapters (hermetic).
 
 The adapter wraps the real collectors' fetch+parse (no StorageManager/Parquet) and maps the
 collector NewsArticle to the local news row contract using the shared canonical SHA-256;
-description=description or content. The toggle gates scheduler routing (default-ON with explicit rollback).
+description=description or content.
 """
 from __future__ import annotations
-
-import sqlite3
 
 import src.news_providers as np
 from src.collectors.polygon_news import NewsArticle
@@ -64,61 +62,6 @@ def test_provider_skips_none_parse_results():
             return None if raw["id"] == "2" else _article(dedup_hash="h1")
     out = np.make_news_provider("finnhub", collector=_FakeFinnhub()).fetch_news("AAPL")
     assert len(out) == 1 and len(out[0]["article_hash"]) == 64  # None parse result skipped
-
-
-def test_use_local_news_default_on(tmp_path, monkeypatch):
-    monkeypatch.delenv("ARKSCOPE_USE_LOCAL_NEWS", raising=False)
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(tmp_path / "absent.db"))
-    assert np.use_local_news_enabled() is True
-
-
-def test_use_local_news_env_override_on(monkeypatch):
-    monkeypatch.setenv("ARKSCOPE_USE_LOCAL_NEWS", "1")
-    assert np.use_local_news_enabled() is True
-
-
-def test_use_local_news_profile_setting_on(tmp_path, monkeypatch):
-    monkeypatch.delenv("ARKSCOPE_USE_LOCAL_NEWS", raising=False)
-    db = tmp_path / "profile_state.db"
-    c = sqlite3.connect(db)
-    c.execute("CREATE TABLE profile_settings (key TEXT PRIMARY KEY, value TEXT)")
-    c.execute("INSERT INTO profile_settings VALUES ('use_local_news', 'true')")
-    c.commit(); c.close()
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db))
-    assert np.use_local_news_enabled() is True
-
-
-def test_use_local_news_profile_false_is_rollback(tmp_path, monkeypatch):
-    monkeypatch.delenv("ARKSCOPE_USE_LOCAL_NEWS", raising=False)
-    db = tmp_path / "profile_state.db"
-    c = sqlite3.connect(db)
-    c.execute("CREATE TABLE profile_settings (key TEXT PRIMARY KEY, value TEXT)")
-    c.execute("INSERT INTO profile_settings VALUES ('use_local_news', 'false')")
-    c.commit(); c.close()
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db))
-    assert np.use_local_news_enabled() is False
-
-
-def test_use_local_news_env_false_overrides_profile_true(tmp_path, monkeypatch):
-    db = tmp_path / "profile_state.db"
-    c = sqlite3.connect(db)
-    c.execute("CREATE TABLE profile_settings (key TEXT PRIMARY KEY, value TEXT)")
-    c.execute("INSERT INTO profile_settings VALUES ('use_local_news', 'true')")
-    c.commit(); c.close()
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db))
-    monkeypatch.setenv("ARKSCOPE_USE_LOCAL_NEWS", "false")
-    assert np.use_local_news_enabled() is False
-
-
-def test_use_local_news_env_true_overrides_profile_false(tmp_path, monkeypatch):
-    db = tmp_path / "profile_state.db"
-    c = sqlite3.connect(db)
-    c.execute("CREATE TABLE profile_settings (key TEXT PRIMARY KEY, value TEXT)")
-    c.execute("INSERT INTO profile_settings VALUES ('use_local_news', 'false')")
-    c.commit(); c.close()
-    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(db))
-    monkeypatch.setenv("ARKSCOPE_USE_LOCAL_NEWS", "yes")
-    assert np.use_local_news_enabled() is True
 
 
 def test_article_to_raw_uses_canonical_sha256_hash():

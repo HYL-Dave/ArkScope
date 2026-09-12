@@ -8,11 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping, Optional, Union
 
-from src.news_providers import (
-    ENV_USE_LOCAL_NEWS,
-    USE_LOCAL_NEWS_KEY,
-    parse_news_toggle,
-)
+from src.news_providers import parse_news_toggle
 
 USE_NORMALIZED_NEWS_WRITES_KEY = "use_normalized_news_writes"
 
@@ -50,9 +46,7 @@ def _malformed_toggle(profile_value: Any, env_value: Any) -> bool:
 def resolve_news_write_route(
     normalized_required: Any,
     normalized_value: Any,
-    local_value: Any,
     normalized_env: Any = None,
-    local_env: Any = None,
 ) -> NewsWriteRoute:
     """Resolve the writer route without reading external state."""
     if not isinstance(normalized_required, bool):
@@ -64,11 +58,6 @@ def resolve_news_write_route(
         return NewsWriteRoute(
             NewsWriteMode.BLOCKED,
             "Normalized-writer setting is malformed; refusing to select a route.",
-        )
-    if _malformed_toggle(local_value, local_env):
-        return NewsWriteRoute(
-            NewsWriteMode.BLOCKED,
-            "Direct-local writer setting is malformed; refusing to select a route.",
         )
     normalized = _resolved_toggle(normalized_value, normalized_env)
 
@@ -107,11 +96,8 @@ def _read_profile_values(profile_db: Union[str, Path]) -> Mapping[str, Any]:
         conn = sqlite3.connect(uri, uri=True)
         try:
             rows = conn.execute(
-                "SELECT key, value FROM profile_settings WHERE key IN (?, ?)",
-                (
-                    USE_NORMALIZED_NEWS_WRITES_KEY,
-                    USE_LOCAL_NEWS_KEY,
-                ),
+                "SELECT key, value FROM profile_settings WHERE key = ?",
+                (USE_NORMALIZED_NEWS_WRITES_KEY,),
             ).fetchall()
         finally:
             conn.close()
@@ -138,7 +124,5 @@ def read_news_write_route(
     return resolve_news_write_route(
         normalized_required=normalized_required,
         normalized_value=values.get(USE_NORMALIZED_NEWS_WRITES_KEY),
-        local_value=values.get(USE_LOCAL_NEWS_KEY),
         normalized_env=env.get(ENV_USE_NORMALIZED_NEWS_WRITES),
-        local_env=env.get(ENV_USE_LOCAL_NEWS),
     )

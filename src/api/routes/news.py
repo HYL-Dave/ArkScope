@@ -1,4 +1,4 @@
-"""News read routes plus direct-local ingest routing settings."""
+"""News read routes plus current normalized-writer settings."""
 
 import os
 
@@ -10,12 +10,7 @@ from src.api.dependencies import get_dal, get_profile_store
 from src.api.permissions import require_profile_state_write
 from src.market_data_admin import local_market_stats, resolve_market_db_path
 from src.news_content_availability import ContentFilter
-from src.news_providers import (
-    ENV_USE_LOCAL_NEWS,
-    USE_LOCAL_NEWS_KEY,
-    parse_news_toggle,
-    resolve_use_local_news,
-)
+from src.news_providers import parse_news_toggle
 from src.news_normalized.routing import (
     ENV_USE_NORMALIZED_NEWS_WRITES,
     USE_NORMALIZED_NEWS_WRITES_KEY,
@@ -32,10 +27,6 @@ from src.tools.news_tools import (
 router = APIRouter(prefix="/news", tags=["news"])
 
 
-class LocalNewsToggle(BaseModel):
-    enabled: bool
-
-
 class NormalizedNewsWritesToggle(BaseModel):
     enabled: bool
 
@@ -45,9 +36,6 @@ def news_status(store: ProfileStateStore = Depends(get_profile_store)):
     """Read direct-news routing, local coverage, and telemetry without writes."""
     path = resolve_market_db_path()
     stats = local_market_stats(path)
-    profile_value = store.get_setting(USE_LOCAL_NEWS_KEY)
-    env_raw = os.environ.get(ENV_USE_LOCAL_NEWS)
-    env_value = parse_news_toggle(env_raw)
     normalized_profile_value = store.get_setting(USE_NORMALIZED_NEWS_WRITES_KEY)
     normalized_setting = parse_news_toggle(normalized_profile_value)
     normalized_env_raw = os.environ.get(ENV_USE_NORMALIZED_NEWS_WRITES)
@@ -55,19 +43,12 @@ def news_status(store: ProfileStateStore = Depends(get_profile_store)):
     write_route = resolve_news_write_route(
         normalized_required=False,
         normalized_value=normalized_profile_value,
-        local_value=profile_value,
         normalized_env=normalized_env_raw,
-        local_env=env_raw,
     )
     return {
         "market_db": path,
         "exists": stats["exists"],
         "news": stats["news"],
-        "use_local_news_setting": resolve_use_local_news(profile_value),
-        "setting_explicit": parse_news_toggle(profile_value) is not None,
-        "env_override": env_value is not None,
-        "env_value": env_value,
-        "direct_active": resolve_use_local_news(profile_value, env_raw),
         "normalized_writes_setting": normalized_setting is True,
         "normalized_writes_setting_explicit": normalized_setting is not None,
         "normalized_writes_env_override": normalized_env_value is not None,
@@ -76,17 +57,6 @@ def news_status(store: ProfileStateStore = Depends(get_profile_store)):
         "write_route_reason": write_route.reason,
         "sync": read_news_sync_status(path),
     }
-
-
-@router.put("/settings")
-def set_local_news(
-    body: LocalNewsToggle,
-    store: ProfileStateStore = Depends(get_profile_store),
-):
-    """Persist the explicit direct-local routing value; scheduler reads it live."""
-    require_profile_state_write("set_use_local_news", {"enabled": body.enabled})
-    store.set_setting(USE_LOCAL_NEWS_KEY, "true" if body.enabled else "false")
-    return {"use_local_news_setting": body.enabled}
 
 
 @router.put("/settings/normalized-writes")

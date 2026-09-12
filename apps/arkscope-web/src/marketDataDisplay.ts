@@ -47,18 +47,6 @@ export function macroRoutingLabel(status: MacroStatus, t: SettingsT): string {
     : t(($) => $.macroStorage.routing.activePending, { value: envNote });
 }
 
-export function newsRoutingLabel(status: NewsStatus, t: SettingsT): string {
-  if (status.env_override) {
-    return status.direct_active
-      ? t(($) => $.newsStorage.routing.directEnvOn)
-      : t(($) => $.newsStorage.routing.directEnvOff);
-  }
-  if (!status.direct_active) return t(($) => $.newsStorage.routing.localCompatibility);
-  return status.setting_explicit
-    ? t(($) => $.newsStorage.routing.directExplicit)
-    : t(($) => $.newsStorage.routing.directDefault);
-}
-
 export function newsWriteRouteLabel(status: NewsStatus, t: SettingsT): string {
   switch (status.write_route) {
     case "normalized":

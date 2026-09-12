@@ -49,8 +49,6 @@ def hermetic(tmp_path, monkeypatch):
     the real DAL / subprocesses / local market DB — and CRITICALLY, stub both
     in-process news adapters so no test can fire a real provider API call."""
     store = ProfileStateStore(tmp_path / "profile_state.db")
-    # writer route unless a test explicitly patches the route.
-    store.set_setting("use_local_news", None)
     monkeypatch.setattr(ds, "_store", lambda: store)
     monkeypatch.setattr(ds, "_LAST_ATTEMPT", {})
     monkeypatch.setattr(ds, "_LAST_RESULT", {})
@@ -1114,10 +1112,9 @@ def test_normalized_massive_provider_missing_key_names_only_canonical_bridge(
     assert "POLYGON_API_KEY" not in message
 
 
-def test_run_source_news_direct_when_use_local_news_on(monkeypatch, hermetic):
-    # S3.2 default ON: polygon_news routes to the DIRECT-LOCAL writer — NO run_incremental (Parquet),
+def test_run_source_news_direct_when_normalized_writes_unset(monkeypatch, hermetic):
+    # The current default selects the direct-local writer, never collector storage.
     import src.collectors.polygon_news as cpn
-    hermetic.set_setting("use_local_news", None)  # unset resolves to the production default ON
     calls = {"run_incremental": 0, "subprocess": 0, "direct": 0, "provider": None}
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: calls.__setitem__("run_incremental", calls["run_incremental"] + 1))
@@ -1831,7 +1828,6 @@ def test_local_news_route_keeps_single_direct_writer(monkeypatch):
 
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL,
                                           "legacy local test route")
-    monkeypatch.setattr("src.news_providers.use_local_news_enabled", lambda: False)
     calls = {"run_incremental": 0, "subprocess": 0, "direct": 0, "provider": None}
     monkeypatch.setattr(cpn, "run_incremental",
                         lambda *a, **k: calls.__setitem__("run_incremental",

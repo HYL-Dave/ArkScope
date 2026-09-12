@@ -975,11 +975,6 @@ const settings = {
     neverRun: "尚未執行",
     loadFailed: "無法載入新聞資料狀態。",
     routing: {
-      directEnvOn: "直寫本地（env 強制開啟）",
-      directEnvOff: "本地相容寫入（env 強制關閉）",
-      localCompatibility: "本地相容寫入",
-      directExplicit: "直寫本地（已設定）",
-      directDefault: "直寫本地（預設）",
       write: {
         normalized: "Normalized SQLite + legacy local projection",
         normalizedCurrent: "Normalized local writer",

@@ -753,7 +753,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1019,
+      settings: 1014,
       research: 207,
       explore: 1219,
       portfolio: 374,
@@ -839,7 +839,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2962);
+      expect(total, `${locale}.total`).toBe(2957);
       expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys].sort());
       expect(Object.keys(resources[locale].settings.secDocument).sort()).toEqual([...secDocumentKeys].sort());
 
@@ -1378,6 +1378,11 @@ describe("bundled i18n resources", () => {
       "models.catalog.selectEffort",
     ]);
     const retiredSettingsPaths = [
+      "newsStorage.routing.directEnvOn",
+      "newsStorage.routing.directEnvOff",
+      "newsStorage.routing.localCompatibility",
+      "newsStorage.routing.directExplicit",
+      "newsStorage.routing.directDefault",
       "providers.discovery.useForSynthesis",
       "providers.discovery.useForTranslation",
       "providers.discovery.directIdAllowed",
