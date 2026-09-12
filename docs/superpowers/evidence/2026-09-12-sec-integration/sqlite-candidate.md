@@ -277,3 +277,12 @@ Actual mapped library and source ID matched the pinned candidate, and the
 unchanged five-case reproducer returned `all_pass`, exit 0. This confirmation
 does not change the activation or production-data boundary above. The separate
 Python 3.13 scope question is still pending the user's answer.
+
+The controller then ran `sqlite-application-stores` against the candidate:
+**330 passed**, exit 0. Before pytest, the launcher verified version, exact
+source ID and `/proc/self/maps` against the private library. The existing
+offline runner used disposable stores and blocked production paths/providers.
+This adds actual SEC capture/store, profile, SA, normalized-news schema/store/
+writer-locking, SQLite backup-wrapper and direct-market tests to the earlier
+standalone probes. It is not the full application suite, a claim that every
+test-created subprocess uses the override, or a production/platform admission.

@@ -76,7 +76,7 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 
 - [x] Preflight and exact task contracts
 - [x] Task 1: issuer/tool service (2d54a482,38529e51; focused835P; independent review approved)
-- [ ] Task 2: four-channel replacement (security decision pending; 4F/758P checkpoint)
+- [ ] Task 2: four-channel replacement (implemented through 5d979910; review fixes 994P, re-review pending)
 - [ ] Task 3: persistent Research citations
 - [x] Task 4: TOC recognition (ba5a3356,5518ae21; focused338P; independent review approved)
 - [ ] Task 5: export/restore
@@ -84,38 +84,23 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 - [ ] Task 7: schedule/Settings
 - [ ] Task 8: cleanup and full verification
 
-Execution order note: Task2 has an uncommitted, hash-frozen checkpoint with four
-OAuth redaction failures requiring the user's security-boundary decision. Task4
-may proceed on disjoint files while that decision is pending. No Task2 completion
-or independent review is claimed. Its48 changed paths are preserved byte-for-byte;
-only Task4 paths are committed. When Task2 resumes, record the new pre-dispatch
-HEAD; since Task2 has no earlier commit, its entire patch remains in that range.
+### Resolved Security Dependency
 
-### Pending Security Decision
+The user approved the shared output-boundary design, implemented and separately
+reviewed at `41682675`. The abandoned SEC exemption is not an implementation
+option. Diagnostics retain their strict scrubber; successful research data uses
+exact-credential and common result-policy admission. The historical four OAuth
+failures/758 passes explain the pause, not the current state or an open decision.
 
-The latest user response questions the root mechanism rather than approving the
-SEC-only exception. [Derived architectural analysis](../../security/hardening/2026-09-12-tool-output-boundary/hardening.md)
-now recommends a shared contextual result/prose boundary with separate diagnostic
-policy. That proposal is not an approved specification or implementation plan.
-The local treatment described below remains the original paused option, not an
-instruction to implement it. Do not resume Task2's security change until this
-larger design decision is settled and the task contract is revised accordingly.
-
-The real OAuth bridge tests show that the generic credential-pattern scrubber
-also matches legitimate SEC decimal values, content hashes and encoded cursors.
-The frozen Task2 checkpoint has 758 passing and four failing cases: successful
-three-tool dispatch and cursor continuation fail in both OAuth transports.
-These are retained failures, not skipped tests or approved exemptions. This is
-not a provider/login failure; all observations use generated offline fixtures.
-
-Proposed, not yet authorized: exempt only structurally validated SEC evidence
-values from broad secret-pattern redaction, preserving exact current-credential
-checks and the existing free-text/error redaction. Validation must cover closed
-nested shapes, bounded canonical cursor payloads and bindings, not merely an
-allowlist of field names. Unknown shapes or actual credential matches must fail
-closed. Redacted text must not be presented as an exact source passage.
-Do not change the shared probe scrubber or ship the paused adapter patch before
-this security decision, new regression/inverse evidence and independent review.
+`ba4f2619` commits the complete former dirty checkpoint; `3fef138d` replays it on
+the security base. `88f0512e` integrates common policies and the SEC-owned OAuth
+deadline. Review found two additional actual execution defects, repaired in
+`5d979910`: the native Anthropic stream must await SEC tools rather than nest
+`asyncio.run`, and metadata/map cancellation must reach governor waiting and
+dispatch/body/retry checkpoints. Tests now exercise the actual SDK tool-result
+roundtrip and both ticker/CIK cancellation paths. The latest focused run is
+994 passed; scoped re-review remains required. Original source branches stay
+intact, and no source implementation remains solely in an untracked checkpoint.
 
 The remaining release work is still Tasks3/5/6/7/8. In particular, persistent
 Research references, portable export/restore, orphan cleanup, schema recovery
@@ -342,7 +327,7 @@ Research registry lacking the new required tools must still fail explicitly.
 | tests/test_sec_tools.py | 54->56, analysis15->17; move old owners to new contracts |
 | tests/test_tools.py | 54->56 three times, analysis15->17; exact names |
 
-- [ ] Write RED `test_each_research_transport_dispatches_three_real_sec_tools`
+- [x] Write RED `test_each_research_transport_dispatches_three_real_sec_tools`
   parameterized for the actual OpenAI FunctionTool invocation, Anthropic dispatch,
   ChatGPT `_invoke_tool` and Claude `_invoke_bridged_tool` entry. Inject only acquisition
   transports/runtime-store construction, keep actual service and serialization.
@@ -361,15 +346,15 @@ Name `test_sec_pages_remain_complete_json_through_bridge_reduction`,
 `test_non_sec_optional_omission_keeps_existing_semantics`,
 `test_required_sec_omission_is_explicit`,
 `test_old_catalog_tool_absent_from_all_current_skills`.
-- [ ] Run RED before replacement; expected missing-new-name assertion, old name
+- [x] Run RED before replacement; expected missing-new-name assertion, old name
   present, or JSON boundary corruption. Record exact failing owner.
-- [ ] Replace all surfaces atomically and implement bounded whole pages and SEC
+- [x] Replace all surfaces atomically and implement bounded whole pages and SEC
   cancellation. Preserve model/auth/effort selection and all other tools.
 - [ ] Focused GREEN runs new tests, subagent/skill owners, auth bridge owners and
   all eight count files. Inverses: omit each transport's new name; select generic
   truncation; omit worker wait; remove one subagent required tool. Named owners
   must fail for each affected boundary; do not merely assert schema counts.
-- [ ] Commit the complete replacement; record changed/removed tests and exact
+- [x] Commit the complete replacement; record changed/removed tests and exact
   route-count collateral. Do not leave an alias for the old model-facing tool.
 
 ### Task 3: Durable Research Citation References
