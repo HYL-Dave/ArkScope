@@ -10,7 +10,8 @@ that service. Persist exact references before admitting maintenance operations.
 **Tech Stack:** Python/SQLite/FastAPI, existing SEC transports, React/TypeScript.
 **Spec:** `docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md`.
 
-Status: Task1 reviewed complete; Task2 next. Implementation authorized by the existing spec and
+Status: Task1 reviewed complete; Task2 paused on OAuth redaction approval;
+independent Task4 proceeds next. Implementation authorized by the existing spec and
 the user's continuation. User asks to finish the remaining release,
 including TOC quality, four-channel wiring and both recovery workflows.
 
@@ -78,6 +79,13 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 - [ ] Task 6: cleanup/reset
 - [ ] Task 7: schedule/Settings
 - [ ] Task 8: cleanup and full verification
+
+Execution order note: Task2 has an uncommitted, hash-frozen checkpoint with four
+OAuth redaction failures requiring the user's security-boundary decision. Task4
+may proceed on disjoint files while that decision is pending. No Task2 completion
+or independent review is claimed. Its48 changed paths are preserved byte-for-byte;
+only Task4 paths are committed. When Task2 resumes, record the new pre-dispatch
+HEAD; since Task2 has no earlier commit, its entire patch remains in that range.
 
 ## Verification Commands
 
@@ -279,6 +287,10 @@ Layer0/Layer5 and both OAuth bridges select it for SEC names. Existing security
 wrapping/redaction remains; model/provider secret-like errors never enter output.
 Do not claim JSON citations are exact if redaction modified their quoted passage.
 Keep optional non-SEC omissions separate from required-SEC inventory failures.
+An OAuth driver with `registry=None` is an existing intentional tool-free mode
+used by model-task canaries and investor-profile calibration, not a broken
+Research registry. Preserve that mode and test actual driver behavior. A supplied
+Research registry lacking the new required tools must still fail explicitly.
 
 | File | Required count collateral |
 |---|---|
@@ -293,7 +305,7 @@ Keep optional non-SEC omissions separate from required-SEC inventory failures.
 
 - [ ] Write RED `test_each_research_transport_dispatches_three_real_sec_tools`
   parameterized for the actual OpenAI FunctionTool invocation, Anthropic dispatch,
-  ChatGPT `_invoke_tool` and Claude `_dispatch_tool` entry. Inject only acquisition
+  ChatGPT `_invoke_tool` and Claude `_invoke_bridged_tool` entry. Inject only acquisition
   transports/runtime-store construction, keep actual service and serialization.
 
 ```python
@@ -674,12 +686,18 @@ historical-not-requested coverage and previous historical continuation; do not
 pretend max_sources=2 alone gives a complete-history result. Normalized schedule
 counts apply forms10-K/10-Q/20-F/40-F and amendments; raw source bytes unchanged.
 
-Per run bounds: at most50 distinct issuer dispatches,101 provider requests (one
+Per run bounds: at most500 distinct issuer dispatches,1001 provider requests (one
 optional map+two per issuer),15min wall budget. Check before each source. Persist
 remaining CIK/ticker scope; each continuation intersects fresh active membership
 and rotates deferred/new issuers so no current member starves. Request bound is
 derived from this shape; no retries. Partial receipts never imply missing issuers
 are empty. No automatic paid-provider fallback or full-document prefetch.
+This raises the draft plan's50-issuer limit: a daily source should not split the
+previously reported roughly187-member universe across four days solely because
+of that arbitrary limit. The500-issuer ceiling is an application safety bound,
+not a measured current universe count or a guarantee that every provider request
+finishes within15min. Limits remain injectable for small deterministic fixtures.
+The provider governor remains authoritative for pacing; no live run is authorized.
 
 SEC-owned durable batch receipt records attempted/confirmed/failed/deferred CIKs,
 request counts, scoped filing/fact counts and gaps; expose last attempt separately
