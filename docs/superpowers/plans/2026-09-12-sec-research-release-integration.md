@@ -10,8 +10,8 @@ that service. Persist exact references before admitting maintenance operations.
 **Tech Stack:** Python/SQLite/FastAPI, existing SEC transports, React/TypeScript.
 **Spec:** `docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md`.
 
-Status: Task1 reviewed complete; Task2 paused on OAuth redaction approval;
-independent Task4 proceeds next. Implementation authorized by the existing spec and
+Status: Tasks1/4 reviewed complete; Task2 paused on OAuth redaction approval.
+Implementation authorized by the existing spec and
 the user's continuation. User asks to finish the remaining release,
 including TOC quality, four-channel wiring and both recovery workflows.
 
@@ -72,9 +72,9 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 
 - [x] Preflight and exact task contracts
 - [x] Task 1: issuer/tool service (2d54a482,38529e51; focused835P; independent review approved)
-- [ ] Task 2: four-channel replacement
+- [ ] Task 2: four-channel replacement (security decision pending; 4F/758P checkpoint)
 - [ ] Task 3: persistent Research citations
-- [ ] Task 4: TOC recognition
+- [x] Task 4: TOC recognition (ba5a3356,5518ae21; focused338P; independent review approved)
 - [ ] Task 5: export/restore
 - [ ] Task 6: cleanup/reset
 - [ ] Task 7: schedule/Settings
@@ -86,6 +86,31 @@ may proceed on disjoint files while that decision is pending. No Task2 completio
 or independent review is claimed. Its48 changed paths are preserved byte-for-byte;
 only Task4 paths are committed. When Task2 resumes, record the new pre-dispatch
 HEAD; since Task2 has no earlier commit, its entire patch remains in that range.
+
+### Pending Security Decision
+
+The real OAuth bridge tests show that the generic credential-pattern scrubber
+also matches legitimate SEC decimal values, content hashes and encoded cursors.
+The frozen Task2 checkpoint has 758 passing and four failing cases: successful
+three-tool dispatch and cursor continuation fail in both OAuth transports.
+These are retained failures, not skipped tests or approved exemptions. This is
+not a provider/login failure; all observations use generated offline fixtures.
+
+Proposed, not yet authorized: exempt only structurally validated SEC evidence
+values from broad secret-pattern redaction, preserving exact current-credential
+checks and the existing free-text/error redaction. Validation must cover closed
+nested shapes, bounded canonical cursor payloads and bindings, not merely an
+allowlist of field names. Unknown shapes or actual credential matches must fail
+closed. Redacted text must not be presented as an exact source passage.
+Do not change the shared probe scrubber or ship the paused adapter patch before
+this security decision, new regression/inverse evidence and independent review.
+
+The remaining release work is still Tasks3/5/6/7/8. In particular, persistent
+Research references, portable export/restore, orphan cleanup, schema recovery
+and the new default-disabled schedule are not completed by the tool/parser work.
+No final full-suite run, production change, merge or push has occurred in this
+integration checkpoint. The separate wider repository cleanup and SQLite upgrade
+are not represented as finished.
 
 ## Verification Commands
 
