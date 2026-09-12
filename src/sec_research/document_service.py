@@ -202,8 +202,16 @@ class DocumentService:
                         raise ValueError("document_not_in_directory")
                     if self.captures.put(directory_body) != directory.sha256:
                         raise ValueError("document_integrity_failed")
-                    page, original = self._read("document", entry.url, extract_document_text, requests, check)
-                    sections, section_gaps = index_sections(page.text, authority["form"], check=check)
+                    structure = []
+
+                    def document_extractor(body, content_type, *, check):
+                        return extract_document_text(body, content_type, check=check,
+                                                     structure_observer=structure.append)
+
+                    page, original = self._read("document", entry.url, document_extractor, requests, check)
+                    sections, section_gaps = index_sections(page.text, authority["form"], check=check,
+                                                           toc_ranges=structure[0]["toc_ranges"])
+                    section_gaps.extend(structure[0]["structure_gaps"])
                     canonical = page.text.encode("utf-8")
                     directory_record = {"filing_id": filing_id, "receipt_id": authority["receipt_id"],
                         "object_sha256": directory.sha256, "observed_at": _timestamp(directory_page.retrieved_at),
@@ -214,6 +222,7 @@ class DocumentService:
                         "observed_at": _timestamp(page.retrieved_at), "refresh_observed_at": observed_at,
                         "directory_sha256": directory.sha256, "source_url": entry.url,
                         "observation_id": observation_id, "extraction_version": EXTRACTION_VERSION,
+                        **structure[0],
                         "mime_type": page.mime_type, "sections": sections, "section_gaps": section_gaps,
                         "catalog_gaps": gaps, "requests": requests, "text_bytes": len(canonical),
                         "original_bytes": len(original)}
