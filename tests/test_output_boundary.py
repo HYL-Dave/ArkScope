@@ -200,6 +200,49 @@ def test_marker_and_marker_edge_collisions_fail_closed(secret):
     assert stream._pending == ""
 
 
+def test_marker_inside_known_secret_cannot_be_created_by_prose():
+    api = boundary()
+    guard = api.OutputGuard(["xyz", "a[REDACTED]b"])
+    with pytest.raises(api.OutputBoundaryError, match="redaction_marker_conflict"):
+        guard.prose("axyzb")
+
+
+@pytest.mark.parametrize("split", range(6))
+def test_marker_inside_known_secret_cannot_be_created_at_any_split(split):
+    api = boundary()
+    stream = api.OutputGuard(["xyz", "a[REDACTED]b"]).stream()
+    text = "axyzb"
+    with pytest.raises(api.OutputBoundaryError, match="redaction_marker_conflict"):
+        stream.feed(text[:split])
+        stream.feed(text[split:])
+        stream.finish()
+    assert stream.finish() == ""
+    assert stream._pending == ""
+
+
+def test_marker_inside_known_secret_cannot_be_created_by_single_character_feeds():
+    api = boundary()
+    stream = api.OutputGuard(["xyz", "a[REDACTED]b"]).stream()
+    with pytest.raises(api.OutputBoundaryError, match="redaction_marker_conflict"):
+        for char in "axyzb":
+            stream.feed(char)
+        stream.finish()
+    assert stream.finish() == ""
+    assert stream._pending == ""
+
+
+def test_marker_inside_known_secret_preserves_unrelated_public_text():
+    api = boundary()
+    guard = api.OutputGuard(["xyz", "a[REDACTED]b"])
+    with pytest.raises(api.OutputBoundaryError, match="known_secret"):
+        guard.check("a[REDACTED]b")
+    public = "ordinary public source"
+    assert guard.check(public) is None
+    assert guard.prose(public) == public
+    stream = guard.stream()
+    assert "".join(stream.feed(char) for char in public) + stream.finish() == public
+
+
 def test_raw_matching_does_not_guess_unknown_credentials_or_recursive_encodings():
     api = boundary()
     secret = "fake+/ space?"

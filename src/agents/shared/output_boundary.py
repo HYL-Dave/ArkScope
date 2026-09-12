@@ -108,7 +108,7 @@ def _representations(secret: str) -> frozenset[str]:
 
 def _safe_marker(patterns: Iterable[str]) -> bool:
     for pattern in patterns:
-        if pattern in REDACTION_MARKER:
+        if pattern in REDACTION_MARKER or REDACTION_MARKER in pattern:
             return False
         # A marker must not create a new exact match at either raw-text edge.
         for size in range(1, min(len(pattern), len(REDACTION_MARKER)) + 1):
