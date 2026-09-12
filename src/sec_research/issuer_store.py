@@ -78,7 +78,7 @@ class IssuerStore:
                     except Exception:
                         raise SourceError("cancelled") from None
                 captures.preflight()
-                response = transport.get(TICKER_MAP_URL)
+                response = transport.get(TICKER_MAP_URL, **({"check": check} if check is not None else {}))
                 response.raise_for_status()
                 body = response.body
                 digest = captures.put(body)

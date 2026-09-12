@@ -16,6 +16,7 @@ _TRANSPORT_CODES = frozenset({
     "sec_identity_unconfigured", "sec_url_unsupported", "sec_rate_limited",
     "sec_response_too_large", "sec_transport_unavailable", "sec_http_error",
     "sec_governor_unavailable", "sec_request_budget_exhausted",
+    "sec_request_cancelled",
 })
 _STORAGE_CODES = frozenset({
     "capture_budget_exceeded", "storage_space_insufficient", "capture_store_write_failed",
@@ -137,7 +138,7 @@ class ResearchService:
             url = _source_url(cik, source)
             try:
                 # Preserve SecTransport's default 16 MiB metadata body bound.
-                response = self.transport.get(url)
+                response = self.transport.get(url, **({"check": check} if check is not None else {}))
                 response.raise_for_status()
                 body = response.body
             except Exception as exc:

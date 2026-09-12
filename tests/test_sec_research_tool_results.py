@@ -66,13 +66,15 @@ def test_sec_cancel_awaits_worker_and_prevents_later_dispatch(tool_fixture, monk
 
     def read(*args, **kwargs):
         contexts.append(marker.get())
+        # This owner models an already-dispatched response, not governor wait.
+        response = original(*args, **kwargs)
         entered.set()
         assert stopped.wait(3), "cancellation did not ask active transport to stop"
         # Give the caller time to return incorrectly if it omits the owned wait.
         import time
         time.sleep(0.08)
         try:
-            return original(*args, **kwargs)
+            return response
         finally:
             finished.set()
 

@@ -1304,6 +1304,36 @@ def _macro_get_macro_value(dal: "DataAccessLayer", tool_input: Dict[str, Any]) -
     )
 
 
+async def execute_tool_async(
+    tool_name: str,
+    tool_input: Dict[str, Any],
+    dal: "DataAccessLayer",
+) -> str:
+    """Await owned SEC work; other tools retain their synchronous dispatch."""
+    from src.sec_research.tool_results import SEC_TOOL_NAMES
+
+    if tool_name not in SEC_TOOL_NAMES:
+        return execute_tool(tool_name, tool_input, dal)
+
+    from src.agents.shared.output_boundary import OutputBoundaryError
+    from src.agents.shared.output_events import check_output_value
+    from src.sec_research.tool_execution import invoke_sec_tool
+
+    try:
+        check_output_value({"tool": tool_name, "input": tool_input})
+    except OutputBoundaryError as exc:
+        return json.dumps({"error": exc.code})
+    try:
+        result = await invoke_sec_tool(tool_name, tool_input)
+        return _serialize_result(result, tool_name=tool_name)
+    except Exception as exc:
+        from src.tools.result_policy import sanitize_tool_error
+
+        detail = sanitize_tool_error(exc)
+        logger.error("Tool %s failed: %s", tool_name, detail)
+        return json.dumps({"error": detail})
+
+
 def execute_tool(
     tool_name: str,
     tool_input: Dict[str, Any],
@@ -1694,10 +1724,8 @@ def execute_tool(
     try:
         if tool_name in SEC_TOOL_NAMES:
             import asyncio
-            from src.sec_research.tool_execution import invoke_sec_tool
-            result = asyncio.run(invoke_sec_tool(tool_name, tool_input))
-        else:
-            result = tool_map[tool_name]()
+            return asyncio.run(execute_tool_async(tool_name, tool_input, dal))
+        result = tool_map[tool_name]()
         return _serialize_result(result, tool_name=tool_name)
     except Exception as e:
         from src.tools.result_policy import sanitize_tool_error
