@@ -237,9 +237,11 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
 
         db_path = resolve_market_db_path()
         sync = overlay_price_authority(read_sync_meta(db_path))
+        sync = dict(sync)
+        # Legacy news cannot survive a failed path probe or current read.
+        sync["news"] = None
         db_exists = Path(db_path).exists()
         direct_news = read_news_sync_status(db_path)
-        sync = dict(sync)
         sync["news"] = direct_news
     except Exception as e:
         notes.append(f"market sync meta failed: {e}")

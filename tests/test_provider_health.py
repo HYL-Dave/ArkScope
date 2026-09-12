@@ -9,6 +9,7 @@ import pytest
 
 from src.service.provider_health import compute_provider_health
 from src.market_data_direct import _ensure_provider_sync_tables
+from src.market_data_admin import read_sync_meta as _read_sync_meta
 
 # Fixed clocks: 2026-06-10 = Wednesday; 2026-06-13 = Saturday (NY weekend).
 _WEDNESDAY = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
@@ -494,6 +495,148 @@ def test_recent_publication_without_ingest_telemetry_is_no_signal(monkeypatch, t
     assert provider["signals"]["direct_sync"] is None
     assert out["local_market"]["sync"]["news"] is None
     assert not (tmp_path / "market.db").exists()
+
+
+@pytest.mark.parametrize("legacy_news_present", [
+    pytest.param(True, id="legacy-news-present"),
+    pytest.param(False, id="legacy-news-absent"),
+])
+def test_health_clears_legacy_news_when_current_telemetry_read_fails(
+    monkeypatch, tmp_path, legacy_news_present,
+):
+    from src.market_data_admin import _NEWS_SCHEMA, _PRICES_SCHEMA
+    from src.tools.backends.sqlite_backend import SqliteBackend
+
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    try:
+        conn.executescript(_NEWS_SCHEMA)
+        conn.executescript(_PRICES_SCHEMA)
+        conn.executescript(
+            "CREATE TABLE market_sync_meta (domain TEXT PRIMARY KEY, last_success TEXT, "
+            "last_error TEXT, rows_added INTEGER, updated_at TEXT);"
+            "CREATE TABLE provider_sync_runs (provider TEXT, domain TEXT);"
+            "INSERT INTO provider_sync_runs VALUES ('polygon','news');"
+        )
+        conn.execute(
+            "INSERT INTO market_sync_meta VALUES (?,?,?,?,?)",
+            ("prices", "2026-06-10T10:15:00Z", "price pacing", 26, "2026-06-10T10:16:00Z"),
+        )
+        if legacy_news_present:
+            conn.execute(
+                "INSERT INTO market_sync_meta VALUES (?,?,?,?,?)",
+                ("news", "2001-01-01T01:00:00Z", "legacy news error", 7654321, "2001-01-01T02:00:00Z"),
+            )
+        conn.executemany(
+            "INSERT INTO news (ticker,title,source,published_at,article_hash) VALUES (?,?,?,?,?)",
+            [("AAPL", "Stored article", source, "2026-06-10T11:30:00+0000", source)
+             for source in ("polygon", "finnhub")],
+        )
+        conn.execute(
+            "INSERT INTO prices (ticker,datetime,interval,open,high,low,close,volume) "
+            "VALUES ('AAPL','2026-06-10T11:45:00+0000','15min',10,12,9,11,100)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    before = db.read_bytes()
+    monkeypatch.setattr("src.market_data_admin.read_sync_meta", _read_sync_meta)
+    for key in ("MASSIVE_API_KEY", "FINNHUB_API_KEY"):
+        monkeypatch.setenv(key, "disposable-key")
+    monkeypatch.setenv("IBKR_HOST", "127.0.0.1")
+    monkeypatch.setenv("IBKR_PORT", "4001")
+    legacy = _read_sync_meta(str(db))
+    if legacy_news_present:
+        assert legacy["news"]["last_success"] == "2001-01-01T01:00:00Z"
+        assert legacy["news"]["rows_added"] == 7654321
+    else:
+        assert legacy["news"] is None
+
+    out = compute_provider_health(_FakeDAL(SqliteBackend(db)), now=_WEDNESDAY)
+
+    assert out["local_market"]["db_exists"] is True
+    assert any(note.startswith("market sync meta failed:") and "no such column" in note
+               for note in out["notes"])
+    sync = out["local_market"]["sync"]
+    assert set(sync) == {"prices", "news", "fundamentals"}
+    assert sync["prices"] == {
+        "last_success": "2026-06-10T10:15:00Z", "last_error": "price pacing",
+        "rows_added": 26, "updated_at": "2026-06-10T10:16:00Z",
+        "authority": "local", "message": "Prices are served from local market_data.db.",
+    }
+    assert sync["fundamentals"] is None
+    for pid in ("massive", "finnhub"):
+        provider = _by_id(out, pid)
+        assert provider["status"] == "no_signal"
+        assert provider["last_success_at"] is None
+        assert provider["last_attempt_at"] is None
+        assert provider["signals"]["direct_sync"] is None
+        assert provider["signals"]["news_latest"] == "2026-06-10T11:30:00+00:00"
+    ibkr = _by_id(out, "ibkr")
+    assert ibkr["status"] == "connected"
+    assert ibkr["last_success_at"] == "2026-06-10T11:45:00+00:00"
+    assert _read_sync_meta(str(db)) == legacy
+    assert db.read_bytes() == before
+    assert sync["news"] is None
+
+
+def test_health_clears_legacy_news_when_db_exists_check_fails(monkeypatch, tmp_path):
+    db = tmp_path / "market.db"
+    conn = sqlite3.connect(db)
+    try:
+        conn.execute(
+            "CREATE TABLE market_sync_meta (domain TEXT PRIMARY KEY, last_success TEXT, "
+            "last_error TEXT, rows_added INTEGER, updated_at TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO market_sync_meta VALUES (?,?,?,?,?)",
+            [
+                ("news", "2001-01-01T01:00:00Z", "legacy news error", 7654321, "2001-01-01T02:00:00Z"),
+                ("prices", "2026-06-10T10:15:00Z", "price pacing", 26, "2026-06-10T10:16:00Z"),
+            ],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    before = db.read_bytes()
+    monkeypatch.setattr("src.market_data_admin.read_sync_meta", _read_sync_meta)
+    for key in ("MASSIVE_API_KEY", "FINNHUB_API_KEY"):
+        monkeypatch.setenv(key, "disposable-key")
+
+    class _UnreadablePath:
+        def __init__(self, path):
+            self.path = path
+
+        def exists(self):
+            raise PermissionError(f"cannot stat {self.path}")
+
+    # Fail only health's probe, after the real legacy reader has returned.
+    monkeypatch.setattr("src.service.provider_health.Path", _UnreadablePath)
+    dal = _FakeDAL(_FakeBackend(stats=_stats(news_rows=[
+        ("polygon", "2026-06-10T11:30:00+0000", 2),
+        ("finnhub", "2026-06-10T11:30:00+0000", 3),
+    ])))
+
+    out = compute_provider_health(dal, now=_WEDNESDAY)
+
+    assert out["local_market"]["db_exists"] is False
+    assert f"market sync meta failed: cannot stat {db}" in out["notes"]
+    sync = out["local_market"]["sync"]
+    assert sync["prices"] == {
+        "last_success": "2026-06-10T10:15:00Z", "last_error": "price pacing",
+        "rows_added": 26, "updated_at": "2026-06-10T10:16:00Z",
+        "authority": "local", "message": "Prices are served from local market_data.db.",
+    }
+    assert sync["fundamentals"] is None
+    for pid in ("massive", "finnhub"):
+        provider = _by_id(out, pid)
+        assert provider["status"] == "no_signal"
+        assert provider["last_success_at"] is None
+        assert provider["last_attempt_at"] is None
+        assert provider["signals"]["direct_sync"] is None
+        assert provider["signals"]["news_latest"] == "2026-06-10T11:30:00+00:00"
+    assert db.read_bytes() == before
+    assert sync["news"] is None
 
 
 def test_p0c_provider_health_marks_price_sync_retired(monkeypatch):
