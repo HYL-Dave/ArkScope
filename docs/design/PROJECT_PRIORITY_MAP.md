@@ -65,8 +65,9 @@ The user approved a shared mechanism, not a SEC exemption. The independent
 `docs/superpowers/specs/2026-09-12-research-output-boundary-design.md` and
 `docs/superpowers/plans/2026-09-12-research-output-boundary.md`. Exact captured
 credentials govern successful content; heuristic redaction remains diagnostic.
-The core passed independent review; four-tool-channel policies through
-`3e73d2aa` have 716 focused passing tests and await independent review. Stateful
+The core and four-tool-channel policies passed independent review. Through
+`41b9f2b5`, 754 focused tests pass; header-context rejection preserves legitimate
+Bearer financial prose and safe failed-tool span metadata is retained. Stateful
 producer/event/persistence integration is still RED-first work in progress.
 The other worktree's SEC Task 2 is parked with four OAuth failures, explicitly
 blocked on this boundary. Those feature nodes are absent from this independent

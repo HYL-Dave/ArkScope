@@ -54,8 +54,11 @@ conversations or token stores were read for this decision.
    never replace an identifier/cursor inside an apparently successful result.
    Deny explicit credential-bearing JSON keys recursively, including mapping
    keys themselves in exact-secret scans. No fallback to arbitrary `str(obj)`.
-   Explicit authentication literals (Bearer or established provider-key
-   prefixes) may also reject a tool result. This is a credential syntax rule,
+   Explicit authentication literals (Bearer in an Authorization or
+   Proxy-Authorization header, or established provider-key prefixes) may also
+   reject a tool result. Bare Bearer followed by a word is not authentication
+   context: financial prose such as Bearer shares must remain public.
+   This is a credential syntax rule,
    not a generic length/entropy/PII heuristic and not prose rewriting. Its
    exact supported forms need tests; arbitrary unknown secrets remain outside
    the guarantee. This retains the existing unrelated sk-ant key-result guard.
