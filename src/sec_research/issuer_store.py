@@ -21,6 +21,8 @@ class IssuerStore:
         if not self.store.paths.market_db_path.exists():
             return None
         with self.store.connect(readonly=True) as conn:
+            if not schema._owned(conn):
+                return None
             schema.verify(conn)
             row = conn.execute("SELECT * FROM sec_research_issuer_maps ORDER BY observation_id DESC LIMIT 1").fetchone()
         if row is None:

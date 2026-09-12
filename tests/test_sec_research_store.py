@@ -95,6 +95,63 @@ def test_install_preserves_populated_unrelated_tables(tmp_path, modules):
                 assert conn.execute(f"SELECT sentinel FROM {table}").fetchone()[0] == "unchanged"
 
 
+@pytest.fixture
+def uninstalled_issuer_market(tmp_path, modules):
+    store = modules[1].Store(SecResearchPaths(tmp_path / "market.db"))
+    with store.connect() as conn:
+        for table in ("prices", "news", "financial_cache"):
+            conn.execute(f"CREATE TABLE {table}(sentinel TEXT)")
+            conn.execute(f"INSERT INTO {table} VALUES ('unchanged')")
+    return store
+
+
+def test_issuer_resolution_existing_uninstalled_market_is_unobserved(uninstalled_issuer_market):
+    from src.sec_research.issuer_store import IssuerStore
+
+    store = uninstalled_issuer_market
+    with store.connect(readonly=True) as conn:
+        before = list(conn.execute("SELECT * FROM sqlite_master"))
+    try:
+        result = IssuerStore(store).resolve("AAPL")
+    except ValueError as exc:
+        result = {"raised": str(exc)}
+    assert result.get("status") == "unavailable", result
+    assert result["cik"] is None and result["candidates"] == []
+    assert result["observed_at"] is None
+    assert result["source"] == {"url": "https://www.sec.gov/files/company_tickers.json", "sha256": None}
+    assert result["gaps"] == [{"code": "issuer_map_unobserved"}]
+    with store.connect(readonly=True) as conn:
+        assert list(conn.execute("SELECT * FROM sqlite_master")) == before
+        for table in ("prices", "news", "financial_cache"):
+            assert [tuple(row) for row in conn.execute(f"SELECT * FROM {table}")] == [("unchanged",)]
+    assert not store.paths.capture_root.exists()
+
+
+@pytest.mark.parametrize("ddl", [
+    "CREATE TABLE sec_research_issuer_maps(value TEXT)",
+    "CREATE TABLE sec_research_objects(sha256 TEXT)",
+    "CREATE VIEW SEC_RESEARCH_ISSUER_MAPS AS SELECT 1 AS value",
+], ids=["wrong-map", "partial", "view"])
+def test_issuer_resolution_incompatible_schema_remains_explicit(uninstalled_issuer_market, ddl):
+    from src.sec_research.issuer_store import IssuerStore
+
+    store = uninstalled_issuer_market
+    with store.connect() as conn:
+        conn.execute(ddl)
+        before = list(conn.execute("SELECT * FROM sqlite_master"))
+    failure = None
+    try:
+        IssuerStore(store).resolve("AAPL")
+    except ValueError as exc:
+        failure = str(exc)
+    assert failure == "sec_research_schema_mismatch"
+    with store.connect(readonly=True) as conn:
+        assert list(conn.execute("SELECT * FROM sqlite_master")) == before
+        for table in ("prices", "news", "financial_cache"):
+            assert [tuple(row) for row in conn.execute(f"SELECT * FROM {table}")] == [("unchanged",)]
+    assert not store.paths.capture_root.exists()
+
+
 @pytest.mark.parametrize("ddl", [
     "CREATE TABLE sec_research_objects(sha256 TEXT PRIMARY KEY, object_key TEXT UNIQUE NOT NULL, size_bytes INTEGER NOT NULL CHECK(size_bytes>0))",
     "CREATE TABLE sec_research_surprise(x)",
