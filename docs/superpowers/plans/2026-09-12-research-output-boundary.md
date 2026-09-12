@@ -199,8 +199,32 @@ controls. `backend-full-03` was stopped before editing (partial 8,068 passed,
 terminated with a platform safety error and no verdict; keep that independent
 gate open for external review rather than treating the probe as approval.
 
-- [ ] Freeze code identity; run all new tests and complete backend under the offline runner. Parse JUnit exact pass/skip/fail/error totals; no inferred aggregate counts.
+- [x] Freeze code identity; run all new tests and complete backend under the offline runner. Parse JUnit exact pass/skip/fail/error totals; no inferred aggregate counts.
 - [x] Run repository census comparison and unbounded residual scans for generic redaction on successful research outputs. Classify diagnostic exceptions, not grep-count assertions.
 - [ ] Dispatch whole-branch independent review with explicit base SHA, not `HEAD~1`; resolve findings with fresh tests and reverify changed surfaces.
-- [ ] Archive commands, RED/GREEN/inverse results and source digests; mark task statuses incrementally.
-- [ ] State independent security-slice status and parked SEC integration status separately. Do not merge or claim complete SEC delivery.
+- [x] Archive commands, RED/GREEN/inverse results and source digests; mark task statuses incrementally.
+- [x] State independent security-slice status and parked SEC integration status separately. Do not merge or claim complete SEC delivery.
+
+Final automated checkpoint: product/test candidate `ff7c4d75`, single complete
+backend `backend-full-04` = 10,166 passed / 12 unchanged manual-live skips,
+zero failures/errors. All 857 cases in seven new suites and seven retained
+safety-owner families executed without skips. The 1,111 source/test/frontend
+files, runner and dependency versions agree before/after the run. Frontend
+1,776 tests and typecheck pass; frontend and dependency declarations are unchanged.
+
+Evidence: `docs/superpowers/evidence/2026-09-12-research-output-boundary/README.md`.
+All 442 sealed evidence files verify against manifest SHA256
+`193d5fe18e9762d3b96fb719e5ba4e379dc461dc6530b5966e9d558a2586459f`.
+The fresh whole-branch reviewer returned no verdict after a platform safety
+error. This is the remaining independent gate, not a failed automatic test.
+The branch and own scratch remain available for user/external review, unmerged.
+The separate SEC feature's four OAuth failures remain explicitly parked; none
+is counted as fixed by this independent branch's green complete run.
+
+Publication checks: all 443 declared evidence paths (442 records plus manifest)
+are in the Git index, with no extras. The repository's `*.log.*` ignore rule
+required explicitly adding only the sealed `output.log.gz` artifacts; no fixture
+data or application state was added. Staged whitespace checking reports four
+trailing blank lines in verbatim historical task briefs/report, intentionally
+preserved with their original hashes. Product/test/current-plan whitespace
+checks are clean; the sealed originals were not rewritten to silence that check.
