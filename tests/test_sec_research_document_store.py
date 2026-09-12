@@ -19,7 +19,7 @@ def test_immutable_original_and_text_registration_and_repeat_capture(rig):
     a, b = documents.capture(first["capture_id"]), documents.capture(second["capture_id"])
     assert a["original_sha256"] == b["original_sha256"] == hashlib.sha256(body).hexdigest()
     assert a["text_sha256"] == b["text_sha256"] == hashlib.sha256(b"needle retained").hexdigest()
-    assert a["metadata"]["extraction_version"] == "sec-document-text-v3"
+    assert a["metadata"]["extraction_version"] == "sec-document-text-v4"
     with rig.store.connect(readonly=True) as conn:
         assert conn.execute("SELECT count(*) FROM sec_research_objects WHERE sha256=?", (a["text_sha256"],)).fetchone()[0] == 1
         assert not list(conn.execute("PRAGMA foreign_key_check"))
