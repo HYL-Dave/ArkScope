@@ -569,6 +569,7 @@ class AnthropicClaudeCodeSdkDriver:
 
         prompt = _compose_input(request.input_messages)
         tool_names: dict[str, str] = {}  # tool_use_id -> name, to label tool_end
+        tool_inputs: dict[str, dict] = {}
         terminal = False
         subscription_auth_verified = False
         loop = asyncio.get_event_loop()
@@ -617,7 +618,7 @@ class AnthropicClaudeCodeSdkDriver:
                         terminal = True
                         return
 
-                for ev in self._map(msg, request, token, tool_names):
+                for ev in self._map(msg, request, token, tool_names, tool_inputs):
                     if ev.type in (EventType.done, EventType.error):
                         terminal = True
                     yield ev
@@ -650,7 +651,8 @@ class AnthropicClaudeCodeSdkDriver:
 
     # --- SDK message -> AgentEvent (§6) ---------------------------------
     def _map(
-        self, msg: Any, request: LLMRequest, token: Optional[str], tool_names: dict[str, str]
+        self, msg: Any, request: LLMRequest, token: Optional[str], tool_names: dict[str, str],
+        tool_inputs: Optional[dict[str, dict]] = None,
     ) -> list[AgentEvent]:
         """Map one SDK message to zero-or-more AgentEvents. Any unmapped type is
         IGNORED (non-terminal) per the §6 by-policy catch-all."""
@@ -677,14 +679,17 @@ class AnthropicClaudeCodeSdkDriver:
                     name = block.name or "tool"
                     if getattr(block, "id", None):
                         tool_names[block.id] = name
+                        if tool_inputs is not None:
+                            tool_inputs[block.id] = check_output_value(block.input or {}, guard=tool_output_guard(token))
                     out.append(
                         AgentEvent(
                             EventType.tool_start,
-                            {"tool": name, "input": block.input or {}},
+                            {"tool": name, "input": block.input or {},
+                             **({"call_id": block.id} if block.id else {})},
                         )
                     )
                 elif isinstance(block, ServerToolResultBlock):
-                    out.append(self._tool_end_event(block.tool_use_id, block.content, None, token, tool_names))
+                    out.append(self._tool_end_event(block.tool_use_id, block.content, None, token, tool_names, tool_inputs))
             return out
 
         if isinstance(msg, UserMessage):
@@ -694,7 +699,7 @@ class AnthropicClaudeCodeSdkDriver:
                     if isinstance(block, ToolResultBlock):
                         out.append(
                             self._tool_end_event(
-                                block.tool_use_id, block.content, block.is_error, token, tool_names
+                                block.tool_use_id, block.content, block.is_error, token, tool_names, tool_inputs
                             )
                         )
             return out
@@ -820,20 +825,32 @@ class AnthropicClaudeCodeSdkDriver:
         is_error: Optional[bool],
         token: Optional[str],
         tool_names: dict[str, str],
+        tool_inputs: Optional[dict[str, dict]] = None,
     ) -> AgentEvent:
         name = tool_names.get(tool_use_id, "tool")
         from src.agents.shared.output_events import check_output_value
         from src.tools.result_policy import tool_output_guard
 
         guard = tool_output_guard(token)
+        from src.sec_research.citations import citation_event_fields
+
         check_output_value({"tool": name, "call_id": tool_use_id}, guard=guard)
         if is_error:
             as_str = _redact_bridge(content, token)
+            admitted = check_output_value(as_str, guard=guard)
+            citation_fields = citation_event_fields(name, {
+                "content": [{"type": "text", "text": admitted}], "is_error": True,
+            })
         else:
             admitted = check_output_value(content, guard=guard)
+            citation_fields = citation_event_fields(name, admitted)
             as_str = admitted if isinstance(admitted, str) else json.dumps(admitted, ensure_ascii=False)
         preview = as_str[:_SUMMARY_CAP]
-        data = {"tool": name, "summary": preview, "chars": len(as_str)}
+        data = {"tool": name, "summary": preview, "chars": len(as_str), **citation_fields}
+        if tool_use_id:
+            data["call_id"] = tool_use_id
+        if tool_inputs is not None and tool_use_id in tool_inputs:
+            data["input"] = tool_inputs[tool_use_id]
         if is_error is not None:
             data["is_error"] = bool(is_error)
         return AgentEvent(EventType.tool_end, data)

@@ -692,10 +692,23 @@ class OpenAIChatGPTOAuthDriver:
                     if name not in _RESEARCH_READONLY_TOOLS:
                         yield AgentEvent(EventType.error, {"error": f"tool '{name}' is not allowed (allowlist veto)", "provider": "openai", "model": request.model})
                         return
-                    yield AgentEvent(EventType.tool_start, {"tool": name, "input": args})
+                    yield AgentEvent(EventType.tool_start, {
+                        "tool": name, "input": args, "call_id": call["call_id"],
+                    })
                     ok, result = await self._invoke_tool(name=name, args=args, token=token)
+                    from src.tools.result_policy import tool_output_guard
+
+                    result = check_output_value(result, guard=tool_output_guard(token))
+                    from src.sec_research.citations import citation_event_fields
+
+                    citation_fields = citation_event_fields(name, result if ok else {
+                        "content": [{"type": "text", "text": result}], "is_error": True,
+                    })
                     summary = result[:_SUMMARY_CAP]
-                    yield AgentEvent(EventType.tool_end, {"tool": name, "summary": summary, "chars": len(result), "is_error": not ok})
+                    yield AgentEvent(EventType.tool_end, {
+                        "tool": name, "summary": summary, "chars": len(result), "is_error": not ok,
+                        "call_id": call["call_id"], "input": args, **citation_fields,
+                    })
                     if ok:
                         used.append(name)
                     input_items.append({
