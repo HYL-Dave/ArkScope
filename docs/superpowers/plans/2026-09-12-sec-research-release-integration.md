@@ -10,7 +10,7 @@ that service. Persist exact references before admitting maintenance operations.
 **Tech Stack:** Python/SQLite/FastAPI, existing SEC transports, React/TypeScript.
 **Spec:** `docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md`.
 
-Status: Tasks1/2/3/4 reviewed complete; Task2 uses the approved shared output
+Status: Tasks1/2/3/4/5 reviewed complete; Task2 uses the approved shared output
 boundary. Its former SEC-specific redaction proposal is superseded, not
 an outstanding authorization request. Source checkpoint `ba4f2619` is preserved;
 integration proceeds on `codex/sec-research-integration` from security `41682675`.
@@ -79,7 +79,7 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 - [x] Task 2: four-channel replacement (5d979910; focused994P, independent scoped re-review51P; full-release gate remains Task8)
 - [x] Task 3: persistent Research citations (7401e656; sealed acceptance10583P/12S, frontend1824P)
 - [x] Task 4: TOC recognition (ba5a3356,5518ae21; focused338P; independent review approved)
-- [ ] Task 5: export/restore
+- [x] Task 5: operation leases/export/restore (4dfa0d37; initial1390P plus fix629P/104UI/typecheck; independent review approved; full continuation gate pending)
 - [ ] Task 6: cleanup/reset
 - [ ] Task 7: schedule/Settings
 - [ ] Task 8: cleanup and full verification
@@ -609,7 +609,7 @@ Expose `python -m src.sec_research export --destination ...` and
 No model-facing filesystem operation. Explicit path/operation validation happens
 before opening a DB; reports contain counts/digests, not source contents/secrets.
 
-- [ ] RED owners: `test_export_uses_backup_inventory_during_concurrent_publish`,
+- [x] RED owners: `test_export_uses_backup_inventory_during_concurrent_publish`,
   `test_export_restore_preserves_wal_and_historical_citations`,
   `test_maintenance_cannot_enter_put_to_publish_gap`,
   `test_stored_reader_lease_does_not_create_capture_root`,
@@ -626,15 +626,15 @@ def test_export_restore_preserves_wal_and_historical_citations(bundle_fixture):
     assert result["source_digest_before"] == result["source_digest_after"]
 ```
 
-- [ ] Run RED: absent command/lease or admitted exclusive operation inside a
+- [x] Run RED: absent command/lease or admitted exclusive operation inside a
   protected publication gap. Use deterministic barriers, no provider processes.
-- [ ] Implement the lease at all actual current entrypoints, then export/restore
+- [x] Implement the lease at all actual current entrypoints, then export/restore
   over verified backup. Protect no-path-create behavior. Include schema/receipt
   JSON closure, not only SQL FK_check. No third generic SQLite backup primitive.
-- [ ] GREEN new operation tests, capture/store/service/document/citation owners,
+- [x] GREEN new operation tests, capture/store/service/document/citation owners,
   backup tests. Inverses: skip outer lease; enumerate live DB; omit catalog source;
   bypass hash; accept existing destination. Each kills named owner without errors.
-- [ ] Commit; report acquired lock order and phase failure semantics. No real
+- [x] Commit; report acquired lock order and phase failure semantics. No real
   operator export/restore occurs in this task.
 
 ### Task 6: Explicit Cleanup And Schema Recovery

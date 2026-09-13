@@ -9,8 +9,14 @@ Its current source checkpoint is `1704ffc4`, worker handoff `c47a3808`.
 The [worker report](task5-worker-report-initial.md) preserves original RED,
 intermediate failures, inverses and the focused1390P/99 frontend/typecheck results.
 These are focused results, not a newly completed whole-suite acceptance.
-Independent review is pending. Task6 orphan cleanup/schema administration has
-only preflight at this checkpoint and is not implemented yet.
+Independent review found two admission/validation defects: known non-busy lease
+failures did not terminalize Research, and empty bundles did not distinguish
+required directories from regular files. Both were fixed in `4dfa0d37` and
+independently approved on scoped re-review. Fix evidence: RED22F/9P, backend629P,
+UI104P/typecheck and two killed/restored inverses. No full-suite claim is made
+from those focused runs. Task5 is reviewed complete; Task6 orphan cleanup/schema
+administration proceeds next. Source-only census remains review_required, not a
+claim of whole-project cleanup.
 
 The existing capture-writer lease covers a write, not the put-to-reference
 publication gap, multi-read queries or durable Research publication. Task5's
