@@ -193,6 +193,9 @@ this plan's disposable scratch after verification and retain the archive.
   candidates or coverage/dependency/untracked drift;151 new uncertainty IDs
   comprise145 mechanically matched position changes and6 reviewed new statements.
   Raw exit2/review_required remains; wider queues are not closed.
+- [x] Handoff/collateral review approved; archive committed at `e20632e7` and
+  verified from Git:278files, zero missing/extra/hash errors. Only this plan's
+  disposable scratch removed after verification; branch/worktree retained.
 
 Evidence and exact receipts:
 `../evidence/2026-09-13-sec-research-citations/README.md`.

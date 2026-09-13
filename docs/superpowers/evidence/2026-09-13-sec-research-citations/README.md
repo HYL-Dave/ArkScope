@@ -147,6 +147,8 @@ both exact membership and every object from Git, not only the local filesystem:
 /home/hyl/.virtualenvs/llm_app/bin/python -B docs/superpowers/evidence/2026-09-13-sec-research-citations/verify_archive.py HEAD
 ```
 
-The post-seal Git verification receipt is `archive-verification.json`. Disposable
-scratch belongs only to this plan and is removed after archive verification;
-the branch and worktree remain. Merge/push/production activation are separate.
+Post-seal verification at `e20632e7` passed:278 expected/committed files, zero
+missing/extra objects or hash mismatches. Receipt: `archive-verification.json`.
+This plan's disposable scratch was then removed; no other worktree/plan scratch
+was deleted. The branch and worktree remain. Merge/push/production activation
+are separate. All cited check paths above now refer to this retained archive.
