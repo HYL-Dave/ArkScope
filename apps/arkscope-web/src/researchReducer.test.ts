@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { documentCitation, factCitation } from "./secCitationTestUtils";
 
 import {
   initialState,
@@ -24,6 +25,59 @@ const f = (type: string, data: unknown = {}, ts = 0): Action => ({ kind: "frame"
 const iso = (ms: number) => new Date(ms).toISOString();
 const msgs = (s: State): Message[] => s.messagesByThread[s.activeThreadId!] ?? [];
 const assistant = (s: State): Message => msgs(s)[msgs(s).length - 1];
+
+describe("call-bound SEC evidence", () => {
+  it("pairs exact IDs across reversed ends, duplicates and late starts", () => {
+    const s = run(submit({ question: "q" }),
+      f("tool_start", { tool: "mcp__ark__tool_read_sec_filing", call_id: "a", input: { query: "A" } }),
+      f("tool_start", { tool: "read_sec_filing", call_id: "b", input: { query: "B" } }),
+      f("tool_end", { tool: "read_sec_filing", call_id: "a", summary: "A", sec_citations: [documentCitation] }),
+      f("tool_end", { tool: "read_sec_filing", call_id: "b", summary: "B", sec_citation_gaps: ["sec_citation_result_invalid"] }),
+      f("tool_end", { tool: "read_sec_filing", call_id: "a", summary: "WRONG", sec_citations: [factCitation] }),
+      f("tool_start", { tool: "read_sec_filing", call_id: "a", input: { query: "WRONG" } }),
+      f("done", { answer: "answer" }));
+    expect(assistant(s).tool_calls).toEqual([
+      { name: "read_sec_filing", call_id: "a", input: { query: "A" }, result_preview: "A", sec_citations: [documentCitation] },
+      { name: "read_sec_filing", call_id: "b", input: { query: "B" }, result_preview: "B", sec_citation_gaps: ["sec_citation_result_invalid"] },
+    ]);
+  });
+
+  it("isolates ID-less legacy pairing and retains end-only input", () => {
+    const s = run(submit({ question: "q" }),
+      f("tool_start", { tool: "legacy", input: { old: true } }),
+      f("tool_start", { tool: "current", call_id: "open" }),
+      f("tool_end", { tool: "legacy", summary: "legacy result" }),
+      f("tool_end", { tool: "current", call_id: "end-only", input: { cik: "123" }, summary: "retained", sec_citations: [factCitation] }),
+      f("tool_end", { tool: "orphan legacy", input: { old: 2 }, summary: "orphan" }),
+      f("done", {}));
+    expect(assistant(s).tool_calls).toEqual([
+      { name: "legacy", input: { old: true }, result_preview: "legacy result" },
+      { name: "current", call_id: "open", input: undefined, result_preview: undefined },
+      { name: "current", call_id: "end-only", input: { cik: "123" }, result_preview: "retained", sec_citations: [factCitation] },
+      { name: "orphan legacy", input: { old: 2 }, result_preview: "orphan" },
+    ]);
+  });
+
+  it.each([f("done", {}), f("error", { code: "run_cancelled" }), { kind: "streamEnd" } as Action, { kind: "streamError", error: "lost" } as Action])("retains refs and present empty gaps through terminal and reload %j", (terminal) => {
+    const s = run(submit({ question: "q" }),
+      f("tool_end", { tool: "get_sec_financial_facts", call_id: "retained", input: { cik: "123" }, sec_citations: [factCitation], sec_citation_gaps: [] }), terminal);
+    const saved = assistant(s);
+    expect(saved.tool_calls[0]).toMatchObject({ call_id: "retained", input: { cik: "123" }, sec_citations: [factCitation], sec_citation_gaps: [] });
+    const restored = reduce(initialState, { kind: "hydrate", threads: s.threads, messagesByThread: JSON.parse(JSON.stringify(s.messagesByThread)), activeThreadId: "t1" });
+    expect(assistant(restored).tool_calls[0]).toMatchObject({ call_id: "retained", sec_citations: [factCitation], sec_citation_gaps: [] });
+  });
+
+  it.each([{ sec_citations: [factCitation] }, { sec_citation_gaps: ["sec_citation_result_invalid"] }])("retains already received SEC evidence when the local poller aborts %j", (metadata) => {
+    const before = run(submit({ question: "q" }), { kind: "linkRun", runId: "run-current" },
+      f("tool_end", { tool: "get_sec_financial_facts", call_id: "retained", input: { cik: "123" }, ...metadata }));
+    const stopped = reduce(before, { kind: "abort", runId: "run-current", ts: 2500 });
+    expect(stopped.pending).toBeNull();
+    expect(stopped.terminal).toBe("aborted");
+    expect(assistant(stopped)).toMatchObject({ role: "assistant", runId: "run-current", tool_calls: [{ call_id: "retained", input: { cik: "123" }, ...metadata }] });
+    expect(reduce(stopped, f("tool_end", { call_id: "retained", summary: "late" }))).toBe(stopped);
+    expect(reduce(before, { kind: "abort", runId: "other" })).toBe(before);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // GROUP 1 — Anthropic LIVE happy-path build-up

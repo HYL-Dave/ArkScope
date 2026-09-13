@@ -7,7 +7,7 @@
 // (sse.ts) — the reducer must tolerate an under-populated frame.data.
 // ============================================================================
 
-import type { PersonalizationTrace } from "./api";
+import type { PersonalizationTrace, SecCitationTrace } from "./api";
 import type { SSEFrame } from "./sse";
 
 export const RESEARCH_DISCONNECT_ERROR_CODE = "run_interrupted" as const;
@@ -19,10 +19,10 @@ export type Provider = "anthropic" | "openai" | string; // string: unknown-provi
 // NEVER from done.tools_used (which is list(set(...)) — deduped & unordered).
 // Wire keys map IN: tool_start.input->input, tool_end.summary->result_preview,
 // tool_end.chars->chars. The wire key `summary` is NEVER a state field.
-export interface ToolTraceRow {
+export interface ToolTraceRow extends SecCitationTrace {
   kind: "tool";
   name: string;
-  input?: unknown; // tool_start.input (undefined for every OpenAI row)
+  input?: unknown; // start input, or retained end-only input
   result_preview?: string; // tool_end.summary, <=200 chars when emitted
   chars?: number; // tool_end.chars when emitted
   done: boolean; // false while open (tool_start seen, tool_end not); true once closed
@@ -34,9 +34,9 @@ export interface ThinkingTraceRow {
 export type TraceRow = ToolTraceRow | ThinkingTraceRow;
 
 // ---- Finalized message tool_calls projection (spec §6a; `input`, not `params`)
-export interface ToolCall {
+export interface ToolCall extends SecCitationTrace {
   name: string;
-  input?: unknown; // Anthropic only; undefined for OpenAI (name-only batch)
+  input?: unknown;
   result_preview?: string; // tool preview when emitted; undefined for still-open rows
 }
 
@@ -165,7 +165,7 @@ function appendInterimText(prev: string, next: unknown): string {
 function toolCalls(trace: TraceRow[]): ToolCall[] {
   return trace
     .filter((r): r is ToolTraceRow => r.kind === "tool")
-    .map((r) => ({ name: r.name, input: r.input, result_preview: r.result_preview }));
+    .map(({ kind: _kind, done: _done, chars: _chars, ...call }) => call);
 }
 
 /** Commit a terminal assistant message: append, drop pending, advance the thread. */
@@ -289,21 +289,34 @@ function onFrame(state: State, a: Extract<Action, { kind: "frame" }>): State {
     case "text":
       return { ...state, pending: { ...p, thinkingActive: false, interimText: appendInterimText(p.interimText, data.content) } };
     case "tool_start":
-      return { ...state, pending: { ...p, thinkingActive: false, trace: [...p.trace, { kind: "tool", name: data.tool, input: data.input, result_preview: undefined, chars: undefined, done: false }] } };
     case "tool_end": {
       const trace = [...p.trace];
+      const callId = data.call_id ?? null;
       let idx = -1;
       for (let i = trace.length - 1; i >= 0; i--) {
         const r = trace[i];
-        if (r.kind === "tool" && !r.done) { idx = i; break; }
+        if (r.kind === "tool" && (callId !== null
+          ? r.call_id === callId
+          : type === "tool_end" && r.call_id == null && !r.done)) { idx = i; break; }
       }
-      if (idx >= 0) {
-        trace[idx] = { ...(trace[idx] as ToolTraceRow), result_preview: data.summary, chars: data.chars, done: true };
-      } else {
-        // OpenAI name-only batch: no open row → append an already-closed row.
-        trace.push({ kind: "tool", name: data.tool, input: undefined, result_preview: data.summary, chars: data.chars, done: true });
+      const existing = idx < 0 ? null : trace[idx] as ToolTraceRow;
+      if (existing?.done) return state; // first completion owns replayed IDs
+      const row: ToolTraceRow = existing ? { ...existing } : {
+        kind: "tool", name: typeof data.tool === "string" ? data.tool.replace(/^mcp__ark__/, "").replace(/^tool_/, "") : data.tool,
+        input: data.input, result_preview: undefined, chars: undefined, done: false,
+        ...(callId !== null ? { call_id: callId } : {}),
+      };
+      if (row.input == null && "input" in data) row.input = data.input;
+      if (type === "tool_end") {
+        row.result_preview = data.summary;
+        row.chars = data.chars;
+        row.done = true;
+        if ("sec_citations" in data) row.sec_citations = structuredClone(data.sec_citations);
+        if ("sec_citation_gaps" in data) row.sec_citation_gaps = [...data.sec_citation_gaps];
       }
-      return { ...state, pending: { ...p, trace } };
+      if (idx < 0) trace.push(row);
+      else trace[idx] = row;
+      return { ...state, pending: { ...p, thinkingActive: type === "tool_start" ? false : p.thinkingActive, trace } };
     }
     case "done":
       return onDone(state, p, data, a.ts);
@@ -329,6 +342,14 @@ function onFrame(state: State, a: Extract<Action, { kind: "frame" }>): State {
 function onAbort(state: State, action: Extract<Action, { kind: "abort" }>): State {
   if (state.pending === null) return state; // no-op: abort after a terminal
   if (action.runId && state.pending.runId !== action.runId) return state;
+  const p = state.pending;
+  if (p.trace.some((row) => row.kind === "tool" && (row.sec_citations !== undefined || row.sec_citation_gaps !== undefined))) {
+    const ts = action.ts ?? p.startedAt;
+    // Local abort also covers lost polling, so do not assert a server outcome.
+    return commit(state, p, terminalMsg(p, p.interimText, ts, {
+      synthesized: true, errorCode: RESEARCH_DISCONNECT_ERROR_CODE, errorDetail: null,
+    }), "aborted", ts);
+  }
   // Drop the in-flight assistant turn; the user message was committed at submit.
   return { ...state, pending: null, terminal: "aborted" };
 }

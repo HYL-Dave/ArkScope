@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
+import { FileText } from "lucide-react";
 
-import { getResearchRun, getResearchRunEvents, type ResearchRunDTO } from "./api";
+import { getResearchRun, getResearchRunEvents, type ResearchRunDTO, type SecCitation, type SecCitationTrace } from "./api";
+import { SecCitationGap, SecCitationView } from "./SecCitationView";
 import {
   presentResearchRoute,
   presentResearchSelection,
@@ -15,9 +17,9 @@ import { sanitizeResearchDiagnostic } from "./researchErrors";
 import type { Message, ToolTraceRow, TraceRow } from "./researchReducer";
 import { quotaKindForAuthMode } from "./researchSelection";
 import { formatSystemTimestamp } from "./timeDisplay";
-import { Drawer, InlineAlert, StatusBadge } from "./ui";
+import { Button, Drawer, InlineAlert, StatusBadge } from "./ui";
 
-interface EvidenceRow {
+interface EvidenceRow extends SecCitationTrace {
   name: string;
   input?: unknown;
   resultPreview?: string;
@@ -51,20 +53,18 @@ export function researchEvidenceRows(
   message: Message | null,
   activeTrace: readonly TraceRow[],
 ): EvidenceRow[] {
-  if (activeTrace.length > 0) {
+  if (!message && activeTrace.length > 0) {
     return activeTrace
       .filter((row): row is ToolTraceRow => row.kind === "tool")
-      .map((row) => ({
-        name: row.name,
-        input: row.input,
-        resultPreview: row.result_preview,
-        completion: row.done ? "complete" : "running",
+      .map(({ kind: _kind, done, chars: _chars, result_preview, ...row }) => ({
+        ...row,
+        resultPreview: result_preview,
+        completion: done ? "complete" : "running",
       }));
   }
-  return (message?.tool_calls ?? []).map((call) => ({
-    name: call.name,
-    input: call.input,
-    resultPreview: call.result_preview,
+  return (message?.tool_calls ?? []).map(({ result_preview, ...call }) => ({
+    ...call,
+    resultPreview: result_preview,
     completion: "recorded",
   }));
 }
@@ -112,6 +112,18 @@ export function ResearchEvidenceDrawer({
     [activeTrace, message],
   );
   const hasEvidence = evidence.length > 0;
+  const evidenceOwner = message ?? activeRun?.id ?? activeTrace;
+  const [sourceSelection, setSourceSelection] = useState<{
+    owner: typeof evidenceOwner; key: string; citation: SecCitation;
+  } | null>(null);
+  const sourceTriggers = useRef(new Map<string, HTMLButtonElement>());
+  const selectedSource = open && sourceSelection?.owner === evidenceOwner ? sourceSelection : null;
+  useEffect(() => { setSourceSelection(null); }, [open, evidenceOwner]);
+  const closeSource = () => {
+    const trigger = selectedSource ? sourceTriggers.current.get(selectedSource.key) : null;
+    setSourceSelection(null);
+    if (trigger?.isConnected) trigger.focus();
+  };
   // A selected transcript turn owns its exact linkage. Never borrow a newer
   // active/latest run for a legacy message that has no persisted run_id.
   const runId = message ? (message.runId ?? null) : (activeRun?.id ?? null);
@@ -269,6 +281,7 @@ export function ResearchEvidenceDrawer({
     () => researchEvidenceTokenRows(usage, researchT),
     [researchLocale, researchT, usage],
   );
+  let factOrdinal = 0;
 
   return (
     <Drawer
@@ -286,7 +299,7 @@ export function ResearchEvidenceDrawer({
           {hasEvidence ? (
             <ul className="research-evidence-list">
               {evidence.map((row, index) => (
-                <li key={`${row.name}-${index}`} className="research-evidence-tool">
+                <li key={row.call_id ?? `${row.name}-${index}`} className="research-evidence-tool" data-call-id={row.call_id}>
                   <div className="research-evidence-tool-head">
                     <span className="mono">{row.name}</span>
                     <StatusBadge
@@ -300,6 +313,22 @@ export function ResearchEvidenceDrawer({
                   {boundedPreview(row.resultPreview) ? (
                     <div className="research-evidence-preview tiny muted">{boundedPreview(row.resultPreview)}</div>
                   ) : null}
+                  {row.sec_citations?.map((citation, citationIndex) => {
+                    const key = `${index}:${citationIndex}`;
+                    const label = citation.kind === "document" ? citation.document_id
+                      : citation.kind === "filing" ? citation.filing_id : citation.cik;
+                    const kind = citation.kind === "document" ? researchT(($) => $.citations.document)
+                      : citation.kind === "filing" ? researchT(($) => $.citations.filing)
+                        : researchT(($) => $.citations.fact, { position: ++factOrdinal });
+                    return <Button key={key} tone="ghost" size="compact" className="sec-citation-open"
+                      data-sec-citation-open={key} aria-expanded={selectedSource?.key === key}
+                      aria-label={researchT(($) => $.citations.open, { kind, label })}
+                      ref={(element) => { if (element) sourceTriggers.current.set(key, element); else sourceTriggers.current.delete(key); }}
+                      icon={<FileText size={16} />} onClick={() => setSourceSelection({ owner: evidenceOwner, key, citation })}>
+                      <span>{kind}: {label}</span>
+                    </Button>;
+                  })}
+                  {row.sec_citation_gaps?.map((code, gapIndex) => <SecCitationGap key={gapIndex} code={code} />)}
                 </li>
               ))}
             </ul>
@@ -307,6 +336,8 @@ export function ResearchEvidenceDrawer({
             <p className="muted tiny">{researchT(($) => $.evidence.noToolEvidence)}</p>
           )}
         </section>
+
+        {selectedSource ? <SecCitationView key={selectedSource.key} citation={selectedSource.citation} onClose={closeSource} /> : null}
 
         <section className="research-run-details">
           <h3 className="surface-title tiny">{researchT(($) => $.evidence.runDetails)}</h3>

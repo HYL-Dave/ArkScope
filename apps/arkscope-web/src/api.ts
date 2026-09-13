@@ -1239,6 +1239,70 @@ export interface SecDocumentCitation {
   match_start_byte: number | null;
   match_end_byte: number | null;
 }
+interface SecObservationCitation {
+  snapshot_id: string;
+  source_sha256: string;
+  source_pointer: string;
+  source_url: string;
+  observed_at: string;
+}
+export interface SecFactCitation extends SecObservationCitation {
+  kind: "fact";
+  cik: string;
+  fact_id: string;
+}
+export interface SecFilingCitation extends SecObservationCitation {
+  kind: "filing";
+  filing_id: string;
+}
+export type SecCitation = (SecDocumentCitation & { kind: "document" }) | SecFactCitation | SecFilingCitation;
+export type SecCitationGapCode = "sec_citation_invalid" | "sec_citation_result_invalid"
+  | "sec_citation_query_invalid" | "sec_citation_missing" | "sec_citation_integrity_failed";
+export interface SecCitationTrace {
+  call_id?: string;
+  sec_citations?: SecCitation[];
+  sec_citation_gaps?: SecCitationGapCode[];
+}
+export type SecCitationRead = SecResearchEnvelope<{
+  citation: SecFactCitation;
+  observation: SecResearchFact;
+} | {
+  citation: SecFilingCitation;
+  observation: SecResearchFiling;
+} | {
+  citation: SecDocumentCitation & { kind: "document" };
+  text: string;
+  document: Omit<SecDocumentMetadata, "primary_document"> & { accession: string; mime_type: string };
+} | null>;
+
+function secCitationQuery(ref: SecCitation): string {
+  const invalid = () => { throw Object.assign(new Error("sec_citation_invalid"), { code: "sec_citation_invalid" }); };
+  if (!ref || typeof ref !== "object" || Array.isArray(ref)) return invalid();
+  const sourceFields = ["kind", "snapshot_id", "source_sha256", "source_pointer", "source_url", "observed_at"];
+  const fields = ref.kind === "document"
+    ? ["kind", "filing_id", "document_id", "capture_id", "accession", "source_url", "original_sha256", "text_sha256", "extraction_version", "start_byte", "end_byte", "match_start_byte", "match_end_byte"]
+    : ref.kind === "fact" ? [...sourceFields, "cik", "fact_id"]
+      : ref.kind === "filing" ? [...sourceFields, "filing_id"] : invalid();
+  const entries = Object.entries(ref).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  if (entries.length !== fields.length || entries.some(([key, value]) => !fields.includes(key)
+    || (key.endsWith("_byte") ? value !== null && !Number.isSafeInteger(value) : typeof value !== "string" || !value.length))) return invalid();
+  if (ref.source_url.length > 2048 || !/^https:\/\/(www|data)\.sec\.gov\/[^\s?#]+$/.test(ref.source_url)) return invalid();
+  if (ref.kind === "document") {
+    const { start_byte: start, end_byte: end, match_start_byte: left, match_end_byte: right } = ref;
+    if (start === null || end === null || start < 0 || end <= start || end > 128 * 1024 * 1024 || end - start > 80000
+      || !((left === null && right === null) || (left !== null && right !== null && start <= left && left < right && right <= end))) return invalid();
+  } else if (Array.from(ref.source_pointer).length > 2048 || !ref.source_pointer.startsWith("/") || /~(?![01])/.test(ref.source_pointer)) return invalid();
+  // Python ensure_ascii escapes DEL and every non-ASCII UTF-16 code unit,
+  // including each half of a surrogate pair. JSON.stringify alone does not.
+  const raw = JSON.stringify(Object.fromEntries(entries)).replace(/[\u007f-\uffff]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
+  if (raw.length > 6144) return invalid();
+  return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+export async function getSecResearchCitation(ref: SecCitation): Promise<SecCitationRead> {
+  return getJSON(`/sec-research/citation?ref=${secCitationQuery(ref)}`);
+}
 export interface SecDocumentMetadata {
   filing_id: string;
   document_id: string;
@@ -1342,7 +1406,7 @@ export interface ResearchThreadDTO {
 export interface ResearchMessageDTO {
   role: "user" | "assistant"; content: string;
   provider: string | null; model: string | null; effort: string | null;
-  tools_used: string[]; tool_calls: Array<{ name: string; input?: unknown; result_preview?: string }>;
+  tools_used: string[]; tool_calls: Array<SecCitationTrace & { name: string; input?: unknown; result_preview?: string }>;
   token_usage: Record<string, number> | null; tickers: string[] | null;
   elapsed_seconds: number | null; is_error: boolean; created_at: string;
   run_id?: string | null;
