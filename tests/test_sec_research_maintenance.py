@@ -18,6 +18,7 @@ from src.sec_research.paths import SecResearchPaths
 from src.sec_research.store import Store
 from tests.test_sec_research_citations import evidence, publish_facts, rig
 from tests.test_sec_research_references import profile
+from tests.test_sec_research_captures import interrupted_publication
 
 
 def api(name="maintenance"):
@@ -111,6 +112,90 @@ def market_writer(admin, monkeypatch):
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         yield lambda locked=True: pool.submit(write, locked).result(timeout=5)
+
+
+@pytest.mark.parametrize("phase", ["before_publish", "before_register"])
+def test_publication_recovery_reaches_explicit_cleanup_with_unrelated_orphan(admin, monkeypatch, phase):
+    a = admin
+    unrelated = a.captures.put(b"unrelated orphan")
+    _, target, stage = interrupted_publication(a.captures, monkeypatch, phase)
+    if phase == "before_register":
+        assert target.stat().st_nlink == stage.stat().st_nlink == 2
+        blocked = preview(a)
+        assert blocked["status"] == "blocked" and blocked["code"] == "capture_path_unsafe", blocked
+    assert a.captures.status()["charged_bytes"] == 27
+    for _ in range(2):
+        state = a.captures.recover()
+        assert (state["persisted_bytes"], state["orphan_bytes"], state["reserved_bytes"]) == (16, 11, 0)
+        assert state["charged_bytes"] == 27
+    if phase == "before_register":
+        assert target.read_bytes() == b"publication" and target.stat().st_nlink == 1
+        assert not stage.exists()
+        key = "objects/" + target.name
+    else:
+        assert not target.exists()
+        assert stage.read_bytes() == b"publication" and stage.stat().st_nlink == 1
+        key = "staging/" + stage.name
+    p = preview(a)
+    assert p["status"] == "ready", p
+    assert {item["key"] for item in p["candidates"]} == {key, "objects/" + unrelated}
+    result = apply(a, p)
+    assert result["status"] == "ok" and result["freed_bytes"] == 27, result
+    assert not target.exists() and not stage.exists()
+    assert not (a.paths.capture_root / "objects" / unrelated).exists()
+    assert a.captures.status()["charged_bytes"] == 0
+
+
+@pytest.mark.parametrize("boundary", ["hash", "unlink", "stage_fsync"])
+def test_publication_recovery_io_allows_market_write_but_excludes_capture_writer(admin, market_writer, monkeypatch, boundary):
+    from src.sec_research.capture_lock import capture_writer
+
+    a = admin
+    _, target, stage = interrupted_publication(a.captures, monkeypatch)
+    fdopen, unlink, fsync = os.fdopen, os.unlink, os.fsync
+    inode, parent_inode = target.stat().st_ino, stage.parent.stat().st_ino
+    observations = []
+
+    def compete():
+        try:
+            with capture_writer(a.paths.capture_root):
+                return "admitted"
+        except ValueError as exc:
+            return str(exc)
+
+    def barrier():
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            other_capture = pool.submit(compete).result(timeout=5)
+        ordinary = market_writer()
+        observations.append((ordinary, other_capture))
+        assert ordinary == "written" and other_capture == "capture_store_busy", observations
+
+    @contextmanager
+    def read(fd, *args, **kwargs):
+        with fdopen(fd, *args, **kwargs) as handle:
+            if os.fstat(fd).st_ino == inode:
+                barrier()
+            yield handle
+
+    def remove(name, *args, **kwargs):
+        if name == stage.name:
+            barrier()
+        return unlink(name, *args, **kwargs)
+
+    def sync(fd):
+        if os.fstat(fd).st_ino == parent_inode and not stage.exists():
+            barrier()
+        return fsync(fd)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, {"hash": "fdopen", "unlink": "unlink", "stage_fsync": "fsync"}[boundary],
+            {"hash": read, "unlink": remove, "stage_fsync": sync}[boundary])
+        state = a.captures.recover()
+    assert observations, "recovery never reached the publication filesystem boundary"
+    with a.store.connect(readonly=True) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM news").fetchone()[0] == len(observations)
+    assert not stage.exists() and target.read_bytes() == b"publication"
+    assert state["charged_bytes"] == 11
 
 
 @pytest.fixture

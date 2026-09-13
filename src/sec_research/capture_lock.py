@@ -266,6 +266,60 @@ class CaptureDirectory:
         return [info.st_dev, info.st_ino, info.st_size, info.st_nlink,
                 info.st_mtime_ns, info.st_ctime_ns]
 
+    def recover_published_stages(self, files):
+        """After accounting commits, remove only a proven publication alias."""
+        by_inode = {}
+        for key, size, inode in files:
+            by_inode.setdefault(inode, []).append((key, size))
+        for inode, entries in by_inode.items():
+            if len(entries) == 1:
+                continue
+            if len(entries) != 2:
+                raise ValueError("capture_path_unsafe")
+            (object_key, size), (stage_key, stage_size) = sorted(entries)
+            if (re.fullmatch(r"objects/[0-9a-f]{64}", object_key) is None
+                    or re.fullmatch(r"staging/[0-9a-f]{32}", stage_key) is None
+                    or size != stage_size):
+                raise ValueError("capture_path_unsafe")
+            self._remove_published_stage(object_key, stage_key, inode, size)
+
+    def _remove_published_stage(self, object_key, stage_key, inode, size):
+        self.assert_current()
+        opened = []
+        try:
+            for key in (object_key, stage_key):
+                parent, name = self._key(key)
+                fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+                opened.append((fd, parent, name))
+                info = os.fstat(fd)
+                if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 2
+                        or (info.st_dev, info.st_ino) != inode or info.st_size != size):
+                    raise ValueError("capture_path_unsafe")
+                if len(opened) == 1:
+                    identity = self._identity(info)
+                elif identity != self._identity(info):
+                    raise ValueError("capture_path_unsafe")
+            digest = hashlib.sha256()
+            with os.fdopen(opened[0][0], "rb", closefd=False) as handle:
+                while chunk := handle.read(1024 * 1024):
+                    digest.update(chunk)
+            self.assert_current()
+            for fd, parent, name in opened:
+                current = os.stat(name, dir_fd=parent, follow_symlinks=False)
+                if (not stat.S_ISREG(current.st_mode)
+                        or identity != self._identity(os.fstat(fd))
+                        or identity != self._identity(current)):
+                    raise ValueError("capture_path_unsafe")
+            if digest.hexdigest() != opened[0][2]:
+                raise ValueError("capture_integrity_failed")
+            _, parent, name = opened[1]
+            os.unlink(name, dir_fd=parent)
+            os.fsync(parent)
+            self.assert_current()
+        finally:
+            for fd, _, _ in opened:
+                os.close(fd)
+
     def inspect_owned(self, key):
         if re.fullmatch(r"(?:objects/[0-9a-f]{64}|staging/[0-9a-f]{32})", key) is None:
             raise ValueError("capture_path_unsafe")
