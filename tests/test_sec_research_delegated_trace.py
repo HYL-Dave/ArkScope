@@ -30,7 +30,7 @@ CALLS = {
 
 @pytest.fixture
 def delegated_trace(isolated, evidence, monkeypatch):
-    from anthropic import Anthropic
+    from anthropic import Anthropic, AsyncAnthropic
     from openai import AsyncOpenAI
     from src.agents import config
     from src.agents.anthropic_agent import agent as ant
@@ -55,7 +55,8 @@ def delegated_trace(isolated, evidence, monkeypatch):
         binding = capture_runtime_auth(parent)
         state = SimpleNamespace(child_results=[], delegate_results=[], requests=[],
             ending=ending, forged=None, service=service, acquisitions=acquisitions,
-            child_followup=None, child_close=None, clients=clients, binding=binding)
+            child_followup=None, child_close=None, child_response_close=None,
+            clients=clients, binding=binding)
 
         def plan(local, payload):
             local.step += 1
@@ -87,8 +88,23 @@ def delegated_trace(isolated, evidence, monkeypatch):
                 raise asyncio.CancelledError
             return [], "Parent complete." if is_parent else "Child complete."
 
-        def anthropic_client(**kwargs):
+        def anthropic_client(asynchronous=False, **kwargs):
             local = SimpleNamespace(step=0)
+
+            class Body(httpx2.AsyncByteStream):
+                def __init__(self, frames):
+                    self.frames = frames
+
+                async def __aiter__(self):
+                    first, rest = self.frames.split(b"\n\n", 1)
+                    yield first + b"\n\n"
+                    if local.child and local.step > 1 and state.child_followup is not None:
+                        await state.child_followup()
+                    yield rest
+
+                async def aclose(self):
+                    if local.child and local.step > 1 and state.child_response_close is not None:
+                        await state.child_response_close()
 
             def reply(request):
                 payload = json.loads(request.content)
@@ -96,11 +112,18 @@ def delegated_trace(isolated, evidence, monkeypatch):
                 blocks = ([{"type": "tool_use", "id": f"same-{i}", "name": name, "input": args}
                            for i, (name, args) in enumerate(calls)] if calls else
                           [{"type": "text", "text": answer}])
+                frames = anthropic_frames(payload["model"], blocks, stop="tool_use" if calls else "end_turn")
                 return httpx2.Response(200, headers={"content-type": "text/event-stream"},
-                    text=anthropic_frames(payload["model"], blocks, stop="tool_use" if calls else "end_turn"))
+                    **({"stream": Body(frames.encode())} if asynchronous else {"text": frames}))
 
-            client = Anthropic(**kwargs, max_retries=0,
-                http_client=httpx2.Client(transport=httpx2.MockTransport(reply)))
+            class Transport(httpx2.MockTransport):
+                async def aclose(self):
+                    if getattr(local, "child", False) and state.child_close is not None:
+                        await state.child_close()
+                    await super().aclose()
+
+            cls, http_cls = (AsyncAnthropic, httpx2.AsyncClient) if asynchronous else (Anthropic, httpx2.Client)
+            client = cls(**kwargs, max_retries=0, http_client=http_cls(transport=Transport(reply)))
             clients.append(client)
             return client
 
@@ -134,6 +157,7 @@ def delegated_trace(isolated, evidence, monkeypatch):
             return client
 
         monkeypatch.setattr("anthropic.Anthropic", anthropic_client)
+        monkeypatch.setattr("anthropic.AsyncAnthropic", lambda **kw: anthropic_client(True, **kw))
         monkeypatch.setattr("openai.AsyncOpenAI", openai_client)
 
         async def execute(run_id="trace-run", marker="all"):
@@ -216,19 +240,120 @@ def test_delegated_references_reopen_after_native_terminal(
 
 
 @pytest.mark.parametrize("parent", PARENTS)
+@pytest.mark.parametrize("close_error", [False, True])
+@pytest.mark.parametrize("cancel_at", ["reading", "response-close"])
+def test_anthropic_model_cancel_joins_response_and_client_and_retains_refs(
+        parent, close_error, cancel_at, delegated_trace, isolated, evidence):
+    from src.sec_research.capture_lock import research_operation
+    from src.sec_research.citations import read_sec_citation
+
+    state = delegated_trace(parent, "anthropic")
+
+    async def exercise():
+        reading, response_closing, client_closing = (asyncio.Event() for _ in range(3))
+        release_response, release_client = asyncio.Event(), asyncio.Event()
+        order = []
+
+        async def read():
+            reading.set()
+            if cancel_at == "reading":
+                await asyncio.Event().wait()
+
+        async def close_response():
+            response_closing.set()
+            await release_response.wait()
+            order.append("response")
+            if close_error:
+                raise OSError("fixture response close failed")
+
+        async def close_client():
+            client_closing.set()
+            await release_client.wait()
+            order.append("client")
+            if close_error:
+                raise OSError("fixture client close failed")
+
+        state.child_followup, state.child_response_close, state.child_close = read, close_response, close_client
+        task = asyncio.create_task(state.execute())
+        try:
+            await asyncio.wait_for(reading.wait(), 5)
+            assert len(state.child_results) == 3
+            if cancel_at == "response-close":
+                await asyncio.wait_for(response_closing.wait(), 5)
+            task.cancel()
+            await asyncio.wait_for(response_closing.wait(), 5)
+            for _ in range(3):
+                task.cancel()
+                await asyncio.sleep(0.01)
+            assert not task.done(), "run released before response finalizer joined"
+            assert not client_closing.is_set(), "client closed before response finalizer joined"
+            with pytest.raises(ValueError, match="sec_research_operation_busy"):
+                with research_operation(evidence.rig.store.paths.capture_root, exclusive=True):
+                    pass
+            release_response.set()
+            await asyncio.wait_for(client_closing.wait(), 5)
+            for _ in range(3):
+                task.cancel()
+                await asyncio.sleep(0.01)
+            assert not task.done(), "run released before client finalizer joined"
+            assert isolated.runs.get_run("trace-run").status == "running"
+            release_client.set()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert order == ["response", "client"]
+            assert len(state.requests) == 3, "cancelled child or parent dispatched another model request"
+            assert len(state.child_results) == 3
+            with research_operation(evidence.rig.store.paths.capture_root, exclusive=True):
+                pass
+        finally:
+            release_response.set()
+            release_client.set()
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            state.child_followup = state.child_response_close = state.child_close = None
+
+    asyncio.run(exercise())
+    run, message, ends, sec_ends = retained(isolated)
+    assert run.status == "cancelled"
+    assert len(sec_ends) == 3
+    expected = {"get_sec_financial_facts": [evidence.fact_ref],
+                "list_sec_filings": evidence.filing_refs, "read_sec_filing": [evidence.document_ref]}
+    for end in sec_ends:
+        assert end["sec_citations"] == expected[end["tool"]]
+        call = next(call for call in message.tool_calls if call["call_id"] == end["call_id"])
+        assert call["sec_citations"] == end["sec_citations"]
+        for ref in call["sec_citations"]:
+            assert read_sec_citation(evidence.rig.store, evidence.rig.captures, citation=ref)["status"] == "ok"
+
+
+@pytest.mark.parametrize("parent", PARENTS)
 @pytest.mark.parametrize("child", CHILDREN)
 def test_delegated_invocations_do_not_exchange_refs_or_call_ids(
         parent, child, delegated_trace, isolated, evidence):
     state = delegated_trace(parent, child)
     async def execute():
+        arrived, both_reading = 0, asyncio.Event()
+
+        async def overlap():
+            nonlocal arrived
+            arrived += 1
+            if arrived == 2:
+                both_reading.set()
+            await asyncio.wait_for(both_reading.wait(), 5)
+
+        state.child_followup = overlap
         await asyncio.gather(state.execute("facts-run", "facts-only"),
                              state.execute("document-run", "document-only"))
+        assert arrived == 2
     asyncio.run(execute())
     first, second = retained(isolated, "facts-run"), retained(isolated, "document-run")
     assert first[0].status == second[0].status == "succeeded"
     assert [end["sec_citations"] for end in first[3]] == [[evidence.fact_ref]]
     assert [end["sec_citations"] for end in second[3]] == [[evidence.document_ref]]
     assert {end["call_id"] for end in first[3]}.isdisjoint(end["call_id"] for end in second[3])
+    with isolated.runs._connect() as conn:
+        assert [tuple(row) for row in conn.execute("PRAGMA integrity_check")] == [("ok",)]
 
 
 @pytest.mark.parametrize("parent", PARENTS)

@@ -349,7 +349,7 @@ class TestAnthropicSubagentRunner:
 
     @patch("src.agents.anthropic_agent.tools.get_anthropic_tools")
     @patch("src.agents.anthropic_agent.tools.execute_tool")
-    @patch("anthropic.Anthropic")
+    @patch("anthropic.AsyncAnthropic")
     @patch("src.agents.config.get_agent_config")
     def test_anthropic_subagent_success(self, mock_config, mock_anthropic_cls, mock_exec, mock_tools):
         """Simple case: model returns text, no tool calls."""
@@ -358,10 +358,11 @@ class TestAnthropicSubagentRunner:
 
         response = self._make_mock_response("Analysis complete")
         mock_client = MagicMock()
+        mock_client.close = AsyncMock()
         mock_stream = MagicMock()
-        mock_stream.__enter__ = MagicMock(return_value=mock_stream)
-        mock_stream.__exit__ = MagicMock(return_value=False)
-        mock_stream.get_final_message.return_value = response
+        mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+        mock_stream.__aexit__ = AsyncMock(return_value=False)
+        mock_stream.get_final_message = AsyncMock(return_value=response)
         mock_client.messages.stream.return_value = mock_stream
         mock_anthropic_cls.return_value = mock_client
 
@@ -375,7 +376,7 @@ class TestAnthropicSubagentRunner:
 
     @patch("src.agents.anthropic_agent.tools.get_anthropic_tools")
     @patch("src.agents.anthropic_agent.tools.execute_tool")
-    @patch("anthropic.Anthropic")
+    @patch("anthropic.AsyncAnthropic")
     @patch("src.agents.config.get_agent_config")
     def test_anthropic_subagent_tool_loop(self, mock_config, mock_anthropic_cls, mock_exec, mock_tools):
         """Model calls a tool, then finishes."""
@@ -392,15 +393,16 @@ class TestAnthropicSubagentRunner:
         final_response = self._make_mock_response("Here is the analysis")
 
         mock_client = MagicMock()
+        mock_client.close = AsyncMock()
         mock_stream_1 = MagicMock()
-        mock_stream_1.__enter__ = MagicMock(return_value=mock_stream_1)
-        mock_stream_1.__exit__ = MagicMock(return_value=False)
-        mock_stream_1.get_final_message.return_value = tool_response
+        mock_stream_1.__aenter__ = AsyncMock(return_value=mock_stream_1)
+        mock_stream_1.__aexit__ = AsyncMock(return_value=False)
+        mock_stream_1.get_final_message = AsyncMock(return_value=tool_response)
 
         mock_stream_2 = MagicMock()
-        mock_stream_2.__enter__ = MagicMock(return_value=mock_stream_2)
-        mock_stream_2.__exit__ = MagicMock(return_value=False)
-        mock_stream_2.get_final_message.return_value = final_response
+        mock_stream_2.__aenter__ = AsyncMock(return_value=mock_stream_2)
+        mock_stream_2.__aexit__ = AsyncMock(return_value=False)
+        mock_stream_2.get_final_message = AsyncMock(return_value=final_response)
 
         mock_client.messages.stream.side_effect = [mock_stream_1, mock_stream_2]
         mock_anthropic_cls.return_value = mock_client
@@ -416,7 +418,7 @@ class TestAnthropicSubagentRunner:
 
     @patch("src.agents.anthropic_agent.tools.get_anthropic_tools")
     @patch("src.agents.anthropic_agent.tools.execute_tool")
-    @patch("anthropic.Anthropic")
+    @patch("anthropic.AsyncAnthropic")
     @patch("src.agents.config.get_agent_config")
     def test_anthropic_subagent_max_turns(self, mock_config, mock_anthropic_cls, mock_exec, mock_tools):
         """Subagent reaches max_turns limit."""
@@ -431,10 +433,11 @@ class TestAnthropicSubagentRunner:
         )
 
         mock_client = MagicMock()
+        mock_client.close = AsyncMock()
         mock_stream = MagicMock()
-        mock_stream.__enter__ = MagicMock(return_value=mock_stream)
-        mock_stream.__exit__ = MagicMock(return_value=False)
-        mock_stream.get_final_message.return_value = tool_response
+        mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+        mock_stream.__aexit__ = AsyncMock(return_value=False)
+        mock_stream.get_final_message = AsyncMock(return_value=tool_response)
         mock_client.messages.stream.return_value = mock_stream
         mock_anthropic_cls.return_value = mock_client
 
@@ -448,7 +451,7 @@ class TestAnthropicSubagentRunner:
 
     @patch("src.agents.anthropic_agent.tools.get_anthropic_tools")
     @patch("src.agents.anthropic_agent.tools.execute_tool")
-    @patch("anthropic.Anthropic")
+    @patch("anthropic.AsyncAnthropic")
     @patch("src.agents.config.get_agent_config")
     def test_anthropic_subagent_1m_context_ga(self, mock_config, mock_anthropic_cls, mock_exec, mock_tools):
         """1M context is GA for 4.6 — uses standard stream, no beta header needed."""
@@ -457,10 +460,11 @@ class TestAnthropicSubagentRunner:
 
         response = self._make_mock_response("done")
         mock_client = MagicMock()
+        mock_client.close = AsyncMock()
         mock_stream = MagicMock()
-        mock_stream.__enter__ = MagicMock(return_value=mock_stream)
-        mock_stream.__exit__ = MagicMock(return_value=False)
-        mock_stream.get_final_message.return_value = response
+        mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+        mock_stream.__aexit__ = AsyncMock(return_value=False)
+        mock_stream.get_final_message = AsyncMock(return_value=response)
         mock_client.messages.stream.return_value = mock_stream
         mock_anthropic_cls.return_value = mock_client
 

@@ -452,7 +452,7 @@ def test_model_probe_invalid_explicit_effort_cannot_normalize(isolated, monkeypa
 def test_delegation_has_explicit_child_auth_and_preserves_parent(
     isolated, monkeypatch, openai_wire, parent_provider, child_provider,
 ):
-    from anthropic import Anthropic
+    from anthropic import AsyncAnthropic
     from src.agents.shared import subagent
     from src.auth_drivers.runtime_binding import capture_runtime_auth, activate_runtime_auth, current_runtime_auth
 
@@ -471,11 +471,11 @@ def test_delegation_has_explicit_child_auth_and_preserves_parent(
         return httpx2.Response(200, text=anthropic_sse(model), headers={"content-type": "text/event-stream"})
 
     def construct(**kwargs):
-        client = Anthropic(**kwargs, http_client=httpx2.Client(transport=httpx2.MockTransport(handler)))
+        client = AsyncAnthropic(**kwargs, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handler)))
         clients.append(client)
         return client
 
-    monkeypatch.setattr("anthropic.Anthropic", construct)
+    monkeypatch.setattr("anthropic.AsyncAnthropic", construct)
     try:
         with activate_runtime_auth(parent):
             result = subagent.dispatch_subagent("code_analyst", "q", dal=object())
@@ -483,7 +483,7 @@ def test_delegation_has_explicit_child_auth_and_preserves_parent(
         assert current_runtime_auth(parent_provider) is None
     finally:
         for client in clients:
-            client.close()
+            asyncio.run(client.close())
     assert (result["error"], result["answer"], result["provider"], result["model"]) == (None, "OK", child_provider, model)
     if child_provider == "openai":
         assert len(openai_wire) == 1
@@ -590,6 +590,7 @@ def test_delegated_oauth_cannot_fall_back_to_api(isolated, monkeypatch, parent_p
     parent = capture_runtime_auth(parent_provider)
     monkeypatch.setattr("openai.AsyncOpenAI", lambda **kw: pytest.fail("OAuth child used API"))
     monkeypatch.setattr("anthropic.Anthropic", lambda **kw: pytest.fail("OAuth child used API"))
+    monkeypatch.setattr("anthropic.AsyncAnthropic", lambda **kw: pytest.fail("OAuth child used API"))
     with activate_runtime_auth(parent):
         result = dispatch_subagent("code_analyst", "q", dal=object())
         assert current_runtime_auth(parent_provider) is parent

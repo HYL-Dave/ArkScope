@@ -547,8 +547,8 @@ async def _run_anthropic_subagent(
     from ..shared.token_tracker import TokenTracker
 
     agent_config = get_agent_config()
-    from src.auth_drivers.live_resolver import live_anthropic_client
-    client = live_anthropic_client()
+    from src.auth_drivers.live_resolver import live_anthropic_async_client
+    client = live_anthropic_async_client()
     cancelled = False
     completions = _ChildSecCompletions()
     try:
@@ -607,8 +607,7 @@ async def _run_anthropic_subagent(
                     **api_kwargs,
                 )
 
-            with stream_ctx as stream:
-                response = stream.get_final_message()
+            response = await _read_anthropic_message(stream_ctx)
 
             tracker.record_anthropic(response, model=config.model)
 
@@ -657,13 +656,41 @@ async def _run_anthropic_subagent(
     finally:
         completions.active = False
         try:
-            client.close()
+            await _close_async_client(client)
         except Exception:
             if not cancelled:
                 raise
 
 
-# ── OpenAI subagent runner ─────────────────────────────────────
+async def _read_anthropic_message(stream_ctx):
+    """Cancel model I/O once, then join its response cleanup through recancels."""
+    response = None
+
+    async def consume():
+        nonlocal response
+        async with stream_ctx as stream:
+            response = stream.response
+            return await stream.get_final_message()
+
+    reading = asyncio.create_task(consume())
+    try:
+        return await asyncio.shield(reading)
+    except asyncio.CancelledError:
+        # HTTPX marks the response closed before awaiting transport cleanup.
+        # A first cancellation arriving there must join, not abort that cleanup.
+        if response is None or not response.is_closed:
+            reading.cancel()
+        while not reading.done():
+            try:
+                await asyncio.shield(reading)
+            except asyncio.CancelledError:
+                continue
+            except BaseException:
+                break
+        if not reading.cancelled():
+            reading.exception()
+        raise
+
 
 async def _close_async_client(client) -> None:
     """Join this client's finalizer before releasing child auth/output scope."""
@@ -682,6 +709,8 @@ async def _close_async_client(client) -> None:
             closing.exception()
         raise
 
+
+# ── OpenAI subagent runner ─────────────────────────────────────
 
 async def _run_openai_subagent(
     config: SubagentConfig,

@@ -74,7 +74,7 @@ def test_anthropic_subagent_rejects_history_only_model_before_client(monkeypatch
 
     calls = []
     monkeypatch.setattr(
-        "src.auth_drivers.live_resolver.live_anthropic_client",
+        "src.auth_drivers.live_resolver.live_anthropic_async_client",
         lambda: calls.append("client"),
     )
 
