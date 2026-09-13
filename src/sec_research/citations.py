@@ -9,7 +9,7 @@ import re
 from urllib.parse import urlsplit
 
 from .captures import MAX_OBJECT_BYTES
-from .catalog import Filing, _primary_document
+from .catalog import Filing, _accepted_at, _primary_document
 from .common import accession_value, date_value, normalize_cik, text_value
 from .documents import directory_url, parse_filing_id
 from .facts import FactObservation
@@ -179,13 +179,28 @@ def _observation_shape(row, kind):
     if kind == "filing":
         if row["filing_id"] != row["cik"] + ":" + row["accession"]:
             raise ValueError
+        # Native query rows are already normalized; malformed evidence is not repaired.
+        if (date_value(row["report_date"], "", optional=True) != row["report_date"]
+                or _accepted_at(row["accepted_at"], "") != row["accepted_at"]):
+            raise ValueError
+        document = _primary_document(row["primary_document"], "")
+        url = None if document is None else directory_url(row["filing_id"]).removesuffix("index.json") + document
+        if document != row["primary_document"] or row["primary_url"] != url:
+            raise ValueError
     else:
         if not isinstance(row["value"], str) or not Decimal(row["value"]).is_finite():
             raise ValueError
         for key in ("namespace", "concept", "unit"):
             text_value(row[key], "")
-        date_value(row["start"], "", optional=True)
-        date_value(row["end"], "")
+        start = date_value(row["start"], "", optional=True)
+        end = date_value(row["end"], "")
+        if start != row["start"] or (start is not None and start > end):
+            raise ValueError
+        fiscal_year = row["fiscal_year"]
+        if fiscal_year is not None and (type(fiscal_year) is not int or not 1 <= fiscal_year <= 9999):
+            raise ValueError
+        for key in ("fiscal_period", "frame"):
+            text_value(row[key], "", optional=True)
 
 
 def _document_data(data, coverage):
