@@ -2,7 +2,7 @@
 
 > Execution: subagent-driven development, sequential writers and test runners.
 
-Status: in progress. This completes Task 3 of
+Status: implementation and acceptance complete through `5235705c`. This completes Task 3 of
 `2026-09-12-sec-research-release-integration.md`; it does not reopen the accepted
 tool wiring, output boundary or TOC work. Authority is
 `../specs/2026-09-10-sec-research-substrate-design.md` and that plan's complete
@@ -91,7 +91,8 @@ post-run events for already observed calls. Keep existing final summaries, retry
 tracing, structured output and selected-auth contracts intact.
 
 RED owners: `test_completed_openai_sec_tool_survives_later_cancel`,
-`test_sec_mcp_text_blocks_preserve_call_bound_citations`, four-channel whole
+`test_four_channels_keep_whole_refs_and_call_inputs` (including actual Claude MCP
+text blocks), four-channel whole
 results with identical reference values, duplicate names and retained inputs,
 typed malformed evidence. Test real producer loops with fake provider messages.
 GREEN relevant native/OAuth research, output boundary, task authority and adapter
@@ -168,3 +169,33 @@ entire chain passes. Explicitly retain Tasks 5/6 and SQLite activation as open.
 Seal a tracked evidence archive, verify every manifest object from Git, commit
 only this work, leave the integration branch and master separate. Delete only
 this plan's disposable scratch after verification and retain the archive.
+
+## Accepted Checkpoint
+
+- [x] Tasks 1-4 implemented, committed and independently reviewed.
+- [x] Final review's queued-completion cancellation P1 reproduced with two
+  deterministic producer/executor/store failures, repaired in `dbc8f7e5` and
+  independently approved. `test_queued_openai_completions_survive_executor_cancellation`
+  covers ordinary and repeated cancellation before queue consumption; no late
+  worker publication or security bypass. Focused709P.
+- [x] Five named inverse modes kill their owners; restored16P. The first500
+  inverse's initial launcher failure is retained separately, not called RED proof.
+- [x] Full backend at `dbc8f7e5`:10583P/12 unchanged S, exact10595 collected and
+  executed IDs,272added/zero removed. All1142 source paths, SDK/runtime and runner
+  hashes remain unchanged through the single full run.
+- [x] Final source differs only by removal of one ineffective CSS rule in
+  `5235705c`; backend source/tests unchanged. Fresh frontend1824P/126files,
+  typecheck/build/i18n pass. Existing act/build-size warnings remain disclosed.
+- [x] Final actual temporary API/store browser: en/zh-Hant at1280/390, old UTF-8
+  passage after refresh/root relocation, exact21digit fact, canonical Unicode
+  pointer, missing-source retry, persisted reload and keyboard focus pass.
+- [x] Final census:4330candidates/3469uncertainties/1158readfiles. Zero new
+  candidates or coverage/dependency/untracked drift;151 new uncertainty IDs
+  comprise145 mechanically matched position changes and6 reviewed new statements.
+  Raw exit2/review_required remains; wider queues are not closed.
+
+Evidence and exact receipts:
+`../evidence/2026-09-13-sec-research-citations/README.md`.
+Task 3 now supplies the concrete retained-reference boundary required by parent
+Tasks5/6. Operation leases/export, cleanup/reset, scheduling and SQLite activation
+remain open; none was performed. Keep the integration branch, without merge/push.
