@@ -10,7 +10,7 @@ that service. Persist exact references before admitting maintenance operations.
 **Tech Stack:** Python/SQLite/FastAPI, existing SEC transports, React/TypeScript.
 **Spec:** `docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md`.
 
-Status: Tasks1/2/4 reviewed complete; Task2 uses the approved shared output
+Status: Tasks1/2/3/4 reviewed complete; Task2 uses the approved shared output
 boundary. Its former SEC-specific redaction proposal is superseded, not
 an outstanding authorization request. Source checkpoint `ba4f2619` is preserved;
 integration proceeds on `codex/sec-research-integration` from security `41682675`.
@@ -77,7 +77,7 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 - [x] Preflight and exact task contracts
 - [x] Task 1: issuer/tool service (2d54a482,38529e51; focused835P; independent review approved)
 - [x] Task 2: four-channel replacement (5d979910; focused994P, independent scoped re-review51P; full-release gate remains Task8)
-- [ ] Task 3: persistent Research citations
+- [x] Task 3: persistent Research citations (7401e656; sealed acceptance10583P/12S, frontend1824P)
 - [x] Task 4: TOC recognition (ba5a3356,5518ae21; focused338P; independent review approved)
 - [ ] Task 5: export/restore
 - [ ] Task 6: cleanup/reset
@@ -103,8 +103,9 @@ roundtrip and both ticker/CIK cancellation paths. The latest focused run is
 findings. Original source branches stay
 intact, and no source implementation remains solely in an untracked checkpoint.
 
-The remaining release work is still Tasks3/5/6/7/8. In particular, persistent
-Research references, portable export/restore, orphan cleanup, schema recovery
+The remaining release work is now Tasks5/6/7/8. Task3's retained references and
+query-only closure are delivered at7401e656; see the citation evidence below.
+Portable export/restore, orphan cleanup, schema recovery
 and the new default-disabled schedule are not completed by the tool/parser work.
 The integration checkpoint passed a fresh complete backend run at `ae2055e3`:
 10279 passed/12 unchanged skips, exactly10291 collected/executed,123 added and10
@@ -113,6 +114,24 @@ failures and their RED-first correction remain in evidence. Frontend1776 passed
 and typecheck passed. This verifies completed changes, not unfinished release
 Tasks3/5/6/7. No production change, merge or push occurred. Wider repository
 cleanup and production SQLite upgrade are not represented as finished.
+
+### September 13 Maintenance Continuation
+
+Task3 acceptance is sealed in
+`../evidence/2026-09-13-sec-research-citations/README.md`: exact10595 backend
+nodes,10583 passed/12 unchanged skips, frontend1824 passed. Its iterator reads
+retained Research messages and events, including archived/event-only roots;
+`sec_reference_closure` verifies their exact stored graph without acquisition.
+
+The existing `capture_writer` is not the maintenance exclusion boundary:
+`CaptureStore.put` releases it before service metadata/reference publication,
+and `CaptureStore.read` uses descriptor-bound I/O without that writer lease.
+Task5's operation lease protects those lifetimes and durable Research publication;
+it is not another refresh mutex or a scheduler job lock. Keep Task6 after Task5
+so cleanup/reset cannot race a reader, producer or export. Do not infer that the
+availability of citation roots alone admits deletion. SQLite activation remains
+outside this plan's explicit no-install/no-production-write boundary; the
+source-only admission preflight still applies.
 
 ## Verification Commands
 
