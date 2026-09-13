@@ -49,7 +49,18 @@ runner helpers were copied byte-for-byte from the preceding reviewed checkpoint.
   SDK's public response property and keeps actual SDK tests as its regression
   owner, not a replacement parser or a transport monkeypatch in product code.
   Final focused verification: **295 passed**, including the two route owners.
-- [ ] Independent review and complete backend acceptance.
+- [x] First independent review: one P2, error-response cleanup during SDK entry.
+- [x] Reproduce P2 with real SDK: 16 failures (429/500 close, 400 body/close).
+- [x] Public SDK middleware now retains pre-entry responses and wraps only
+  their byte-stream finalizers. Reads and retry policy remain SDK-owned;
+  cancellation waits for cleanup then propagates, preventing another retry.
+  Observed responses are released after each model turn. The intermediate
+  `is_closed` cancellation workaround is removed, not stacked as another policy.
+  First covering run: 145 passed. The middleware client shares the original
+  HTTP client; it does not construct a second connection pool or select auth.
+  Expanded covering: **317 passed**, including six unchanged-retry controls
+  (400 once, 429/500 three attempts with a two-retry budget, both native parents).
+- [ ] Scoped re-review and complete backend acceptance.
 - [ ] Seal evidence and update the release checkpoint.
 
 ## Remaining Scope
@@ -63,3 +74,9 @@ schema, source transport, output policy or selected model/effort changed.
 SQLite activation, C12/C15/C20, locale/SQL census queues, production disposition
 and Windows/macOS acceptance remain separate work. A successful Linux offline
 suite will not be reported as those tasks being completed.
+
+The dependency floor is deliberately raised from `anthropic>=1.2.0` to
+`anthropic>=1.4.0`, the installed version whose public `with_middleware` contract
+and client-copy behavior were inspected and exercised. No support claim is made
+for that interface on untested older versions; no installed package changed.
+The requirement does not alter Claude Code SDK/OAuth admission.
