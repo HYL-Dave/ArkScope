@@ -1,6 +1,6 @@
 """Explicit cleanup over disposable stores, including interrupted durability."""
 
-from contextlib import closing
+from contextlib import closing, contextmanager
 from concurrent.futures import ThreadPoolExecutor
 import importlib
 import importlib.util
@@ -60,6 +60,32 @@ def snapshot(a):
     return rows, files
 
 
+def assert_profile_writable(a):
+    error = None
+    try:
+        with sqlite3.connect(a.profile_path, timeout=0) as conn:
+            assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
+            conn.execute("UPDATE profile_settings SET value='ordinary profile write' WHERE key='fixture'")
+    except sqlite3.Error as exc:
+        error = type(exc).__name__
+    assert error is None, ("operator output broke the profile writer", error)
+    assert a.profile.execute("SELECT value FROM profile_settings WHERE key='fixture'").fetchone()[0] == "ordinary profile write"
+
+
+@pytest.mark.parametrize("suffix", ["", "-journal", "-wal", "-shm"])
+def test_cleanup_receipt_rejects_profile_sqlite_namespace(admin, suffix):
+    a = admin
+    a.captures.put(b"retained")
+    before, p = snapshot(a), preview(a)
+    destination = a.profile_path.with_name(a.profile_path.name + suffix)
+    result = apply(a, p, str(destination))
+    created = bool(suffix) and destination.exists()
+    assert_profile_writable(a)
+    assert not created, result
+    assert result["status"] == "blocked" and result["phase"] == "not_started", result
+    assert snapshot(a) == before
+
+
 @pytest.fixture
 def market_writer(admin, monkeypatch):
     from src.market_data_direct import market_write_lock
@@ -85,6 +111,92 @@ def market_writer(admin, monkeypatch):
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         yield lambda locked=True: pool.submit(write, locked).result(timeout=5)
+
+
+@pytest.fixture
+def failure_audit_barrier(admin, market_writer, monkeypatch):
+    a = admin
+
+    def observe(module):
+        events, audits = [], []
+        operation = module.research_operation
+        write = api("operations").OperationReceipt.write
+
+        @contextmanager
+        def lease(*args, **kwargs):
+            with operation(*args, **kwargs):
+                events.append("entered")
+                try:
+                    yield
+                finally:
+                    events.append("exiting")
+
+        def enter_sec():
+            try:
+                with research_operation(a.paths.capture_root):
+                    return "admitted"
+            except ValueError as exc:
+                return str(exc)
+
+        def audit(self, result):
+            if result["status"] == "blocked" and result["code"] is not None:
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    sec = pool.submit(enter_sec).result(timeout=5)
+                market = market_writer()
+                audits.append((result["phase"], sec, market))
+                assert events == ["entered"], ("original SEC lease exited before failure audit", events)
+                assert sec == "sec_research_operation_busy", audits
+                assert market == "written", audits
+            return write(self, result)
+
+        monkeypatch.setattr(module, "research_operation", lease)
+        monkeypatch.setattr(api("operations").OperationReceipt, "write", audit)
+        return events, audits
+
+    return observe
+
+
+@pytest.mark.parametrize("stage,phase", [("unlink", "charged"), ("transaction", "prepared")])
+def test_cleanup_failure_audit_keeps_original_exclusive_lease(admin, failure_audit_barrier, monkeypatch, stage, phase):
+    a, module = admin, api()
+    sha = a.captures.put(b"retained")
+    p = preview(a)
+    events, audits = failure_audit_barrier(module)
+    delete = module._delete_registered
+
+    def fail(*args):
+        if stage == "transaction":
+            delete(*args)
+        raise OSError("fixture failed cleanup stage")
+
+    if stage == "unlink":
+        monkeypatch.setattr(CaptureDirectory, "remove_owned", fail)
+    else:
+        monkeypatch.setattr(module, "_delete_registered", fail)
+    result = apply(a, p)
+    assert result["status"] == "blocked" and result["phase"] == phase, result
+    assert audits == [(phase, "sec_research_operation_busy", "written")]
+    assert events == ["entered", "exiting"]
+    assert json.loads((a.tmp / "receipt.json").read_text())["phase"] == phase
+    assert (a.paths.capture_root / "objects" / sha).read_bytes() == b"retained"
+    assert a.captures.status()["charged_bytes"] == 8
+
+
+@pytest.mark.parametrize("operation", ["cleanup", "schema"])
+def test_admin_admission_failure_has_no_lease_or_audit(admin, failure_audit_barrier, operation):
+    a = admin
+    module = api() if operation == "cleanup" else api("schema_admin")
+    p = preview(a) if operation == "cleanup" else module.preview_schema_reset(a.paths, mode="reset", profile_connection=a.profile)
+    events, audits = failure_audit_barrier(module)
+    p["approval_sha256"] = "0" * 64
+    if operation == "cleanup":
+        result = apply(a, p)
+    else:
+        result = module.apply_schema_reset(a.paths, p, approval_sha256=p["approval_sha256"],
+            receipt_path=a.tmp / "receipt.json", backup_path=a.tmp / "backup", profile_connection=a.profile)
+    assert result["status"] == "blocked" and result["phase"] == result["receipt_phase"] == "not_started"
+    assert events == audits == []
+    assert not (a.tmp / "receipt.json").exists() and not (a.tmp / "backup").exists()
 
 
 @pytest.mark.parametrize("stage", ["capture", "unlink", "receipt"])

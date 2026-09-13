@@ -1,6 +1,6 @@
 """Explicit, digest-approved SEC orphan cleanup; previews never recover stores."""
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import hashlib
 import json
 import os
@@ -355,12 +355,13 @@ def validate_preview(preview, *, operation, approval_sha256):
              _hash({k: v for k, v in preview.items() if k != "approval_sha256"}))
 
 
-def _output_path(paths, path):
+def _output_path(paths, path, *, profile_path):
     path = _path(path)
-    _require(not path.is_relative_to(paths.capture_root) and path not in {
-        paths.market_db_path, paths.market_db_path.with_name(paths.market_db_path.name + "-wal"),
-        paths.market_db_path.with_name(paths.market_db_path.name + "-shm"),
-        paths.market_db_path.with_name(paths.market_db_path.name + "-journal")}, "sec_research_admin_path_invalid")
+    reserved = {database.with_name(database.name + suffix)
+                for database in (paths.market_db_path, profile_path)
+                for suffix in ("", "-journal", "-wal", "-shm")}
+    _require(not path.is_relative_to(paths.capture_root) and path not in reserved,
+             "sec_research_admin_path_invalid")
     _new_destination(path)
     return path
 
@@ -427,63 +428,63 @@ def _write_point(conn, preview):
 
 
 def apply_cleanup(paths, preview, *, approval_sha256, receipt_path, profile_connection) -> dict:
-    result, audit, directory = _receipt(preview), None, None
+    result, audit = _receipt(preview), None
+    lifetime = ExitStack()
     try:
         validate_preview(preview, operation="cleanup", approval_sha256=approval_sha256)
         _require(preview["status"] == "ready")
-        receipt_path = _output_path(paths, receipt_path)
-        _profile_admission(profile_connection)
+        profile_path, _ = _profile_admission(profile_connection)
+        receipt_path = _output_path(paths, receipt_path, profile_path=profile_path)
         _file_identity(paths.market_db_path)
-        with research_operation(paths.capture_root, exclusive=True):
-            directory = CaptureDirectory(paths.capture_root)
-            with Store(paths).connect(readonly=True) as conn, _profile_snapshot(profile_connection) as (profile, identity):
-                conn.execute("BEGIN")
-                current = _observe(paths, conn, directory, profile, identity, "cleanup", None)
-                _recheck(preview, current)
-            result.update(selected=[c["key"] for c in current["candidates"]],
-                          remaining=[c["key"] for c in current["candidates"]],
-                          retained_bytes=current["retained_bytes"], apply_effect=current["apply_effect"],
-                          references=current["references"], reference_status=current["reference_status"])
-            audit = OperationReceipt(receipt_path)
-            prepared = dict(result, phase="prepared")
-            audit.write(prepared)
-            result = prepared
-            with _write_transaction(paths) as conn:
-                _write_point(conn, current)
-                for item in current["candidates"]:
-                    conn.execute("INSERT OR REPLACE INTO sec_research_orphans VALUES(?,?)",
-                                 (item["key"], item["size_bytes"]))
-                _delete_registered(conn, current["candidates"])
-                conn.execute("DELETE FROM sec_research_reservations")
-            result.update(phase="charged", accounting="orphans_charged")
-            audit.write(result)
+        lifetime.enter_context(research_operation(paths.capture_root, exclusive=True))
+        directory = CaptureDirectory(paths.capture_root)
+        lifetime.callback(directory.close)
+        with Store(paths).connect(readonly=True) as conn, _profile_snapshot(profile_connection) as (profile, identity):
+            conn.execute("BEGIN")
+            current = _observe(paths, conn, directory, profile, identity, "cleanup", None)
+            _recheck(preview, current)
+        result.update(selected=[c["key"] for c in current["candidates"]],
+                      remaining=[c["key"] for c in current["candidates"]],
+                      retained_bytes=current["retained_bytes"], apply_effect=current["apply_effect"],
+                      references=current["references"], reference_status=current["reference_status"])
+        audit = OperationReceipt(receipt_path)
+        lifetime.callback(audit.close)
+        prepared = dict(result, phase="prepared")
+        audit.write(prepared)
+        result = prepared
+        with _write_transaction(paths) as conn:
+            _write_point(conn, current)
             for item in current["candidates"]:
-                absent = item["kind"] == "absent_charge"
-                if absent:
-                    directory.confirm_absent(item["key"])
-                else:
-                    directory.remove_owned({k: v for k, v in item.items() if k != "kind"})
-                    result["removed"].append(item["key"])
-                    result["remaining"].remove(item["key"])
-                    result["freed_bytes"] += item["size_bytes"]
-                    result["retained_bytes"] -= item["size_bytes"]
-                    result["phase"] = "files_removed"
-                    audit.write(result)
-                with _write_transaction(paths) as conn:
-                    conn.execute("DELETE FROM sec_research_orphans WHERE object_key=?", (item["key"],))
-                if absent:
-                    result["resolved_charges"].append(item["key"])
-                    result["remaining"].remove(item["key"])
-                    result["phase"] = "charges_reconciled"
-                    audit.write(result)
-            result["accounting"] = "reconciled"
-            completed = dict(result, status="ok", phase="complete", recovery="none")
-            audit.write(completed)
-            return completed
+                conn.execute("INSERT OR REPLACE INTO sec_research_orphans VALUES(?,?)",
+                             (item["key"], item["size_bytes"]))
+            _delete_registered(conn, current["candidates"])
+            conn.execute("DELETE FROM sec_research_reservations")
+        result.update(phase="charged", accounting="orphans_charged")
+        audit.write(result)
+        for item in current["candidates"]:
+            absent = item["kind"] == "absent_charge"
+            if absent:
+                directory.confirm_absent(item["key"])
+            else:
+                directory.remove_owned({k: v for k, v in item.items() if k != "kind"})
+                result["removed"].append(item["key"])
+                result["remaining"].remove(item["key"])
+                result["freed_bytes"] += item["size_bytes"]
+                result["retained_bytes"] -= item["size_bytes"]
+                result["phase"] = "files_removed"
+                audit.write(result)
+            with _write_transaction(paths) as conn:
+                conn.execute("DELETE FROM sec_research_orphans WHERE object_key=?", (item["key"],))
+            if absent:
+                result["resolved_charges"].append(item["key"])
+                result["remaining"].remove(item["key"])
+                result["phase"] = "charges_reconciled"
+                audit.write(result)
+        result["accounting"] = "reconciled"
+        completed = dict(result, status="ok", phase="complete", recovery="none")
+        audit.write(completed)
+        return completed
     except (ValueError, OSError, sqlite3.Error, TypeError, KeyError, KeyboardInterrupt) as exc:
         return _finish_failure(result, audit, exc)
     finally:
-        if directory is not None:
-            directory.close()
-        if audit is not None:
-            audit.close()
+        lifetime.close()

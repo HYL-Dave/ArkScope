@@ -6,7 +6,7 @@ import hashlib
 import pytest
 
 from src.sec_research.paths import SecResearchPaths
-from tests.test_sec_research_maintenance import admin
+from tests.test_sec_research_maintenance import admin, assert_profile_writable, snapshot
 
 
 def cli():
@@ -39,6 +39,40 @@ def test_cli_explicit_preview_approval_and_receipt(admin, monkeypatch, capsys, o
     assert result["status"] == "ok" and result["phase"] == "complete"
     output = capsys.readouterr().out
     assert "operator fixture" not in output and str(a.profile_path) not in output
+    assert_profile_writable(a)
+
+
+@pytest.mark.parametrize("suffix", ["", "-journal", "-wal", "-shm"])
+@pytest.mark.parametrize("operation,output", [("cleanup", "preview"), ("schema", "preview"),
+    ("cleanup", "receipt"), ("schema", "receipt"), ("schema", "backup")])
+def test_cli_outputs_reject_profile_sqlite_namespace(admin, monkeypatch, suffix, operation, output):
+    a, module = admin, cli()
+    a.captures.put(b"retained")
+    monkeypatch.setattr(SecResearchPaths, "resolve", classmethod(lambda cls: a.paths))
+    monkeypatch.setattr(module, "_profile_path", lambda: a.profile_path)
+    path, receipt, backup = a.tmp / "preview.json", a.tmp / "receipt.json", a.tmp / "backup"
+    destination = a.profile_path.with_name(a.profile_path.name + suffix)
+    before = snapshot(a)
+    if output == "preview":
+        args = [operation + "-preview", "--preview", str(destination)]
+        if operation == "schema":
+            args += ["--mode", "reset"]
+    else:
+        args = [operation + "-preview", "--preview", str(path)]
+        if operation == "schema":
+            args += ["--mode", "reset"]
+        assert module.main(args) == 0
+        p = json.loads(path.read_text())
+        args = [operation + "-apply", "--preview", str(path), "--approval-sha256", p["approval_sha256"],
+                "--receipt", str(destination if output == "receipt" else receipt)]
+        if operation == "schema":
+            args += ["--backup", str(destination if output == "backup" else backup)]
+    code = module.main(args)
+    created = bool(suffix) and destination.exists()
+    assert_profile_writable(a)
+    assert code == 1 and not created, (code, destination)
+    assert not receipt.exists() and not backup.exists()
+    assert snapshot(a) == before
 
 
 @pytest.mark.parametrize("args", [

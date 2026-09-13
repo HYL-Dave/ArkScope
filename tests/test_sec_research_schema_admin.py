@@ -8,7 +8,8 @@ import pytest
 
 from src.sec_research import schema
 from src.sec_research.capture_lock import research_operation
-from tests.test_sec_research_maintenance import admin, api, snapshot, market_writer
+from tests.test_sec_research_maintenance import (admin, api, snapshot, market_writer,
+    assert_profile_writable, failure_audit_barrier)
 from tests.test_sec_research_citations import evidence, rig
 from tests.test_sec_research_references import profile
 
@@ -21,6 +22,53 @@ def apply(a, p, name="receipt.json", backup="backup"):
     return api("schema_admin").apply_schema_reset(a.paths, p, approval_sha256=p["approval_sha256"],
         backup_path=None if backup is None else a.tmp / backup,
         receipt_path=a.tmp / name, profile_connection=a.profile)
+
+
+@pytest.mark.parametrize("suffix", ["", "-journal", "-wal", "-shm"])
+@pytest.mark.parametrize("output", ["receipt", "backup"])
+def test_schema_outputs_reject_profile_sqlite_namespace(admin, suffix, output):
+    a = admin
+    a.captures.put(b"retained")
+    before, p = snapshot(a), preview(a)
+    destination = a.profile_path.with_name(a.profile_path.name + suffix)
+    result = apply(a, p, name=str(destination) if output == "receipt" else "receipt.json",
+                   backup=str(destination) if output == "backup" else "backup")
+    created = bool(suffix) and destination.exists()
+    assert_profile_writable(a)
+    assert not created, result
+    assert result["status"] == "blocked" and result["phase"] == "not_started", result
+    assert not (a.tmp / "receipt.json").exists() and not (a.tmp / "backup").exists()
+    assert snapshot(a) == before
+
+
+@pytest.mark.parametrize("stage,phase", [("backup", "prepared"), ("transaction", "backed_up"), ("stale", "backed_up")])
+def test_schema_failure_audit_keeps_original_exclusive_lease(admin, failure_audit_barrier, monkeypatch, stage, phase):
+    a, module = admin, api("schema_admin")
+    sha = a.captures.put(b"retained")
+    p = preview(a)
+    events, audits = failure_audit_barrier(module)
+    original = module._drop_owned if stage == "transaction" else module.raw_backup
+
+    def fail(*args, **kwargs):
+        if stage == "backup":
+            raise OSError("fixture failed backup")
+        result = original(*args, **kwargs)
+        if stage == "transaction":
+            raise sqlite3.OperationalError("fixture failure after DROP")
+        with a.store.connect() as conn:
+            conn.execute("INSERT INTO sec_research_reservations VALUES('changed',1)")
+        return result
+
+    monkeypatch.setattr(module, "_drop_owned" if stage == "transaction" else "raw_backup", fail)
+    result = apply(a, p)
+    assert result["status"] == "blocked" and result["phase"] == phase, result
+    assert audits == [(phase, "sec_research_operation_busy", "written")]
+    assert events == ["entered", "exiting"]
+    assert json.loads((a.tmp / "receipt.json").read_text())["phase"] == phase
+    with a.store.connect(readonly=True) as conn:
+        schema.verify(conn)
+        assert conn.execute("SELECT COUNT(*) FROM sec_research_objects").fetchone()[0] == 1
+    assert (a.paths.capture_root / "objects" / sha).read_bytes() == b"retained"
 
 
 def test_schema_reset_requires_backup_and_exclusive_lease(admin):
