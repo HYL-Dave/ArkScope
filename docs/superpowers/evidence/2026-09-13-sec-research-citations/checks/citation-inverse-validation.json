@@ -1,0 +1,44 @@
+{
+  "all_checks_passed": true,
+  "inverses": {
+    "inverse-bound-hash-01": {
+      "current_function_sha256": "a454e599328ff1d8d8a411695a2b794d0575491455f3591f9b0edb5833e66271",
+      "failed_owners": [
+        "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[fact-change0]"
+      ],
+      "receipt_sha256": "ccc232cc4a979321b404f98f3ce1521d2300c2e76592ddad0d146b12f87a11f3"
+    },
+    "inverse-call-id-01": {
+      "current_function_sha256": "b2cfb45a49634bce268e9f1f970ce8c70519a44a5fb2c20dc9ade29e2da7d7d2",
+      "failed_owners": [
+        "test_sec_tool_end_preserves_whole_citations_by_call_id"
+      ],
+      "receipt_sha256": "cee3e7ea8636e3a86ea30f30030a4bc392157610ac9a27aaaec09b5bb03bc510"
+    },
+    "inverse-event-roots-01": {
+      "current_function_sha256": "48efccd135024c0eb57e7b49ce7f35c03d817be3543e1935f5c63c1f0d9ffed1",
+      "failed_owners": [
+        "test_profile_iterator_enumerates_message_and_event_only_roots"
+      ],
+      "receipt_sha256": "9986ad7600d1f1ee5df2d2e60fc93cf481a0e3feb9aefc28dfa01d7c29619fee"
+    },
+    "inverse-optional-fields-01": {
+      "current_function_sha256": "b2cfb45a49634bce268e9f1f970ce8c70519a44a5fb2c20dc9ade29e2da7d7d2",
+      "failed_owners": [
+        "test_sec_tool_end_preserves_whole_citations_by_call_id"
+      ],
+      "receipt_sha256": "6038d059433eac8d04509f06b30217d90c0d6515d6ed959c59d002bbe9f2395b"
+    },
+    "inverse-recovery-500-02": {
+      "current_function_sha256": "7ec4cc3470827217eae44add9c0bb35077f58ff4a629c2e1b8700c3d6475e5b5",
+      "failed_owners": [
+        "test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls[no-task-cancel]",
+        "test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls[restart]"
+      ],
+      "receipt_sha256": "987bbda0d939de4f7737634a8f501797f5ee6103e8ea2b3d7bf3220b4db85585"
+    }
+  },
+  "restored_passed": 16,
+  "setup_failure_excluded": "inverse-recovery-500-01",
+  "source_files_mutated_on_disk": false
+}

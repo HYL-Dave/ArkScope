@@ -1,0 +1,22 @@
+{
+  "diff": "--- admitted\n+++ inverse\n@@ -16,7 +16,7 @@\n                 _require(type(call) is dict)\n                 yield from _profile_citations(call.get(\"name\"), call)\n         for record in profile_connection.execute(\n-            \"SELECT data_json FROM research_run_events ORDER BY run_id, seq\"\n+            \"SELECT data_json FROM research_run_events WHERE 0 ORDER BY run_id, seq\"\n         ):\n             data = _json(record[0])\n             _require(type(data) is dict)\n",
+  "exit_code": 1,
+  "inverse_sha256": "105417c5b7a3f3595a87a5f40a963c9214b3a4eff3fa6b43cb9fa40bcacec6cb",
+  "module": "src.sec_research.references",
+  "name": "omit_retained_event_only_roots",
+  "original_restored": true,
+  "qualname": "iter_research_sec_citations",
+  "recipe": {
+    "module": "src.sec_research.references",
+    "name": "omit_retained_event_only_roots",
+    "qualname": "iter_research_sec_citations",
+    "replacements": [
+      {
+        "new": "SELECT data_json FROM research_run_events WHERE 0 ORDER BY run_id, seq",
+        "old": "SELECT data_json FROM research_run_events ORDER BY run_id, seq"
+      }
+    ]
+  },
+  "source_sha256": "48efccd135024c0eb57e7b49ce7f35c03d817be3543e1935f5c63c1f0d9ffed1",
+  "tracked_source_edited": false
+}

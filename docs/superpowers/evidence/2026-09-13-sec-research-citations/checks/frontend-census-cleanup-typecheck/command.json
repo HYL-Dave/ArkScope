@@ -1,0 +1,22 @@
+{
+  "name": "frontend-census-cleanup-typecheck",
+  "command": [
+    "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+    "run",
+    "typecheck"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+  "exit_code": 0,
+  "seconds": 11.657,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-typecheck",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-typecheck/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_node.cjs"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-typecheck/output.log"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "truncate_transactional_recovery_at_500_events",
+  "module": "src.research_runs",
+  "qualname": "ResearchRunStore._terminalize_error_on_connection",
+  "replacements": [{
+    "old": "WHERE run_id = ? AND type IN ('tool_start', 'tool_end') ORDER BY seq",
+    "new": "WHERE run_id = ? AND type IN ('tool_start', 'tool_end') ORDER BY seq LIMIT 500"
+  }]
+}

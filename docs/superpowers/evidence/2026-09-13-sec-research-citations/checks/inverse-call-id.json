@@ -1,0 +1,9 @@
+{
+  "name": "match_same_name_instead_of_exact_call_id",
+  "module": "src.research_tool_trace",
+  "qualname": "accumulate_tool_calls",
+  "replacements": [{
+    "old": "target = identified.get(call_id) if call_id is not None else None",
+    "new": "target = next((index for index, row in enumerate(rows) if row[\"name\"] == _name(data.get(\"tool\"))), None)"
+  }]
+}

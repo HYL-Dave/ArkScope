@@ -1,0 +1,26 @@
+{
+  "name": "task2-edge-red-02",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_pytest.py",
+    "-q",
+    "tests/test_sec_research_trace.py::test_error_marked_result_cannot_become_successful_evidence",
+    "tests/test_sec_research_trace.py::test_openai_end_hook_retains_input_without_start_and_ignores_raw_duplicate",
+    "tests/test_sec_research_trace.py::test_repeated_close_cancellation_awaits_same_openai_worker",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task2-edge-red-02/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 4.329,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task2-edge-red-02",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task2-edge-red-02/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task2-edge-red-02/output.log"
+}

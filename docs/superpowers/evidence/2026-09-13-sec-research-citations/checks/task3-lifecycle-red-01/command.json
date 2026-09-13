@@ -1,0 +1,25 @@
+{
+  "name": "task3-lifecycle-red-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_pytest.py",
+    "-q",
+    "tests/test_sec_research_trace.py::test_partial_trace_cannot_replace_durable_refs_or_consume_identified_rows",
+    "tests/test_sec_research_trace.py::test_executor_retains_citations_and_gaps_through_terminal_and_archive",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task3-lifecycle-red-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 4.009,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task3-lifecycle-red-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task3-lifecycle-red-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task3-lifecycle-red-01/output.log"
+}

@@ -1,0 +1,29 @@
+{
+  "name": "task4-final-focused-01",
+  "command": [
+    "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+    "test",
+    "--",
+    "--run",
+    "src/secCitationApi.test.ts",
+    "src/researchReducer.test.ts",
+    "src/ResearchEvidenceDrawer.test.tsx",
+    "src/SecCitationView.test.tsx",
+    "src/i18n/resources.test.ts",
+    "src/i18n/foundationBoundaries.test.ts"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+  "exit_code": 0,
+  "seconds": 1.916,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task4-final-focused-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task4-final-focused-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_node.cjs"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task4-final-focused-01/output.log"
+}

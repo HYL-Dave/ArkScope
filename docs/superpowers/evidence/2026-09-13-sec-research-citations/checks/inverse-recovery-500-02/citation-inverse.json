@@ -1,0 +1,22 @@
+{
+  "diff": "--- admitted\n+++ inverse\n@@ -31,7 +31,7 @@\n     # including events beyond the bounded public replay page.\n     events = conn.execute(\n         \"SELECT type, data_json FROM research_run_events \"\n-        \"WHERE run_id = ? AND type IN ('tool_start', 'tool_end') ORDER BY seq\",\n+        \"WHERE run_id = ? AND type IN ('tool_start', 'tool_end') ORDER BY seq LIMIT 500\",\n         (run_id,),\n     )\n     tool_calls = accumulate_tool_calls(\n",
+  "exit_code": 1,
+  "inverse_sha256": "dc6641a4066586dc7888ff4d273e66476146b080f87183b9f69f9b16d2b9ecb0",
+  "module": "src.research_runs",
+  "name": "truncate_transactional_recovery_at_500_events",
+  "original_restored": true,
+  "qualname": "ResearchRunStore._terminalize_error_on_connection",
+  "recipe": {
+    "module": "src.research_runs",
+    "name": "truncate_transactional_recovery_at_500_events",
+    "qualname": "ResearchRunStore._terminalize_error_on_connection",
+    "replacements": [
+      {
+        "new": "WHERE run_id = ? AND type IN ('tool_start', 'tool_end') ORDER BY seq LIMIT 500",
+        "old": "WHERE run_id = ? AND type IN ('tool_start', 'tool_end') ORDER BY seq"
+      }
+    ]
+  },
+  "source_sha256": "7ec4cc3470827217eae44add9c0bb35077f58ff4a629c2e1b8700c3d6475e5b5",
+  "tracked_source_edited": false
+}

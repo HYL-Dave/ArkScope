@@ -1,0 +1,28 @@
+{
+  "name": "inverse-restored-green-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_pytest.py",
+    "-q",
+    "tests/test_sec_research_trace.py",
+    "tests/test_sec_research_references.py",
+    "tests/test_sec_research_citations.py",
+    "-k",
+    "test_sec_tool_end_preserves_whole_citations_by_call_id or test_profile_iterator_enumerates_message_and_event_only_roots or test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls or test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/inverse-restored-green-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 9.194,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/inverse-restored-green-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/inverse-restored-green-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/inverse-restored-green-01/output.log"
+}

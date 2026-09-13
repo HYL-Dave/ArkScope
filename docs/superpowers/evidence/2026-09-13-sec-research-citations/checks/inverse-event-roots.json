@@ -1,0 +1,9 @@
+{
+  "name": "omit_retained_event_only_roots",
+  "module": "src.sec_research.references",
+  "qualname": "iter_research_sec_citations",
+  "replacements": [{
+    "old": "SELECT data_json FROM research_run_events ORDER BY run_id, seq",
+    "new": "SELECT data_json FROM research_run_events WHERE 0 ORDER BY run_id, seq"
+  }]
+}

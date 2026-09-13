@@ -1,0 +1,26 @@
+{
+  "diff": "--- admitted\n+++ inverse\n@@ -2,13 +2,13 @@\n     cik = ref[\"cik\"] if ref[\"kind\"] == \"fact\" else parse_filing_id(ref[\"filing_id\"])[0]\n     metadata = self._snapshot(cik, ref[\"snapshot_id\"])\n     _require(metadata[\"kind\"] == (\"facts\" if ref[\"kind\"] == \"fact\" else \"catalog\")\n-             and metadata[\"object_sha256\"] == ref[\"source_sha256\"]\n+             and True\n              and metadata[\"source_url\"] == ref[\"source_url\"])\n     with closing(self._rows(metadata, pointer=ref[\"source_pointer\"])) as rows:\n         selected = next(rows, None)\n         _require(selected is not None and next(rows, None) is None)\n         _, row = selected\n     key = \"fact_id\" if ref[\"kind\"] == \"fact\" else \"filing_id\"\n-    _require(row is not None and row[key] == ref[key] and row[\"source\"][\"sha256\"] == ref[\"source_sha256\"])\n+    _require(row is not None and row[key] == ref[key])\n     self._observation_receipts(ref, metadata)\n     return {\"citation\": ref, \"observation\": {**row, \"observed_at\": ref[\"observed_at\"]}}, ref[\"observed_at\"]\n",
+  "exit_code": 1,
+  "inverse_sha256": "f56ac0f2546cc7dd0686b97484dc1a0a188dc9a1cbc2d0f7290468b8cfb7d700",
+  "module": "src.sec_research.references",
+  "name": "ignore_bound_fact_source_hash",
+  "original_restored": true,
+  "qualname": "_ReferenceReader._observation",
+  "recipe": {
+    "module": "src.sec_research.references",
+    "name": "ignore_bound_fact_source_hash",
+    "qualname": "_ReferenceReader._observation",
+    "replacements": [
+      {
+        "new": "and True",
+        "old": "and metadata[\"object_sha256\"] == ref[\"source_sha256\"]"
+      },
+      {
+        "new": "",
+        "old": " and row[\"source\"][\"sha256\"] == ref[\"source_sha256\"]"
+      }
+    ]
+  },
+  "source_sha256": "a454e599328ff1d8d8a411695a2b794d0575491455f3591f9b0edb5833e66271",
+  "tracked_source_edited": false
+}

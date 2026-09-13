@@ -1,0 +1,15 @@
+{
+  "name": "ignore_bound_fact_source_hash",
+  "module": "src.sec_research.references",
+  "qualname": "_ReferenceReader._observation",
+  "replacements": [
+    {
+      "old": "and metadata[\"object_sha256\"] == ref[\"source_sha256\"]",
+      "new": "and True"
+    },
+    {
+      "old": " and row[\"source\"][\"sha256\"] == ref[\"source_sha256\"]",
+      "new": ""
+    }
+  ]
+}

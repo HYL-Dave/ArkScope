@@ -1,0 +1,22 @@
+{
+  "diff": "--- admitted\n+++ inverse\n@@ -33,7 +33,7 @@\n             row[\"input\"] = data[\"input\"]\n         if etype == \"tool_end\":\n             row[\"result_preview\"] = data.get(\"summary\")\n-            for field in (\"sec_citations\", \"sec_citation_gaps\"):\n+            for field in ():\n                 if field in data:\n                     row[field] = data[field]\n             completed.add(target)\n",
+  "exit_code": 1,
+  "inverse_sha256": "e6776d0e938706fca0d12914d04867ebfcc65485fb886cd9038d1f6c0e5d52a8",
+  "module": "src.research_tool_trace",
+  "name": "drop_optional_citation_projection",
+  "original_restored": true,
+  "qualname": "accumulate_tool_calls",
+  "recipe": {
+    "module": "src.research_tool_trace",
+    "name": "drop_optional_citation_projection",
+    "qualname": "accumulate_tool_calls",
+    "replacements": [
+      {
+        "new": "for field in ():",
+        "old": "for field in (\"sec_citations\", \"sec_citation_gaps\"):"
+      }
+    ]
+  },
+  "source_sha256": "b2cfb45a49634bce268e9f1f970ce8c70519a44a5fb2c20dc9ade29e2da7d7d2",
+  "tracked_source_edited": false
+}

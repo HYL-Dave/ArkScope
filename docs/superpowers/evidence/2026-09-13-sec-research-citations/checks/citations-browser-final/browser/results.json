@@ -1,0 +1,1246 @@
+{
+  "workflows": [
+    {
+      "locale": "en",
+      "width": 1280,
+      "geometry": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "clippedButtons": []
+      },
+      "pinned_text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 ",
+      "newer_capture_distinct": true,
+      "reopened_after_relocation": true,
+      "persisted_message_reloaded": true,
+      "exact_fact_value": "123456789012345678945",
+      "missing_object_retry": true,
+      "focus_restored": true,
+      "page_errors": []
+    },
+    {
+      "locale": "en",
+      "width": 390,
+      "geometry": {
+        "width": 390,
+        "scrollWidth": 390,
+        "clippedButtons": []
+      },
+      "pinned_text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 ",
+      "newer_capture_distinct": true,
+      "reopened_after_relocation": true,
+      "persisted_message_reloaded": true,
+      "exact_fact_value": "123456789012345678945",
+      "missing_object_retry": true,
+      "focus_restored": true,
+      "page_errors": []
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 1280,
+      "geometry": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "clippedButtons": []
+      },
+      "pinned_text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 ",
+      "newer_capture_distinct": true,
+      "reopened_after_relocation": true,
+      "persisted_message_reloaded": true,
+      "exact_fact_value": "123456789012345678945",
+      "missing_object_retry": true,
+      "focus_restored": true,
+      "page_errors": []
+    },
+    {
+      "locale": "zh-Hant",
+      "width": 390,
+      "geometry": {
+        "width": 390,
+        "scrollWidth": 390,
+        "clippedButtons": []
+      },
+      "pinned_text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 ",
+      "newer_capture_distinct": true,
+      "reopened_after_relocation": true,
+      "persisted_message_reloaded": true,
+      "exact_fact_value": "123456789012345678945",
+      "missing_object_retry": true,
+      "focus_restored": true,
+      "page_errors": []
+    }
+  ],
+  "responses": [
+    {
+      "path": "/research/runs/citation-browser-run",
+      "status": 200,
+      "body": {
+        "run": {
+          "id": "citation-browser-run",
+          "thread_id": "citation-browser",
+          "status": "succeeded",
+          "question": "Read SEC evidence",
+          "ticker": null,
+          "provider": "openai",
+          "model": "offline-fixture",
+          "effort": "low",
+          "assistant_stance": null,
+          "personalization": null,
+          "auth_mode": null,
+          "credential_id": null,
+          "started_at": null,
+          "completed_at": "2026-09-13T05:15:23+00:00",
+          "error": null,
+          "error_code": null,
+          "token_usage": null,
+          "created_at": "2026-09-13T05:15:23+00:00",
+          "updated_at": "2026-09-13T05:15:23+00:00"
+        }
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJjaWsiOiIwMDAwMzIwMTkzIiwiZmFjdF9pZCI6InNlY2ZhY3RfZDZhN2U1MGMxYWZjYWMyYTY3ZWM1NjZlYTMyNTFlMGZhZjlkMmMzOWU0NGUwOGM0NDIwODcxYTJlYzcwZTUyYiIsImtpbmQiOiJmYWN0Iiwib2JzZXJ2ZWRfYXQiOiIyMDI2LTA5LTEzVDA1OjE1OjIyLjgxNjgwMloiLCJzbmFwc2hvdF9pZCI6InNlY3NuYXBzaG90XzAxN2E5MTg5NjVmYjljNTBhM2RkMjhjOTFhNWQ5NzlkZjg5NDI1MDk5MjIxYjY0ODMyZmZlNWYwZWI3ZmY5ZjciLCJzb3VyY2VfcG9pbnRlciI6Ii9mYWN0cy9jdXN0b21cdThjYTF-MX4wbnMvQXNzZXRzL3VuaXRzL1VTRC80NCIsInNvdXJjZV9zaGEyNTYiOiJkZGRhMmY3MWNkMDk2OTk2ZDg2NzhiNGNiNDZkNzliMWQ2M2U1MzRkNjVhMDkxN2QyZjAzNDFjMTFlN2YwNTkzIiwic291cmNlX3VybCI6Imh0dHBzOi8vZGF0YS5zZWMuZ292L2FwaS94YnJsL2NvbXBhbnlmYWN0cy9DSUswMDAwMzIwMTkzLmpzb24ifQ",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "cik": "0000320193",
+            "fact_id": "secfact_d6a7e50c1afcac2a67ec566ea3251e0faf9d2c39e44e08c4420871a2ec70e52b",
+            "kind": "fact",
+            "observed_at": "2026-09-13T05:15:22.816802Z",
+            "snapshot_id": "secsnapshot_017a918965fb9c50a3dd28c91a5d979df89425099221b64832ffe5f0eb7ff9f7",
+            "source_pointer": "/facts/custom\u8ca1~1~0ns/Assets/units/USD/44",
+            "source_sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+            "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json"
+          },
+          "observation": {
+            "snapshot_id": "secsnapshot_017a918965fb9c50a3dd28c91a5d979df89425099221b64832ffe5f0eb7ff9f7",
+            "fact_id": "secfact_d6a7e50c1afcac2a67ec566ea3251e0faf9d2c39e44e08c4420871a2ec70e52b",
+            "cik": "0000320193",
+            "namespace": "custom\u8ca1/~ns",
+            "concept": "Assets",
+            "value": "123456789012345678945",
+            "unit": "USD",
+            "start": null,
+            "end": "1981-12-31",
+            "fiscal_year": 1981,
+            "fiscal_period": "FY",
+            "form": "10-K",
+            "accession": "0000320193-26-000045",
+            "filed_date": "2026-02-01",
+            "frame": "CY1981Q4I",
+            "source": {
+              "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+              "pointer": "/facts/custom\u8ca1~1~0ns/Assets/units/USD/44"
+            },
+            "observed_at": "2026-09-13T05:15:22.816802Z",
+            "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+            "object_sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593"
+          }
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:22.816802Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImZpbGluZyIsIm9ic2VydmVkX2F0IjoiMjAyNi0wOS0xM1QwNToxNToyMi43OTA2OTRaIiwic25hcHNob3RfaWQiOiJzZWNzbmFwc2hvdF9jZGM2M2U5MjhlZGEwNTViYWExYWM2ZTYyYzA1MjZlZWFhYmZiNTIyZTIyMmZlYmVlZGMwYTUwZDRhMDcwNTg2Iiwic291cmNlX3BvaW50ZXIiOiIvZmlsaW5ncy9yZWNlbnQvYWNjZXNzaW9uTnVtYmVyLzAiLCJzb3VyY2Vfc2hhMjU2IjoiNDY3ODRlZTEyOGM5MTIxOTAxZThjMDk1ZTY3ZTM3YzcxMzMxNDY2ZDFiYzJmMGE3ZDU3ZWVkYzA1ZTFjYmY3ZSIsInNvdXJjZV91cmwiOiJodHRwczovL2RhdGEuc2VjLmdvdi9zdWJtaXNzaW9ucy9DSUswMDAwMzIwMTkzLmpzb24ifQ",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "filing",
+            "observed_at": "2026-09-13T05:15:22.790694Z",
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source_pointer": "/filings/recent/accessionNumber/0",
+            "source_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json"
+          },
+          "observation": {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "cik": "0000320193",
+            "accession": "0000320193-26-000001",
+            "form": "10-K",
+            "filed_date": "2026-08-29",
+            "report_date": "2026-06-30",
+            "accepted_at": "2026-08-30T15:00:00Z",
+            "primary_document": "fixture-1.htm",
+            "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/0"
+            },
+            "observed_at": "2026-09-13T05:15:22.790694Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:22.790694Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "unavailable",
+        "data": null,
+        "gaps": [
+          {
+            "code": "sec_citation_integrity_failed"
+          }
+        ],
+        "observed_at": null,
+        "coverage": {
+          "complete": false
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/research/runs/citation-browser-run",
+      "status": 200,
+      "body": {
+        "run": {
+          "id": "citation-browser-run",
+          "thread_id": "citation-browser",
+          "status": "succeeded",
+          "question": "Read SEC evidence",
+          "ticker": null,
+          "provider": "openai",
+          "model": "offline-fixture",
+          "effort": "low",
+          "assistant_stance": null,
+          "personalization": null,
+          "auth_mode": null,
+          "credential_id": null,
+          "started_at": null,
+          "completed_at": "2026-09-13T05:15:23+00:00",
+          "error": null,
+          "error_code": null,
+          "token_usage": null,
+          "created_at": "2026-09-13T05:15:23+00:00",
+          "updated_at": "2026-09-13T05:15:23+00:00"
+        }
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/research/runs/citation-browser-run",
+      "status": 200,
+      "body": {
+        "run": {
+          "id": "citation-browser-run",
+          "thread_id": "citation-browser",
+          "status": "succeeded",
+          "question": "Read SEC evidence",
+          "ticker": null,
+          "provider": "openai",
+          "model": "offline-fixture",
+          "effort": "low",
+          "assistant_stance": null,
+          "personalization": null,
+          "auth_mode": null,
+          "credential_id": null,
+          "started_at": null,
+          "completed_at": "2026-09-13T05:15:23+00:00",
+          "error": null,
+          "error_code": null,
+          "token_usage": null,
+          "created_at": "2026-09-13T05:15:23+00:00",
+          "updated_at": "2026-09-13T05:15:23+00:00"
+        }
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJjaWsiOiIwMDAwMzIwMTkzIiwiZmFjdF9pZCI6InNlY2ZhY3RfZDZhN2U1MGMxYWZjYWMyYTY3ZWM1NjZlYTMyNTFlMGZhZjlkMmMzOWU0NGUwOGM0NDIwODcxYTJlYzcwZTUyYiIsImtpbmQiOiJmYWN0Iiwib2JzZXJ2ZWRfYXQiOiIyMDI2LTA5LTEzVDA1OjE1OjIyLjgxNjgwMloiLCJzbmFwc2hvdF9pZCI6InNlY3NuYXBzaG90XzAxN2E5MTg5NjVmYjljNTBhM2RkMjhjOTFhNWQ5NzlkZjg5NDI1MDk5MjIxYjY0ODMyZmZlNWYwZWI3ZmY5ZjciLCJzb3VyY2VfcG9pbnRlciI6Ii9mYWN0cy9jdXN0b21cdThjYTF-MX4wbnMvQXNzZXRzL3VuaXRzL1VTRC80NCIsInNvdXJjZV9zaGEyNTYiOiJkZGRhMmY3MWNkMDk2OTk2ZDg2NzhiNGNiNDZkNzliMWQ2M2U1MzRkNjVhMDkxN2QyZjAzNDFjMTFlN2YwNTkzIiwic291cmNlX3VybCI6Imh0dHBzOi8vZGF0YS5zZWMuZ292L2FwaS94YnJsL2NvbXBhbnlmYWN0cy9DSUswMDAwMzIwMTkzLmpzb24ifQ",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "cik": "0000320193",
+            "fact_id": "secfact_d6a7e50c1afcac2a67ec566ea3251e0faf9d2c39e44e08c4420871a2ec70e52b",
+            "kind": "fact",
+            "observed_at": "2026-09-13T05:15:22.816802Z",
+            "snapshot_id": "secsnapshot_017a918965fb9c50a3dd28c91a5d979df89425099221b64832ffe5f0eb7ff9f7",
+            "source_pointer": "/facts/custom\u8ca1~1~0ns/Assets/units/USD/44",
+            "source_sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+            "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json"
+          },
+          "observation": {
+            "snapshot_id": "secsnapshot_017a918965fb9c50a3dd28c91a5d979df89425099221b64832ffe5f0eb7ff9f7",
+            "fact_id": "secfact_d6a7e50c1afcac2a67ec566ea3251e0faf9d2c39e44e08c4420871a2ec70e52b",
+            "cik": "0000320193",
+            "namespace": "custom\u8ca1/~ns",
+            "concept": "Assets",
+            "value": "123456789012345678945",
+            "unit": "USD",
+            "start": null,
+            "end": "1981-12-31",
+            "fiscal_year": 1981,
+            "fiscal_period": "FY",
+            "form": "10-K",
+            "accession": "0000320193-26-000045",
+            "filed_date": "2026-02-01",
+            "frame": "CY1981Q4I",
+            "source": {
+              "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+              "pointer": "/facts/custom\u8ca1~1~0ns/Assets/units/USD/44"
+            },
+            "observed_at": "2026-09-13T05:15:22.816802Z",
+            "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+            "object_sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593"
+          }
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:22.816802Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImZpbGluZyIsIm9ic2VydmVkX2F0IjoiMjAyNi0wOS0xM1QwNToxNToyMi43OTA2OTRaIiwic25hcHNob3RfaWQiOiJzZWNzbmFwc2hvdF9jZGM2M2U5MjhlZGEwNTViYWExYWM2ZTYyYzA1MjZlZWFhYmZiNTIyZTIyMmZlYmVlZGMwYTUwZDRhMDcwNTg2Iiwic291cmNlX3BvaW50ZXIiOiIvZmlsaW5ncy9yZWNlbnQvYWNjZXNzaW9uTnVtYmVyLzAiLCJzb3VyY2Vfc2hhMjU2IjoiNDY3ODRlZTEyOGM5MTIxOTAxZThjMDk1ZTY3ZTM3YzcxMzMxNDY2ZDFiYzJmMGE3ZDU3ZWVkYzA1ZTFjYmY3ZSIsInNvdXJjZV91cmwiOiJodHRwczovL2RhdGEuc2VjLmdvdi9zdWJtaXNzaW9ucy9DSUswMDAwMzIwMTkzLmpzb24ifQ",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "filing",
+            "observed_at": "2026-09-13T05:15:22.790694Z",
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source_pointer": "/filings/recent/accessionNumber/0",
+            "source_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json"
+          },
+          "observation": {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "cik": "0000320193",
+            "accession": "0000320193-26-000001",
+            "form": "10-K",
+            "filed_date": "2026-08-29",
+            "report_date": "2026-06-30",
+            "accepted_at": "2026-08-30T15:00:00Z",
+            "primary_document": "fixture-1.htm",
+            "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/0"
+            },
+            "observed_at": "2026-09-13T05:15:22.790694Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:22.790694Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "unavailable",
+        "data": null,
+        "gaps": [
+          {
+            "code": "sec_citation_integrity_failed"
+          }
+        ],
+        "observed_at": null,
+        "coverage": {
+          "complete": false
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/research/runs/citation-browser-run",
+      "status": 200,
+      "body": {
+        "run": {
+          "id": "citation-browser-run",
+          "thread_id": "citation-browser",
+          "status": "succeeded",
+          "question": "Read SEC evidence",
+          "ticker": null,
+          "provider": "openai",
+          "model": "offline-fixture",
+          "effort": "low",
+          "assistant_stance": null,
+          "personalization": null,
+          "auth_mode": null,
+          "credential_id": null,
+          "started_at": null,
+          "completed_at": "2026-09-13T05:15:23+00:00",
+          "error": null,
+          "error_code": null,
+          "token_usage": null,
+          "created_at": "2026-09-13T05:15:23+00:00",
+          "updated_at": "2026-09-13T05:15:23+00:00"
+        }
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/research/runs/citation-browser-run",
+      "status": 200,
+      "body": {
+        "run": {
+          "id": "citation-browser-run",
+          "thread_id": "citation-browser",
+          "status": "succeeded",
+          "question": "Read SEC evidence",
+          "ticker": null,
+          "provider": "openai",
+          "model": "offline-fixture",
+          "effort": "low",
+          "assistant_stance": null,
+          "personalization": null,
+          "auth_mode": null,
+          "credential_id": null,
+          "started_at": null,
+          "completed_at": "2026-09-13T05:15:23+00:00",
+          "error": null,
+          "error_code": null,
+          "token_usage": null,
+          "created_at": "2026-09-13T05:15:23+00:00",
+          "updated_at": "2026-09-13T05:15:23+00:00"
+        }
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJjaWsiOiIwMDAwMzIwMTkzIiwiZmFjdF9pZCI6InNlY2ZhY3RfZDZhN2U1MGMxYWZjYWMyYTY3ZWM1NjZlYTMyNTFlMGZhZjlkMmMzOWU0NGUwOGM0NDIwODcxYTJlYzcwZTUyYiIsImtpbmQiOiJmYWN0Iiwib2JzZXJ2ZWRfYXQiOiIyMDI2LTA5LTEzVDA1OjE1OjIyLjgxNjgwMloiLCJzbmFwc2hvdF9pZCI6InNlY3NuYXBzaG90XzAxN2E5MTg5NjVmYjljNTBhM2RkMjhjOTFhNWQ5NzlkZjg5NDI1MDk5MjIxYjY0ODMyZmZlNWYwZWI3ZmY5ZjciLCJzb3VyY2VfcG9pbnRlciI6Ii9mYWN0cy9jdXN0b21cdThjYTF-MX4wbnMvQXNzZXRzL3VuaXRzL1VTRC80NCIsInNvdXJjZV9zaGEyNTYiOiJkZGRhMmY3MWNkMDk2OTk2ZDg2NzhiNGNiNDZkNzliMWQ2M2U1MzRkNjVhMDkxN2QyZjAzNDFjMTFlN2YwNTkzIiwic291cmNlX3VybCI6Imh0dHBzOi8vZGF0YS5zZWMuZ292L2FwaS94YnJsL2NvbXBhbnlmYWN0cy9DSUswMDAwMzIwMTkzLmpzb24ifQ",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "cik": "0000320193",
+            "fact_id": "secfact_d6a7e50c1afcac2a67ec566ea3251e0faf9d2c39e44e08c4420871a2ec70e52b",
+            "kind": "fact",
+            "observed_at": "2026-09-13T05:15:22.816802Z",
+            "snapshot_id": "secsnapshot_017a918965fb9c50a3dd28c91a5d979df89425099221b64832ffe5f0eb7ff9f7",
+            "source_pointer": "/facts/custom\u8ca1~1~0ns/Assets/units/USD/44",
+            "source_sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+            "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json"
+          },
+          "observation": {
+            "snapshot_id": "secsnapshot_017a918965fb9c50a3dd28c91a5d979df89425099221b64832ffe5f0eb7ff9f7",
+            "fact_id": "secfact_d6a7e50c1afcac2a67ec566ea3251e0faf9d2c39e44e08c4420871a2ec70e52b",
+            "cik": "0000320193",
+            "namespace": "custom\u8ca1/~ns",
+            "concept": "Assets",
+            "value": "123456789012345678945",
+            "unit": "USD",
+            "start": null,
+            "end": "1981-12-31",
+            "fiscal_year": 1981,
+            "fiscal_period": "FY",
+            "form": "10-K",
+            "accession": "0000320193-26-000045",
+            "filed_date": "2026-02-01",
+            "frame": "CY1981Q4I",
+            "source": {
+              "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+              "pointer": "/facts/custom\u8ca1~1~0ns/Assets/units/USD/44"
+            },
+            "observed_at": "2026-09-13T05:15:22.816802Z",
+            "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+            "object_sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593"
+          }
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:22.816802Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImZpbGluZyIsIm9ic2VydmVkX2F0IjoiMjAyNi0wOS0xM1QwNToxNToyMi43OTA2OTRaIiwic25hcHNob3RfaWQiOiJzZWNzbmFwc2hvdF9jZGM2M2U5MjhlZGEwNTViYWExYWM2ZTYyYzA1MjZlZWFhYmZiNTIyZTIyMmZlYmVlZGMwYTUwZDRhMDcwNTg2Iiwic291cmNlX3BvaW50ZXIiOiIvZmlsaW5ncy9yZWNlbnQvYWNjZXNzaW9uTnVtYmVyLzAiLCJzb3VyY2Vfc2hhMjU2IjoiNDY3ODRlZTEyOGM5MTIxOTAxZThjMDk1ZTY3ZTM3YzcxMzMxNDY2ZDFiYzJmMGE3ZDU3ZWVkYzA1ZTFjYmY3ZSIsInNvdXJjZV91cmwiOiJodHRwczovL2RhdGEuc2VjLmdvdi9zdWJtaXNzaW9ucy9DSUswMDAwMzIwMTkzLmpzb24ifQ",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "filing",
+            "observed_at": "2026-09-13T05:15:22.790694Z",
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source_pointer": "/filings/recent/accessionNumber/0",
+            "source_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json"
+          },
+          "observation": {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "cik": "0000320193",
+            "accession": "0000320193-26-000001",
+            "form": "10-K",
+            "filed_date": "2026-08-29",
+            "report_date": "2026-06-30",
+            "accepted_at": "2026-08-30T15:00:00Z",
+            "primary_document": "fixture-1.htm",
+            "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/0"
+            },
+            "observed_at": "2026-09-13T05:15:22.790694Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:22.790694Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "unavailable",
+        "data": null,
+        "gaps": [
+          {
+            "code": "sec_citation_integrity_failed"
+          }
+        ],
+        "observed_at": null,
+        "coverage": {
+          "complete": false
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/research/runs/citation-browser-run",
+      "status": 200,
+      "body": {
+        "run": {
+          "id": "citation-browser-run",
+          "thread_id": "citation-browser",
+          "status": "succeeded",
+          "question": "Read SEC evidence",
+          "ticker": null,
+          "provider": "openai",
+          "model": "offline-fixture",
+          "effort": "low",
+          "assistant_stance": null,
+          "personalization": null,
+          "auth_mode": null,
+          "credential_id": null,
+          "started_at": null,
+          "completed_at": "2026-09-13T05:15:23+00:00",
+          "error": null,
+          "error_code": null,
+          "token_usage": null,
+          "created_at": "2026-09-13T05:15:23+00:00",
+          "updated_at": "2026-09-13T05:15:23+00:00"
+        }
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/research/runs/citation-browser-run",
+      "status": 200,
+      "body": {
+        "run": {
+          "id": "citation-browser-run",
+          "thread_id": "citation-browser",
+          "status": "succeeded",
+          "question": "Read SEC evidence",
+          "ticker": null,
+          "provider": "openai",
+          "model": "offline-fixture",
+          "effort": "low",
+          "assistant_stance": null,
+          "personalization": null,
+          "auth_mode": null,
+          "credential_id": null,
+          "started_at": null,
+          "completed_at": "2026-09-13T05:15:23+00:00",
+          "error": null,
+          "error_code": null,
+          "token_usage": null,
+          "created_at": "2026-09-13T05:15:23+00:00",
+          "updated_at": "2026-09-13T05:15:23+00:00"
+        }
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJjaWsiOiIwMDAwMzIwMTkzIiwiZmFjdF9pZCI6InNlY2ZhY3RfZDZhN2U1MGMxYWZjYWMyYTY3ZWM1NjZlYTMyNTFlMGZhZjlkMmMzOWU0NGUwOGM0NDIwODcxYTJlYzcwZTUyYiIsImtpbmQiOiJmYWN0Iiwib2JzZXJ2ZWRfYXQiOiIyMDI2LTA5LTEzVDA1OjE1OjIyLjgxNjgwMloiLCJzbmFwc2hvdF9pZCI6InNlY3NuYXBzaG90XzAxN2E5MTg5NjVmYjljNTBhM2RkMjhjOTFhNWQ5NzlkZjg5NDI1MDk5MjIxYjY0ODMyZmZlNWYwZWI3ZmY5ZjciLCJzb3VyY2VfcG9pbnRlciI6Ii9mYWN0cy9jdXN0b21cdThjYTF-MX4wbnMvQXNzZXRzL3VuaXRzL1VTRC80NCIsInNvdXJjZV9zaGEyNTYiOiJkZGRhMmY3MWNkMDk2OTk2ZDg2NzhiNGNiNDZkNzliMWQ2M2U1MzRkNjVhMDkxN2QyZjAzNDFjMTFlN2YwNTkzIiwic291cmNlX3VybCI6Imh0dHBzOi8vZGF0YS5zZWMuZ292L2FwaS94YnJsL2NvbXBhbnlmYWN0cy9DSUswMDAwMzIwMTkzLmpzb24ifQ",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "cik": "0000320193",
+            "fact_id": "secfact_d6a7e50c1afcac2a67ec566ea3251e0faf9d2c39e44e08c4420871a2ec70e52b",
+            "kind": "fact",
+            "observed_at": "2026-09-13T05:15:22.816802Z",
+            "snapshot_id": "secsnapshot_017a918965fb9c50a3dd28c91a5d979df89425099221b64832ffe5f0eb7ff9f7",
+            "source_pointer": "/facts/custom\u8ca1~1~0ns/Assets/units/USD/44",
+            "source_sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+            "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json"
+          },
+          "observation": {
+            "snapshot_id": "secsnapshot_017a918965fb9c50a3dd28c91a5d979df89425099221b64832ffe5f0eb7ff9f7",
+            "fact_id": "secfact_d6a7e50c1afcac2a67ec566ea3251e0faf9d2c39e44e08c4420871a2ec70e52b",
+            "cik": "0000320193",
+            "namespace": "custom\u8ca1/~ns",
+            "concept": "Assets",
+            "value": "123456789012345678945",
+            "unit": "USD",
+            "start": null,
+            "end": "1981-12-31",
+            "fiscal_year": 1981,
+            "fiscal_period": "FY",
+            "form": "10-K",
+            "accession": "0000320193-26-000045",
+            "filed_date": "2026-02-01",
+            "frame": "CY1981Q4I",
+            "source": {
+              "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+              "pointer": "/facts/custom\u8ca1~1~0ns/Assets/units/USD/44"
+            },
+            "observed_at": "2026-09-13T05:15:22.816802Z",
+            "source_url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+            "object_sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593"
+          }
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:22.816802Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImZpbGluZyIsIm9ic2VydmVkX2F0IjoiMjAyNi0wOS0xM1QwNToxNToyMi43OTA2OTRaIiwic25hcHNob3RfaWQiOiJzZWNzbmFwc2hvdF9jZGM2M2U5MjhlZGEwNTViYWExYWM2ZTYyYzA1MjZlZWFhYmZiNTIyZTIyMmZlYmVlZGMwYTUwZDRhMDcwNTg2Iiwic291cmNlX3BvaW50ZXIiOiIvZmlsaW5ncy9yZWNlbnQvYWNjZXNzaW9uTnVtYmVyLzAiLCJzb3VyY2Vfc2hhMjU2IjoiNDY3ODRlZTEyOGM5MTIxOTAxZThjMDk1ZTY3ZTM3YzcxMzMxNDY2ZDFiYzJmMGE3ZDU3ZWVkYzA1ZTFjYmY3ZSIsInNvdXJjZV91cmwiOiJodHRwczovL2RhdGEuc2VjLmdvdi9zdWJtaXNzaW9ucy9DSUswMDAwMzIwMTkzLmpzb24ifQ",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "filing",
+            "observed_at": "2026-09-13T05:15:22.790694Z",
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source_pointer": "/filings/recent/accessionNumber/0",
+            "source_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json"
+          },
+          "observation": {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "cik": "0000320193",
+            "accession": "0000320193-26-000001",
+            "form": "10-K",
+            "filed_date": "2026-08-29",
+            "report_date": "2026-06-30",
+            "accepted_at": "2026-08-30T15:00:00Z",
+            "primary_document": "fixture-1.htm",
+            "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/0"
+            },
+            "observed_at": "2026-09-13T05:15:22.790694Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:22.790694Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "unavailable",
+        "data": null,
+        "gaps": [
+          {
+            "code": "sec_citation_integrity_failed"
+          }
+        ],
+        "observed_at": null,
+        "coverage": {
+          "complete": false
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "path": "/research/runs/citation-browser-run",
+      "status": 200,
+      "body": {
+        "run": {
+          "id": "citation-browser-run",
+          "thread_id": "citation-browser",
+          "status": "succeeded",
+          "question": "Read SEC evidence",
+          "ticker": null,
+          "provider": "openai",
+          "model": "offline-fixture",
+          "effort": "low",
+          "assistant_stance": null,
+          "personalization": null,
+          "auth_mode": null,
+          "credential_id": null,
+          "started_at": null,
+          "completed_at": "2026-09-13T05:15:23+00:00",
+          "error": null,
+          "error_code": null,
+          "token_usage": null,
+          "created_at": "2026-09-13T05:15:23+00:00",
+          "updated_at": "2026-09-13T05:15:23+00:00"
+        }
+      }
+    },
+    {
+      "path": "/sec-research/citation?ref=eyJhY2Nlc3Npb24iOiIwMDAwMzIwMTkzLTI2LTAwMDAwMSIsImNhcHR1cmVfaWQiOiJzZWNkb2NfN2FjMmYxMGEwNWMzMmVhYjRmYTM2NjIxZThmYmE4MTVlNzNlYWZmZjA2YmY1MmEwMDNlNmU2MmZhM2U0NjkwNSIsImRvY3VtZW50X2lkIjoiZmlsZTpmaXh0dXJlLTEuaHRtIiwiZW5kX2J5dGUiOjE3NiwiZXh0cmFjdGlvbl92ZXJzaW9uIjoic2VjLWRvY3VtZW50LXRleHQtdjQiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwia2luZCI6ImRvY3VtZW50IiwibWF0Y2hfZW5kX2J5dGUiOjU3LCJtYXRjaF9zdGFydF9ieXRlIjo1MSwib3JpZ2luYWxfc2hhMjU2IjoiZmRmMjNkYmJlODQzNzA5YWMzNzIxMzhiODVkZDA2ZTYyZDU0Y2JmZTllY2RkNTA2YmY5NjI2ODFlMzdjMTA4NSIsInNvdXJjZV91cmwiOiJodHRwczovL3d3dy5zZWMuZ292L0FyY2hpdmVzL2VkZ2FyL2RhdGEvMzIwMTkzLzAwMDAzMjAxOTMyNjAwMDAwMS9maXh0dXJlLTEuaHRtIiwic3RhcnRfYnl0ZSI6MCwidGV4dF9zaGEyNTYiOiJhZmJjMjk3NmMxNGU5ZDgwNGVlZTYwOTA3OTljZmIwMDllYTVlZTAyMGJkZmMxOTYxNjkyYzk0NzFmZjJhZWVjIn0",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "data": {
+          "citation": {
+            "accession": "0000320193-26-000001",
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "document_id": "file:fixture-1.htm",
+            "end_byte": 176,
+            "extraction_version": "sec-document-text-v4",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "kind": "document",
+            "match_end_byte": 57,
+            "match_start_byte": 51,
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "start_byte": 0,
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec"
+          },
+          "document": {
+            "capture_id": "secdoc_7ac2f10a05c32eab4fa36621e8fba815e73eafff06bf52a003e6e62fa3e46905",
+            "accession": "0000320193-26-000001",
+            "filing_id": "0000320193:0000320193-26-000001",
+            "document_id": "file:fixture-1.htm",
+            "form": "10-K",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+            "original_sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+            "text_sha256": "afbc2976c14e9d804eee6090799cfb009ea5ee020bdfc1961692c9471ff2aeec",
+            "extraction_version": "sec-document-text-v4",
+            "mime_type": "text/html"
+          },
+          "text": "ITEM 1. BUSINESS\nResearch evidence 0: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 1: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 2: Caf\u00e9 \u8ca1\u5831 needle 1.\nResearch evidence 3: Caf\u00e9 "
+        },
+        "gaps": [],
+        "observed_at": "2026-09-13T05:15:23.140366Z",
+        "coverage": {
+          "complete": true
+        },
+        "next_cursor": null
+      }
+    }
+  ]
+}

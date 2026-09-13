@@ -1,0 +1,22 @@
+{
+  "diff": "--- admitted\n+++ inverse\n@@ -15,7 +15,7 @@\n         if etype not in (\"tool_start\", \"tool_end\"):\n             continue\n         call_id = data.get(\"call_id\")\n-        target = identified.get(call_id) if call_id is not None else None\n+        target = next((index for index, row in enumerate(rows) if row[\"name\"] == _name(data.get(\"tool\"))), None)\n         if call_id is None and etype == \"tool_end\" and anonymous_open:\n             target = anonymous_open.pop()\n         if target is None:\n",
+  "exit_code": 1,
+  "inverse_sha256": "7b5e0d7b8505ae600e49d764cf880b91efb155123d0e7ca207acf0dc165711bb",
+  "module": "src.research_tool_trace",
+  "name": "match_same_name_instead_of_exact_call_id",
+  "original_restored": true,
+  "qualname": "accumulate_tool_calls",
+  "recipe": {
+    "module": "src.research_tool_trace",
+    "name": "match_same_name_instead_of_exact_call_id",
+    "qualname": "accumulate_tool_calls",
+    "replacements": [
+      {
+        "new": "target = next((index for index, row in enumerate(rows) if row[\"name\"] == _name(data.get(\"tool\"))), None)",
+        "old": "target = identified.get(call_id) if call_id is not None else None"
+      }
+    ]
+  },
+  "source_sha256": "b2cfb45a49634bce268e9f1f970ce8c70519a44a5fb2c20dc9ade29e2da7d7d2",
+  "tracked_source_edited": false
+}

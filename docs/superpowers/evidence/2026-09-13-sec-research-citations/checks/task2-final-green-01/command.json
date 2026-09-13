@@ -1,0 +1,39 @@
+{
+  "name": "task2-final-green-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_pytest.py",
+    "-q",
+    "tests/test_sec_research_trace.py",
+    "tests/test_sec_research_citations.py",
+    "tests/test_sec_research_native_dispatch.py",
+    "tests/test_sec_research_tool_adapters.py",
+    "tests/test_sec_research_output_integration.py",
+    "tests/test_output_boundary.py",
+    "tests/test_research_output_events.py",
+    "tests/test_research_output_lifetimes.py",
+    "tests/test_research_output_compaction.py",
+    "tests/test_tool_output_channels.py",
+    "tests/test_task_runtime_binding.py",
+    "tests/test_events.py",
+    "tests/test_agents.py",
+    "tests/test_chatgpt_oauth_driver.py",
+    "tests/test_claude_code_sdk_driver.py",
+    "tests/test_openai_sync_surface_cleanup.py",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task2-final-green-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 80.461,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task2-final-green-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task2-final-green-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/task2-final-green-01/output.log"
+}

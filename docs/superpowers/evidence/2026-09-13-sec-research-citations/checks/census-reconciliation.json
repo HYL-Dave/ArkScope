@@ -1,0 +1,3177 @@
+{
+  "base_counts": {
+    "candidates": 4330,
+    "uncertainties": 3463
+  },
+  "comparison": {
+    "coverage_reductions": [],
+    "dependency_metadata_changed": [],
+    "new_candidates": [],
+    "new_uncertainties": [
+      "frontend:044d7bfcd4bbdba5",
+      "frontend:05b2f48429dae542",
+      "frontend:083fad546991acde",
+      "frontend:09107a5464f78eb1",
+      "frontend:0a7bf33dc2cb7627",
+      "frontend:0afeacf404fd1636",
+      "frontend:0cb9565e820f1c1f",
+      "frontend:0eb1174aa9cab2f4",
+      "frontend:0f5090853a525ae2",
+      "frontend:0fcffbc7e437575b",
+      "frontend:12e1561c77056801",
+      "frontend:192cb00d50742c80",
+      "frontend:19b2b4a099206c44",
+      "frontend:19df2f0be52e6152",
+      "frontend:2058419e3565e78b",
+      "frontend:23dd5532fcd1ba47",
+      "frontend:2556cddb429315ff",
+      "frontend:26219136675921cf",
+      "frontend:26ef1088fc4600f2",
+      "frontend:2a0f02f348b0f3d3",
+      "frontend:2b102a31621a1c4c",
+      "frontend:2f67b9c9f4a19a03",
+      "frontend:34d9e5c65567cafc",
+      "frontend:3ac42b32acc3b291",
+      "frontend:3bfab531235c78a3",
+      "frontend:3d014042fb38989d",
+      "frontend:3d2c27c8b848d915",
+      "frontend:3f39cc9a3eee4aa7",
+      "frontend:400bf3c9fc54b07f",
+      "frontend:40d776d342f63a62",
+      "frontend:45d97ebd351a908f",
+      "frontend:45e580d2c60afe61",
+      "frontend:46414919aaa4da2f",
+      "frontend:4746dcd73ebfa858",
+      "frontend:4823dfb90d5f42c2",
+      "frontend:491178c463c059d9",
+      "frontend:4b95b15d57ee8a6e",
+      "frontend:4e35889e58c08eb2",
+      "frontend:4e7d9f2932a0bb8e",
+      "frontend:4fa94a4bb8415b57",
+      "frontend:53478379e8d32204",
+      "frontend:5839892b0509ebda",
+      "frontend:5d9d2a1e06872edc",
+      "frontend:5f7baec3c587a8b0",
+      "frontend:5fa3a86983db752f",
+      "frontend:5ff89c4a4d00fab9",
+      "frontend:61f0e5604f9ebc0f",
+      "frontend:64af1326644b994d",
+      "frontend:66295f78bb2ae979",
+      "frontend:6a4a444befa4d935",
+      "frontend:6a625419b918b839",
+      "frontend:6bcd7765cb2ba1aa",
+      "frontend:6d8627f057eef665",
+      "frontend:7003f15f35bb3d1c",
+      "frontend:73e14f5892c6751e",
+      "frontend:74399ec2ea223382",
+      "frontend:75755ab29a7f36b0",
+      "frontend:7597fea19da5623c",
+      "frontend:78ae4c5de89101cf",
+      "frontend:7a8d25cfeec23779",
+      "frontend:7bb438bbd004996d",
+      "frontend:7c330c43d2f31766",
+      "frontend:821aa6cefb974076",
+      "frontend:8426d6efcd6d8775",
+      "frontend:8768b6ef95afdbea",
+      "frontend:883b1668bf73d6d0",
+      "frontend:8b2ab374e0b39e0b",
+      "frontend:8d52a7690c62316f",
+      "frontend:8d783fd4a5234703",
+      "frontend:8dcda484a303c5b0",
+      "frontend:9510768b5b46486c",
+      "frontend:955864d4b2ec5f07",
+      "frontend:97c015cbb6bffabd",
+      "frontend:993f960e10c5e2a1",
+      "frontend:99dbb1d717971a7e",
+      "frontend:9bd64a29e77e4d7b",
+      "frontend:9f587f1ba36d4e9f",
+      "frontend:a760282ca6e78446",
+      "frontend:a8ecf1a2469cbe47",
+      "frontend:a9f4cf8481234e72",
+      "frontend:ab9c4ea5a78e00a8",
+      "frontend:ad9a41550aab26a5",
+      "frontend:adcb4190cccf83fe",
+      "frontend:b024c1f715600170",
+      "frontend:b2129cbc6c6a4c08",
+      "frontend:b40b0ddde8ec2bb4",
+      "frontend:b4498ef51e21ef8b",
+      "frontend:b574b4ea3cb8c6c9",
+      "frontend:b57faf6c6bbe9f46",
+      "frontend:b60b0914b09c7c69",
+      "frontend:b95aa90b15516726",
+      "frontend:ba54cb41a200be8f",
+      "frontend:baab90e4f7abb804",
+      "frontend:bc1ea59ca9f722f6",
+      "frontend:bd3d7d39324cc6ea",
+      "frontend:bf921a352cfd2d40",
+      "frontend:c4109ce3e09599c0",
+      "frontend:c7f8f00c874eedc4",
+      "frontend:c885339315468a23",
+      "frontend:c963e01e6b7c7cd9",
+      "frontend:cb950be27f84eadc",
+      "frontend:ccc7882456558e6c",
+      "frontend:d09113714e3dc4f4",
+      "frontend:d3166a32c857116e",
+      "frontend:d3bc1d437def190b",
+      "frontend:d73930ffc3a6c596",
+      "frontend:d98bfdc05896a597",
+      "frontend:d9cd60e1bbb7d307",
+      "frontend:d9cd7495f5c40451",
+      "frontend:dc707793e9c38c7a",
+      "frontend:de30ca61948152f6",
+      "frontend:df75e900e02942d7",
+      "frontend:e371967bd0858281",
+      "frontend:e3adb96c525777ea",
+      "frontend:ea9721eb26e7593d",
+      "frontend:eab054d309cae25c",
+      "frontend:eb5363425ccdbd9a",
+      "frontend:eb54e3ded61a7018",
+      "frontend:ed6e813fda0f8994",
+      "frontend:ed7d5d94edd857da",
+      "frontend:f0784dc80c1be85d",
+      "frontend:f0b4ae113df17fdc",
+      "frontend:f13d065de2ecc1ca",
+      "frontend:f56e20e67f5b4e0b",
+      "frontend:f94371641a1b3fc1",
+      "frontend:fcaa9786c4a153d4",
+      "frontend:fcdd6f923c68b8dd",
+      "sql:0019c341ee1f2707",
+      "sql:0c6dfa4d50d67555",
+      "sql:17326cff3d410b05",
+      "sql:21a9a970eeed1d22",
+      "sql:254c7e43069111c8",
+      "sql:27036ff0f00fffbf",
+      "sql:3a573a58f940ae1e",
+      "sql:3f38ae5446deb18f",
+      "sql:4846552cc6117be6",
+      "sql:56d90ed3c8f7aeab",
+      "sql:591d87868661c5ab",
+      "sql:6c3bbae585d95cad",
+      "sql:9a64c9334d2fa421",
+      "sql:a823ffa8b09f019f",
+      "sql:aac9e96fa4488372",
+      "sql:afdd26fe2d1d05e2",
+      "sql:c088727f0b9faa2a",
+      "sql:c703e1d56d09bb50",
+      "sql:c8a501cd7871d7c5",
+      "sql:ca7e049d5bc6c0e1",
+      "sql:e76df689c89969d4",
+      "sql:ecf4120fc6004249",
+      "sql:ef76a89c9f8cfe33",
+      "sql:f9f6540aa536386c"
+    ],
+    "new_untracked_paths": [],
+    "review_required": true
+  },
+  "current_counts": {
+    "candidates": 4330,
+    "uncertainties": 3469
+  },
+  "method": "Identical non-position metadata; SQL additionally maps unchanged source lines and identical source AST fragments. This is not scanner completeness or deletion authority.",
+  "new_or_changed": [
+    {
+      "axis": "http",
+      "column": 10,
+      "expression": "getJSON(`/sec-research/citation?ref=${secCitationQuery(ref)}`)",
+      "file": "apps/arkscope-web/src/api.ts",
+      "id": "frontend:d73930ffc3a6c596",
+      "line": 1304,
+      "reason": "template-http-url"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:17326cff3d410b05",
+      "kind": "unmodeled_sql_statement",
+      "line": 44,
+      "path": "src/sec_research/references.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:27036ff0f00fffbf",
+      "kind": "sql_prepare_failed",
+      "line": 198,
+      "path": "src/sec_research/references.py"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:3f38ae5446deb18f",
+      "kind": "dynamic_sql",
+      "line": 109,
+      "path": "src/sec_research/references.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:aac9e96fa4488372",
+      "kind": "sql_prepare_failed",
+      "line": 176,
+      "path": "src/sec_research/references.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:c703e1d56d09bb50",
+      "kind": "sql_prepare_failed",
+      "line": 90,
+      "path": "src/sec_research/references.py"
+    }
+  ],
+  "position_only": [
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionAttemptResult>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/retry`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:044d7bfcd4bbdba5",
+        "line": 4641,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionAttemptResult>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/retry`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b2befb942a5bbbc3",
+        "line": 4577,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 52,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/check`, \"POST\", undefined, 300_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:05b2f48429dae542",
+        "line": 4426,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 52,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/check`, \"POST\", undefined, 300_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3545990dd00772f7",
+        "line": 4362,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 75,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.ts",
+        "id": "frontend:083fad546991acde",
+        "line": 490,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 75,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.ts",
+        "id": "frontend:0f2e2ec87ec5edc2",
+        "line": 469,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:09107a5464f78eb1",
+        "line": 94,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:323d9efd72f9afa5",
+        "line": 39,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<OAuthStatusResult>(`/config/credentials/openai/oauth/status?state=${encodeURIComponent(state)}`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:0a7bf33dc2cb7627",
+        "line": 1733,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<OAuthStatusResult>(`/config/credentials/openai/oauth/status?state=${encodeURIComponent(state)}`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:c16ee2b5a079b5c2",
+        "line": 1669,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/assessments/${encodeURIComponent(assessmentId)}/accept`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:0afeacf404fd1636",
+        "line": 4549,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/assessments/${encodeURIComponent(assessmentId)}/accept`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2f7fda911a99b7db",
+        "line": 4485,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/analysis/cards/${runId}/save`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:0cb9565e820f1c1f",
+        "line": 2707,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/analysis/cards/${runId}/save`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:90507d3fa16fbae3",
+        "line": 2643,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<TickerIdentityTransitionPreview>(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/transition-preview${\n      tickerIdentityPreviewQuery(options)\n    }`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:0eb1174aa9cab2f4",
+        "line": 4605,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<TickerIdentityTransitionPreview>(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/transition-preview${\n      tickerIdentityPreviewQuery(options)\n    }`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:cb9a7609e04a6837",
+        "line": 4541,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<MarketDataCoverage>(`/market-data/coverage/${encodeURIComponent(ticker)}`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:0f5090853a525ae2",
+        "line": 2496,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<MarketDataCoverage>(`/market-data/coverage/${encodeURIComponent(ticker)}`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8e315f0aa819b61f",
+        "line": 2432,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 119,
+        "expression": "commonT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:0fcffbc7e437575b",
+        "line": 391,
+        "namespaces": [
+          "common"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 7,
+        "expression": "commonT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:4382905ecdb08c37",
+        "line": 267,
+        "namespaces": [
+          "common"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 49,
+        "expression": "sendJSON<unknown>(`/market-data/price-repair/${repairId}/resume`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:12e1561c77056801",
+        "line": 4903,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 49,
+        "expression": "sendJSON<unknown>(`/market-data/price-repair/${repairId}/resume`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:637c1c2cc2be81c5",
+        "line": 4839,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON(`/sec-research/filings/${encodeURIComponent(filingId)}/document${params.size ? `?${params}` : \"\"}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:192cb00d50742c80",
+        "line": 1365,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON(`/sec-research/filings/${encodeURIComponent(filingId)}/document${params.size ? `?${params}` : \"\"}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3f613df929727767",
+        "line": 1301,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 48,
+        "expression": "sendJSON<unknown>(\n    path,\n    \"POST\",\n    body,\n    fixedTaskRequestTimeoutMs(runtime, \"card_synthesis\"),\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:19b2b4a099206c44",
+        "line": 2691,
+        "reason": "dynamic-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 48,
+        "expression": "sendJSON<unknown>(\n    path,\n    \"POST\",\n    body,\n    fixedTaskRequestTimeoutMs(runtime, \"card_synthesis\"),\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:11df353f4b24412a",
+        "line": 2627,
+        "reason": "dynamic-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".investigation-runtime input[type=\"number\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:19df2f0be52e6152",
+        "line": 4004,
+        "reason": "unsupported-css-selector"
+      },
+      "old": {
+        "axis": "css",
+        "column": 1,
+        "expression": ".investigation-runtime input[type=\"number\"]",
+        "file": "apps/arkscope-web/src/styles.css",
+        "id": "frontend:edf34907aa178f51",
+        "line": 3994,
+        "reason": "unsupported-css-selector"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 33,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:2058419e3565e78b",
+        "line": 810,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:3323a06de383754d",
+        "line": 42,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{\n    provider: ModelProvider;\n    model: string;\n    effort: string | null;\n  } | null>(`/research/threads/${encodeURIComponent(threadId)}/selection`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:23dd5532fcd1ba47",
+        "line": 1519,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{\n    provider: ModelProvider;\n    model: string;\n    effort: string | null;\n  } | null>(`/research/threads/${encodeURIComponent(threadId)}/selection`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:fe063935a33104fd",
+        "line": 1455,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ run: ResearchRunDTO }>(\n    `/research/runs/${encodeURIComponent(runId)}`,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2556cddb429315ff",
+        "line": 1541,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ run: ResearchRunDTO }>(\n    `/research/runs/${encodeURIComponent(runId)}`,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ae96f77f58c1351c",
+        "line": 1477,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 66,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:26219136675921cf",
+        "line": 373,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 41,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:062254eb94f4db49",
+        "line": 258,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<PortfolioSnapshot>(\n    includeClosed ? \"/portfolio?include_closed=true\" : \"/portfolio\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:26ef1088fc4600f2",
+        "line": 1953,
+        "reason": "dynamic-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<PortfolioSnapshot>(\n    includeClosed ? \"/portfolio?include_closed=true\" : \"/portfolio\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d62886c841844b97",
+        "line": 1889,
+        "reason": "dynamic-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SecurityLifecycleCaseListResponse>(\n    `/security-lifecycle/cases${lifecycleQuery(filters)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2a0f02f348b0f3d3",
+        "line": 4439,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SecurityLifecycleCaseListResponse>(\n    `/security-lifecycle/cases${lifecycleQuery(filters)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7b513df923442e8f",
+        "line": 4375,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<FundamentalsResult>(`/fundamentals/${encodeURIComponent(ticker)}?stored=true`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2b102a31621a1c4c",
+        "line": 2492,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<FundamentalsResult>(`/fundamentals/${encodeURIComponent(ticker)}?stored=true`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3701403689ac0b6e",
+        "line": 2428,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 66,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:2f67b9c9f4a19a03",
+        "line": 376,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 8,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:07cf935c4d37697d",
+        "line": 266,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/schedule/${encodeURIComponent(source)}`, \"PUT\", body, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:34d9e5c65567cafc",
+        "line": 5362,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/schedule/${encodeURIComponent(source)}`, \"PUT\", body, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5f088b34772c660c",
+        "line": 5298,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 42,
+        "expression": "{...currentProps!}",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.test.tsx",
+        "id": "frontend:3ac42b32acc3b291",
+        "line": 173,
+        "reason": "dynamic-class-name"
+      },
+      "old": {
+        "axis": "css",
+        "column": 42,
+        "expression": "{...currentProps!}",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.test.tsx",
+        "id": "frontend:1ace925a1742fc51",
+        "line": 172,
+        "reason": "dynamic-class-name"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<PortfolioActivityPage>(`/portfolio/activity${suffix}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3bfab531235c78a3",
+        "line": 2203,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<PortfolioActivityPage>(`/portfolio/activity${suffix}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:1f1de736df9ce405",
+        "line": 2139,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:3d014042fb38989d",
+        "line": 96,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 33,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:3faa87610d0dca67",
+        "line": 756,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioActivityAnnotation>(\n    `/portfolio/activity/annotations/${encodeURIComponent(activityId)}`,\n    \"PUT\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3d2c27c8b848d915",
+        "line": 2210,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioActivityAnnotation>(\n    `/portfolio/activity/annotations/${encodeURIComponent(activityId)}`,\n    \"PUT\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:de37b82f7420236b",
+        "line": 2146,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/providers/test/${encodeURIComponent(provider)}`, \"POST\", undefined, 15_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3f39cc9a3eee4aa7",
+        "line": 5469,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/providers/test/${encodeURIComponent(provider)}`, \"POST\", undefined, 15_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7478579302fec980",
+        "line": 5405,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ thread_id: string; messages: ResearchMessageDTO[] }>(`/research/threads/${encodeURIComponent(threadId)}/messages`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:400bf3c9fc54b07f",
+        "line": 1512,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ thread_id: string; messages: ResearchMessageDTO[] }>(`/research/threads/${encodeURIComponent(threadId)}/messages`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a34eac5e4653308e",
+        "line": 1448,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:40d776d342f63a62",
+        "line": 258,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 69,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:18a0d24064a5201a",
+        "line": 351,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 43,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/review${lifecycleQuery(options)}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:45d97ebd351a908f",
+        "line": 4405,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 43,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/review${lifecycleQuery(options)}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:61fe64373d94bdf9",
+        "line": 4341,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ ticker: string; notes: Note[] }>(\n    `/profile/tickers/${encodeURIComponent(ticker)}/notes`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:45e580d2c60afe61",
+        "line": 2567,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ ticker: string; notes: Note[] }>(\n    `/profile/tickers/${encodeURIComponent(ticker)}/notes`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:41b8f6bcc0235c7e",
+        "line": 2503,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 74,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:46414919aaa4da2f",
+        "line": 307,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:20807339e5fc8795",
+        "line": 270,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/schedule/run/${encodeURIComponent(source)}`, \"POST\", undefined, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4746dcd73ebfa858",
+        "line": 5368,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/schedule/run/${encodeURIComponent(source)}`, \"POST\", undefined, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9abff64d8482afc2",
+        "line": 5304,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionRecord>(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/approve-transition`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4823dfb90d5f42c2",
+        "line": 4621,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionRecord>(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/approve-transition`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:03d920d3d6b6d5e7",
+        "line": 4557,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 7,
+        "expression": "commonT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:491178c463c059d9",
+        "line": 279,
+        "namespaces": [
+          "common"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 19,
+        "expression": "commonT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:a8d78b280eabbac2",
+        "line": 266,
+        "namespaces": [
+          "common"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<TickerAggregate>(`/profile/tickers/${encodeURIComponent(ticker)}/state`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4b95b15d57ee8a6e",
+        "line": 2563,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<TickerAggregate>(`/profile/tickers/${encodeURIComponent(ticker)}/state`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d0a2055b02c9b21b",
+        "line": 2499,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 23,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/latest`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4e35889e58c08eb2",
+        "line": 4389,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 23,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/latest`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ef11d7c07d59bbab",
+        "line": 4325,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 51,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/prepare`,\n    \"POST\", { check_sha256: checkSha256, ...options })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4e7d9f2932a0bb8e",
+        "line": 4430,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 51,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers/prepare`,\n    \"POST\", { check_sha256: checkSha256, ...options })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9fb6fe13cbdea4c7",
+        "line": 4366,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ thread: ResearchThreadDTO }>(\n    `/research/threads/${encodeURIComponent(threadId)}`,\n    \"PATCH\",\n    patch,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4fa94a4bb8415b57",
+        "line": 1501,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ thread: ResearchThreadDTO }>(\n    `/research/threads/${encodeURIComponent(threadId)}`,\n    \"PATCH\",\n    patch,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b865d96a582ac433",
+        "line": 1437,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 51,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.ts",
+        "id": "frontend:53478379e8d32204",
+        "line": 454,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 40,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.ts",
+        "id": "frontend:1a7d5f2fc25803f7",
+        "line": 176,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<NewsFeedResponse>(`/news/feed?${sp.toString()}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5839892b0509ebda",
+        "line": 5059,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<NewsFeedResponse>(`/news/feed?${sp.toString()}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d7c0fdd9904a5ace",
+        "line": 4995,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:5d9d2a1e06872edc",
+        "line": 95,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 33,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:680eb17526261c64",
+        "line": 681,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 40,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/runs`, \"POST\", body)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5f7baec3c587a8b0",
+        "line": 4394,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 40,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/runs`, \"POST\", body)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a9893c3b2ce0e80a",
+        "line": 4330,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 52,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5fa3a86983db752f",
+        "line": 4422,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 52,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/providers`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:983a672647cd115a",
+        "line": 4358,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionRecord>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/cancel`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5ff89c4a4d00fab9",
+        "line": 4631,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionRecord>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/cancel`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d38d4562b7c08190",
+        "line": 4567,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/profile/tickers/${encodeURIComponent(ticker)}/priority`, \"POST\", { priority })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:61f0e5604f9ebc0f",
+        "line": 2410,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/profile/tickers/${encodeURIComponent(ticker)}/priority`, \"POST\", { priority })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3f6d15c9240b4f9a",
+        "line": 2346,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ deleted: boolean; id: string }>(\n    `/config/credentials/${encodeURIComponent(credentialId)}`,\n    \"DELETE\",\n    undefined,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:64af1326644b994d",
+        "line": 1770,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ deleted: boolean; id: string }>(\n    `/config/credentials/${encodeURIComponent(credentialId)}`,\n    \"DELETE\",\n    undefined,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7653a4469b52af23",
+        "line": 1706,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/action-proposals/${encodeURIComponent(proposalId)}/dismiss`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:66295f78bb2ae979",
+        "line": 4578,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/action-proposals/${encodeURIComponent(proposalId)}/dismiss`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3ca24933ce2e1048",
+        "line": 4514,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<OAuthAccountSyncView>(\n    `/config/credentials/${encodeURIComponent(credentialId)}/account-usage/sync`,\n    \"POST\",\n    undefined,\n    40_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:6a4a444befa4d935",
+        "line": 1657,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<OAuthAccountSyncView>(\n    `/config/credentials/${encodeURIComponent(credentialId)}/account-usage/sync`,\n    \"POST\",\n    undefined,\n    40_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d26f6c0a442133ab",
+        "line": 1593,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 43,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/operations?limit=5&offset=${offset}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:6a625419b918b839",
+        "line": 4994,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 43,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/operations?limit=5&offset=${offset}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d39a33d2b17eb5d4",
+        "line": 4930,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 53,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.ts",
+        "id": "frontend:6bcd7765cb2ba1aa",
+        "line": 486,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 51,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.ts",
+        "id": "frontend:36e40afac32117f3",
+        "line": 433,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ deleted: boolean; route: TaskRoute }>(\n    `/config/model-routes/${task}`,\n    \"DELETE\",\n    undefined,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:6d8627f057eef665",
+        "line": 1576,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ deleted: boolean; route: TaskRoute }>(\n    `/config/model-routes/${task}`,\n    \"DELETE\",\n    undefined,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8a14516a5a3cc511",
+        "line": 1512,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 34,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:7003f15f35bb3d1c",
+        "line": 695,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 34,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:6ae219f857e6a123",
+        "line": 641,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/acknowledgements`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:73e14f5892c6751e",
+        "line": 4559,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/acknowledgements`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:5415bb45d5a2fa06",
+        "line": 4495,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 52,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/preflight${lifecycleQuery({ language })}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:74399ec2ea223382",
+        "line": 4385,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 52,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/targets/${encodeURIComponent(ticker)}/preflight${lifecycleQuery({ language })}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:eb41dce0f005f833",
+        "line": 4321,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 33,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:75755ab29a7f36b0",
+        "line": 750,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:a40db312dc8e01cc",
+        "line": 38,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SAFeedResponse>(`/sa/feed?${sp.toString()}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7597fea19da5623c",
+        "line": 5114,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SAFeedResponse>(`/sa/feed?${sp.toString()}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a5f53cb7b411ca4a",
+        "line": 5050,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 8,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:78ae4c5de89101cf",
+        "line": 278,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 69,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:275bc16e264c984b",
+        "line": 355,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "css",
+        "column": 42,
+        "expression": "{...currentProps!}",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.test.tsx",
+        "id": "frontend:7a8d25cfeec23779",
+        "line": 165,
+        "reason": "dynamic-class-name"
+      },
+      "old": {
+        "axis": "css",
+        "column": 42,
+        "expression": "{...currentProps!}",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.test.tsx",
+        "id": "frontend:6fd3901473f2b846",
+        "line": 164,
+        "reason": "dynamic-class-name"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<CockpitWatchlist>(`/cockpit/watchlist?include_archived=${includeArchived}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7bb438bbd004996d",
+        "line": 1827,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<CockpitWatchlist>(`/cockpit/watchlist?include_archived=${includeArchived}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:eb206121e7d87495",
+        "line": 1763,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ thread_id: string; deleted: boolean }>(`/research/threads/${encodeURIComponent(threadId)}`, \"DELETE\", undefined, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7c330c43d2f31766",
+        "line": 1526,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ thread_id: string; deleted: boolean }>(`/research/threads/${encodeURIComponent(threadId)}`, \"DELETE\", undefined, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:afa95140a33c16b7",
+        "line": 1462,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<OAuthAccountSyncView>(\n    `/config/credentials/${encodeURIComponent(credentialId)}/account-usage`,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:821aa6cefb974076",
+        "line": 1650,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<OAuthAccountSyncView>(\n    `/config/credentials/${encodeURIComponent(credentialId)}/account-usage`,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:66a401462b3eb85e",
+        "line": 1586,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 68,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:8426d6efcd6d8775",
+        "line": 379,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:338be9224a9fb0b7",
+        "line": 255,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 44,
+        "expression": "getJSON<unknown>(path)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8768b6ef95afdbea",
+        "line": 2701,
+        "reason": "dynamic-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 44,
+        "expression": "getJSON<unknown>(path)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2ded67663d8991c9",
+        "line": 2637,
+        "reason": "dynamic-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 84,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.ts",
+        "id": "frontend:883b1668bf73d6d0",
+        "line": 487,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 53,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.ts",
+        "id": "frontend:38c4079215f141bf",
+        "line": 465,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 46,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/cancel`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8b2ab374e0b39e0b",
+        "line": 4401,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 46,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/cancel`, \"POST\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:550d84b4e17f5e01",
+        "line": 4337,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 9,
+        "expression": "sendJSON(`/profile/alpha-picks-tracking/${encodeURIComponent(membershipId)}`, \"POST\", { action })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8d52a7690c62316f",
+        "line": 3087,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 9,
+        "expression": "sendJSON(`/profile/alpha-picks-tracking/${encodeURIComponent(membershipId)}`, \"POST\", { action })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:10195304c8a6b4fd",
+        "line": 3023,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionAttemptResult>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/reverse`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8d783fd4a5234703",
+        "line": 4651,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerIdentityTransitionAttemptResult>(\n    `/security-lifecycle/transitions/${encodeURIComponent(transitionId)}/reverse`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:2f9a109f21e38dd1",
+        "line": 4587,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 45,
+        "expression": "sendJSON<unknown>(\n    `/security-lifecycle/transition-activity/${encodeURIComponent(activityId)}/acknowledge`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8dcda484a303c5b0",
+        "line": 4674,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 45,
+        "expression": "sendJSON<unknown>(\n    `/security-lifecycle/transition-activity/${encodeURIComponent(activityId)}/acknowledge`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9f60eb44396045dd",
+        "line": 4610,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 57,
+        "expression": "sendJSON<unknown>(\n    `/security-lifecycle/cases/${encodeURIComponent(packet.case_id)}/confirm-review`, \"POST\",\n    { assessment_id: packet.assessment_id, packet_sha256: packet.packet_sha256, action:",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9510768b5b46486c",
+        "line": 4373,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 57,
+        "expression": "sendJSON<unknown>(\n    `/security-lifecycle/cases/${encodeURIComponent(packet.case_id)}/confirm-review`, \"POST\",\n    { assessment_id: packet.assessment_id, packet_sha256: packet.packet_sha256, action:",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7cd666b9ca2da927",
+        "line": 4309,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerAggregate>(\n    `/profile/tickers/${encodeURIComponent(ticker)}/tags`,\n    \"POST\",\n    { value, facet },\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:955864d4b2ec5f07",
+        "line": 2590,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerAggregate>(\n    `/profile/tickers/${encodeURIComponent(ticker)}/tags`,\n    \"POST\",\n    { value, facet },\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b589265cd0a65206",
+        "line": 2526,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<Note>(`/profile/tickers/${encodeURIComponent(ticker)}/notes`, \"POST\", { body })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:97c015cbb6bffabd",
+        "line": 2573,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<Note>(`/profile/tickers/${encodeURIComponent(ticker)}/notes`, \"POST\", { body })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:37b23de067097e04",
+        "line": 2509,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/profile/lists/${listId}/members/${encodeURIComponent(ticker)}`, \"DELETE\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:993f960e10c5e2a1",
+        "line": 2403,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/profile/lists/${listId}/members/${encodeURIComponent(ticker)}`, \"DELETE\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:bb8a31be15e40f8d",
+        "line": 2339,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:99dbb1d717971a7e",
+        "line": 92,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:db5140a4cc5f6e5d",
+        "line": 40,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ credential: ProviderCredential }>(\n    `/config/credentials/${encodeURIComponent(credentialId)}`,\n    \"PUT\",\n    body,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9bd64a29e77e4d7b",
+        "line": 1761,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ credential: ProviderCredential }>(\n    `/config/credentials/${encodeURIComponent(credentialId)}`,\n    \"PUT\",\n    body,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:60705c087a012551",
+        "line": 1697,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<ResearchThreadsResponse>(`/research/threads?${query.toString()}`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9f587f1ba36d4e9f",
+        "line": 1489,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<ResearchThreadsResponse>(`/research/threads?${query.toString()}`, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ec159e6b0162d342",
+        "line": 1425,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioPosition>(\n    `/portfolio/positions/${encodeURIComponent(positionId)}`,\n    \"PATCH\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a760282ca6e78446",
+        "line": 2230,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioPosition>(\n    `/portfolio/positions/${encodeURIComponent(positionId)}`,\n    \"PATCH\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7f35a62fa4ed907e",
+        "line": 2166,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ run: ResearchRunDTO }>(`/research/runs/${encodeURIComponent(runId)}/cancel`, \"POST\", undefined, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a8ecf1a2469cbe47",
+        "line": 1553,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ run: ResearchRunDTO }>(`/research/runs/${encodeURIComponent(runId)}/cancel`, \"POST\", undefined, 8_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:866ebbe11753a5b4",
+        "line": 1489,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:a9f4cf8481234e72",
+        "line": 267,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 44,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:7e1b145261d51f1c",
+        "line": 269,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 41,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:ab9c4ea5a78e00a8",
+        "line": 270,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 10,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:8f6ea302f2f6899a",
+        "line": 246,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<ConsensusSummary>(`/analysis/consensus/${encodeURIComponent(ticker)}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ad9a41550aab26a5",
+        "line": 2433,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<ConsensusSummary>(`/analysis/consensus/${encodeURIComponent(ticker)}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ec1dbbb211d201c3",
+        "line": 2369,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 52,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:adcb4190cccf83fe",
+        "line": 279,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 74,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:a50975f75fca8660",
+        "line": 294,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 69,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:b024c1f715600170",
+        "line": 382,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 66,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:a679f9a81e598678",
+        "line": 345,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 46,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b2129cbc6c6a4c08",
+        "line": 4397,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 46,
+        "expression": "getJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:788d001908bc387a",
+        "line": 4333,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 11,
+        "expression": "getJSON<unknown>(\n      `/security-lifecycle/cases/${encodeURIComponent(caseId)}`,\n    )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b40b0ddde8ec2bb4",
+        "line": 4486,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 11,
+        "expression": "getJSON<unknown>(\n      `/security-lifecycle/cases/${encodeURIComponent(caseId)}`,\n    )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:8b374bc19e546ec3",
+        "line": 4422,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 33,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:b4498ef51e21ef8b",
+        "line": 782,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:eb6bd2ff7ab9f1d3",
+        "line": 41,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<WatchlistSummary>(`/profile/lists/${listId}`, \"PATCH\", { name })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b574b4ea3cb8c6c9",
+        "line": 2391,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<WatchlistSummary>(`/profile/lists/${listId}`, \"PATCH\", { name })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:934db0ec5bca246a",
+        "line": 2327,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 11,
+        "expression": "getJSON<unknown>(\n      `/security-lifecycle/candidates${lifecycleQuery(filters)}`,\n    )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b57faf6c6bbe9f46",
+        "line": 4451,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 11,
+        "expression": "getJSON<unknown>(\n      `/security-lifecycle/candidates${lifecycleQuery(filters)}`,\n    )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4dcbed896227c52e",
+        "line": 4387,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ deleted: boolean; activity_id: string }>(\n    `/portfolio/activity/annotations/${encodeURIComponent(activityId)}`,\n    \"DELETE\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b60b0914b09c7c69",
+        "line": 2220,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ deleted: boolean; activity_id: string }>(\n    `/portfolio/activity/annotations/${encodeURIComponent(activityId)}`,\n    \"DELETE\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:59c69e080c37f291",
+        "line": 2156,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<UniverseResponse>(`/profile/universe?include_archived=${includeArchived}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b95aa90b15516726",
+        "line": 1831,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<UniverseResponse>(`/profile/universe?include_archived=${includeArchived}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:4248f3f22ab3a739",
+        "line": 1767,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/profile/tickers/${encodeURIComponent(ticker)}/tags?${q.toString()}`,\n    \"DELETE\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ba54cb41a200be8f",
+        "line": 2606,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/profile/tickers/${encodeURIComponent(ticker)}/tags?${q.toString()}`,\n    \"DELETE\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:0aac1874ea6b1247",
+        "line": 2542,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioPosition>(\n    `/portfolio/positions/${encodeURIComponent(positionId)}`,\n    \"DELETE\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:baab90e4f7abb804",
+        "line": 2238,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioPosition>(\n    `/portfolio/positions/${encodeURIComponent(positionId)}`,\n    \"DELETE\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:c8a999e3c97b4f80",
+        "line": 2174,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/evidence`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:bc1ea59ca9f722f6",
+        "line": 4504,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/evidence`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:fcad02242facef34",
+        "line": 4440,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/providers/config/${encodeURIComponent(provider)}/${encodeURIComponent(field)}/import-env`,\n    \"POST\",\n    { source_env_var: sourceEnvVar ?? null, confirm_guarded: confirmGuarded },\n  ",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:bd3d7d39324cc6ea",
+        "line": 5452,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/providers/config/${encodeURIComponent(provider)}/${encodeURIComponent(field)}/import-env`,\n    \"POST\",\n    { source_env_var: sourceEnvVar ?? null, confirm_guarded: confirmGuarded },\n  ",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d3aeadc16cf298f7",
+        "line": 5388,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ deleted: boolean; id: number }>(\n    `/profile/tickers/${encodeURIComponent(ticker)}/notes/${noteId}`,\n    \"DELETE\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:bf921a352cfd2d40",
+        "line": 2577,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<{ deleted: boolean; id: number }>(\n    `/profile/tickers/${encodeURIComponent(ticker)}/notes/${noteId}`,\n    \"DELETE\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:99b04d2bbfcc6d18",
+        "line": 2513,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<ProbeResponse>(`/config/credentials/${encodeURIComponent(credentialId)}/probe`, \"POST\", undefined, 150_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:c4109ce3e09599c0",
+        "line": 1697,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<ProbeResponse>(`/config/credentials/${encodeURIComponent(credentialId)}/probe`, \"POST\", undefined, 150_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:feba4954afc268ca",
+        "line": 1633,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 33,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:c7f8f00c874eedc4",
+        "line": 735,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 33,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:efa3b53d87a1cce4",
+        "line": 696,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioAccount>(\n    `/portfolio/accounts/${encodeURIComponent(accountId)}`,\n    \"PATCH\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:c885339315468a23",
+        "line": 2266,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioAccount>(\n    `/portfolio/accounts/${encodeURIComponent(accountId)}`,\n    \"PATCH\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7eee4f0b2b4ce8e1",
+        "line": 2202,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SecurityLifecycleInvestigationRun>(\n    `/security-lifecycle/investigations/${encodeURIComponent(runId)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:c963e01e6b7c7cd9",
+        "line": 4495,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<SecurityLifecycleInvestigationRun>(\n    `/security-lifecycle/investigations/${encodeURIComponent(runId)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:735c2d1fec97843e",
+        "line": 4431,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ run: ResearchRunDTO; events: ResearchRunEventDTO[]; has_more: boolean }>(\n    `/research/runs/${encodeURIComponent(runId)}/events?after=${after}`,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:cb950be27f84eadc",
+        "line": 1547,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ run: ResearchRunDTO; events: ResearchRunEventDTO[]; has_more: boolean }>(\n    `/research/runs/${encodeURIComponent(runId)}/events?after=${after}`,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:a96fc9b046550185",
+        "line": 1483,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ lists: WatchlistSummary[] }>(`/profile/lists?include_archived=${includeArchived}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ccc7882456558e6c",
+        "line": 2382,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ lists: WatchlistSummary[] }>(`/profile/lists?include_archived=${includeArchived}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:32021d9222c70963",
+        "line": 2318,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ thread: ResearchThreadDTO }>(\n    `/research/threads/${encodeURIComponent(threadId)}`,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d09113714e3dc4f4",
+        "line": 1492,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<{ thread: ResearchThreadDTO }>(\n    `/research/threads/${encodeURIComponent(threadId)}`,\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:14610813ff018c4e",
+        "line": 1428,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/profile/tickers/${encodeURIComponent(ticker)}/hidden`, \"POST\", { hidden })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d3166a32c857116e",
+        "line": 2523,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/profile/tickers/${encodeURIComponent(ticker)}/hidden`, \"POST\", { hidden })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d72bbf598f899fde",
+        "line": 2459,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/profile/lists/${listId}`, \"DELETE\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d3bc1d437def190b",
+        "line": 2394,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/profile/lists/${listId}`, \"DELETE\")",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:095f9a19ad2137eb",
+        "line": 2330,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<PriceChange>(`/prices/${encodeURIComponent(ticker)}/change?days=${days}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d98bfdc05896a597",
+        "line": 1823,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON<PriceChange>(`/prices/${encodeURIComponent(ticker)}/change?days=${days}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:01c3dce495345a25",
+        "line": 1759,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/assessments`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d9cd60e1bbb7d307",
+        "line": 4539,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/cases/${encodeURIComponent(caseId)}/assessments`,\n    \"POST\",\n    body,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:fe02e2fa96500a10",
+        "line": 4475,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON(`/symbols/search?q=${encodeURIComponent(q)}&limit=${limit}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:d9cd7495f5c40451",
+        "line": 2507,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "getJSON(`/symbols/search?q=${encodeURIComponent(q)}&limit=${limit}`, 20_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:09fc9ac1d559c630",
+        "line": 2443,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 50,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/${repairId}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:dc707793e9c38c7a",
+        "line": 4998,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 50,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/${repairId}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:b768e5548ca69370",
+        "line": 4934,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 12,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:de30ca61948152f6",
+        "line": 93,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 33,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchReducer.test.ts",
+        "id": "frontend:f1fb46ffc8ca344e",
+        "line": 728,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerAggregate>(\n    `/profile/tickers/${encodeURIComponent(ticker)}/archive`,\n    \"POST\",\n    { archived },\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:df75e900e02942d7",
+        "line": 2555,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerAggregate>(\n    `/profile/tickers/${encodeURIComponent(ticker)}/archive`,\n    \"POST\",\n    { archived },\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:c7a1f7af593346ab",
+        "line": 2491,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 45,
+        "expression": "sendJSON<unknown>(\n    path,\n    \"POST\",\n    options?.refresh === true ? { lang, refresh: true } : { lang },\n    fixedTaskRequestTimeoutMs(runtime, \"card_translation\"),\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:e371967bd0858281",
+        "line": 2728,
+        "reason": "dynamic-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 45,
+        "expression": "sendJSON<unknown>(\n    path,\n    \"POST\",\n    options?.refresh === true ? { lang, refresh: true } : { lang },\n    fixedTaskRequestTimeoutMs(runtime, \"card_translation\"),\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:877b225dc34880b9",
+        "line": 2664,
+        "reason": "dynamic-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 19,
+        "expression": "commonT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:e3adb96c525777ea",
+        "line": 278,
+        "namespaces": [
+          "common"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 119,
+        "expression": "commonT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:e935f58a480c753e",
+        "line": 360,
+        "namespaces": [
+          "common"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 24,
+        "expression": "getJSON<TradingDayCoverage>(\n    `/market-data/trading-days?lookback_days=${lookbackDays}&interval=${encodeURIComponent(interval)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ea9721eb26e7593d",
+        "line": 5009,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 24,
+        "expression": "getJSON<TradingDayCoverage>(\n    `/market-data/trading-days?lookback_days=${lookbackDays}&interval=${encodeURIComponent(interval)}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9aac01cb57daf370",
+        "line": 4945,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerAggregate>(`/profile/lists/${listId}/members`, \"POST\", { ticker })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:eab054d309cae25c",
+        "line": 2397,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<TickerAggregate>(`/profile/lists/${listId}/members`, \"POST\", { ticker })",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ff5bd3e1abdb0328",
+        "line": 2333,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 44,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:eb5363425ccdbd9a",
+        "line": 281,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 66,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:b3bfee845fe9a8e3",
+        "line": 342,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 69,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:eb54e3ded61a7018",
+        "line": 386,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 52,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:c31a5d39ec01c6a1",
+        "line": 267,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 57,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/confirm`, \"POST\",\n    { packet_sha256: packet.packet_sha256, action: packet.action, ...packet.options, acknowled",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:ed6e813fda0f8994",
+        "line": 4410,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 57,
+        "expression": "sendJSON<unknown>(`/security-lifecycle/investigations/runs/${encodeURIComponent(runId)}/confirm`, \"POST\",\n    { packet_sha256: packet.packet_sha256, action: packet.action, ...packet.options, acknowled",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:1da66402eb5958de",
+        "line": 4346,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:ed7d5d94edd857da",
+        "line": 282,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 68,
+        "expression": "researchT",
+        "file": "apps/arkscope-web/src/ResearchEvidenceDrawer.tsx",
+        "id": "frontend:d07b327379c6399d",
+        "line": 348,
+        "namespaces": [
+          "research"
+        ],
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 45,
+        "expression": "getJSON<unknown>(path)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:f0784dc80c1be85d",
+        "line": 2660,
+        "reason": "dynamic-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 45,
+        "expression": "getJSON<unknown>(path)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:9508e33604ff9468",
+        "line": 2596,
+        "reason": "dynamic-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 41,
+        "expression": "getJSON<unknown>(\n    `/security-lifecycle/transition-activity${query ? `?${query}` : \"\"}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:f0b4ae113df17fdc",
+        "line": 4666,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 41,
+        "expression": "getJSON<unknown>(\n    `/security-lifecycle/transition-activity${query ? `?${query}` : \"\"}`,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:40ab365434445619",
+        "line": 4602,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/sec-research/filings/${encodeURIComponent(filingId)}/document`, \"POST\", { document_id: \"primary\" }, 600_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:f13d065de2ecc1ca",
+        "line": 1368,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(`/sec-research/filings/${encodeURIComponent(filingId)}/document`, \"POST\", { document_id: \"primary\" }, 600_000)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:7944bb5f76f4d83c",
+        "line": 1304,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/acknowledgements/${encodeURIComponent(acknowledgementId)}/reopen`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:f56e20e67f5b4e0b",
+        "line": 4569,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/security-lifecycle/acknowledgements/${encodeURIComponent(acknowledgementId)}/reopen`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:841110c23f610ac1",
+        "line": 4505,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioCaptureReview>(\n    `/portfolio/capture/runs/${encodeURIComponent(runId)}/apply`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:f94371641a1b3fc1",
+        "line": 2375,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON<PortfolioCaptureReview>(\n    `/portfolio/capture/runs/${encodeURIComponent(runId)}/apply`,\n    \"POST\",\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:55bc37ed69be0085",
+        "line": 2311,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 40,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/preview?lookback_days=${lookbackDays}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:fcaa9786c4a153d4",
+        "line": 4887,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 40,
+        "expression": "getJSON<unknown>(`/market-data/price-repair/preview?lookback_days=${lookbackDays}`)",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:6f37864f7ff15704",
+        "line": 4823,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/providers/config/${encodeURIComponent(provider)}`,\n    \"PUT\",\n    { fields, confirm_guarded: confirmGuarded ?? {} },\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:fcdd6f923c68b8dd",
+        "line": 5432,
+        "reason": "template-http-url"
+      },
+      "old": {
+        "axis": "http",
+        "column": 10,
+        "expression": "sendJSON(\n    `/providers/config/${encodeURIComponent(provider)}`,\n    \"PUT\",\n    { fields, confirm_guarded: confirmGuarded ?? {} },\n    8_000,\n  )",
+        "file": "apps/arkscope-web/src/api.ts",
+        "id": "frontend:3b3fc027fea98b61",
+        "line": 5368,
+        "reason": "template-http-url"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:0019c341ee1f2707",
+        "kind": "unmodeled_sql_statement",
+        "line": 375,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:6233bc5bfda1a3c7",
+        "kind": "unmodeled_sql_statement",
+        "line": 373,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:0c6dfa4d50d67555",
+        "kind": "unmodeled_sql_statement",
+        "line": 319,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:7a18e24bb66ec86b",
+        "kind": "unmodeled_sql_statement",
+        "line": 317,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:21a9a970eeed1d22",
+        "kind": "dynamic_sql",
+        "line": 694,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:57f5a1995f6a36a8",
+        "kind": "dynamic_sql",
+        "line": 681,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:254c7e43069111c8",
+        "kind": "unmodeled_sql_statement",
+        "line": 144,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:a0ce1af43085e8ba",
+        "kind": "unmodeled_sql_statement",
+        "line": 142,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:3a573a58f940ae1e",
+        "kind": "dynamic_sql",
+        "line": 613,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:b827d5c57012d8be",
+        "kind": "dynamic_sql",
+        "line": 600,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:4846552cc6117be6",
+        "kind": "dynamic_sql",
+        "line": 608,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:7e8663fd70d4bd00",
+        "kind": "dynamic_sql",
+        "line": 595,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:56d90ed3c8f7aeab",
+        "kind": "dynamic_sql",
+        "line": 693,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:093703896140ba66",
+        "kind": "dynamic_sql",
+        "line": 680,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:591d87868661c5ab",
+        "kind": "dynamic_sql",
+        "line": 553,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:bc64b79cea9e5dab",
+        "kind": "dynamic_sql",
+        "line": 540,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:6c3bbae585d95cad",
+        "kind": "dynamic_sql",
+        "line": 616,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:269f7f45fe00d6de",
+        "kind": "dynamic_sql",
+        "line": 603,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:9a64c9334d2fa421",
+        "kind": "unmodeled_sql_statement",
+        "line": 24,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:ef5095aed77f3151",
+        "kind": "unmodeled_sql_statement",
+        "line": 22,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:a823ffa8b09f019f",
+        "kind": "unmodeled_sql_statement",
+        "line": 792,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:46785aef97c8f6d4",
+        "kind": "unmodeled_sql_statement",
+        "line": 779,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:afdd26fe2d1d05e2",
+        "kind": "unmodeled_sql_statement",
+        "line": 817,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:a14cd024dedc4ff3",
+        "kind": "unmodeled_sql_statement",
+        "line": 804,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:c088727f0b9faa2a",
+        "kind": "dynamic_sql",
+        "line": 167,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:01ef07885212011a",
+        "kind": "dynamic_sql",
+        "line": 165,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:c8a501cd7871d7c5",
+        "kind": "unmodeled_sql_statement",
+        "line": 211,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:e4f63502a8f639c2",
+        "kind": "unmodeled_sql_statement",
+        "line": 209,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:ca7e049d5bc6c0e1",
+        "kind": "unmodeled_sql_statement",
+        "line": 153,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:aa2f54121e749e20",
+        "kind": "unmodeled_sql_statement",
+        "line": 151,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:e76df689c89969d4",
+        "kind": "dynamic_sql",
+        "line": 552,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:ac17f6293aa69180",
+        "kind": "dynamic_sql",
+        "line": 539,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:ecf4120fc6004249",
+        "kind": "unmodeled_sql_statement",
+        "line": 158,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:b1c1ed666e60edde",
+        "kind": "unmodeled_sql_statement",
+        "line": 156,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:ef76a89c9f8cfe33",
+        "kind": "unmodeled_sql_statement",
+        "line": 513,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:02cd686420d15eea",
+        "kind": "unmodeled_sql_statement",
+        "line": 500,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:f9f6540aa536386c",
+        "kind": "unmodeled_sql_statement",
+        "line": 143,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:dac6bab87d17ab61",
+        "kind": "unmodeled_sql_statement",
+        "line": 141,
+        "path": "src/research_runs.py"
+      }
+    }
+  ],
+  "position_only_by_axis": {
+    "css": 3,
+    "http": 93,
+    "i18n": 30,
+    "sql": 19
+  },
+  "position_only_count": 145
+}

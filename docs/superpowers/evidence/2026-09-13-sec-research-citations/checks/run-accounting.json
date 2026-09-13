@@ -1,0 +1,2193 @@
+{
+  "counting_policy": "Only backend-final-full owns the complete backend total; overlapping selections are not added.",
+  "runs": [
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "d4a1866b5432337a2756465beb0acd94172ca408cee10c92fb7d84a5bbb0d3c8",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "backend-final-collection",
+      "seconds": 7.827
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "3c921d38a58909ed15827d93b3a8f95430c25d0a649fa7b89e0587347cbd3897",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "backend-final-collection-02",
+      "seconds": 7.9
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "45e94bd0705fbd8b2bb753ed341a140180f93af4e5ed3127270e79c8115af69a",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 10583,
+        "skipped": 12
+      },
+      "run": "backend-final-full",
+      "seconds": 1216.176
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "fd9a5bf304167c7f92b7986dbfbd7b0eba47ac18f623b8e1f64fb0a80ec5c5e6",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "census-citations-base",
+      "seconds": 15.551
+    },
+    {
+      "classification": "review_required; use separate classified census report",
+      "command_sha256": "de14072284f60e420e1a07b039e1888c31df795d5e8d67f6ec184da6175212f2",
+      "exit_code": 2,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "census-citations-cleanup-final",
+      "seconds": 13.719
+    },
+    {
+      "classification": "review_required; use separate classified census report",
+      "command_sha256": "c849f43e3c9a8c0978118ea4905bc47aa793c674c52d4bccdfba1344537fe5b6",
+      "exit_code": 2,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "census-citations-final",
+      "seconds": 13.947
+    },
+    {
+      "classification": "preview listener blocked by test-only DNS guard; corrected preview-only wrapper",
+      "command_sha256": "9529fec7b0bfcbe930958b2eaddffba93520e0d6258ce21a361af40f45a87382",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "citations-browser-01",
+      "seconds": 4.15
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "4709ecbb1643623360d0103e870521a382c189712c8df452a8eb81d1d82feec5",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "citations-browser-02",
+      "seconds": 8.788
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "ebfda607479e7d936467fdd9a61e51760fddefbee1a2999ead140a2ea264ee66",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "citations-browser-cleanup-final",
+      "seconds": 9.033
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "5e85deaa51adc85b08b51858d12df431f5b7a26c8e400f87c29bb7c1b9101b5a",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "citations-browser-final",
+      "seconds": 8.518
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "b5987effa911c51208df370ac49612d252e98392c32ae05f5e3dd51a38620d47",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "citations-fixture-setup-01",
+      "seconds": 2.884
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "32d477168ef4d21b25af8454d8fe1bf62d2565402061aee31f04dc2ea0ec26f1",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "citations-fixture-setup-02",
+      "seconds": 3.255
+    },
+    {
+      "classification": "controller nonexistent test path; exit4 and zero tests; corrected02",
+      "command_sha256": "7c1c9370af2454e56041f550544af774f40f1c8444ff0d5279a5aa82e3ef0454",
+      "exit_code": 4,
+      "failed_nodes": [],
+      "junit_counts": {},
+      "run": "final-review-cancel-green",
+      "seconds": 0.294
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "a63d908b6920a000635232b2d59345c35654fb437cde8ab50d4408f8d05e582b",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 709
+      },
+      "run": "final-review-cancel-green-02",
+      "seconds": 63.047
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "53bebc5d5e4a033e4e5cbd3f74e5f429f3623f6e89c4410a29dca4515b20fddc",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_queued_openai_completions_survive_executor_cancellation[False]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_queued_openai_completions_survive_executor_cancellation[True]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 2
+      },
+      "run": "final-review-cancel-red",
+      "seconds": 3.761
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "ed1ebe572cc2488103ed63b150a8dab4d1bac52a9b58fed51178c1494c12ec7b",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "frontend-census-cleanup-build",
+      "seconds": 14.428
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "aa7c2e2dbc1d5cf726bb711edd7512332f6f72e58265e45a3bf165b697a2b2aa",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "frontend-census-cleanup-final",
+      "seconds": 14.516
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "448014c249c14eb1716747c1f229cd4bca35406f2087458c1ced01d49c276f42",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "frontend-census-cleanup-i18n",
+      "seconds": 0.837
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "c3039bbf482b41525be9d98862345d3e51aab943d294a5b353a57aac575c61b1",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "frontend-census-cleanup-typecheck",
+      "seconds": 11.657
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "0e1e1dd88758aba85b4230ac522bf2d6fac0d23bcc366bc494fcec3f98159439",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "frontend-final-current",
+      "seconds": 14.549
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "b8fe0d922abea4d69f294b9ba1c3d93b4437a3f04d2b30e8ed94f01e14e2d34a",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[fact-change0]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1,
+        "passed": 11
+      },
+      "run": "inverse-bound-hash-01",
+      "seconds": 3.536
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "304867655f302bf8115cd7e4d801ef81fc0d29eddc9d89812f73659e05a43685",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_sec_tool_end_preserves_whole_citations_by_call_id",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "inverse-call-id-01",
+      "seconds": 3.477
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "feac80846c5df9107ad0490247f2b207e65b1a3223ee77be02ec3cb921b176f6",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_enumerates_message_and_event_only_roots",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "inverse-event-roots-01",
+      "seconds": 1.574
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "858d2e66eec4d47dcc14a8cb93e78c4aea77c299b7322fe4da0f6d069f7c053d",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_sec_tool_end_preserves_whole_citations_by_call_id",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "inverse-optional-fields-01",
+      "seconds": 3.48
+    },
+    {
+      "classification": "launcher annotation setup failure; rerun02 proves inverse",
+      "command_sha256": "7f47b46bf8e0805d0815a0c210e72dc07f3e56f33584c63f4ef5dc4b51903e49",
+      "exit_code": 3,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "inverse-recovery-500-01",
+      "seconds": 0.325
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "310451db8e870f07f732751cc3d8acd346702432bb908b3c0aaa51f24406cc75",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls[restart]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls[no-task-cancel]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 2
+      },
+      "run": "inverse-recovery-500-02",
+      "seconds": 7.29
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "178f9991fdc8d29ec98558e922ac4b8ac1bdd7bd5543e76ab36d62e0f8772692",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 16
+      },
+      "run": "inverse-restored-green-01",
+      "seconds": 9.194
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "20d73250891934825cf702cdfd293e1c46800d3c34f504c8ca576fd425ec2e3b",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 491
+      },
+      "run": "task1-baseline-01",
+      "seconds": 27.015
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "ecd3df704507e29ea0a9583489c15e18b1c661dd2e8676c34bd03706a0873ad9",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 1534
+      },
+      "run": "task1-broad-green-01",
+      "seconds": 97.028
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "f87ffc6ca206cf8a2e95984806b242dc436f969f0e81cb11a7ebd544a0475238",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 430
+      },
+      "run": "task1-fix1-green-01",
+      "seconds": 25.575
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "0006c467b5f3b70e2a7d702f65449ae7cafcf8acf2fe745c3d1c54d79c0f60cd",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-fiscal-year-bool]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-fiscal-year-zero]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-fiscal-year-overflow]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-fiscal-year-float]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-fiscal-year-text]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-reversed-period]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-unnormalized-start]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-fiscal-period-type]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-fiscal-period-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-fiscal-period-control]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-frame-type]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-frame-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[fact-frame-control]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-document-type]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-document-path]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-unnormalized-document]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-report-date-calendar]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-report-date-type]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-unnormalized-report-date]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-accepted-at-type]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-accepted-at-calendar]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-accepted-at-naive]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-unnormalized-accepted-at]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-unnormalized-timezone]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-url-without-document]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-document-without-url]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-url-type]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-document-url-mismatch]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-url-host]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-url-cik]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_complete_native_row_mutations_are_closed_gaps[filing-url-accession]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 31,
+        "passed": 8
+      },
+      "run": "task1-fix1-red-01",
+      "seconds": 6.745
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "c63a75279729a2ace51b058d6a27b14a24c1d5b57b9bdaa8e778952e82cc40b3",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 186
+      },
+      "run": "task1-green-01",
+      "seconds": 21.441
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "d5611d35d5d64d36c2238b04784485d212e6dd61ebbbd28fdd8dd0c656707e20",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_citations",
+          "test_whole_query_results_pin_fact_document_and_every_catalog_source",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_conflicting_filing_variants_keep_separate_exact_references",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[dict-]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[dict-tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[dict-mcp__ark__]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[dict-mcp__ark__tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[json-]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[json-tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[json-mcp__ark__]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[json-mcp__ark__tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[wrapped-]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[wrapped-tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[wrapped-mcp__ark__]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[wrapped-mcp__ark__tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[blocks-]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[blocks-tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[blocks-mcp__ark__]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[blocks-mcp__ark__tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[mcp-]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[mcp-tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[mcp-mcp__ark__]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[mcp-mcp__ark__tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[sdk-]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[sdk-tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[sdk-mcp__ark__]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_owned_whole_results_and_actual_mcp_text_blocks[sdk-mcp__ark__tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_unknown_tools_never_parse_or_scan_evidence[other]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_unknown_tools_never_parse_or_scan_evidence[provider__list_sec_filings]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_unknown_tools_never_parse_or_scan_evidence[mcp__other__read_sec_filing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_unknown_tools_never_parse_or_scan_evidence[tool_tool_list_sec_filings]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_unknown_tools_never_parse_or_scan_evidence[None]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change0]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change1]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change2]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change5]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change6]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change7]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change8]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change9]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change10]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change11]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_fact_reference_rejects_malformed_fields[change12]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_document_reference_rejects_invalid_ranges[change0]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_document_reference_rejects_invalid_ranges[change1]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_document_reference_rejects_invalid_ranges[change2]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_document_reference_rejects_invalid_ranges[change3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_document_reference_rejects_invalid_ranges[change4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_document_reference_rejects_invalid_ranges[change5]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_document_reference_rejects_invalid_ranges[change6]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_document_reference_rejects_invalid_ranges[change7]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_closed_document_reference_rejects_invalid_ranges[change8]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_owned_evidence_is_a_typed_event_gap[prose]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_owned_evidence_is_a_typed_event_gap[preview]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_owned_evidence_is_a_typed_event_gap[extra]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_owned_evidence_is_a_typed_event_gap[bad_row]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_owned_evidence_is_a_typed_event_gap[bad_source]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_owned_evidence_is_a_typed_event_gap[wrong_wrapper]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_owned_evidence_is_a_typed_event_gap[mixed_blocks]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_owned_evidence_is_a_typed_event_gap[duplicate_json]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_owned_evidence_is_a_typed_event_gap[nonfinite]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_valid_whole_no_reference_envelopes_are_not_citation_gaps[empty-get_sec_financial_facts]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_valid_whole_no_reference_envelopes_are_not_citation_gaps[empty-list_sec_filings]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_valid_whole_no_reference_envelopes_are_not_citation_gaps[empty-read_sec_filing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_valid_whole_no_reference_envelopes_are_not_citation_gaps[unavailable-get_sec_financial_facts]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_valid_whole_no_reference_envelopes_are_not_citation_gaps[unavailable-list_sec_filings]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_valid_whole_no_reference_envelopes_are_not_citation_gaps[unavailable-read_sec_filing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_document_index_and_empty_search_do_not_invent_passage_citations",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_research_citation_reopens_exact_bytes_after_refresh_and_relocation",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[fact-change0]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[fact-change1]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[fact-change2]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[fact-change3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[filing-change4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[document-change5]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[document-change6]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[document-change7]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[document-change8]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[document-change9]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[document-change10]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_bound_hash_pointer_metadata_and_utf8_tampering_is_unavailable[document-change11]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_identical_bytes_reobserved_at_receipt_time_remain_reopenable",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_canonical_query_roundtrip_is_bounded_and_rejects_other_encodings",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_reference_closure_retains_directory_catalog_and_fact_objects",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_closure_is_sorted_independent_of_reference_order_and_includes_unbound_fact_ids",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_missing_or_corrupt_retained_object_fails_closure_and_exact_read[directory]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_missing_or_corrupt_retained_object_fails_closure_and_exact_read[catalog]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_missing_or_corrupt_retained_object_fails_closure_and_exact_read[fact]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_missing_or_corrupt_retained_object_fails_closure_and_exact_read[original]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_missing_or_corrupt_retained_object_fails_closure_and_exact_read[text]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_corrupt_metadata_cannot_become_citation_or_maintenance_authority[fact_value]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_corrupt_metadata_cannot_become_citation_or_maintenance_authority[filing_pointer]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_corrupt_metadata_cannot_become_citation_or_maintenance_authority[receipt_binding]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_corrupt_metadata_cannot_become_citation_or_maintenance_authority[catalog_provenance]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_duplicate_catalog_provenance_is_rejected_even_with_matching_document_identity",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_routes",
+          "test_citation_get_reopens_real_retained_source_before_dynamic_cik_route",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_routes",
+          "test_citation_query_errors_are_closed_before_store_access[params0]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_routes",
+          "test_citation_query_errors_are_closed_before_store_access[params1]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_routes",
+          "test_citation_query_errors_are_closed_before_store_access[params2]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_routes",
+          "test_citation_query_errors_are_closed_before_store_access[params3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_routes",
+          "test_citation_query_errors_are_closed_before_store_access[params4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_routes",
+          "test_citation_query_errors_are_closed_before_store_access[params5]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 103
+      },
+      "run": "task1-red-01",
+      "seconds": 15.755
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "2ea2f56a5fc262b87c448cee9ad3d547633cbee398b3630883e2c624470ff1a3",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_api",
+          "test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes",
+          "failure"
+        ],
+        [
+          "tests.test_security_lifecycle_routes",
+          "test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 2
+      },
+      "run": "task1-route-count-red-01",
+      "seconds": 4.864
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "b0335a9198186a38ad82e67d2835080936633722453ad0baec7194d68ff33653",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 31
+      },
+      "run": "task1-scale-green-01",
+      "seconds": 9.047
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "5b163d215dca26c3e91cc2696bafe20d0c5370d60ed7cd698f40685b7cf52282",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_references",
+          "test_missing_or_corrupt_retained_object_fails_closure_and_exact_read[fact]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_closure_aggregate_exceeds_per_object_budget_with_bounded_source_processing",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_exact_read_is_not_invalidated_by_later_unrelated_receipt_members[fact]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_exact_read_is_not_invalidated_by_later_unrelated_receipt_members[filing]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 4,
+        "passed": 5
+      },
+      "run": "task1-scale-red-01",
+      "seconds": 5.243
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "14390182918c9c15b2334bc27a16c93ac2c58d6b14f7a7c9c9a1801b32cd3bad",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 208
+      },
+      "run": "task1-self-review-green-01",
+      "seconds": 25.584
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "7854c546e8c3feac8b12236720629fe89e6132f2fbb875458bfe24466262788b",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_no_passage_document_evidence_is_not_silently_ignored[document_type]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_no_passage_document_evidence_is_not_silently_ignored[document_fields]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_no_passage_document_evidence_is_not_silently_ignored[document_hash]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_no_passage_document_evidence_is_not_silently_ignored[coverage]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_no_passage_document_evidence_is_not_silently_ignored[section]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_malformed_no_passage_document_evidence_is_not_silently_ignored[directory_source]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_no_evidence_status_cannot_hide_a_nonempty_document_passage[empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_no_evidence_status_cannot_hide_a_nonempty_document_passage[unavailable]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_conflicting_mcp_structured_content_is_a_gap_not_ignored_evidence[dict]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_conflicting_mcp_structured_content_is_a_gap_not_ignored_evidence[sdk]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 10,
+        "passed": 17
+      },
+      "run": "task1-self-review-red-01",
+      "seconds": 5.961
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "fd5d70c97b2236fc04f8fcacb55fe16f9a2d975761b682c96f8196c650a4019f",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 101
+      },
+      "run": "task2-edge-green-01",
+      "seconds": 13.298
+    },
+    {
+      "classification": "mixed ChatGPT error-evidence gap and misplaced fixture assertion; corrected02",
+      "command_sha256": "10d8ddb7733a40a9d09d3c0287e8f33c266e2dc86a92c4953c66effa12f81983",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_error_marked_result_cannot_become_successful_evidence[chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_repeated_close_cancellation_awaits_same_openai_worker",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 2,
+        "passed": 51
+      },
+      "run": "task2-edge-red-01",
+      "seconds": 13.306
+    },
+    {
+      "classification": "error-evidence RED plus deliberate exact-ID dedup inverse; see task2 report",
+      "command_sha256": "ce9654ce2a8afcb3d2f54bc85cbf20c118afee8db9e51662f0f3070c7eb0236b",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_error_marked_result_cannot_become_successful_evidence[chatgpt-False]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_openai_end_hook_retains_input_without_start_and_ignores_raw_duplicate",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 2,
+        "passed": 3
+      },
+      "run": "task2-edge-red-02",
+      "seconds": 4.329
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "c90aa9547a6469ff96bf4d7f9451c54eda0474999429a0b739e0b49237a77bcf",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_openai_hookless_raw_response_fallback_retains_end_only_input",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task2-fallback-red-01",
+      "seconds": 3.222
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "b20f554b95939b12c15111669332bbfec4bf526150e14d45f3ce330ed67eeeea",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 1164
+      },
+      "run": "task2-final-green-01",
+      "seconds": 80.461
+    },
+    {
+      "classification": "incorrect fixture isinstance against generic RunHooks alias; corrected hook owners",
+      "command_sha256": "f5694ad4c717d7ba7012d055b95c4ba640e599d60159429782e939ec614668ee",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[cancel]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[close]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[error]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[retry]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 4,
+        "passed": 36
+      },
+      "run": "task2-green-01",
+      "seconds": 11.044
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "1e6ed0de1125b05c1ddfe3404fcb7740408f385ba6b7a0b8944002c97272efc0",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 40
+      },
+      "run": "task2-green-02",
+      "seconds": 10.469
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "b7ef29377bf6b8e99c2f250977d936612d5fa3fb0aa87b55a55d19480d487f38",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[cancel]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[close]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[error]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[retry]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 4
+      },
+      "run": "task2-hooks-red-02",
+      "seconds": 12.2
+    },
+    {
+      "classification": "mixed missing behavior and incorrect Anthropic fixture patch target; corrected02",
+      "command_sha256": "8c7f68dfa476df984b11e9b10f9bfe0f9564e2b250b00de73a7dd103d3bc1de5",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[facts-get_sec_financial_facts-openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[facts-get_sec_financial_facts-anthropic]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[facts-get_sec_financial_facts-chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[facts-get_sec_financial_facts-claude]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[filings-list_sec_filings-openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[filings-list_sec_filings-anthropic]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[filings-list_sec_filings-chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[filings-list_sec_filings-claude]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[document-read_sec_filing-openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[document-read_sec_filing-anthropic]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[document-read_sec_filing-chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[document-read_sec_filing-claude]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_malformed_owned_evidence_is_a_gap_in_each_producer[openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_malformed_owned_evidence_is_a_gap_in_each_producer[anthropic]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_malformed_owned_evidence_is_a_gap_in_each_producer[chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_malformed_owned_evidence_is_a_gap_in_each_producer[claude]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_full_result_secret_is_rejected_before_citation_projection[openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_full_result_secret_is_rejected_before_citation_projection[anthropic]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_full_result_secret_is_rejected_before_citation_projection[chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_event_boundary_admits_only_typed_owned_citations[]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_event_boundary_admits_only_typed_owned_citations[tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_event_boundary_admits_only_typed_owned_citations[mcp__ark__]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_event_boundary_admits_only_typed_owned_citations[mcp__ark__tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[cancel]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[close]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[error]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[retry]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 27,
+        "passed": 12
+      },
+      "run": "task2-red-01",
+      "seconds": 19.251
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "e17f244e86c9f8c2c8b01e26ac9d8d3661396737ea73ab01907447f20369ca63",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[facts-get_sec_financial_facts-openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[facts-get_sec_financial_facts-anthropic]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[facts-get_sec_financial_facts-chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[facts-get_sec_financial_facts-claude]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[filings-list_sec_filings-openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[filings-list_sec_filings-anthropic]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[filings-list_sec_filings-chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[filings-list_sec_filings-claude]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[document-read_sec_filing-openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[document-read_sec_filing-anthropic]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[document-read_sec_filing-chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_four_channels_keep_whole_refs_and_call_inputs[document-read_sec_filing-claude]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_malformed_owned_evidence_is_a_gap_in_each_producer[openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_malformed_owned_evidence_is_a_gap_in_each_producer[anthropic]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_malformed_owned_evidence_is_a_gap_in_each_producer[chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_malformed_owned_evidence_is_a_gap_in_each_producer[claude]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_full_result_secret_is_rejected_before_citation_projection[openai]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_full_result_secret_is_rejected_before_citation_projection[chatgpt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_event_boundary_admits_only_typed_owned_citations[]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_event_boundary_admits_only_typed_owned_citations[tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_event_boundary_admits_only_typed_owned_citations[mcp__ark__]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_event_boundary_admits_only_typed_owned_citations[mcp__ark__tool_]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[cancel]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[close]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[error]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_completed_openai_sec_tool_survives_later_cancel[retry]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 26,
+        "passed": 13
+      },
+      "run": "task2-red-02",
+      "seconds": 19.397
+    },
+    {
+      "classification": "two old exact start-event assertions missing newly required call_id",
+      "command_sha256": "ed8f75b4b2d3c87d18e170e882bff4533aec28ba7344e66981e61f369d52a31e",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_chatgpt_oauth_driver",
+          "test_stream_llm_runs_allowed_tool_and_continues_without_previous_response_id",
+          "failure"
+        ],
+        [
+          "tests.test_chatgpt_oauth_driver",
+          "test_stream_llm_uses_last_call_id_when_arguments_done_omits_id",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 2,
+        "passed": 1145
+      },
+      "run": "task2-regression-01",
+      "seconds": 77.988
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "ff406528f0ba32c11e03fdd284576af3b3429cfde075a6524f49d686f7051d5b",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 160
+      },
+      "run": "task3-baseline-01",
+      "seconds": 16.739
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "250171637935ad788e6ddfe4e02ce72ef5cb9fac2a4d71ab238e6dcc2faaf7f5",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 772
+      },
+      "run": "task3-final-green-01",
+      "seconds": 77.371
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "3735ad9dd489dacf8f67c0e1cec5595add749f77f31067a8a0a4a57fd60263b8",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 264
+      },
+      "run": "task3-green-01",
+      "seconds": 34.67
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "b8f42b182374add0c125586fa3c325427be851816fc49149897be871ac0eb75d",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_partial_trace_cannot_replace_durable_refs_or_consume_identified_rows",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_executor_retains_citations_and_gaps_through_terminal_and_archive[success]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_executor_retains_citations_and_gaps_through_terminal_and_archive[error]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_executor_retains_citations_and_gaps_through_terminal_and_archive[cancel]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 4
+      },
+      "run": "task3-lifecycle-red-01",
+      "seconds": 4.009
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "b46846cfb3ee398d6e95f93dbc464e7bd83e8503c5970ff4cee37885904ffad8",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_trace",
+          "test_sec_tool_end_preserves_whole_citations_by_call_id",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_idless_events_never_consume_identified_calls",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_duplicate_identified_events_do_not_duplicate_or_exchange_references",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_trace_normalizes_only_owned_prefixes[mcp__ark__tool_read_sec_filing-read_sec_filing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_trace_normalizes_only_owned_prefixes[tool_read_sec_filing-read_sec_filing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_trace_normalizes_only_owned_prefixes[mcp__foreign__read_sec_filing-mcp__foreign__read_sec_filing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_trace_normalizes_only_owned_prefixes[prefix_tool_read_sec_filing-prefix_tool_read_sec_filing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_trace_normalizes_only_owned_prefixes[tool_tool_read_sec_filing-tool_read_sec_filing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_sec_citations_roundtrip_event_message_and_legacy_rows",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls[restart]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls[no-task-cancel]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_terminalization_reconciles_partial_caller_trace[None]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_terminalization_reconciles_partial_caller_trace[partial1]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_terminalization_reconciles_partial_caller_trace[partial2]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_trace",
+          "test_terminal_trace_reads_uncommitted_events_and_rolls_back_atomically",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_enumerates_message_and_event_only_roots",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_requires_explicit_query_only_even_for_readonly_uri",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_legacy_absence_is_valid_and_never_mines_prose",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields0-message]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields0-event]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields1-message]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields1-event]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields2-message]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields2-event]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields3-message]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields3-event]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields4-message]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields4-event]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields5-message]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields5-event]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields6-message]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields6-event]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields7-message]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_present_fields_and_gaps[fields7-event]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[message-]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[message-null]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[message-{}]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[message-[null]]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[message-[{\"sec_citations\":[{}],\"sec_citations\":[]}]]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[message-[{\"input\":{\"invalid\":NaN}}]]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[event-]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[event-null]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[event-[]]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[event-{]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[event-{\"sec_citations\":[{}],\"sec_citations\":[]}]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_references",
+          "test_profile_iterator_rejects_malformed_retained_json[event-{\"input\":{\"invalid\":Infinity}}]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 46,
+        "passed": 70
+      },
+      "run": "task3-red-01",
+      "seconds": 27.63
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "6ce37da8e2e590d3791b17405f5c200e9bdb38fd4f2571213089d6d311872747",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-abort-red-01",
+      "seconds": 0.811
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "60eeb3cd8dccab48ff71d52b7502231ac93e3f136afd98c619bc3e31db2c4172",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-boundary-red-01",
+      "seconds": 2.054
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "6d4614459fd42bed6e0b916f17112a85475f2087838ed1e9c89248e439258fa8",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-fact-label-green-01",
+      "seconds": 2.085
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "c81b98be4148d6fb25291e8afdf625e9fce4dd13b1d41a2c6e685ef6be73273d",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-fact-label-red-01",
+      "seconds": 2.17
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "ccd9101da53d4ce598a84347b4884298ea4435c84148b7e07b485af9d176d25c",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-build-01",
+      "seconds": 14.482
+    },
+    {
+      "classification": "reserved i18next ordinal boolean option; renamed to position",
+      "command_sha256": "e2f809e2dd8108bec58e67092266e10328847ae09bc1ee22e8866b2961f055c2",
+      "exit_code": 2,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-build-02",
+      "seconds": 11.394
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "e5386cc61d203c813eeb9f6fa7f18a6375a5fa9f93113cdbe3d0484d6ef583c9",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-build-03",
+      "seconds": 14.657
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "751460b0ce7d1b942c954d0679771e1a6ea67b905e06f7084ca02caf8a79f879",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-focused-01",
+      "seconds": 1.916
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "7fd21793eb524bf9143bbc9fb6928b47a7342fd07ae85381c680b3870f6c9130",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-full-01",
+      "seconds": 14.04
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "a61c579e22b63dec55ee3a1edcf59e29169a7f33f98f8a07198c5efecdf08d36",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-full-02",
+      "seconds": 14.208
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "fb8ccea83c2ed16cb0c2d318240b5468c23a0608991fd7312cef5e801eec8d6f",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-full-03",
+      "seconds": 14.011
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "697a7fffd82a68ea0c0b61c1d3c53f3353316844b03e03b6eefa76d538a991b3",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-i18n-01",
+      "seconds": 0.821
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "63fba975cb6bf95a88b632cb6ed90c2100e6b80137fdb7ca5d13f8fbad883be2",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-i18n-03",
+      "seconds": 0.826
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "95df5a1f5a0ea2ff6ad1abede9d858762c157521300c16a367977800cbf11082",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-typecheck-01",
+      "seconds": 11.423
+    },
+    {
+      "classification": "reserved i18next ordinal boolean option; renamed to position",
+      "command_sha256": "e6203bd94ed6d47669af29ed4b130e820f9a75a2c703ccfaa2fca171516081ef",
+      "exit_code": 2,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-typecheck-02",
+      "seconds": 11.522
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "33ceadc9759dd882577d77810e737f363bc16274f7240e11f0dc975f9c7a1067",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-final-typecheck-03",
+      "seconds": 11.439
+    },
+    {
+      "classification": "localized interpolation and locale inventory collateral; corrected final03",
+      "command_sha256": "9676e4b1dde4cddd04f8691e1d71f307e2c5dc504e942109ed041a9c021a4323",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-full-01",
+      "seconds": 14.046
+    },
+    {
+      "classification": "test Response reuse and post-unpin focus fixture assumptions; see task4 report",
+      "command_sha256": "e8a5bfc7c2d66b28b95f57a83fb62c841a50be94199530aea8feaf69c15d2844",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-green-01",
+      "seconds": 1.941
+    },
+    {
+      "classification": "test Response reuse and post-unpin focus fixture assumptions; see task4 report",
+      "command_sha256": "c7c8468b86309c7b316124cefecb5de872d4ee2f48bd9327da415b5a26029555",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-green-02",
+      "seconds": 1.947
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "aa971eb01c3fb65558c45f9ac5564ac9baf848d4299e9f5e2e32530d84762765",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-green-03",
+      "seconds": 1.951
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "dab6ae3c32606735ecec02520a3b76adebb48f353491b08694da90e4945536d7",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-green-04",
+      "seconds": 1.919
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "42db7d5a885baa60f22c346364a7f9879b6201c1fabed50eb987bb6c798b6939",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-red-01",
+      "seconds": 1.807
+    },
+    {
+      "classification": "retained RED/inverse; exact intended owner evidence in task/inverse reports",
+      "command_sha256": "8b03e59d12c9c3ca888447346c707532913ac74d73ae71bfc0221c1e734f532f",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-retry-red-01",
+      "seconds": 1.568
+    },
+    {
+      "classification": "completed_check; scope from exact command, not additive coverage",
+      "command_sha256": "e9df9bde0f7ff9bd661121624fae9c3dd6d3c09a445344f04c6db7de1f4fb917",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task4-typecheck-01",
+      "seconds": 11.202
+    }
+  ],
+  "unclassified_failures": []
+}

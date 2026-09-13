@@ -1,0 +1,11 @@
+{
+  "phase": "fixture_setup_only",
+  "calls": 3,
+  "references": 3,
+  "passage_utf8_bytes": 176,
+  "source_dispatches": 3,
+  "document_dispatches": 4,
+  "newer_capture_distinct": true,
+  "reopened_after_relocation": true,
+  "browser_exercised": false
+}

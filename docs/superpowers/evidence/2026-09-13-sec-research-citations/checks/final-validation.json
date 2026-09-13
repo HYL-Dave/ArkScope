@@ -1,0 +1,145 @@
+{
+  "all_checks_passed": true,
+  "backend": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 10583,
+    "skipped": 12
+  },
+  "backend_source_anchor": "dbc8f7e51ad91a18783a9ea48d40b7f93e9ed444",
+  "browser_workflows": 4,
+  "checks": {
+    "browser_integrity_geometry_and_retry": true,
+    "complete_backend_accepted": true,
+    "final_frontend_commands_pass": true,
+    "five_inverse_receipts_accepted": true,
+    "four_final_browser_workflows": true,
+    "full_frontend_1824_in_126_files": true,
+    "no_new_candidates_or_coverage_dependency_untracked_drift": true,
+    "only_final_source_change_is_dead_css_deletion": true,
+    "same_runtime_sdk_and_guards": true,
+    "uncertainties_accounted": true
+  },
+  "final_commands": {
+    "citations-browser-cleanup-final": {
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/browser_check.py",
+        "--base",
+        "http://127.0.0.1:8457",
+        "--output",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/citations-browser-cleanup-final/browser"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/citations-browser-cleanup-final",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/citations-browser-cleanup-final/home",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PLAYWRIGHT_BROWSERS_PATH": "/home/hyl/.cache/ms-playwright",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/citations-browser-cleanup-final/output.log",
+      "name": "citations-browser-cleanup-final",
+      "seconds": 9.033
+    },
+    "frontend-census-cleanup-build": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "run",
+        "build"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-build",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-build/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-build/output.log",
+      "name": "frontend-census-cleanup-build",
+      "seconds": 14.428
+    },
+    "frontend-census-cleanup-final": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "test",
+        "--",
+        "--run"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-final",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-final/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-final/output.log",
+      "name": "frontend-census-cleanup-final",
+      "seconds": 14.516
+    },
+    "frontend-census-cleanup-i18n": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "run",
+        "check:i18n-literals"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-i18n",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-i18n/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-i18n/output.log",
+      "name": "frontend-census-cleanup-i18n",
+      "seconds": 0.837
+    },
+    "frontend-census-cleanup-typecheck": {
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "run",
+        "typecheck"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "environment": {
+        "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-typecheck",
+        "CI": "1",
+        "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-typecheck/home",
+        "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/offline_node.cjs",
+        "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TZ": "Asia/Taipei"
+      },
+      "exit_code": 0,
+      "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-13-sec-research-citations/frontend-census-cleanup-typecheck/output.log",
+      "name": "frontend-census-cleanup-typecheck",
+      "seconds": 11.657
+    }
+  },
+  "final_source_anchor": "5235705cfcdeddaf0bf786896e70fc3367f58b21",
+  "frontend_passed": 1824,
+  "source_change_after_backend": [
+    "apps/arkscope-web/src/styles.css"
+  ]
+}
