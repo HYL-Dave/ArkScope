@@ -79,8 +79,8 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 - [x] Task 2: four-channel replacement (5d979910; focused994P, independent scoped re-review51P; full-release gate remains Task8)
 - [x] Task 3: persistent Research citations (7401e656; sealed acceptance10583P/12S, frontend1824P)
 - [x] Task 4: TOC recognition (ba5a3356,5518ae21; focused338P; independent review approved)
-- [x] Task 5: operation leases/export/restore (4dfa0d37; initial1390P plus fix629P/104UI/typecheck; independent review approved; full continuation gate pending)
-- [x] Task 6: cleanup/reset (78157e62; covering1064P, scoped review approved; actual-store rollout unperformed, full continuation gate pending)
+- [x] Task 5: operation leases/export/restore (4dfa0d37; independent review approved; final continuation10827P/12unchangedS, frontend1830P)
+- [x] Task 6: cleanup/reset (78157e62; covering1064P, scoped review approved; same complete continuation gate passed; actual-store rollout unperformed)
 - [ ] Task 7: schedule/Settings
 - [ ] Task 8: cleanup and full verification
 
@@ -103,10 +103,11 @@ roundtrip and both ticker/CIK cancellation paths. The latest focused run is
 findings. Original source branches stay
 intact, and no source implementation remains solely in an untracked checkpoint.
 
-The remaining release work is now Tasks5/6/7/8. Task3's retained references and
-query-only closure are delivered at7401e656; see the citation evidence below.
-Portable export/restore, orphan cleanup, schema recovery
-and the new default-disabled schedule are not completed by the tool/parser work.
+The remaining release work is now Tasks7/8. Task3's retained references and
+query-only closure are delivered at7401e656; Tasks5/6 source implementation is
+accepted through78157e62. See the citation and maintenance evidence below.
+The new default-disabled schedule is still unimplemented; actual-store rollout
+is not authorized by completing source implementation.
 The integration checkpoint passed a fresh complete backend run at `ae2055e3`:
 10279 passed/12 unchanged skips, exactly10291 collected/executed,123 added and10
 removed against the security base. The first complete attempt's two stale-count
@@ -132,6 +133,17 @@ so cleanup/reset cannot race a reader, producer or export. Do not infer that the
 availability of citation roots alone admits deletion. SQLite activation remains
 outside this plan's explicit no-install/no-production-write boundary; the
 source-only admission preflight still applies.
+
+Tasks5/6 now pass independent task reviews and the complete maintenance
+continuation gate at78157e62: **10827 passed/12 unchanged skips**, exact10839
+collected/executed,244 added/0 removed from citation acceptance. All1151 frozen
+source/test/resource paths and the runtime/runner match before/after. Frontend
+**1830 passed**, typecheck/build/i18n pass. Original RED, intermediate failures,
+review repairs and exact inverse-restoration receipts are retained in
+`../evidence/2026-09-13-sec-research-maintenance/README.md`.
+The operator runbook is `docs/design/SEC_RESEARCH_OPERATIONS.md`. Source-only
+census remains review_required; this is not Task8 whole-release acceptance,
+master-merge approval, actual-store cleanup/reset or SQLite activation.
 
 ## Verification Commands
 

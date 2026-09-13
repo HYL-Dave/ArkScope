@@ -534,8 +534,10 @@ fallback. No Massive/EODHD request or LLM spend belongs in this collector.
   This is an explicit current-schema recovery operation, not a migration chain
   or a startup DROP. No production installation/reset is implied or authorized.
 
-Both source implementations are accepted by the Task6 review and its1064-test
-covering run; the complete maintenance continuation regression remains pending.
+Both source implementations are accepted by the Task6 review, its1064-test
+covering run and the complete maintenance continuation regression:
+10827 passed/12 unchanged skips, exact10839 nodes, frontend1830 passed.
+Evidence: `docs/superpowers/evidence/2026-09-13-sec-research-maintenance/README.md`.
 Actual-store execution is separate and unperformed. The operator workflow is
 documented in `docs/design/SEC_RESEARCH_OPERATIONS.md`; an unknown owned schema
 may produce only an explicitly approved raw safety backup and must remain
