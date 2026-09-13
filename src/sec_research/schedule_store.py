@@ -7,6 +7,7 @@ import re
 from . import schema
 from .capture_lock import store_operation
 from .common import normalize_cik
+from .issuers import parse_issuer
 from .store import _bounded_json, _timestamp
 
 
@@ -128,6 +129,20 @@ def validate_batch(batch, store=None, *, cache=None):
         if batch["status"] != "running":
             _require(attempted == confirmed | failed)
             _require(batch["status"] != "succeeded" or batch["universe_status"] == "available")
+            if batch["universe_status"] == "available":
+                unresolved = [row["ticker"] for row in batch["unresolved"]]
+                _require(len(unresolved) == len(set(unresolved)))
+                unresolved = set(unresolved)
+                rotated = [ticker for row in rotation for ticker in row["tickers"]]
+                _require(len(rotated) == len(set(rotated)))
+                # Failed-map rotation is retained history, not resolved coverage.
+                resolved = {ticker: row["cik"] for row in rotation for ticker in row["tickers"]
+                            if ticker not in unresolved}
+                _require(set(members) == set(resolved) | unresolved)
+                _require(set(resolved.values()) == attempted | deferred)
+                for ticker, cik in resolved.items():
+                    kind, value = parse_issuer(ticker)
+                    _require(kind != "cik" or value == cik)
             incomplete = bool(failed or deferred or batch["unresolved"] or batch["gaps"] or batch["stop_reason"])
             acquired = any(row["completed_sources"] for row in outcomes)
             _require(batch["status"] == (("partial" if acquired else "failed") if incomplete else "succeeded"))

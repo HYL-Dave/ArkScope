@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from tests.test_active_universe import databases
 from tests.test_data_scheduler import hermetic
-from tests.test_sec_research_schedule import schedule_fixture, sources, owner
+from tests.test_sec_research_schedule import schedule_fixture, sources, owner, uncovered_membership_batch
 from tests.test_sec_research_service import WireSession, WireResponse
 from tests.test_sec_research_issuers import MAP_URL, map_body
 
@@ -125,6 +125,20 @@ def test_malformed_sec_adapter_result_never_becomes_success(runtime, monkeypatch
     result = f.ds.run_source("sec_research_filings", "manual")
     assert result["status"] == "failed"
     assert result["error"] == "sec_schedule_result_invalid"
+
+
+@pytest.mark.parametrize("terminal", ["empty", "succeeded", "partial", "failed"])
+def test_uncovered_membership_adapter_result_is_rejected(runtime, monkeypatch, terminal):
+    f = runtime
+    batch = uncovered_membership_batch(f, terminal)
+    monkeypatch.setattr(owner(), "run_incremental", lambda **_: batch)
+    result = f.ds.run_source("sec_research_filings", "manual")
+    assert result["status"] == "failed" and result["error"] == "sec_schedule_result_invalid"
+    assert f.ds._state_store().all()["sec_research_filings"]["last_status"] == "failed"
+    audit = f.jobs.list_runs(limit=10)
+    assert len(audit) == 1 and audit[0]["status"] == "failed"
+    assert audit[0]["error"] == "sec_schedule_result_invalid"
+    assert f.wire.calls == [] and f.constructed == []
 
 
 def test_schedule_status_is_stored_only_and_precedes_dynamic_cik(runtime, monkeypatch):
