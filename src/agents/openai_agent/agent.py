@@ -18,7 +18,7 @@ from src.auth_drivers.runtime_binding import register_output_api_key, sanitize_r
 
 from ..config import get_agent_config, ReasoningEffort
 from ..shared.events import AgentEvent, EventType
-from ..shared.output_boundary import output_scope
+from ..shared.output_boundary import OutputBoundaryError, output_scope
 from ..shared.output_events import check_output_value, protect_event_stream, protect_output_text
 from ..shared.prompts import SYSTEM_PROMPT
 from ..shared.replay import (
@@ -570,9 +570,8 @@ async def run_query_stream(
     """
     Run a query yielding events for progress tracking.
 
-    OpenAI Agents SDK handles the tool loop internally (black box),
-    so we can only emit events before and after the run. Tool events
-    are extracted post-run from raw_responses.
+    SDK lifecycle hooks publish tool completions while the owned runner is
+    active. Raw-response extraction is diagnostic, not an event authority.
 
     Args:
         question: The user's question
@@ -582,10 +581,10 @@ async def run_query_stream(
         max_tool_calls: Override max turns for AI Research (default from AgentConfig)
 
     Yields:
-        AgentEvent for thinking, tool_end (post-run), and done
+        AgentEvent for thinking, tool_start, tool_end, and done
     """
     try:
-        from agents import RunConfig, Runner
+        from agents import RunConfig, RunHooks, Runner
     except ImportError:
         raise ImportError(
             "OpenAI Agents SDK not installed. Run: pip install openai-agents"
@@ -657,6 +656,55 @@ async def run_query_stream(
     if session:
         runner_kwargs["session"] = session
 
+    class ToolEvents(RunHooks):
+        def __init__(self, attempt):
+            self.attempt = attempt
+            self.active = True
+            self.queue = asyncio.Queue()
+            self.ready = asyncio.Event()
+            self.observed = set()
+
+        def metadata(self, context, tool):
+            raw = check_output_value({
+                "tool": getattr(context, "tool_name", tool.name),
+                "call_id": getattr(context, "tool_call_id", None),
+                "input": getattr(context, "tool_arguments", "{}"),
+            })
+            try:
+                args = json.loads(raw["input"]) if isinstance(raw["input"], str) else raw["input"]
+            except (ValueError, TypeError):
+                raise OutputBoundaryError("invalid_value") from None
+            if type(args) is not dict:
+                raise OutputBoundaryError("invalid_value")
+            data = {"tool": raw["tool"], "input": check_output_value(args)}
+            if raw["call_id"] is not None:
+                data["call_id"] = f"openai:{self.attempt}:{raw['call_id']}"
+            return raw["call_id"], data
+
+        def publish(self, kind, data):
+            self.queue.put_nowait(AgentEvent(kind, check_output_value(data)))
+            self.ready.set()
+
+        async def on_tool_start(self, context, agent, tool):
+            if not self.active:
+                return
+            _, data = self.metadata(context, tool)
+            self.publish(EventType.tool_start, data)
+
+        async def on_tool_end(self, context, agent, tool, result):
+            if not self.active:
+                return
+            from src.sec_research.citations import citation_event_fields
+
+            call_id, data = self.metadata(context, tool)
+            result = check_output_value(result)
+            if call_id is not None and call_id in self.observed:
+                return
+            fields = citation_event_fields(data["tool"], result)
+            text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
+            self.publish(EventType.tool_end, {**data, "summary": text[:200], "chars": len(text), **fields})
+            self.observed.add(call_id)
+
     # Outer try ensures ANY exception (runner or post-processing) logs to scratchpad
     try:
         logger.debug(
@@ -669,7 +717,38 @@ async def run_query_stream(
         result = None
         for _attempt in range(_max_retries):
             try:
-                result = await Runner.run(agent, **runner_kwargs)
+                hooks = ToolEvents(_attempt)
+                worker = asyncio.create_task(Runner.run(agent, hooks=hooks, **runner_kwargs))
+                worker.add_done_callback(lambda done, ready=hooks.ready: ready.set())
+                try:
+                    while True:
+                        await hooks.ready.wait()
+                        hooks.ready.clear()
+                        # Drain committed completions even if the runner failed in
+                        # the same loop turn. The terminal must never overtake them.
+                        while not hooks.queue.empty():
+                            event = hooks.queue.get_nowait()
+                            if event.type == EventType.tool_end:
+                                tools_used.append(event.data["tool"])
+                            yield event
+                        if worker.done():
+                            result = worker.result()
+                            break
+                finally:
+                    hooks.active = False
+                    if not worker.done():
+                        worker.cancel()
+                    # Own this exact worker through repeated cancellation and
+                    # asynchronous SDK cleanup, never detach it on aclose.
+                    while not worker.done():
+                        try:
+                            await asyncio.shield(worker)
+                        except asyncio.CancelledError:
+                            continue
+                        except BaseException:
+                            break
+                    if not worker.cancelled():
+                        worker.exception()
                 break
             except Exception as e:
                 is_retryable = "No tool output found" in str(e)
@@ -695,11 +774,7 @@ async def run_query_stream(
 
         # Extract tools used and token usage from result
         ext = _extract_tool_info(result, pad, tracker, model_name, capture=capture)
-        tools_used = ext.tools_used
-
-        # Emit tool_end events for stream consumers
-        for detail in ext.tool_calls_detail:
-            yield AgentEvent(EventType.tool_end, {"tool": detail["name"]})
+        tools_used.extend(ext.tools_used)
 
         answer = protect_output_text(result.final_output if result.final_output is not None else "")
         logger.debug("Extraction done: %d unique tools, tokens=%s", len(set(tools_used)), tracker.summary())

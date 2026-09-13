@@ -542,11 +542,15 @@ async def run_query_stream(
                 yield AgentEvent(EventType.tool_start, {
                     "tool": tool_name,
                     "input": tool_input,
+                    "call_id": tool_id,
                 })
 
                 # Execute the tool
                 result = await execute_tool_async(tool_name, tool_input, dal)
-                check_output_value(result)
+                result = check_output_value(result)
+                from src.sec_research.citations import citation_event_fields
+
+                citation_fields = citation_event_fields(tool_name, result)
                 # P1.4 Layer 0: budget + overflow disk persist + observability
                 # metadata. compression dict carries raw/compressed digests +
                 # bytes + overflow_record_id so audit pipelines can reconcile
@@ -573,8 +577,11 @@ async def run_query_stream(
 
                 yield AgentEvent(EventType.tool_end, {
                     "tool": tool_name,
+                    "call_id": tool_id,
+                    "input": tool_input,
                     "summary": result_str[:200],
                     "chars": len(result_str),
+                    **citation_fields,
                 })
 
                 tool_results.append({

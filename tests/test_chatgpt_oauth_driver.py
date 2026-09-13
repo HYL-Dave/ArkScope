@@ -628,7 +628,7 @@ def test_stream_llm_runs_allowed_tool_and_continues_without_previous_response_id
     assert [e.type for e in events] == [
         EventType.thinking, EventType.tool_start, EventType.tool_end, EventType.text, EventType.done,
     ]
-    assert events[1].data == {"tool": "get_price_change", "input": {"ticker": "AAPL"}}
+    assert events[1].data == {"tool": "get_price_change", "input": {"ticker": "AAPL"}, "call_id": "call_1"}
     assert events[2].data["tool"] == "get_price_change" and "AAPL" in events[2].data["summary"]
     followup = client.responses.calls[1]
     assert followup["stream"] is True and followup["store"] is False
@@ -745,7 +745,7 @@ def test_stream_llm_uses_last_call_id_when_arguments_done_omits_id(monkeypatch):
 
     events = _run(_collect(d.stream_llm(_req())))
 
-    assert events[1].data == {"tool": "get_price_change", "input": {"ticker": "MSFT"}}
+    assert events[1].data == {"tool": "get_price_change", "input": {"ticker": "MSFT"}, "call_id": "call_1"}
 
 
 def test_stream_llm_off_allowlist_tool_errors_without_calling_registry(monkeypatch):

@@ -41,7 +41,10 @@ _FIELDS = {
     EventType.text: frozenset({"content"}),
     EventType.thinking_content: frozenset({"thinking"}),
     EventType.tool_start: frozenset({"tool", "input", "call_id"}),
-    EventType.tool_end: frozenset({"tool", "summary", "chars", "is_error", "call_id"}),
+    EventType.tool_end: frozenset({
+        "tool", "summary", "chars", "is_error", "call_id", "input",
+        "sec_citations", "sec_citation_gaps",
+    }),
     EventType.done: frozenset({"answer", "tools_used", "provider", "model", "token_usage"}),
     EventType.error: frozenset({
         "error", "message", "detail", "code", "provider", "model", "turn",
@@ -233,6 +236,13 @@ class ProtectedEventStream(AsyncIterator[AgentEvent]):
         metadata = check_output_value({key: value for key, value in data.items() if key not in prose_fields}, guard=self._guard)
         if data.keys() - _FIELDS[kind] or _REQUIRED.get(kind, frozenset()) - data.keys():
             raise OutputBoundaryError("invalid_value")
+        if kind == EventType.tool_end:
+            from src.sec_research.citations import CitationError, validate_citation_event_fields
+
+            try:
+                validate_citation_event_fields(metadata.get("tool"), metadata)
+            except CitationError:
+                raise OutputBoundaryError("invalid_value") from None
         for key, value in data.items():
             if key in prose_fields or key in {"tool", "call_id", "code"}:
                 valid = type(value) is str

@@ -380,6 +380,24 @@ def citation_event_fields(tool_name, result) -> dict:
         return {"sec_citation_gaps": [error.code]}
 
 
+def validate_citation_event_fields(tool_name, metadata) -> None:
+    """Validate optional evidence fields after the caller's security admission."""
+    present = {"sec_citations", "sec_citation_gaps"} & metadata.keys()
+    if not present:
+        return
+    if _tool_name(tool_name) is None:
+        raise CitationError("sec_citation_invalid")
+    for key in present:
+        values = metadata[key]
+        if type(values) is not list:
+            raise CitationError("sec_citation_invalid")
+        for value in values:
+            if key == "sec_citations":
+                validate_citation(value)
+            elif type(value) is not str or value not in CITATION_GAP_CODES:
+                raise CitationError("sec_citation_invalid")
+
+
 def read_sec_citation(store, captures, *, citation) -> dict:
     """Reopen one exact retained observation or passage, without any acquisition."""
     from .references import _ReferenceReader, _retained_errors
