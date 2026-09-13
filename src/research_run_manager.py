@@ -21,7 +21,7 @@ from src.auth_drivers.runtime_binding import (
     RuntimeAuthBinding, RuntimeAuthUnavailable, activate_runtime_auth,
 )
 from src.api.routes.query import accumulate_tool_calls, _persist_assistant_turn, _persist_error_turn
-from src.research_errors import ResearchFailure, SEC_RESEARCH_MAINTENANCE_FAILURE, classify_research_failure
+from src.research_errors import ResearchFailure, classify_research_failure, classify_sec_research_admission_failure
 from src.research_runs import ResearchRunStore
 from src.research_threads import MAX_TOOL_CALLS_SENTINEL, ResearchThreadStore
 from src.sec_research.capture_lock import research_operation
@@ -93,13 +93,14 @@ async def execute_research_run(
         try:
             lease.enter_context(research_operation(SecResearchPaths.resolve().capture_root))
         except ValueError as exc:
-            if str(exc) != SEC_RESEARCH_MAINTENANCE_FAILURE.code:
+            failure = classify_sec_research_admission_failure(exc)
+            if failure is None:
                 raise
             # No provider/result exists yet; this transaction publishes no refs.
             run_store.fail_queued_run_handoff(
                 run_id=run_id, thread_store=thread_store,
-                message=SEC_RESEARCH_MAINTENANCE_FAILURE.detail,
-                error_code=SEC_RESEARCH_MAINTENANCE_FAILURE.code,
+                message=failure.detail,
+                error_code=failure.code,
             )
             return
         with output_scope(inherit=True):

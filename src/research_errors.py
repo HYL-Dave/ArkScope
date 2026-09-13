@@ -10,6 +10,20 @@ from typing import Any
 from src.auth_drivers.runtime_binding import RuntimeAuthBinding, sanitize_runtime_error
 
 
+_SEC_RESEARCH_ADMISSION_DETAILS = {
+    "sec_research_operation_busy": "Research was not started because SEC research maintenance is in progress. "
+                                   "Try again after maintenance finishes.",
+    "capture_platform_unsupported": "Research was not started because this platform does not support "
+                                    "SEC operation protection.",
+    "capture_path_unsafe": "Research was not started because its SEC capture path failed safety checks.",
+    "sec_research_operation_invalid": "Research was not started because its SEC operation protection "
+                                      "configuration is invalid.",
+    "storage_space_insufficient": "Research was not started because SEC operation protection could not "
+                                  "allocate storage space.",
+    "capture_store_write_failed": "Research was not started because SEC operation protection could not be acquired.",
+}
+
+
 RESEARCH_ERROR_CODES = frozenset(
     {
         "reauth_required",
@@ -20,7 +34,7 @@ RESEARCH_ERROR_CODES = frozenset(
         "provider_call_failed",
         "run_cancelled",
         "run_interrupted",
-        "sec_research_operation_busy",
+        *_SEC_RESEARCH_ADMISSION_DETAILS,
     }
 )
 
@@ -44,11 +58,13 @@ class ResearchFailure:
     detail: str
 
 
-SEC_RESEARCH_MAINTENANCE_FAILURE = ResearchFailure(
-    code="sec_research_operation_busy",
-    detail="Research was not started because SEC research maintenance is in progress. "
-           "Try again after maintenance finishes.",
-)
+def classify_sec_research_admission_failure(error: ValueError) -> ResearchFailure | None:
+    """Map only exact closed lease failures, never arbitrary exception prose."""
+    if type(error) is not ValueError or len(error.args) != 1 or type(error.args[0]) is not str:
+        return None
+    code = error.args[0]
+    detail = _SEC_RESEARCH_ADMISSION_DETAILS.get(code)
+    return ResearchFailure(code=code, detail=detail) if detail is not None else None
 
 
 def sanitize_research_detail(value: Any, *, binding: RuntimeAuthBinding | None = None) -> str:

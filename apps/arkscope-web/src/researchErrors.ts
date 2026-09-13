@@ -16,7 +16,8 @@ export interface ResearchErrorPresentation {
 interface ErrorDefinition {
   state: CommonUiState;
   copy: "reauth" | "missingCredential" | "timeout" | "refusal" | "providerCallFailed"
-    | "toolLimit" | "cancelled" | "interrupted" | "maintenance";
+    | "toolLimit" | "cancelled" | "interrupted" | "maintenance"
+    | "protectionPlatform" | "protectionPath" | "protectionConfiguration" | "protectionSpace" | "protectionUnavailable";
   target?: NavigationTarget;
   preservePartial?: boolean;
 }
@@ -57,6 +58,26 @@ const DEFINITIONS: Record<string, ErrorDefinition> = {
   sec_research_operation_busy: {
     state: "blocked",
     copy: "maintenance",
+  },
+  capture_platform_unsupported: {
+    state: "blocked",
+    copy: "protectionPlatform",
+  },
+  capture_path_unsafe: {
+    state: "blocked",
+    copy: "protectionPath",
+  },
+  sec_research_operation_invalid: {
+    state: "blocked",
+    copy: "protectionConfiguration",
+  },
+  storage_space_insufficient: {
+    state: "blocked",
+    copy: "protectionSpace",
+  },
+  capture_store_write_failed: {
+    state: "blocked",
+    copy: "protectionUnavailable",
   },
   tool_limit_reached: {
     state: "failed",
@@ -123,6 +144,36 @@ function errorCopy(
       return {
         title: t(($) => $.errors.maintenanceTitle),
         detail: t(($) => $.errors.maintenanceDetail),
+        actionLabel: null,
+      };
+    case "protectionPlatform":
+      return {
+        title: t(($) => $.errors.protectionPlatformTitle),
+        detail: t(($) => $.errors.protectionPlatformDetail),
+        actionLabel: null,
+      };
+    case "protectionPath":
+      return {
+        title: t(($) => $.errors.protectionPathTitle),
+        detail: t(($) => $.errors.protectionPathDetail),
+        actionLabel: null,
+      };
+    case "protectionConfiguration":
+      return {
+        title: t(($) => $.errors.protectionConfigurationTitle),
+        detail: t(($) => $.errors.protectionConfigurationDetail),
+        actionLabel: null,
+      };
+    case "protectionSpace":
+      return {
+        title: t(($) => $.errors.protectionSpaceTitle),
+        detail: t(($) => $.errors.protectionSpaceDetail),
+        actionLabel: null,
+      };
+    case "protectionUnavailable":
+      return {
+        title: t(($) => $.errors.protectionUnavailableTitle),
+        detail: t(($) => $.errors.protectionUnavailableDetail),
         actionLabel: null,
       };
     case "toolLimit":

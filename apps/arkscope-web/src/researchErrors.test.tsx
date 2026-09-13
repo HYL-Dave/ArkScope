@@ -75,6 +75,24 @@ describe("research error presentation", () => {
     }
   });
 
+  it.each([
+    ["capture_platform_unsupported", "Research protection unsupported on this platform", "此平台不支援研究保護"],
+    ["capture_path_unsafe", "Research storage path is unsafe", "研究儲存路徑不安全"],
+    ["sec_research_operation_invalid", "Research protection configuration is invalid", "研究保護設定無效"],
+    ["storage_space_insufficient", "Insufficient space for Research protection", "研究保護所需空間不足"],
+    ["capture_store_write_failed", "Research protection unavailable", "研究保護無法使用"],
+  ])("preserves the closed admission code %s without claiming maintenance or dispatch", (code, english, chinese) => {
+    for (const locale of ["en", "zh-Hant"] as const) {
+      const result = presentResearchError({ code }, researchT(locale));
+      expect(result).toMatchObject({
+        code, state: "blocked", target: null, actionLabel: null, preservePartial: false, developerDetail: null,
+      });
+      expect(result.title).toBe(locale === "en" ? english : chinese);
+      expect(result.detail).toContain(locale === "en" ? "Research was not started." : "研究尚未開始。");
+      expect(result.detail).not.toMatch(/maintenance|Provider|維護/);
+    }
+  });
+
   it("marks tool_limit_reached as partial-preserving and offers simplify or retry", () => {
     expect(presentResearchError({ code: "tool_limit_reached" }, researchT("zh-Hant"))).toMatchObject({
       state: "failed",

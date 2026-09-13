@@ -280,14 +280,14 @@ def _space(destination, database_bytes, object_bytes, free_bytes):
 
 
 def _members(path):
-    members = set()
+    members = {}
 
     def walk(fd, prefix):
         for name in os.listdir(fd):
             key = prefix + name
             info = os.stat(name, dir_fd=fd, follow_symlinks=False)
             _require(stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode), "sec_research_bundle_path_invalid")
-            members.add(key)
+            members[key] = stat.S_IFMT(info.st_mode)
             if stat.S_ISDIR(info.st_mode):
                 child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
                 try:
@@ -306,8 +306,9 @@ def _members(path):
 def _expected(manifest):
     name = manifest["database"]["name"]
     root = name + ".sec-research"
-    return {name, root, root + "/objects", root + "/staging", MANIFEST,
-            *(root + "/" + item["key"] for item in manifest["objects"])}
+    return {name: stat.S_IFREG, MANIFEST: stat.S_IFREG, root: stat.S_IFDIR,
+            root + "/objects": stat.S_IFDIR, root + "/staging": stat.S_IFDIR,
+            **{root + "/" + item["key"]: stat.S_IFREG for item in manifest["objects"]}}
 
 
 def _manifest_shape(value):
@@ -337,7 +338,8 @@ def _verify_bundle(path, manifest, *, incomplete=False):
     _manifest_shape(manifest)
     expected = _expected(manifest)
     if incomplete:
-        expected = expected - {MANIFEST} | {".incomplete"}
+        del expected[MANIFEST]
+        expected[".incomplete"] = stat.S_IFREG
     _require(_members(path) == expected, "sec_research_bundle_members_invalid")
     db = manifest["database"]
     # SQLite's fixed header must advertise rollback mode before any connection
