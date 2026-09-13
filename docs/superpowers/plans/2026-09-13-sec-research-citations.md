@@ -54,6 +54,10 @@ six-field envelope, with typed unavailable for missing/corrupt retained evidence
 Closure returns deterministic sorted capture/directory/snapshot/receipt/fact/
 filing and object identities. Traverse receipt source_snapshots and all document
 catalog sources. Missing or corrupt closure nodes fail explicitly. No deletions.
+Process one bounded source at a time and retain compact identities, not all parsed
+payloads. The approved adjustable100GiB store must not encounter a new small
+cumulative byte/row ceiling. Exact reads verify their own binding, without
+expanding unrelated receipt members; maintenance closure verifies all members.
 
 RED owners include exact reopen after refresh/relocation, bound hash/pointer/
 range tampering, invalid/extra fields, duplicate catalog provenance, MCP parsing,
@@ -69,6 +73,10 @@ Modify `src/agents/openai_agent/agent.py`,
 `src/auth_drivers/chatgpt_oauth_driver.py`,
 `src/auth_drivers/claude_code_sdk_driver.py`; focused tests in
 `tests/test_sec_research_trace.py` and adapter/stream owners.
+Extend `src/agents/shared/output_events.py`'s closed tool-end vocabulary with
+input and the two citation fields, with explicit typed validation. Exact-secret
+checks still precede projection; unknown fields still fail closed. Include its
+existing security owners in focused verification.
 
 Each start/end carries the same optional call_id; completed events include
 references/gaps from whole post-security output before preview/Layer0 reduction.
@@ -93,6 +101,8 @@ tests. Review and commit before proceeding.
 
 Modify `src/api/routes/query.py`, `src/research_runs.py`,
 `src/api/routes/research.py`, `src/research_run_manager.py` only as needed;
+use a focused `src/research_tool_trace.py` shared accumulator if needed to avoid
+making the store import an API route;
 extend `src/sec_research/references.py` with
 `iter_research_sec_citations(profile_connection)`.
 Tests: `test_sec_research_trace.py`, `test_sec_research_references.py`, research
