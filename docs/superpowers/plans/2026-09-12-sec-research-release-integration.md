@@ -10,7 +10,7 @@ that service. Persist exact references before admitting maintenance operations.
 **Tech Stack:** Python/SQLite/FastAPI, existing SEC transports, React/TypeScript.
 **Spec:** `docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md`.
 
-Status: Tasks1/2/3/4/5 reviewed complete; Task2 uses the approved shared output
+Status: Tasks1/2/3/4/5/6/7 reviewed complete; Task2 uses the approved shared output
 boundary. Its former SEC-specific redaction proposal is superseded, not
 an outstanding authorization request. Source checkpoint `ba4f2619` is preserved;
 integration proceeds on `codex/sec-research-integration` from security `41682675`.
@@ -80,9 +80,9 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 - [x] Task 3: persistent Research citations (7401e656; sealed acceptance10583P/12S, frontend1824P)
 - [x] Task 4: TOC recognition (ba5a3356,5518ae21; focused338P; independent review approved)
 - [x] Task 5: operation leases/export/restore (4dfa0d37; independent review approved; final continuation10827P/12unchangedS, frontend1830P)
-- [x] Task 6: cleanup/reset (78157e62; covering1064P, scoped review approved; same complete continuation gate passed; actual-store rollout unperformed)
-- [ ] Task 7: schedule/Settings
-- [ ] Task 8: cleanup and full verification
+- [x] Task 6: cleanup/reset (78157e62; covering1064P, scoped review approved; same complete continuation gate passed; interrupted-publication follow-up d2f491c1 independently approved with1092 focused passes; actual-store rollout unperformed)
+- [x] Task 7: schedule/Settings (936ede10,883b0185; focused2493P/449P; independent scoped re-review approved; full release gate remains Task8)
+- [ ] Task 8: workflow/census/frontend checkpoints complete; final acceptance blocked by re-review N1 at911d69a2, full backend not run
 
 ### Resolved Security Dependency
 
@@ -103,10 +103,11 @@ roundtrip and both ticker/CIK cancellation paths. The latest focused run is
 findings. Original source branches stay
 intact, and no source implementation remains solely in an untracked checkpoint.
 
-The remaining release work is now Tasks7/8. Task3's retained references and
+The remaining release work is now Task8. Task3's retained references and
 query-only closure are delivered at7401e656; Tasks5/6 source implementation is
 accepted through78157e62. See the citation and maintenance evidence below.
-The new default-disabled schedule is still unimplemented; actual-store rollout
+The default-disabled schedule is implemented and reviewed through883b0185;
+actual-store rollout
 is not authorized by completing source implementation.
 The integration checkpoint passed a fresh complete backend run at `ae2055e3`:
 10279 passed/12 unchanged skips, exactly10291 collected/executed,123 added and10
@@ -115,6 +116,24 @@ failures and their RED-first correction remain in evidence. Frontend1776 passed
 and typecheck passed. This verifies completed changes, not unfinished release
 Tasks3/5/6/7. No production change, merge or push occurred. Wider repository
 cleanup and production SQLite upgrade are not represented as finished.
+
+### September 13 Interrupted Publication Repair
+
+User review exposed a real missing recovery window after object hardlink
+publication but before registration. The unchanged178-pass baseline did not
+cover it: a disposable two-window probe returned1failed/1passed. The before-
+register pair retained nlink2, blocking cleanup of unrelated orphans as well.
+
+`d2f491c1` repairs only a proven canonical object/staging alias after accounting
+commits. It retains the first validated inode identity through hashing and the
+pre-unlink recheck, syncs the staging directory, and never loosens strict admin
+inventory. Registered reads, standalone stages, foreign links, corruption,
+replacement, accounting/unlink/fsync failures and actual concurrent market
+writers have separate owners. Restored-source covering is1092passed; the
+inverse omitting the new call gives2intended failures/2controls passed.
+Independent task review approved both compliance and quality with no findings.
+This is a focused source repair, not a fresh complete backend or live-store run.
+Previews remain read-only and must be regenerated after writer recovery.
 
 ### September 13 Maintenance Continuation
 
@@ -793,7 +812,7 @@ capacity separately. Terminal schedule changes refresh local status/capacity,
 not pinned captures, cursor snapshots or dirty budget drafts. Old SEC enabled
 keys are never inherited. Budget PUT cannot enable or dispatch.
 
-- [ ] RED owners `test_sec_schedule_disabled_even_with_old_enabled_key`,
+- [x] RED owners `test_sec_schedule_disabled_even_with_old_enabled_key`,
   `test_empty_universe_success_is_not_acquisition`,
   `test_unavailable_universe_never_dispatches`,
   `test_schedule_deduplicates_cik_and_exposes_unresolved_symbols`,
@@ -811,15 +830,15 @@ def test_sec_schedule_disabled_even_with_old_enabled_key(schedule_fixture):
     assert schedule_fixture.tick_dispatches() == []
 ```
 
-- [ ] RED with real disposable scheduler/profile/market stores; provider transport
+- [x] RED with real disposable scheduler/profile/market stores; provider transport
   only fake. Use deterministic time/dispatch recorders, no supervisor launch.
-- [ ] Implement scoped receipts, bounded scheduler outcome mapping and real
+- [x] Implement scoped receipts, bounded scheduler outcome mapping and real
   Settings consumer. Preserve current route/write permission controls and
   accurate current-tool/category counts if schema tests move.
-- [ ] GREEN schedule/API/frontend controls, macro/news unchanged controls and
+- [x] GREEN schedule/API/frontend controls, macro/news unchanged controls and
   desktop/mobile screenshots. Inverses enable by default, traverse a historical
   pointer, drop partial status, erase last success, reuse removed membership.
-- [ ] Commit with source/body request inventory and scope definitions, leaving the
+- [x] Commit with source/body request inventory and scope definitions, leaving the
   actual user's schedule disabled and production configuration untouched.
 
 ### Task 8: Release Verification And Current-Surface Cleanup
@@ -837,7 +856,7 @@ CaptureStore, Research trace/persistence, export/restore and maintenance command
 Only remote response bytes/time/filesystem failures and model transport messages
 are injected. This is offline workflow validation, not live provider/model proof.
 
-- [ ] Write `test_research_catalog_fact_document_reload_export_restore` with a
+- [x] Write `test_research_catalog_fact_document_reload_export_restore` with a
   generated mapping, submissions, Company Facts, directory and HTML filing.
   Execute all three tools through a real adapter, persist the trace, reopen exact
   fact/passage references, export, restore to a new root and reopen again.
@@ -855,6 +874,28 @@ Add explicit interrupted-refresh->stored-reference-read->cleanup-negative
 workflow and default-disabled schedule controls. First run records the missing
 workflow's concrete RED, if any; do not manufacture a regression when already
 implemented behavior passes, instead label that as a positive integration check.
+
+Workflow source `a77a7c2e` has two new integration owners and nine focused passes
+including seven existing controls. Both workflows passed as positive integration
+checks; two retained fixture setup failures are not product RED. Whole-change
+review then found an async delegated SEC invocation defect. The final fix wave
+also owns the confirmed absence of delegated citation forwarding: preserve
+actual admitted SEC completions through existing parent events, not arbitrary
+delegate-result metadata. Complete source acceptance waits on that repair,
+scoped re-review and the frozen complete backend gate.
+
+Final fix `911d69a2` records1349 covering passes,194 restored focused passes and
+three current-source killed inverses. The single scoped re-review accepts I1,
+M1 and delegated citation forwarding, but identifies ImportantN1: changing the
+OpenAI delegate from sync to async moves the unchanged blocking Anthropic SDK
+stream onto the parent's event loop. This is confirmed static source evidence;
+a held-stream heartbeat regression has not yet been executed. The proposed next
+scope is an awaitable Anthropic child client preserving captured auth/effort and
+owned cancellation. It was put to the user; it is not implemented by this plan's
+final fix wave. Full release acceptance and merge remain blocked. The fresh
+frontend1833P/typecheck/build/literal checks and11023-node collection do not
+replace the deliberately unrun final complete backend gate.
+
 - [ ] Re-run mechanical repository census against the sealed document baseline;
   classify every new candidate, dependency change and coverage reduction with a
   current owner. Remove only confirmed abandoned SEC aliases/entrypoints and

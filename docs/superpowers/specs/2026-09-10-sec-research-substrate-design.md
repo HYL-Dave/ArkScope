@@ -10,7 +10,7 @@ the drawer reopens exact stored facts, filing observations and UTF-8 passages.
 Cancellation, restart, archive, later refresh and root relocation preserve pins.
 Missing or malformed evidence is an explicit typed gap, never latest substitution.
 
-Current acceptance: full backend **10583 passed /12 unchanged skips** at
+Earlier citation checkpoint: full backend **10583 passed /12 unchanged skips** at
 `dbc8f7e5`, exact10595 collected/executed IDs,272added/zero removed and1142 frozen
 source paths. Final source removes only an ineffective CSS rule; backend bytes
 are unchanged. Fresh frontend **1824 passed**, typecheck/build/i18n and four
@@ -20,9 +20,25 @@ cancellation P1 is reproduced, repaired and independently approved. Evidence:
 `../evidence/2026-09-13-sec-research-citations/README.md`; focused plan:
 `../plans/2026-09-13-sec-research-citations.md`.
 
-This is not the complete first release. Operation leases, portable export/restore,
-orphan cleanup, schema reset and the default-disabled schedule remain open under
-release Tasks5-7. Wider abandoned-surface cleanup, cross-platform native acceptance
+Subsequent maintenance acceptance through `78157e62` completed operation leases,
+portable export/restore, orphan cleanup and schema reset with10827passed/12
+unchanged skips and frontend1830passed; evidence is retained separately in
+`../evidence/2026-09-13-sec-research-maintenance/README.md`. A later user-reported
+interrupted-publication cleanup defect was reproduced and repaired at `d2f491c1`:
+writer recovery removes only the proven redundant staging hardlink after durable
+accounting, without broadening admin inventory. Its focused1092-pass covering
+and independent review are not a new complete-backend claim.
+
+Task7's default-disabled schedule is implemented through `883b0185`, including
+independently accepted fixes for immutable-map binding and terminal accounting.
+Task8 adds combined workflows and repairs delegated SEC invocation/reference
+retention in `911d69a2` with1349 focused passes and frontend1833passes. However,
+final scoped review finds ImportantN1: synchronous Anthropic child SDK I/O now
+blocks the OpenAI parent's event loop. The proposed awaitable-client correction
+is pending, and this is not complete first-release acceptance.11023 tests were
+collected, not fully executed; the final backend gate is deferred until N1 is
+repaired. Evidence: `../evidence/2026-09-12-sec-research-release-integration/README.md`.
+Wider abandoned-surface cleanup, cross-platform native acceptance
 and SQLite runtime activation remain separate work. No production activation,
 provider-data call, real cleanup, App restart, merge or push occurred here.
 
