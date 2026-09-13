@@ -8,7 +8,7 @@ provider stream lifecycle.
 from __future__ import annotations
 
 import asyncio
-from contextlib import aclosing
+from contextlib import ExitStack, aclosing
 import logging
 import time
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
@@ -21,7 +21,7 @@ from src.auth_drivers.runtime_binding import (
     RuntimeAuthBinding, RuntimeAuthUnavailable, activate_runtime_auth,
 )
 from src.api.routes.query import accumulate_tool_calls, _persist_assistant_turn, _persist_error_turn
-from src.research_errors import ResearchFailure, classify_research_failure
+from src.research_errors import ResearchFailure, SEC_RESEARCH_MAINTENANCE_FAILURE, classify_research_failure
 from src.research_runs import ResearchRunStore
 from src.research_threads import MAX_TOOL_CALLS_SENTINEL, ResearchThreadStore
 from src.sec_research.capture_lock import research_operation
@@ -86,11 +86,27 @@ async def execute_research_run(
     stream_factory: Optional[StreamFactory] = None,
 ) -> None:
     """Execute one run and persist both replay events and terminal transcript."""
-    with research_operation(SecResearchPaths.resolve().capture_root), output_scope(inherit=True):
-        await _execute_research_run(
-            run_id=run_id, run_store=run_store, thread_store=thread_store,
-            dal=dal, history=history, auth_binding=auth_binding, stream_factory=stream_factory,
-        )
+    run = run_store.get_run(run_id)
+    if run is None or run.status != "queued":
+        return
+    with ExitStack() as lease:
+        try:
+            lease.enter_context(research_operation(SecResearchPaths.resolve().capture_root))
+        except ValueError as exc:
+            if str(exc) != SEC_RESEARCH_MAINTENANCE_FAILURE.code:
+                raise
+            # No provider/result exists yet; this transaction publishes no refs.
+            run_store.fail_queued_run_handoff(
+                run_id=run_id, thread_store=thread_store,
+                message=SEC_RESEARCH_MAINTENANCE_FAILURE.detail,
+                error_code=SEC_RESEARCH_MAINTENANCE_FAILURE.code,
+            )
+            return
+        with output_scope(inherit=True):
+            await _execute_research_run(
+                run_id=run_id, run_store=run_store, thread_store=thread_store,
+                dal=dal, history=history, auth_binding=auth_binding, stream_factory=stream_factory,
+            )
 
 
 async def _execute_research_run(

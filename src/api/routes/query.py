@@ -501,11 +501,24 @@ async def query_agent_stream(
     persist = valid_thread_id(request.thread_id)
 
     async def event_generator():
-        from contextlib import aclosing
+        from contextlib import ExitStack, aclosing
+        from src.agents.shared.events import AgentEvent, EventType
+        from src.research_errors import SEC_RESEARCH_MAINTENANCE_FAILURE
         from src.sec_research.capture_lock import research_operation
         from src.sec_research.paths import SecResearchPaths
 
-        with research_operation(SecResearchPaths.resolve().capture_root):
+        with ExitStack() as lease:
+            try:
+                lease.enter_context(research_operation(SecResearchPaths.resolve().capture_root))
+            except ValueError as exc:
+                if str(exc) != SEC_RESEARCH_MAINTENANCE_FAILURE.code:
+                    raise
+                # No user turn or provider dispatch has been admitted.
+                yield AgentEvent(EventType.error, {
+                    "error": SEC_RESEARCH_MAINTENANCE_FAILURE.detail,
+                    "code": SEC_RESEARCH_MAINTENANCE_FAILURE.code,
+                }).to_sse()
+                return
             async with aclosing(protected_event_generator()) as events:
                 async for event in events:
                     yield event

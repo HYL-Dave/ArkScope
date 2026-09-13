@@ -170,7 +170,8 @@ def backup_market_db(
         fd = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         os.close(fd)
         reserved = True
-    src = sqlite3.connect(src_path, timeout=10.0)
+    # A read-write last connection would checkpoint and remove a stranded WAL.
+    src = sqlite3.connect(Path(src_path).resolve().as_uri() + "?mode=ro", uri=True, timeout=10.0)
     try:
         dst = sqlite3.connect(destination)
         try:

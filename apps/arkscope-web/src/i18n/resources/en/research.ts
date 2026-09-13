@@ -198,6 +198,8 @@ const research = {
   },
   errors: {
     providerCallFailedTitle: "Provider call failed",
+    maintenanceTitle: "Research maintenance in progress",
+    maintenanceDetail: "Research was not started. Try again after maintenance finishes.",
     missingCredentialTitle: "Sign-in not configured",
     maxTurnsTitle: "Tool-call limit reached",
     timeoutTitle: "Model run timed out",

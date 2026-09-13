@@ -198,6 +198,8 @@ const research = {
   },
   errors: {
     providerCallFailedTitle: "Provider 呼叫失敗",
+    maintenanceTitle: "研究資料維護中",
+    maintenanceDetail: "研究尚未開始。請等維護完成後重試。",
     missingCredentialTitle: "尚未設定登入",
     maxTurnsTitle: "已達工具呼叫上限",
     timeoutTitle: "模型執行逾時",
