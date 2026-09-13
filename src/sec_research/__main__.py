@@ -20,8 +20,8 @@ def _profile_path():
 
 
 @contextmanager
-def open_profile_readonly():
-    path = _path(_profile_path())
+def open_profile_readonly(path):
+    path = _path(path)
     with _file(path):
         pass
     conn = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, isolation_level=None)
@@ -49,13 +49,14 @@ def _maintenance(args):
         preview = read_operator_json(preview_path)
         validate_preview(preview, operation=operation, approval_sha256=args.approval_sha256)
     paths = SecResearchPaths.resolve()
+    profile_path = _path(_profile_path())
     if action == "preview":
-        _output_path(paths, preview_path)
+        _output_path(paths, preview_path, profile_path=profile_path)
     else:
-        _output_path(paths, args.receipt)
+        _output_path(paths, args.receipt, profile_path=profile_path)
         if operation == "schema":
-            _output_path(paths, args.backup)
-    with open_profile_readonly() as profile:
+            _output_path(paths, args.backup, profile_path=profile_path)
+    with open_profile_readonly(profile_path) as profile:
         if action == "preview":
             result = (preview_cleanup(paths, profile_connection=profile) if operation == "cleanup" else
                       preview_schema_reset(paths, mode=args.mode, profile_connection=profile))
