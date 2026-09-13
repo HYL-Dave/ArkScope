@@ -545,6 +545,7 @@ async def _run_anthropic_subagent(
     from ..anthropic_agent.tools import execute_tool_async, get_anthropic_tools
     from ..config import get_agent_config
     from ..shared.token_tracker import TokenTracker
+    from .anthropic_response_cleanup import AnthropicResponseCleanup
 
     agent_config = get_agent_config()
     from src.auth_drivers.live_resolver import live_anthropic_async_client
@@ -552,6 +553,8 @@ async def _run_anthropic_subagent(
     cancelled = False
     completions = _ChildSecCompletions()
     try:
+        responses = AnthropicResponseCleanup()
+        client = client.with_middleware(responses.observe)
         register_output_api_key(client)
 
         # Filter tools to subagent's allowed subset
@@ -607,7 +610,7 @@ async def _run_anthropic_subagent(
                     **api_kwargs,
                 )
 
-            response = await _read_anthropic_message(stream_ctx)
+            response = await _read_anthropic_message(stream_ctx, responses)
 
             tracker.record_anthropic(response, model=config.model)
 
@@ -662,24 +665,28 @@ async def _run_anthropic_subagent(
                 raise
 
 
-async def _read_anthropic_message(stream_ctx):
+async def _read_anthropic_message(stream_ctx, responses):
     """Cancel model I/O once, then join its response cleanup through recancels."""
-    response = None
-
     async def consume():
-        nonlocal response
-        async with stream_ctx as stream:
-            response = stream.response
-            return await stream.get_final_message()
+        cancelled = False
+        try:
+            async with stream_ctx as stream:
+                return await stream.get_final_message()
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
+        finally:
+            try:
+                await _close_async_client(responses)
+            except Exception:
+                if not cancelled:
+                    raise
 
     reading = asyncio.create_task(consume())
     try:
         return await asyncio.shield(reading)
     except asyncio.CancelledError:
-        # HTTPX marks the response closed before awaiting transport cleanup.
-        # A first cancellation arriving there must join, not abort that cleanup.
-        if response is None or not response.is_closed:
-            reading.cancel()
+        reading.cancel()
         while not reading.done():
             try:
                 await asyncio.shield(reading)

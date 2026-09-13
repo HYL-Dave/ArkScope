@@ -358,6 +358,7 @@ class TestAnthropicSubagentRunner:
 
         response = self._make_mock_response("Analysis complete")
         mock_client = MagicMock()
+        mock_client.with_middleware.return_value = mock_client
         mock_client.close = AsyncMock()
         mock_stream = MagicMock()
         mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
@@ -393,6 +394,7 @@ class TestAnthropicSubagentRunner:
         final_response = self._make_mock_response("Here is the analysis")
 
         mock_client = MagicMock()
+        mock_client.with_middleware.return_value = mock_client
         mock_client.close = AsyncMock()
         mock_stream_1 = MagicMock()
         mock_stream_1.__aenter__ = AsyncMock(return_value=mock_stream_1)
@@ -433,6 +435,7 @@ class TestAnthropicSubagentRunner:
         )
 
         mock_client = MagicMock()
+        mock_client.with_middleware.return_value = mock_client
         mock_client.close = AsyncMock()
         mock_stream = MagicMock()
         mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
@@ -460,6 +463,7 @@ class TestAnthropicSubagentRunner:
 
         response = self._make_mock_response("done")
         mock_client = MagicMock()
+        mock_client.with_middleware.return_value = mock_client
         mock_client.close = AsyncMock()
         mock_stream = MagicMock()
         mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)

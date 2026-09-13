@@ -28,7 +28,7 @@ httpx
 # Agent SDKs (optional - install for POST /query endpoint)
 openai-agents>=0.22.0
 openai-codex==0.147.0  # Account-usage observer; bundled CLI protocol is reviewed and version-gated.
-anthropic>=1.2.0
+anthropic>=1.4.0
 claude-agent-sdk==0.2.152  # Claude-subscription Research driver; PINNED with bundled CLI 2.1.259 admission and live negative gates on every bump
 
 

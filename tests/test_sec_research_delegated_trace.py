@@ -56,7 +56,7 @@ def delegated_trace(isolated, evidence, monkeypatch):
         state = SimpleNamespace(child_results=[], delegate_results=[], requests=[],
             ending=ending, forged=None, service=service, acquisitions=acquisitions,
             child_followup=None, child_close=None, child_response_close=None,
-            clients=clients, binding=binding)
+            child_status=200, retry_limit=0, clients=clients, binding=binding)
 
         def plan(local, payload):
             local.step += 1
@@ -96,8 +96,12 @@ def delegated_trace(isolated, evidence, monkeypatch):
                     self.frames = frames
 
                 async def __aiter__(self):
-                    first, rest = self.frames.split(b"\n\n", 1)
-                    yield first + b"\n\n"
+                    if b"\n\n" in self.frames:
+                        first, rest = self.frames.split(b"\n\n", 1)
+                        yield first + b"\n\n"
+                    else:
+                        yield self.frames[:1]
+                        rest = self.frames[1:]
                     if local.child and local.step > 1 and state.child_followup is not None:
                         await state.child_followup()
                     yield rest
@@ -113,7 +117,11 @@ def delegated_trace(isolated, evidence, monkeypatch):
                            for i, (name, args) in enumerate(calls)] if calls else
                           [{"type": "text", "text": answer}])
                 frames = anthropic_frames(payload["model"], blocks, stop="tool_use" if calls else "end_turn")
-                return httpx2.Response(200, headers={"content-type": "text/event-stream"},
+                status = state.child_status if local.child and local.step > 1 else 200
+                if status != 200:
+                    frames = json.dumps({"type": "error", "error": {
+                        "type": "rate_limit_error", "message": "Fixture provider rejection."}})
+                return httpx2.Response(status, headers={"content-type": "text/event-stream", "retry-after-ms": "1"},
                     **({"stream": Body(frames.encode())} if asynchronous else {"text": frames}))
 
             class Transport(httpx2.MockTransport):
@@ -123,7 +131,7 @@ def delegated_trace(isolated, evidence, monkeypatch):
                     await super().aclose()
 
             cls, http_cls = (AsyncAnthropic, httpx2.AsyncClient) if asynchronous else (Anthropic, httpx2.Client)
-            client = cls(**kwargs, max_retries=0, http_client=http_cls(transport=Transport(reply)))
+            client = cls(**kwargs, max_retries=state.retry_limit, http_client=http_cls(transport=Transport(reply)))
             clients.append(client)
             return client
 
@@ -241,13 +249,19 @@ def test_delegated_references_reopen_after_native_terminal(
 
 @pytest.mark.parametrize("parent", PARENTS)
 @pytest.mark.parametrize("close_error", [False, True])
-@pytest.mark.parametrize("cancel_at", ["reading", "response-close"])
+@pytest.mark.parametrize("status,cancel_at", [
+    (200, "reading"), (200, "response-close"),
+    (429, "response-close"), (500, "response-close"),
+    (400, "reading"), (400, "response-close"),
+])
 def test_anthropic_model_cancel_joins_response_and_client_and_retains_refs(
-        parent, close_error, cancel_at, delegated_trace, isolated, evidence):
+        parent, close_error, status, cancel_at, delegated_trace, isolated, evidence):
     from src.sec_research.capture_lock import research_operation
     from src.sec_research.citations import read_sec_citation
 
     state = delegated_trace(parent, "anthropic")
+    state.child_status = status
+    state.retry_limit = 2 if status != 200 else 0
 
     async def exercise():
         reading, response_closing, client_closing = (asyncio.Event() for _ in range(3))
@@ -276,10 +290,11 @@ def test_anthropic_model_cancel_joins_response_and_client_and_retains_refs(
         state.child_followup, state.child_response_close, state.child_close = read, close_response, close_client
         task = asyncio.create_task(state.execute())
         try:
-            await asyncio.wait_for(reading.wait(), 5)
-            assert len(state.child_results) == 3
             if cancel_at == "response-close":
                 await asyncio.wait_for(response_closing.wait(), 5)
+            else:
+                await asyncio.wait_for(reading.wait(), 5)
+            assert len(state.child_results) == 3
             task.cancel()
             await asyncio.wait_for(response_closing.wait(), 5)
             for _ in range(3):
@@ -354,6 +369,23 @@ def test_delegated_invocations_do_not_exchange_refs_or_call_ids(
     assert {end["call_id"] for end in first[3]}.isdisjoint(end["call_id"] for end in second[3])
     with isolated.runs._connect() as conn:
         assert [tuple(row) for row in conn.execute("PRAGMA integrity_check")] == [("ok",)]
+
+
+@pytest.mark.parametrize("parent", PARENTS)
+@pytest.mark.parametrize("status,attempts", [(400, 1), (429, 3), (500, 3)])
+def test_anthropic_child_response_ownership_preserves_sdk_retry_policy(
+        parent, status, attempts, delegated_trace, isolated):
+    state = delegated_trace(parent, "anthropic")
+    state.child_status, state.retry_limit = status, 2
+    asyncio.run(state.execute())
+    child_requests = [request for request in state.requests if request["model"] == CHILDREN["anthropic"]]
+    assert len(child_requests) == 1 + attempts  # First successful tool turn, then the error attempts.
+    assert len(state.child_results) == 3 * attempts
+    result = unwrap(state.delegate_results[0])
+    assert result["answer"] == "" and result["error"]
+    run, message, ends, sec_ends = retained(isolated)
+    assert run.status == "succeeded"  # The fixture parent can still report the failed delegation.
+    assert len(sec_ends) == 3
 
 
 @pytest.mark.parametrize("parent", PARENTS)
