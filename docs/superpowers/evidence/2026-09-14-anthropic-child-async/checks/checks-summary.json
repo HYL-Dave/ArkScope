@@ -1,0 +1,227 @@
+{
+  "frontend_source_unchanged": {
+    "from": "e447d3947f31242bf8f5e1ddab558cc208014571",
+    "paths": 297,
+    "to": "39b6587f76deb79b22bf819f084c09985c560b4c"
+  },
+  "nonzero_count": 8,
+  "overlapping_checks_are_not_summed": true,
+  "run_count": 26,
+  "runs": [
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {
+        "passed": 11050,
+        "skipped": 12
+      },
+      "run": "accepted-backend-full",
+      "seconds": 1379.518
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "run": "accepted-census",
+      "seconds": 13.99
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {},
+      "run": "accepted-collection",
+      "seconds": 8.101
+    },
+    {
+      "classification": "new integrity fixture compared sqlite3.Row to tuple",
+      "exit_code": 1,
+      "junit": {
+        "failure": 4,
+        "passed": 283
+      },
+      "run": "authority-covering",
+      "seconds": 35.082
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {
+        "passed": 289
+      },
+      "run": "authority-green",
+      "seconds": 35.937
+    },
+    {
+      "classification": "complete suite found missed async mock in lifetime fixture",
+      "exit_code": 1,
+      "junit": {
+        "failure": 1,
+        "passed": 11049,
+        "skipped": 12
+      },
+      "run": "backend-full",
+      "seconds": 1395.978
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "run": "build",
+      "seconds": 14.581
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {
+        "passed": 54
+      },
+      "run": "cancellation-green",
+      "seconds": 25.623
+    },
+    {
+      "classification": "response cleanup ownership regression reproduced",
+      "exit_code": 1,
+      "junit": {
+        "failure": 4
+      },
+      "run": "cancellation-red",
+      "seconds": 7.033
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "run": "census",
+      "seconds": 14.162
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {
+        "passed": 2
+      },
+      "run": "child-heartbeat-green",
+      "seconds": 3.675
+    },
+    {
+      "classification": "model I/O heartbeat regression reproduced; route controls pass",
+      "exit_code": 1,
+      "junit": {
+        "failure": 2,
+        "passed": 2
+      },
+      "run": "child-red",
+      "seconds": 5.151
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {
+        "passed": 295
+      },
+      "run": "close-entry-green",
+      "seconds": 38.708
+    },
+    {
+      "classification": "first cancellation during response close reproduced",
+      "exit_code": 1,
+      "junit": {
+        "failure": 4
+      },
+      "run": "close-entry-red",
+      "seconds": 7.052
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "run": "collection",
+      "seconds": 7.935
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {
+        "passed": 145
+      },
+      "run": "error-entry-green",
+      "seconds": 38.123
+    },
+    {
+      "classification": "pre-stream error response cleanup regression reproduced",
+      "exit_code": 1,
+      "junit": {
+        "failure": 16
+      },
+      "run": "error-entry-red",
+      "seconds": 33.102
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "run": "final-collection",
+      "seconds": 7.76
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {
+        "passed": 291
+      },
+      "run": "final-focused",
+      "seconds": 35.782
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "run": "frontend",
+      "seconds": 14.349
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "run": "i18n",
+      "seconds": 0.823
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {
+        "passed": 593
+      },
+      "run": "lifetime-collateral-green",
+      "seconds": 69.589
+    },
+    {
+      "classification": "isolated lifetime fixture collateral reproduced",
+      "exit_code": 1,
+      "junit": {
+        "failure": 1,
+        "passed": 1
+      },
+      "run": "lifetime-collateral-red",
+      "seconds": 5.976
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "junit": {
+        "passed": 317
+      },
+      "run": "retry-and-authority",
+      "seconds": 49.726
+    },
+    {
+      "classification": "route inventory drift reproduced",
+      "exit_code": 1,
+      "junit": {
+        "failure": 2
+      },
+      "run": "route-red",
+      "seconds": 4.934
+    },
+    {
+      "classification": "passed check",
+      "exit_code": 0,
+      "run": "typecheck",
+      "seconds": 11.572
+    }
+  ],
+  "unfinished": []
+}

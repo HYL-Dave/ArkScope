@@ -1,8 +1,17 @@
 # SEC Research Release Integration
 
+**Later checkpoint:** The user-approved
+[Anthropic child async follow-up](../2026-09-14-anthropic-child-async/README.md)
+closes N1 and the subsequent pre-stream response-cleanup finding. Its final
+single complete backend run at `39b6587f` passes 11050 tests with 12 unchanged
+skips. The record below remains the historical `bf7831b8` checkpoint, including
+its deliberate unrun full gate and original failed reviews; it is not rewritten
+as evidence that those earlier checks passed. Actual activation, cross-platform
+acceptance, SQLite deployment and broader cleanup remain separate.
+
 Checkpoint evidence for the September 13-14 continuation of the
 [approved plan](../../plans/2026-09-12-sec-research-release-integration.md).
-**Release acceptance is blocked by ImportantN1.** Publication recovery and
+**At this checkpoint, release acceptance was blocked by ImportantN1.** Publication recovery and
 Task7 scheduling are complete and independently reviewed; Task8 is incomplete.
 This is not a complete-regression, merge or actual-store rollout approval.
 

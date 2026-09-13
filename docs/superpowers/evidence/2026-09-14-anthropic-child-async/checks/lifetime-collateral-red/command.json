@@ -1,0 +1,24 @@
+{
+  "name": "lifetime-collateral-red",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/offline_pytest.py",
+    "-q",
+    "tests/test_research_output_lifetimes.py::test_threaded_child_retains_captured_secret_for_late_parent_callback",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/lifetime-collateral-red/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 5.976,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/lifetime-collateral-red",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/lifetime-collateral-red/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/lifetime-collateral-red/output.log"
+}

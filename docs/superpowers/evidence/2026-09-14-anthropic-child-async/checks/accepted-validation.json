@@ -1,0 +1,1133 @@
+{
+  "added": [
+    [
+      "tests.test_anthropic_child_async",
+      "test_anthropic_child_cancels_pending_response_headers[cancel]"
+    ],
+    [
+      "tests.test_anthropic_child_async",
+      "test_anthropic_child_cancels_pending_response_headers[timeout]"
+    ],
+    [
+      "tests.test_anthropic_child_async",
+      "test_anthropic_child_model_io_allows_parent_heartbeat[claude-sonnet-4-5-True]"
+    ],
+    [
+      "tests.test_anthropic_child_async",
+      "test_anthropic_child_model_io_allows_parent_heartbeat[claude-sonnet-4-6-False]"
+    ],
+    [
+      "tests.test_anthropic_child_async",
+      "test_async_anthropic_resolution_keeps_selected_authority[active-oauth]"
+    ],
+    [
+      "tests.test_anthropic_child_async",
+      "test_async_anthropic_resolution_keeps_selected_authority[active]"
+    ],
+    [
+      "tests.test_anthropic_child_async",
+      "test_async_anthropic_resolution_keeps_selected_authority[captured-oauth]"
+    ],
+    [
+      "tests.test_anthropic_child_async",
+      "test_async_anthropic_resolution_keeps_selected_authority[captured]"
+    ],
+    [
+      "tests.test_anthropic_child_async",
+      "test_async_anthropic_resolution_keeps_selected_authority[env]"
+    ],
+    [
+      "tests.test_data_scheduler",
+      "test_sec_schedule_disabled_even_with_old_enabled_key[False]"
+    ],
+    [
+      "tests.test_data_scheduler",
+      "test_sec_schedule_disabled_even_with_old_enabled_key[True]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_binds_unlink_to_accounted_entry[fifo]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_binds_unlink_to_accounted_entry[regular]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_binds_unlink_to_accounted_entry[symlink]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_does_not_prune_separate_identical_stage"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_does_not_refresh_identity_to_accept_new_foreign_link"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rechecks_identity_after_hash_before_unlink[body]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rechecks_identity_after_hash_before_unlink[extra_link]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rechecks_identity_after_hash_before_unlink[object]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rechecks_identity_after_hash_before_unlink[root]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rechecks_identity_after_hash_before_unlink[stage]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rejects_unproven_alias_without_unlink[extra_object]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rejects_unproven_alias_without_unlink[extra_stage]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rejects_unproven_alias_without_unlink[foreign_link]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rejects_unproven_alias_without_unlink[malformed_object]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rejects_unproven_alias_without_unlink[malformed_stage]"
+    ],
+    [
+      "tests.test_sec_research_capture_lock",
+      "test_publication_recovery_rejects_unproven_alias_without_unlink[mismatched_body]"
+    ],
+    [
+      "tests.test_sec_research_captures",
+      "test_publication_recovery_after_registration_retains_exact_read_and_single_charge"
+    ],
+    [
+      "tests.test_sec_research_captures",
+      "test_publication_recovery_excludes_live_worker_then_recovers_dead_worker"
+    ],
+    [
+      "tests.test_sec_research_captures",
+      "test_publication_recovery_failure_preserves_charge_and_retry_converges[accounting_commit]"
+    ],
+    [
+      "tests.test_sec_research_captures",
+      "test_publication_recovery_failure_preserves_charge_and_retry_converges[stage_fsync]"
+    ],
+    [
+      "tests.test_sec_research_captures",
+      "test_publication_recovery_failure_preserves_charge_and_retry_converges[unlink]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[get_sec_financial_facts-openai-tool]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[get_sec_financial_facts-parent]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[get_sec_financial_facts-sync-dispatch]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[get_sec_financial_facts-sync-tool]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[list_sec_filings-openai-tool]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[list_sec_filings-parent]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[list_sec_filings-sync-dispatch]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[list_sec_filings-sync-tool]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[read_sec_filing-openai-tool]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[read_sec_filing-parent]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[read_sec_filing-sync-dispatch]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_envelope_reaches_child_next_turn[read_sec_filing-sync-tool]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_delegated_sec_rejects_credential_inherited_from_foreign_provider"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close-error]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-model-close-error]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_parent_awaits_configured_openai_child_and_owns_client_close[success]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_parent_cancel_joins_delegated_sec_before_releasing_protection[close-error]"
+    ],
+    [
+      "tests.test_sec_research_delegated_dispatch",
+      "test_parent_cancel_joins_delegated_sec_before_releasing_protection[close-ok]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_child_response_ownership_preserves_sdk_retry_policy[400-1-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_child_response_ownership_preserves_sdk_retry_policy[400-1-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_child_response_ownership_preserves_sdk_retry_policy[429-3-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_child_response_ownership_preserves_sdk_retry_policy[429-3-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_child_response_ownership_preserves_sdk_retry_policy[500-3-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_child_response_ownership_preserves_sdk_retry_policy[500-3-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[200-reading-False-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[200-reading-False-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[200-reading-True-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[200-reading-True-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[200-response-close-False-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[200-response-close-False-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[200-response-close-True-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[200-response-close-True-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[400-reading-False-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[400-reading-False-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[400-reading-True-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[400-reading-True-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[400-response-close-False-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[400-response-close-False-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[400-response-close-True-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[400-response-close-True-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[429-response-close-False-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[429-response-close-False-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[429-response-close-True-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[429-response-close-True-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[500-response-close-False-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[500-response-close-False-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[500-response-close-True-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_anthropic_model_cancel_joins_response_and_client_and_retains_refs[500-response-close-True-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_arbitrary_delegate_answer_cannot_claim_sec_metadata[anthropic-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_arbitrary_delegate_answer_cannot_claim_sec_metadata[anthropic-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_arbitrary_delegate_answer_cannot_claim_sec_metadata[openai-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_arbitrary_delegate_answer_cannot_claim_sec_metadata[openai-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_cancel_drains_child_completions_but_fences_late_callbacks_until_join[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_cancel_drains_child_completions_but_fences_late_callbacks_until_join[openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_invocations_do_not_exchange_refs_or_call_ids[anthropic-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_invocations_do_not_exchange_refs_or_call_ids[anthropic-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_invocations_do_not_exchange_refs_or_call_ids[openai-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_invocations_do_not_exchange_refs_or_call_ids[openai-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[cancel-anthropic-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[cancel-anthropic-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[cancel-openai-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[cancel-openai-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[failure-anthropic-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[failure-anthropic-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[failure-openai-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[failure-openai-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[success-anthropic-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[success-anthropic-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[success-openai-anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_references_reopen_after_native_terminal[success-openai-openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_trace_cannot_admit_foreign_credential[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_delegated_trace_cannot_admit_foreign_credential[openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_explicit_close_does_not_yield_remaining_child_events[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_explicit_close_does_not_yield_remaining_child_events[openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_malformed_admitted_sec_completion_retains_typed_gap[anthropic]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_malformed_admitted_sec_completion_retains_typed_gap[openai]"
+    ],
+    [
+      "tests.test_sec_research_delegated_trace",
+      "test_openai_child_joins_cancelled_sec_worker_before_client_and_parent_release"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_publication_recovery_io_allows_market_write_but_excludes_capture_writer[hash]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_publication_recovery_io_allows_market_write_but_excludes_capture_writer[stage_fsync]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_publication_recovery_io_allows_market_write_but_excludes_capture_writer[unlink]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_publication_recovery_reaches_explicit_cleanup_with_unrelated_orphan[before_publish]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_publication_recovery_reaches_explicit_cleanup_with_unrelated_orphan[before_register]"
+    ],
+    [
+      "tests.test_sec_research_release_workflow",
+      "test_interrupted_refresh_keeps_stored_references_out_of_cleanup"
+    ],
+    [
+      "tests.test_sec_research_release_workflow",
+      "test_research_catalog_fact_document_reload_export_restore"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_bounds_defer_without_starving_current_members"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[cik]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[count]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[extra]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[map]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[map_overflow]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[receipt]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[rotation]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[scope]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[status]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[unknown_success]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_batch_shape_and_hidden_receipt_references_are_validated[unreported_attempt]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_busy_issuer_is_failed_without_abandoning_other_issuers"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_changed_ticker_membership_intersects_before_map_checkpoint"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_deadline_and_request_budget_checked_before_each_source"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_deadline_during_real_transport_body_unwinds_without_claiming_http_success"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_empty_universe_success_is_not_acquisition"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_failed_map_preserves_rotation_without_dispatching_stale_resolution"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_interrupted_batch_persists_intent_and_rotates_failed_member"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_limits_are_closed_application_safety_bounds[overrides0]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_limits_are_closed_application_safety_bounds[overrides1]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_limits_are_closed_application_safety_bounds[overrides2]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_limits_are_closed_application_safety_bounds[overrides3]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_limits_are_closed_application_safety_bounds[overrides4]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_limits_are_closed_application_safety_bounds[overrides5]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_malformed_observed_member_stops_whole_batch_without_dispatch[None]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_malformed_observed_member_stops_whole_batch_without_dispatch[ONE\\nTWO]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_malformed_observed_member_stops_whole_batch_without_dispatch[XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_malformed_observed_member_stops_whole_batch_without_dispatch[]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_map_lease_abort_accounts_unresolved_members_and_retains_rotation"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_mixed_transport_storage_gaps_keep_terminal_batch[False-storage_space_insufficient]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_running_membership_checkpoint_does_not_claim_terminal_coverage"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_deduplicates_cik_and_exposes_unresolved_symbols"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_export_and_admin_verify_all_checkpoints"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[False-changed-after_refresh]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[False-changed-between_members]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[False-failed-after_refresh]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[False-failed-between_members]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-after_refresh]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-between_members]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[True-changed-after_refresh]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[True-changed-between_members]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[True-failed-after_refresh]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[True-failed-between_members]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-after_refresh]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-between_members]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_sec_partial_failure_retains_previous_success"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_space_symbol_is_unresolved_without_rejecting_observed_membership"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_status_rejects_inconsistent_batch_column_timestamp"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_cik_partition_is_validated[duplicate_member]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_cik_partition_is_validated[extra_cik]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_cik_partition_is_validated[wrong_cik]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[admin-empty]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[admin-failed]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[admin-partial]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[admin-succeeded]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[export-empty]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[export-failed]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[export-partial]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[export-succeeded]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[record-empty]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[record-failed]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[record-partial]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[record-succeeded]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[status-empty]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[status-failed]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[status-partial]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[status-succeeded]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[validator-empty]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[validator-failed]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[validator-partial]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_terminal_membership_witness_is_rejected[validator-succeeded]"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_unavailable_membership_preserves_rotation_and_empty_clears_without_acquisition"
+    ],
+    [
+      "tests.test_sec_research_schedule",
+      "test_unavailable_universe_never_dispatches"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_absent_or_invalid_schedule_status_does_not_install[False]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_absent_or_invalid_schedule_status_does_not_install[True]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_actual_sec_scheduler_adapter_maps_outcomes_and_audit[None-succeeded]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_actual_sec_scheduler_adapter_maps_outcomes_and_audit[all-failed]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_actual_sec_scheduler_adapter_maps_outcomes_and_audit[facts-partial]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_actual_space_symbol_membership_keeps_other_issuer_and_stored_status"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_budget_edit_never_enables_schedule"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_malformed_sec_adapter_result_never_becomes_success[None]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_malformed_sec_adapter_result_never_becomes_success[payload1]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_malformed_sec_adapter_result_never_becomes_success[payload2]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_malformed_sec_adapter_result_never_becomes_success[payload3]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_malformed_sec_adapter_result_never_becomes_success[payload4]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_missing_managed_identity_has_typed_failed_batch_without_old_key"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_only_sec_invalid_symbol_needs_no_credentials_or_transport"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_runtime_empty_universe_needs_no_credentials_or_transport"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_schedule_commands_keep_actual_permission_gate"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_schedule_keeps_per_response_bound_without_twelve_mib_batch_ceiling"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_schedule_sixteen_mib_response_rejection_and_no_rate_limit_retry"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_schedule_status_is_stored_only_and_precedes_dynamic_cik"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_uncovered_membership_adapter_result_is_rejected[empty]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_uncovered_membership_adapter_result_is_rejected[failed]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_uncovered_membership_adapter_result_is_rejected[partial]"
+    ],
+    [
+      "tests.test_sec_research_schedule_runtime",
+      "test_uncovered_membership_adapter_result_is_rejected[succeeded]"
+    ],
+    [
+      "tests.test_sec_research_service",
+      "test_invalid_receipt_scope_rejected_before_acquisition[None]"
+    ],
+    [
+      "tests.test_sec_research_service",
+      "test_invalid_receipt_scope_rejected_before_acquisition[True]"
+    ],
+    [
+      "tests.test_sec_research_service",
+      "test_invalid_receipt_scope_rejected_before_acquisition[]"
+    ],
+    [
+      "tests.test_sec_research_service",
+      "test_invalid_receipt_scope_rejected_before_acquisition[history]"
+    ],
+    [
+      "tests.test_sec_research_service",
+      "test_recent_schedule_preserves_explicit_history_continuation"
+    ],
+    [
+      "tests.test_sec_research_tool_service",
+      "test_recent_schedule_never_satisfies_tool_history_resume_or_changes_cursor"
+    ]
+  ],
+  "backend": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 11050,
+    "skipped": 12
+  },
+  "baseline": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 10827,
+    "skipped": 12
+  },
+  "baseline_junit_gzip_sha256": "df08da5c36a7c828b0bcdcbcf8d989ac4d972ddfbbb538ff0034424eca455a7b",
+  "checks": {
+    "collected_equals_executed": true,
+    "complete_commands_succeeded": true,
+    "explicit_tests_directory": true,
+    "immutable_source_anchor_matches": true,
+    "maintenance_operation_and_citation_regression_suites_ran": true,
+    "no_backend_failures_or_errors": true,
+    "no_duplicate_nodes": true,
+    "no_source_runtime_or_runner_drift": true,
+    "retained_safety_owners_ran": true,
+    "unchanged_skip_ids": true
+  },
+  "collected": 11062,
+  "collection_run": "accepted-collection",
+  "executed": 11062,
+  "junit_sha256": "c87b1ec3147ddeab72bf84aceb1483f794e2dd71dab0c4bc4753f8ff808974cd",
+  "limit": "Frozen Linux offline Anthropic child async and response/citation ownership acceptance. No actual provider calls, production DB access, SQLite activation, native Anthropic parent async conversion, cross-platform approval, merge or push.",
+  "new_suites": {
+    "test_anthropic_child_async": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 9,
+      "skipped": 0
+    },
+    "test_api": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 25,
+      "skipped": 0
+    },
+    "test_research_output_events": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 330,
+      "skipped": 0
+    },
+    "test_research_output_lifetimes": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 35,
+      "skipped": 0
+    },
+    "test_sec_research_citations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 143,
+      "skipped": 0
+    },
+    "test_sec_research_cli": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 36,
+      "skipped": 0
+    },
+    "test_sec_research_delegated_dispatch": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 19,
+      "skipped": 0
+    },
+    "test_sec_research_delegated_trace": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 59,
+      "skipped": 0
+    },
+    "test_sec_research_maintenance": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 60,
+      "skipped": 0
+    },
+    "test_sec_research_operation_admission": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 28,
+      "skipped": 0
+    },
+    "test_sec_research_operations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 73,
+      "skipped": 0
+    },
+    "test_sec_research_references": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 47,
+      "skipped": 0
+    },
+    "test_sec_research_schema_admin": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 52,
+      "skipped": 0
+    },
+    "test_sec_research_trace": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 75,
+      "skipped": 0
+    },
+    "test_security_lifecycle_routes": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 38,
+      "skipped": 0
+    },
+    "test_subagent": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 64,
+      "skipped": 0
+    },
+    "test_task_runtime_binding": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 141,
+      "skipped": 0
+    }
+  },
+  "removed": [],
+  "retained_safety_owners": {
+    "test_api_fixed_dispatch_pins_complete_selection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0
+    },
+    "test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_failed_generation_redacts_selected_key_after_activation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_openai_retry_key_echo_is_private_without_changing_retry_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_original_oauth_id_can_refresh_normally_without_reselection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    }
+  },
+  "seconds": 1379.518,
+  "skipped": [
+    [
+      "tests.test_detailed_financials.TestLiveTechMetrics",
+      "test_nvda_tech_metrics"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_basic_stock_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_connection"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_iv_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_filter"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_quote"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_volume_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_put_call_ratio_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_scanner_parameters"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_unusual_activity"
+    ],
+    [
+      "tests.test_option_chain_tools.TestLiveOptionChain",
+      "test_spy_option_chain"
+    ],
+    [
+      "tests.test_peer_comparison.TestLivePeerComparison",
+      "test_nvda_peer_comparison"
+    ]
+  ],
+  "source_anchor": "39b6587f76deb79b22bf819f084c09985c560b4c",
+  "source_collection_sha256": "ead0eaac7d2aa87282b7151e4ac0af8b37e82f859ba0db4001683c06f3ce7b88",
+  "source_drift": [],
+  "source_files": 1160,
+  "source_snapshot_after": "accepted-source-after.json",
+  "source_snapshot_before": "accepted-source-before.json",
+  "sqlite": "3.37.2"
+}

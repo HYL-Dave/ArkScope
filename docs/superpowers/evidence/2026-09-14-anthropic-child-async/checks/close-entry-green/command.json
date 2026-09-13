@@ -1,0 +1,32 @@
+{
+  "name": "close-entry-green",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/offline_pytest.py",
+    "-q",
+    "tests/test_anthropic_child_async.py",
+    "tests/test_live_resolver.py",
+    "tests/test_task_runtime_binding.py",
+    "tests/test_subagent.py",
+    "tests/test_fable_5_1_runtime.py",
+    "tests/test_sec_research_delegated_trace.py",
+    "tests/test_sec_research_delegated_dispatch.py",
+    "tests/test_api.py::test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes",
+    "tests/test_security_lifecycle_routes.py::test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_routes",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/close-entry-green/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 38.708,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/close-entry-green",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/close-entry-green/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-anthropic-child-async/close-entry-green/output.log"
+}

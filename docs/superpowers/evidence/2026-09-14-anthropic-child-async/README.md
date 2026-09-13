@@ -3,8 +3,15 @@
 Source baseline: `bf7831b870cd051bd4969abceb647f8b8d195885`.
 
 This bounded follow-up implements the async child direction approved on
-2026-09-14. It closes N1 from the release-integration checkpoint, not the
-unrelated cleanup/runtime deployment backlog. Initial status: in progress.
+2026-09-14. **N1, the subsequent P2 cleanup finding, and the two route-inventory
+regressions are closed. Linux complete-backend acceptance is GREEN.** This does
+not close the unrelated cleanup/runtime deployment backlog or declare a complete
+cross-platform SEC release.
+
+Implementation: `e447d394` (async child and route inventory), `24c10280`
+(pre-stream error cleanup and inspected SDK floor), `39b6587f`
+(missed output-lifetime fixture collateral). The final frozen source anchor is
+`39b6587f76deb79b22bf819f084c09985c560b4c`.
 
 ## Scope And Acceptance
 
@@ -71,8 +78,57 @@ runner helpers were copied byte-for-byte from the preceding reviewed checkpoint.
   controls added. Expanded output-lifetime/delegation covering: **593 passed**.
   This is a real missed test collateral, not an environmental waiver or a
   product connection-error fix. No product source changed after `24c10280`.
-- [ ] Re-run one complete backend suite after the fixture correction.
-- [ ] Seal evidence and update the release checkpoint.
+- [x] Re-run one complete backend suite after the fixture correction:
+  **11050 passed / 12 skipped**, zero failures or errors.
+- [x] Reconcile all 11062 collected/executed identities, unchanged skip IDs,
+  required safety owners and unchanged source/runtime/runner identities.
+- [x] Seal evidence and update the release checkpoint.
+
+## Final Verification
+
+| Check | Observed result |
+| --- | --- |
+| Single complete backend at `39b6587f` | 11050 passed / 12 skipped; pytest 1375.50s, launcher wall time 1379.518s |
+| Collection/execution | Exact 11062-node equality; no duplicates or missing nodes |
+| Earlier maintenance full-suite baseline | 10827 passed / 12 skipped; +223 nodes / -0, same 12 skip identities |
+| This follow-up's release checkpoint | 11023 collected at `bf7831b8`; +39 tests, none removed |
+| Source/runtime/runner freeze | 1160 source files unchanged before/after the complete run |
+| Focused auth/retry/cancellation covering | 317 passed; later output-lifetime/delegation covering 593 passed; not additive |
+| Frontend at `e447d394` | 1833 passed / 126 files; all 297 recorded frontend paths unchanged through `39b6587f` |
+| Typecheck, build, i18n literal check | Passed; bundle-size and existing raw test warnings retained |
+| Current-source census | 4400 candidates / 3579 uncertainties / 1176 files read; zero new candidates, uncertainties, reductions or untracked paths versus the previous integration census |
+| Independent scoped re-review | P2 addressed; no new actionable findings; source/evidence review, not another full test run |
+| Receipt ledger | 26 finished runs, 8 nonzero attempts, each classified; no unfinished runs |
+
+The accepted source collection SHA-256 is
+`ead0eaac7d2aa87282b7151e4ac0af8b37e82f859ba0db4001683c06f3ce7b88`.
+See [node and runtime reconciliation](checks/accepted-validation.json),
+[all check outcomes](checks/checks-summary.json), the
+[original review](checks/review.md) and [scoped re-review](checks/rereview.md).
+The first failed full run and isolated reproduction remain in `checks/`, not
+replaced by the successful run. The read-only comparison's `review_required:
+false` applies only to this delta; it does not close existing cleanup queues.
+Its unchanged dependency-import metadata is not a claim that the requirement
+version string stayed unchanged; the deliberate Anthropic floor is below.
+
+The create-only [archive manifest](checks/manifest.json) binds 89 selected files
+and 3055820 stored bytes, with both original and stored SHA-256 values. Generated
+databases, HOME/credentials, binaries and unrelated scratch are excluded. Review
+readback and replay helpers are included, not only result summaries.
+
+The real SDK tests cover standard and beta heartbeat behavior, pending headers,
+200 body/finalizer cancellation and 400/429/500 pre-entry cleanup, including
+repeated cancellation and cleanup errors. Both native parents retain completed
+SEC references, release operation ownership only after cleanup, and send no
+post-cancel request. Concurrent child runs retain distinct calls/references and
+pass the disposable profile's `integrity_check`. No live provider behavior or
+exhaustive low-level network/redirect shutdown proof is inferred.
+
+Earlier workflow/browser/inverse receipts retain their original source anchors
+in the [release-integration checkpoint](../2026-09-12-sec-research-release-integration/README.md).
+They are not re-labelled as fresh browser or inverse runs at `39b6587f`. This
+packet owns the reproduced N1/P2 fixes and the new complete Linux regression
+gate; it does not silently waive the broader release checklist.
 
 ## Remaining Scope
 
