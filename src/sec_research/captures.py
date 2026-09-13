@@ -76,6 +76,9 @@ class CaptureStore:
             conn.execute("DELETE FROM sec_research_orphans")
             conn.executemany("INSERT INTO sec_research_orphans VALUES(?,?)", orphans)
             conn.execute("DELETE FROM sec_research_reservations")
+        # The published inode is now durably charged. Alias verification and
+        # directory durability must not hold the shared market writer lock.
+        directory.recover_published_stages(files)
 
     def recover(self):
         with _storage_errors(), capture_writer(self.store.paths.capture_root) as directory:

@@ -7,6 +7,7 @@ import multiprocessing
 import shutil
 import sqlite3
 import os
+from contextlib import contextmanager
 
 import pytest
 
@@ -312,3 +313,139 @@ def test_capture_reopens_after_database_and_root_move(captures, tmp_path):
     moved = CaptureStore(Store(paths), budget=lambda: 1)
     assert moved.read(digest) == b"portable"
     assert moved.status()["over_budget"] is True
+
+
+def interrupted_publication(captures, monkeypatch, phase="before_register", body=b"publication"):
+    from src.sec_research.capture_lock import CaptureDirectory
+
+    def fail(*args):
+        raise sqlite3.OperationalError("fixture publication interruption")
+
+    with monkeypatch.context() as patch:
+        if phase == "before_register":
+            patch.setattr(captures, "_register", fail)
+        else:
+            method = "publish" if phase == "before_publish" else "remove_stage"
+            patch.setattr(CaptureDirectory, method, fail)
+        with pytest.raises(ValueError, match="^capture_store_write_failed$"):
+            captures.put(body)
+    root = captures.store.paths.capture_root
+    sha = hashlib.sha256(body).hexdigest()
+    stages = list((root / "staging").iterdir())
+    assert len(stages) == 1
+    return sha, root / "objects" / sha, stages[0]
+
+
+def test_publication_recovery_after_registration_retains_exact_read_and_single_charge(captures, monkeypatch):
+    sha, target, stage = interrupted_publication(captures, monkeypatch, "after_register")
+    assert target.stat().st_nlink == 2
+    assert captures.read(sha) == b"publication"
+    for _ in range(2):
+        state = captures.recover()
+        assert not stage.exists(), "registered publication still has its redundant staging name"
+        assert target.stat().st_nlink == 1
+        assert captures.read(sha) == b"publication"
+        assert (state["persisted_bytes"], state["orphan_bytes"], state["reserved_bytes"]) == (11, 0, 0)
+        assert state["charged_bytes"] == 11
+
+
+@pytest.mark.parametrize("fault", ["accounting_commit", "unlink", "stage_fsync"])
+def test_publication_recovery_failure_preserves_charge_and_retry_converges(captures, monkeypatch, fault):
+    _, target, stage = interrupted_publication(captures, monkeypatch)
+    connect, unlink, fsync = captures.store.connect, os.unlink, os.fsync
+    parent = stage.parent.stat()
+
+    @contextmanager
+    def fail_commit(*args, **kwargs):
+        with connect(*args, **kwargs) as conn:
+            if not kwargs.get("readonly"):
+                conn.set_authorizer(lambda action, name, *_: sqlite3.SQLITE_DENY
+                    if action == sqlite3.SQLITE_TRANSACTION and name == "COMMIT" else sqlite3.SQLITE_OK)
+            yield conn
+
+    def check_accounting():
+        with connect(readonly=True) as conn:
+            assert [tuple(row) for row in conn.execute("SELECT * FROM sec_research_orphans")] == [
+                ("objects/" + target.name, 11)]
+            assert conn.execute("SELECT COUNT(*) FROM sec_research_reservations").fetchone()[0] == 0
+
+    def fail_unlink(name, *args, **kwargs):
+        if name == stage.name:
+            check_accounting()
+            raise OSError(errno.EIO, "fixture unlink failure after accounting commit")
+        return unlink(name, *args, **kwargs)
+
+    def fail_fsync(fd):
+        info = os.fstat(fd)
+        if (info.st_dev, info.st_ino) == (parent.st_dev, parent.st_ino) and not stage.exists():
+            check_accounting()
+            raise OSError(errno.EIO, "fixture post-unlink directory durability failure")
+        return fsync(fd)
+
+    with monkeypatch.context() as patch:
+        if fault == "accounting_commit":
+            patch.setattr(captures.store, "connect", fail_commit)
+        elif fault == "unlink":
+            patch.setattr(os, "unlink", fail_unlink)
+        else:
+            patch.setattr(os, "fsync", fail_fsync)
+        with pytest.raises(ValueError, match="^capture_store_write_failed$"):
+            captures.recover()
+        assert target.read_bytes() == b"publication"
+        assert stage.exists() is (fault != "stage_fsync")
+        state = captures.status()
+        assert state["charged_bytes"] == 11
+        assert (state["orphan_bytes"], state["reserved_bytes"]) == (
+            (0, 11) if fault == "accounting_commit" else (11, 0))
+        # Retrying an unresolved failure must not acknowledge durability or erase its charge.
+        with pytest.raises(ValueError, match="^capture_store_write_failed$"):
+            captures.recover()
+        assert captures.status()["charged_bytes"] == 11
+    for _ in range(2):
+        state = captures.recover()
+        assert not stage.exists(), "retry did not converge to a single published name"
+        assert target.read_bytes() == b"publication" and target.stat().st_nlink == 1
+        assert (state["orphan_bytes"], state["reserved_bytes"], state["charged_bytes"]) == (11, 0, 11)
+
+
+def _published_writer(path, published, release):
+    from src.sec_research.captures import CaptureStore
+    from src.sec_research.paths import SecResearchPaths
+    from src.sec_research.store import Store
+
+    captures = CaptureStore(Store(SecResearchPaths(path)), budget=lambda: 100, free_bytes=lambda _: 2**40)
+    register = captures._register
+
+    def pause(*args):
+        published.set()
+        release.wait(20)
+        return register(*args)
+
+    captures._register = pause
+    captures.put(b"publication")
+
+
+def test_publication_recovery_excludes_live_worker_then_recovers_dead_worker(captures):
+    context = multiprocessing.get_context("fork")
+    published, release = context.Event(), context.Event()
+    process = context.Process(target=_published_writer,
+        args=(captures.store.paths.market_db_path, published, release))
+    process.start()
+    try:
+        assert published.wait(10)
+        target = captures.store.paths.capture_root / "objects" / hashlib.sha256(b"publication").hexdigest()
+        assert target.stat().st_nlink == 2
+        with pytest.raises(ValueError, match="^capture_store_busy$"):
+            captures.recover()
+        assert captures.status()["reserved_bytes"] == 11
+        process.terminate()
+        process.join(10)
+        assert not process.is_alive()
+        state = captures.recover()
+        assert list((captures.store.paths.capture_root / "staging").iterdir()) == []
+        assert target.read_bytes() == b"publication" and target.stat().st_nlink == 1
+        assert (state["orphan_bytes"], state["reserved_bytes"], state["charged_bytes"]) == (11, 0, 11)
+    finally:
+        if process.is_alive():
+            process.terminate()
+        process.join(10)

@@ -1,8 +1,12 @@
 """The capture writer must never silently lose cross-process exclusion."""
 
 import importlib.util
+import os
+from contextlib import contextmanager
 
 import pytest
+
+from tests.test_sec_research_captures import captures, interrupted_publication
 
 
 def test_capture_writer_implementation_exists():
@@ -115,3 +119,150 @@ def test_capture_root_lock_replacement_cannot_admit_another_owner(tmp_path):
         with pytest.raises(ValueError, match="sec_research_refresh_busy"):
             with issuer_refresh(root, "320193"):
                 pytest.fail("replacement bypassed refresh")
+
+
+@pytest.mark.parametrize("damage", ["foreign_link", "extra_stage", "extra_object",
+    "malformed_stage", "malformed_object", "mismatched_body"])
+def test_publication_recovery_rejects_unproven_alias_without_unlink(captures, monkeypatch, tmp_path, damage):
+    _, target, stage = interrupted_publication(captures, monkeypatch)
+    if damage == "foreign_link":
+        os.link(target, tmp_path / "foreign")
+    elif damage == "extra_stage":
+        os.link(target, stage.parent / ("f" * 32))
+    elif damage == "extra_object":
+        os.link(target, target.parent / ("f" * 64))
+    elif damage == "malformed_stage":
+        stage = stage.rename(stage.with_name("a"))
+    elif damage == "malformed_object":
+        target = target.rename(target.with_name("b"))
+    else:
+        target.write_bytes(b"substituted")
+    before = {p: (p.read_bytes(), p.stat().st_ino, p.stat().st_nlink)
+        for parent in (target.parent, stage.parent) for p in parent.iterdir()}
+    with pytest.raises(ValueError, match="^capture_(path_unsafe|integrity_failed)$"):
+        captures.recover()
+    assert {p: (p.read_bytes(), p.stat().st_ino, p.stat().st_nlink) for p in before} == before
+    assert captures.status()["charged_bytes"] == 11
+    with writer()(captures.store.paths.capture_root) as directory:
+        with pytest.raises(ValueError, match="^capture_path_unsafe$"):
+            directory.inventory()
+    if damage == "foreign_link":
+        assert (tmp_path / "foreign").read_bytes() == b"publication"
+
+
+def test_publication_recovery_does_not_prune_separate_identical_stage(captures, monkeypatch):
+    _, target, stage = interrupted_publication(captures, monkeypatch)
+    stage.unlink()
+    stage.write_bytes(b"publication")
+    assert stage.stat().st_ino != target.stat().st_ino
+    state = captures.recover()
+    assert stage.read_bytes() == target.read_bytes() == b"publication"
+    assert state["charged_bytes"] == state["orphan_bytes"] == 22
+
+
+def test_publication_recovery_does_not_refresh_identity_to_accept_new_foreign_link(captures, monkeypatch, tmp_path):
+    _, target, stage = interrupted_publication(captures, monkeypatch)
+    open_file, fstat = os.open, os.fstat
+    stage_fds, changed = set(), []
+    foreign = tmp_path / "foreign"
+
+    def open_stage(name, *args, **kwargs):
+        fd = open_file(name, *args, **kwargs)
+        if name == stage.name:
+            stage_fds.add(fd)
+        return fd
+
+    def add_link_after_stat(fd):
+        info = fstat(fd)
+        if fd in stage_fds and not changed:
+            os.link(target, foreign)
+            changed.append(True)
+        return info
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "open", open_stage)
+        patch.setattr(os, "supports_dir_fd", os.supports_dir_fd | {open_stage})
+        patch.setattr(os, "fstat", add_link_after_stat)
+        with pytest.raises(ValueError, match="^capture_path_unsafe$"):
+            captures.recover()
+    assert changed == [True]
+    assert stage.read_bytes() == target.read_bytes() == foreign.read_bytes() == b"publication"
+    assert stage.stat().st_nlink == target.stat().st_nlink == foreign.stat().st_nlink == 3
+    assert captures.status()["charged_bytes"] == 11
+
+
+@pytest.mark.parametrize("replacement", ["regular", "symlink", "fifo"])
+def test_publication_recovery_binds_unlink_to_accounted_entry(captures, monkeypatch, tmp_path, replacement):
+    from src.sec_research.capture_lock import CaptureDirectory
+
+    _, target, stage = interrupted_publication(captures, monkeypatch)
+    files = CaptureDirectory.files
+    retained = tmp_path / "retained-stage"
+
+    def replace_after_scan(directory):
+        result = files(directory)
+        stage.rename(retained)
+        if replacement == "regular":
+            stage.write_bytes(b"unproven")
+        elif replacement == "symlink":
+            stage.symlink_to(retained)
+        else:
+            os.mkfifo(stage)
+        return result
+
+    with monkeypatch.context() as patch:
+        patch.setattr(CaptureDirectory, "files", replace_after_scan)
+        with pytest.raises(ValueError, match="^capture_(path_unsafe|store_write_failed)$"):
+            captures.recover()
+    assert stage.lstat()
+    assert retained.read_bytes() == target.read_bytes() == b"publication"
+    assert captures.status()["charged_bytes"] == 11
+
+
+@pytest.mark.parametrize("replacement", ["stage", "object", "root", "extra_link", "body"])
+def test_publication_recovery_rechecks_identity_after_hash_before_unlink(captures, monkeypatch, tmp_path, replacement):
+    _, target, stage = interrupted_publication(captures, monkeypatch)
+    original_inode, fdopen = target.stat().st_ino, os.fdopen
+    moved = tmp_path / "detached"
+    changed = []
+
+    @contextmanager
+    def replace_after_read(fd, *args, **kwargs):
+        is_object = os.fstat(fd).st_ino == original_inode
+        with fdopen(fd, *args, **kwargs) as handle:
+            yield handle
+            if is_object and not changed:
+                changed.append(replacement)
+                if replacement in {"stage", "object"}:
+                    path = stage if replacement == "stage" else target
+                    path.rename(moved)
+                    path.write_bytes(b"unproven replacement")
+                elif replacement == "root":
+                    root = captures.store.paths.capture_root
+                    root.rename(moved)
+                    root.mkdir()
+                    (root / "objects").mkdir()
+                    (root / "staging").mkdir()
+                elif replacement == "extra_link":
+                    os.link(target, moved)
+                else:
+                    target.write_bytes(b"substituted")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "fdopen", replace_after_read)
+        with pytest.raises(ValueError, match="^capture_path_unsafe$"):
+            captures.recover()
+    assert changed == [replacement]
+    if replacement == "root":
+        assert (moved / "staging" / stage.name).read_bytes() == b"publication"
+        assert (moved / "objects" / target.name).read_bytes() == b"publication"
+    elif replacement == "stage":
+        assert stage.read_bytes() == b"unproven replacement"
+        assert target.read_bytes() == moved.read_bytes() == b"publication"
+    elif replacement == "object":
+        assert target.read_bytes() == b"unproven replacement"
+        assert stage.read_bytes() == moved.read_bytes() == b"publication"
+    else:
+        assert stage.read_bytes() == target.read_bytes() == (
+            b"substituted" if replacement == "body" else b"publication")
+    assert captures.status()["charged_bytes"] == 11
