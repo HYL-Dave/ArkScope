@@ -754,7 +754,7 @@ describe("bundled i18n resources", () => {
       common: 82,
       shell: 37,
       settings: 1014,
-      research: 224,
+      research: 236,
       explore: 1219,
       portfolio: 374,
       system: 24,
@@ -839,7 +839,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2974);
+      expect(total, `${locale}.total`).toBe(2986);
       expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys].sort());
       expect(Object.keys(resources[locale].settings.secDocument).sort()).toEqual([...secDocumentKeys].sort());
 
