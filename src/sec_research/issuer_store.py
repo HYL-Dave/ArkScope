@@ -33,14 +33,15 @@ class IssuerStore:
         return result
 
     @store_operation
-    def resolve(self, issuer: str) -> dict:
-        """Return a stored resolution observation; explicit CIKs need no map I/O."""
+    def resolve(self, issuer: str, *, observation: dict | None = None) -> dict:
+        """Resolve against a supplied observation or latest; explicit CIKs need no map I/O."""
         kind, value = parse_issuer(issuer)
         result = dict(status="ok", cik=value if kind == "cik" else None,
                       candidates=[], observed_at=None, source=None, gaps=[])
         if kind == "cik":
             return result
-        observation = self.latest()
+        if observation is None:
+            observation = self.latest()
         result.update(status="unavailable", source={"url": TICKER_MAP_URL, "sha256": None})
         if observation is None:
             result["gaps"] = [{"code": "issuer_map_unobserved"}]

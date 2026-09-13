@@ -110,17 +110,27 @@ def _collect(batch, previous, resolver, service, transport, limits, check, persi
         else:
             resolvable.append(member)
             needs_map = needs_map or kind == "ticker"
-    if needs_map:
-        observation = resolver.refresh(transport, service.captures, clock=service.clock, check=check)
-        batch["issuer_map_observation_id"] = observation["observation_id"]
+    observation = None
     current = {}
-    for member in resolvable:
-        resolution = resolver.resolve(member)
-        if resolution["status"] != "ok":
-            batch["unresolved"].append(dict(ticker=member, candidates=resolution["candidates"],
-                code=resolution["gaps"][0]["code"]))
-        else:
-            current.setdefault(resolution["cik"], []).append(member)
+    try:
+        if needs_map:
+            observation = resolver.refresh(transport, service.captures, clock=service.clock, check=check)
+            batch["issuer_map_observation_id"] = observation["observation_id"]
+        for member in resolvable:
+            resolution = resolver.resolve(member, observation=observation)
+            if resolution["status"] != "ok":
+                batch["unresolved"].append(dict(ticker=member, candidates=resolution["candidates"],
+                    code=resolution["gaps"][0]["code"]))
+            else:
+                current.setdefault(resolution["cik"], []).append(member)
+    except Exception as exc:
+        code = "issuer_map_busy" if str(exc) == "issuer_map_busy" else _storage_code(exc)
+        unresolved = {row["ticker"] for row in batch["unresolved"]}
+        # Resolution aborted before dispatch; explicitly retain unresolved scope.
+        batch["unresolved"].extend(dict(ticker=member, candidates=[], code=code)
+            for member in resolvable if member not in unresolved)
+        batch["gaps"].append({"code": code})
+        return
     # Keep surviving members in their old rotation position, then append new
     # CIKs. Every attempted member moves behind those waiting, even on failure.
     queue = [row["cik"] for row in previous["rotation"] if row["cik"] in current] if previous else []
@@ -180,9 +190,11 @@ def _collect(batch, previous, resolver, service, transport, limits, check, persi
         else:
             batch["failed_ciks"].append(cik)
         batch["gaps"].extend(dict(cik=cik, **gap) for gap in receipt["gaps"])
-        if any(gap["code"] in {"capture_budget_exceeded", "storage_space_insufficient",
-                               "capture_store_write_failed"} for gap in receipt["gaps"]):
-            batch["stop_reason"] = next(gap["code"] for gap in receipt["gaps"])
+        for gap in receipt["gaps"]:
+            if gap["code"] in {"capture_budget_exceeded", "storage_space_insufficient",
+                               "capture_store_write_failed"}:
+                batch["stop_reason"] = gap["code"]
+                break
         persist()
         if progress is not None:
             progress(len(batch["attempted_ciks"]), len(queue), cik)
