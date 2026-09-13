@@ -790,6 +790,35 @@ def test_empty_export_never_creates_source_capture_root(store, tmp_path):
     assert not store.paths.capture_root.exists()
 
 
+@pytest.mark.parametrize("member", ["objects", "staging", None], ids=["objects-file", "staging-file", "valid"])
+def test_empty_restore_requires_directory_members_before_destination(store, tmp_path, member):
+    api = bundle_api()
+    bundle = tmp_path / "empty-bundle"
+    manifest = api.export_bundle(store.paths, bundle)
+    assert manifest["objects"] == []
+    source = SecResearchPaths.from_market_db(bundle / "market_data.db")
+    if member is not None:
+        path = source.capture_root / member
+        path.rmdir()
+        path.write_bytes(b"undeclared content in a directory-shaped member")
+    before = {str(path.relative_to(bundle)): digest(path) if path.is_file() else "directory"
+              for path in bundle.rglob("*")}
+    destination = tmp_path / "restored"
+    result = attempt(api.restore_bundle, bundle, destination)
+    if member is not None:
+        assert result == {"error": "sec_research_bundle_members_invalid"}, result
+        assert not destination.exists()
+    else:
+        assert result == manifest
+        restored = Store(SecResearchPaths.from_market_db(destination / "market_data.db"))
+        for child in ("objects", "staging"):
+            assert (restored.paths.capture_root / child).is_dir()
+        with restored.connect(readonly=True) as conn:
+            assert conn.execute("SELECT COUNT(*) FROM sec_research_objects").fetchone()[0] == 0
+    assert before == {str(path.relative_to(bundle)): digest(path) if path.is_file() else "directory"
+                      for path in bundle.rglob("*")}
+
+
 def test_publication_platform_failure_precedes_database_open(tmp_path, monkeypatch):
     api = bundle_api()
     monkeypatch.setattr(api, "_renameat2", None)
