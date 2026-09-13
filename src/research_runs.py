@@ -366,8 +366,9 @@ class ResearchRunStore:
         run_id: str,
         thread_store: ResearchThreadStore,
         message: str,
+        error_code: Optional[str] = None,
     ) -> ResearchRun:
-        """Atomically record a scheduler handoff failure for a queued run."""
+        """Atomically fail pre-execution admission without publishing SEC results."""
         self._require_shared_database(thread_store)
         ts = _now()
         with self._write_lock, thread_store._write_lock, self._connect() as conn:
@@ -378,6 +379,7 @@ class ResearchRunStore:
                     run_id,
                     "failed",
                     error=message,
+                    error_code=error_code,
                     expected_status="queued",
                     now=ts,
                 )
@@ -387,7 +389,7 @@ class ResearchRunStore:
                     conn,
                     run_id,
                     "error",
-                    {"error": message},
+                    {"error": message, **({"code": error_code} if error_code is not None else {})},
                     now=ts,
                 )
                 thread_store._append_message_on_connection(
@@ -400,6 +402,7 @@ class ResearchRunStore:
                     model=failed_run.model,
                     effort=failed_run.effort,
                     is_error=True,
+                    error_code=error_code,
                     now=ts,
                 )
                 conn.commit()

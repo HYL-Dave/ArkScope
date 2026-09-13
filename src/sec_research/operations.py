@@ -399,6 +399,7 @@ def export_bundle(paths, destination: Path, *, free_bytes=None) -> dict:
     """Create a new verified bundle. Never normalize or enumerate the live DB after backup."""
     with _errors():
         destination = _path(destination)
+        _require(not destination.is_relative_to(paths.capture_root), "sec_research_bundle_path_invalid")
         _require(_renameat2 is not None, "sec_research_bundle_publication_unsupported")
         _new_destination(destination)
         source = _path(paths.market_db_path)
@@ -446,6 +447,7 @@ def restore_bundle(bundle: Path, destination: Path, *, database_name="market_dat
     with _errors():
         bundle, destination = _path(bundle), _path(destination)
         _basename(database_name)
+        _require(not destination.is_relative_to(bundle), "sec_research_bundle_path_invalid")
         _require(_renameat2 is not None, "sec_research_bundle_publication_unsupported")
         _new_destination(destination)
         with _file(bundle / MANIFEST) as handle:

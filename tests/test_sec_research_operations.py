@@ -277,6 +277,126 @@ def test_research_result_lease_reaches_durable_commit(evidence, trace_stores, mo
     assert other_owner(paths.capture_root) == "entered"
 
 
+@pytest.mark.parametrize("scheduled", [False, True], ids=["direct", "scheduled"])
+@pytest.mark.parametrize("busy", [True, False], ids=["maintenance", "available"])
+def test_research_busy_admission_terminalizes_without_dispatch(store, trace_stores, monkeypatch, scheduled, busy):
+    from src.agents.shared.events import AgentEvent, EventType
+    from src.api.routes import query
+    from src.auth_drivers.runtime_binding import RuntimeAuthBinding
+    from src import research_run_manager as manager
+
+    runs, threads = trace_stores
+    monkeypatch.setattr(SecResearchPaths, "resolve", lambda: store.paths)
+    monkeypatch.setattr("src.api.personalization.resolve_personalization", lambda _: ("", {
+        "profile_active": False, "assistant_stance": "off", "skill_mode": "off",
+        "suggested_skills": [], "applied_skills": [], "context_snapshot": ""}))
+    dispatched = []
+
+    async def stream(**kwargs):
+        dispatched.append(True)
+        yield AgentEvent(EventType.done, {"answer": "Answer", "provider": "openai", "model": "gpt-5.4-mini"})
+
+    monkeypatch.setattr(query, "_research_provider_stream", stream)
+    errors = []
+
+    async def execute():
+        with operation(store.paths.capture_root, exclusive=True) if busy else nullcontext():
+            args = dict(run_id="trace-run", run_store=runs, thread_store=threads, dal=object(), history=[],
+                auth_binding=RuntimeAuthBinding("openai", "db_api_key", "api_key", None, _api_key="offline-key"))
+            task = (manager.schedule_research_run(**args) if scheduled else
+                    asyncio.create_task(manager.execute_research_run(**args, stream_factory=stream)))
+            try:
+                await task
+            except ValueError as exc:
+                errors.append(str(exc))
+            await asyncio.sleep(0)  # Drain the actual scheduler's done callback.
+            assert "trace-run" not in manager._TASKS
+            run = runs.get_run("trace-run")
+            assert run.status == ("failed" if busy else "succeeded"), (run.status, errors)
+            assert run.completed_at is not None
+            messages = threads.list_messages("trace-thread")
+            events = runs.list_events("trace-run")
+            assert len(messages) == 2 and messages[-1].role == "assistant"
+            assert len(events) == 1
+            if busy:
+                assert run.error_code == "sec_research_operation_busy"
+                assert run.started_at is None and run.personalization is None
+                assert messages[-1].is_error and messages[-1].error_code == run.error_code
+                assert not messages[-1].tool_calls and not messages[-1].token_usage
+                assert events[0].type == "error"
+                assert events[0].data == {"error": run.error, "code": run.error_code}
+                assert "maintenance" in run.error.lower() and "not started" in run.error.lower()
+            else:
+                assert events[0].type == "done" and messages[-1].content == "Answer"
+            await asyncio.create_task(manager.execute_research_run(**args, stream_factory=stream))
+            assert runs.list_events("trace-run") == events
+            assert threads.list_messages("trace-thread") == messages
+
+    asyncio.run(execute())
+    assert errors == []
+    assert dispatched == ([] if busy else [True])
+    assert other_owner(store.paths.capture_root) == "entered"
+
+
+@pytest.mark.parametrize("busy", [True, False], ids=["maintenance", "available"])
+@pytest.mark.parametrize("asgi_version", ["2.3", "2.4"])
+def test_legacy_busy_admission_completes_http_sse_without_dispatch(store, trace_stores, monkeypatch, busy, asgi_version):
+    from src.agents.shared.events import AgentEvent, EventType
+    from src.api.routes import query
+    from src.auth_drivers.runtime_binding import RuntimeAuthBinding
+
+    _, threads = trace_stores
+    monkeypatch.setattr(SecResearchPaths, "resolve", lambda: store.paths)
+    monkeypatch.setattr(query, "capture_runtime_auth", lambda _: RuntimeAuthBinding(
+        "openai", "db_api_key", "api_key", None, _api_key="offline-key"))
+    monkeypatch.setattr(query, "_resolve_query_task_route", lambda *_: ("gpt-5.4-mini", "low"))
+    monkeypatch.setattr(query, "_require_live_model_auth", lambda *_: None)
+    monkeypatch.setattr(query, "_require_client_compaction_compatibility", lambda *_: None)
+    monkeypatch.setattr(query, "_resolve_personalization", lambda _: ("", {}))
+    dispatched, messages, errors = [], [], []
+
+    async def stream(**kwargs):
+        dispatched.append(True)
+        yield AgentEvent(EventType.done, {"answer": "Answer", "provider": "openai", "model": "gpt-5.4-mini"})
+
+    monkeypatch.setattr(query, "_research_provider_stream", stream)
+
+    async def send(message):
+        messages.append(message)
+
+    async def receive():
+        await asyncio.Future()  # The ASGI 2.3 disconnect listener is cancelled on completion.
+
+    async def execute():
+        response = await query.query_agent_stream(query.QueryRequest(question="New question", provider="openai",
+            thread_id="trace-thread"), dal=object(), store=threads)
+        with operation(store.paths.capture_root, exclusive=True) if busy else nullcontext():
+            task = asyncio.create_task(response({"type": "http", "asgi": {"spec_version": asgi_version}}, receive, send))
+            try:
+                await task
+            except ValueError as exc:
+                errors.append(str(exc))
+
+    asyncio.run(execute())
+    assert errors == [], errors
+    assert messages[0]["status"] == 200
+    assert b"text/event-stream" in dict(messages[0]["headers"])[b"content-type"]
+    assert messages[-1] == {"type": "http.response.body", "body": b"", "more_body": False}
+    body = b"".join(message.get("body", b"") for message in messages).decode()
+    events = [json.loads(frame.removeprefix("data: ")) for frame in body.strip().split("\n\n")]
+    assert len(events) == 1
+    if busy:
+        assert events[0]["type"] == "error"
+        assert events[0]["data"]["code"] == "sec_research_operation_busy"
+        assert "maintenance" in events[0]["data"]["error"].lower()
+        assert len(threads.list_messages("trace-thread")) == 1  # No user turn admitted.
+    else:
+        assert events[0]["type"] == "done"
+        assert threads.list_messages("trace-thread")[-1].content == "Answer"
+    assert dispatched == ([] if busy else [True])
+    assert other_owner(store.paths.capture_root) == "entered"
+
+
 def bundle_api():
     assert importlib.util.find_spec("src.sec_research.operations") is not None, "portable bundle command absent"
     from src.sec_research import operations
@@ -301,6 +421,39 @@ def exported(evidence, tmp_path):
     assert "error" not in result, result
     assert (path / "manifest.json").is_file()
     return api, path, result
+
+
+@pytest.mark.parametrize("kind", ["export", "restore"])
+@pytest.mark.parametrize("relative", [".", "child", "objects/child"])
+def test_bundle_destination_cannot_mutate_source(evidence, tmp_path, monkeypatch, kind, relative):
+    api = bundle_api()
+    paths = evidence.rig.store.paths
+    if kind == "restore":
+        _, source, _ = exported(evidence, tmp_path)
+        relative = relative.replace("objects/", "market_data.db.sec-research/objects/")
+        function, args = api.restore_bundle, (source, source / relative)
+    else:
+        source = paths.capture_root
+        function, args = api.export_bundle, (paths, source / relative)
+    before = {str(path.relative_to(source)): digest(path) if path.is_file() else "directory"
+              for path in source.rglob("*")}
+    backup_calls = []
+    original = api.backup_market_db
+
+    def backup(*args, **kwargs):
+        backup_calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(api, "backup_market_db", backup)
+    result = attempt(function, *args)
+    assert result == {"error": "sec_research_bundle_path_invalid"}, result
+    assert backup_calls == []
+    assert before == {str(path.relative_to(source)): digest(path) if path.is_file() else "directory"
+                      for path in source.rglob("*")}
+    if kind == "restore":
+        assert "error" not in attempt(api.restore_bundle, source, tmp_path / "sibling")
+    else:
+        assert "error" not in attempt(api.export_bundle, paths, tmp_path / "sibling")
 
 
 def test_export_restore_preserves_wal_and_historical_citations(evidence, tmp_path):
@@ -668,3 +821,30 @@ def test_restore_rejects_wal_bundle_before_sqlite_open(evidence, tmp_path, monke
     assert not opened, "non-normalized bundle reached SQLite and could create WAL/SHM"
     assert not (bundle / "market_data.db-wal").exists()
     assert not (bundle / "market_data.db-shm").exists()
+
+
+def test_export_does_not_checkpoint_stranded_source_wal(evidence, tmp_path):
+    api = bundle_api()
+    paths = evidence.rig.store.paths
+    child = os.fork()
+    if child == 0:
+        try:
+            conn = sqlite3.connect(paths.market_db_path)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA wal_autocheckpoint=0")
+            conn.execute("CREATE TABLE stranded_market(value TEXT)")
+            conn.execute("INSERT INTO stranded_market VALUES('retained WAL')")
+            conn.commit()
+        except BaseException:
+            os._exit(1)
+        os._exit(0)
+    _, status = os.waitpid(child, 0)
+    assert os.waitstatus_to_exitcode(status) == 0
+    files = [paths.market_db_path, paths.market_db_path.with_name(paths.market_db_path.name + "-wal")]
+    before = [digest(path) for path in files]
+    result = attempt(api.export_bundle, paths, tmp_path / "stranded")
+    assert "error" not in result, result
+    assert [digest(path) if path.exists() else None for path in files] == before
+    restored = Store(SecResearchPaths.from_market_db(tmp_path / "stranded" / "market_data.db"))
+    with restored.connect(readonly=True) as conn:
+        assert conn.execute("SELECT value FROM stranded_market").fetchone()[0] == "retained WAL"

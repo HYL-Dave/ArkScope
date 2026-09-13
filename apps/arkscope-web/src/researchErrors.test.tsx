@@ -61,6 +61,20 @@ describe("research error presentation", () => {
     expect(refusal.detail).not.toBe(providerFailure.detail);
   });
 
+  it("keeps maintenance admission distinct from a dispatched provider failure", () => {
+    for (const locale of ["en", "zh-Hant"] as const) {
+      const result = presentResearchError({ code: "sec_research_operation_busy" }, researchT(locale));
+      expect(result).toMatchObject({
+        code: "sec_research_operation_busy", state: "blocked", target: null, actionLabel: null,
+        preservePartial: false, developerDetail: null,
+      });
+      expect(result.title).toBe(locale === "en" ? "Research maintenance in progress" : "研究資料維護中");
+      expect(result.detail).toBe(locale === "en"
+        ? "Research was not started. Try again after maintenance finishes."
+        : "研究尚未開始。請等維護完成後重試。");
+    }
+  });
+
   it("marks tool_limit_reached as partial-preserving and offers simplify or retry", () => {
     expect(presentResearchError({ code: "tool_limit_reached" }, researchT("zh-Hant"))).toMatchObject({
       state: "failed",

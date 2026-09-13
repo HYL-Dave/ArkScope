@@ -16,7 +16,7 @@ export interface ResearchErrorPresentation {
 interface ErrorDefinition {
   state: CommonUiState;
   copy: "reauth" | "missingCredential" | "timeout" | "refusal" | "providerCallFailed"
-    | "toolLimit" | "cancelled" | "interrupted";
+    | "toolLimit" | "cancelled" | "interrupted" | "maintenance";
   target?: NavigationTarget;
   preservePartial?: boolean;
 }
@@ -53,6 +53,10 @@ const DEFINITIONS: Record<string, ErrorDefinition> = {
   provider_call_failed: {
     state: "failed",
     copy: "providerCallFailed",
+  },
+  sec_research_operation_busy: {
+    state: "blocked",
+    copy: "maintenance",
   },
   tool_limit_reached: {
     state: "failed",
@@ -113,6 +117,12 @@ function errorCopy(
       return {
         title: t(($) => $.errors.providerCallFailedTitle),
         detail: t(($) => $.errors.providerCallFailedDetail),
+        actionLabel: null,
+      };
+    case "maintenance":
+      return {
+        title: t(($) => $.errors.maintenanceTitle),
+        detail: t(($) => $.errors.maintenanceDetail),
         actionLabel: null,
       };
     case "toolLimit":

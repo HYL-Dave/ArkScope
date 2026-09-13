@@ -20,6 +20,7 @@ RESEARCH_ERROR_CODES = frozenset(
         "provider_call_failed",
         "run_cancelled",
         "run_interrupted",
+        "sec_research_operation_busy",
     }
 )
 
@@ -41,6 +42,13 @@ _DIRECT_TIMEOUT_PREFIXES = ("APITimeoutError:", "TimeoutError:")
 class ResearchFailure:
     code: str
     detail: str
+
+
+SEC_RESEARCH_MAINTENANCE_FAILURE = ResearchFailure(
+    code="sec_research_operation_busy",
+    detail="Research was not started because SEC research maintenance is in progress. "
+           "Try again after maintenance finishes.",
+)
 
 
 def sanitize_research_detail(value: Any, *, binding: RuntimeAuthBinding | None = None) -> str:
