@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
+from src.research_tool_trace import accumulate_tool_calls
+
 if TYPE_CHECKING:
     from src.research_threads import ResearchThreadStore
 
@@ -435,6 +437,17 @@ class ResearchRunStore:
         )
         if persisted_personalization is not None:
             personalization = persisted_personalization
+        # Recovery must see every durable completion on this same transaction,
+        # including events beyond the bounded public replay page.
+        events = conn.execute(
+            "SELECT type, data_json FROM research_run_events "
+            "WHERE run_id = ? AND type IN ('tool_start', 'tool_end') ORDER BY seq",
+            (run_id,),
+        )
+        tool_calls = accumulate_tool_calls(
+            ((row["type"], json.loads(row["data_json"])) for row in events),
+            tool_calls=tool_calls,
+        )
         terminal = self._mark_terminal_on_connection(
             conn,
             run_id,

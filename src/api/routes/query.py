@@ -24,6 +24,7 @@ from src.model_capabilities import (
     model_auth_admission_detail,
 )
 from src.model_routing import task_route_admission_detail
+from src.research_tool_trace import accumulate_tool_calls
 from pydantic import BaseModel
 
 from ..dependencies import get_dal, get_thread_store
@@ -57,29 +58,6 @@ def _compose_agent_question(question: str, ticker: Optional[str]) -> str:
     t = (ticker or "").strip().upper()
     return f"針對 {t}：{question}" if t else question
 
-
-
-def accumulate_tool_calls(events: list[tuple[str, dict]]) -> list[dict]:
-    """Reconstruct the chronological tool_calls from the (type, data) stream of
-    tool_start/tool_end events — server-side mirror of the client reducer, so a
-    reloaded turn shows the real trace (NOT the deduped done.tools_used, #3).
-
-    tool_start opens a row (name+input); tool_end completes the most-recent open
-    row (result_preview); a tool_end with no open row (OpenAI name-only batch)
-    appends an already-closed name-only row.
-    """
-    rows: list[dict] = []
-    for etype, data in events:
-        if etype == "tool_start":
-            rows.append({"name": data.get("tool"), "input": data.get("input"), "result_preview": None, "_done": False})
-        elif etype == "tool_end":
-            target = next((r for r in reversed(rows) if not r["_done"]), None)
-            if target is not None:
-                target["result_preview"] = data.get("summary")
-                target["_done"] = True
-            else:
-                rows.append({"name": data.get("tool"), "input": None, "result_preview": data.get("summary"), "_done": True})
-    return [{"name": r["name"], "input": r["input"], "result_preview": r["result_preview"]} for r in rows]
 
 
 def _anthropic_subscription_stream(*, credential_id, question, model, effort, dal, history, personalization_context: str = ""):
