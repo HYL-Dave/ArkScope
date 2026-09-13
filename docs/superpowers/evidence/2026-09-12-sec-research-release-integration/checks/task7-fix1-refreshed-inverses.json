@@ -1,0 +1,158 @@
+[
+  {
+    "name": "refresh-traverse-actual-historical-pointer",
+    "prior_name": "traverse-actual-historical-pointer",
+    "stage": "prior requirement refreshed on fix1 final source",
+    "red": "task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse",
+    "green": "task7-fix1-20-refresh-traverse-actual-historical-pointer-restored",
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "test_schedule_deduplicates_cik_and_exposes_unresolved_symbols"
+    ],
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "replacements": [
+          {
+            "original": "            receipt = research.refresh(cik, scope=\"recent\", max_sources=2, check=check)",
+            "mutant": "            receipt = research.refresh(cik, scope=\"full\", max_sources=2, check=check)"
+          }
+        ],
+        "before": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b",
+        "mutant": "683e0a0ff9b6c273bbbe9a52f2c03ba3204eade286bd5ad3ecd1490045448ec3",
+        "original_artifact": "task7-fix1-inverse-artifacts/refresh-traverse-actual-historical-pointer/1-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/refresh-traverse-actual-historical-pointer/1-mutant.py",
+        "restored": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+      },
+      {
+        "file": "src/sec_research/service.py",
+        "replacements": [
+          {
+            "original": "                        pending.append(historical.name)",
+            "mutant": "                        pending.insert(0, historical.name)"
+          }
+        ],
+        "before": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+        "mutant": "f2bded5a3bf1d0db41be11bce4658f2f80f96404c8a397b3bf4c55e9d948bb35",
+        "original_artifact": "task7-fix1-inverse-artifacts/refresh-traverse-actual-historical-pointer/2-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/refresh-traverse-actual-historical-pointer/2-mutant.py",
+        "restored": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9"
+      }
+    ],
+    "replay": "Use retained originals/mutants and exact replacement strings in a disposable worktree at the fix1 commit. Run the selector through unchanged run_checks.py with a NEW create-only task7-fix1-* name, restore originals, rerun; verify all hashes. No providers or installation.",
+    "red_exit": 1,
+    "red_tail": "    [\n        'https://www.sec.gov/files/company_tickers.json',\n        'https://data.sec.gov/submissions/CIK0000000001.json',\n  -     'https://data.sec.gov/api/xbrl/companyfacts/CIK0000000001.json',\n  +     'https://data.sec.gov/submissions/CIK0000000001-submissions-001.json',\n    ]\n1 failed, 76 deselected in 0.65s\n",
+    "green_exit": 0,
+    "green_tail": "- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-20-refresh-traverse-actual-historical-pointer-restored/results.xml -\n1 passed, 76 deselected in 0.65s\n"
+  },
+  {
+    "name": "refresh-erase-success",
+    "prior_name": "erase-success",
+    "stage": "prior requirement refreshed on fix1 final source",
+    "red": "task7-fix1-21-refresh-erase-success-inverse",
+    "green": "task7-fix1-22-refresh-erase-success-restored",
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "test_sec_partial_failure_retains_previous_success"
+    ],
+    "files": [
+      {
+        "file": "src/sec_research/schedule_store.py",
+        "replacements": [
+          {
+            "original": "                WHERE acquired_at IS NOT NULL ORDER BY checkpoint_id DESC LIMIT 1\"\"\").fetchone()",
+            "mutant": "                ORDER BY checkpoint_id DESC LIMIT 1\"\"\").fetchone()"
+          }
+        ],
+        "before": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed",
+        "mutant": "d918c9bcae4381f85f8b17d550c5b6822d8b5c94e75adcfa9e9f860e1d476e58",
+        "original_artifact": "task7-fix1-inverse-artifacts/refresh-erase-success/1-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/refresh-erase-success/1-mutant.py",
+        "restored": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed"
+      }
+    ],
+    "replay": "Use retained originals/mutants and exact replacement strings in a disposable worktree at the fix1 commit. Run the selector through unchanged run_checks.py with a NEW create-only task7-fix1-* name, restore originals, rerun; verify all hashes. No providers or installation.",
+    "red_exit": 1,
+    "red_tail": "tests/test_sec_research_schedule.py:290: in test_sec_partial_failure_retains_previous_success\n    assert f.status()[\"last_acquisition_at\"] == NOW\nE   AssertionError: assert None == '2026-09-11T12:00:00Z'\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-21-refresh-erase-success-inverse/results.xml -\n=========================== short test summary info ============================\nFAILED tests/test_sec_research_schedule.py::test_sec_partial_failure_retains_previous_success - AssertionError: assert None == '2026-09-11T12:00:00Z'\n1 failed, 76 deselected in 0.71s\n",
+    "green_exit": 0,
+    "green_tail": "- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-22-refresh-erase-success-restored/results.xml -\n1 passed, 76 deselected in 0.80s\n"
+  },
+  {
+    "name": "refresh-reuse-membership",
+    "prior_name": "reuse-membership",
+    "stage": "prior requirement refreshed on fix1 final source",
+    "red": "task7-fix1-23-refresh-reuse-membership-inverse",
+    "green": "task7-fix1-24-refresh-reuse-membership-restored",
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "test_batch_bounds_defer_without_starving_current_members"
+    ],
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "replacements": [
+          {
+            "original": "            members = universe_reader()",
+            "mutant": "            members = previous[\"universe_tickers\"] if previous else universe_reader()"
+          }
+        ],
+        "before": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b",
+        "mutant": "03550b18c1f49d862982406463a0076885ec861c8e35b342a5652d4d9b0dc82e",
+        "original_artifact": "task7-fix1-inverse-artifacts/refresh-reuse-membership/1-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/refresh-reuse-membership/1-mutant.py",
+        "restored": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+      }
+    ],
+    "replay": "Use retained originals/mutants and exact replacement strings in a disposable worktree at the fix1 commit. Run the selector through unchanged run_checks.py with a NEW create-only task7-fix1-* name, restore originals, rerun; verify all hashes. No providers or installation.",
+    "red_exit": 1,
+    "red_tail": "            '0000000001',\n        ],\n  -     [\n  -         '0000000004',\n  -     ],\n    ]\n1 failed, 76 deselected in 0.92s\n",
+    "green_exit": 0,
+    "green_tail": "- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-24-refresh-reuse-membership-restored/results.xml -\n1 passed, 76 deselected in 0.89s\n"
+  },
+  {
+    "name": "refresh-reject-observed-space-symbol",
+    "prior_name": "reject-observed-space-symbol",
+    "stage": "prior requirement refreshed on fix1 final source",
+    "red": "task7-fix1-25-refresh-reject-observed-space-symbol-inverse",
+    "green": "task7-fix1-26-refresh-reject-observed-space-symbol-restored",
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "tests/test_sec_research_schedule_runtime.py",
+      "tests/test_active_universe.py",
+      "-k",
+      "space_symbol or only_sec_invalid_symbol or exact_hidden_veto_distinguishes"
+    ],
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "replacements": [
+          {
+            "original": "            normalized = [normalize_member(member) for member in members]",
+            "mutant": "            normalized = []\n            for member in members:\n                parse_issuer(member)\n                normalized.append(normalize_member(member))"
+          }
+        ],
+        "before": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b",
+        "mutant": "393573dacde279297e901fba35845d160aaed09245cddcb23ab52854634d199e",
+        "original_artifact": "task7-fix1-inverse-artifacts/refresh-reject-observed-space-symbol/1-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/refresh-reject-observed-space-symbol/1-mutant.py",
+        "restored": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+      }
+    ],
+    "replay": "Use retained originals/mutants and exact replacement strings in a disposable worktree at the fix1 commit. Run the selector through unchanged run_checks.py with a NEW create-only task7-fix1-* name, restore originals, rerun; verify all hashes. No providers or installation.",
+    "red_exit": 1,
+    "red_tail": "  + failed\nFAILED tests/test_sec_research_schedule_runtime.py::test_only_sec_invalid_symbol_needs_no_credentials_or_transport - AssertionError: assert ('unavailable' == 'available'\n  \n  - available\n  + unavailable\n  ? ++)\n3 failed, 1 passed, 117 deselected in 1.76s\n",
+    "green_exit": 0,
+    "green_tail": "- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-26-refresh-reject-observed-space-symbol-restored/results.xml -\n4 passed, 117 deselected in 2.48s\n"
+  }
+]

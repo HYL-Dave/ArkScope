@@ -1,0 +1,48 @@
+{
+  "verification_command": "env HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-27-backend-cover/home /home/hyl/.virtualenvs/llm_app/bin/python -B -c 'import hashlib,json,pathlib,subprocess,os\nroot=pathlib.Path.cwd(); work=root/\".superpowers/sdd/2026-09-12-sec-research-release-integration\"\ndef git(*args): return subprocess.check_output([\"git\",*args],text=True).strip()\ndef sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()\nproof=json.loads((work/\"task7-fix1-proof-readback.json\").read_text())\ncommit=git(\"rev-parse\",\"HEAD\"); parent=git(\"rev-parse\",\"HEAD^\"); files=git(\"diff-tree\",\"--no-commit-id\",\"--name-only\",\"-r\",commit).splitlines()\nassert parent==proof[\"base\"] and set(files)=={r[\"path\"] for r in proof[\"sources\"]}\nassert git(\"branch\",\"--show-current\")==\"codex/sec-research-integration\"\nassert not git(\"diff\",\"--cached\",\"--name-only\")\nassert not git(\"status\",\"--porcelain\",\"--\",*files)\nfor r in proof[\"sources\"]:\n    data=subprocess.check_output([\"git\",\"show\",commit+\":\"+r[\"path\"]])\n    assert hashlib.sha256(data).hexdigest()==sha(root/r[\"path\"])==r[\"sha256\"]\nreceipts=json.loads((work/\"task7-fix1-receipts.json\").read_text())\nassert receipts[\"runner_receipts\"]==29 and receipts[\"nonzero_exits\"]==14\nfor r in receipts[\"records\"]:\n    p=root/r[\"command_receipt\"]; c=json.loads(p.read_text())\n    assert sha(p)==r[\"command_sha256\"] and c[\"exit_code\"]==r[\"exit_code\"]\n    assert sha(root/r[\"log\"])==r[\"log_sha256\"] and r[\"disposition\"] and r[\"explanation\"]\n    if r[\"junit\"]: assert sha(root/r[\"junit\"])==r[\"junit_sha256\"]\nprocesses=subprocess.check_output([\"ps\",\"-eo\",\"pid=,ppid=,comm=,args=\"],text=True).splitlines()\nactive=[]\nfor line in processes:\n    parts=line.strip().split(None,3)\n    if len(parts)<4: continue\n    pid,ppid,comm,args=parts\n    if int(pid)==os.getpid() or not (comm.startswith(\"python\") or comm.startswith(\"node\")): continue\n    if any(s in args for s in [\"offline_pytest.py\",\"browser_check.py\",\"browser_fixture.py\",\"vite-preview.mjs\",\"vitest\"]) and (str(root) in args or str(work) in args):\n        active.append(line.strip())\nassert not active, active\nprint(json.dumps(dict(commit=commit,parent=parent,branch=git(\"branch\",\"--show-current\"),files=files,source_hashes=proof[\"sources\"],committed_worktree_tested_sources_match=True,receipt_count=29,receipt_hash_exit_log_junit_readback=True,index_empty=True,owned_source_clean=True,remaining_status=git(\"status\",\"--short\").splitlines(),active_owned_runners=active,browser_servers_stopped=json.loads((work/\"task7-fix1-29-browser-final/browser/browser-results.json\").read_text())[\"servers_stopped\"])))\n'",
+  "commit": "883b0185b1b044ff6a94a7690cb85253fc7c82e5",
+  "parent": "936ede10f04c370bf2322ee70833f9e0f29b7a44",
+  "branch": "codex/sec-research-integration",
+  "files": [
+    "src/sec_research/issuer_store.py",
+    "src/sec_research/schedule_store.py",
+    "src/sec_research/scheduled.py",
+    "tests/test_sec_research_schedule.py",
+    "tests/test_sec_research_schedule_runtime.py"
+  ],
+  "source_hashes": [
+    {
+      "path": "src/sec_research/issuer_store.py",
+      "sha256": "75e5864b8955b1178a72c0333d5832faf6e62af1df7c3ce9a34afb37e1610e12"
+    },
+    {
+      "path": "src/sec_research/scheduled.py",
+      "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+    },
+    {
+      "path": "src/sec_research/schedule_store.py",
+      "sha256": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed"
+    },
+    {
+      "path": "tests/test_sec_research_schedule.py",
+      "sha256": "50db19f7a2f26138cc08e39c1c5deb04664374206f7586d0b09b894012f9e32e"
+    },
+    {
+      "path": "tests/test_sec_research_schedule_runtime.py",
+      "sha256": "60ae64c7982de33de2235971a32c3dc01edbf541db2701fd8dafb1a4a52f0d3d"
+    }
+  ],
+  "committed_worktree_tested_sources_match": true,
+  "receipt_count": 29,
+  "receipt_hash_exit_log_junit_readback": true,
+  "index_empty": true,
+  "owned_source_clean": true,
+  "remaining_status": [
+    "M docs/design/SEC_RESEARCH_OPERATIONS.md",
+    " M docs/superpowers/plans/2026-09-12-sec-research-release-integration.md",
+    " M docs/superpowers/specs/2026-09-10-sec-research-substrate-design.md",
+    "?? docs/superpowers/evidence/2026-09-13-sec-publication-recovery/"
+  ],
+  "active_owned_runners": [],
+  "browser_servers_stopped": true
+}

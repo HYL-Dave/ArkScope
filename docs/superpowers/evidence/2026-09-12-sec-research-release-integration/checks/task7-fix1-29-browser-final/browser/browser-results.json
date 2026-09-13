@@ -1,0 +1,1263 @@
+{
+  "measurements": [
+    {
+      "case": "en-1280x960",
+      "geometry": {
+        "viewport": [
+          1280,
+          960
+        ],
+        "documentWidth": 1280,
+        "rects": [
+          {
+            "text": "Next eligible time",
+            "x": 250,
+            "y": 339.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Disabled",
+            "x": 536,
+            "y": 339.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Last attempt",
+            "x": 250,
+            "y": 364.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "09-13 23:59 Asia/Taipei \u00b7 09-13 11:59 ET",
+            "x": 536,
+            "y": 364.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Last successful issuer acquisition",
+            "x": 250,
+            "y": 388.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "09-13 23:59 Asia/Taipei \u00b7 09-13 11:59 ET",
+            "x": 536,
+            "y": 388.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Last completed batch",
+            "x": 250,
+            "y": 413.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Unknown",
+            "x": 536,
+            "y": 413.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Active symbols",
+            "x": 250,
+            "y": 437.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "3",
+            "x": 536,
+            "y": 437.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Attempted issuers",
+            "x": 250,
+            "y": 462.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "2",
+            "x": 536,
+            "y": 462.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Confirmed issuers",
+            "x": 250,
+            "y": 486.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "1",
+            "x": 536,
+            "y": 486.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Failed or partial issuers",
+            "x": 250,
+            "y": 511.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "1",
+            "x": 536,
+            "y": 511.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Deferred issuers",
+            "x": 250,
+            "y": 535.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "0",
+            "x": 536,
+            "y": 535.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Scoped filings",
+            "x": 250,
+            "y": 560.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "52",
+            "x": 536,
+            "y": 560.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Scoped facts",
+            "x": 250,
+            "y": 584.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "45",
+            "x": 536,
+            "y": 584.59375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "Admitted source attempts",
+            "x": 250,
+            "y": 609.09375,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "5",
+            "x": 536,
+            "y": 609.09375,
+            "width": 274,
+            "height": 19.5
+          }
+        ],
+        "overlap": [],
+        "clipped": []
+      },
+      "controls_geometry": {
+        "clientWidth": 980,
+        "scrollWidth": 980,
+        "clipped": []
+      },
+      "existing_run_now_notices": [
+        "SEC Research: Last status was started"
+      ],
+      "pinned_capture_id": "secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653",
+      "pinned_text_sha256": "76c7724167e9eacbae33c2710131a563488203991860dd37c4ffce7c01ba6aff",
+      "catalog_sha256": "73663c5cd326dd37e1f41b2ee4e34fbf0a06aa218bda173395e25f8ed9028a6c",
+      "dirty_budget": "150",
+      "body_requests": [
+        "https://www.sec.gov/files/company_tickers.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000789019.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json"
+      ],
+      "batch": {
+        "status": "partial",
+        "data": {
+          "last_attempt": {
+            "batch_id": "6dcf527a9f9f46df94d2cd41851d6563",
+            "status": "partial",
+            "started_at": "2026-09-13T15:59:31.177050Z",
+            "finished_at": "2026-09-13T15:59:31.668901Z",
+            "acquired_at": "2026-09-13T15:59:31.589011Z",
+            "universe_tickers": [
+              "MISSING",
+              "ONE",
+              "TWO"
+            ],
+            "universe_status": "available",
+            "rotation": [
+              {
+                "cik": "0000320193",
+                "tickers": [
+                  "ONE"
+                ]
+              },
+              {
+                "cik": "0000789019",
+                "tickers": [
+                  "TWO"
+                ]
+              }
+            ],
+            "scope": "recent",
+            "forms": [
+              "10-K",
+              "10-Q",
+              "20-F",
+              "40-F"
+            ],
+            "attempted_ciks": [
+              "0000320193",
+              "0000789019"
+            ],
+            "confirmed_ciks": [
+              "0000320193"
+            ],
+            "failed_ciks": [
+              "0000789019"
+            ],
+            "deferred_ciks": [],
+            "unresolved": [
+              {
+                "ticker": "MISSING",
+                "candidates": [],
+                "code": "issuer_not_found"
+              }
+            ],
+            "outcomes": [
+              {
+                "cik": "0000320193",
+                "receipt_id": 7,
+                "status": "ok",
+                "completed_sources": 2,
+                "filing_count": 26,
+                "fact_count": 45
+              },
+              {
+                "cik": "0000789019",
+                "receipt_id": 10,
+                "status": "partial",
+                "completed_sources": 1,
+                "filing_count": 26,
+                "fact_count": 0
+              }
+            ],
+            "request_count": 5,
+            "filing_count": 52,
+            "fact_count": 45,
+            "gaps": [
+              {
+                "cik": "0000789019",
+                "source": "companyfacts",
+                "code": "sec_rate_limited"
+              }
+            ],
+            "stop_reason": null,
+            "elapsed_seconds": 0.49187187664210796,
+            "issuer_map_observation_id": 2
+          },
+          "last_acquisition_at": "2026-09-13T15:59:31.589011Z",
+          "last_completed_batch": null
+        },
+        "gaps": [
+          {
+            "cik": "0000789019",
+            "source": "companyfacts",
+            "code": "sec_rate_limited"
+          }
+        ],
+        "observed_at": "2026-09-13T15:59:31.668901Z",
+        "coverage": {
+          "scope": "recent",
+          "forms": [
+            "10-K",
+            "10-Q",
+            "20-F",
+            "40-F"
+          ],
+          "history_requested": false
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "case": "en-390x844",
+      "geometry": {
+        "viewport": [
+          390,
+          844
+        ],
+        "documentWidth": 390,
+        "rects": [
+          {
+            "text": "Next eligible time",
+            "x": 12,
+            "y": 261.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Disabled",
+            "x": 201,
+            "y": 261.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Last attempt",
+            "x": 12,
+            "y": 286.09375,
+            "width": 177,
+            "height": 39
+          },
+          {
+            "text": "09-13 23:59 Asia/Taipei \u00b7 09-13 11:59 ET",
+            "x": 201,
+            "y": 286.09375,
+            "width": 177,
+            "height": 39
+          },
+          {
+            "text": "Last successful issuer acquisition",
+            "x": 12,
+            "y": 330.09375,
+            "width": 177,
+            "height": 39
+          },
+          {
+            "text": "09-13 23:59 Asia/Taipei \u00b7 09-13 11:59 ET",
+            "x": 201,
+            "y": 330.09375,
+            "width": 177,
+            "height": 39
+          },
+          {
+            "text": "Last completed batch",
+            "x": 12,
+            "y": 374.09375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Unknown",
+            "x": 201,
+            "y": 374.09375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Active symbols",
+            "x": 12,
+            "y": 398.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "3",
+            "x": 201,
+            "y": 398.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Attempted issuers",
+            "x": 12,
+            "y": 423.09375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "2",
+            "x": 201,
+            "y": 423.09375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Confirmed issuers",
+            "x": 12,
+            "y": 447.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "1",
+            "x": 201,
+            "y": 447.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Failed or partial issuers",
+            "x": 12,
+            "y": 472.09375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "1",
+            "x": 201,
+            "y": 472.09375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Deferred issuers",
+            "x": 12,
+            "y": 496.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "0",
+            "x": 201,
+            "y": 496.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Scoped filings",
+            "x": 12,
+            "y": 521.09375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "52",
+            "x": 201,
+            "y": 521.09375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Scoped facts",
+            "x": 12,
+            "y": 545.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "45",
+            "x": 201,
+            "y": 545.59375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "Admitted source attempts",
+            "x": 12,
+            "y": 570.09375,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "5",
+            "x": 201,
+            "y": 570.09375,
+            "width": 177,
+            "height": 19.5
+          }
+        ],
+        "overlap": [],
+        "clipped": []
+      },
+      "controls_geometry": {
+        "clientWidth": 336,
+        "scrollWidth": 980,
+        "clipped": []
+      },
+      "existing_run_now_notices": [
+        "SEC Research: Last status was started"
+      ],
+      "pinned_capture_id": "secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653",
+      "pinned_text_sha256": "76c7724167e9eacbae33c2710131a563488203991860dd37c4ffce7c01ba6aff",
+      "catalog_sha256": "73663c5cd326dd37e1f41b2ee4e34fbf0a06aa218bda173395e25f8ed9028a6c",
+      "dirty_budget": "150",
+      "body_requests": [
+        "https://www.sec.gov/files/company_tickers.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000789019.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json"
+      ],
+      "batch": {
+        "status": "partial",
+        "data": {
+          "last_attempt": {
+            "batch_id": "24da9148d24c4d6eacba9f107b8ae688",
+            "status": "partial",
+            "started_at": "2026-09-13T15:59:34.330034Z",
+            "finished_at": "2026-09-13T15:59:34.799800Z",
+            "acquired_at": "2026-09-13T15:59:34.730065Z",
+            "universe_tickers": [
+              "MISSING",
+              "ONE",
+              "TWO"
+            ],
+            "universe_status": "available",
+            "rotation": [
+              {
+                "cik": "0000320193",
+                "tickers": [
+                  "ONE"
+                ]
+              },
+              {
+                "cik": "0000789019",
+                "tickers": [
+                  "TWO"
+                ]
+              }
+            ],
+            "scope": "recent",
+            "forms": [
+              "10-K",
+              "10-Q",
+              "20-F",
+              "40-F"
+            ],
+            "attempted_ciks": [
+              "0000320193",
+              "0000789019"
+            ],
+            "confirmed_ciks": [
+              "0000320193"
+            ],
+            "failed_ciks": [
+              "0000789019"
+            ],
+            "deferred_ciks": [],
+            "unresolved": [
+              {
+                "ticker": "MISSING",
+                "candidates": [],
+                "code": "issuer_not_found"
+              }
+            ],
+            "outcomes": [
+              {
+                "cik": "0000320193",
+                "receipt_id": 13,
+                "status": "ok",
+                "completed_sources": 2,
+                "filing_count": 26,
+                "fact_count": 45
+              },
+              {
+                "cik": "0000789019",
+                "receipt_id": 16,
+                "status": "partial",
+                "completed_sources": 1,
+                "filing_count": 26,
+                "fact_count": 0
+              }
+            ],
+            "request_count": 5,
+            "filing_count": 52,
+            "fact_count": 45,
+            "gaps": [
+              {
+                "cik": "0000789019",
+                "source": "companyfacts",
+                "code": "sec_rate_limited"
+              }
+            ],
+            "stop_reason": null,
+            "elapsed_seconds": 0.4697929760441184,
+            "issuer_map_observation_id": 4
+          },
+          "last_acquisition_at": "2026-09-13T15:59:34.730065Z",
+          "last_completed_batch": null
+        },
+        "gaps": [
+          {
+            "cik": "0000789019",
+            "source": "companyfacts",
+            "code": "sec_rate_limited"
+          }
+        ],
+        "observed_at": "2026-09-13T15:59:34.799800Z",
+        "coverage": {
+          "scope": "recent",
+          "forms": [
+            "10-K",
+            "10-Q",
+            "20-F",
+            "40-F"
+          ],
+          "history_requested": false
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "case": "zh-Hant-1280x960",
+      "geometry": {
+        "viewport": [
+          1280,
+          960
+        ],
+        "documentWidth": 1280,
+        "rects": [
+          {
+            "text": "\u4e0b\u6b21\u53ef\u57f7\u884c\u6642\u9593",
+            "x": 250,
+            "y": 339.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u5df2\u505c\u7528",
+            "x": 536,
+            "y": 339.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u6700\u8fd1\u5617\u8a66",
+            "x": 250,
+            "y": 364.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "09-13 23:59 Asia/Taipei \u00b7 09-13 11:59 ET",
+            "x": 536,
+            "y": 364.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u6700\u8fd1\u6210\u529f\u64f7\u53d6\u767c\u884c\u4eba",
+            "x": 250,
+            "y": 388.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "09-13 23:59 Asia/Taipei \u00b7 09-13 11:59 ET",
+            "x": 536,
+            "y": 388.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u6700\u8fd1\u5b8c\u6210\u6279\u6b21",
+            "x": 250,
+            "y": 413.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u672a\u77e5",
+            "x": 536,
+            "y": 413.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u76ee\u524d\u80a1\u7968\u4ee3\u865f",
+            "x": 250,
+            "y": 437.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "3",
+            "x": 536,
+            "y": 437.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u5df2\u5617\u8a66\u767c\u884c\u4eba",
+            "x": 250,
+            "y": 462.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "2",
+            "x": 536,
+            "y": 462.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u5df2\u78ba\u8a8d\u767c\u884c\u4eba",
+            "x": 250,
+            "y": 486.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "1",
+            "x": 536,
+            "y": 486.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u5931\u6557\u6216\u90e8\u5206\u5b8c\u6210\u767c\u884c\u4eba",
+            "x": 250,
+            "y": 511.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "1",
+            "x": 536,
+            "y": 511.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u5ef6\u5f8c\u767c\u884c\u4eba",
+            "x": 250,
+            "y": 535.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "0",
+            "x": 536,
+            "y": 535.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u7bc4\u570d\u5167\u7533\u5831",
+            "x": 250,
+            "y": 560.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "52",
+            "x": 536,
+            "y": 560.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u7bc4\u570d\u5167\u8ca1\u52d9\u4e8b\u5be6",
+            "x": 250,
+            "y": 584.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "45",
+            "x": 536,
+            "y": 584.65625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "\u5df2\u51c6\u5165\u4f86\u6e90\u5617\u8a66",
+            "x": 250,
+            "y": 609.15625,
+            "width": 274,
+            "height": 19.5
+          },
+          {
+            "text": "5",
+            "x": 536,
+            "y": 609.15625,
+            "width": 274,
+            "height": 19.5
+          }
+        ],
+        "overlap": [],
+        "clipped": []
+      },
+      "controls_geometry": {
+        "clientWidth": 980,
+        "scrollWidth": 980,
+        "clipped": []
+      },
+      "existing_run_now_notices": [
+        "SEC \u8ca1\u52d9\u7814\u7a76\uff1a\u4e0a\u6b21\u72c0\u614b\u70ba started"
+      ],
+      "pinned_capture_id": "secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653",
+      "pinned_text_sha256": "76c7724167e9eacbae33c2710131a563488203991860dd37c4ffce7c01ba6aff",
+      "catalog_sha256": "223f757129cc38623ef8c465638895e1a11b449e5034980b8be39979c7195c7c",
+      "dirty_budget": "150",
+      "body_requests": [
+        "https://www.sec.gov/files/company_tickers.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000789019.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json"
+      ],
+      "batch": {
+        "status": "partial",
+        "data": {
+          "last_attempt": {
+            "batch_id": "e00da60f497546a789b14e77ff6d3b3b",
+            "status": "partial",
+            "started_at": "2026-09-13T15:59:37.096912Z",
+            "finished_at": "2026-09-13T15:59:37.506213Z",
+            "acquired_at": "2026-09-13T15:59:37.439270Z",
+            "universe_tickers": [
+              "MISSING",
+              "ONE",
+              "TWO"
+            ],
+            "universe_status": "available",
+            "rotation": [
+              {
+                "cik": "0000320193",
+                "tickers": [
+                  "ONE"
+                ]
+              },
+              {
+                "cik": "0000789019",
+                "tickers": [
+                  "TWO"
+                ]
+              }
+            ],
+            "scope": "recent",
+            "forms": [
+              "10-K",
+              "10-Q",
+              "20-F",
+              "40-F"
+            ],
+            "attempted_ciks": [
+              "0000320193",
+              "0000789019"
+            ],
+            "confirmed_ciks": [
+              "0000320193"
+            ],
+            "failed_ciks": [
+              "0000789019"
+            ],
+            "deferred_ciks": [],
+            "unresolved": [
+              {
+                "ticker": "MISSING",
+                "candidates": [],
+                "code": "issuer_not_found"
+              }
+            ],
+            "outcomes": [
+              {
+                "cik": "0000320193",
+                "receipt_id": 19,
+                "status": "ok",
+                "completed_sources": 2,
+                "filing_count": 26,
+                "fact_count": 45
+              },
+              {
+                "cik": "0000789019",
+                "receipt_id": 22,
+                "status": "partial",
+                "completed_sources": 1,
+                "filing_count": 26,
+                "fact_count": 0
+              }
+            ],
+            "request_count": 5,
+            "filing_count": 52,
+            "fact_count": 45,
+            "gaps": [
+              {
+                "cik": "0000789019",
+                "source": "companyfacts",
+                "code": "sec_rate_limited"
+              }
+            ],
+            "stop_reason": null,
+            "elapsed_seconds": 0.40932337287813425,
+            "issuer_map_observation_id": 6
+          },
+          "last_acquisition_at": "2026-09-13T15:59:37.439270Z",
+          "last_completed_batch": null
+        },
+        "gaps": [
+          {
+            "cik": "0000789019",
+            "source": "companyfacts",
+            "code": "sec_rate_limited"
+          }
+        ],
+        "observed_at": "2026-09-13T15:59:37.506213Z",
+        "coverage": {
+          "scope": "recent",
+          "forms": [
+            "10-K",
+            "10-Q",
+            "20-F",
+            "40-F"
+          ],
+          "history_requested": false
+        },
+        "next_cursor": null
+      }
+    },
+    {
+      "case": "zh-Hant-390x844",
+      "geometry": {
+        "viewport": [
+          390,
+          844
+        ],
+        "documentWidth": 390,
+        "rects": [
+          {
+            "text": "\u4e0b\u6b21\u53ef\u57f7\u884c\u6642\u9593",
+            "x": 12,
+            "y": 262.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u5df2\u505c\u7528",
+            "x": 201,
+            "y": 262.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u6700\u8fd1\u5617\u8a66",
+            "x": 12,
+            "y": 286.65625,
+            "width": 177,
+            "height": 39
+          },
+          {
+            "text": "09-13 23:59 Asia/Taipei \u00b7 09-13 11:59 ET",
+            "x": 201,
+            "y": 286.65625,
+            "width": 177,
+            "height": 39
+          },
+          {
+            "text": "\u6700\u8fd1\u6210\u529f\u64f7\u53d6\u767c\u884c\u4eba",
+            "x": 12,
+            "y": 330.65625,
+            "width": 177,
+            "height": 39
+          },
+          {
+            "text": "09-13 23:59 Asia/Taipei \u00b7 09-13 11:59 ET",
+            "x": 201,
+            "y": 330.65625,
+            "width": 177,
+            "height": 39
+          },
+          {
+            "text": "\u6700\u8fd1\u5b8c\u6210\u6279\u6b21",
+            "x": 12,
+            "y": 374.65625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u672a\u77e5",
+            "x": 201,
+            "y": 374.65625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u76ee\u524d\u80a1\u7968\u4ee3\u865f",
+            "x": 12,
+            "y": 399.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "3",
+            "x": 201,
+            "y": 399.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u5df2\u5617\u8a66\u767c\u884c\u4eba",
+            "x": 12,
+            "y": 423.65625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "2",
+            "x": 201,
+            "y": 423.65625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u5df2\u78ba\u8a8d\u767c\u884c\u4eba",
+            "x": 12,
+            "y": 448.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "1",
+            "x": 201,
+            "y": 448.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u5931\u6557\u6216\u90e8\u5206\u5b8c\u6210\u767c\u884c\u4eba",
+            "x": 12,
+            "y": 472.65625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "1",
+            "x": 201,
+            "y": 472.65625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u5ef6\u5f8c\u767c\u884c\u4eba",
+            "x": 12,
+            "y": 497.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "0",
+            "x": 201,
+            "y": 497.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u7bc4\u570d\u5167\u7533\u5831",
+            "x": 12,
+            "y": 521.65625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "52",
+            "x": 201,
+            "y": 521.65625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u7bc4\u570d\u5167\u8ca1\u52d9\u4e8b\u5be6",
+            "x": 12,
+            "y": 546.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "45",
+            "x": 201,
+            "y": 546.15625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "\u5df2\u51c6\u5165\u4f86\u6e90\u5617\u8a66",
+            "x": 12,
+            "y": 570.65625,
+            "width": 177,
+            "height": 19.5
+          },
+          {
+            "text": "5",
+            "x": 201,
+            "y": 570.65625,
+            "width": 177,
+            "height": 19.5
+          }
+        ],
+        "overlap": [],
+        "clipped": []
+      },
+      "controls_geometry": {
+        "clientWidth": 336,
+        "scrollWidth": 980,
+        "clipped": []
+      },
+      "existing_run_now_notices": [
+        "SEC \u8ca1\u52d9\u7814\u7a76\uff1a\u4e0a\u6b21\u72c0\u614b\u70ba started"
+      ],
+      "pinned_capture_id": "secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653",
+      "pinned_text_sha256": "76c7724167e9eacbae33c2710131a563488203991860dd37c4ffce7c01ba6aff",
+      "catalog_sha256": "223f757129cc38623ef8c465638895e1a11b449e5034980b8be39979c7195c7c",
+      "dirty_budget": "150",
+      "body_requests": [
+        "https://www.sec.gov/files/company_tickers.json",
+        "https://data.sec.gov/submissions/CIK0000320193.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "https://data.sec.gov/submissions/CIK0000789019.json",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json"
+      ],
+      "batch": {
+        "status": "partial",
+        "data": {
+          "last_attempt": {
+            "batch_id": "3cc66652212c41b1bfb340d154d657e0",
+            "status": "partial",
+            "started_at": "2026-09-13T15:59:39.949376Z",
+            "finished_at": "2026-09-13T15:59:40.389454Z",
+            "acquired_at": "2026-09-13T15:59:40.330157Z",
+            "universe_tickers": [
+              "MISSING",
+              "ONE",
+              "TWO"
+            ],
+            "universe_status": "available",
+            "rotation": [
+              {
+                "cik": "0000320193",
+                "tickers": [
+                  "ONE"
+                ]
+              },
+              {
+                "cik": "0000789019",
+                "tickers": [
+                  "TWO"
+                ]
+              }
+            ],
+            "scope": "recent",
+            "forms": [
+              "10-K",
+              "10-Q",
+              "20-F",
+              "40-F"
+            ],
+            "attempted_ciks": [
+              "0000320193",
+              "0000789019"
+            ],
+            "confirmed_ciks": [
+              "0000320193"
+            ],
+            "failed_ciks": [
+              "0000789019"
+            ],
+            "deferred_ciks": [],
+            "unresolved": [
+              {
+                "ticker": "MISSING",
+                "candidates": [],
+                "code": "issuer_not_found"
+              }
+            ],
+            "outcomes": [
+              {
+                "cik": "0000320193",
+                "receipt_id": 25,
+                "status": "ok",
+                "completed_sources": 2,
+                "filing_count": 26,
+                "fact_count": 45
+              },
+              {
+                "cik": "0000789019",
+                "receipt_id": 28,
+                "status": "partial",
+                "completed_sources": 1,
+                "filing_count": 26,
+                "fact_count": 0
+              }
+            ],
+            "request_count": 5,
+            "filing_count": 52,
+            "fact_count": 45,
+            "gaps": [
+              {
+                "cik": "0000789019",
+                "source": "companyfacts",
+                "code": "sec_rate_limited"
+              }
+            ],
+            "stop_reason": null,
+            "elapsed_seconds": 0.4401065744459629,
+            "issuer_map_observation_id": 8
+          },
+          "last_acquisition_at": "2026-09-13T15:59:40.330157Z",
+          "last_completed_batch": null
+        },
+        "gaps": [
+          {
+            "cik": "0000789019",
+            "source": "companyfacts",
+            "code": "sec_rate_limited"
+          }
+        ],
+        "observed_at": "2026-09-13T15:59:40.389454Z",
+        "coverage": {
+          "scope": "recent",
+          "forms": [
+            "10-K",
+            "10-Q",
+            "20-F",
+            "40-F"
+          ],
+          "history_requested": false
+        },
+        "next_cursor": null
+      }
+    }
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "external_requests": [],
+  "unrelated_generated_endpoints": [
+    "/config/model-catalog",
+    "/macro/snapshot",
+    "/macro/status",
+    "/market-data/price-repair/operations",
+    "/market-data/status",
+    "/market-data/trading-days",
+    "/news/status",
+    "/providers/config",
+    "/providers/health",
+    "/sa/extension-health",
+    "/security-lifecycle/automation",
+    "/security-lifecycle/cases"
+  ],
+  "verification_scope": "Actual Settings SEC panel and shared scheduler only; unrelated sections use generated empty/disabled fixture responses, not product health evidence.",
+  "servers_stopped": true
+}

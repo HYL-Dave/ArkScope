@@ -1,0 +1,625 @@
+{
+  "changed_operation_definitions_since_acceptance": [
+    "_verify_database"
+  ],
+  "delegated_fix": {
+    "commit": "911d69a28a2a633c82335ef378d0784875757000",
+    "covering": {
+      "errors": 0,
+      "failures": 0,
+      "passed": 1349,
+      "skipped": 0,
+      "tests": 1349
+    },
+    "current_inverses": [
+      {
+        "boundary": "child-client-close-join",
+        "red": "task8-final-fix-inverse-close-04",
+        "restored": "task8-final-fix-restored-04",
+        "source_sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83"
+      },
+      {
+        "boundary": "child-sec-completion-fence",
+        "red": "task8-final-fix-inverse-citation-fence-02",
+        "restored": "task8-final-fix-restored-04",
+        "source_sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83"
+      },
+      {
+        "boundary": "delegated-sdk-call-join",
+        "red": "task8-final-fix-inverse-sdk-join-02",
+        "restored": "task8-final-fix-restored-04",
+        "source_sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83"
+      }
+    ],
+    "receipt_count": 36,
+    "verified_files": {
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py": "4c74153e1ef86c35f7bbc923586de624c0ffe3f577c2853e6e4c0a78426c95ff",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py": "2c1cc48b15f817b02cc70a99cad757a0962e875e37381fa122fca8b89796247f",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/green-01-test.py": "83186c6d9aae0c0df54fd94444b17ef94f4dd879433631361913822afcf651e0",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test-02.py": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test-03.py": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test-04.py": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test.py": "5de3a8f780c2d1201b0a86146976bc1603b7f5f880c2d1aa2c21f3e64d2eb5d1",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-trace-test-03.py": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-trace-test-04.py": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/red-02-test.py": "50a84ad2977b177ea04c4043d0f485b5f57c670555e65ad5b388eac3d37922cf",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-02.py": "9f15cba1fb7e6d3384a40b0317e91774e1f70f5fc3a04a83f8f2a7b6f2270a82",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-03.py": "ec682a7aecc3ed6a26ae47fb1e0bf7764ff4c2a3a26fb2e44ec4bddc1c9db64e",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-04.py": "ce93761306336ba1b52767e7d2b215c0c08c8442f9851cf1ea183bc58fa06bb7",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-citation-fence-03.py": "e51f6263f1673771489d92b776418ffd57ca1729e5dfc37919f4e728b707d315",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-citation-fence-04.py": "e591260a53c7ea02d15b8bfd03cf943e6caf704e762ca5ad53bb0a166f7b894a",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-sdk-join-03.py": "f2cba270c1769863949b03761d60a44b68f2664654fd437c5b370081f7763615",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-sdk-join-04.py": "09cd276413f545a8abeea6eac021af6fa88f4136c3ba3fde0b6a47dca4576ea9",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant.py": "8f7a643e4f1c724dc9fe553302668b4c39158e1791805fbb15aa5b8301a376b3",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-02.py": "a5d5df3110830702a943b1eefafaecf8b2ec2eb4e9b4f21c5c0681850adc507f",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-03.py": "b577b14176043ad0a79be05e083fe74b40566ce0d0dd2e2ba7b5cd21cfe9622b",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-04.py": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original.py": "934635ff1c608fe5c87c8355fbe463f5bc7771bb9f8496adf0c9449ebe21ac51",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-01/command.json": "fca3414648ce1414cc1de30b960156afe4662ef8c64a1544201301d1e2ed6e12",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-01/output.log": "8647cfc76f6406a3479ff2d0660e21c8ca63b6cb96d88d8236a67d33baa52327",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-01/results.xml": "f0cf0f04320944dc87b616a72fc0a9f897a1ac812a9f48d52ae8c226d4e7f72f",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-02/command.json": "27a6f31061f88283e51fbf7f8b398ddeecb605e6410e129dfebcd9f040def3d2",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-02/output.log": "5681ed63f84939a50576dffffab1ac0d0e7d241a558b01b94c64049b2011d743",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-02/results.xml": "23d6b79a8fc59ad2f1b0097cc54db56843d3c49ff9c01a20aa71ddbfc3697198",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/command.json": "2fb407d0590c85a61f8917f6b97937462cf84a14a90a64c6da67ca5ee60490ef",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/output.log": "80f637cdd06c2d6f798e4c8760097975d720b92e2bd6896ac1eedc38ac066281",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/results.xml": "d0f7cf9ad96fc69017eb67f6d194478d794c657314d0d4fbf69f96ea72a8b799",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-01/command.json": "9b1d2fbce6bc0cc91261d779f78c9f018d6dd93c5f4139bed1cf6ea5af5f875a",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-01/output.log": "7e63c01580dc111cd0373ce42bf2bbae5157acdc34f8fd5d44a16f4683403393",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-01/results.xml": "0d28778b672b15f71e5d6ce414477c3877eb0296da550f61a2edb27e0787fcf7",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-02/command.json": "6ad4dc107c59b43296fd250033369afe6f57ec42916f7a05b40a0b85bc0d1c63",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-02/output.log": "7d75f7f49418018d36f1913b73d7019ebe7f792c0dbcbc7681975fc95401b8a1",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-02/results.xml": "c54389ed444ac336572ec62b037a70241b033931dc8dbb31f8d39ea410300914",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-01/command.json": "8a50fb03d4c442b2346e6afd0f732efd479dff0a6bd15097300bb8d1a3418f54",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-01/output.log": "18f4697b09b0419034705583d98771d72871a5222dae23a7c5d534169c2d5b0c",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-01/results.xml": "37e30a9960d354b362839c8681edc61412ff8679ee244f9244ede2b5abc2e298",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-02/command.json": "aed05b22a329411d1fb886c99206fe33509d991f99e2fa0194692c9ef0e74164",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-02/output.log": "259b3580bd0e4a4719bb53d4fe17d175cdb767aa785881cbaa9799d2a44d16b7",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-02/results.xml": "86efd401e70556234892435310cc177c9fdad4e482b3d1264c8eb119cd0c8006",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-01/command.json": "75cd779fa025b4997ed23592b3d62d1ff224e05bcdeffff9a2ee5fda584f1e53",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-01/output.log": "bffdf98ce06c11c0489a13ec15738b9ed7532ad99ccfe099af182879920b7512",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-01/results.xml": "5f84b0e97118b8f10e5f9f9d7c8bb2bed7b77320426f91ee88c1ba38749d931b",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-02/command.json": "e4375fd1c0e8f747c64b994dc510f475ccb5b6238826da5133150e8c69d1645c",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-02/output.log": "21d3813d4ab1281cc1d398ff0a33d3b993512c61bccb317d0d7ddaaba837120d",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-02/results.xml": "c7a6a482be7094a18e37e9e958bd6bd3f3c00db7c076dc96bcce591ec22426bb",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-cleanup-01/command.json": "4e5390d86c256d28c6032366b826e350a41693cf6139bbbd7cf43bc716b73403",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-cleanup-01/output.log": "9f8a981a78627330c6f6318292423d84ec13efa5d03f82ae1ba149b21fd571e8",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-cleanup-01/results.xml": "997b12f3081004617a3a7826af7e8e9329019550ac7489a02abca2f57fde84ca",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-final-01/command.json": "4c2398bbb874349c61503c16be91625b1b9e124632939e698cb3f926cc533a7e",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-final-01/output.log": "f7d92fd202b1ee53c5d43e0a80c10f98423182acb74bf82c78030766754dbea5",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-final-01/results.xml": "708d7cfde080c25d6cb02dd54932022d24cb15b2e7319c2acc589f20257a54e6",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-private-owners-01/command.json": "4a0c986e403f1cdca9c955731ca69d529385be4c335dff7b9f1e2fb0bf9f63df",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-private-owners-01/output.log": "aa6c54bde44028fac50b277c121cfb56dbcbb080ddcfec0070ca089c2269d772",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-private-owners-01/results.xml": "ceb1d3089b3689f013b27aafef891ecd6a81b31b6061f3240ad023c5f5923ca9",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-01/command.json": "6381cd05b14512514fd261ec1369e66681ca46b81477a8035c022b18d2f29f4e",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-01/output.log": "cb458d8a32647c737f93d30230aa6e9350e554bc8bfac53d1a53df7b8f892a42",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-01/results.xml": "12007260fd4c2565c961da5a312bbf1e2e4d04620c28676cf61b3f23484f4b9d",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-02/command.json": "e0acbad09faba42734b7010f2a773602f12db29e72d50731cc5e90b23c59a41a",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-02/output.log": "9909a5def64f9ff980f51a3a5bf1f4e4c1139b4b7c49c873f502f558bea59b1a",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-02/results.xml": "b132f02873df4155c2b1f1c3304abd983cc67843a574ded682d72eee7dcdefcd",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-01/command.json": "808ebc67faa1c45a48d7422a333d4e524b3cdfba65a1cd0909e31e4c80a5deba",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-01/output.log": "62344fa6448169d664d0426cf3cae03b42c0934bb1d22f5cda76512143da5f66",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-01/results.xml": "85c01cf5d1e67248c928eb81b6727d49f3dd3ff6e3788ccae8517b8b8dcc37c9",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-02/command.json": "404db0ce0d5a98162f85eb11db76923a0d22db1a3fbfa0860e6ebbc12f6fc315",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-02/output.log": "7fec19713b7915cbbbeac12ec9b946c6eadffc07a3c051ecd3234ac79d91e0f1",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-02/results.xml": "f08544a3e7786259fd1f31cc1fdc7cfb31125d384d38ae9408d6885c9a6fa6d9",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-03/command.json": "b6ecad5756ac809fd4f1ace52993bdf87120353acac4741005c0b148b722e86f",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-03/output.log": "20dd2a3243b9c1b7b42c89b16795cb45800a1b65dc2d9b4b68c7f181b11e7a44",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-03/results.xml": "79f8a98337152b30766c423e0facfbc34a26b935bb847fb98e747a1545f23107",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-04/command.json": "e1456cea07cc74a9fc2a26db3e03a9a99279fa65942e4dbbb6ad596154297b97",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-04/output.log": "6602625e408c1fc06ad15a60a697f5ec2bb50a59c37348e45d69bd6dbc343eb6",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-04/results.xml": "9e569da97a2b4131aebccfdf25415fb29bece64d495ce9358f60744a51c7fc71",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-01/command.json": "b29544bcf1b810015d7f6e5bd9375befb09d450916f25a7c49a086788356f620",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-01/output.log": "e22051f276e915ab190f90b8480e4b601ca91f80848fb6cfc3c27f4a0a134183",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-01/results.xml": "0b35413e3f03acb0088aebd6e126967c4f8a296a55255b5ec444a9ffc8edc889",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-02/command.json": "270ae1c7819b77cc17c091ebb5bf8524ca269fde55e5ddc75cf6dc3e26a80a3a",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-02/output.log": "3ad1ceca943f9691a9579e84a0bc50d3d797a4de08bb24456a51c289c3a92022",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-02/results.xml": "cbbd4a8da78ba833975bac02f53f4020e453845a3e8fa3e029e7b2ecc001e1db",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-01/command.json": "7850c5209a386ad1ccc6464fec6776720a5cf575af25cbe378ff228b8f107cf7",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-01/output.log": "91e33d0c1366d5c69b235d53d78ea8357c6d89d51f42f1e279ea8f533fb8bdbf",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-01/results.xml": "d19fb4db3ee38b0ea0c4d879b1102cddbaa989831ba83af540dc6e2817882f6e",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-02/command.json": "141a39225ef95409661e9e09a551d11c641c94b8206deceb350fdfa10bab33b2",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-02/output.log": "ec46a5835fee948feb84e199906a791186ea1ae7d7b0dce883cdab0320111ffc",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-02/results.xml": "9821e5c4d6a4e7bbadd49875ac55b4affa24692930b7fd8c12e93228b14ba101",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-03/command.json": "765b20a378bf25bed5dc1a37e7731577c9c1d85cc23088b99a47934f2601a028",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-03/output.log": "c9e2ef86c731f54b8bebc6e5410a94d696b4aee0d50c92dfa769a2534c4f3dcc",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-03/results.xml": "1ae65d845ea8a11b3308d821fcdd13a3f0b380e236cd89d8c41bfc94420b5be5",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-04/command.json": "6bf00cd0bf9ca58c1e75956815d755838fdcfb6f2f60e5ce1de521bcbb1a5c41",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-04/output.log": "baad84e3e2acf01f97dbd73e427fbc7f0e7fa293bb5ac79c43eec5059b5f081d",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-04/results.xml": "d63a814984d9cbcd3bfae8293f66f3253ca0d5fa4dc9e3454a9c84654d91100e",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-01/command.json": "7b1cdaf5e147682902a556f5b093e8c88d79ce9db393b4f526a436d31ff3ca61",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-01/output.log": "40c5383d597006056157341cad9d3bd3ad4df943726d662de16809dffee80a65",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-01/results.xml": "687905d67903f20694e4c057ef358f1858d259f2243054e76cfdeb474306b0f6",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-02/command.json": "c233ca167f5f4e746e9ddcf8c4e052e4c7cdf5885af49f52ff3e5c32cfdfc3ca",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-02/output.log": "27b3e4e0dcebe5ab7c61d40ffc3d9c5e0716a3204c74cfd699e2286ef8c26a2e",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-02/results.xml": "1ec9251eb56c0ade897ffee9816475a170325b4ccc9b9c70fff1f5fad365f749",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-01/command.json": "17de19b8ff755657bff0521305ae4f4e8676b0d5083b688875404e0addab3804",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-01/output.log": "1f1411f24eb443c614d69e1d8b18e41dc9c52ee827f9e8b11064c665483a9413",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-01/results.xml": "20017626d61ca8e60096081037428d22386fa6338aa3799a80a7732b27804012",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-02/command.json": "0a7a633ccecf24fb1a22d9fecf0fdfacb5882522b6ddb92d83f1613625acb5ac",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-02/output.log": "856a8f9cc53b3a44369aeb6fa680393d26b1ce78b7a3d5fe183195803899c149",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-02/results.xml": "bf338bbb33749f664e0962fa1f528ccf04473caa914de8a5d0793d4f23b4c7c9",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-03/command.json": "dc418210a9188d9a695690f9837add60eaff956407ff9b2dbb8e434ef6d1c580",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-03/output.log": "7f4efc1340386d74c6fc480b84bf7725fe80bed0937396bad50728aa6f1ddca2",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-03/results.xml": "2dd445bf3090ef9bb5493bbe8ffe8a990caaa154c9c247e1a7809fff86534b77",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-01/command.json": "c689fc15d14b5cd37991724638ccd7f101cf510be6dcf3ad046ace90c8e9a072",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-01/output.log": "e1c53021ec8a26f23df5819dd87ed167fedf53bc32682887cbcc2a08b4e22ca3",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-01/results.xml": "e6df4721d7e895cb36a077847d715799c2466da7d8c08dfbcc50a75a01e1cf73",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-02/command.json": "28aa333ca31769a83d29c4a1988726b95d1a0ae0ab367799991e6ec973b09e13",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-02/output.log": "2026fa1451a5c803e0aaab68e5ac88f2caaa7bbd8ab6f5be4ad6274d80050535",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-02/results.xml": "d8f46917253f345f8443bb382c330e5bcc901a08355a841042c2296274c81132",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-private-owners-01/command.json": "8b5d98bbefba219d005f1e5e72bc32cf51126e074e3f6fd0f0934890d4a7d74b",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-private-owners-01/output.log": "8b17ea830c7e22ffbafbe4a907edda1708eae035c5de7db1939ae871b613ecf6",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-private-owners-01/results.xml": "d8933b0d19bc86cec0213a1f508172ed77af0da508bc98acc93464b511312a06",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-01/command.json": "82327cb766181151fae8c2fc11e7bf257671958a5982bcfd86358ec9e32ad3b2",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-01/output.log": "08c766fd4cd9c61308d7e6ca45f2ee2bf8583eddc243fd24983db5dc1d50ccaa",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-01/results.xml": "f621d2660ffef4e4dda7ebd9d0d7edfd5a7a5437810acefaf886fa2dac689fc6",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-02/command.json": "1269fb18609df7bce1bbbbcbf9e960680835a26a816db656ca8d04cd79a6b656",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-02/output.log": "7397cee5462c9a0abe473a153decf83859252c40c9de14fbb22ef0b380f65479",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-02/results.xml": "60cd533fc8ce33a95b478bc3fb48cc0958336e05c9f2617e533142066c556932",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/command.json": "3c7d58c2ff7d07b83c040a4f7404bd635fd030069d337ca400f1f4bf2b8ad9cc",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/output.log": "da14345eb53666d28359131ea42c74a09e68d77af4dc4201b21ce7826832b128",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/results.xml": "ebed1c6eaadb9b897f5f37aacfa3c069c771273129ce9f2d7bccf6fbd1a0df8e",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/command.json": "bde02c288b65a0d12d09398716d4452a4013569deb91722b9d328854c60b9681",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/output.log": "e26bf705cd20010a0390dcc276e78c4e9ce0e8166a06de52f68715cfe5fa5ae3",
+      ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/results.xml": "69a6c4cbfd41fb7227d75817a74ac5a404b3377438bdaafeab18b9b19d2c1dc9",
+      "src/agents/anthropic_agent/agent.py": "4c9ec8381ea264f56a074684c89f4872a6329d67448cfcef0024ddae653ba6ab",
+      "src/agents/anthropic_agent/tools.py": "5c4d864b98fefb0a324d42f1e9b662b39b12c507e8ba0c94470b271f46e5722f",
+      "src/agents/openai_agent/agent.py": "f23e4fb4464b38ab2f65d5bb1618a99df1a82d163802cf14b2390ce62a3c5bcb",
+      "src/agents/openai_agent/tools.py": "1fe60144cd3d7f1f98f036d8bf98f80719d645695c422ab835769c9cab11d166",
+      "src/agents/shared/subagent.py": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+      "tests/test_fable_5_1_runtime.py": "76403a8ced25f9125b76f02cf9bdb083658a3f9b77541d04a54c35572c75a6f8",
+      "tests/test_sec_research_delegated_dispatch.py": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+      "tests/test_sec_research_delegated_trace.py": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+      "tests/test_sec_research_release_workflow.py": "afae02c74e70a66e63212000f0808476ebc4e1a0a6ad020d107deb6def906c50",
+      "tests/test_subagent.py": "663343ccffcb5c31194b739117842a351ca70d6f8e99a8e602d1447ea9cd0639"
+    }
+  },
+  "existing_maintenance_definitions_preserved": 39,
+  "limit": "Readback of retained proofs, not a fresh inverse run or actual-store validation. Earlier Task5/6 receipt stages remain historical checkpoints.",
+  "operation_change_owner": "Task7 adds schedule batch validation/counts; terminal-coverage inverse and export/status/admin negative owners verify that new boundary. Earlier inventory/hash/path mechanisms are unchanged, not newly mutated here.",
+  "passed": true,
+  "publication_current_source_test_runner_match": true,
+  "publication_receipt_sha256": "b51f7fe07fdcba8e26b67c7fe5459b565349a257b0dcdddc5ebb380e0dc7eec2",
+  "schedule_proofs": [
+    {
+      "files": [
+        {
+          "file": "src/service/data_scheduler.py",
+          "sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa"
+        }
+      ],
+      "proof": "enable-by-default",
+      "record": "task7-final-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "8f7f739962d8c146fa364901965dafd3fb2603e640a7d1e07556c7fc53a5c562",
+          "exit": 1,
+          "junit": {
+            "failures": 2,
+            "nodes": 2
+          },
+          "log_sha256": "82b0a39c08bb3125a2814227d67a26d73c2ceb68c5220e3e6540556fb925a6f5",
+          "phase": "red",
+          "run": "task7-63-final-enable-by-default-inverse"
+        },
+        {
+          "command_sha256": "1f28fbc7c735a6e7aa90e5eaa5484620f315f67103fd345c1fe44af946b3faad",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 2
+          },
+          "log_sha256": "5cd0ebd5aae9a2e4ee5b3092049407f7a2d158af03b9c0cdb79c52c683e7e949",
+          "phase": "green",
+          "run": "task7-64-final-enable-by-default-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/service/data_scheduler.py",
+          "sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa"
+        }
+      ],
+      "proof": "drop-partial",
+      "record": "task7-final-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "e5abfbc5bfcaa5b5187bf078f5e523ac213da703cd6be96b52a83a42c59c6401",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 3
+          },
+          "log_sha256": "c2e0966e7103a4b6f9887765c87baace94d88edb24bc7948dd1cf45ca9bc3de6",
+          "phase": "red",
+          "run": "task7-67-final-drop-partial-inverse"
+        },
+        {
+          "command_sha256": "c36537cee1ec0410e88d8339215407621dbf9e216cda9f6cc1637ff1a0946a2e",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 3
+          },
+          "log_sha256": "535b4ef4635ca2f89d4d5e54024709d31c8a425bbf558e5cdf485c7e6736c7b1",
+          "phase": "green",
+          "run": "task7-68-final-drop-partial-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+          "sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde"
+        }
+      ],
+      "proof": "reset-pins",
+      "record": "task7-final-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "76f6525268b6a7e08ae56f27bf356e8e68a699ebf34338851340d2847cdd420c",
+          "exit": 1,
+          "junit": null,
+          "log_sha256": "faf1e9716c6cb9be63f1cf698f72e2a559235a7f5be3e66d76732cef99de0691",
+          "phase": "red",
+          "run": "task7-73-final-reset-pins-inverse"
+        },
+        {
+          "command_sha256": "62c00a20eecb96facbb76c9dc4e14e48298a7953f21290a9e08d2ac72d1de352",
+          "exit": 0,
+          "junit": null,
+          "log_sha256": "d8c8d638f32bec7d37a00f69233a5410a3eac38901198ab8260684580f3bffac",
+          "phase": "green",
+          "run": "task7-74-final-reset-pins-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+          "sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde"
+        }
+      ],
+      "proof": "reset-draft",
+      "record": "task7-final-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "2f70295ede38b3c338fb5467470d076fb121a9e7f5f5e50b0d36e870e49f7c6b",
+          "exit": 1,
+          "junit": null,
+          "log_sha256": "37b8f2dd18b1321249e45e0058b613a53a2817eb7552ddec71328e998fcf9e6b",
+          "phase": "red",
+          "run": "task7-75-final-reset-draft-inverse"
+        },
+        {
+          "command_sha256": "6053585ac6b840eea5c637db76c1b104360fbdb5edfa8edd0081489469ec1a73",
+          "exit": 0,
+          "junit": null,
+          "log_sha256": "4c826739da284b7074473c99caf518f49497dcfe2ec05976c7cc1c2cf376120c",
+          "phase": "green",
+          "run": "task7-76-final-reset-draft-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "mixed-stop",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "499630c80455405b0833d233eb1b5bf43a95532d5957a7fa33516a2076d4bece",
+          "exit": 1,
+          "junit": {
+            "failures": 4,
+            "nodes": 5
+          },
+          "log_sha256": "d9166e32a65a13cc7bc612db4ff22d9dfb98846fd775766dc945edbbacb28d1e",
+          "phase": "red",
+          "run": "task7-fix1-09-mixed-stop-inverse"
+        },
+        {
+          "command_sha256": "94b70fa880a8aa9b61b48ac0dabe4b1246296f994c040a964d6f54238a3ca4d6",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 5
+          },
+          "log_sha256": "8ae11d1b4fb1141005fbf5beb0f8e184d41484ab64933c9efc82ae8884f7f18b",
+          "phase": "green",
+          "run": "task7-fix1-10-mixed-stop-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "map-dispatch",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "583b7b9ef6b2b0b846d6508c4d263aee3b70a41864b39d537d0e3490b2c8f866",
+          "exit": 1,
+          "junit": {
+            "failures": 12,
+            "nodes": 12
+          },
+          "log_sha256": "65200ebfb136038da20596f0dea24ed3e91862c6e098f9d96a145a6defbd0360",
+          "phase": "red",
+          "run": "task7-fix1-11-map-dispatch-inverse"
+        },
+        {
+          "command_sha256": "78db40d5b72b4bbff252614a0fe492ae5e735b282189218330852019c261f336",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 12
+          },
+          "log_sha256": "7cea345cad37bc7e1b661c551c58cf2f1a185530a90d704b65332548db8e17b0",
+          "phase": "green",
+          "run": "task7-fix1-12-map-dispatch-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/issuer_store.py",
+          "sha256": "75e5864b8955b1178a72c0333d5832faf6e62af1df7c3ce9a34afb37e1610e12"
+        }
+      ],
+      "proof": "map-resolver",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "6dda09c7643e77c9a0ddf30a93fc28fae92aa1089d40c67237c006709c88b779",
+          "exit": 1,
+          "junit": {
+            "failures": 12,
+            "nodes": 12
+          },
+          "log_sha256": "e2ebf09fccee75ba3c2dbd680bf48e1c21e3909b9b465626f3ea8bf3640c3c80",
+          "phase": "red",
+          "run": "task7-fix1-13-map-resolver-inverse"
+        },
+        {
+          "command_sha256": "2af55cd37e4af491a0ced9cb892889230903f302e68dcac6575868560584532d",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 12
+          },
+          "log_sha256": "48872c7950ea014d5f4502c264a10338fba22282863575bcaf43e95f73c299d8",
+          "phase": "green",
+          "run": "task7-fix1-14-map-resolver-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/schedule_store.py",
+          "sha256": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed"
+        }
+      ],
+      "proof": "terminal-coverage",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "0f9e12523afb231d4ddbd860d05e55453d6dcf66a932776448c8aeb38668ea00",
+          "exit": 1,
+          "junit": {
+            "failures": 27,
+            "nodes": 29
+          },
+          "log_sha256": "109c36d6f496d5b604a12a300a1fe47e06939654dc22fbbb098d433fc3aa3323",
+          "phase": "red",
+          "run": "task7-fix1-15-terminal-coverage-inverse"
+        },
+        {
+          "command_sha256": "c9c95353e93930bf4705b4775a4b482748838be399bf81850ddbbd3b8b10a6e6",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 29
+          },
+          "log_sha256": "f0f26013d227c577e8d931418e8b0a1593efcb67c4e66814d22f89447e10b2e4",
+          "phase": "green",
+          "run": "task7-fix1-16-terminal-coverage-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "aborted-membership",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "7a0ff0d73834a910e7adae3fd2ed3a80485940d3a358049138f2f72a5ca71c89",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 1
+          },
+          "log_sha256": "8bae041e0be8756f1ce2933a2dc17fa236c2328bddd6c6e99b1a2470b5517cea",
+          "phase": "red",
+          "run": "task7-fix1-17-aborted-membership-inverse"
+        },
+        {
+          "command_sha256": "292897658625fd4bc724f598c1acf2ed58e16fced859f5509ea0b460c01302ab",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 1
+          },
+          "log_sha256": "ed381dbd281a4c0f7eafc1dc3958c178acdcdeb96fc59a36eac25ad21096a8d9",
+          "phase": "green",
+          "run": "task7-fix1-18-aborted-membership-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        },
+        {
+          "file": "src/sec_research/service.py",
+          "sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9"
+        }
+      ],
+      "proof": "refresh-traverse-actual-historical-pointer",
+      "record": "task7-fix1-refreshed-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "416f9b36123713c7288babc9122d11238c82035445975db0dcbf052cad021540",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 1
+          },
+          "log_sha256": "e0aa5b6855a21d2fc92dfb08adb8a71591ff52618e611c16ef83d8770b56e7c9",
+          "phase": "red",
+          "run": "task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse"
+        },
+        {
+          "command_sha256": "d72eba19f55e17b1bd0bdf3099e6289f6c36d0a84827ed3cc47ba590225206e8",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 1
+          },
+          "log_sha256": "9c52f6914c8132f616a176f04816e8b3f22bcb6bf475a29b4dda2c0ce42276c0",
+          "phase": "green",
+          "run": "task7-fix1-20-refresh-traverse-actual-historical-pointer-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/schedule_store.py",
+          "sha256": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed"
+        }
+      ],
+      "proof": "refresh-erase-success",
+      "record": "task7-fix1-refreshed-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "d4294dd3abb89e977854216a880669b1030e2b4aab4146b9b043a83b6a81eedd",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 1
+          },
+          "log_sha256": "84d75e444b53b9c77a2c23906d99876557888e2232874991d917953a218d305f",
+          "phase": "red",
+          "run": "task7-fix1-21-refresh-erase-success-inverse"
+        },
+        {
+          "command_sha256": "bad25f2a2eff070dcaa404855eac5499c849c99ec0931c6366b410a03dfe7f63",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 1
+          },
+          "log_sha256": "7d4c0d5acc41537d9db1aeb53116ed5ff2109903fab2b5a534b07e7d8cf0963d",
+          "phase": "green",
+          "run": "task7-fix1-22-refresh-erase-success-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "refresh-reuse-membership",
+      "record": "task7-fix1-refreshed-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "2e094b481dc0c2a79345db632a02e8060eef53e3857b01883bfe747580bdbec0",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 1
+          },
+          "log_sha256": "35e3618314b41a6a80b9993f342b8265449d063bcb879ca51dadf697c0532efc",
+          "phase": "red",
+          "run": "task7-fix1-23-refresh-reuse-membership-inverse"
+        },
+        {
+          "command_sha256": "9ebf5cd04353943da09d831b42b6021149d191df113b1291cd85413bd4e8162b",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 1
+          },
+          "log_sha256": "eaeaab50ad3a34a4357d6f412f3dc874a8b8acb4d09185b601903a2cbe6df3bd",
+          "phase": "green",
+          "run": "task7-fix1-24-refresh-reuse-membership-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "refresh-reject-observed-space-symbol",
+      "record": "task7-fix1-refreshed-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "27b8238c792efe6ebf1ca1dbe02233d6ec20f49c9a0db90168c16f42b6b7375c",
+          "exit": 1,
+          "junit": {
+            "failures": 3,
+            "nodes": 4
+          },
+          "log_sha256": "dcfc67210d03a63ad4a627a03381299f8781d8ef0da984edbb6da4324510bedb",
+          "phase": "red",
+          "run": "task7-fix1-25-refresh-reject-observed-space-symbol-inverse"
+        },
+        {
+          "command_sha256": "a058516f0060553f67c19ce23601eb693afa8af3d95a6769140c29385aabd817",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 4
+          },
+          "log_sha256": "54049bc15f4c618537cbd31a14fee45eb525f124cf2439b3840954306153eacf",
+          "phase": "green",
+          "run": "task7-fix1-26-refresh-reject-observed-space-symbol-restored"
+        }
+      ]
+    }
+  ],
+  "unchanged_maintenance_sources_since_acceptance": {
+    "src/sec_research/maintenance.py": "0d64f3d0c8b3bc50df5c5d7cc96a8e826e2e710078c518459e5d5350b96c0a90",
+    "src/sec_research/references.py": "3973bd2d7e594f034d7f284efdb7ef52ce801e531d25190981ac87af2072908f",
+    "src/sec_research/schema_admin.py": "963276ac7f1a086451e056c349beda08e93151f5f2ffe2ee095018ae301c305b"
+  }
+}

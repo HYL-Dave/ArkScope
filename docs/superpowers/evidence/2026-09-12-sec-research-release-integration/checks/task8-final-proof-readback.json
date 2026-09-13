@@ -1,0 +1,452 @@
+{
+  "changed_operation_definitions_since_acceptance": [
+    "_verify_database"
+  ],
+  "existing_maintenance_definitions_preserved": 39,
+  "limit": "Readback of retained proofs, not a fresh inverse run or actual-store validation. Earlier Task5/6 receipt stages remain historical checkpoints.",
+  "operation_change_owner": "Task7 adds schedule batch validation/counts; terminal-coverage inverse and export/status/admin negative owners verify that new boundary. Earlier inventory/hash/path mechanisms are unchanged, not newly mutated here.",
+  "passed": true,
+  "publication_current_source_test_runner_match": true,
+  "publication_receipt_sha256": "b51f7fe07fdcba8e26b67c7fe5459b565349a257b0dcdddc5ebb380e0dc7eec2",
+  "schedule_proofs": [
+    {
+      "files": [
+        {
+          "file": "src/service/data_scheduler.py",
+          "sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa"
+        }
+      ],
+      "proof": "enable-by-default",
+      "record": "task7-final-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "8f7f739962d8c146fa364901965dafd3fb2603e640a7d1e07556c7fc53a5c562",
+          "exit": 1,
+          "junit": {
+            "failures": 2,
+            "nodes": 2
+          },
+          "log_sha256": "82b0a39c08bb3125a2814227d67a26d73c2ceb68c5220e3e6540556fb925a6f5",
+          "phase": "red",
+          "run": "task7-63-final-enable-by-default-inverse"
+        },
+        {
+          "command_sha256": "1f28fbc7c735a6e7aa90e5eaa5484620f315f67103fd345c1fe44af946b3faad",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 2
+          },
+          "log_sha256": "5cd0ebd5aae9a2e4ee5b3092049407f7a2d158af03b9c0cdb79c52c683e7e949",
+          "phase": "green",
+          "run": "task7-64-final-enable-by-default-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/service/data_scheduler.py",
+          "sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa"
+        }
+      ],
+      "proof": "drop-partial",
+      "record": "task7-final-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "e5abfbc5bfcaa5b5187bf078f5e523ac213da703cd6be96b52a83a42c59c6401",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 3
+          },
+          "log_sha256": "c2e0966e7103a4b6f9887765c87baace94d88edb24bc7948dd1cf45ca9bc3de6",
+          "phase": "red",
+          "run": "task7-67-final-drop-partial-inverse"
+        },
+        {
+          "command_sha256": "c36537cee1ec0410e88d8339215407621dbf9e216cda9f6cc1637ff1a0946a2e",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 3
+          },
+          "log_sha256": "535b4ef4635ca2f89d4d5e54024709d31c8a425bbf558e5cdf485c7e6736c7b1",
+          "phase": "green",
+          "run": "task7-68-final-drop-partial-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+          "sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde"
+        }
+      ],
+      "proof": "reset-pins",
+      "record": "task7-final-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "76f6525268b6a7e08ae56f27bf356e8e68a699ebf34338851340d2847cdd420c",
+          "exit": 1,
+          "junit": null,
+          "log_sha256": "faf1e9716c6cb9be63f1cf698f72e2a559235a7f5be3e66d76732cef99de0691",
+          "phase": "red",
+          "run": "task7-73-final-reset-pins-inverse"
+        },
+        {
+          "command_sha256": "62c00a20eecb96facbb76c9dc4e14e48298a7953f21290a9e08d2ac72d1de352",
+          "exit": 0,
+          "junit": null,
+          "log_sha256": "d8c8d638f32bec7d37a00f69233a5410a3eac38901198ab8260684580f3bffac",
+          "phase": "green",
+          "run": "task7-74-final-reset-pins-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+          "sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde"
+        }
+      ],
+      "proof": "reset-draft",
+      "record": "task7-final-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "2f70295ede38b3c338fb5467470d076fb121a9e7f5f5e50b0d36e870e49f7c6b",
+          "exit": 1,
+          "junit": null,
+          "log_sha256": "37b8f2dd18b1321249e45e0058b613a53a2817eb7552ddec71328e998fcf9e6b",
+          "phase": "red",
+          "run": "task7-75-final-reset-draft-inverse"
+        },
+        {
+          "command_sha256": "6053585ac6b840eea5c637db76c1b104360fbdb5edfa8edd0081489469ec1a73",
+          "exit": 0,
+          "junit": null,
+          "log_sha256": "4c826739da284b7074473c99caf518f49497dcfe2ec05976c7cc1c2cf376120c",
+          "phase": "green",
+          "run": "task7-76-final-reset-draft-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "mixed-stop",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "499630c80455405b0833d233eb1b5bf43a95532d5957a7fa33516a2076d4bece",
+          "exit": 1,
+          "junit": {
+            "failures": 4,
+            "nodes": 5
+          },
+          "log_sha256": "d9166e32a65a13cc7bc612db4ff22d9dfb98846fd775766dc945edbbacb28d1e",
+          "phase": "red",
+          "run": "task7-fix1-09-mixed-stop-inverse"
+        },
+        {
+          "command_sha256": "94b70fa880a8aa9b61b48ac0dabe4b1246296f994c040a964d6f54238a3ca4d6",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 5
+          },
+          "log_sha256": "8ae11d1b4fb1141005fbf5beb0f8e184d41484ab64933c9efc82ae8884f7f18b",
+          "phase": "green",
+          "run": "task7-fix1-10-mixed-stop-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "map-dispatch",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "583b7b9ef6b2b0b846d6508c4d263aee3b70a41864b39d537d0e3490b2c8f866",
+          "exit": 1,
+          "junit": {
+            "failures": 12,
+            "nodes": 12
+          },
+          "log_sha256": "65200ebfb136038da20596f0dea24ed3e91862c6e098f9d96a145a6defbd0360",
+          "phase": "red",
+          "run": "task7-fix1-11-map-dispatch-inverse"
+        },
+        {
+          "command_sha256": "78db40d5b72b4bbff252614a0fe492ae5e735b282189218330852019c261f336",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 12
+          },
+          "log_sha256": "7cea345cad37bc7e1b661c551c58cf2f1a185530a90d704b65332548db8e17b0",
+          "phase": "green",
+          "run": "task7-fix1-12-map-dispatch-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/issuer_store.py",
+          "sha256": "75e5864b8955b1178a72c0333d5832faf6e62af1df7c3ce9a34afb37e1610e12"
+        }
+      ],
+      "proof": "map-resolver",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "6dda09c7643e77c9a0ddf30a93fc28fae92aa1089d40c67237c006709c88b779",
+          "exit": 1,
+          "junit": {
+            "failures": 12,
+            "nodes": 12
+          },
+          "log_sha256": "e2ebf09fccee75ba3c2dbd680bf48e1c21e3909b9b465626f3ea8bf3640c3c80",
+          "phase": "red",
+          "run": "task7-fix1-13-map-resolver-inverse"
+        },
+        {
+          "command_sha256": "2af55cd37e4af491a0ced9cb892889230903f302e68dcac6575868560584532d",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 12
+          },
+          "log_sha256": "48872c7950ea014d5f4502c264a10338fba22282863575bcaf43e95f73c299d8",
+          "phase": "green",
+          "run": "task7-fix1-14-map-resolver-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/schedule_store.py",
+          "sha256": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed"
+        }
+      ],
+      "proof": "terminal-coverage",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "0f9e12523afb231d4ddbd860d05e55453d6dcf66a932776448c8aeb38668ea00",
+          "exit": 1,
+          "junit": {
+            "failures": 27,
+            "nodes": 29
+          },
+          "log_sha256": "109c36d6f496d5b604a12a300a1fe47e06939654dc22fbbb098d433fc3aa3323",
+          "phase": "red",
+          "run": "task7-fix1-15-terminal-coverage-inverse"
+        },
+        {
+          "command_sha256": "c9c95353e93930bf4705b4775a4b482748838be399bf81850ddbbd3b8b10a6e6",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 29
+          },
+          "log_sha256": "f0f26013d227c577e8d931418e8b0a1593efcb67c4e66814d22f89447e10b2e4",
+          "phase": "green",
+          "run": "task7-fix1-16-terminal-coverage-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "aborted-membership",
+      "record": "task7-fix1-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "7a0ff0d73834a910e7adae3fd2ed3a80485940d3a358049138f2f72a5ca71c89",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 1
+          },
+          "log_sha256": "8bae041e0be8756f1ce2933a2dc17fa236c2328bddd6c6e99b1a2470b5517cea",
+          "phase": "red",
+          "run": "task7-fix1-17-aborted-membership-inverse"
+        },
+        {
+          "command_sha256": "292897658625fd4bc724f598c1acf2ed58e16fced859f5509ea0b460c01302ab",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 1
+          },
+          "log_sha256": "ed381dbd281a4c0f7eafc1dc3958c178acdcdeb96fc59a36eac25ad21096a8d9",
+          "phase": "green",
+          "run": "task7-fix1-18-aborted-membership-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        },
+        {
+          "file": "src/sec_research/service.py",
+          "sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9"
+        }
+      ],
+      "proof": "refresh-traverse-actual-historical-pointer",
+      "record": "task7-fix1-refreshed-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "416f9b36123713c7288babc9122d11238c82035445975db0dcbf052cad021540",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 1
+          },
+          "log_sha256": "e0aa5b6855a21d2fc92dfb08adb8a71591ff52618e611c16ef83d8770b56e7c9",
+          "phase": "red",
+          "run": "task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse"
+        },
+        {
+          "command_sha256": "d72eba19f55e17b1bd0bdf3099e6289f6c36d0a84827ed3cc47ba590225206e8",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 1
+          },
+          "log_sha256": "9c52f6914c8132f616a176f04816e8b3f22bcb6bf475a29b4dda2c0ce42276c0",
+          "phase": "green",
+          "run": "task7-fix1-20-refresh-traverse-actual-historical-pointer-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/schedule_store.py",
+          "sha256": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed"
+        }
+      ],
+      "proof": "refresh-erase-success",
+      "record": "task7-fix1-refreshed-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "d4294dd3abb89e977854216a880669b1030e2b4aab4146b9b043a83b6a81eedd",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 1
+          },
+          "log_sha256": "84d75e444b53b9c77a2c23906d99876557888e2232874991d917953a218d305f",
+          "phase": "red",
+          "run": "task7-fix1-21-refresh-erase-success-inverse"
+        },
+        {
+          "command_sha256": "bad25f2a2eff070dcaa404855eac5499c849c99ec0931c6366b410a03dfe7f63",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 1
+          },
+          "log_sha256": "7d4c0d5acc41537d9db1aeb53116ed5ff2109903fab2b5a534b07e7d8cf0963d",
+          "phase": "green",
+          "run": "task7-fix1-22-refresh-erase-success-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "refresh-reuse-membership",
+      "record": "task7-fix1-refreshed-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "2e094b481dc0c2a79345db632a02e8060eef53e3857b01883bfe747580bdbec0",
+          "exit": 1,
+          "junit": {
+            "failures": 1,
+            "nodes": 1
+          },
+          "log_sha256": "35e3618314b41a6a80b9993f342b8265449d063bcb879ca51dadf697c0532efc",
+          "phase": "red",
+          "run": "task7-fix1-23-refresh-reuse-membership-inverse"
+        },
+        {
+          "command_sha256": "9ebf5cd04353943da09d831b42b6021149d191df113b1291cd85413bd4e8162b",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 1
+          },
+          "log_sha256": "eaeaab50ad3a34a4357d6f412f3dc874a8b8acb4d09185b601903a2cbe6df3bd",
+          "phase": "green",
+          "run": "task7-fix1-24-refresh-reuse-membership-restored"
+        }
+      ]
+    },
+    {
+      "files": [
+        {
+          "file": "src/sec_research/scheduled.py",
+          "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+        }
+      ],
+      "proof": "refresh-reject-observed-space-symbol",
+      "record": "task7-fix1-refreshed-inverses.json",
+      "runs": [
+        {
+          "command_sha256": "27b8238c792efe6ebf1ca1dbe02233d6ec20f49c9a0db90168c16f42b6b7375c",
+          "exit": 1,
+          "junit": {
+            "failures": 3,
+            "nodes": 4
+          },
+          "log_sha256": "dcfc67210d03a63ad4a627a03381299f8781d8ef0da984edbb6da4324510bedb",
+          "phase": "red",
+          "run": "task7-fix1-25-refresh-reject-observed-space-symbol-inverse"
+        },
+        {
+          "command_sha256": "a058516f0060553f67c19ce23601eb693afa8af3d95a6769140c29385aabd817",
+          "exit": 0,
+          "junit": {
+            "failures": 0,
+            "nodes": 4
+          },
+          "log_sha256": "54049bc15f4c618537cbd31a14fee45eb525f124cf2439b3840954306153eacf",
+          "phase": "green",
+          "run": "task7-fix1-26-refresh-reject-observed-space-symbol-restored"
+        }
+      ]
+    }
+  ],
+  "unchanged_maintenance_sources_since_acceptance": {
+    "src/sec_research/maintenance.py": "0d64f3d0c8b3bc50df5c5d7cc96a8e826e2e710078c518459e5d5350b96c0a90",
+    "src/sec_research/references.py": "3973bd2d7e594f034d7f284efdb7ef52ce801e531d25190981ac87af2072908f",
+    "src/sec_research/schema_admin.py": "963276ac7f1a086451e056c349beda08e93151f5f2ffe2ee095018ae301c305b"
+  }
+}

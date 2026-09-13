@@ -1,0 +1,292 @@
+[
+  {
+    "name": "enable-by-default",
+    "stage": "post-membership final-source proof",
+    "red": "task7-63-final-enable-by-default-inverse",
+    "green": "task7-64-final-enable-by-default-restored",
+    "files": [
+      {
+        "file": "src/service/data_scheduler.py",
+        "replacements": [
+          {
+            "original": "    enabled = (store.get_setting(f\"schedule.{source}.enabled\") or \"\").strip().lower() in (",
+            "mutant": "    enabled = (store.get_setting(f\"schedule.{source}.enabled\") or (\"true\" if source == \"sec_research_filings\" else \"\")).strip().lower() in ("
+          }
+        ],
+        "before": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+        "mutant": "8bdca544b1f9100f9eb74bf8117114b7039efbbda247778d8152afa80e80fa71",
+        "original_artifact": "task7-inverse-artifacts/final-enable-by-default/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/final-enable-by-default/1-mutant.py",
+        "restored": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa"
+      }
+    ],
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_data_scheduler.py",
+      "-k",
+      "test_sec_schedule_disabled_even_with_old_enabled_key"
+    ],
+    "replay": "In an isolated disposable worktree at the reported final commit, verify the original hashes, apply the exact replacement(s) or archived mutant source, execute this selector through unchanged run_checks.py with a NEW create-only task7-* name; restore exact original source and rerun. No live providers, config, database access, or installation.",
+    "red_exit": 1,
+    "red_tail": "    assert cfg[\"enabled\"] is False and cfg[\"interval_minutes\"] == 1440\nE   assert (True is False)\n__________ test_sec_schedule_disabled_even_with_old_enabled_key[True] __________\ntests/test_data_scheduler.py:177: in test_sec_schedule_disabled_even_with_old_enabled_key\n    assert cfg[\"enabled\"] is False and cfg[\"interval_minutes\"] == 1440\nE   assert (True is False)\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-63-final-enable-by-default-inverse/results.xml -\n=========================== short test summary info ============================\nFAILED tests/test_data_scheduler.py::test_sec_schedule_disabled_even_with_old_enabled_key[False] - assert (True is False)\nFAILED tests/test_data_scheduler.py::test_sec_schedule_disabled_even_with_old_enabled_key[True] - assert (True is False)\n2 failed, 136 deselected in 1.13s\n",
+    "green_exit": 0,
+    "green_tail": "{\"name\": \"task7-64-final-enable-by-default-restored\", \"command\": [\"/home/hyl/.virtualenvs/llm_app/bin/python\", \"-B\", \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py\", \"-q\", \"tests/test_data_scheduler.py\", \"-k\", \"test_sec_schedule_disabled_even_with_old_enabled_key\", \"--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-64-final-enable-by-default-restored/results.xml\"], \"cwd\": \"/tmp/arkscope-research-output-boundary\", \"exit_code\": 0, \"seconds\": 1.45, \"environment\": {\"PATH\": \"/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin\", \"PYTEST_DISABLE_PLUGIN_AUTOLOAD\": \"1\", \"PYTHONDONTWRITEBYTECODE\": \"1\", \"ARKSCOPE_OFFLINE_TEST_WORKSPACE\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-64-final-enable-by-default-restored\", \"HOME\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-64-final-enable-by-default-restored/home\", \"CI\": \"1\", \"TZ\": \"Asia/Taipei\"}, \"log\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-64-final-enable-by-default-restored/output.log\"}\n..                                                                       [100%]\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-64-final-enable-by-default-restored/results.xml -\n2 passed, 136 deselected in 1.04s\n"
+  },
+  {
+    "name": "traverse-actual-historical-pointer",
+    "stage": "post-membership final-source proof",
+    "red": "task7-65-final-traverse-actual-historical-pointer-inverse",
+    "green": "task7-66-final-traverse-actual-historical-pointer-restored",
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "replacements": [
+          {
+            "original": "            receipt = research.refresh(cik, scope=\"recent\", max_sources=2, check=check)",
+            "mutant": "            receipt = research.refresh(cik, scope=\"full\", max_sources=2, check=check)"
+          }
+        ],
+        "before": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+        "mutant": "c1a18b827b9d0f8f9d76c8b582b8e03ca107ef0480a38775edae283fc10a7fc5",
+        "original_artifact": "task7-inverse-artifacts/final-traverse-actual-historical-pointer/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/final-traverse-actual-historical-pointer/1-mutant.py",
+        "restored": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3"
+      },
+      {
+        "file": "src/sec_research/service.py",
+        "replacements": [
+          {
+            "original": "                        pending.append(historical.name)",
+            "mutant": "                        pending.insert(0, historical.name)"
+          }
+        ],
+        "before": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+        "mutant": "f2bded5a3bf1d0db41be11bce4658f2f80f96404c8a397b3bf4c55e9d948bb35",
+        "original_artifact": "task7-inverse-artifacts/final-traverse-actual-historical-pointer/2-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/final-traverse-actual-historical-pointer/2-mutant.py",
+        "restored": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9"
+      }
+    ],
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "test_schedule_deduplicates_cik_and_exposes_unresolved_symbols"
+    ],
+    "replay": "In an isolated disposable worktree at the reported final commit, verify the original hashes, apply the exact replacement(s) or archived mutant source, execute this selector through unchanged run_checks.py with a NEW create-only task7-* name; restore exact original source and rerun. No live providers, config, database access, or installation.",
+    "red_exit": 1,
+    "red_tail": "  \n  At index 2 diff: 'https://data.sec.gov/submissions/CIK0000000001-submissions-001.json' != 'https://data.sec.gov/api/xbrl/companyfacts/CIK0000000001.json'\n  \n  Full diff:\n    [\n        'https://www.sec.gov/files/company_tickers.json',\n        'https://data.sec.gov/submissions/CIK0000000001.json',\n  -     'https://data.sec.gov/api/xbrl/companyfacts/CIK0000000001.json',\n  +     'https://data.sec.gov/submissions/CIK0000000001-submissions-001.json',\n    ]\n1 failed, 35 deselected in 0.66s\n",
+    "green_exit": 0,
+    "green_tail": "{\"name\": \"task7-66-final-traverse-actual-historical-pointer-restored\", \"command\": [\"/home/hyl/.virtualenvs/llm_app/bin/python\", \"-B\", \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py\", \"-q\", \"tests/test_sec_research_schedule.py\", \"-k\", \"test_schedule_deduplicates_cik_and_exposes_unresolved_symbols\", \"--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-66-final-traverse-actual-historical-pointer-restored/results.xml\"], \"cwd\": \"/tmp/arkscope-research-output-boundary\", \"exit_code\": 0, \"seconds\": 0.971, \"environment\": {\"PATH\": \"/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin\", \"PYTEST_DISABLE_PLUGIN_AUTOLOAD\": \"1\", \"PYTHONDONTWRITEBYTECODE\": \"1\", \"ARKSCOPE_OFFLINE_TEST_WORKSPACE\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-66-final-traverse-actual-historical-pointer-restored\", \"HOME\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-66-final-traverse-actual-historical-pointer-restored/home\", \"CI\": \"1\", \"TZ\": \"Asia/Taipei\"}, \"log\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-66-final-traverse-actual-historical-pointer-restored/output.log\"}\n.                                                                        [100%]\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-66-final-traverse-actual-historical-pointer-restored/results.xml -\n1 passed, 35 deselected in 0.65s\n"
+  },
+  {
+    "name": "drop-partial",
+    "stage": "post-membership final-source proof",
+    "red": "task7-67-final-drop-partial-inverse",
+    "green": "task7-68-final-drop-partial-restored",
+    "files": [
+      {
+        "file": "src/service/data_scheduler.py",
+        "replacements": [
+          {
+            "original": "                adapter_partial = (\n                    isinstance(result[\"collect\"], dict)",
+            "mutant": "                adapter_partial = (\n                    source != \"sec_research_filings\" and isinstance(result[\"collect\"], dict)"
+          }
+        ],
+        "before": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+        "mutant": "160f501f0992bdcc583ec33ec0068a536c0340cef5c0fe7e5cd0e68c95bedcc3",
+        "original_artifact": "task7-inverse-artifacts/final-drop-partial/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/final-drop-partial/1-mutant.py",
+        "restored": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa"
+      }
+    ],
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule_runtime.py",
+      "-k",
+      "test_actual_sec_scheduler_adapter_maps_outcomes_and_audit"
+    ],
+    "replay": "In an isolated disposable worktree at the reported final commit, verify the original hashes, apply the exact replacement(s) or archived mutant source, execute this selector through unchanged run_checks.py with a NEW create-only task7-* name; restore exact original source and rerun. No live providers, config, database access, or installation.",
+    "red_exit": 1,
+    "red_tail": "E     \nE     - partial\nE     + succeeded\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-67-final-drop-partial-inverse/results.xml -\n=========================== short test summary info ============================\nFAILED tests/test_sec_research_schedule_runtime.py::test_actual_sec_scheduler_adapter_maps_outcomes_and_audit[facts-partial] - AssertionError: {'collect': {'acquired_at': None, 'attempted_ciks': ['0000000001', '0000000002'], 'batch_id': '413a4286b3d14ad9a13fc72..., 'confirmed_ciks': [], ...}, 'error': 'sec_schedule_partial', 'source': 'sec_research_filings', 'status': 'succeeded'}\nassert 'succeeded' == 'partial'\n  \n  - partial\n  + succeeded\n1 failed, 2 passed, 16 deselected in 3.46s\n",
+    "green_exit": 0,
+    "green_tail": "{\"name\": \"task7-68-final-drop-partial-restored\", \"command\": [\"/home/hyl/.virtualenvs/llm_app/bin/python\", \"-B\", \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py\", \"-q\", \"tests/test_sec_research_schedule_runtime.py\", \"-k\", \"test_actual_sec_scheduler_adapter_maps_outcomes_and_audit\", \"--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-68-final-drop-partial-restored/results.xml\"], \"cwd\": \"/tmp/arkscope-research-output-boundary\", \"exit_code\": 0, \"seconds\": 3.889, \"environment\": {\"PATH\": \"/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin\", \"PYTEST_DISABLE_PLUGIN_AUTOLOAD\": \"1\", \"PYTHONDONTWRITEBYTECODE\": \"1\", \"ARKSCOPE_OFFLINE_TEST_WORKSPACE\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-68-final-drop-partial-restored\", \"HOME\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-68-final-drop-partial-restored/home\", \"CI\": \"1\", \"TZ\": \"Asia/Taipei\"}, \"log\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-68-final-drop-partial-restored/output.log\"}\n...                                                                      [100%]\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-68-final-drop-partial-restored/results.xml -\n3 passed, 16 deselected in 3.43s\n"
+  },
+  {
+    "name": "erase-success",
+    "stage": "post-membership final-source proof",
+    "red": "task7-69-final-erase-success-inverse",
+    "green": "task7-70-final-erase-success-restored",
+    "files": [
+      {
+        "file": "src/sec_research/schedule_store.py",
+        "replacements": [
+          {
+            "original": "                WHERE acquired_at IS NOT NULL ORDER BY checkpoint_id DESC LIMIT 1\"\"\").fetchone()",
+            "mutant": "                ORDER BY checkpoint_id DESC LIMIT 1\"\"\").fetchone()"
+          }
+        ],
+        "before": "da170ec839e3154ef1ae83af2f71f2636f91ab204998ba4a49fe4ceb8d833c16",
+        "mutant": "2a986c099f4574c797a83c41e7f51ba1a3d8109667c4f099d7bdd48cb3c563f3",
+        "original_artifact": "task7-inverse-artifacts/final-erase-success/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/final-erase-success/1-mutant.py",
+        "restored": "da170ec839e3154ef1ae83af2f71f2636f91ab204998ba4a49fe4ceb8d833c16"
+      }
+    ],
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "test_sec_partial_failure_retains_previous_success"
+    ],
+    "replay": "In an isolated disposable worktree at the reported final commit, verify the original hashes, apply the exact replacement(s) or archived mutant source, execute this selector through unchanged run_checks.py with a NEW create-only task7-* name; restore exact original source and rerun. No live providers, config, database access, or installation.",
+    "red_exit": 1,
+    "red_tail": "{\"name\": \"task7-69-final-erase-success-inverse\", \"command\": [\"/home/hyl/.virtualenvs/llm_app/bin/python\", \"-B\", \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py\", \"-q\", \"tests/test_sec_research_schedule.py\", \"-k\", \"test_sec_partial_failure_retains_previous_success\", \"--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-69-final-erase-success-inverse/results.xml\"], \"cwd\": \"/tmp/arkscope-research-output-boundary\", \"exit_code\": 1, \"seconds\": 1.034, \"environment\": {\"PATH\": \"/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin\", \"PYTEST_DISABLE_PLUGIN_AUTOLOAD\": \"1\", \"PYTHONDONTWRITEBYTECODE\": \"1\", \"ARKSCOPE_OFFLINE_TEST_WORKSPACE\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-69-final-erase-success-inverse\", \"HOME\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-69-final-erase-success-inverse/home\", \"CI\": \"1\", \"TZ\": \"Asia/Taipei\"}, \"log\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-69-final-erase-success-inverse/output.log\"}\nF                                                                        [100%]\n=================================== FAILURES ===================================\n______________ test_sec_partial_failure_retains_previous_success _______________\ntests/test_sec_research_schedule.py:222: in test_sec_partial_failure_retains_previous_success\n    assert f.status()[\"last_acquisition_at\"] == NOW\nE   AssertionError: assert None == '2026-09-11T12:00:00Z'\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-69-final-erase-success-inverse/results.xml -\n=========================== short test summary info ============================\nFAILED tests/test_sec_research_schedule.py::test_sec_partial_failure_retains_previous_success - AssertionError: assert None == '2026-09-11T12:00:00Z'\n1 failed, 35 deselected in 0.72s\n",
+    "green_exit": 0,
+    "green_tail": "{\"name\": \"task7-70-final-erase-success-restored\", \"command\": [\"/home/hyl/.virtualenvs/llm_app/bin/python\", \"-B\", \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py\", \"-q\", \"tests/test_sec_research_schedule.py\", \"-k\", \"test_sec_partial_failure_retains_previous_success\", \"--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-70-final-erase-success-restored/results.xml\"], \"cwd\": \"/tmp/arkscope-research-output-boundary\", \"exit_code\": 0, \"seconds\": 1.087, \"environment\": {\"PATH\": \"/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin\", \"PYTEST_DISABLE_PLUGIN_AUTOLOAD\": \"1\", \"PYTHONDONTWRITEBYTECODE\": \"1\", \"ARKSCOPE_OFFLINE_TEST_WORKSPACE\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-70-final-erase-success-restored\", \"HOME\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-70-final-erase-success-restored/home\", \"CI\": \"1\", \"TZ\": \"Asia/Taipei\"}, \"log\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-70-final-erase-success-restored/output.log\"}\n.                                                                        [100%]\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-70-final-erase-success-restored/results.xml -\n1 passed, 35 deselected in 0.77s\n"
+  },
+  {
+    "name": "reuse-membership",
+    "stage": "post-membership final-source proof",
+    "red": "task7-71-final-reuse-membership-inverse",
+    "green": "task7-72-final-reuse-membership-restored",
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "replacements": [
+          {
+            "original": "            members = universe_reader()",
+            "mutant": "            members = previous[\"universe_tickers\"] if previous else universe_reader()"
+          }
+        ],
+        "before": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+        "mutant": "1590da123df6c7e9ae7b33a14330181e1959c114d92c14731529a3e600b1fdb3",
+        "original_artifact": "task7-inverse-artifacts/final-reuse-membership/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/final-reuse-membership/1-mutant.py",
+        "restored": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3"
+      }
+    ],
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "test_batch_bounds_defer_without_starving_current_members"
+    ],
+    "replay": "In an isolated disposable worktree at the reported final commit, verify the original hashes, apply the exact replacement(s) or archived mutant source, execute this selector through unchanged run_checks.py with a NEW create-only task7-* name; restore exact original source and rerun. No live providers, config, database access, or installation.",
+    "red_exit": 1,
+    "red_tail": "        [\n            '0000000003',\n        ],\n        [\n            '0000000001',\n        ],\n  -     [\n  -         '0000000004',\n  -     ],\n    ]\n1 failed, 35 deselected in 0.91s\n",
+    "green_exit": 0,
+    "green_tail": "{\"name\": \"task7-72-final-reuse-membership-restored\", \"command\": [\"/home/hyl/.virtualenvs/llm_app/bin/python\", \"-B\", \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py\", \"-q\", \"tests/test_sec_research_schedule.py\", \"-k\", \"test_batch_bounds_defer_without_starving_current_members\", \"--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-72-final-reuse-membership-restored/results.xml\"], \"cwd\": \"/tmp/arkscope-research-output-boundary\", \"exit_code\": 0, \"seconds\": 1.204, \"environment\": {\"PATH\": \"/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin\", \"PYTEST_DISABLE_PLUGIN_AUTOLOAD\": \"1\", \"PYTHONDONTWRITEBYTECODE\": \"1\", \"ARKSCOPE_OFFLINE_TEST_WORKSPACE\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-72-final-reuse-membership-restored\", \"HOME\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-72-final-reuse-membership-restored/home\", \"CI\": \"1\", \"TZ\": \"Asia/Taipei\"}, \"log\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-72-final-reuse-membership-restored/output.log\"}\n.                                                                        [100%]\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-72-final-reuse-membership-restored/results.xml -\n1 passed, 35 deselected in 0.88s\n"
+  },
+  {
+    "name": "reset-pins",
+    "stage": "post-membership final-source proof",
+    "red": "task7-73-final-reset-pins-inverse",
+    "green": "task7-74-final-reset-pins-restored",
+    "files": [
+      {
+        "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+        "replacements": [
+          {
+            "original": "    if (!before.running && terminalRevision(before) === terminalRevision(source)) return;\n    void loadScheduleStatus();",
+            "mutant": "    if (!before.running && terminalRevision(before) === terminalRevision(source)) return;\n    invalidate(true);\n    void loadScheduleStatus();"
+          }
+        ],
+        "before": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+        "mutant": "8e09e7845ab748abb96c94a4352ce834bb9b7292265efb2ea8a3612ed7c474af",
+        "original_artifact": "task7-inverse-artifacts/final-reset-pins/1-original.tsx",
+        "mutant_artifact": "task7-inverse-artifacts/final-reset-pins/1-mutant.tsx",
+        "restored": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde"
+      }
+    ],
+    "selector": [
+      "frontend",
+      "test",
+      "--",
+      "src/settings/SecResearchPanel.test.tsx",
+      "-t",
+      "uses shared SEC controls"
+    ],
+    "replay": "In an isolated disposable worktree at the reported final commit, verify the original hashes, apply the exact replacement(s) or archived mutant source, execute this selector through unchanged run_checks.py with a NEW create-only task7-* name; restore exact original source and rerun. No live providers, config, database access, or installation.",
+    "red_exit": 1,
+    "red_tail": "\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m42 skipped\u001b[39m\u001b[90m (43)\u001b[39m\n\u001b[2m   Start at \u001b[22m 23:06:34\n\u001b[2m   Duration \u001b[22m 1.43s\u001b[2m (transform 479ms, setup 225ms, import 456ms, tests 158ms, environment 491ms)\u001b[22m\n\nnpm error Lifecycle script `test` failed with error:\nnpm error code 1\nnpm error path /tmp/arkscope-research-output-boundary/apps/arkscope-web\nnpm error workspace arkscope-web@0.0.1\nnpm error location /tmp/arkscope-research-output-boundary/apps/arkscope-web\nnpm error command failed\nnpm error command sh -c vitest run src/settings/SecResearchPanel.test.tsx -t 'uses shared SEC controls'\n",
+    "green_exit": 0,
+    "green_tail": "\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m42 skipped\u001b[39m\u001b[90m (43)\u001b[39m\n\u001b[2m   Start at \u001b[22m 23:06:37\n\u001b[2m   Duration \u001b[22m 1.42s\u001b[2m (transform 470ms, setup 204ms, import 467ms, tests 153ms, environment 498ms)\u001b[22m\n\n"
+  },
+  {
+    "name": "reset-draft",
+    "stage": "post-membership final-source proof",
+    "red": "task7-75-final-reset-draft-inverse",
+    "green": "task7-76-final-reset-draft-restored",
+    "files": [
+      {
+        "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+        "replacements": [
+          {
+            "original": "    if (!before.running && terminalRevision(before) === terminalRevision(source)) return;\n    void loadScheduleStatus();",
+            "mutant": "    if (!before.running && terminalRevision(before) === terminalRevision(source)) return;\n    dirty.current = false;\n    void loadScheduleStatus();"
+          }
+        ],
+        "before": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+        "mutant": "d6058729f868d11e0a372fb3edf49bd8cfee8706e43b804b0de4585531e1319c",
+        "original_artifact": "task7-inverse-artifacts/final-reset-draft/1-original.tsx",
+        "mutant_artifact": "task7-inverse-artifacts/final-reset-draft/1-mutant.tsx",
+        "restored": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde"
+      }
+    ],
+    "selector": [
+      "frontend",
+      "test",
+      "--",
+      "src/settings/SecResearchPanel.test.tsx",
+      "-t",
+      "uses shared SEC controls"
+    ],
+    "replay": "In an isolated disposable worktree at the reported final commit, verify the original hashes, apply the exact replacement(s) or archived mutant source, execute this selector through unchanged run_checks.py with a NEW create-only task7-* name; restore exact original source and rerun. No live providers, config, database access, or installation.",
+    "red_exit": 1,
+    "red_tail": "\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m42 skipped\u001b[39m\u001b[90m (43)\u001b[39m\n\u001b[2m   Start at \u001b[22m 23:06:40\n\u001b[2m   Duration \u001b[22m 1.44s\u001b[2m (transform 496ms, setup 231ms, import 463ms, tests 162ms, environment 489ms)\u001b[22m\n\nnpm error Lifecycle script `test` failed with error:\nnpm error code 1\nnpm error path /tmp/arkscope-research-output-boundary/apps/arkscope-web\nnpm error workspace arkscope-web@0.0.1\nnpm error location /tmp/arkscope-research-output-boundary/apps/arkscope-web\nnpm error command failed\nnpm error command sh -c vitest run src/settings/SecResearchPanel.test.tsx -t 'uses shared SEC controls'\n",
+    "green_exit": 0,
+    "green_tail": "\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m42 skipped\u001b[39m\u001b[90m (43)\u001b[39m\n\u001b[2m   Start at \u001b[22m 23:06:43\n\u001b[2m   Duration \u001b[22m 1.42s\u001b[2m (transform 462ms, setup 217ms, import 453ms, tests 160ms, environment 492ms)\u001b[22m\n\n"
+  },
+  {
+    "name": "reject-observed-space-symbol",
+    "stage": "post-membership final-source proof",
+    "red": "task7-77-final-reject-observed-space-symbol-inverse",
+    "green": "task7-78-final-reject-observed-space-symbol-restored",
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "replacements": [
+          {
+            "original": "            normalized = [normalize_member(member) for member in members]",
+            "mutant": "            normalized = []\n            for member in members:\n                parse_issuer(member)\n                normalized.append(normalize_member(member))"
+          }
+        ],
+        "before": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+        "mutant": "68d3498ce5d42e4bca10a2d22e211a12b4b058c8c3c29dc6780c98e20ce8c040",
+        "original_artifact": "task7-inverse-artifacts/final-reject-observed-space-symbol/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/final-reject-observed-space-symbol/1-mutant.py",
+        "restored": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3"
+      }
+    ],
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "tests/test_sec_research_schedule_runtime.py",
+      "tests/test_active_universe.py",
+      "-k",
+      "space_symbol or only_sec_invalid_symbol or exact_hidden_veto_distinguishes"
+    ],
+    "replay": "In an isolated disposable worktree at the reported final commit, verify the original hashes, apply the exact replacement(s) or archived mutant source, execute this selector through unchanged run_checks.py with a NEW create-only task7-* name; restore exact original source and rerun. No live providers, config, database access, or installation.",
+    "red_exit": 1,
+    "red_tail": "  ? ++\nFAILED tests/test_sec_research_schedule_runtime.py::test_actual_space_symbol_membership_keeps_other_issuer_and_stored_status - AssertionError: assert 'failed' == 'partial'\n  \n  - partial\n  + failed\nFAILED tests/test_sec_research_schedule_runtime.py::test_only_sec_invalid_symbol_needs_no_credentials_or_transport - AssertionError: assert ('unavailable' == 'available'\n  \n  - available\n  + unavailable\n  ? ++)\n3 failed, 1 passed, 72 deselected in 1.73s\n",
+    "green_exit": 0,
+    "green_tail": "{\"name\": \"task7-78-final-reject-observed-space-symbol-restored\", \"command\": [\"/home/hyl/.virtualenvs/llm_app/bin/python\", \"-B\", \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py\", \"-q\", \"tests/test_sec_research_schedule.py\", \"tests/test_sec_research_schedule_runtime.py\", \"tests/test_active_universe.py\", \"-k\", \"space_symbol or only_sec_invalid_symbol or exact_hidden_veto_distinguishes\", \"--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-78-final-reject-observed-space-symbol-restored/results.xml\"], \"cwd\": \"/tmp/arkscope-research-output-boundary\", \"exit_code\": 0, \"seconds\": 2.961, \"environment\": {\"PATH\": \"/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin\", \"PYTEST_DISABLE_PLUGIN_AUTOLOAD\": \"1\", \"PYTHONDONTWRITEBYTECODE\": \"1\", \"ARKSCOPE_OFFLINE_TEST_WORKSPACE\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-78-final-reject-observed-space-symbol-restored\", \"HOME\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-78-final-reject-observed-space-symbol-restored/home\", \"CI\": \"1\", \"TZ\": \"Asia/Taipei\"}, \"log\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-78-final-reject-observed-space-symbol-restored/output.log\"}\n....                                                                     [100%]\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-78-final-reject-observed-space-symbol-restored/results.xml -\n4 passed, 72 deselected in 2.49s\n"
+  }
+]

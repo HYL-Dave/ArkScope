@@ -1,0 +1,804 @@
+"""
+Subagent dispatch — specialized agents for focused subtasks (Phase 6).
+
+The main agent can delegate tasks to subagents via the `delegate_to_subagent` tool.
+Each subagent has its own model, system prompt, tool subset, and token tracker.
+Subagents start from clean state and return structured JSON results.
+
+Model communication stays structured JSON, with no message history sharing.
+Native parents may observe admitted SEC completions independently of that JSON.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
+from copy import copy
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+from uuid import uuid4
+
+from .events import AgentEvent, EventType
+from .output_boundary import output_scope
+from .output_events import check_output_value, protect_output_text
+from src.auth_drivers.runtime_binding import register_output_api_key
+
+logger = logging.getLogger(__name__)
+
+_sec_completion_observer = ContextVar("subagent_sec_completion_observer", default=None)
+_delegated_call_owner = ContextVar("subagent_call_owner", default=None)
+
+
+class _SubagentCalls:
+    """Retain invocation tasks the SDK may cancel without joining."""
+
+    def __init__(self):
+        self.owner = asyncio.current_task()
+        self.tasks = set()
+        self.active = True
+
+    def track(self):
+        if not self.active:
+            raise asyncio.CancelledError
+        task = asyncio.current_task()
+        if task is not self.owner:
+            self.tasks.add(task)
+            task.add_done_callback(self.tasks.discard)
+
+    async def close(self):
+        self.active = False
+        pending = [task for task in self.tasks if not task.done()]
+        for task in pending:
+            task.cancel()
+        if not pending:
+            return
+        joining = asyncio.gather(*pending, return_exceptions=True)
+        try:
+            await asyncio.shield(joining)
+        except asyncio.CancelledError:
+            while not joining.done():
+                try:
+                    await asyncio.shield(joining)
+                except asyncio.CancelledError:
+                    continue
+            joining.result()
+            raise
+
+
+@asynccontextmanager
+async def observe_subagent_sec(publish, *, enabled=lambda: True):
+    """Borrow a native parent's sink only for this awaited invocation."""
+    active = True
+
+    def completed(name, arguments, call_id, result):
+        if not active or not enabled():
+            return
+        from src.sec_research.citations import citation_event_fields
+        from src.sec_research.tool_results import SEC_TOOL_NAMES
+
+        if name.removeprefix("tool_") not in SEC_TOOL_NAMES:
+            return
+        result = check_output_value(result)
+        arguments = check_output_value(arguments)
+        if isinstance(arguments, str):
+            arguments = json.loads(arguments)
+        fields = citation_event_fields(name, result)
+        text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
+        publish(AgentEvent(EventType.tool_end, check_output_value({
+            "tool": name, "input": arguments, "call_id": call_id,
+            "summary": text[:200], "chars": len(text), **fields,
+        })))
+
+    token = _sec_completion_observer.set(completed)
+    calls = _SubagentCalls()
+    owner_token = _delegated_call_owner.set(calls)
+    try:
+        yield
+    finally:
+        active = False
+        _sec_completion_observer.reset(token)
+        _delegated_call_owner.reset(owner_token)
+        await calls.close()
+
+
+class _ChildSecCompletions:
+    """Isolate SDK call IDs and fence callbacks before child client cleanup."""
+
+    def __init__(self):
+        self.observer = _sec_completion_observer.get()
+        self.namespace = uuid4().hex
+        self.active = True
+
+    def complete(self, name, arguments, call_id, result):
+        if self.active and self.observer is not None:
+            self.observer(name, arguments, f"delegate:{self.namespace}:{call_id}", result)
+
+
+# ── 1M context ─────────────────────────────────────────────────
+# GA models need no beta header; legacy beta models still do. Membership is a
+# registry fact (context_mode in src/model_capabilities.py) — P2.7 convergence.
+# The header string itself is a wire constant and stays here.
+from src.model_capabilities import (
+    all_models as _all_capabilities,
+    capability_for,
+    model_execution_admission_detail,
+)
+
+_1M_GA_MODELS = frozenset(
+    c.id for c in _all_capabilities("anthropic") if c.context_mode == "ga_1m"
+)
+_1M_BETA_MODELS = frozenset(
+    c.id for c in _all_capabilities("anthropic") if c.context_mode == "beta_1m"
+)
+_EXTENDED_CONTEXT_BETA = "context-1m-2025-08-07"
+
+
+def _use_extended_context_beta(model: str, enabled: bool) -> bool:
+    """Check if the 1M beta header is needed for this model.
+
+    Returns True only for legacy models that still require the beta header.
+    Opus 4.7 / Sonnet 4.6 have 1M GA — no header needed.
+    """
+    if not enabled:
+        return False
+    capability = capability_for(model)
+    return bool(
+        capability is not None
+        and capability.provider == "anthropic"
+        and capability.context_mode == "beta_1m"
+    )
+
+
+# ── Provider detection ─────────────────────────────────────────
+
+def _detect_provider(model: str) -> str:
+    """Auto-detect provider from model name prefix."""
+    if model.startswith(("gpt-", "o1", "o3", "o4")):
+        return "openai"
+    return "anthropic"
+
+
+# ── Tool filtering ─────────────────────────────────────────────
+
+def _filter_anthropic_tools(
+    all_tools: List[Dict[str, Any]],
+    allowed_names: List[str],
+) -> List[Dict[str, Any]]:
+    """Filter Anthropic tool schemas to only include allowed names."""
+    allowed = set(allowed_names)
+    from src.sec_research.tool_results import require_sec_inventory
+    require_sec_inventory((t["name"] for t in all_tools), allowed)
+    return [t for t in all_tools if t["name"] in allowed]
+
+
+def _filter_openai_tools(all_tools: List, allowed_names: List[str]) -> List:
+    """Filter OpenAI @function_tool objects to only include allowed names.
+
+    Handles the tool_ prefix convention used by OpenAI SDK wrappers.
+    """
+    allowed = set(allowed_names)
+    from src.sec_research.tool_results import require_sec_inventory
+    require_sec_inventory((getattr(t, "name", "").removeprefix("tool_") for t in all_tools), allowed)
+    allowed_prefixed = {f"tool_{n}" for n in allowed_names}
+    return [
+        t for t in all_tools
+        if getattr(t, "name", "") in allowed | allowed_prefixed
+    ]
+
+
+# ── SubagentConfig ─────────────────────────────────────────────
+
+@dataclass
+class SubagentConfig:
+    """Definition of a specialized subagent."""
+
+    name: str
+    description: str
+    model: str
+    system_prompt: str
+    tool_names: List[str] = field(default_factory=list)
+    max_turns: int = 8
+    # Provider-specific reasoning config
+    reasoning_effort: Optional[str] = None   # OpenAI (e.g. "xhigh")
+    anthropic_effort: Optional[str] = None   # Anthropic (e.g. "max")
+    anthropic_thinking: bool = False
+    # 1M context beta (Anthropic only, Opus 4.7 + Sonnet 4.5)
+    extended_context: bool = False
+
+
+# ── Subagent system prompts ────────────────────────────────────
+
+_CODE_ANALYST_PROMPT = """\
+You are a quantitative evidence analyst in the ArkScope trading system.
+Your job is to review financial metrics returned by existing ArkScope data tools.
+
+You handle two types of tasks:
+1. Directed review: compare provider-computed metrics and explain their implications
+2. Multi-source analysis: identify agreements, conflicts, and missing calculations
+
+You can retrieve structured price and fundamental data with available ArkScope
+tools. Use calculate_compound_growth, calculate_dcf,
+calculate_peer_statistics, calculate_implied_valuation, and
+calculate_weighted_scenarios for supported precise financial calculations.
+Arbitrary Python execution is unavailable. Do not invent other precise custom
+calculations or statistics. Use only values that tools actually return; when a
+requested result is unavailable, state the formula and inputs needed and record
+it as a data gap. Handle missing data and insufficient samples explicitly.
+"""
+
+_DEEP_RESEARCHER_PROMPT = """\
+You are a deep research analyst in the ArkScope trading system.
+Your job is to perform thorough, multi-tool investigation of a specific topic.
+
+When given a research task:
+1. Gather data from ArkScope's structured news, SEC, price, fundamental, and
+   event tools
+2. Cross-reference findings for consistency
+3. Identify contradictions and data gaps
+4. Synthesize a comprehensive analysis with confidence assessment
+
+Use web_browse only when a known source URL is already present in the supplied
+evidence and its page content is needed. It is not a general search tool.
+
+Return structured, actionable findings — not surface-level summaries.
+"""
+
+_DATA_SUMMARIZER_PROMPT = """\
+You are a data summarization specialist in the ArkScope trading system.
+Your job is to efficiently retrieve data and produce concise summaries.
+
+Given a summarization task:
+1. SCOUT FIRST: For multi-ticker tasks, call get_news_brief() to get
+   article counts and sentiment averages for all tickers in one call.
+2. SELECTIVE DRILL-DOWN: Only call get_ticker_news() for tickers that
+   show high article count or extreme sentiment (avg < 2.5 or avg > 4.0).
+3. Extract key metrics and patterns
+4. Return a concise, structured summary
+
+Prioritize speed and conciseness. Focus on actionable insights.
+Use get_news_brief() as your primary screening tool — it returns
+compact stats for many tickers without overwhelming the context.
+"""
+
+_REVIEWER_PROMPT = """\
+You are a critical analysis reviewer in the ArkScope trading system.
+Your job is to find flaws, gaps, and risks in analysis conclusions.
+
+You receive analysis conclusions and supporting data via context. Your task:
+1. Identify logical jumps or unsupported inferences in the conclusions
+2. Point out risk factors that were overlooked or underweighted
+3. Question data sufficiency: sample size, time range, missing sources
+4. Check for common analytical traps: value trap, recency bias,
+   survivorship bias, confirmation bias
+5. Suggest a confidence adjustment based on your findings
+
+Use the internal ticker-news tool to fact-check claims or find counter-evidence.
+
+Return structured JSON:
+{
+  "issues": [{"description": "...", "severity": "high|medium|low"}],
+  "confidence_adjustment": -0.15,  // float between -0.3 and +0.1
+  "recommendation": "proceed|revise|reject",
+  "reasoning": "Brief overall assessment"
+}
+"""
+
+# ── Predefined subagent registry ───────────────────────────────
+
+SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
+    "code_analyst": SubagentConfig(
+        name="code_analyst",
+        description=(
+            "Quantitative evidence review across existing price and fundamental "
+            "tools, with explicit treatment of unsupported calculations."
+        ),
+        model="gpt-5.6-sol",
+        system_prompt=_CODE_ANALYST_PROMPT,
+        tool_names=[
+            "get_ticker_prices",
+            "get_price_change",
+            "get_fundamentals_analysis",
+            "calculate_compound_growth",
+            "calculate_dcf",
+            "calculate_implied_valuation",
+            "calculate_peer_statistics",
+            "calculate_weighted_scenarios",
+        ],
+        max_turns=8,
+        reasoning_effort="xhigh",
+    ),
+    "deep_researcher": SubagentConfig(
+        name="deep_researcher",
+        description=(
+            "Performs thorough multi-source investigation: cross-referencing "
+            "raw news, price action, fundamentals, "
+            "and event sequences to produce comprehensive analysis."
+        ),
+        model="gpt-5.6-sol",
+        system_prompt=_DEEP_RESEARCHER_PROMPT,
+        tool_names=[
+            "get_ticker_news",
+            "search_news_by_keyword",
+            "get_ticker_prices",
+            "get_price_change",
+            "get_sector_performance",
+            "detect_news_volume_anomaly",
+            "detect_event_chains",
+            "get_fundamentals_analysis",
+            "list_sec_filings",
+            "get_sec_financial_facts",
+            "read_sec_filing",
+            "web_browse",
+        ],
+        max_turns=10,
+        reasoning_effort="xhigh",
+    ),
+    "data_summarizer": SubagentConfig(
+        name="data_summarizer",
+        description=(
+            "Fast data retrieval and summarization: watchlist overviews, "
+            "sector comparisons, multi-ticker screening, and news digests. "
+            "Optimized for speed and conciseness."
+        ),
+        model="claude-sonnet-5",
+        system_prompt=_DATA_SUMMARIZER_PROMPT,
+        tool_names=[
+            "get_news_brief",
+            "get_ticker_news",
+            "search_news_advanced",
+            "get_price_change",
+            "get_sector_performance",
+            "get_watchlist_overview",
+            "get_morning_brief",
+            "get_fundamentals_analysis",
+        ],
+        max_turns=6,
+        anthropic_thinking=True,  # adaptive — model decides when to think
+    ),
+    "reviewer": SubagentConfig(
+        name="reviewer",
+        description=(
+            "Critical analysis reviewer: examines conclusions for logical "
+            "flaws, overlooked risks, data gaps, and common analytical biases. "
+            "Returns structured confidence adjustment."
+        ),
+        model="claude-opus-5",
+        system_prompt=_REVIEWER_PROMPT,
+        tool_names=[
+            "get_ticker_news",
+        ],
+        max_turns=4,
+        anthropic_thinking=True,
+        anthropic_effort="max",
+    ),
+}
+
+# Maximum context_json chars to pass to subagent (prevent context explosion)
+_MAX_CONTEXT_CHARS = 5000
+
+
+# ── Model override ─────────────────────────────────────────────
+
+def _apply_config_overrides(config: SubagentConfig) -> SubagentConfig:
+    """Apply model and max_turns overrides from AgentConfig if present.
+
+    Returns a copy with overrides applied (original registry unchanged).
+    """
+    from ..config import get_agent_config
+    agent_config = get_agent_config()
+
+    override_model = agent_config.subagent_models.get(config.name)
+    override_turns = agent_config.subagent_max_turns.get(config.name)
+
+    # Check if any override actually changes a value
+    model_changed = override_model and override_model != config.model
+    turns_changed = override_turns and override_turns != config.max_turns
+
+    if not model_changed and not turns_changed:
+        return config
+
+    overridden = copy(config)
+    if model_changed:
+        overridden.model = override_model
+        logger.info(
+            f"Subagent '{config.name}' model overridden: "
+            f"{config.model} → {override_model}"
+        )
+    if turns_changed:
+        overridden.max_turns = override_turns
+        logger.info(
+            f"Subagent '{config.name}' max_turns overridden: "
+            f"{config.max_turns} → {override_turns}"
+        )
+    return overridden
+
+
+# ── Dispatch ───────────────────────────────────────────────────
+
+def dispatch_subagent(
+    subagent_name: str,
+    task: str,
+    context_json: str = "",
+    dal: Any = None,
+) -> Dict[str, Any]:
+    """Synchronous entrypoint for callers outside an event loop."""
+    return asyncio.run(dispatch_subagent_async(subagent_name, task, context_json, dal))
+
+
+async def dispatch_subagent_async(
+    subagent_name: str,
+    task: str,
+    context_json: str = "",
+    dal: Any = None,
+) -> Dict[str, Any]:
+    """
+    Dispatch a task to a specialized subagent.
+
+    Runs a complete agent loop (clean state) using the subagent's configured
+    model, system prompt, and tool subset.
+
+    Args:
+        subagent_name: Key in SUBAGENT_REGISTRY
+        task: Natural language task description
+        context_json: Optional JSON string with context data
+        dal: DataAccessLayer instance
+
+    Returns:
+        Dict with: subagent, answer, tools_used, model, provider,
+        token_usage, error
+    """
+    owner = _delegated_call_owner.get()
+    if owner is not None:
+        owner.track()
+    if subagent_name not in SUBAGENT_REGISTRY:
+        available = ", ".join(sorted(SUBAGENT_REGISTRY.keys()))
+        return {
+            "subagent": subagent_name,
+            "answer": "",
+            "tools_used": [],
+            "model": "",
+            "provider": "",
+            "token_usage": {},
+            "error": f"Unknown subagent: {subagent_name}. Available: {available}",
+        }
+
+    config = SUBAGENT_REGISTRY[subagent_name]
+
+    # Apply model override from stored or request-time AgentConfig.
+    config = _apply_config_overrides(config)
+
+    provider = _detect_provider(config.model)
+
+    check_output_value({"subagent": subagent_name, "task": task, "context": context_json})
+
+    # Build subagent input
+    subagent_input = f"Task: {task}"
+    if context_json:
+        preview = context_json[:_MAX_CONTEXT_CHARS]
+        if len(context_json) > _MAX_CONTEXT_CHARS:
+            preview += f"\n... [{len(context_json) - _MAX_CONTEXT_CHARS} chars truncated]"
+        subagent_input += f"\n\nContext data:\n{preview}"
+
+    logger.info(
+        f"Dispatching to subagent '{subagent_name}' "
+        f"(model={config.model}, provider={provider}, max_turns={config.max_turns})"
+    )
+
+    from src.auth_drivers.runtime_binding import (
+        activate_runtime_auth, capture_child_runtime_auth, sanitize_runtime_error,
+    )
+
+    child_auth = None
+    try:
+        child_auth = capture_child_runtime_auth(provider)
+        with output_scope(inherit=True), activate_runtime_auth(child_auth):
+            if provider == "openai":
+                result = await _run_openai_subagent_async(config, subagent_input, dal)
+            else:
+                result = await _run_anthropic_subagent_async(config, subagent_input, dal)
+            result = {**result, "answer": protect_output_text(result.get("answer", ""))}
+            check_output_value(result)
+
+        return {
+            "subagent": subagent_name,
+            "answer": result.get("answer", ""),
+            "tools_used": result.get("tools_used", []),
+            "model": config.model,
+            "provider": provider,
+            "token_usage": result.get("token_usage", {}),
+            "error": None,
+        }
+    except Exception as e:
+        detail = sanitize_runtime_error(e, binding=child_auth)
+        logger.error("Subagent '%s' failed: %s", subagent_name, detail)
+        return {
+            "subagent": subagent_name,
+            "answer": "",
+            "tools_used": [],
+            "model": config.model,
+            "provider": provider,
+            "token_usage": {},
+            "error": detail,
+        }
+
+
+# ── Anthropic subagent runner ──────────────────────────────────
+
+def _run_anthropic_subagent(
+    config: SubagentConfig,
+    question: str,
+    dal: Any,
+) -> Dict[str, Any]:
+    """Synchronous bridge to the same owned child loop."""
+    return asyncio.run(_run_anthropic_subagent_async(config, question, dal))
+
+
+async def _run_anthropic_subagent_async(
+    config: SubagentConfig,
+    question: str,
+    dal: Any,
+) -> Dict[str, Any]:
+    """Run a subagent using the Anthropic SDK (simplified messages loop)."""
+    execution_detail = model_execution_admission_detail(config.model)
+    if execution_detail is not None:
+        raise ValueError(execution_detail)
+    from ..anthropic_agent.agent import (
+        _build_thinking_param,
+        _prepare_cached_system,
+        _prepare_cached_tools,
+        _supports_effort,
+    )
+    from ..anthropic_agent.tools import execute_tool_async, get_anthropic_tools
+    from ..config import get_agent_config
+    from ..shared.token_tracker import TokenTracker
+
+    agent_config = get_agent_config()
+    from src.auth_drivers.live_resolver import live_anthropic_client
+    client = live_anthropic_client()
+    cancelled = False
+    completions = _ChildSecCompletions()
+    try:
+        register_output_api_key(client)
+
+        # Filter tools to subagent's allowed subset
+        all_tools = get_anthropic_tools()
+        tools = _filter_anthropic_tools(all_tools, config.tool_names)
+
+        # Hosted server tools — single source of truth in shared/server_tools.py.
+        from .server_tools import anthropic_server_tools
+        for _kind, tool_def in anthropic_server_tools(agent_config):
+            tools.append(tool_def)
+
+        # Apply prompt caching: cache_control on tools (last) + system prompt
+        tools = _prepare_cached_tools(tools)
+        cached_system = _prepare_cached_system(config.system_prompt)
+
+        messages: List[dict] = [{"role": "user", "content": question}]
+        tools_used: List[str] = []
+        tracker = TokenTracker()
+
+        # Build API kwargs (effort + thinking)
+        api_kwargs: Dict[str, Any] = {}
+
+        if config.anthropic_effort and _supports_effort(config.model):
+            api_kwargs["output_config"] = {"effort": config.anthropic_effort}
+
+        thinking_param, effective_max_tokens = _build_thinking_param(
+            config.model, config.anthropic_thinking, agent_config,
+        )
+        if thinking_param:
+            api_kwargs["thinking"] = thinking_param
+
+        # 1M context: GA for 4.6 (no header). Legacy models still need beta header.
+        use_beta = _use_extended_context_beta(config.model, config.extended_context)
+
+        for turn in range(config.max_turns):
+            if use_beta:
+                stream_ctx = client.beta.messages.stream(
+                    model=config.model,
+                    max_tokens=effective_max_tokens,
+                    system=cached_system,
+                    tools=tools,
+                    messages=messages,
+                    betas=[_EXTENDED_CONTEXT_BETA],
+                    **api_kwargs,
+                )
+            else:
+                stream_ctx = client.messages.stream(
+                    model=config.model,
+                    max_tokens=effective_max_tokens,
+                    system=cached_system,
+                    tools=tools,
+                    messages=messages,
+                    **api_kwargs,
+                )
+
+            with stream_ctx as stream:
+                response = stream.get_final_message()
+
+            tracker.record_anthropic(response, model=config.model)
+
+            # Handle pause_turn (Claude web search server tool mid-turn pause)
+            if response.stop_reason == "pause_turn":
+                messages.append({"role": "assistant", "content": response.content})
+                continue
+
+            if response.stop_reason != "tool_use":
+                final_text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        final_text += block.text
+                return {
+                    "answer": final_text,
+                    "tools_used": list(set(tools_used)),
+                    "token_usage": tracker.summary(),
+                }
+
+            # Process tool calls
+            tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+            tool_results = []
+            for tool_use in tool_use_blocks:
+                check_output_value({"tool": tool_use.name, "input": tool_use.input, "call_id": tool_use.id})
+                tools_used.append(tool_use.name)
+                logger.debug(f"Subagent tool call: {tool_use.name}")
+                result = await execute_tool_async(tool_use.name, tool_use.input, dal)
+                completions.complete(tool_use.name, tool_use.input, f"{turn}:{tool_use.id}", result)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.id,
+                    "content": result,
+                })
+
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": tool_results})
+
+        return {
+            "answer": "Subagent reached maximum tool calls.",
+            "tools_used": list(set(tools_used)),
+            "token_usage": tracker.summary(),
+        }
+    except asyncio.CancelledError:
+        cancelled = True
+        raise
+    finally:
+        completions.active = False
+        try:
+            client.close()
+        except Exception:
+            if not cancelled:
+                raise
+
+
+# ── OpenAI subagent runner ─────────────────────────────────────
+
+def _run_openai_subagent(
+    config: SubagentConfig,
+    question: str,
+    dal: Any,
+) -> Dict[str, Any]:
+    """Synchronous bridge to the same owned child loop."""
+    return asyncio.run(_run_openai_subagent_async(config, question, dal))
+
+
+async def _close_async_client(client) -> None:
+    """Join this client's finalizer before releasing child auth/output scope."""
+    closing = asyncio.create_task(client.close())
+    try:
+        await asyncio.shield(closing)
+    except asyncio.CancelledError:
+        while not closing.done():
+            try:
+                await asyncio.shield(closing)
+            except asyncio.CancelledError:
+                continue
+            except BaseException:
+                break
+        if not closing.cancelled():
+            closing.exception()
+        raise
+
+
+async def _run_openai_subagent_async(
+    config: SubagentConfig,
+    question: str,
+    dal: Any,
+) -> Dict[str, Any]:
+    """Run a subagent using the awaited OpenAI Agents SDK loop."""
+    from agents import Agent, ModelSettings, OpenAIResponsesModel, RunConfig, RunHooks, Runner
+    from openai.types.shared import Reasoning
+    from src.auth_drivers.live_resolver import live_openai_async_client
+
+    from ..config import get_agent_config
+    from ..openai_agent.agent import _get_openai_max_output
+    from ..openai_agent.tools import create_openai_tools
+    from ..shared.token_tracker import TokenTracker
+
+    agent_config = get_agent_config()
+
+    # Create and filter tools
+    all_tools = create_openai_tools(dal)
+    tools = _filter_openai_tools(all_tools, config.tool_names)
+    sec_calls = _SubagentCalls()
+    from src.sec_research.tool_results import SEC_TOOL_NAMES
+
+    for tool in tools:
+        if getattr(tool, "name", "").removeprefix("tool_") in SEC_TOOL_NAMES:
+            async def invoke_owned(context, arguments, invoke=tool.on_invoke_tool):
+                sec_calls.track()
+                return await invoke(context, arguments)
+
+            tool.on_invoke_tool = invoke_owned
+
+    # Build reasoning settings
+    effort = config.reasoning_effort or agent_config.reasoning_effort
+    if effort == "none":
+        effective_max_tokens = agent_config.max_tokens
+    else:
+        effective_max_tokens = _get_openai_max_output(config.model)
+
+    client = live_openai_async_client()
+    cancelled = False
+    completions = _ChildSecCompletions()
+
+    class SecCompletions(RunHooks):
+        async def on_tool_end(self, context, agent, tool, result):
+            completions.complete(tool.name, context.tool_arguments, context.tool_call_id, result)
+
+    try:
+        register_output_api_key(client)
+        agent = Agent(
+            name=f"ArkScope Subagent: {config.name}",
+            instructions=config.system_prompt,
+            model=OpenAIResponsesModel(model=config.model, openai_client=client),
+            tools=tools,
+            model_settings=ModelSettings(
+                reasoning=Reasoning(effort=effort),
+                max_tokens=effective_max_tokens,
+            ),
+        )
+
+        result = await Runner.run(
+            agent,
+            input=question,
+            max_turns=config.max_turns,
+            auto_previous_response_id=True,
+            run_config=RunConfig(trace_include_sensitive_data=False),
+            hooks=SecCompletions(),
+        )
+
+        # Extract tools used and token usage
+        tracker = TokenTracker()
+        tools_used: List[str] = []
+        if hasattr(result, "raw_responses"):
+            tracker.record_openai_result(result, model=config.model)
+            for response in result.raw_responses:
+                if hasattr(response, "output"):
+                    for item in response.output:
+                        if hasattr(item, "name"):
+                            tools_used.append(item.name)
+
+        answer = str(result.final_output) if result.final_output else ""
+        return {
+            "answer": answer,
+            "tools_used": list(set(tools_used)),
+            "token_usage": tracker.summary(),
+        }
+    except asyncio.CancelledError:
+        cancelled = True
+        raise
+    finally:
+        completions.active = False
+        try:
+            await sec_calls.close()
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
+        finally:
+            try:
+                await _close_async_client(client)
+            except Exception:
+                if not cancelled:
+                    raise

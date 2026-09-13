@@ -1,0 +1,122 @@
+[
+  {
+    "name": "enable-by-default",
+    "file": "src/service/data_scheduler.py",
+    "before": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+    "mutant": "8bdca544b1f9100f9eb74bf8117114b7039efbbda247778d8152afa80e80fa71",
+    "restored": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+    "red": "task7-32-default-inverse",
+    "green": "task7-33-default-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  },
+  {
+    "name": "history-traversal",
+    "file": "src/sec_research/service.py",
+    "before": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+    "mutant": "0e08bc49466b5f5727270dc1f5cfc8833017f4e76ed88763bb631e0491f4d528",
+    "restored": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+    "red": "task7-34-history-traversal-inverse",
+    "green": "task7-35-history-traversal-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  },
+  {
+    "name": "drop-partial",
+    "file": "src/service/data_scheduler.py",
+    "before": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+    "mutant": "160f501f0992bdcc583ec33ec0068a536c0340cef5c0fe7e5cd0e68c95bedcc3",
+    "restored": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+    "red": "task7-36-drop-partial-inverse",
+    "green": "task7-37-drop-partial-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  },
+  {
+    "name": "erase-success",
+    "file": "src/sec_research/schedule_store.py",
+    "before": "90ad6c75da5e27287e550eed840dc608441c4179d430199a760b5c250df47cd6",
+    "mutant": "107f8e8c71f1f522609ee901f29c57c24322de708adb0e756e24d2431dd7dbbf",
+    "restored": "90ad6c75da5e27287e550eed840dc608441c4179d430199a760b5c250df47cd6",
+    "red": "task7-38-erase-success-inverse",
+    "green": "task7-39-erase-success-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  },
+  {
+    "name": "reuse-membership",
+    "file": "src/sec_research/scheduled.py",
+    "before": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+    "mutant": "bd19a0fc2dd9e823d9a4b1e80385b83f4011cd7f7ac3660925b904783e0b074f",
+    "restored": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+    "red": "task7-40-reuse-membership-inverse",
+    "green": "task7-41-reuse-membership-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  },
+  {
+    "name": "reset-pins",
+    "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+    "before": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+    "mutant": "8e09e7845ab748abb96c94a4352ce834bb9b7292265efb2ea8a3612ed7c474af",
+    "restored": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+    "red": "task7-42-reset-pins-inverse",
+    "green": "task7-43-reset-pins-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  },
+  {
+    "name": "reset-draft",
+    "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+    "before": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+    "mutant": "d6058729f868d11e0a372fb3edf49bd8cfee8706e43b804b0de4585531e1319c",
+    "restored": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+    "red": "task7-44-reset-draft-inverse",
+    "green": "task7-45-reset-draft-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  },
+  {
+    "name": "wrong-full-scope-two-sources",
+    "file": "src/sec_research/scheduled.py",
+    "before": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+    "mutant": "f7581e14626824e8924f6a57f723e46bfdb325b686c660bed43f206bc1a74396",
+    "restored": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+    "red": "task7-46-history-dispatch-inverse",
+    "green": "task7-47-history-dispatch-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  },
+  {
+    "name": "traverse-actual-historical-pointer",
+    "sources": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "before": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+        "mutant": "f7581e14626824e8924f6a57f723e46bfdb325b686c660bed43f206bc1a74396",
+        "restored": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256"
+      },
+      {
+        "file": "src/sec_research/service.py",
+        "before": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+        "mutant": "f2bded5a3bf1d0db41be11bce4658f2f80f96404c8a397b3bf4c55e9d948bb35",
+        "restored": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9"
+      }
+    ],
+    "red": "task7-48-history-pointer-inverse",
+    "green": "task7-49-history-pointer-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  },
+  {
+    "name": "erase-success-final-integrity",
+    "file": "src/sec_research/schedule_store.py",
+    "before": "bbfa0bd6e6d1875598ae230a235323a9adc015eeece1391fb20017aa40a2fd73",
+    "mutant": "5e70df0eb5b2be2a045e3c39c72a1115be80052f6e60e563054715e1607591be",
+    "restored": "bbfa0bd6e6d1875598ae230a235323a9adc015eeece1391fb20017aa40a2fd73",
+    "red": "task7-55-success-final-inverse",
+    "green": "task7-56-success-final-restored",
+    "red_exit": 1,
+    "green_exit": 0
+  }
+]

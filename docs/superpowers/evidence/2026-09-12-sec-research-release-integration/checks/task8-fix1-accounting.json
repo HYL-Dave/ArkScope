@@ -1,0 +1,907 @@
+{
+  "counting_policy": "Only the named final full backend run owns its total. Focused runs are not added.",
+  "process_limit": "Receipt accounting does not establish absence of unrelated external processes.",
+  "runs": [
+    {
+      "classification": "intended RED with fixture limitation: Mixed gaps left running checkpoints and invalid stop reasons (4F). Initial budget=0 fixture also mapped to capture_store_write_failed; corrected actual budget=1 and re-proved RED in 03.",
+      "command_sha256": "94026ada0278859616e045449a76c69e36ecd0e90b84bc17d0a93165da581466",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[False-storage_space_insufficient]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 4
+      },
+      "run": "task7-fix1-01-mixed-stop-red",
+      "seconds": 1.83
+    },
+    {
+      "classification": "intermediate fixture failure: 3F/2P after production I1 fix: budget=0 was invalid configuration, and identical source bytes correctly retained 5 catalog observations rather than the asserted 10. Corrected test-only setup/expectation; real original-source RED repeated in 03 and GREEN in 04.",
+      "command_sha256": "cc58b39576254d605143c33bd29da59d5b8dbc1fd40f4a42c11985924b174a29",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 3,
+        "passed": 2
+      },
+      "run": "task7-fix1-02-mixed-stop-green",
+      "seconds": 2.173
+    },
+    {
+      "classification": "intended RED: Corrected real budget=1/free-space=0 fixture proves all four mixed-gap terminal checkpoint failures on original stop selection; resolved by 04.",
+      "command_sha256": "5619f330939ee8097a17546ad5e958427880a7f857f8395a340baf86eb5a7b39",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[False-storage_space_insufficient]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 4
+      },
+      "run": "task7-fix1-03-mixed-stop-corrected-red",
+      "seconds": 1.888
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "96a322b76609e24797e9ae8012a6a689114de60c41679dc97801faaf2d2e9694",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 5
+      },
+      "run": "task7-fix1-04-mixed-stop-green",
+      "seconds": 2.225
+    },
+    {
+      "classification": "intended RED: All twelve captured/foreign map state and timing combinations expose latest-map drift in dispatch or unresolved outcomes; resolved by 06.",
+      "command_sha256": "f4e1e944a605bb43cd8270aa85323f97ae93af9ce85dd7ffe9dd8c3bdfd3a0aa",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-changed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-changed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-failed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-failed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-changed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-changed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-failed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-failed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-between_members]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 12
+      },
+      "run": "task7-fix1-05-map-binding-red",
+      "seconds": 3.267
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "ad1a30aea059b37de0fe32785b2c41ed54b090483954c0874cbeae79a9e019ec",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 33
+      },
+      "run": "task7-fix1-06-map-binding-green",
+      "seconds": 4.339
+    },
+    {
+      "classification": "intended RED: Uncovered terminal membership accepted at validator/store/status/admin/export/adapter boundaries; map lease abort lacked explicit terminal accounting (28F). Running-checkpoint control passes; resolved by 08.",
+      "command_sha256": "73ad06b0c2a33cf2d65d0e75d6f37638d4ecae1e23dc6ddb3fde34908cdcf09d",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[validator-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[validator-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[validator-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[validator-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[record-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[record-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[record-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[record-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[status-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[status-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[status-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[status-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[admin-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[admin-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[admin-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[admin-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[export-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[export-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[export-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[export-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_cik_partition_is_validated[duplicate_member]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_cik_partition_is_validated[wrong_cik]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_cik_partition_is_validated[extra_cik]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_map_lease_abort_accounts_unresolved_members_and_retains_rotation",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_uncovered_membership_adapter_result_is_rejected[empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_uncovered_membership_adapter_result_is_rejected[succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_uncovered_membership_adapter_result_is_rejected[partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_uncovered_membership_adapter_result_is_rejected[failed]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 28,
+        "passed": 1
+      },
+      "run": "task7-fix1-07-terminal-coverage-red",
+      "seconds": 5.085
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "a0b14925b089dbaa814d17b86ef0eda72169487af2299fbbbc4c7e4fd2ef9101",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 100
+      },
+      "run": "task7-fix1-08-terminal-coverage-green",
+      "seconds": 18.666
+    },
+    {
+      "classification": "intended inverse RED: mixed transport/storage stop selection: 4 mixed-gap cases fail while prior-success control passes. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 10.",
+      "command_sha256": "499630c80455405b0833d233eb1b5bf43a95532d5957a7fa33516a2076d4bece",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[False-storage_space_insufficient]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 4,
+        "passed": 1
+      },
+      "run": "task7-fix1-09-mixed-stop-inverse",
+      "seconds": 2.202
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "94b70fa880a8aa9b61b48ac0dabe4b1246296f994c040a964d6f54238a3ca4d6",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 5
+      },
+      "run": "task7-fix1-10-mixed-stop-restored",
+      "seconds": 2.226
+    },
+    {
+      "classification": "intended inverse RED: dispatch observation argument: all 12 interleaved map cases fail. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 12.",
+      "command_sha256": "583b7b9ef6b2b0b846d6508c4d263aee3b70a41864b39d537d0e3490b2c8f866",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-changed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-changed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-failed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-failed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-changed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-changed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-failed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-failed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-between_members]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 12
+      },
+      "run": "task7-fix1-11-map-dispatch-inverse",
+      "seconds": 3.238
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "78db40d5b72b4bbff252614a0fe492ae5e735b282189218330852019c261f336",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 12
+      },
+      "run": "task7-fix1-12-map-dispatch-restored",
+      "seconds": 3.267
+    },
+    {
+      "classification": "intended inverse RED: resolver's supplied observation: all 12 interleaved map cases fail. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 14.",
+      "command_sha256": "6dda09c7643e77c9a0ddf30a93fc28fae92aa1089d40c67237c006709c88b779",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-changed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-changed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-failed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-failed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-changed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-changed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-failed-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-failed-between_members]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-after_refresh]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-between_members]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 12
+      },
+      "run": "task7-fix1-13-map-resolver-inverse",
+      "seconds": 3.241
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "2af55cd37e4af491a0ced9cb892889230903f302e68dcac6575868560584532d",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 12
+      },
+      "run": "task7-fix1-14-map-resolver-restored",
+      "seconds": 3.296
+    },
+    {
+      "classification": "intended inverse RED: terminal membership coverage validation: 27 cases fail while running-checkpoint and accounted map-abort controls pass. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 16.",
+      "command_sha256": "0f9e12523afb231d4ddbd860d05e55453d6dcf66a932776448c8aeb38668ea00",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[validator-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[validator-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[validator-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[validator-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[record-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[record-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[record-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[record-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[status-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[status-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[status-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[status-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[admin-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[admin-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[admin-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[admin-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[export-empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[export-succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[export-partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_witness_is_rejected[export-failed]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_cik_partition_is_validated[duplicate_member]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_cik_partition_is_validated[wrong_cik]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule",
+          "test_terminal_membership_cik_partition_is_validated[extra_cik]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_uncovered_membership_adapter_result_is_rejected[empty]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_uncovered_membership_adapter_result_is_rejected[succeeded]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_uncovered_membership_adapter_result_is_rejected[partial]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_uncovered_membership_adapter_result_is_rejected[failed]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 27,
+        "passed": 2
+      },
+      "run": "task7-fix1-15-terminal-coverage-inverse",
+      "seconds": 5.328
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "c9c95353e93930bf4705b4775a4b482748838be399bf81850ddbbd3b8b10a6e6",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 29
+      },
+      "run": "task7-fix1-16-terminal-coverage-restored",
+      "seconds": 4.969
+    },
+    {
+      "classification": "intended inverse RED: aborted-resolution unresolved accounting: actual map-lease abort is rejected by terminal validator. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 18.",
+      "command_sha256": "7a0ff0d73834a910e7adae3fd2ed3a80485940d3a358049138f2f72a5ca71c89",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_map_lease_abort_accounts_unresolved_members_and_retains_rotation",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task7-fix1-17-aborted-membership-inverse",
+      "seconds": 1.63
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "292897658625fd4bc724f598c1acf2ed58e16fced859f5509ea0b460c01302ab",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 1
+      },
+      "run": "task7-fix1-18-aborted-membership-restored",
+      "seconds": 2.104
+    },
+    {
+      "classification": "intended inverse RED: refreshed earlier actual historical-pointer prohibition: exact recent source inventory fails on dispatched historical URL. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 20.",
+      "command_sha256": "416f9b36123713c7288babc9122d11238c82035445975db0dcbf052cad021540",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_schedule_deduplicates_cik_and_exposes_unresolved_symbols",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse",
+      "seconds": 0.967
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "d72eba19f55e17b1bd0bdf3099e6289f6c36d0a84827ed3cc47ba590225206e8",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 1
+      },
+      "run": "task7-fix1-20-refresh-traverse-actual-historical-pointer-restored",
+      "seconds": 0.979
+    },
+    {
+      "classification": "intended inverse RED: refreshed earlier independent last acquisition retention: partial/failure erases prior successful acquisition timestamp. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 22.",
+      "command_sha256": "d4294dd3abb89e977854216a880669b1030e2b4aab4146b9b043a83b6a81eedd",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_sec_partial_failure_retains_previous_success",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task7-fix1-21-refresh-erase-success-inverse",
+      "seconds": 1.028
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "bad25f2a2eff070dcaa404855eac5499c849c99ec0931c6366b410a03dfe7f63",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 1
+      },
+      "run": "task7-fix1-22-refresh-erase-success-restored",
+      "seconds": 1.118
+    },
+    {
+      "classification": "intended inverse RED: refreshed earlier fresh-universe membership: removed member appears in reused membership. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 24.",
+      "command_sha256": "2e094b481dc0c2a79345db632a02e8060eef53e3857b01883bfe747580bdbec0",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_batch_bounds_defer_without_starving_current_members",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task7-fix1-23-refresh-reuse-membership-inverse",
+      "seconds": 1.243
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "9ebf5cd04353943da09d831b42b6021149d191df113b1291cd85413bd4e8162b",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 1
+      },
+      "run": "task7-fix1-24-refresh-reuse-membership-restored",
+      "seconds": 1.207
+    },
+    {
+      "classification": "intended inverse RED: refreshed earlier observed space-symbol boundary: 3 mixed observed-membership cases fail; unchanged hidden-distinction control passes. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 26.",
+      "command_sha256": "27b8238c792efe6ebf1ca1dbe02233d6ec20f49c9a0db90168c16f42b6b7375c",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_schedule",
+          "test_space_symbol_is_unresolved_without_rejecting_observed_membership",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_actual_space_symbol_membership_keeps_other_issuer_and_stored_status",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_schedule_runtime",
+          "test_only_sec_invalid_symbol_needs_no_credentials_or_transport",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 3,
+        "passed": 1
+      },
+      "run": "task7-fix1-25-refresh-reject-observed-space-symbol-inverse",
+      "seconds": 2.23
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "a058516f0060553f67c19ce23601eb693afa8af3d95a6769140c29385aabd817",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 4
+      },
+      "run": "task7-fix1-26-refresh-reject-observed-space-symbol-restored",
+      "seconds": 2.952
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "a90054b8ca23861db9fb3d74f4cf6edfac194cb28ced61a4f1ab30ca70c21f56",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 2493
+      },
+      "run": "task7-fix1-27-backend-cover",
+      "seconds": 238.752
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "7473dc4181e24c49677a869c63a13c856569a5e9463eca4eecbf468a7a2ff56c",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task7-fix1-28-settings-cover",
+      "seconds": 5.447
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "4b11accc1a6091d7e5ac20d1a7e152dd48720380cff9b1feca077a3595a6c56c",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task7-fix1-29-browser-final",
+      "seconds": 15.384
+    }
+  ],
+  "unclassified_failures": [],
+  "unfinished": []
+}

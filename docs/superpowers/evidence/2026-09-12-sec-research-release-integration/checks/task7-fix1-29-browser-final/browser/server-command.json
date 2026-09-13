@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/home/hyl/.nvm/versions/node/v22.14.0/bin/node",
+    "/tmp/arkscope-research-output-boundary/node_modules/vite/bin/vite.js",
+    "--config",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/vite-preview.mjs"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "base": "http://127.0.0.1:48003",
+  "fixture_api": "http://127.0.0.1:36203",
+  "home": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/home"
+}

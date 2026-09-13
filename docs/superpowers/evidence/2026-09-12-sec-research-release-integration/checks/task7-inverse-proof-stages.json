@@ -1,0 +1,24 @@
+{
+  "checkpoint": {
+    "executions": 10,
+    "recipes": "task7-inverse-recipes.json",
+    "hash_ledger": "task7-inverses.json",
+    "note": "32-49 pre-integrity checkpoint; 55-56 post-integrity but pre-membership checkpoint. Not presented as final-source proof."
+  },
+  "final": {
+    "executions": 8,
+    "recipes": "task7-final-inverses.json",
+    "runs": "63-78",
+    "note": "After both integrity and membership repairs; every original/restored hash matches final Task7 source. Includes five required backend inverses, two UI inverses, and observed-member boundary inverse."
+  },
+  "artifact_root": "task7-inverse-artifacts",
+  "original_mutant_source_pairs": 20,
+  "artifact_files": 40,
+  "replay": "Each recipe retains exact original and mutant source, replacement strings, test selector, red/restored command receipts. Re-run in a disposable worktree using a NEW create-only task7-* name with unchanged guards.",
+  "semantic_caveats": [
+    "34 detects illegal historical continuation before dispatch; not a confirmed historical request.",
+    "46 detects wrong full scope/confirmedness, not historical dispatch.",
+    "48 and 65 really dispatch the injected declared historical pointer and fail the exact URL inventory.",
+    "Metadata source attempts, even failed attempts, are not actual confirmed provider HTTP."
+  ]
+}

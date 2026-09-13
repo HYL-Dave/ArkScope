@@ -22,7 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
-| **P0-E** | **Verified renames, financial freshness, SEC research access and macro result truth** | **SEC CITATIONS, PROTECTED EXPORT/RESTORE AND MAINTENANCE IMPLEMENTED; SCHEDULE/ROLLOUT OPEN.** Through `78157e62`, Tasks5/6 add operation-lifetime exclusion, verified portable bundles and digest-approved orphan cleanup/schema recovery. Both independent reviews and scoped repairs are accepted; long file/audit work does not hold the global market writer lock. Full backend **10827P/12 unchanged S**, exact10839nodes (+244/-0 against citation acceptance),1151 frozen paths; frontend **1830P**, typecheck/build/i18n pass. Prior three-tool/four-channel durable citations and adjustable100GiB capacity remain. SEC-RECOVERY-001/002 source implementation is closed, not actual-store execution. Task7 schedule and Task8 wider cleanup/release acceptance remain open; census is review_required. Evidence: `docs/superpowers/evidence/2026-09-13-sec-research-maintenance/README.md`; operator guide: `docs/design/SEC_RESEARCH_OPERATIONS.md`. No production access, provider call, install, cleanup/reset, App restart, merge or push. | Complete useful research/data workflows while preserving membership removals, provenance and truthful execution status. |
+| **P0-E** | **Verified renames, financial freshness, SEC research access and macro result truth** | **PUBLICATION RECOVERY AND SCHEDULE CLOSED; RELEASE BLOCKED BY DELEGATED MODEL I/O.** `d2f491c1` repairs the interrupted hardlink recovery gap; Task7 through `883b0185` adds independently reviewed default-disabled current-universe scheduling. `911d69a2` repairs delegated invocation, retained references and SDK cleanup ownership with **1349 focused passes**; final scoped review closes the three named findings but finds ImportantN1: synchronous Anthropic child I/O newly blocks the OpenAI parent loop. Proposed next scope: awaitable child client preserving captured auth/model/effort. Fresh frontend **1833P**, typecheck/build/i18n pass; **11023 nodes collected, final complete backend NOT RUN** pending N1. Earlier full10827P/12S remains a historical maintenance checkpoint. Source1158paths/runtime/runners are unchanged across current checks. Evidence: `docs/superpowers/evidence/2026-09-12-sec-research-release-integration/README.md`. Task8/release acceptance, actual activation and wider cleanup remain open; census retains review_required. No production access, provider call, install, cleanup/reset, App restart, merge or push. | Complete useful research/data workflows while preserving membership removals, provenance and truthful execution status. |
 | **P1** | **PRE-RELEASE-ABANDONED-SURFACE-CLEANUP** | **C03/C09/C10/C11/C13 CLOSED; WIDER CLEANUP OPEN.** Through `1304c96d`, C11 removes the obsolete news switch/PUT/status fields and false legacy/publication telemetry fallback; current writers, IBKR semantics and retained data remain. EIR-001/C13 removes exactly five unused page-head CSS rules with ten unchanged responsive comparisons. Fresh full backend **10,311P/12 unchanged S**, exact 10,323 nodes, frontend **1,779P**, typecheck/build/i18n and independent reviews pass. The first full run's missed fixture-classification guard is corrected and retained as failed evidence. Census removes 15 occurrences, adds no candidates and retains review_required. Evidence: `docs/superpowers/evidence/2026-09-13-maintenance-closures/README.md`. C12, C15/C20, CENSUS-I18N-001, broader CSS, CENSUS-SQL-001 and actual stored-data/schema/key disposition remain open; C21 is deferred. The retention manifest is not DROP/backup approval. | Apply the user's pre-release deletion policy without removing live capabilities, retained data, or hiding incomplete cleanup. |
 | **P1** | **SQLITE-RUNTIME-READMISSION** | **3.53.4 CANDIDATE VERIFIED; SOURCE-ONLY ADMISSION PREFLIGHT COMPLETE; NOT ACTIVATED.** Prior five-case UPSERT/8 synthetic/330 application-store candidate evidence remains in `docs/superpowers/evidence/2026-09-12-sec-integration/sqlite-candidate.md`; WAL-reset stress is not deterministic proof. September 13 source-only preflight identifies an app-private immutable library plus unchanged-Python wrapper, separate Electron/SA selectors and a sanitized analysis child that drops loader settings. Relocation and compile-profile acceptance (including bind capacity/privacy) must precede the actual stopped-writer backup/integrity/switch window; the scratch artifact is not deployable. Entry and child requirements: `docs/superpowers/evidence/2026-09-13-maintenance-closures/checks/sqlite-admission-preflight.md`. No actual selector/store inspection, package installation or activation occurred. Do not upgrade Python/numpy merely to replace SQLite, install global libraries, or imply that upgrading repairs existing data. | Own the user's identified storage-engine risk before sustained SEC ingestion, without conflating a synthetic reproducer with damage to their databases. |
 | **P0-E** | **Security lifecycle tracking correctness + investigation** | **MERGED LOCALLY AND JOURNAL V2 INSTALLED; USER RESTART/HAND TEST NEXT.** The authorized September 8 cutover adds eight tables while preserving all 71 original profile tables and 72,471 rows. The 36 SEC cases leave the work queue; their rows and three listing-authority treatment records remain intact. Target-first provider review, independent Settings/model routing, four auth adapters and separate human confirmation/reversal are available after restart. Both pre-merge and merged suites pass 7,114P/12S backend and 1,633P frontend, with build/typecheck. Final review retains 31 mutation owners, 96 screenshots and all three current-source Claude OAuth live controls; other channels remain offline-verified only. Earlier ARCH/LTHM/TA treatment and the eleven August 21-September 4 price sessions were already verified; this deployment makes no newer price-data claim. **Next: user manually restarts and follows the hand-test checklist, then decides push.** No new provider call, tracking action, legacy-row deletion or App start occurred during deployment. Receipt/guide: `docs/superpowers/evidence/2026-09-08-lifecycle-investigation-deployment/README.md`. | Correct price/news collection symbols and durable removal without confusing an invalid listing with issuer extinction or an acquisition with same-security continuity. |
@@ -57,11 +57,13 @@ complete reference recheck and receipt) and **SEC-RECOVERY-002** (operator-owned
 schema reset/uninstall with backup and unrelated-data preservation). Both recovery
 implementations are accepted through78157e62; they are not implicit behavior of
 recovery accounting or verify/install. Their constraints are in SEC spec
-section10 and `docs/design/SEC_RESEARCH_OPERATIONS.md`. Task7 scheduling and
-Task8 release acceptance remain open. No production schema install, reset,
+section10 and `docs/design/SEC_RESEARCH_OPERATIONS.md`. Task7 scheduling is now
+implemented and reviewed through883b0185. Task8 remains blocked by the final
+review's delegated-model-I/O regression N1; see the current P0-E row and September14
+evidence. No production schema install, reset,
 deletion or source call is authorized by this documentation update.
 
-**Shared research output security (2026-09-12, implemented; final review open):**
+**Shared research output security (historical September12 checkpoint):**
 The user approved a shared mechanism, not a SEC exemption. The independent
 `codex/research-output-boundary` slice starts from `18d46062`; its spec/plan is
 `docs/superpowers/specs/2026-09-12-research-output-boundary-design.md` and
@@ -86,7 +88,11 @@ The other worktree's SEC Task 2 is parked with four OAuth failures, explicitly
 blocked on this boundary. Those feature nodes are absent from this independent
 branch and are not claimed fixed. SEC feature completion and remaining cleanup
 retain their existing owners. No production access, provider call, install,
-schema change, merge, push or restart is part of this security slice.
+schema change, merge, push or restart is part of this security slice. Subsequent
+integration resolved the four parked SEC OAuth failures and completed the
+three-tool/four-channel wiring; the paragraph above preserves the independent
+slice's original review status, not today's integration status. Current release
+acceptance and its open N1 are owned by the P0-E row above.
 
 Subscription strategy: see §10. Splits into **operational** (must-keep) vs
 **research** (evidence-gated). Paid IV/options data is research subscription work and
@@ -644,6 +650,25 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-14 (PUBLICATION RECOVERY/SCHEDULE CLOSED; FINAL SEC ACCEPTANCE HELD):**
+  User's interrupted-publication report reproduced on generated stores. Repair
+  d2f491c1 accounts durably before removing only a proven redundant staging
+  hardlink; strict admin inventory and reference protection remain. Task7
+  936ede10/883b0185 adds disabled daily recent-submissions/Company-Facts collection,
+  truthful outcomes, immutable-map binding, fair continuation and real Settings
+  controls; independent review and scoped repairs pass. Task8 workflow tests and
+  final repair911d69a2 add real delegated execution/reference/cancellation owners.
+  Final re-review accepts I1/M1/citations but finds N1: blocking Anthropic SDK I/O
+  moved onto the OpenAI parent's loop. Do not accept or merge that regression.
+  Ask for the awaitable-child-client follow-up, preserving captured authority;
+  no hidden second fix wave. Full backend is deliberately not run yet;11023
+  collected nodes are not passes. Fresh frontend1833P and typecheck/build/literals
+  pass; source1158paths/runtime/runners stay fixed. All168 check receipts and81
+  nonzero attempts remain classified, with no unfinished runner. Census keeps
+  review_required and existing cleanup owners. SQLite remains3.37.2; no actual
+  store/config/runtime/merge/push action. Evidence and all controller rulings:
+  `docs/superpowers/evidence/2026-09-12-sec-research-release-integration/`.
 
 - **2026-09-13 (DURABLE SEC RESEARCH CITATIONS CLOSED; NO MAINTENANCE ACTIVATION):**
   User requests continued bounded completion. Focused plan from `ca49b454`

@@ -1,0 +1,178 @@
+[
+  {
+    "name": "mixed-stop",
+    "stage": "fix1 final-source proof after all I1-I3 repairs",
+    "base": "936ede10f04c370bf2322ee70833f9e0f29b7a44",
+    "red": "task7-fix1-09-mixed-stop-inverse",
+    "green": "task7-fix1-10-mixed-stop-restored",
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "mixed_transport_storage_gaps or sec_partial_failure_retains_previous_success"
+    ],
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "replacements": [
+          {
+            "original": "        for gap in receipt[\"gaps\"]:\n            if gap[\"code\"] in {\"capture_budget_exceeded\", \"storage_space_insufficient\",\n                               \"capture_store_write_failed\"}:\n                batch[\"stop_reason\"] = gap[\"code\"]\n                break",
+            "mutant": "        if any(gap[\"code\"] in {\"capture_budget_exceeded\", \"storage_space_insufficient\",\n                               \"capture_store_write_failed\"} for gap in receipt[\"gaps\"]):\n            batch[\"stop_reason\"] = next(gap[\"code\"] for gap in receipt[\"gaps\"])"
+          }
+        ],
+        "before": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b",
+        "mutant": "f0e7028e58bbb6c2abb820fd04a9b6e6b404d3287a6983b137f207bc06292139",
+        "original_artifact": "task7-fix1-inverse-artifacts/mixed-stop/1-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/mixed-stop/1-mutant.py",
+        "restored": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+      }
+    ],
+    "replay": "Verify original hash at the reported fix1 source commit in a disposable worktree. Apply exact replacement or archived mutant, run the recorded selector through unchanged run_checks.py with a NEW create-only task7-fix1-* name, restore exact original and rerun. Original/mutant artifacts and red/restored command receipts are retained; no live providers or installation.",
+    "red_exit": 1,
+    "red_tail": "=========================== short test summary info ============================\nFAILED tests/test_sec_research_schedule.py::test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded] - Failed: mixed source gaps lost terminal batch: sec_schedule_batch_invalid; retained=running\nFAILED tests/test_sec_research_schedule.py::test_mixed_transport_storage_gaps_keep_terminal_batch[False-storage_space_insufficient] - Failed: mixed source gaps lost terminal batch: sec_schedule_batch_invalid; retained=running\nFAILED tests/test_sec_research_schedule.py::test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded] - Failed: mixed source gaps lost terminal batch: sec_schedule_batch_invalid; retained=running\nFAILED tests/test_sec_research_schedule.py::test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient] - Failed: mixed source gaps lost terminal batch: sec_schedule_batch_invalid; retained=running\n4 failed, 1 passed, 72 deselected in 1.86s\n",
+    "green_exit": 0,
+    "green_tail": "- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-10-mixed-stop-restored/results.xml -\n5 passed, 72 deselected in 1.88s\n"
+  },
+  {
+    "name": "map-dispatch",
+    "stage": "fix1 final-source proof after all I1-I3 repairs",
+    "base": "936ede10f04c370bf2322ee70833f9e0f29b7a44",
+    "red": "task7-fix1-11-map-dispatch-inverse",
+    "green": "task7-fix1-12-map-dispatch-restored",
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "resolution_stays_bound_to_returned_map"
+    ],
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "replacements": [
+          {
+            "original": "            resolution = resolver.resolve(member, observation=observation)",
+            "mutant": "            resolution = resolver.resolve(member)"
+          }
+        ],
+        "before": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b",
+        "mutant": "12a655ffc118d975b2ffb9894e3f5d0436931907686eb061030bbd879e0e4a90",
+        "original_artifact": "task7-fix1-inverse-artifacts/map-dispatch/1-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/map-dispatch/1-mutant.py",
+        "restored": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+      }
+    ],
+    "replay": "Verify original hash at the reported fix1 source commit in a disposable worktree. Apply exact replacement or archived mutant, run the recorded selector through unchanged run_checks.py with a NEW create-only task7-fix1-* name, restore exact original and rerun. Original/mutant artifacts and red/restored command receipts are retained; no live providers or installation.",
+    "red_exit": 1,
+    "red_tail": "  Full diff:\n    [\n        '0000000001',\n  -     '0000000002',\n    ]\n12 failed, 65 deselected in 2.91s\n",
+    "green_exit": 0,
+    "green_tail": "- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-12-map-dispatch-restored/results.xml -\n12 passed, 65 deselected in 2.92s\n"
+  },
+  {
+    "name": "map-resolver",
+    "stage": "fix1 final-source proof after all I1-I3 repairs",
+    "base": "936ede10f04c370bf2322ee70833f9e0f29b7a44",
+    "red": "task7-fix1-13-map-resolver-inverse",
+    "green": "task7-fix1-14-map-resolver-restored",
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "resolution_stays_bound_to_returned_map"
+    ],
+    "files": [
+      {
+        "file": "src/sec_research/issuer_store.py",
+        "replacements": [
+          {
+            "original": "        if observation is None:\n            observation = self.latest()",
+            "mutant": "        observation = self.latest()"
+          }
+        ],
+        "before": "75e5864b8955b1178a72c0333d5832faf6e62af1df7c3ce9a34afb37e1610e12",
+        "mutant": "38687c3a2ec06545cb65affeff922545ca80dc7bc2fd21dfc021738d6768e268",
+        "original_artifact": "task7-fix1-inverse-artifacts/map-resolver/1-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/map-resolver/1-mutant.py",
+        "restored": "75e5864b8955b1178a72c0333d5832faf6e62af1df7c3ce9a34afb37e1610e12"
+      }
+    ],
+    "replay": "Verify original hash at the reported fix1 source commit in a disposable worktree. Apply exact replacement or archived mutant, run the recorded selector through unchanged run_checks.py with a NEW create-only task7-fix1-* name, restore exact original and rerun. Original/mutant artifacts and red/restored command receipts are retained; no live providers or installation.",
+    "red_exit": 1,
+    "red_tail": "  Full diff:\n    [\n        '0000000001',\n  -     '0000000002',\n    ]\n12 failed, 65 deselected in 2.91s\n",
+    "green_exit": 0,
+    "green_tail": "- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-14-map-resolver-restored/results.xml -\n12 passed, 65 deselected in 2.95s\n"
+  },
+  {
+    "name": "terminal-coverage",
+    "stage": "fix1 final-source proof after all I1-I3 repairs",
+    "base": "936ede10f04c370bf2322ee70833f9e0f29b7a44",
+    "red": "task7-fix1-15-terminal-coverage-inverse",
+    "green": "task7-fix1-16-terminal-coverage-restored",
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "tests/test_sec_research_schedule_runtime.py",
+      "-k",
+      "terminal_membership or running_membership or map_lease_abort or uncovered_membership"
+    ],
+    "files": [
+      {
+        "file": "src/sec_research/schedule_store.py",
+        "replacements": [
+          {
+            "original": "            _require(batch[\"status\"] != \"succeeded\" or batch[\"universe_status\"] == \"available\")\n            if batch[\"universe_status\"] == \"available\":",
+            "mutant": "            _require(batch[\"status\"] != \"succeeded\" or batch[\"universe_status\"] == \"available\")\n            if False and batch[\"universe_status\"] == \"available\":"
+          }
+        ],
+        "before": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed",
+        "mutant": "5b24b56ddec33ccbd5763b0f8f76fad1b4aa03b3caa508fcec571677edeaa3f1",
+        "original_artifact": "task7-fix1-inverse-artifacts/terminal-coverage/1-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/terminal-coverage/1-mutant.py",
+        "restored": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed"
+      }
+    ],
+    "replay": "Verify original hash at the reported fix1 source commit in a disposable worktree. Apply exact replacement or archived mutant, run the recorded selector through unchanged run_checks.py with a NEW create-only task7-fix1-* name, restore exact original and rerun. Original/mutant artifacts and red/restored command receipts are retained; no live providers or installation.",
+    "red_exit": 1,
+    "red_tail": "  \n    failed and 'sec_schedule_failed' == 'sec_schedule_result_invalid'\n  \n  - sec_schedule_result_invalid\n  + sec_schedule_failed)\n27 failed, 2 passed, 71 deselected in 4.86s\n",
+    "green_exit": 0,
+    "green_tail": "- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-16-terminal-coverage-restored/results.xml -\n29 passed, 71 deselected in 4.49s\n"
+  },
+  {
+    "name": "aborted-membership",
+    "stage": "fix1 final-source proof after all I1-I3 repairs",
+    "base": "936ede10f04c370bf2322ee70833f9e0f29b7a44",
+    "red": "task7-fix1-17-aborted-membership-inverse",
+    "green": "task7-fix1-18-aborted-membership-restored",
+    "selector": [
+      "backend",
+      "-q",
+      "tests/test_sec_research_schedule.py",
+      "-k",
+      "map_lease_abort"
+    ],
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "replacements": [
+          {
+            "original": "        batch[\"unresolved\"].extend(dict(ticker=member, candidates=[], code=code)\n            for member in resolvable if member not in unresolved)",
+            "mutant": "        batch[\"unresolved\"].extend([])"
+          }
+        ],
+        "before": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b",
+        "mutant": "302a0093b49a657cdf2876dc9fd3ab1e2b46b6289d0cd8d2410d3a0df5a977b7",
+        "original_artifact": "task7-fix1-inverse-artifacts/aborted-membership/1-original.py",
+        "mutant_artifact": "task7-fix1-inverse-artifacts/aborted-membership/1-mutant.py",
+        "restored": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+      }
+    ],
+    "replay": "Verify original hash at the reported fix1 source commit in a disposable worktree. Apply exact replacement or archived mutant, run the recorded selector through unchanged run_checks.py with a NEW create-only task7-fix1-* name, restore exact original and rerun. Original/mutant artifacts and red/restored command receipts are retained; no live providers or installation.",
+    "red_exit": 1,
+    "red_tail": "    raise ValueError(\"sec_schedule_batch_invalid\") from None\nE   ValueError: sec_schedule_batch_invalid\n- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-17-aborted-membership-inverse/results.xml -\n=========================== short test summary info ============================\nFAILED tests/test_sec_research_schedule.py::test_map_lease_abort_accounts_unresolved_members_and_retains_rotation - ValueError: sec_schedule_batch_invalid\n1 failed, 76 deselected in 1.30s\n",
+    "green_exit": 0,
+    "green_tail": "- generated xml file: /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-18-aborted-membership-restored/results.xml -\n1 passed, 76 deselected in 1.76s\n"
+  }
+]

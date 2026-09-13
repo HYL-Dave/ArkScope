@@ -1,0 +1,886 @@
+{
+  "base": "d2f491c130f10c738b2158e76e3e536df207e927",
+  "branch": "codex/sec-research-integration",
+  "sources": [
+    {
+      "path": "apps/arkscope-web/src/SettingsLocalStorage.test.ts",
+      "sha256": "bd17efbf57e3b3f4298a02cf370863d008a262a55f0c2a6596604532b8bc4a76",
+      "bytes": 37846,
+      "kind": "test"
+    },
+    {
+      "path": "apps/arkscope-web/src/api.ts",
+      "sha256": "09868702f7cbb213057f8647c660d3664fdd4aed2cad1c68bbf21a6337a35bb4",
+      "bytes": 187669,
+      "kind": "production"
+    },
+    {
+      "path": "apps/arkscope-web/src/i18n/resources.test.ts",
+      "sha256": "1b7113aafae04b64469e7332f441f5d1801052027589001bc9af3a43f22b6c72",
+      "bytes": 70593,
+      "kind": "test"
+    },
+    {
+      "path": "apps/arkscope-web/src/i18n/resources/en/settings.ts",
+      "sha256": "8fd25a4849e6d7babc41ae2a937838ea6881bcbc70f50822f5b55a51193213b0",
+      "bytes": 58884,
+      "kind": "production"
+    },
+    {
+      "path": "apps/arkscope-web/src/i18n/resources/zh-Hant/settings.ts",
+      "sha256": "628e02a223252677c606a5f4ce9677ac3082f325f288004c96ffe1fba85e182f",
+      "bytes": 56984,
+      "kind": "production"
+    },
+    {
+      "path": "apps/arkscope-web/src/settings/DataStorageSection.test.tsx",
+      "sha256": "faebcc4f87af58a3dc4327cbd36600b486559b87956c208855bb66ef712fd851",
+      "bytes": 36809,
+      "kind": "test"
+    },
+    {
+      "path": "apps/arkscope-web/src/settings/SecDocumentReader.test.tsx",
+      "sha256": "72ddcc91dc9ad27a164a7638d34924606ef3db9e055270c42890874d1bb8925a",
+      "bytes": 27634,
+      "kind": "test"
+    },
+    {
+      "path": "apps/arkscope-web/src/settings/SecResearchPanel.test.tsx",
+      "sha256": "962c88ed5d8bfa3fab9c52d530c8d4041a36bf2994afed25b5e0658f6040e73d",
+      "bytes": 33906,
+      "kind": "test"
+    },
+    {
+      "path": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+      "sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "bytes": 26448,
+      "kind": "production"
+    },
+    {
+      "path": "apps/arkscope-web/src/settings/dataScheduleControls.tsx",
+      "sha256": "6486a6e9db0ad1a23262a2696f79838678b4eca98f64b652578b202d91cf5802",
+      "bytes": 17907,
+      "kind": "production"
+    },
+    {
+      "path": "apps/arkscope-web/src/settings/secResearch.css",
+      "sha256": "4a0f2d79ba69a3c6295880dd5b4b860657e84a44e210eebbbb53372b749c0689",
+      "bytes": 4599,
+      "kind": "production"
+    },
+    {
+      "path": "apps/arkscope-web/src/settings/settingsBackendCopy.test.ts",
+      "sha256": "93a3d8f73a61b3bb84905e4ca11f9b05bd51da44bc9c4f013153a31773d2fc44",
+      "bytes": 19922,
+      "kind": "test"
+    },
+    {
+      "path": "apps/arkscope-web/src/settings/settingsBackendCopy.ts",
+      "sha256": "73b0426ce5a6dd2db413fb49458888adf4c5d60e8f38a5b3531ceeb2929eac5d",
+      "bytes": 13267,
+      "kind": "production"
+    },
+    {
+      "path": "src/api/routes/sec_research.py",
+      "sha256": "9086b631dd365c6469229143aaaa3c4e575c575f972e00da466a4209a364701b",
+      "bytes": 15345,
+      "kind": "production"
+    },
+    {
+      "path": "src/sec_research/operations.py",
+      "sha256": "aae23b0a19c675aac4fd25a6df52b7a4e40d40db12868a410873dd308f25068e",
+      "bytes": 28537,
+      "kind": "production"
+    },
+    {
+      "path": "src/sec_research/queries.py",
+      "sha256": "43406972004f8837fcb50caac28a2c646b6f1a8e2ef909781eb2e844bb790c1a",
+      "bytes": 20154,
+      "kind": "production"
+    },
+    {
+      "path": "src/sec_research/schedule_store.py",
+      "sha256": "da170ec839e3154ef1ae83af2f71f2636f91ab204998ba4a49fe4ceb8d833c16",
+      "bytes": 10734,
+      "kind": "production"
+    },
+    {
+      "path": "src/sec_research/scheduled.py",
+      "sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "bytes": 10613,
+      "kind": "production"
+    },
+    {
+      "path": "src/sec_research/schema.py",
+      "sha256": "dca795944b737b0497eb0be1ae875824a5e93442609abb4733d2312181947223",
+      "bytes": 8255,
+      "kind": "production"
+    },
+    {
+      "path": "src/sec_research/service.py",
+      "sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "bytes": 9172,
+      "kind": "production"
+    },
+    {
+      "path": "src/sec_research/store.py",
+      "sha256": "d46dccee5ed50c5f3d4c1c914cf0b8e4a5b010ed85bf01f742612ba7becebbed",
+      "bytes": 17128,
+      "kind": "production"
+    },
+    {
+      "path": "src/sec_research/tool_service.py",
+      "sha256": "c718420402ca5668ab980fc2c442eda7c984e974a59595812a300b99ec763af1",
+      "bytes": 9703,
+      "kind": "production"
+    },
+    {
+      "path": "src/service/data_scheduler.py",
+      "sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "bytes": 81070,
+      "kind": "production"
+    },
+    {
+      "path": "tests/test_data_scheduler.py",
+      "sha256": "a0217e5fb6d63abeb34f5af5746387256b06fbfe38d7b3bb9e1153cdfd9858c1",
+      "bytes": 139359,
+      "kind": "test"
+    },
+    {
+      "path": "tests/test_sec_research_schedule.py",
+      "sha256": "c7667083e2696080d05334fce1bb22f11df7b46528333b63125aec9385e29332",
+      "bytes": 17661,
+      "kind": "test"
+    },
+    {
+      "path": "tests/test_sec_research_schedule_runtime.py",
+      "sha256": "f7658556301b62911030478cc68573018d28f3271aedd159b9b89cfce62f5c7e",
+      "bytes": 11558,
+      "kind": "test"
+    },
+    {
+      "path": "tests/test_sec_research_service.py",
+      "sha256": "f0f04aa9e6dcd58d14ddc0b4ef0125c508760c87b843dc0b56254e8e3fd1c506",
+      "bytes": 31635,
+      "kind": "test"
+    },
+    {
+      "path": "tests/test_sec_research_tool_service.py",
+      "sha256": "a1e215b44202f6c45ff0a90251ef905b67cb05b9cb3f75519c22fed9317bdff0",
+      "bytes": 20461,
+      "kind": "test"
+    }
+  ],
+  "helpers": [
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+      "sha256": "2c1cc48b15f817b02cc70a99cad757a0962e875e37381fa122fca8b89796247f"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+      "sha256": "4c74153e1ef86c35f7bbc923586de624c0ffe3f577c2853e6e4c0a78426c95ff"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/offline_node.cjs",
+      "sha256": "35f45243a42cf069225ff91e726779333c33bb9a3abc4c1f694404c3810b728b"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/browser_fixture.py",
+      "sha256": "16cbae676518717d9fb6a3cb5d8703444c0b5fc3c060c6d49a456e020aa6d44b"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/browser_check.py",
+      "sha256": "70c00873df3bd427cc8d290569f9c37504d3faf915423ef0c70f552a58f0c6ba"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/vite-preview.mjs",
+      "sha256": "83e6f8d1550668d0eae50f78445f5133a30cd3438a9be853beb1c52f63d2eb88"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/browser-fixture/main.tsx",
+      "sha256": "6c7f1848b53f400c9edc7037a07850ee4c320d10932980fa1a14897744f1bbcd"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/browser-fixture/index.html",
+      "sha256": "db2c03027fe176293e041b710a40f816ac459317722c448420297289dc1c9c12"
+    }
+  ],
+  "guard_hashes_verified": true,
+  "inverse_checks": [
+    {
+      "name": "enable-by-default",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "src/service/data_scheduler.py",
+      "original_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "mutant_sha256": "8bdca544b1f9100f9eb74bf8117114b7039efbbda247778d8152afa80e80fa71",
+      "restored_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "current_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "history-traversal",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "src/sec_research/service.py",
+      "original_sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "mutant_sha256": "0e08bc49466b5f5727270dc1f5cfc8833017f4e76ed88763bb631e0491f4d528",
+      "restored_sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "current_sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "drop-partial",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "src/service/data_scheduler.py",
+      "original_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "mutant_sha256": "160f501f0992bdcc583ec33ec0068a536c0340cef5c0fe7e5cd0e68c95bedcc3",
+      "restored_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "current_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "erase-success",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "src/sec_research/schedule_store.py",
+      "original_sha256": "90ad6c75da5e27287e550eed840dc608441c4179d430199a760b5c250df47cd6",
+      "mutant_sha256": "107f8e8c71f1f522609ee901f29c57c24322de708adb0e756e24d2431dd7dbbf",
+      "restored_sha256": "90ad6c75da5e27287e550eed840dc608441c4179d430199a760b5c250df47cd6",
+      "current_sha256": "da170ec839e3154ef1ae83af2f71f2636f91ab204998ba4a49fe4ceb8d833c16",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "reuse-membership",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "src/sec_research/scheduled.py",
+      "original_sha256": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+      "mutant_sha256": "bd19a0fc2dd9e823d9a4b1e80385b83f4011cd7f7ac3660925b904783e0b074f",
+      "restored_sha256": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+      "current_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "reset-pins",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+      "original_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "mutant_sha256": "8e09e7845ab748abb96c94a4352ce834bb9b7292265efb2ea8a3612ed7c474af",
+      "restored_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "current_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "reset-draft",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+      "original_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "mutant_sha256": "d6058729f868d11e0a372fb3edf49bd8cfee8706e43b804b0de4585531e1319c",
+      "restored_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "current_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "wrong-full-scope-two-sources",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "src/sec_research/scheduled.py",
+      "original_sha256": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+      "mutant_sha256": "f7581e14626824e8924f6a57f723e46bfdb325b686c660bed43f206bc1a74396",
+      "restored_sha256": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+      "current_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "traverse-actual-historical-pointer",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "src/sec_research/scheduled.py",
+      "original_sha256": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+      "mutant_sha256": "f7581e14626824e8924f6a57f723e46bfdb325b686c660bed43f206bc1a74396",
+      "restored_sha256": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+      "current_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "traverse-actual-historical-pointer",
+      "stage": "pre-integrity checkpoint proof",
+      "file": "src/sec_research/service.py",
+      "original_sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "mutant_sha256": "f2bded5a3bf1d0db41be11bce4658f2f80f96404c8a397b3bf4c55e9d948bb35",
+      "restored_sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "current_sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "erase-success-final-integrity",
+      "stage": "post-integrity, pre-membership checkpoint proof; superseded by task7-69/70",
+      "file": "src/sec_research/schedule_store.py",
+      "original_sha256": "bbfa0bd6e6d1875598ae230a235323a9adc015eeece1391fb20017aa40a2fd73",
+      "mutant_sha256": "5e70df0eb5b2be2a045e3c39c72a1115be80052f6e60e563054715e1607591be",
+      "restored_sha256": "bbfa0bd6e6d1875598ae230a235323a9adc015eeece1391fb20017aa40a2fd73",
+      "current_sha256": "da170ec839e3154ef1ae83af2f71f2636f91ab204998ba4a49fe4ceb8d833c16",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "enable-by-default",
+      "stage": "post-membership final-source proof",
+      "file": "src/service/data_scheduler.py",
+      "original_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "mutant_sha256": "8bdca544b1f9100f9eb74bf8117114b7039efbbda247778d8152afa80e80fa71",
+      "restored_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "current_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "traverse-actual-historical-pointer",
+      "stage": "post-membership final-source proof",
+      "file": "src/sec_research/scheduled.py",
+      "original_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "mutant_sha256": "c1a18b827b9d0f8f9d76c8b582b8e03ca107ef0480a38775edae283fc10a7fc5",
+      "restored_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "current_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "traverse-actual-historical-pointer",
+      "stage": "post-membership final-source proof",
+      "file": "src/sec_research/service.py",
+      "original_sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "mutant_sha256": "f2bded5a3bf1d0db41be11bce4658f2f80f96404c8a397b3bf4c55e9d948bb35",
+      "restored_sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "current_sha256": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "drop-partial",
+      "stage": "post-membership final-source proof",
+      "file": "src/service/data_scheduler.py",
+      "original_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "mutant_sha256": "160f501f0992bdcc583ec33ec0068a536c0340cef5c0fe7e5cd0e68c95bedcc3",
+      "restored_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "current_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "erase-success",
+      "stage": "post-membership final-source proof",
+      "file": "src/sec_research/schedule_store.py",
+      "original_sha256": "da170ec839e3154ef1ae83af2f71f2636f91ab204998ba4a49fe4ceb8d833c16",
+      "mutant_sha256": "2a986c099f4574c797a83c41e7f51ba1a3d8109667c4f099d7bdd48cb3c563f3",
+      "restored_sha256": "da170ec839e3154ef1ae83af2f71f2636f91ab204998ba4a49fe4ceb8d833c16",
+      "current_sha256": "da170ec839e3154ef1ae83af2f71f2636f91ab204998ba4a49fe4ceb8d833c16",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "reuse-membership",
+      "stage": "post-membership final-source proof",
+      "file": "src/sec_research/scheduled.py",
+      "original_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "mutant_sha256": "1590da123df6c7e9ae7b33a14330181e1959c114d92c14731529a3e600b1fdb3",
+      "restored_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "current_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "reset-pins",
+      "stage": "post-membership final-source proof",
+      "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+      "original_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "mutant_sha256": "8e09e7845ab748abb96c94a4352ce834bb9b7292265efb2ea8a3612ed7c474af",
+      "restored_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "current_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "reset-draft",
+      "stage": "post-membership final-source proof",
+      "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+      "original_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "mutant_sha256": "d6058729f868d11e0a372fb3edf49bd8cfee8706e43b804b0de4585531e1319c",
+      "restored_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "current_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    },
+    {
+      "name": "reject-observed-space-symbol",
+      "stage": "post-membership final-source proof",
+      "file": "src/sec_research/scheduled.py",
+      "original_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "mutant_sha256": "68d3498ce5d42e4bca10a2d22e211a12b4b058c8c3c29dc6780c98e20ce8c040",
+      "restored_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "current_sha256": "2f8c244a0e1dac539355aa0c5c1afbe749dc9c5674617f036d3a70dda17711c3",
+      "artifacts_verified": true,
+      "recipe_verified": true
+    }
+  ],
+  "browser_source_inventory": {
+    "source_dispatches": [
+      "https://data.sec.gov/submissions/CIK0000320193.json",
+      "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+      "https://www.sec.gov/files/company_tickers.json",
+      "https://data.sec.gov/submissions/CIK0000320193.json",
+      "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "https://data.sec.gov/submissions/CIK0000789019.json",
+      "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+      "https://www.sec.gov/files/company_tickers.json",
+      "https://data.sec.gov/submissions/CIK0000320193.json",
+      "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "https://data.sec.gov/submissions/CIK0000789019.json",
+      "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+      "https://www.sec.gov/files/company_tickers.json",
+      "https://data.sec.gov/submissions/CIK0000320193.json",
+      "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "https://data.sec.gov/submissions/CIK0000789019.json",
+      "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+      "https://www.sec.gov/files/company_tickers.json",
+      "https://data.sec.gov/submissions/CIK0000320193.json",
+      "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "https://data.sec.gov/submissions/CIK0000789019.json",
+      "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json"
+    ],
+    "writes": [
+      {
+        "action": "sec_research_refresh",
+        "detail": {
+          "cik": "0000320193"
+        }
+      },
+      {
+        "action": "sec_research_document_acquire",
+        "detail": {
+          "filing_id": "0000320193:0000320193-26-000001",
+          "document_id": "primary"
+        }
+      }
+    ],
+    "fail_history": true,
+    "conflicts": false,
+    "document_dispatches": [
+      {
+        "path": "/Archives/edgar/data/320193/000032019326000001/index.json",
+        "identity": "ArkScope research@arkscope.test"
+      },
+      {
+        "path": "/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+        "identity": "ArkScope research@arkscope.test"
+      }
+    ],
+    "document_revision": 1,
+    "document_fail": false,
+    "extra_documents": 0,
+    "phase": "zh-Hant-390x844-schedule",
+    "bodies": [
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+        "bytes": 3030,
+        "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+        "status": 200,
+        "phase": "seed"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "bytes": 7730,
+        "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+        "status": 200,
+        "phase": "seed"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+        "status": null,
+        "code": "sec_rate_limited",
+        "phase": "seed",
+        "bytes": 0
+      },
+      {
+        "kind": "document",
+        "url": "/Archives/edgar/data/320193/000032019326000001/index.json",
+        "bytes": 205,
+        "sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487.body",
+        "status": 200,
+        "phase": "seed"
+      },
+      {
+        "kind": "document",
+        "url": "/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+        "bytes": 25268,
+        "sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085.body",
+        "status": 200,
+        "phase": "seed"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://www.sec.gov/files/company_tickers.json",
+        "bytes": 118,
+        "sha256": "9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef.body",
+        "status": 200,
+        "phase": "en-1280x960-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+        "bytes": 3030,
+        "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+        "status": 200,
+        "phase": "en-1280x960-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "bytes": 7730,
+        "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+        "status": 200,
+        "phase": "en-1280x960-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000789019.json",
+        "bytes": 3030,
+        "sha256": "94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea.body",
+        "status": 200,
+        "phase": "en-1280x960-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+        "status": null,
+        "code": "sec_rate_limited",
+        "phase": "en-1280x960-schedule",
+        "bytes": 0
+      },
+      {
+        "kind": "metadata",
+        "url": "https://www.sec.gov/files/company_tickers.json",
+        "bytes": 118,
+        "sha256": "9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef.body",
+        "status": 200,
+        "phase": "en-390x844-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+        "bytes": 3030,
+        "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+        "status": 200,
+        "phase": "en-390x844-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "bytes": 7730,
+        "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+        "status": 200,
+        "phase": "en-390x844-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000789019.json",
+        "bytes": 3030,
+        "sha256": "94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea.body",
+        "status": 200,
+        "phase": "en-390x844-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+        "status": null,
+        "code": "sec_rate_limited",
+        "phase": "en-390x844-schedule",
+        "bytes": 0
+      },
+      {
+        "kind": "metadata",
+        "url": "https://www.sec.gov/files/company_tickers.json",
+        "bytes": 118,
+        "sha256": "9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef.body",
+        "status": 200,
+        "phase": "zh-Hant-1280x960-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+        "bytes": 3030,
+        "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+        "status": 200,
+        "phase": "zh-Hant-1280x960-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "bytes": 7730,
+        "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+        "status": 200,
+        "phase": "zh-Hant-1280x960-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000789019.json",
+        "bytes": 3030,
+        "sha256": "94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea.body",
+        "status": 200,
+        "phase": "zh-Hant-1280x960-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+        "status": null,
+        "code": "sec_rate_limited",
+        "phase": "zh-Hant-1280x960-schedule",
+        "bytes": 0
+      },
+      {
+        "kind": "metadata",
+        "url": "https://www.sec.gov/files/company_tickers.json",
+        "bytes": 118,
+        "sha256": "9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef.body",
+        "status": 200,
+        "phase": "zh-Hant-390x844-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+        "bytes": 3030,
+        "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+        "status": 200,
+        "phase": "zh-Hant-390x844-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+        "bytes": 7730,
+        "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+        "status": 200,
+        "phase": "zh-Hant-390x844-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/submissions/CIK0000789019.json",
+        "bytes": 3030,
+        "sha256": "94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea",
+        "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea.body",
+        "status": 200,
+        "phase": "zh-Hant-390x844-schedule"
+      },
+      {
+        "kind": "metadata",
+        "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+        "status": null,
+        "code": "sec_rate_limited",
+        "phase": "zh-Hant-390x844-schedule",
+        "bytes": 0
+      }
+    ],
+    "fail_facts": true,
+    "block": false
+  },
+  "browser_files": [
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/api-requests.json",
+      "sha256": "6535e500cee03482de798f96b67913520a68d9ca6b0eb090b4e0f2d2a2840c7b",
+      "bytes": 51539
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/browser-results.json",
+      "sha256": "458e19d5365790099b9432623eb436f042b3e84819abe19fc1dd8fd5ea773aaa",
+      "bytes": 33716
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/en-1280x960-controls-source.png",
+      "sha256": "27fd32029379f17d09b84c844d8c2e99508a46b77b1329a9583275280e1ba3ab",
+      "bytes": 122341
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/en-1280x960-controls.png",
+      "sha256": "27fd32029379f17d09b84c844d8c2e99508a46b77b1329a9583275280e1ba3ab",
+      "bytes": 122341
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/en-1280x960-pinned.png",
+      "sha256": "1920d7c333e9ace222b85f486942d73a95ee8854811b460e4830ed74dc3ca68a",
+      "bytes": 125866
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/en-1280x960-status.png",
+      "sha256": "63e04562eb4f869ea272d867777802146102a27d657bb7195d5d108f5565e486",
+      "bytes": 91401
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/en-390x844-controls-source.png",
+      "sha256": "582297a236a01bba3f2c1cf5928ab162111fb14417d7ccf1934c413457cc3bd3",
+      "bytes": 66795
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/en-390x844-controls.png",
+      "sha256": "e0dda8507f545fffd5358a66fbaaaee249390abed75cce3bbf185441238d3136",
+      "bytes": 49348
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/en-390x844-pinned.png",
+      "sha256": "26030030500e4ab895681b09052a740be6391507ba1a04bcc662ada333cd526a",
+      "bytes": 54912
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/en-390x844-status.png",
+      "sha256": "9da5e712e4e6bfdf0c1f81c8d12ab790164b33cdf7e74925000e7f2e70d9adcd",
+      "bytes": 54884
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/seed.json",
+      "sha256": "fcbba29eeb06183de723e3a81998563c89013d483e3b2c3cdc06f391a1e23cf5",
+      "bytes": 24534
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/server-command.json",
+      "sha256": "b13a22541714b6dd25970fae86c0653e3fceb6d86aa3c32b1285d04cf687ab02",
+      "bytes": 574
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/source-inventory.json",
+      "sha256": "696f7ba4cf23fe6dad503b5ca66338cbd5e26f3ee20ba54b2e4ac97211723a36",
+      "bytes": 13602
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487.body",
+      "sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487",
+      "bytes": 205
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+      "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+      "bytes": 3030
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea.body",
+      "sha256": "94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea",
+      "bytes": 3030
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef.body",
+      "sha256": "9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef",
+      "bytes": 118
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+      "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+      "bytes": 7730
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/stores/fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085.body",
+      "sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+      "bytes": 25268
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/zh-Hant-1280x960-controls-source.png",
+      "sha256": "63b77070850581072d5025fb7f78b3b9eb9a6d23d4f1880e163b523f55835c0d",
+      "bytes": 135477
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/zh-Hant-1280x960-controls.png",
+      "sha256": "63b77070850581072d5025fb7f78b3b9eb9a6d23d4f1880e163b523f55835c0d",
+      "bytes": 135477
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/zh-Hant-1280x960-pinned.png",
+      "sha256": "37d6b786727e4ce0970e8ccda0fc939f32a111bcc885d2c6931a29ba684398f5",
+      "bytes": 127922
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/zh-Hant-1280x960-status.png",
+      "sha256": "265070c8ae79ab919610962cb27c3c35494987324befad37a1d5fbbd3f2b69cb",
+      "bytes": 100497
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/zh-Hant-390x844-controls-source.png",
+      "sha256": "25a855980a2f5bffcd1aa61a6c8b0bb907e2f9267221bc8b4cd13efe70c3260f",
+      "bytes": 83591
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/zh-Hant-390x844-controls.png",
+      "sha256": "bcaab9ad86cbbf2b5177b45a9a93d9f1994fefeb6be16c896c349ac075ddccc9",
+      "bytes": 64908
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/zh-Hant-390x844-pinned.png",
+      "sha256": "0923e7f9a426d80f7055e59e1f6deece3ef847013083790b4516588775d3c3fb",
+      "bytes": 56135
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-80-browser-final-membership/browser/zh-Hant-390x844-status.png",
+      "sha256": "83e03c509f77e4eee99058f5870c379c36dc48ec214fcf60f40c95a995e19cef",
+      "bytes": 62097
+    }
+  ],
+  "browser": {
+    "cases": [
+      "en-1280x960",
+      "en-390x844",
+      "zh-Hant-1280x960",
+      "zh-Hant-390x844"
+    ],
+    "measurements_verified": true,
+    "api_requests": 168,
+    "api_non_200": 0,
+    "console_errors": [],
+    "page_errors": [],
+    "external_requests": [],
+    "servers_stopped": true,
+    "unrelated_generated_endpoints": [
+      "/config/model-catalog",
+      "/macro/snapshot",
+      "/macro/status",
+      "/market-data/price-repair/operations",
+      "/market-data/status",
+      "/market-data/trading-days",
+      "/news/status",
+      "/providers/config",
+      "/providers/health",
+      "/sa/extension-health",
+      "/security-lifecycle/automation",
+      "/security-lifecycle/cases"
+    ],
+    "verification_scope": "Actual Settings SEC panel and shared scheduler only; unrelated sections use generated empty/disabled fixture responses, not product health evidence.",
+    "metadata_attempts": 23,
+    "document_attempts": 2,
+    "generated_response_bodies": 20,
+    "closed_failures": 5
+  },
+  "active_runners": [],
+  "index_empty_before_staging": true
+}

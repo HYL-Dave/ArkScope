@@ -1,0 +1,589 @@
+{
+  "refresh": {
+    "receipt_id": 4,
+    "scope": "full",
+    "cik": "0000320193",
+    "status": "partial",
+    "completed": [
+      "submissions",
+      "companyfacts"
+    ],
+    "pending": [
+      "CIK0000320193-submissions-001.json"
+    ],
+    "gaps": [
+      {
+        "source": "CIK0000320193-submissions-001.json",
+        "code": "sec_rate_limited"
+      }
+    ],
+    "observed_at": "2026-09-13T15:59:27.494035Z",
+    "recorded_at": "2026-09-13T15:59:27.495424Z",
+    "source_snapshots": {
+      "submissions": {
+        "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+        "observed_at": "2026-09-13T15:59:27.425092Z"
+      },
+      "companyfacts": {
+        "snapshot_id": "secsnapshot_017a918965fb9c50a3dd28c91a5d979df89425099221b64832ffe5f0eb7ff9f7",
+        "observed_at": "2026-09-13T15:59:27.460242Z"
+      }
+    }
+  },
+  "filings": {
+    "status": "partial",
+    "data": [
+      {
+        "filing_id": "0000320193:0000320193-26-000001",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000001",
+        "form": "10-K",
+        "filed_date": "2026-08-29",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-1.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/0"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000002",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000002",
+        "form": "10-Q",
+        "filed_date": "2026-08-28",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-2.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000002/fixture-2.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/1"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000003",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000003",
+        "form": "10-K",
+        "filed_date": "2026-08-27",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-3.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000003/fixture-3.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/2"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000004",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000004",
+        "form": "10-Q",
+        "filed_date": "2026-08-26",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-4.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000004/fixture-4.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/3"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000005",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000005",
+        "form": "10-K",
+        "filed_date": "2026-08-25",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-5.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000005/fixture-5.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/4"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000006",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000006",
+        "form": "10-Q",
+        "filed_date": "2026-08-24",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-6.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000006/fixture-6.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/5"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000007",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000007",
+        "form": "10-K",
+        "filed_date": "2026-08-23",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-7.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000007/fixture-7.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/6"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000008",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000008",
+        "form": "10-Q",
+        "filed_date": "2026-08-22",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-8.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000008/fixture-8.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/7"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000009",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000009",
+        "form": "10-K",
+        "filed_date": "2026-08-21",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-9.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000009/fixture-9.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/8"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000010",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000010",
+        "form": "10-Q",
+        "filed_date": "2026-08-20",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-10.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000010/fixture-10.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/9"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000011",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000011",
+        "form": "10-K/A",
+        "filed_date": "2026-08-19",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-11.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000011/fixture-11.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/10"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000012",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000012",
+        "form": "10-Q",
+        "filed_date": "2026-08-18",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-12.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000012/fixture-12.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/11"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000013",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000013",
+        "form": "10-K",
+        "filed_date": "2026-08-17",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-13.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000013/fixture-13.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/12"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000014",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000014",
+        "form": "10-Q",
+        "filed_date": "2026-08-16",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-14.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000014/fixture-14.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/13"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000015",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000015",
+        "form": "10-K",
+        "filed_date": "2026-08-15",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-15.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000015/fixture-15.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/14"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000016",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000016",
+        "form": "10-Q",
+        "filed_date": "2026-08-14",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-16.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000016/fixture-16.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/15"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000017",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000017",
+        "form": "10-K",
+        "filed_date": "2026-08-13",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-17.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000017/fixture-17.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/16"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000018",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000018",
+        "form": "10-Q",
+        "filed_date": "2026-08-12",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-18.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000018/fixture-18.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/17"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000019",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000019",
+        "form": "10-K",
+        "filed_date": "2026-08-11",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-19.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000019/fixture-19.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/18"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      },
+      {
+        "filing_id": "0000320193:0000320193-26-000020",
+        "cik": "0000320193",
+        "accession": "0000320193-26-000020",
+        "form": "10-Q",
+        "filed_date": "2026-08-10",
+        "report_date": "2026-06-30",
+        "accepted_at": "2026-08-30T15:00:00Z",
+        "primary_document": "fixture-20.htm",
+        "primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000020/fixture-20.htm",
+        "sources": [
+          {
+            "snapshot_id": "secsnapshot_cdc63e928eda055baa1ac6e62c0526eeaabfb522e222febeedc0a50d4a070586",
+            "source": {
+              "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+              "pointer": "/filings/recent/accessionNumber/19"
+            },
+            "observed_at": "2026-09-13T15:59:27.425092Z",
+            "source_url": "https://data.sec.gov/submissions/CIK0000320193.json",
+            "object_sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e"
+          }
+        ]
+      }
+    ],
+    "gaps": [
+      {
+        "code": "catalog_source_gaps",
+        "count": 1
+      },
+      {
+        "code": "catalog_sources_pending",
+        "count": 1
+      }
+    ],
+    "observed_at": "2026-09-13T15:59:27.494035Z",
+    "coverage": {
+      "catalog_sources": 1,
+      "admitted_rows": 26,
+      "admitted_bytes": 20355,
+      "receipt_id": 4,
+      "scope": "full",
+      "bindings_digest": "5dddee89f1818499d8ce84c9f0bd11f9eebe23948f7fea95fb9b061aad598e34",
+      "selection_total": 26,
+      "complete": false
+    },
+    "next_cursor": "eyJiaW5kaW5nc19kaWdlc3QiOiI1ZGRkZWU4OWYxODE4NDk5ZDhjZTg0YzlmMGJkMTFmOWVlYmUyMzk0OGY3ZmVhOTVmYjliMDYxYWFkNTk4ZTM0IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9"
+  },
+  "document": {
+    "attempt_id": 3,
+    "filing_id": "0000320193:0000320193-26-000001",
+    "document_id": "primary",
+    "resolved_document_id": "file:fixture-1.htm",
+    "primary_document": "fixture-1.htm",
+    "capture_id": "secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653",
+    "status": "partial",
+    "observed_at": "2026-09-13T15:59:27.513314Z",
+    "acquisition_id": "5bf0ab53060741c98f8265dc7405a46b",
+    "outcome": "complete",
+    "gaps": [
+      {
+        "code": "catalog_source_gaps",
+        "count": 1
+      },
+      {
+        "code": "catalog_sources_pending",
+        "count": 1
+      }
+    ],
+    "requests": [
+      {
+        "operation": "directory",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/index.json",
+        "request_count": 1,
+        "dispatch_state": "dispatched",
+        "report": {
+          "requests": 1,
+          "observations": [
+            {
+              "request_index": 1,
+              "status": 200,
+              "framing": "content_length",
+              "content_encoding": "identity",
+              "declared_body_bytes": 205,
+              "received_body_bytes": 205,
+              "decoded_body_bytes": 205,
+              "result_code": "complete"
+            }
+          ]
+        },
+        "gaps": []
+      },
+      {
+        "operation": "document",
+        "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+        "request_count": 1,
+        "dispatch_state": "dispatched",
+        "report": {
+          "requests": 1,
+          "observations": [
+            {
+              "request_index": 1,
+              "status": 200,
+              "framing": "content_length",
+              "content_encoding": "identity",
+              "declared_body_bytes": 25268,
+              "received_body_bytes": 25268,
+              "decoded_body_bytes": 25268,
+              "result_code": "complete"
+            }
+          ]
+        },
+        "gaps": []
+      }
+    ],
+    "invalidation_primary_document": null
+  }
+}

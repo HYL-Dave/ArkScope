@@ -1,0 +1,1556 @@
+{
+  "base": "936ede10f04c370bf2322ee70833f9e0f29b7a44",
+  "runner_receipts": 29,
+  "nonzero_exits": 14,
+  "all_original_logs_retained": true,
+  "no_failure_suppression": true,
+  "collection_command": "env HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-27-backend-cover/home /home/hyl/.virtualenvs/llm_app/bin/python -B -c 'import hashlib, json, pathlib, re, xml.etree.ElementTree as ET\nwork=pathlib.Path(\".superpowers/sdd/2026-09-12-sec-research-release-integration\")\nrecords=[]\nfor path in sorted(work.glob(\"task7-fix1-*/command.json\")):\n    r=json.loads(path.read_text())\n    log=path.parent/\"output.log\"\n    clean=re.sub(r\"\\x1b\\[[0-9;]*m\",\"\",log.read_text())\n    xml=path.parent/\"results.xml\"\n    counts=None; failed=[]\n    if xml.exists():\n        cases=ET.parse(xml).findall(\".//testcase\")\n        counts=dict(executed=len(cases),failed=sum(c.find(\"failure\") is not None for c in cases),errors=sum(c.find(\"error\") is not None for c in cases),skipped=sum(c.find(\"skipped\") is not None for c in cases))\n        counts[\"passed\"]=counts[\"executed\"]-counts[\"failed\"]-counts[\"errors\"]-counts[\"skipped\"]\n        failed=[dict(owner=c.attrib.get(\"classname\"),name=c.attrib[\"name\"]) for c in cases if c.find(\"failure\") is not None or c.find(\"error\") is not None]\n    summaries=[line.strip() for line in clean.splitlines() if re.search(r\"^\\s*(?:\\d+ (?:failed|passed|skipped)|Tests\\s|Test Files\\s)|browser_cases\",line)]\n    records.append(dict(name=r[\"name\"],command=r[\"command\"],cwd=r[\"cwd\"],exit_code=r[\"exit_code\"],seconds=r[\"seconds\"],command_receipt=str(path),log=str(log),command_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),log_sha256=hashlib.sha256(log.read_bytes()).hexdigest(),junit=str(xml) if xml.exists() else None,junit_sha256=hashlib.sha256(xml.read_bytes()).hexdigest() if xml.exists() else None,counts=counts,failed_cases=failed,summary_lines=summaries[-3:],act_warning_count=clean.count(\"not configured to support act(\")))\nassert len(records)==29\nprint(json.dumps(records))\n'",
+  "records": [
+    {
+      "name": "task7-fix1-01-mixed-stop-red",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "mixed_transport_storage_gaps",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-01-mixed-stop-red/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 1.83,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-01-mixed-stop-red/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-01-mixed-stop-red/output.log",
+      "command_sha256": "94026ada0278859616e045449a76c69e36ecd0e90b84bc17d0a93165da581466",
+      "log_sha256": "a1d0c58dd5f01ea466400be8d7e6225e131996c175d933cc03bbe9b03c2f7829",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-01-mixed-stop-red/results.xml",
+      "junit_sha256": "6a2277d0e64f912fb48d9c9ac0871242f552a5605f2eab9364db6660b4918d26",
+      "counts": {
+        "executed": 4,
+        "failed": 4,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[False-storage_space_insufficient]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient]"
+        }
+      ],
+      "summary_lines": [
+        "4 failed, 36 deselected in 1.50s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended RED with fixture limitation",
+      "explanation": "Mixed gaps left running checkpoints and invalid stop reasons (4F). Initial budget=0 fixture also mapped to capture_store_write_failed; corrected actual budget=1 and re-proved RED in 03."
+    },
+    {
+      "name": "task7-fix1-02-mixed-stop-green",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "mixed_transport_storage_gaps or sec_partial_failure_retains_previous_success",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-02-mixed-stop-green/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 2.173,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-02-mixed-stop-green/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-02-mixed-stop-green/output.log",
+      "command_sha256": "cc58b39576254d605143c33bd29da59d5b8dbc1fd40f4a42c11985924b174a29",
+      "log_sha256": "9c541626292ea6f5ae99a406a14424293b26fd08f7d4e7811726d3b71f79d214",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-02-mixed-stop-green/results.xml",
+      "junit_sha256": "6f96fb54ae56ecbd46708d9ad3a31d44b915ce16dd84096d08e7680b46648c01",
+      "counts": {
+        "executed": 5,
+        "failed": 3,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 2
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient]"
+        }
+      ],
+      "summary_lines": [
+        "3 failed, 2 passed, 35 deselected in 1.82s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intermediate fixture failure",
+      "explanation": "3F/2P after production I1 fix: budget=0 was invalid configuration, and identical source bytes correctly retained 5 catalog observations rather than the asserted 10. Corrected test-only setup/expectation; real original-source RED repeated in 03 and GREEN in 04."
+    },
+    {
+      "name": "task7-fix1-03-mixed-stop-corrected-red",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "mixed_transport_storage_gaps",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-03-mixed-stop-corrected-red/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 1.888,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-03-mixed-stop-corrected-red/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-03-mixed-stop-corrected-red/output.log",
+      "command_sha256": "5619f330939ee8097a17546ad5e958427880a7f857f8395a340baf86eb5a7b39",
+      "log_sha256": "c448b2c2e848c8cf15238424fdc81589aa147dcdf10dac397951bb73d8b863a8",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-03-mixed-stop-corrected-red/results.xml",
+      "junit_sha256": "8b8e90c28f4a52b5767fc5fdb01c1ae8e213e1ce478b8ff9102e3e4bca5f94aa",
+      "counts": {
+        "executed": 4,
+        "failed": 4,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[False-storage_space_insufficient]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient]"
+        }
+      ],
+      "summary_lines": [
+        "4 failed, 36 deselected in 1.55s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended RED",
+      "explanation": "Corrected real budget=1/free-space=0 fixture proves all four mixed-gap terminal checkpoint failures on original stop selection; resolved by 04."
+    },
+    {
+      "name": "task7-fix1-04-mixed-stop-green",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "mixed_transport_storage_gaps or sec_partial_failure_retains_previous_success",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-04-mixed-stop-green/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 2.225,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-04-mixed-stop-green/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-04-mixed-stop-green/output.log",
+      "command_sha256": "96a322b76609e24797e9ae8012a6a689114de60c41679dc97801faaf2d2e9694",
+      "log_sha256": "adbb3d146bed56054fe77db16f2551af1f892ad0a00202a187ea508ef4d4e2ea",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-04-mixed-stop-green/results.xml",
+      "junit_sha256": "5ae8f50d5f8e92a5ab820b1a095bf1f395005d3c3def4dd704043bd295240d91",
+      "counts": {
+        "executed": 5,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 5
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "5 passed, 35 deselected in 1.88s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "GREEN",
+      "explanation": "Four mixed transport/storage combinations and existing prior-success control pass."
+    },
+    {
+      "name": "task7-fix1-05-map-binding-red",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "resolution_stays_bound_to_returned_map",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-05-map-binding-red/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 3.267,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-05-map-binding-red/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-05-map-binding-red/output.log",
+      "command_sha256": "f4e1e944a605bb43cd8270aa85323f97ae93af9ce85dd7ffe9dd8c3bdfd3a0aa",
+      "log_sha256": "4be588cdee725326425ddada66c8cec94df690cc16c920487a1ee432ab97b1c8",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-05-map-binding-red/results.xml",
+      "junit_sha256": "68945a12797206e370c5b51afb91483f32d9215689cbe2464bf6d260906e81c5",
+      "counts": {
+        "executed": 12,
+        "failed": 12,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-changed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-changed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-failed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-failed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-changed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-changed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-failed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-failed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-between_members]"
+        }
+      ],
+      "summary_lines": [
+        "12 failed, 40 deselected in 2.92s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended RED",
+      "explanation": "All twelve captured/foreign map state and timing combinations expose latest-map drift in dispatch or unresolved outcomes; resolved by 06."
+    },
+    {
+      "name": "task7-fix1-06-map-binding-green",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "tests/test_sec_research_issuers.py",
+        "-k",
+        "resolution_stays_bound_to_returned_map or failed_map_preserves_rotation or deduplicates_cik or resolve or invalid",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-06-map-binding-green/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 4.339,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-06-map-binding-green/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-06-map-binding-green/output.log",
+      "command_sha256": "ad1a30aea059b37de0fe32785b2c41ed54b090483954c0874cbeae79a9e019ec",
+      "log_sha256": "e9f24d83e95b87656fa3a0622b368c70be5bb1bbf18979697ee8af5eba131873",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-06-map-binding-green/results.xml",
+      "junit_sha256": "757a81da8159d3923edd679a82cd64741a160f78234b2cd7ce4b1ea2eb898b7f",
+      "counts": {
+        "executed": 33,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 33
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "33 passed, 49 deselected in 4.00s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "GREEN covering",
+      "explanation": "Immutable returned-map resolution plus existing issuer, missing/invalid identifier and rotation owners pass (33P)."
+    },
+    {
+      "name": "task7-fix1-07-terminal-coverage-red",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "tests/test_sec_research_schedule_runtime.py",
+        "-k",
+        "terminal_membership or running_membership or map_lease_abort or uncovered_membership",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-07-terminal-coverage-red/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 5.085,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-07-terminal-coverage-red/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-07-terminal-coverage-red/output.log",
+      "command_sha256": "73ad06b0c2a33cf2d65d0e75d6f37638d4ecae1e23dc6ddb3fde34908cdcf09d",
+      "log_sha256": "c32a9a27c7eefcbab7492d9b72435495142595a7b9a7bd1c3e2aa08dcdcfbf47",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-07-terminal-coverage-red/results.xml",
+      "junit_sha256": "00f45fa615402fd750598e05648141be87d2b7c25797f78e46b6d7fcf5cf018a",
+      "counts": {
+        "executed": 29,
+        "failed": 28,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[validator-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[validator-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[validator-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[validator-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[record-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[record-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[record-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[record-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[status-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[status-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[status-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[status-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[admin-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[admin-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[admin-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[admin-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[export-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[export-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[export-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[export-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_cik_partition_is_validated[duplicate_member]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_cik_partition_is_validated[wrong_cik]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_cik_partition_is_validated[extra_cik]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_map_lease_abort_accounts_unresolved_members_and_retains_rotation"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_uncovered_membership_adapter_result_is_rejected[empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_uncovered_membership_adapter_result_is_rejected[succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_uncovered_membership_adapter_result_is_rejected[partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_uncovered_membership_adapter_result_is_rejected[failed]"
+        }
+      ],
+      "summary_lines": [
+        "28 failed, 1 passed, 71 deselected in 4.62s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended RED",
+      "explanation": "Uncovered terminal membership accepted at validator/store/status/admin/export/adapter boundaries; map lease abort lacked explicit terminal accounting (28F). Running-checkpoint control passes; resolved by 08."
+    },
+    {
+      "name": "task7-fix1-08-terminal-coverage-green",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "tests/test_sec_research_schedule_runtime.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-08-terminal-coverage-green/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 18.666,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-08-terminal-coverage-green/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-08-terminal-coverage-green/output.log",
+      "command_sha256": "a0b14925b089dbaa814d17b86ef0eda72169487af2299fbbbc4c7e4fd2ef9101",
+      "log_sha256": "72fedfc06412f26a018882c44a90db68b5cf6144cfaa018e9cfddf9772cd4cea",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-08-terminal-coverage-green/results.xml",
+      "junit_sha256": "61ad640a21f52699c14bdd66c9cacc799e1221a655cc0707d02949404d869972",
+      "counts": {
+        "executed": 100,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 100
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "100 passed in 18.18s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "GREEN covering",
+      "explanation": "Complete schedule core/runtime modules pass (100P), including I1-I3 and retained existing controls."
+    },
+    {
+      "name": "task7-fix1-09-mixed-stop-inverse",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "mixed_transport_storage_gaps or sec_partial_failure_retains_previous_success",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-09-mixed-stop-inverse/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 2.202,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-09-mixed-stop-inverse/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-09-mixed-stop-inverse/output.log",
+      "command_sha256": "499630c80455405b0833d233eb1b5bf43a95532d5957a7fa33516a2076d4bece",
+      "log_sha256": "d9166e32a65a13cc7bc612db4ff22d9dfb98846fd775766dc945edbbacb28d1e",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-09-mixed-stop-inverse/results.xml",
+      "junit_sha256": "73f587637c01ed4bcaaefe37f511f7b970abe3650a788bba51292a2213c70af4",
+      "counts": {
+        "executed": 5,
+        "failed": 4,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[False-capture_budget_exceeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[False-storage_space_insufficient]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[True-capture_budget_exceeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_mixed_transport_storage_gaps_keep_terminal_batch[True-storage_space_insufficient]"
+        }
+      ],
+      "summary_lines": [
+        "4 failed, 1 passed, 72 deselected in 1.86s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended inverse RED",
+      "explanation": "mixed transport/storage stop selection: 4 mixed-gap cases fail while prior-success control passes. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 10."
+    },
+    {
+      "name": "task7-fix1-10-mixed-stop-restored",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "mixed_transport_storage_gaps or sec_partial_failure_retains_previous_success",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-10-mixed-stop-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 2.226,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-10-mixed-stop-restored/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-10-mixed-stop-restored/output.log",
+      "command_sha256": "94b70fa880a8aa9b61b48ac0dabe4b1246296f994c040a964d6f54238a3ca4d6",
+      "log_sha256": "8ae11d1b4fb1141005fbf5beb0f8e184d41484ab64933c9efc82ae8884f7f18b",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-10-mixed-stop-restored/results.xml",
+      "junit_sha256": "623f4d70da4cc2fe1fe02405187e77ef316c821ae36a46f144ba8faac517d218",
+      "counts": {
+        "executed": 5,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 5
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "5 passed, 72 deselected in 1.88s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "exact restore GREEN",
+      "explanation": "mixed transport/storage stop selection: exact before-source SHA restored, matching focused selectors pass; original/mutant/restored hashes and artifacts read back."
+    },
+    {
+      "name": "task7-fix1-11-map-dispatch-inverse",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "resolution_stays_bound_to_returned_map",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-11-map-dispatch-inverse/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 3.238,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-11-map-dispatch-inverse/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-11-map-dispatch-inverse/output.log",
+      "command_sha256": "583b7b9ef6b2b0b846d6508c4d263aee3b70a41864b39d537d0e3490b2c8f866",
+      "log_sha256": "65200ebfb136038da20596f0dea24ed3e91862c6e098f9d96a145a6defbd0360",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-11-map-dispatch-inverse/results.xml",
+      "junit_sha256": "5cde7e52de778ad737b95d69397a5283f3576b5aad4aa80a2b2ce29dd44f00c5",
+      "counts": {
+        "executed": 12,
+        "failed": 12,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-changed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-changed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-failed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-failed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-changed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-changed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-failed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-failed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-between_members]"
+        }
+      ],
+      "summary_lines": [
+        "12 failed, 65 deselected in 2.91s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended inverse RED",
+      "explanation": "dispatch observation argument: all 12 interleaved map cases fail. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 12."
+    },
+    {
+      "name": "task7-fix1-12-map-dispatch-restored",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "resolution_stays_bound_to_returned_map",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-12-map-dispatch-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 3.267,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-12-map-dispatch-restored/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-12-map-dispatch-restored/output.log",
+      "command_sha256": "78db40d5b72b4bbff252614a0fe492ae5e735b282189218330852019c261f336",
+      "log_sha256": "7cea345cad37bc7e1b661c551c58cf2f1a185530a90d704b65332548db8e17b0",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-12-map-dispatch-restored/results.xml",
+      "junit_sha256": "956bef08761873aaef3c27899d90323aa2ade2baa3dedb57a82fb74022e74851",
+      "counts": {
+        "executed": 12,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 12
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "12 passed, 65 deselected in 2.92s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "exact restore GREEN",
+      "explanation": "dispatch observation argument: exact before-source SHA restored, matching focused selectors pass; original/mutant/restored hashes and artifacts read back."
+    },
+    {
+      "name": "task7-fix1-13-map-resolver-inverse",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "resolution_stays_bound_to_returned_map",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-13-map-resolver-inverse/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 3.241,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-13-map-resolver-inverse/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-13-map-resolver-inverse/output.log",
+      "command_sha256": "6dda09c7643e77c9a0ddf30a93fc28fae92aa1089d40c67237c006709c88b779",
+      "log_sha256": "e2ebf09fccee75ba3c2dbd680bf48e1c21e3909b9b465626f3ea8bf3640c3c80",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-13-map-resolver-inverse/results.xml",
+      "junit_sha256": "587146297c00ab425af6b57a45d654b3120c9107b843dc70643d075660c5914b",
+      "counts": {
+        "executed": 12,
+        "failed": 12,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-changed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-changed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-failed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-failed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[False-interrupted-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-changed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-changed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-failed-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-failed-between_members]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-after_refresh]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_resolution_stays_bound_to_returned_map[True-interrupted-between_members]"
+        }
+      ],
+      "summary_lines": [
+        "12 failed, 65 deselected in 2.91s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended inverse RED",
+      "explanation": "resolver's supplied observation: all 12 interleaved map cases fail. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 14."
+    },
+    {
+      "name": "task7-fix1-14-map-resolver-restored",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "resolution_stays_bound_to_returned_map",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-14-map-resolver-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 3.296,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-14-map-resolver-restored/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-14-map-resolver-restored/output.log",
+      "command_sha256": "2af55cd37e4af491a0ced9cb892889230903f302e68dcac6575868560584532d",
+      "log_sha256": "48872c7950ea014d5f4502c264a10338fba22282863575bcaf43e95f73c299d8",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-14-map-resolver-restored/results.xml",
+      "junit_sha256": "34a9531c9947896ef3d5fa49582335ab1f6f74d353e3871097a66eba80c0b25c",
+      "counts": {
+        "executed": 12,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 12
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "12 passed, 65 deselected in 2.95s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "exact restore GREEN",
+      "explanation": "resolver's supplied observation: exact before-source SHA restored, matching focused selectors pass; original/mutant/restored hashes and artifacts read back."
+    },
+    {
+      "name": "task7-fix1-15-terminal-coverage-inverse",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "tests/test_sec_research_schedule_runtime.py",
+        "-k",
+        "terminal_membership or running_membership or map_lease_abort or uncovered_membership",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-15-terminal-coverage-inverse/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 5.328,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-15-terminal-coverage-inverse/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-15-terminal-coverage-inverse/output.log",
+      "command_sha256": "0f9e12523afb231d4ddbd860d05e55453d6dcf66a932776448c8aeb38668ea00",
+      "log_sha256": "109c36d6f496d5b604a12a300a1fe47e06939654dc22fbbb098d433fc3aa3323",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-15-terminal-coverage-inverse/results.xml",
+      "junit_sha256": "5cedff001ad831a214e5307c1878a4938c264418b19e05b72e4aee0f3b625ffe",
+      "counts": {
+        "executed": 29,
+        "failed": 27,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 2
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[validator-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[validator-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[validator-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[validator-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[record-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[record-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[record-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[record-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[status-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[status-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[status-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[status-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[admin-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[admin-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[admin-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[admin-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[export-empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[export-succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[export-partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_witness_is_rejected[export-failed]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_cik_partition_is_validated[duplicate_member]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_cik_partition_is_validated[wrong_cik]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_terminal_membership_cik_partition_is_validated[extra_cik]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_uncovered_membership_adapter_result_is_rejected[empty]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_uncovered_membership_adapter_result_is_rejected[succeeded]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_uncovered_membership_adapter_result_is_rejected[partial]"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_uncovered_membership_adapter_result_is_rejected[failed]"
+        }
+      ],
+      "summary_lines": [
+        "27 failed, 2 passed, 71 deselected in 4.86s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended inverse RED",
+      "explanation": "terminal membership coverage validation: 27 cases fail while running-checkpoint and accounted map-abort controls pass. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 16."
+    },
+    {
+      "name": "task7-fix1-16-terminal-coverage-restored",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "tests/test_sec_research_schedule_runtime.py",
+        "-k",
+        "terminal_membership or running_membership or map_lease_abort or uncovered_membership",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-16-terminal-coverage-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 4.969,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-16-terminal-coverage-restored/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-16-terminal-coverage-restored/output.log",
+      "command_sha256": "c9c95353e93930bf4705b4775a4b482748838be399bf81850ddbbd3b8b10a6e6",
+      "log_sha256": "f0f26013d227c577e8d931418e8b0a1593efcb67c4e66814d22f89447e10b2e4",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-16-terminal-coverage-restored/results.xml",
+      "junit_sha256": "6be18eec7b2ff85e3e41ab84dd206da3ebd98cef756491e8e183f81d407edb3d",
+      "counts": {
+        "executed": 29,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 29
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "29 passed, 71 deselected in 4.49s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "exact restore GREEN",
+      "explanation": "terminal membership coverage validation: exact before-source SHA restored, matching focused selectors pass; original/mutant/restored hashes and artifacts read back."
+    },
+    {
+      "name": "task7-fix1-17-aborted-membership-inverse",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "map_lease_abort",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-17-aborted-membership-inverse/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 1.63,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-17-aborted-membership-inverse/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-17-aborted-membership-inverse/output.log",
+      "command_sha256": "7a0ff0d73834a910e7adae3fd2ed3a80485940d3a358049138f2f72a5ca71c89",
+      "log_sha256": "8bae041e0be8756f1ce2933a2dc17fa236c2328bddd6c6e99b1a2470b5517cea",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-17-aborted-membership-inverse/results.xml",
+      "junit_sha256": "985e3ec27a0852247a907df1089ea310bb226f2f65c2103e9dbfed57f22c7cc9",
+      "counts": {
+        "executed": 1,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_map_lease_abort_accounts_unresolved_members_and_retains_rotation"
+        }
+      ],
+      "summary_lines": [
+        "1 failed, 76 deselected in 1.30s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended inverse RED",
+      "explanation": "aborted-resolution unresolved accounting: actual map-lease abort is rejected by terminal validator. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 18."
+    },
+    {
+      "name": "task7-fix1-18-aborted-membership-restored",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "map_lease_abort",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-18-aborted-membership-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 2.104,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-18-aborted-membership-restored/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-18-aborted-membership-restored/output.log",
+      "command_sha256": "292897658625fd4bc724f598c1acf2ed58e16fced859f5509ea0b460c01302ab",
+      "log_sha256": "ed381dbd281a4c0f7eafc1dc3958c178acdcdeb96fc59a36eac25ad21096a8d9",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-18-aborted-membership-restored/results.xml",
+      "junit_sha256": "40acb5f51ed4205d25e55ad9043867aa0e5fb4a9fce881aa4c58252628bd7576",
+      "counts": {
+        "executed": 1,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "1 passed, 76 deselected in 1.76s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "exact restore GREEN",
+      "explanation": "aborted-resolution unresolved accounting: exact before-source SHA restored, matching focused selectors pass; original/mutant/restored hashes and artifacts read back."
+    },
+    {
+      "name": "task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "test_schedule_deduplicates_cik_and_exposes_unresolved_symbols",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 0.967,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse/output.log",
+      "command_sha256": "416f9b36123713c7288babc9122d11238c82035445975db0dcbf052cad021540",
+      "log_sha256": "e0aa5b6855a21d2fc92dfb08adb8a71591ff52618e611c16ef83d8770b56e7c9",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse/results.xml",
+      "junit_sha256": "7cc4f6f1210a5980975da4a7f81c08845ed084db2876b3eafaff9aae8a10789f",
+      "counts": {
+        "executed": 1,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_schedule_deduplicates_cik_and_exposes_unresolved_symbols"
+        }
+      ],
+      "summary_lines": [
+        "1 failed, 76 deselected in 0.65s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended inverse RED",
+      "explanation": "refreshed earlier actual historical-pointer prohibition: exact recent source inventory fails on dispatched historical URL. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 20."
+    },
+    {
+      "name": "task7-fix1-20-refresh-traverse-actual-historical-pointer-restored",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "test_schedule_deduplicates_cik_and_exposes_unresolved_symbols",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-20-refresh-traverse-actual-historical-pointer-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 0.979,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-20-refresh-traverse-actual-historical-pointer-restored/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-20-refresh-traverse-actual-historical-pointer-restored/output.log",
+      "command_sha256": "d72eba19f55e17b1bd0bdf3099e6289f6c36d0a84827ed3cc47ba590225206e8",
+      "log_sha256": "9c52f6914c8132f616a176f04816e8b3f22bcb6bf475a29b4dda2c0ce42276c0",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-20-refresh-traverse-actual-historical-pointer-restored/results.xml",
+      "junit_sha256": "77584737d9636223f43633f13926acbef13ef8ea9ecf283456d2b2e18753e4b2",
+      "counts": {
+        "executed": 1,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "1 passed, 76 deselected in 0.65s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "exact restore GREEN",
+      "explanation": "refreshed earlier actual historical-pointer prohibition: exact before-source SHA restored, matching focused selectors pass; original/mutant/restored hashes and artifacts read back."
+    },
+    {
+      "name": "task7-fix1-21-refresh-erase-success-inverse",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "test_sec_partial_failure_retains_previous_success",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-21-refresh-erase-success-inverse/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 1.028,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-21-refresh-erase-success-inverse/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-21-refresh-erase-success-inverse/output.log",
+      "command_sha256": "d4294dd3abb89e977854216a880669b1030e2b4aab4146b9b043a83b6a81eedd",
+      "log_sha256": "84d75e444b53b9c77a2c23906d99876557888e2232874991d917953a218d305f",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-21-refresh-erase-success-inverse/results.xml",
+      "junit_sha256": "3e78218a613c983679516c4428d3f1bd8b517a40f2d3e02a3912e25795f74abf",
+      "counts": {
+        "executed": 1,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_sec_partial_failure_retains_previous_success"
+        }
+      ],
+      "summary_lines": [
+        "1 failed, 76 deselected in 0.71s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended inverse RED",
+      "explanation": "refreshed earlier independent last acquisition retention: partial/failure erases prior successful acquisition timestamp. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 22."
+    },
+    {
+      "name": "task7-fix1-22-refresh-erase-success-restored",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "test_sec_partial_failure_retains_previous_success",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-22-refresh-erase-success-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 1.118,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-22-refresh-erase-success-restored/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-22-refresh-erase-success-restored/output.log",
+      "command_sha256": "bad25f2a2eff070dcaa404855eac5499c849c99ec0931c6366b410a03dfe7f63",
+      "log_sha256": "7d4c0d5acc41537d9db1aeb53116ed5ff2109903fab2b5a534b07e7d8cf0963d",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-22-refresh-erase-success-restored/results.xml",
+      "junit_sha256": "4b9efaa24faaf2a45e071f2cfe711dd0552f35800764dbdd14b9c2fc2f55893f",
+      "counts": {
+        "executed": 1,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "1 passed, 76 deselected in 0.80s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "exact restore GREEN",
+      "explanation": "refreshed earlier independent last acquisition retention: exact before-source SHA restored, matching focused selectors pass; original/mutant/restored hashes and artifacts read back."
+    },
+    {
+      "name": "task7-fix1-23-refresh-reuse-membership-inverse",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "test_batch_bounds_defer_without_starving_current_members",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-23-refresh-reuse-membership-inverse/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 1.243,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-23-refresh-reuse-membership-inverse/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-23-refresh-reuse-membership-inverse/output.log",
+      "command_sha256": "2e094b481dc0c2a79345db632a02e8060eef53e3857b01883bfe747580bdbec0",
+      "log_sha256": "35e3618314b41a6a80b9993f342b8265449d063bcb879ca51dadf697c0532efc",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-23-refresh-reuse-membership-inverse/results.xml",
+      "junit_sha256": "3ba0f73367f2fb7fd6ea71efd99f9d1e8fb7316c8a3f2b5d070bc9868c1e4950",
+      "counts": {
+        "executed": 1,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_batch_bounds_defer_without_starving_current_members"
+        }
+      ],
+      "summary_lines": [
+        "1 failed, 76 deselected in 0.92s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended inverse RED",
+      "explanation": "refreshed earlier fresh-universe membership: removed member appears in reused membership. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 24."
+    },
+    {
+      "name": "task7-fix1-24-refresh-reuse-membership-restored",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "-k",
+        "test_batch_bounds_defer_without_starving_current_members",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-24-refresh-reuse-membership-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 1.207,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-24-refresh-reuse-membership-restored/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-24-refresh-reuse-membership-restored/output.log",
+      "command_sha256": "9ebf5cd04353943da09d831b42b6021149d191df113b1291cd85413bd4e8162b",
+      "log_sha256": "eaeaab50ad3a34a4357d6f412f3dc874a8b8acb4d09185b601903a2cbe6df3bd",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-24-refresh-reuse-membership-restored/results.xml",
+      "junit_sha256": "c1ad53a89ddc3d85e3f2238a423061d883d77944d1ef586121ad51400e175235",
+      "counts": {
+        "executed": 1,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "1 passed, 76 deselected in 0.89s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "exact restore GREEN",
+      "explanation": "refreshed earlier fresh-universe membership: exact before-source SHA restored, matching focused selectors pass; original/mutant/restored hashes and artifacts read back."
+    },
+    {
+      "name": "task7-fix1-25-refresh-reject-observed-space-symbol-inverse",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "tests/test_sec_research_schedule_runtime.py",
+        "tests/test_active_universe.py",
+        "-k",
+        "space_symbol or only_sec_invalid_symbol or exact_hidden_veto_distinguishes",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-25-refresh-reject-observed-space-symbol-inverse/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 1,
+      "seconds": 2.23,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-25-refresh-reject-observed-space-symbol-inverse/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-25-refresh-reject-observed-space-symbol-inverse/output.log",
+      "command_sha256": "27b8238c792efe6ebf1ca1dbe02233d6ec20f49c9a0db90168c16f42b6b7375c",
+      "log_sha256": "dcfc67210d03a63ad4a627a03381299f8781d8ef0da984edbb6da4324510bedb",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-25-refresh-reject-observed-space-symbol-inverse/results.xml",
+      "junit_sha256": "ad056062be398cfc9e5a0a6c24ce6d66fe4418a8b94adbea45d1289dbf0d3cb5",
+      "counts": {
+        "executed": 4,
+        "failed": 3,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "failed_cases": [
+        {
+          "owner": "tests.test_sec_research_schedule",
+          "name": "test_space_symbol_is_unresolved_without_rejecting_observed_membership"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_actual_space_symbol_membership_keeps_other_issuer_and_stored_status"
+        },
+        {
+          "owner": "tests.test_sec_research_schedule_runtime",
+          "name": "test_only_sec_invalid_symbol_needs_no_credentials_or_transport"
+        }
+      ],
+      "summary_lines": [
+        "3 failed, 1 passed, 117 deselected in 1.76s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "intended inverse RED",
+      "explanation": "refreshed earlier observed space-symbol boundary: 3 mixed observed-membership cases fail; unchanged hidden-distinction control passes. Immutable original/mutant artifacts and exact replacement recipe retained; exact restoration verified by 26."
+    },
+    {
+      "name": "task7-fix1-26-refresh-reject-observed-space-symbol-restored",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_schedule.py",
+        "tests/test_sec_research_schedule_runtime.py",
+        "tests/test_active_universe.py",
+        "-k",
+        "space_symbol or only_sec_invalid_symbol or exact_hidden_veto_distinguishes",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-26-refresh-reject-observed-space-symbol-restored/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 2.952,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-26-refresh-reject-observed-space-symbol-restored/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-26-refresh-reject-observed-space-symbol-restored/output.log",
+      "command_sha256": "a058516f0060553f67c19ce23601eb693afa8af3d95a6769140c29385aabd817",
+      "log_sha256": "54049bc15f4c618537cbd31a14fee45eb525f124cf2439b3840954306153eacf",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-26-refresh-reject-observed-space-symbol-restored/results.xml",
+      "junit_sha256": "d03800a0253b2714fe9ef61dedb535b50129d748b27f6d924f2c5c16c88071c8",
+      "counts": {
+        "executed": 4,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 4
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "4 passed, 117 deselected in 2.48s"
+      ],
+      "act_warning_count": 0,
+      "disposition": "exact restore GREEN",
+      "explanation": "refreshed earlier observed space-symbol boundary: exact before-source SHA restored, matching focused selectors pass; original/mutant/restored hashes and artifacts read back."
+    },
+    {
+      "name": "task7-fix1-27-backend-cover",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_capture_lock.py",
+        "tests/test_sec_research_captures.py",
+        "tests/test_sec_research_catalog.py",
+        "tests/test_sec_research_citations.py",
+        "tests/test_sec_research_cli.py",
+        "tests/test_sec_research_common.py",
+        "tests/test_sec_research_config.py",
+        "tests/test_sec_research_document_queries.py",
+        "tests/test_sec_research_document_routes.py",
+        "tests/test_sec_research_document_service.py",
+        "tests/test_sec_research_document_store.py",
+        "tests/test_sec_research_document_text.py",
+        "tests/test_sec_research_document_toc.py",
+        "tests/test_sec_research_documents.py",
+        "tests/test_sec_research_fact_queries.py",
+        "tests/test_sec_research_facts.py",
+        "tests/test_sec_research_issuers.py",
+        "tests/test_sec_research_maintenance.py",
+        "tests/test_sec_research_native_dispatch.py",
+        "tests/test_sec_research_operation_admission.py",
+        "tests/test_sec_research_operations.py",
+        "tests/test_sec_research_output_integration.py",
+        "tests/test_sec_research_paths.py",
+        "tests/test_sec_research_queries.py",
+        "tests/test_sec_research_references.py",
+        "tests/test_sec_research_routes.py",
+        "tests/test_sec_research_schedule.py",
+        "tests/test_sec_research_schedule_runtime.py",
+        "tests/test_sec_research_schema_admin.py",
+        "tests/test_sec_research_service.py",
+        "tests/test_sec_research_store.py",
+        "tests/test_sec_research_tool_adapters.py",
+        "tests/test_sec_research_tool_results.py",
+        "tests/test_sec_research_tool_service.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_data_scheduler.py",
+        "tests/test_scheduler_state.py",
+        "tests/test_macro_scheduler_integration.py",
+        "tests/test_macro_scheduler_outcomes.py",
+        "tests/test_sec_transport.py",
+        "tests/test_sec_transport_cancellation.py",
+        "tests/test_active_universe.py",
+        "tests/test_sec_tools.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-27-backend-cover/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 238.752,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-27-backend-cover/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-27-backend-cover/output.log",
+      "command_sha256": "a90054b8ca23861db9fb3d74f4cf6edfac194cb28ced61a4f1ab30ca70c21f56",
+      "log_sha256": "62309f73631dd08c38cc115bb5ed2877b7b55e2226c8d9d4ed2fade6e39250ea",
+      "junit": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-27-backend-cover/results.xml",
+      "junit_sha256": "f3f7453f925a611922fd88f8a48c9d0dd733283be29f62de936a817cba1eacfd",
+      "counts": {
+        "executed": 2493,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 2493
+      },
+      "failed_cases": [],
+      "summary_lines": [
+        "2493 passed in 236.95s (0:03:56)"
+      ],
+      "act_warning_count": 0,
+      "disposition": "final focused covering",
+      "explanation": "Restored final fix source: 2493P across 43 focused SEC, transport, active-universe, scheduler-state, macro integration/outcome and scheduler/tool owners. Not full backend."
+    },
+    {
+      "name": "task7-fix1-28-settings-cover",
+      "command": [
+        "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+        "test",
+        "--",
+        "Settings",
+        "settings",
+        "SourceRunProgress",
+        "SecCitationView",
+        "i18n/resources",
+        "apiError"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+      "exit_code": 0,
+      "seconds": 5.447,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-28-settings-cover/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-28-settings-cover/output.log",
+      "command_sha256": "7473dc4181e24c49677a869c63a13c856569a5e9463eca4eecbf468a7a2ff56c",
+      "log_sha256": "b1854b53efbd5893496561b1269c5f3dfa2734dbf980b8da0c07c5db7d31837c",
+      "junit": null,
+      "junit_sha256": null,
+      "counts": null,
+      "failed_cases": [],
+      "summary_lines": [
+        "Test Files  28 passed (28)",
+        "Tests  449 passed (449)"
+      ],
+      "act_warning_count": 37,
+      "disposition": "final focused covering with retained diagnostics",
+      "explanation": "449P/28 files in actual Settings/shared schedule, source progress, citation, locale and API error owners. 37 act-environment warnings retained; no suppression or frontend infrastructure change. Not full frontend."
+    },
+    {
+      "name": "task7-fix1-29-browser-final",
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/browser_check.py",
+        "--base",
+        "http://127.0.0.1:8457",
+        "--output",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "exit_code": 0,
+      "seconds": 15.384,
+      "command_receipt": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/command.json",
+      "log": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/output.log",
+      "command_sha256": "4b11accc1a6091d7e5ac20d1a7e152dd48720380cff9b1feca077a3595a6c56c",
+      "log_sha256": "653c36c4d6afedc9dcc08cc411dce506c8096673938a30067e098c39a859a46f",
+      "junit": null,
+      "junit_sha256": null,
+      "counts": null,
+      "failed_cases": [],
+      "summary_lines": [
+        "{\"browser_cases\": 4, \"output\": \"/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser\", \"servers_stopped\": true}"
+      ],
+      "act_warning_count": 0,
+      "disposition": "final restored-source browser",
+      "explanation": "Existing actual-service browser workflow rerun once, all four locale/viewport cases pass. Dirty budget, pin/stored pages and exact source requests retained; generated unrelated endpoints explicitly declared; servers stopped."
+    }
+  ]
+}

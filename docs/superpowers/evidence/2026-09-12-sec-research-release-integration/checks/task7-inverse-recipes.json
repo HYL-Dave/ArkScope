@@ -1,0 +1,291 @@
+[
+  {
+    "name": "enable-by-default",
+    "stage": "pre-integrity checkpoint proof",
+    "red_receipt": "task7-32-default-inverse/command.json",
+    "green_receipt": "task7-33-default-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "name": "enable-by-default",
+        "file": "src/service/data_scheduler.py",
+        "before": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+        "mutant": "8bdca544b1f9100f9eb74bf8117114b7039efbbda247778d8152afa80e80fa71",
+        "restored": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+        "red": "task7-32-default-inverse",
+        "green": "task7-33-default-restored",
+        "red_exit": 1,
+        "green_exit": 0,
+        "original_artifact": "task7-inverse-artifacts/enable-by-default/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/enable-by-default/1-mutant.py",
+        "replacements": [
+          {
+            "original": "    enabled = (store.get_setting(f\"schedule.{source}.enabled\") or \"\").strip().lower() in (",
+            "mutant": "    enabled = (store.get_setting(f\"schedule.{source}.enabled\") or (\"true\" if source == \"sec_research_filings\" else \"\")).strip().lower() in ("
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "history-traversal",
+    "stage": "pre-integrity checkpoint proof",
+    "red_receipt": "task7-34-history-traversal-inverse/command.json",
+    "green_receipt": "task7-35-history-traversal-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "name": "history-traversal",
+        "file": "src/sec_research/service.py",
+        "before": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+        "mutant": "0e08bc49466b5f5727270dc1f5cfc8833017f4e76ed88763bb631e0491f4d528",
+        "restored": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+        "red": "task7-34-history-traversal-inverse",
+        "green": "task7-35-history-traversal-restored",
+        "red_exit": 1,
+        "green_exit": 0,
+        "original_artifact": "task7-inverse-artifacts/history-traversal/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/history-traversal/1-mutant.py",
+        "replacements": [
+          {
+            "original": "            if source == \"submissions\" and scope == \"full\":",
+            "mutant": "            if source == \"submissions\":"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "drop-partial",
+    "stage": "pre-integrity checkpoint proof",
+    "red_receipt": "task7-36-drop-partial-inverse/command.json",
+    "green_receipt": "task7-37-drop-partial-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "name": "drop-partial",
+        "file": "src/service/data_scheduler.py",
+        "before": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+        "mutant": "160f501f0992bdcc583ec33ec0068a536c0340cef5c0fe7e5cd0e68c95bedcc3",
+        "restored": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+        "red": "task7-36-drop-partial-inverse",
+        "green": "task7-37-drop-partial-restored",
+        "red_exit": 1,
+        "green_exit": 0,
+        "original_artifact": "task7-inverse-artifacts/drop-partial/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/drop-partial/1-mutant.py",
+        "replacements": [
+          {
+            "original": "                adapter_partial = (\n                    isinstance(result[\"collect\"], dict)",
+            "mutant": "                adapter_partial = (\n                    source != \"sec_research_filings\" and isinstance(result[\"collect\"], dict)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "erase-success",
+    "stage": "pre-integrity checkpoint proof",
+    "red_receipt": "task7-38-erase-success-inverse/command.json",
+    "green_receipt": "task7-39-erase-success-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "name": "erase-success",
+        "file": "src/sec_research/schedule_store.py",
+        "before": "90ad6c75da5e27287e550eed840dc608441c4179d430199a760b5c250df47cd6",
+        "mutant": "107f8e8c71f1f522609ee901f29c57c24322de708adb0e756e24d2431dd7dbbf",
+        "restored": "90ad6c75da5e27287e550eed840dc608441c4179d430199a760b5c250df47cd6",
+        "red": "task7-38-erase-success-inverse",
+        "green": "task7-39-erase-success-restored",
+        "red_exit": 1,
+        "green_exit": 0,
+        "original_artifact": "task7-inverse-artifacts/erase-success/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/erase-success/1-mutant.py",
+        "replacements": [
+          {
+            "original": "                WHERE acquired_at IS NOT NULL ORDER BY checkpoint_id DESC LIMIT 1\"\"\").fetchone()",
+            "mutant": "                ORDER BY checkpoint_id DESC LIMIT 1\"\"\").fetchone()"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "reuse-membership",
+    "stage": "pre-integrity checkpoint proof",
+    "red_receipt": "task7-40-reuse-membership-inverse/command.json",
+    "green_receipt": "task7-41-reuse-membership-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "name": "reuse-membership",
+        "file": "src/sec_research/scheduled.py",
+        "before": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+        "mutant": "bd19a0fc2dd9e823d9a4b1e80385b83f4011cd7f7ac3660925b904783e0b074f",
+        "restored": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+        "red": "task7-40-reuse-membership-inverse",
+        "green": "task7-41-reuse-membership-restored",
+        "red_exit": 1,
+        "green_exit": 0,
+        "original_artifact": "task7-inverse-artifacts/reuse-membership/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/reuse-membership/1-mutant.py",
+        "replacements": [
+          {
+            "original": "            members = universe_reader()",
+            "mutant": "            members = previous[\"universe_tickers\"] if previous else universe_reader()"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "reset-pins",
+    "stage": "pre-integrity checkpoint proof",
+    "red_receipt": "task7-42-reset-pins-inverse/command.json",
+    "green_receipt": "task7-43-reset-pins-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "name": "reset-pins",
+        "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+        "before": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+        "mutant": "8e09e7845ab748abb96c94a4352ce834bb9b7292265efb2ea8a3612ed7c474af",
+        "restored": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+        "red": "task7-42-reset-pins-inverse",
+        "green": "task7-43-reset-pins-restored",
+        "red_exit": 1,
+        "green_exit": 0,
+        "original_artifact": "task7-inverse-artifacts/reset-pins/1-original.tsx",
+        "mutant_artifact": "task7-inverse-artifacts/reset-pins/1-mutant.tsx",
+        "replacements": [
+          {
+            "original": "    if (!before.running && terminalRevision(before) === terminalRevision(source)) return;\n    void loadScheduleStatus();",
+            "mutant": "    if (!before.running && terminalRevision(before) === terminalRevision(source)) return;\n    invalidate(true);\n    void loadScheduleStatus();"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "reset-draft",
+    "stage": "pre-integrity checkpoint proof",
+    "red_receipt": "task7-44-reset-draft-inverse/command.json",
+    "green_receipt": "task7-45-reset-draft-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "name": "reset-draft",
+        "file": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+        "before": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+        "mutant": "d6058729f868d11e0a372fb3edf49bd8cfee8706e43b804b0de4585531e1319c",
+        "restored": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+        "red": "task7-44-reset-draft-inverse",
+        "green": "task7-45-reset-draft-restored",
+        "red_exit": 1,
+        "green_exit": 0,
+        "original_artifact": "task7-inverse-artifacts/reset-draft/1-original.tsx",
+        "mutant_artifact": "task7-inverse-artifacts/reset-draft/1-mutant.tsx",
+        "replacements": [
+          {
+            "original": "    if (!before.running && terminalRevision(before) === terminalRevision(source)) return;\n    void loadScheduleStatus();",
+            "mutant": "    if (!before.running && terminalRevision(before) === terminalRevision(source)) return;\n    dirty.current = false;\n    void loadScheduleStatus();"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "wrong-full-scope-two-sources",
+    "stage": "pre-integrity checkpoint proof",
+    "red_receipt": "task7-46-history-dispatch-inverse/command.json",
+    "green_receipt": "task7-47-history-dispatch-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "name": "wrong-full-scope-two-sources",
+        "file": "src/sec_research/scheduled.py",
+        "before": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+        "mutant": "f7581e14626824e8924f6a57f723e46bfdb325b686c660bed43f206bc1a74396",
+        "restored": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+        "red": "task7-46-history-dispatch-inverse",
+        "green": "task7-47-history-dispatch-restored",
+        "red_exit": 1,
+        "green_exit": 0,
+        "original_artifact": "task7-inverse-artifacts/wrong-full-scope-two-sources/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/wrong-full-scope-two-sources/1-mutant.py",
+        "replacements": [
+          {
+            "original": "            receipt = research.refresh(cik, scope=\"recent\", max_sources=2, check=check)",
+            "mutant": "            receipt = research.refresh(cik, scope=\"full\", max_sources=2, check=check)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "traverse-actual-historical-pointer",
+    "stage": "pre-integrity checkpoint proof",
+    "red_receipt": "task7-48-history-pointer-inverse/command.json",
+    "green_receipt": "task7-49-history-pointer-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "file": "src/sec_research/scheduled.py",
+        "before": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+        "mutant": "f7581e14626824e8924f6a57f723e46bfdb325b686c660bed43f206bc1a74396",
+        "restored": "7b56ecddaa9e53d37fdc3f1fbe597eb95dd98fb4e3c3d699344163e440571256",
+        "original_artifact": "task7-inverse-artifacts/traverse-actual-historical-pointer/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/traverse-actual-historical-pointer/1-mutant.py",
+        "replacements": [
+          {
+            "original": "            receipt = research.refresh(cik, scope=\"recent\", max_sources=2, check=check)",
+            "mutant": "            receipt = research.refresh(cik, scope=\"full\", max_sources=2, check=check)"
+          }
+        ]
+      },
+      {
+        "file": "src/sec_research/service.py",
+        "before": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+        "mutant": "f2bded5a3bf1d0db41be11bce4658f2f80f96404c8a397b3bf4c55e9d948bb35",
+        "restored": "12310e97016c43bd4a5fb95e3c72af2c1659ebe30e4b42ee212aa7d0c1af5dd9",
+        "original_artifact": "task7-inverse-artifacts/traverse-actual-historical-pointer/2-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/traverse-actual-historical-pointer/2-mutant.py",
+        "replacements": [
+          {
+            "original": "                        pending.append(historical.name)",
+            "mutant": "                        pending.insert(0, historical.name)"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "erase-success-final-integrity",
+    "stage": "post-integrity, pre-membership checkpoint proof; superseded by task7-69/70",
+    "red_receipt": "task7-55-success-final-inverse/command.json",
+    "green_receipt": "task7-56-success-final-restored/command.json",
+    "replay": "Use the retained source artifacts in a disposable worktree, verifying hashes before replacement. Run the recorded selector through unchanged run_checks.py with a NEW create-only task7-* run name; restore exact originals and repeat. Owner tests at final commit retain these selectors. No live provider/config/DB or installation.",
+    "files": [
+      {
+        "name": "erase-success-final-integrity",
+        "file": "src/sec_research/schedule_store.py",
+        "before": "bbfa0bd6e6d1875598ae230a235323a9adc015eeece1391fb20017aa40a2fd73",
+        "mutant": "5e70df0eb5b2be2a045e3c39c72a1115be80052f6e60e563054715e1607591be",
+        "restored": "bbfa0bd6e6d1875598ae230a235323a9adc015eeece1391fb20017aa40a2fd73",
+        "red": "task7-55-success-final-inverse",
+        "green": "task7-56-success-final-restored",
+        "red_exit": 1,
+        "green_exit": 0,
+        "original_artifact": "task7-inverse-artifacts/erase-success-final-integrity/1-original.py",
+        "mutant_artifact": "task7-inverse-artifacts/erase-success-final-integrity/1-mutant.py",
+        "replacements": [
+          {
+            "original": "                WHERE acquired_at IS NOT NULL ORDER BY checkpoint_id DESC LIMIT 1\"\"\").fetchone()",
+            "mutant": "                ORDER BY checkpoint_id DESC LIMIT 1\"\"\").fetchone()"
+          }
+        ]
+      }
+    ]
+  }
+]

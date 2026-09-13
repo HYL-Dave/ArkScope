@@ -1,0 +1,25 @@
+{
+  "name": "task7-75-final-reset-draft-inverse",
+  "command": [
+    "/home/hyl/.nvm/versions/node/v22.14.0/bin/npm",
+    "test",
+    "--",
+    "src/settings/SecResearchPanel.test.tsx",
+    "-t",
+    "uses shared SEC controls"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/apps/arkscope-web",
+  "exit_code": 1,
+  "seconds": 1.837,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-75-final-reset-draft-inverse",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-75-final-reset-draft-inverse/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "NODE_OPTIONS": "--require=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_node.cjs"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-75-final-reset-draft-inverse/output.log"
+}

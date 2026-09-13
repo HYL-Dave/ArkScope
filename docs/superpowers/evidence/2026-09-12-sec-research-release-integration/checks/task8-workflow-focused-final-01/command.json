@@ -1,0 +1,31 @@
+{
+  "name": "task8-workflow-focused-final-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+    "-q",
+    "tests/test_sec_research_release_workflow.py",
+    "tests/test_sec_research_tool_adapters.py::test_each_research_transport_dispatches_three_real_sec_tools[anthropic]",
+    "tests/test_sec_research_trace.py::test_sec_citations_roundtrip_event_message_and_legacy_rows",
+    "tests/test_sec_research_operations.py::test_export_restore_preserves_wal_and_historical_citations",
+    "tests/test_sec_research_maintenance.py::test_cleanup_preserves_every_retained_reference_class",
+    "tests/test_sec_research_tool_service.py::test_stored_and_pinned_calls_never_open_acquisition",
+    "tests/test_sec_research_tool_service.py::test_document_refresh_failure_blocks_old_capture_but_pin_reopens",
+    "tests/test_sec_research_document_queries.py::test_unknown_form_keeps_whole_text_and_section_gap",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-workflow-focused-final-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 7.796,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-workflow-focused-final-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-workflow-focused-final-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-workflow-focused-final-01/output.log"
+}

@@ -25,6 +25,33 @@ own transaction locks still apply, so this is not a fixed latency guarantee.
 Protection currently requires supported POSIX/no-follow filesystem semantics;
 it does not exclude arbitrary external SQL or filesystem editors.
 
+## Scheduled Acquisition
+
+`sec_research_filings` is a separate, default-disabled source in Settings' shared
+data-source schedules. Its default interval is 1440 minutes. Enabling it uses the
+existing scheduler; Run Now uses the same source exclusion. Saving a capture
+budget does not enable or dispatch the source. Old SEC-company-event settings
+are not inherited.
+
+Each run observes current active-universe membership and deduplicates resolved
+issuers. It acquires recent submissions and Company Facts, not historical
+submission shards or complete filing documents. Missing/ambiguous symbols are
+reported separately; one unresolved symbol does not suppress other issuers.
+Every later batch rereads membership before continuing its persisted rotation.
+
+The batch admits at most 500 issuers and 1001 source attempts within a 15-minute
+wall budget, with existing SEC pacing and no rate-limit retries. Those are
+admission limits, not throughput promises or instant cancellation of in-flight
+synchronous I/O. Request counts include failed admitted attempts. Deferred work
+remains visible and waits for another explicit or scheduled run.
+
+Settings separates the last attempt, successful issuer acquisition and completed
+batch. Partial acquisition is not a completed batch. Empty valid membership
+performs no acquisition; unavailable membership is not reported as empty.
+Scheduled recent data does not complete a pending full-history refresh, replace
+fixed document versions, or rewrite saved Research references. A schema mismatch
+remains explicit; scheduling never resets an existing store.
+
 ## Export And Restore
 
 ```text
@@ -56,6 +83,19 @@ and `approval_sha256`. Apply approves that exact candidate set; there is no
 force, age-based sweep or automatic confirmation. Every historical snapshot,
 receipt, observation, document, issuer mapping and Research reference is retained.
 Unknown directory entries, symlinks or ambiguous identities block cleanup.
+
+An interrupted publication can leave one object and its staging name as two
+hardlinks. Writer recovery (`CaptureStore.recover`, also used by admitted
+preflight/put) first commits accounting, then removes only a proven redundant
+staging link and syncs that directory. Proof requires the canonical two names,
+the same regular-file identity, exactly two links and the correct content hash;
+registered object bytes remain intact. A standalone staged body is not removed.
+Unlink or sync failure retains the charge and reports failure for explicit retry.
+
+Preview does not invoke writer recovery and still rejects multiple links. After
+successful writer recovery, generate a new preview and approve its exact
+candidates. External links, replaced entries and corrupt content do not qualify
+for this repair; do not remove them manually to bypass a blocked preview.
 
 Registered but unreferenced objects become orphan charges transactionally before
 unlink. Files are counted as removed only after directory durability succeeds.

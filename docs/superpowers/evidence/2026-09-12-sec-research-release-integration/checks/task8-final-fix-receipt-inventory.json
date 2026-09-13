@@ -1,0 +1,2037 @@
+{
+  "schema": "task8-final-fix-receipt-inventory-v1",
+  "base": "a77a7c2e7cb1bb1b8d2b92cd4cfb129f299f6687",
+  "commit": "911d69a28a2a633c82335ef378d0784875757000",
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "receipt_count": 36,
+  "runner_sources": [
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+      "sha256": "2c1cc48b15f817b02cc70a99cad757a0962e875e37381fa122fca8b89796247f",
+      "mode": "0o664"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+      "sha256": "4c74153e1ef86c35f7bbc923586de624c0ffe3f577c2853e6e4c0a78426c95ff",
+      "mode": "0o664"
+    }
+  ],
+  "final_source_and_tests": [
+    {
+      "path": "src/agents/anthropic_agent/agent.py",
+      "sha256": "4c9ec8381ea264f56a074684c89f4872a6329d67448cfcef0024ddae653ba6ab",
+      "mode": "0o664"
+    },
+    {
+      "path": "src/agents/anthropic_agent/tools.py",
+      "sha256": "5c4d864b98fefb0a324d42f1e9b662b39b12c507e8ba0c94470b271f46e5722f",
+      "mode": "0o664"
+    },
+    {
+      "path": "src/agents/openai_agent/agent.py",
+      "sha256": "f23e4fb4464b38ab2f65d5bb1618a99df1a82d163802cf14b2390ce62a3c5bcb",
+      "mode": "0o664"
+    },
+    {
+      "path": "src/agents/openai_agent/tools.py",
+      "sha256": "1fe60144cd3d7f1f98f036d8bf98f80719d645695c422ab835769c9cab11d166",
+      "mode": "0o664"
+    },
+    {
+      "path": "src/agents/shared/subagent.py",
+      "sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+      "mode": "0o664"
+    },
+    {
+      "path": "tests/test_subagent.py",
+      "sha256": "663343ccffcb5c31194b739117842a351ca70d6f8e99a8e602d1447ea9cd0639",
+      "mode": "0o664"
+    },
+    {
+      "path": "tests/test_fable_5_1_runtime.py",
+      "sha256": "76403a8ced25f9125b76f02cf9bdb083658a3f9b77541d04a54c35572c75a6f8",
+      "mode": "0o664"
+    },
+    {
+      "path": "tests/test_sec_research_delegated_dispatch.py",
+      "sha256": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+      "mode": "0o664"
+    },
+    {
+      "path": "tests/test_sec_research_delegated_trace.py",
+      "sha256": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+      "mode": "0o664"
+    },
+    {
+      "path": "tests/test_sec_research_release_workflow.py",
+      "sha256": "afae02c74e70a66e63212000f0808476ebc4e1a0a6ad020d107deb6def906c50",
+      "mode": "0o664"
+    }
+  ],
+  "final_acceptance_receipts": [
+    "task8-final-fix-green-private-owners-01",
+    "task8-final-fix-restored-04",
+    "task8-final-fix-covering-03"
+  ],
+  "receipts": [
+    {
+      "name": "task8-final-fix-red-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-01/command.json",
+        "sha256": "7850c5209a386ad1ccc6464fec6776720a5cf575af25cbe378ff228b8f107cf7",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "parent",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 4.621,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "parent"
+      ],
+      "result": {
+        "tests": 3,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "3 failed, 9 deselected, 3 warnings in 3.61s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-01/output.log",
+        "sha256": "91e33d0c1366d5c69b235d53d78ea8357c6d89d51f42f1e279ea8f533fb8bdbf",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-01/results.xml",
+        "sha256": "d19fb4db3ee38b0ea0c4d879b1102cddbaa989831ba83af540dc6e2817882f6e",
+        "mode": "0o664"
+      },
+      "disposition": "real_red",
+      "explanation": "BASE I1: three actual Anthropic parent/child SEC envelope assertions fail with the nested asyncio.run error; unawaited-coroutine warnings preserved."
+    },
+    {
+      "name": "task8-final-fix-red-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-02/command.json",
+        "sha256": "141a39225ef95409661e9e09a551d11c641c94b8206deceb350fdfa10bab33b2",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 12.746,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py"
+      ],
+      "result": {
+        "tests": 16,
+        "failures": 14,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 2
+      },
+      "summary": "14 failed, 2 passed, 4 warnings in 11.73s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-02/output.log",
+        "sha256": "ec46a5835fee948feb84e199906a791186ea1ae7d7b0dce883cdab0320111ffc",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-02/results.xml",
+        "sha256": "9821e5c4d6a4e7bbadd49875ac55b4affa24692930b7fd8c12e93228b14ba101",
+        "mode": "0o664"
+      },
+      "disposition": "mixed_real_red_and_fixture_error",
+      "explanation": "13 real dispatch/ownership failures (three parent envelopes, nine unclosed-client controls, one foreign-secret path blocked by nested loop); one cancellation fixture used a managed-route-unadmitted parent model. Two release workflows pass. Fixture failure is not cancellation proof."
+    },
+    {
+      "name": "task8-final-fix-red-03",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-03/command.json",
+        "sha256": "765b20a378bf25bed5dc1a37e7731577c9c1d85cc23088b99a47934f2601a028",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "parent_cancel or parent]",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-03/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 7.719,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-03",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "parent_cancel or parent]"
+      ],
+      "result": {
+        "tests": 4,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "4 failed, 10 deselected, 4 warnings in 6.70s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-03/output.log",
+        "sha256": "c9e2ef86c731f54b8bebc6e5410a94d696b4aee0d50c92dfa769a2534c4f3dcc",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-03/results.xml",
+        "sha256": "1ae65d845ea8a11b3308d821fcdd13a3f0b380e236cd89d8c41bfc94420b5be5",
+        "mode": "0o664"
+      },
+      "disposition": "real_red",
+      "explanation": "Corrected admitted parent fixture: three complete-envelope failures and cancellation never reaching delegated SEC because of the actual nested-loop failure. No successful cancellation claim."
+    },
+    {
+      "name": "task8-final-fix-red-04",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-04/command.json",
+        "sha256": "6bf00cd0bf9ca58c1e75956815d755838fdcfb6f2f60e5ce1de521bcbb1a5c41",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "configured_openai_child",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-04/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 10.339,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-04",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "configured_openai_child"
+      ],
+      "result": {
+        "tests": 2,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "2 failed, 14 deselected in 9.20s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-04/output.log",
+        "sha256": "baad84e3e2acf01f97dbd73e427fbc7f0e7fa293bb5ac79c43eec5059b5f081d",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-04/results.xml",
+        "sha256": "d63a814984d9cbcd3bfae8293f66f3253ca0d5fa4dc9e3454a9c84654d91100e",
+        "mode": "0o664"
+      },
+      "disposition": "real_red",
+      "explanation": "Actual Anthropic parent/OpenAI child blocked by Runner.run_sync on the running loop in both endings; not an import or syntax failure."
+    },
+    {
+      "name": "task8-final-fix-green-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-01/command.json",
+        "sha256": "9b1d2fbce6bc0cc91261d779f78c9f018d6dd93c5f4139bed1cf6ea5af5f875a",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 10.861,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-green-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py"
+      ],
+      "result": {
+        "tests": 18,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 16
+      },
+      "summary": "2 failed, 16 passed in 9.59s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-01/output.log",
+        "sha256": "7e63c01580dc111cd0373ce42bf2bbae5157acdc34f8fd5d44a16f4683403393",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-01/results.xml",
+        "sha256": "0d28778b672b15f71e5d6ce414477c3877eb0296da550f61a2edb27e0787fcf7",
+        "mode": "0o664"
+      },
+      "disposition": "fixture_error",
+      "explanation": "16 passed; two expectations were wrong: Research executor persists cancellation then re-raises CancelledError, and the foreign value is rejected earlier by ToolService as sec_research_store_unavailable."
+    },
+    {
+      "name": "task8-final-fix-green-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-02/command.json",
+        "sha256": "6ad4dc107c59b43296fd250033369afe6f57ec42916f7a05b40a0b85bc0d1c63",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "tests/test_subagent.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 11.182,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-green-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "tests/test_subagent.py"
+      ],
+      "result": {
+        "tests": 82,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 82
+      },
+      "summary": "82 passed in 9.90s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-02/output.log",
+        "sha256": "7d75f7f49418018d36f1913b73d7019ebe7f792c0dbcbc7681975fc95401b8a1",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-02/results.xml",
+        "sha256": "c54389ed444ac336572ec62b037a70241b033931dc8dbb31f8d39ea410300914",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_green",
+      "explanation": "82 passed on first corrected I1/M1 implementation, before cleanup-exception and citation extensions."
+    },
+    {
+      "name": "task8-final-fix-inverse-close-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-01/command.json",
+        "sha256": "808ebc67faa1c45a48d7422a333d4e524b3cdfba65a1cd0909e31e4c80a5deba",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py::test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close]",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 5.141,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-inverse-close-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py::test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close]"
+      ],
+      "result": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "1 failed in 3.77s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-01/output.log",
+        "sha256": "62344fa6448169d664d0426cf3cae03b42c0934bb1d22f5cda76512143da5f66",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-01/results.xml",
+        "sha256": "85c01cf5d1e67248c928eb81b6727d49f3dd3ff6e3788ccae8517b8b8dcc37c9",
+        "mode": "0o664"
+      },
+      "disposition": "killed_inverse",
+      "explanation": "Initial-source client-close join inverse killed at finished.is_set() false, not syntax/import failure; original/mutant artifacts preserved."
+    },
+    {
+      "name": "task8-final-fix-restored-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-01/command.json",
+        "sha256": "82327cb766181151fae8c2fc11e7bf257671958a5982bcfd86358ec9e32ad3b2",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "tests/test_subagent.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 11.497,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-restored-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "tests/test_subagent.py"
+      ],
+      "result": {
+        "tests": 82,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 82
+      },
+      "summary": "82 passed in 10.05s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-01/output.log",
+        "sha256": "08c766fd4cd9c61308d7e6ca45f2ee2bf8583eddc243fd24983db5dc1d50ccaa",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-01/results.xml",
+        "sha256": "f621d2660ffef4e4dda7ebd9d0d7edfd5a7a5437810acefaf886fa2dac689fc6",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_restored_green",
+      "explanation": "82 passed after exact original restore from first close inverse."
+    },
+    {
+      "name": "task8-final-fix-covering-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-01/command.json",
+        "sha256": "fca3414648ce1414cc1de30b960156afe4662ef8c64a1544201301d1e2ed6e12",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_native_dispatch.py",
+        "tests/test_sec_research_tool_adapters.py",
+        "tests/test_sec_research_tool_results.py",
+        "tests/test_sec_research_tool_service.py",
+        "tests/test_sec_research_output_integration.py",
+        "tests/test_output_boundary.py",
+        "tests/test_tool_output_policy.py",
+        "tests/test_tool_output_channels.py",
+        "tests/test_research_output_events.py",
+        "tests/test_research_output_lifetimes.py",
+        "tests/test_task_runtime_binding.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_operations.py",
+        "tests/test_sec_research_operation_admission.py",
+        "tests/test_sec_research_release_workflow.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 112.012,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-covering-01",
+        "backend",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_native_dispatch.py",
+        "tests/test_sec_research_tool_adapters.py",
+        "tests/test_sec_research_tool_results.py",
+        "tests/test_sec_research_tool_service.py",
+        "tests/test_sec_research_output_integration.py",
+        "tests/test_output_boundary.py",
+        "tests/test_tool_output_policy.py",
+        "tests/test_tool_output_channels.py",
+        "tests/test_research_output_events.py",
+        "tests/test_research_output_lifetimes.py",
+        "tests/test_task_runtime_binding.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_operations.py",
+        "tests/test_sec_research_operation_admission.py",
+        "tests/test_sec_research_release_workflow.py"
+      ],
+      "result": {
+        "tests": 1312,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1312
+      },
+      "summary": "1312 passed in 110.43s (0:01:50)",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-01/output.log",
+        "sha256": "8647cfc76f6406a3479ff2d0660e21c8ca63b6cb96d88d8236a67d33baa52327",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-01/results.xml",
+        "sha256": "f0cf0f04320944dc87b616a72fc0a9f897a1ac812a9f48d52ae8c226d4e7f72f",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_covering_green",
+      "explanation": "1312 passed on initial I1/M1 source; superseded by final-source covering."
+    },
+    {
+      "name": "task8-final-fix-red-cleanup-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-01/command.json",
+        "sha256": "c689fc15d14b5cd37991724638ccd7f101cf510be6dcf3ad046ace90c8e9a072",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "close_error or close-error",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 5.355,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-cleanup-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "close_error or close-error"
+      ],
+      "result": {
+        "tests": 2,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "2 failed, 16 deselected in 3.99s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-01/output.log",
+        "sha256": "e1c53021ec8a26f23df5819dd87ed167fedf53bc32682887cbcc2a08b4e22ca3",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-01/results.xml",
+        "sha256": "e6df4721d7e895cb36a077847d715799c2466da7d8c08dfbcc50a75a01e1cf73",
+        "mode": "0o664"
+      },
+      "disposition": "intermediate_regression_red",
+      "explanation": "Two OpenAI-child cancellation cases prove newly added close errors masked cancellation; DID NOT RAISE CancelledError. Not a fixture mistake."
+    },
+    {
+      "name": "task8-final-fix-red-cleanup-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-02/command.json",
+        "sha256": "28aa333ca31769a83d29c4a1988726b95d1a0ae0ab367799991e6ec973b09e13",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "close_error or close-error",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 5.71,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-cleanup-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "-k",
+        "close_error or close-error"
+      ],
+      "result": {
+        "tests": 3,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "3 failed, 16 deselected in 4.24s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-02/output.log",
+        "sha256": "2026fa1451a5c803e0aaab68e5ac88f2caaa7bbd8ab6f5be4ad6274d80050535",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-cleanup-02/results.xml",
+        "sha256": "d8f46917253f345f8443bb382c330e5bcc901a08355a841042c2296274c81132",
+        "mode": "0o664"
+      },
+      "disposition": "intermediate_regression_red",
+      "explanation": "Three failures: adds Anthropic close-error and refines OpenAI model-cancel without repeat cancel; all prove cancellation masked by newly owned close errors."
+    },
+    {
+      "name": "task8-final-fix-green-cleanup-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-cleanup-01/command.json",
+        "sha256": "4e5390d86c256d28c6032366b826e350a41693cf6139bbbd7cf43bc716b73403",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "tests/test_subagent.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-cleanup-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 11.724,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-green-cleanup-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "tests/test_subagent.py"
+      ],
+      "result": {
+        "tests": 85,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 85
+      },
+      "summary": "85 passed in 10.44s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-cleanup-01/output.log",
+        "sha256": "9f8a981a78627330c6f6318292423d84ec13efa5d03f82ae1ba149b21fd571e8",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-cleanup-01/results.xml",
+        "sha256": "997b12f3081004617a3a7826af7e8e9329019550ac7489a02abca2f57fde84ca",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_green",
+      "explanation": "85 passed after preserving cancellation across child finalizer failures."
+    },
+    {
+      "name": "task8-final-fix-inverse-close-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-02/command.json",
+        "sha256": "404db0ce0d5a98162f85eb11db76923a0d22db1a3fbfa0860e6ebbc12f6fc315",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py::test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close]",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 5.023,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-inverse-close-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py::test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close]"
+      ],
+      "result": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "1 failed in 3.77s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-02/output.log",
+        "sha256": "7fec19713b7915cbbbeac12ec9b946c6eadffc07a3c051ecd3234ac79d91e0f1",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-02/results.xml",
+        "sha256": "f08544a3e7786259fd1f31cc1fdc7cfb31125d384d38ae9408d6885c9a6fa6d9",
+        "mode": "0o664"
+      },
+      "disposition": "killed_inverse",
+      "explanation": "Close-join inverse rebound to cleanup-fixed source; finished.is_set() false. Exact immutable revision-02 original and mutant preserved."
+    },
+    {
+      "name": "task8-final-fix-restored-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-02/command.json",
+        "sha256": "1269fb18609df7bce1bbbbcbf9e960680835a26a816db656ca8d04cd79a6b656",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "tests/test_subagent.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 11.83,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-restored-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_release_workflow.py",
+        "tests/test_subagent.py"
+      ],
+      "result": {
+        "tests": 85,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 85
+      },
+      "summary": "85 passed in 10.55s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-02/output.log",
+        "sha256": "7397cee5462c9a0abe473a153decf83859252c40c9de14fbb22ef0b380f65479",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-02/results.xml",
+        "sha256": "60cd533fc8ce33a95b478bc3fb48cc0958336e05c9f2617e533142066c556932",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_restored_green",
+      "explanation": "85 passed after exact revision-02 restore."
+    },
+    {
+      "name": "task8-final-fix-covering-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-02/command.json",
+        "sha256": "27a6f31061f88283e51fbf7f8b398ddeecb605e6410e129dfebcd9f040def3d2",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_native_dispatch.py",
+        "tests/test_sec_research_tool_adapters.py",
+        "tests/test_sec_research_tool_results.py",
+        "tests/test_sec_research_tool_service.py",
+        "tests/test_sec_research_output_integration.py",
+        "tests/test_output_boundary.py",
+        "tests/test_tool_output_policy.py",
+        "tests/test_tool_output_channels.py",
+        "tests/test_research_output_events.py",
+        "tests/test_research_output_lifetimes.py",
+        "tests/test_task_runtime_binding.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_operations.py",
+        "tests/test_sec_research_operation_admission.py",
+        "tests/test_sec_research_release_workflow.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 138.686,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-covering-02",
+        "backend",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_native_dispatch.py",
+        "tests/test_sec_research_tool_adapters.py",
+        "tests/test_sec_research_tool_results.py",
+        "tests/test_sec_research_tool_service.py",
+        "tests/test_sec_research_output_integration.py",
+        "tests/test_output_boundary.py",
+        "tests/test_tool_output_policy.py",
+        "tests/test_tool_output_channels.py",
+        "tests/test_research_output_events.py",
+        "tests/test_research_output_lifetimes.py",
+        "tests/test_task_runtime_binding.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_operations.py",
+        "tests/test_sec_research_operation_admission.py",
+        "tests/test_sec_research_release_workflow.py"
+      ],
+      "result": {
+        "tests": 1315,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1315
+      },
+      "summary": "1315 passed in 137.14s (0:02:17)",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-02/output.log",
+        "sha256": "5681ed63f84939a50576dffffab1ac0d0e7d241a558b01b94c64049b2011d743",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-02/results.xml",
+        "sha256": "23d6b79a8fc59ad2f1b0097cc54db56843d3c49ff9c01a20aa71ddbfc3697198",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_covering_green",
+      "explanation": "1315 passed on cleanup-fixed I1/M1 source before citation observer; not final-source acceptance."
+    },
+    {
+      "name": "task8-final-fix-red-citations-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-01/command.json",
+        "sha256": "17de19b8ff755657bff0521305ae4f4e8676b0d5083b688875404e0addab3804",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 9.716,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-citations-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py"
+      ],
+      "result": {
+        "tests": 20,
+        "failures": 20,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "20 failed in 8.60s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-01/output.log",
+        "sha256": "1f1411f24eb443c614d69e1d8b18e41dc9c52ee827f9e8b11064c665483a9413",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-01/results.xml",
+        "sha256": "20017626d61ca8e60096081037428d22386fa6338aa3799a80a7732b27804012",
+        "mode": "0o664"
+      },
+      "disposition": "fixture_error",
+      "explanation": "All 20 test bodies stopped before delegation: create_run_with_user_message omitted new_thread_title, user_content and user_tickers. Not behavioral RED."
+    },
+    {
+      "name": "task8-final-fix-red-citations-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-02/command.json",
+        "sha256": "0a7a633ccecf24fb1a22d9fecf0fdfacb5882522b6ddb92d83f1613625acb5ac",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 14.885,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-citations-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py"
+      ],
+      "result": {
+        "tests": 20,
+        "failures": 16,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 4
+      },
+      "summary": "16 failed, 4 passed in 13.61s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-02/output.log",
+        "sha256": "856a8f9cc53b3a44369aeb6fa680393d26b1ce78b7a3d5fe183195803899c149",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-02/results.xml",
+        "sha256": "bf338bbb33749f664e0962fa1f528ccf04473caa914de8a5d0793d4f23b4c7c9",
+        "mode": "0o664"
+      },
+      "disposition": "real_red",
+      "explanation": "12 native parent/child success/failure/cancel readbacks and four invocation-isolation readbacks lost admitted SEC completions. Four forged-delegate controls passed."
+    },
+    {
+      "name": "task8-final-fix-red-citations-03",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-03/command.json",
+        "sha256": "dc418210a9188d9a695690f9837add60eaff956407ff9b2dbb8e434ef6d1c580",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-03/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 16.511,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-citations-03",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py"
+      ],
+      "result": {
+        "tests": 24,
+        "failures": 20,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 4
+      },
+      "summary": "20 failed, 4 passed in 15.18s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-03/output.log",
+        "sha256": "7f4efc1340386d74c6fc480b84bf7725fe80bed0937396bad50728aa6f1ddca2",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citations-03/results.xml",
+        "sha256": "2dd445bf3090ef9bb5493bbe8ffe8a990caaa154c9c247e1a7809fff86534b77",
+        "mode": "0o664"
+      },
+      "disposition": "real_red",
+      "explanation": "20 missing-completion failures including malformed-result gap and foreign-secret-safe completion retention; four forged-delegate controls passed. Secret rejection itself remained intact."
+    },
+    {
+      "name": "task8-final-fix-green-citations-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-01/command.json",
+        "sha256": "75cd779fa025b4997ed23592b3d62d1ff224e05bcdeffff9a2ee5fda584f1e53",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_trace.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 41.32,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-green-citations-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_trace.py"
+      ],
+      "result": {
+        "tests": 182,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 182
+      },
+      "summary": "182 passed in 40.02s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-01/output.log",
+        "sha256": "bffdf98ce06c11c0489a13ec15738b9ed7532ad99ccfe099af182879920b7512",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-01/results.xml",
+        "sha256": "5f84b0e97118b8f10e5f9f9d7c8bb2bed7b77320426f91ee88c1ba38749d931b",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_green",
+      "explanation": "182 passed after initial bounded observer and parent drain extension."
+    },
+    {
+      "name": "task8-final-fix-green-citations-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-02/command.json",
+        "sha256": "e4375fd1c0e8f747c64b994dc510f475ccb5b6238826da5133150e8c69d1645c",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_trace.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 43.472,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-green-citations-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_trace.py"
+      ],
+      "result": {
+        "tests": 186,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 184
+      },
+      "summary": "2 failed, 184 passed in 42.14s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-02/output.log",
+        "sha256": "21d3813d4ab1281cc1d398ff0a33d3b993512c61bccb317d0d7ddaaba837120d",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citations-02/results.xml",
+        "sha256": "c7a6a482be7094a18e37e9e958bd6bd3f3c00db7c076dc96bcce591ec22426bb",
+        "mode": "0o664"
+      },
+      "disposition": "mixed_regression_and_fixture_error",
+      "explanation": "184 passed; real OpenAI-parent premature release during held child cleanup plus one explicit-close fixture using effort instead of reasoning_effort for OpenAI."
+    },
+    {
+      "name": "task8-final-fix-red-citation-lifetime-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-01/command.json",
+        "sha256": "7b1cdaf5e147682902a556f5b093e8c88d79ce9db393b4f526a436d31ff3ca61",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or explicit_close",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 6.861,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-citation-lifetime-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or explicit_close"
+      ],
+      "result": {
+        "tests": 4,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 3
+      },
+      "summary": "1 failed, 3 passed, 24 deselected in 5.55s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-01/output.log",
+        "sha256": "40c5383d597006056157341cad9d3bd3ad4df943726d662de16809dffee80a65",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-01/results.xml",
+        "sha256": "687905d67903f20694e4c057ef358f1858d259f2243054e76cfdeb474306b0f6",
+        "mode": "0o664"
+      },
+      "disposition": "intermediate_regression_red",
+      "explanation": "Corrected fixture isolates actual OpenAI-parent early release with no cleanup exception; three lifetime controls pass."
+    },
+    {
+      "name": "task8-final-fix-red-citation-lifetime-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-02/command.json",
+        "sha256": "c233ca167f5f4e746e9ddcf8c4e052e4c7cdf5885af49f52ff3e5c32cfdfc3ca",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or joins_cancelled_sec_worker",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 6.527,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-citation-lifetime-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or joins_cancelled_sec_worker"
+      ],
+      "result": {
+        "tests": 3,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "summary": "2 failed, 1 passed, 26 deselected in 5.25s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-02/output.log",
+        "sha256": "27b3e4e0dcebe5ab7c61d40ffc3d9c5e0716a3204c74cfd699e2286ef8c26a2e",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-citation-lifetime-02/results.xml",
+        "sha256": "1ec9251eb56c0ade897ffee9816475a170325b4ccc9b9c70fff1f5fad365f749",
+        "mode": "0o664"
+      },
+      "disposition": "intermediate_regression_red",
+      "explanation": "Two real SDK ownership failures: OpenAI parent abandons delegated client cleanup, OpenAI child abandons cancelled SEC worker. Anthropic-parent child-client control passes."
+    },
+    {
+      "name": "task8-final-fix-green-citation-lifetime-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-01/command.json",
+        "sha256": "8a50fb03d4c442b2346e6afd0f732efd479dff0a6bd15097300bb8d1a3418f54",
+        "mode": "0o664"
+      },
+      "exit_code": 2,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or explicit_close or joins_cancelled_sec_worker",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 0.683,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-green-citation-lifetime-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or explicit_close or joins_cancelled_sec_worker"
+      ],
+      "result": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 1,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "1 error in 0.38s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-01/output.log",
+        "sha256": "18f4697b09b0419034705583d98771d72871a5222dae23a7c5d534169c2d5b0c",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-01/results.xml",
+        "sha256": "37e30a9960d354b362839c8681edc61412ff8679ee244f9244ede2b5abc2e298",
+        "mode": "0o664"
+      },
+      "disposition": "implementation_collection_error",
+      "explanation": "Missed async on asynccontextmanager produced await-outside-async SyntaxError during collection. Not behavioral RED, not an inverse."
+    },
+    {
+      "name": "task8-final-fix-green-citation-lifetime-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-02/command.json",
+        "sha256": "aed05b22a329411d1fb886c99206fe33509d991f99e2fa0194692c9ef0e74164",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or explicit_close or joins_cancelled_sec_worker",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 7.051,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-green-citation-lifetime-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or explicit_close or joins_cancelled_sec_worker"
+      ],
+      "result": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 5
+      },
+      "summary": "5 passed, 24 deselected in 5.59s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-02/output.log",
+        "sha256": "259b3580bd0e4a4719bb53d4fe17d175cdb767aa785881cbaa9799d2a44d16b7",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-citation-lifetime-02/results.xml",
+        "sha256": "86efd401e70556234892435310cc177c9fdad4e482b3d1264c8eb119cd0c8006",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_green",
+      "explanation": "Five lifetime controls pass after invocation-local joining of SDK-abandoned delegated/SEC calls."
+    },
+    {
+      "name": "task8-final-fix-green-final-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-final-01/command.json",
+        "sha256": "4c2398bbb874349c61503c16be91625b1b9e124632939e698cb3f926cc533a7e",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_release_workflow.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-final-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 46.314,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-green-final-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_release_workflow.py"
+      ],
+      "result": {
+        "tests": 189,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 189
+      },
+      "summary": "189 passed in 44.99s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-final-01/output.log",
+        "sha256": "f7d92fd202b1ee53c5d43e0a80c10f98423182acb74bf82c78030766754dbea5",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-final-01/results.xml",
+        "sha256": "708d7cfde080c25d6cb02dd54932022d24cb15b2e7319c2acc589f20257a54e6",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_green",
+      "explanation": "189 focused passes on observer and SDK-join source before controller private-wrapper cleanup ruling."
+    },
+    {
+      "name": "task8-final-fix-inverse-close-03",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-03/command.json",
+        "sha256": "b6ecad5756ac809fd4f1ace52993bdf87120353acac4741005c0b148b722e86f",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py::test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close]",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-03/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 5.063,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-inverse-close-03",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py::test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close]"
+      ],
+      "result": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "1 failed in 3.71s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-03/output.log",
+        "sha256": "20dd2a3243b9c1b7b42c89b16795cb45800a1b65dc2d9b4b68c7f181b11e7a44",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-03/results.xml",
+        "sha256": "79f8a98337152b30766c423e0facfbc34a26b935bb847fb98e747a1545f23107",
+        "mode": "0o664"
+      },
+      "disposition": "killed_inverse",
+      "explanation": "Close-join inverse rebound to observer/SDK-join source, killed at unfinished close; revision-03 artifacts retained."
+    },
+    {
+      "name": "task8-final-fix-inverse-citation-fence-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-01/command.json",
+        "sha256": "6381cd05b14512514fd261ec1369e66681ca46b81477a8035c022b18d2f29f4e",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py::test_cancel_drains_child_completions_but_fences_late_callbacks_until_join[anthropic]",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 5.52,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-inverse-citation-fence-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py::test_cancel_drains_child_completions_but_fences_late_callbacks_until_join[anthropic]"
+      ],
+      "result": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "1 failed in 4.11s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-01/output.log",
+        "sha256": "cb458d8a32647c737f93d30230aa6e9350e554bc8bfac53d1a53df7b8f892a42",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-01/results.xml",
+        "sha256": "12007260fd4c2565c961da5a312bbf1e2e4d04620c28676cf61b3f23484f4b9d",
+        "mode": "0o664"
+      },
+      "disposition": "killed_inverse",
+      "explanation": "Disabling OpenAI child's completion fence admits a late callback and triggers known_secret during held cleanup, killing parent-held-lifetime assertion; revision-03 artifacts retained."
+    },
+    {
+      "name": "task8-final-fix-inverse-sdk-join-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-01/command.json",
+        "sha256": "b29544bcf1b810015d7f6e5bd9375befb09d450916f25a7c49a086788356f620",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or joins_cancelled_sec_worker",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 6.542,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-inverse-sdk-join-01",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or joins_cancelled_sec_worker"
+      ],
+      "result": {
+        "tests": 3,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "summary": "2 failed, 1 passed, 26 deselected in 5.32s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-01/output.log",
+        "sha256": "e22051f276e915ab190f90b8480e4b601ca91f80848fb6cfc3c27f4a0a134183",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-01/results.xml",
+        "sha256": "0b35413e3f03acb0088aebd6e126967c4f8a296a55255b5ec444a9ffc8edc889",
+        "mode": "0o664"
+      },
+      "disposition": "killed_inverse",
+      "explanation": "Emptying the owned pending-call set reproduces both SDK ownership failures; one direct Anthropic control passes. Revision-03 artifacts retained."
+    },
+    {
+      "name": "task8-final-fix-restored-03",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/command.json",
+        "sha256": "3c7d58c2ff7d07b83c040a4f7404bd635fd030069d337ca400f1f4bf2b8ad9cc",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_release_workflow.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 46.477,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-restored-03",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_release_workflow.py"
+      ],
+      "result": {
+        "tests": 189,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 189
+      },
+      "summary": "189 passed in 45.06s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/output.log",
+        "sha256": "da14345eb53666d28359131ea42c74a09e68d77af4dc4201b21ce7826832b128",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/results.xml",
+        "sha256": "ebed1c6eaadb9b897f5f37aacfa3c069c771273129ce9f2d7bccf6fbd1a0df8e",
+        "mode": "0o664"
+      },
+      "disposition": "checkpoint_restored_green",
+      "explanation": "189 passed after restoring exact revision-03 bytes for all three inverse boundaries; superseded only by requested private-wrapper cleanup."
+    },
+    {
+      "name": "task8-final-fix-red-private-owners-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-private-owners-01/command.json",
+        "sha256": "8b5d98bbefba219d005f1e5e72bc32cf51126e074e3f6fd0f0934890d4a7d74b",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_fable_5_1_runtime.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-private-owners-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 4.555,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-red-private-owners-01",
+        "backend",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_fable_5_1_runtime.py"
+      ],
+      "result": {
+        "tests": 69,
+        "failures": 6,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 63
+      },
+      "summary": "6 failed, 63 passed in 3.59s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-private-owners-01/output.log",
+        "sha256": "8b17ea830c7e22ffbafbe4a907edda1708eae035c5de7db1939ae871b613ecf6",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-red-private-owners-01/results.xml",
+        "sha256": "d8933b0d19bc86cec0213a1f508172ed77af0da508bc98acc93464b511312a06",
+        "mode": "0o664"
+      },
+      "disposition": "cleanup_interface_red",
+      "explanation": "Six direct helper tests expect coroutine owners but receive synchronous wrapper results; 63 other subagent/Fable tests pass. Physical-cleanup interface RED, not a new I1 defect or killed inverse."
+    },
+    {
+      "name": "task8-final-fix-green-private-owners-01",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-private-owners-01/command.json",
+        "sha256": "4a0c986e403f1cdca9c955731ca69d529385be4c335dff7b9f1e2fb0bf9f63df",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_fable_5_1_runtime.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_task_runtime_binding.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-private-owners-01/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 32.195,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-green-private-owners-01",
+        "backend",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_fable_5_1_runtime.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_task_runtime_binding.py"
+      ],
+      "result": {
+        "tests": 258,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 258
+      },
+      "summary": "258 passed in 30.73s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-private-owners-01/output.log",
+        "sha256": "aa6c54bde44028fac50b277c121cfb56dbcbb080ddcfec0070ca089c2269d772",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-green-private-owners-01/results.xml",
+        "sha256": "ceb1d3089b3689f013b27aafef891ecd6a81b31b6061f3240ad023c5f5923ca9",
+        "mode": "0o664"
+      },
+      "disposition": "final_source_focused_green",
+      "explanation": "258 passed including public sync dispatch, Fable guards, auth, delegated execution and citations after removing test-only private sync wrappers."
+    },
+    {
+      "name": "task8-final-fix-inverse-close-04",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-04/command.json",
+        "sha256": "e1456cea07cc74a9fc2a26db3e03a9a99279fa65942e4dbbb6ad596154297b97",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py::test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close]",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-04/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 5.16,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-inverse-close-04",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_dispatch.py::test_parent_awaits_configured_openai_child_and_owns_client_close[cancel-close]"
+      ],
+      "result": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "1 failed in 3.76s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-04/output.log",
+        "sha256": "6602625e408c1fc06ad15a60a697f5ec2bb50a59c37348e45d69bd6dbc343eb6",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-04/results.xml",
+        "sha256": "9e569da97a2b4131aebccfdf25415fb29bece64d495ce9358f60744a51c7fc71",
+        "mode": "0o664"
+      },
+      "disposition": "killed_inverse_final_source",
+      "explanation": "Final-source close-join inverse killed at finished.is_set() false, with exact revision-04 original/mutant/test artifacts."
+    },
+    {
+      "name": "task8-final-fix-inverse-citation-fence-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-02/command.json",
+        "sha256": "e0acbad09faba42734b7010f2a773602f12db29e72d50731cc5e90b23c59a41a",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py::test_cancel_drains_child_completions_but_fences_late_callbacks_until_join[anthropic]",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 5.367,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-inverse-citation-fence-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py::test_cancel_drains_child_completions_but_fences_late_callbacks_until_join[anthropic]"
+      ],
+      "result": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0
+      },
+      "summary": "1 failed in 4.09s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-02/output.log",
+        "sha256": "9909a5def64f9ff980f51a3a5bf1f4e4c1139b4b7c49c873f502f558bea59b1a",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-02/results.xml",
+        "sha256": "b132f02873df4155c2b1f1c3304abd983cc67843a574ded682d72eee7dcdefcd",
+        "mode": "0o664"
+      },
+      "disposition": "killed_inverse_final_source",
+      "explanation": "Final-source completion-fence inverse killed by late callback known_secret during held cleanup, not syntax/import failure."
+    },
+    {
+      "name": "task8-final-fix-inverse-sdk-join-02",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-02/command.json",
+        "sha256": "270ae1c7819b77cc17c091ebb5bf8524ca269fde55e5ddc75cf6dc3e26a80a3a",
+        "mode": "0o664"
+      },
+      "exit_code": 1,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or joins_cancelled_sec_worker",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-02/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 6.356,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-inverse-sdk-join-02",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "-k",
+        "cancel_drains or joins_cancelled_sec_worker"
+      ],
+      "result": {
+        "tests": 3,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1
+      },
+      "summary": "2 failed, 1 passed, 26 deselected in 5.12s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-02/output.log",
+        "sha256": "3ad1ceca943f9691a9579e84a0bc50d3d797a4de08bb24456a51c289c3a92022",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-02/results.xml",
+        "sha256": "cbbd4a8da78ba833975bac02f53f4020e453845a3e8fa3e029e7b2ecc001e1db",
+        "mode": "0o664"
+      },
+      "disposition": "killed_inverse_final_source",
+      "explanation": "Final-source SDK-call-join inverse reproduces premature parent release and abandoned SEC worker; two failures, one passing control."
+    },
+    {
+      "name": "task8-final-fix-restored-04",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/command.json",
+        "sha256": "bde02c288b65a0d12d09398716d4452a4013569deb91722b9d328854c60b9681",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_fable_5_1_runtime.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_release_workflow.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 46.451,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-restored-04",
+        "backend",
+        "-q",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_subagent.py",
+        "tests/test_fable_5_1_runtime.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_release_workflow.py"
+      ],
+      "result": {
+        "tests": 194,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 194
+      },
+      "summary": "194 passed in 45.14s",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/output.log",
+        "sha256": "e26bf705cd20010a0390dcc276e78c4e9ce0e8166a06de52f68715cfe5fa5ae3",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/results.xml",
+        "sha256": "69a6c4cbfd41fb7227d75817a74ac5a404b3377438bdaafeab18b9b19d2c1dc9",
+        "mode": "0o664"
+      },
+      "disposition": "final_source_restored_green",
+      "explanation": "Combined focused verification after exact revision-04 restoration of all three inverse boundaries; includes Fable, sync controls, trace and M1."
+    },
+    {
+      "name": "task8-final-fix-covering-03",
+      "command_json": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/command.json",
+        "sha256": "2fb407d0590c85a61f8917f6b97937462cf84a14a90a64c6da67ca5ee60490ef",
+        "mode": "0o664"
+      },
+      "exit_code": 0,
+      "command": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_fable_5_1_runtime.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_native_dispatch.py",
+        "tests/test_sec_research_tool_adapters.py",
+        "tests/test_sec_research_tool_results.py",
+        "tests/test_sec_research_tool_service.py",
+        "tests/test_sec_research_output_integration.py",
+        "tests/test_output_boundary.py",
+        "tests/test_tool_output_policy.py",
+        "tests/test_tool_output_channels.py",
+        "tests/test_research_output_events.py",
+        "tests/test_research_output_lifetimes.py",
+        "tests/test_task_runtime_binding.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_operations.py",
+        "tests/test_sec_research_operation_admission.py",
+        "tests/test_sec_research_release_workflow.py",
+        "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/results.xml"
+      ],
+      "cwd": "/tmp/arkscope-research-output-boundary",
+      "seconds": 128.402,
+      "launch_argv": [
+        "/home/hyl/.virtualenvs/llm_app/bin/python",
+        "-B",
+        ".superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+        "task8-final-fix-covering-03",
+        "backend",
+        "-q",
+        "tests/test_subagent.py",
+        "tests/test_fable_5_1_runtime.py",
+        "tests/test_sec_research_delegated_dispatch.py",
+        "tests/test_sec_research_delegated_trace.py",
+        "tests/test_sec_research_native_dispatch.py",
+        "tests/test_sec_research_tool_adapters.py",
+        "tests/test_sec_research_tool_results.py",
+        "tests/test_sec_research_tool_service.py",
+        "tests/test_sec_research_output_integration.py",
+        "tests/test_output_boundary.py",
+        "tests/test_tool_output_policy.py",
+        "tests/test_tool_output_channels.py",
+        "tests/test_research_output_events.py",
+        "tests/test_research_output_lifetimes.py",
+        "tests/test_task_runtime_binding.py",
+        "tests/test_sec_research_trace.py",
+        "tests/test_sec_research_operations.py",
+        "tests/test_sec_research_operation_admission.py",
+        "tests/test_sec_research_release_workflow.py"
+      ],
+      "result": {
+        "tests": 1349,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 1349
+      },
+      "summary": "1349 passed in 126.73s (0:02:06)",
+      "log": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/output.log",
+        "sha256": "80f637cdd06c2d6f798e4c8760097975d720b92e2bd6896ac1eedc38ac066281",
+        "mode": "0o664"
+      },
+      "junit": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/results.xml",
+        "sha256": "d0f7cf9ad96fc69017eb67f6d194478d794c657314d0d4fbf69f96ea72a8b799",
+        "mode": "0o664"
+      },
+      "disposition": "final_source_covering_green",
+      "explanation": "Final scoped covering across subagent, Fable, delegation, native dispatch, adapters, SEC service/output, auth, trace, operations and release workflow. No full suite."
+    }
+  ],
+  "inverse_proof_path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-proof.json",
+  "archive_guidance": "Select only the listed command.json/output.log/results.xml, preflight/report/manifests and immutable source/test snapshots. Do not recurse into receipt HOME or generated stores. No controller sealer changes were made.",
+  "non_runner_readback_notes": [
+    "Initial broad /tmp rg returned permission-denied exit 2 for systemd-private directories; no file edit or product execution.",
+    "Read-only symbol searches referenced nonexistent src/sec_research/operation_lock.py and src/task_routes.py (exit 2); actual local owners were then read.",
+    "Local AGENTS.md search had no matches (exit 1); this is not a test failure.",
+    "Read-only SDK source search referenced nonexistent agents/_run_impl.py (exit 2); actual agents/run_internal/tool_execution.py was read instead.",
+    "One bulk evidence JSON read exceeded the tool-output limit and JSON.parse failed on its truncation notice. It wrote no files. Successful bounded readback batches produced this inventory.",
+    "No-match runner process check returned exit 1 with empty output, the expected no-active-runner result."
+  ],
+  "handoff": {
+    "active_runner_sessions": [],
+    "active_runner_processes": [],
+    "process_check_command": "ps -eo pid,ppid,args | rg '[/]([r]un_checks|[o]ffline_pytest)\\.py.*task8-final-fix|[/][o]ffline_pytest\\.py'",
+    "process_check_exit_code": 1,
+    "process_check_output": "",
+    "meaning": "No matching runner process; every exec session was polled to completion.",
+    "index": "Empty after scoped source/test commit; controller docs/evidence not staged."
+  }
+}

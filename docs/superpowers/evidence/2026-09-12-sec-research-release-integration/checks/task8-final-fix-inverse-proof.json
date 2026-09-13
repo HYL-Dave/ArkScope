@@ -1,0 +1,553 @@
+{
+  "schema": "task8-final-fix-inverse-proof-v1",
+  "base": "a77a7c2e7cb1bb1b8d2b92cd4cfb129f299f6687",
+  "commit": "911d69a28a2a633c82335ef378d0784875757000",
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "source_target": "src/agents/shared/subagent.py",
+  "final_source_sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+  "artifact_creation": "cp --no-clobber followed by chmod 444; existing snapshots were never overwritten.",
+  "invocations": [
+    {
+      "boundary": "child-client-close-join",
+      "revision": "01",
+      "final_source": false,
+      "target": "src/agents/shared/subagent.py",
+      "original": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original.py",
+        "sha256": "934635ff1c608fe5c87c8355fbe463f5bc7771bb9f8496adf0c9449ebe21ac51",
+        "mode": "0o444"
+      },
+      "mutant": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant.py",
+        "sha256": "8f7a643e4f1c724dc9fe553302668b4c39158e1791805fbb15aa5b8301a376b3",
+        "mode": "0o444"
+      },
+      "tests": [
+        {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test.py",
+          "sha256": "5de3a8f780c2d1201b0a86146976bc1603b7f5f880c2d1aa2c21f3e64d2eb5d1",
+          "mode": "0o444"
+        }
+      ],
+      "mutation": "Await closing directly instead of shielding its first await.",
+      "kill": {
+        "receipt": "task8-final-fix-inverse-close-01",
+        "command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-01/command.json",
+          "sha256": "808ebc67faa1c45a48d7422a333d4e524b3cdfba65a1cd0909e31e4c80a5deba",
+          "mode": "0o664"
+        },
+        "exit_code": 1,
+        "result": "1 failed in 3.77s",
+        "behavioral_assertion": "finished.is_set() is false after repeated cancellation.",
+        "syntax_or_import_failure": false
+      },
+      "restore": {
+        "method": "apply_patch exact inverse followed by cmp",
+        "command": [
+          "cmp",
+          "src/agents/shared/subagent.py",
+          ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original.py"
+        ],
+        "exit_code": 0,
+        "restored_sha256": "934635ff1c608fe5c87c8355fbe463f5bc7771bb9f8496adf0c9449ebe21ac51",
+        "green_receipt": "task8-final-fix-restored-01",
+        "green_command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-01/command.json",
+          "sha256": "82327cb766181151fae8c2fc11e7bf257671958a5982bcfd86358ec9e32ad3b2",
+          "mode": "0o664"
+        },
+        "green_result": "82 passed in 10.05s"
+      }
+    },
+    {
+      "boundary": "child-client-close-join",
+      "revision": "02",
+      "final_source": false,
+      "target": "src/agents/shared/subagent.py",
+      "original": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-02.py",
+        "sha256": "a5d5df3110830702a943b1eefafaecf8b2ec2eb4e9b4f21c5c0681850adc507f",
+        "mode": "0o444"
+      },
+      "mutant": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-02.py",
+        "sha256": "9f15cba1fb7e6d3384a40b0317e91774e1f70f5fc3a04a83f8f2a7b6f2270a82",
+        "mode": "0o444"
+      },
+      "tests": [
+        {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test-02.py",
+          "sha256": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+          "mode": "0o444"
+        }
+      ],
+      "mutation": "Await closing directly instead of shielding its first await.",
+      "kill": {
+        "receipt": "task8-final-fix-inverse-close-02",
+        "command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-02/command.json",
+          "sha256": "404db0ce0d5a98162f85eb11db76923a0d22db1a3fbfa0860e6ebbc12f6fc315",
+          "mode": "0o664"
+        },
+        "exit_code": 1,
+        "result": "1 failed in 3.77s",
+        "behavioral_assertion": "finished.is_set() is false after repeated cancellation.",
+        "syntax_or_import_failure": false
+      },
+      "restore": {
+        "method": "apply_patch exact inverse followed by cmp",
+        "command": [
+          "cmp",
+          "src/agents/shared/subagent.py",
+          ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-02.py"
+        ],
+        "exit_code": 0,
+        "restored_sha256": "a5d5df3110830702a943b1eefafaecf8b2ec2eb4e9b4f21c5c0681850adc507f",
+        "green_receipt": "task8-final-fix-restored-02",
+        "green_command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-02/command.json",
+          "sha256": "1269fb18609df7bce1bbbbcbf9e960680835a26a816db656ca8d04cd79a6b656",
+          "mode": "0o664"
+        },
+        "green_result": "85 passed in 10.55s"
+      }
+    },
+    {
+      "boundary": "child-client-close-join",
+      "revision": "03",
+      "final_source": false,
+      "target": "src/agents/shared/subagent.py",
+      "original": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-03.py",
+        "sha256": "b577b14176043ad0a79be05e083fe74b40566ce0d0dd2e2ba7b5cd21cfe9622b",
+        "mode": "0o444"
+      },
+      "mutant": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-03.py",
+        "sha256": "ec682a7aecc3ed6a26ae47fb1e0bf7764ff4c2a3a26fb2e44ec4bddc1c9db64e",
+        "mode": "0o444"
+      },
+      "tests": [
+        {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test-03.py",
+          "sha256": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+          "mode": "0o444"
+        }
+      ],
+      "mutation": "Await closing directly instead of shielding its first await.",
+      "kill": {
+        "receipt": "task8-final-fix-inverse-close-03",
+        "command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-03/command.json",
+          "sha256": "b6ecad5756ac809fd4f1ace52993bdf87120353acac4741005c0b148b722e86f",
+          "mode": "0o664"
+        },
+        "exit_code": 1,
+        "result": "1 failed in 3.71s",
+        "behavioral_assertion": "finished.is_set() is false after repeated cancellation.",
+        "syntax_or_import_failure": false
+      },
+      "restore": {
+        "method": "apply_patch exact inverse followed by cmp",
+        "command": [
+          "cmp",
+          "src/agents/shared/subagent.py",
+          ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-03.py"
+        ],
+        "exit_code": 0,
+        "restored_sha256": "b577b14176043ad0a79be05e083fe74b40566ce0d0dd2e2ba7b5cd21cfe9622b",
+        "green_receipt": "task8-final-fix-restored-03",
+        "green_command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/command.json",
+          "sha256": "3c7d58c2ff7d07b83c040a4f7404bd635fd030069d337ca400f1f4bf2b8ad9cc",
+          "mode": "0o664"
+        },
+        "green_result": "189 passed in 45.06s"
+      }
+    },
+    {
+      "boundary": "child-sec-completion-fence",
+      "revision": "03",
+      "final_source": false,
+      "target": "src/agents/shared/subagent.py",
+      "original": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-03.py",
+        "sha256": "b577b14176043ad0a79be05e083fe74b40566ce0d0dd2e2ba7b5cd21cfe9622b",
+        "mode": "0o444"
+      },
+      "mutant": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-citation-fence-03.py",
+        "sha256": "e51f6263f1673771489d92b776418ffd57ca1729e5dfc37919f4e728b707d315",
+        "mode": "0o444"
+      },
+      "tests": [
+        {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-trace-test-03.py",
+          "sha256": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+          "mode": "0o444"
+        }
+      ],
+      "mutation": "Leave OpenAI child completions active on entry to owned cleanup.",
+      "kill": {
+        "receipt": "task8-final-fix-inverse-citation-fence-01",
+        "command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-01/command.json",
+          "sha256": "6381cd05b14512514fd261ec1369e66681ca46b81477a8035c022b18d2f29f4e",
+          "mode": "0o664"
+        },
+        "exit_code": 1,
+        "result": "1 failed in 4.11s",
+        "behavioral_assertion": "Late callback raises known_secret during held cleanup; parent-held-lifetime assertion fails.",
+        "syntax_or_import_failure": false
+      },
+      "restore": {
+        "method": "apply_patch exact inverse followed by cmp",
+        "command": [
+          "cmp",
+          "src/agents/shared/subagent.py",
+          ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-03.py"
+        ],
+        "exit_code": 0,
+        "restored_sha256": "b577b14176043ad0a79be05e083fe74b40566ce0d0dd2e2ba7b5cd21cfe9622b",
+        "green_receipt": "task8-final-fix-restored-03",
+        "green_command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/command.json",
+          "sha256": "3c7d58c2ff7d07b83c040a4f7404bd635fd030069d337ca400f1f4bf2b8ad9cc",
+          "mode": "0o664"
+        },
+        "green_result": "189 passed in 45.06s"
+      }
+    },
+    {
+      "boundary": "delegated-sdk-call-join",
+      "revision": "03",
+      "final_source": false,
+      "target": "src/agents/shared/subagent.py",
+      "original": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-03.py",
+        "sha256": "b577b14176043ad0a79be05e083fe74b40566ce0d0dd2e2ba7b5cd21cfe9622b",
+        "mode": "0o444"
+      },
+      "mutant": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-sdk-join-03.py",
+        "sha256": "f2cba270c1769863949b03761d60a44b68f2664654fd437c5b370081f7763615",
+        "mode": "0o444"
+      },
+      "tests": [
+        {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-trace-test-03.py",
+          "sha256": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+          "mode": "0o444"
+        }
+      ],
+      "mutation": "Replace the owned pending-task snapshot with an empty list.",
+      "kill": {
+        "receipt": "task8-final-fix-inverse-sdk-join-01",
+        "command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-01/command.json",
+          "sha256": "b29544bcf1b810015d7f6e5bd9375befb09d450916f25a7c49a086788356f620",
+          "mode": "0o664"
+        },
+        "exit_code": 1,
+        "result": "2 failed, 1 passed, 26 deselected in 5.32s",
+        "behavioral_assertion": "Both delegated client and child SEC worker outlive parent protection; two assertions fail, one control passes.",
+        "syntax_or_import_failure": false
+      },
+      "restore": {
+        "method": "apply_patch exact inverse followed by cmp",
+        "command": [
+          "cmp",
+          "src/agents/shared/subagent.py",
+          ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-03.py"
+        ],
+        "exit_code": 0,
+        "restored_sha256": "b577b14176043ad0a79be05e083fe74b40566ce0d0dd2e2ba7b5cd21cfe9622b",
+        "green_receipt": "task8-final-fix-restored-03",
+        "green_command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-03/command.json",
+          "sha256": "3c7d58c2ff7d07b83c040a4f7404bd635fd030069d337ca400f1f4bf2b8ad9cc",
+          "mode": "0o664"
+        },
+        "green_result": "189 passed in 45.06s"
+      }
+    },
+    {
+      "boundary": "child-client-close-join",
+      "revision": "04",
+      "final_source": true,
+      "target": "src/agents/shared/subagent.py",
+      "original": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-04.py",
+        "sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+        "mode": "0o444"
+      },
+      "mutant": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-04.py",
+        "sha256": "ce93761306336ba1b52767e7d2b215c0c08c8442f9851cf1ea183bc58fa06bb7",
+        "mode": "0o444"
+      },
+      "tests": [
+        {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test-04.py",
+          "sha256": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+          "mode": "0o444"
+        }
+      ],
+      "mutation": "Await closing directly instead of shielding its first await.",
+      "kill": {
+        "receipt": "task8-final-fix-inverse-close-04",
+        "command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-close-04/command.json",
+          "sha256": "e1456cea07cc74a9fc2a26db3e03a9a99279fa65942e4dbbb6ad596154297b97",
+          "mode": "0o664"
+        },
+        "exit_code": 1,
+        "result": "1 failed in 3.76s",
+        "behavioral_assertion": "finished.is_set() is false after repeated cancellation.",
+        "syntax_or_import_failure": false
+      },
+      "restore": {
+        "method": "apply_patch exact inverse followed by cmp",
+        "command": [
+          "cmp",
+          "src/agents/shared/subagent.py",
+          ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-04.py"
+        ],
+        "exit_code": 0,
+        "restored_sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+        "green_receipt": "task8-final-fix-restored-04",
+        "green_command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/command.json",
+          "sha256": "bde02c288b65a0d12d09398716d4452a4013569deb91722b9d328854c60b9681",
+          "mode": "0o664"
+        },
+        "green_result": "194 passed in 45.14s"
+      }
+    },
+    {
+      "boundary": "child-sec-completion-fence",
+      "revision": "04",
+      "final_source": true,
+      "target": "src/agents/shared/subagent.py",
+      "original": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-04.py",
+        "sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+        "mode": "0o444"
+      },
+      "mutant": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-citation-fence-04.py",
+        "sha256": "e591260a53c7ea02d15b8bfd03cf943e6caf704e762ca5ad53bb0a166f7b894a",
+        "mode": "0o444"
+      },
+      "tests": [
+        {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-trace-test-04.py",
+          "sha256": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+          "mode": "0o444"
+        }
+      ],
+      "mutation": "Leave OpenAI child completions active on entry to owned cleanup.",
+      "kill": {
+        "receipt": "task8-final-fix-inverse-citation-fence-02",
+        "command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-citation-fence-02/command.json",
+          "sha256": "e0acbad09faba42734b7010f2a773602f12db29e72d50731cc5e90b23c59a41a",
+          "mode": "0o664"
+        },
+        "exit_code": 1,
+        "result": "1 failed in 4.09s",
+        "behavioral_assertion": "Late callback raises known_secret during held cleanup; parent-held-lifetime assertion fails.",
+        "syntax_or_import_failure": false
+      },
+      "restore": {
+        "method": "apply_patch exact inverse followed by cmp",
+        "command": [
+          "cmp",
+          "src/agents/shared/subagent.py",
+          ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-04.py"
+        ],
+        "exit_code": 0,
+        "restored_sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+        "green_receipt": "task8-final-fix-restored-04",
+        "green_command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/command.json",
+          "sha256": "bde02c288b65a0d12d09398716d4452a4013569deb91722b9d328854c60b9681",
+          "mode": "0o664"
+        },
+        "green_result": "194 passed in 45.14s"
+      }
+    },
+    {
+      "boundary": "delegated-sdk-call-join",
+      "revision": "04",
+      "final_source": true,
+      "target": "src/agents/shared/subagent.py",
+      "original": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-04.py",
+        "sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+        "mode": "0o444"
+      },
+      "mutant": {
+        "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-sdk-join-04.py",
+        "sha256": "09cd276413f545a8abeea6eac021af6fa88f4136c3ba3fde0b6a47dca4576ea9",
+        "mode": "0o444"
+      },
+      "tests": [
+        {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-trace-test-04.py",
+          "sha256": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+          "mode": "0o444"
+        }
+      ],
+      "mutation": "Replace the owned pending-task snapshot with an empty list.",
+      "kill": {
+        "receipt": "task8-final-fix-inverse-sdk-join-02",
+        "command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-inverse-sdk-join-02/command.json",
+          "sha256": "270ae1c7819b77cc17c091ebb5bf8524ca269fde55e5ddc75cf6dc3e26a80a3a",
+          "mode": "0o664"
+        },
+        "exit_code": 1,
+        "result": "2 failed, 1 passed, 26 deselected in 5.12s",
+        "behavioral_assertion": "Both delegated client and child SEC worker outlive parent protection; two assertions fail, one control passes.",
+        "syntax_or_import_failure": false
+      },
+      "restore": {
+        "method": "apply_patch exact inverse followed by cmp",
+        "command": [
+          "cmp",
+          "src/agents/shared/subagent.py",
+          ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-04.py"
+        ],
+        "exit_code": 0,
+        "restored_sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+        "green_receipt": "task8-final-fix-restored-04",
+        "green_command_json": {
+          "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-restored-04/command.json",
+          "sha256": "bde02c288b65a0d12d09398716d4452a4013569deb91722b9d328854c60b9681",
+          "mode": "0o664"
+        },
+        "green_result": "194 passed in 45.14s"
+      }
+    }
+  ],
+  "artifacts": [
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/green-01-test.py",
+      "sha256": "83186c6d9aae0c0df54fd94444b17ef94f4dd879433631361913822afcf651e0",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test-02.py",
+      "sha256": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test-03.py",
+      "sha256": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test-04.py",
+      "sha256": "94430e838da57e3d4d5ba24d2e2c59f010863fbb8af8b23e1424d0d6d429c3c9",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-test.py",
+      "sha256": "5de3a8f780c2d1201b0a86146976bc1603b7f5f880c2d1aa2c21f3e64d2eb5d1",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-trace-test-03.py",
+      "sha256": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/inverse-trace-test-04.py",
+      "sha256": "32bba3f24004a12409b58b387783c7913e40479289f7526175693695404d5f49",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/red-02-test.py",
+      "sha256": "50a84ad2977b177ea04c4043d0f485b5f57c670555e65ad5b388eac3d37922cf",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-02.py",
+      "sha256": "9f15cba1fb7e6d3384a40b0317e91774e1f70f5fc3a04a83f8f2a7b6f2270a82",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-03.py",
+      "sha256": "ec682a7aecc3ed6a26ae47fb1e0bf7764ff4c2a3a26fb2e44ec4bddc1c9db64e",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-04.py",
+      "sha256": "ce93761306336ba1b52767e7d2b215c0c08c8442f9851cf1ea183bc58fa06bb7",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-citation-fence-03.py",
+      "sha256": "e51f6263f1673771489d92b776418ffd57ca1729e5dfc37919f4e728b707d315",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-citation-fence-04.py",
+      "sha256": "e591260a53c7ea02d15b8bfd03cf943e6caf704e762ca5ad53bb0a166f7b894a",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-sdk-join-03.py",
+      "sha256": "f2cba270c1769863949b03761d60a44b68f2664654fd437c5b370081f7763615",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant-sdk-join-04.py",
+      "sha256": "09cd276413f545a8abeea6eac021af6fa88f4136c3ba3fde0b6a47dca4576ea9",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.mutant.py",
+      "sha256": "8f7a643e4f1c724dc9fe553302668b4c39158e1791805fbb15aa5b8301a376b3",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-02.py",
+      "sha256": "a5d5df3110830702a943b1eefafaecf8b2ec2eb4e9b4f21c5c0681850adc507f",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-03.py",
+      "sha256": "b577b14176043ad0a79be05e083fe74b40566ce0d0dd2e2ba7b5cd21cfe9622b",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original-04.py",
+      "sha256": "0d04e48041a66f3b1acd875f4c9fc4eba60283d165b79ff6e4242f0731576e83",
+      "mode": "0o444"
+    },
+    {
+      "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-artifacts/subagent.original.py",
+      "sha256": "934635ff1c608fe5c87c8355fbe463f5bc7771bb9f8496adf0c9449ebe21ac51",
+      "mode": "0o444"
+    }
+  ],
+  "final_covering": {
+    "path": ".superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/command.json",
+    "sha256": "2fb407d0590c85a61f8917f6b97937462cf84a14a90a64c6da67ca5ee60490ef",
+    "mode": "0o664"
+  },
+  "final_covering_result": "1349 passed in 126.73s (0:02:06)",
+  "no_mutant_in_worktree": true,
+  "handoff": {
+    "active_runner_sessions": [],
+    "active_runner_processes": [],
+    "process_check_command": "ps -eo pid,ppid,args | rg '[/]([r]un_checks|[o]ffline_pytest)\\.py.*task8-final-fix|[/][o]ffline_pytest\\.py'",
+    "process_check_exit_code": 1,
+    "process_check_output": "",
+    "meaning": "No matching runner process; every exec session was polled to completion.",
+    "index": "Empty after scoped source/test commit; controller docs/evidence not staged."
+  }
+}

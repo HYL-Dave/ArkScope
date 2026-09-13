@@ -1,0 +1,428 @@
+{
+  "collection_command": "env HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-27-backend-cover/home /home/hyl/.virtualenvs/llm_app/bin/python -B -c 'import hashlib,json,pathlib,collections,subprocess\nroot=pathlib.Path.cwd(); work=root/\".superpowers/sdd/2026-09-12-sec-research-release-integration\"; browser=work/\"task7-fix1-29-browser-final/browser\"\ndef sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()\nresults=json.loads((browser/\"browser-results.json\").read_text()); sources=json.loads((browser/\"source-inventory.json\").read_text()); api=json.loads((browser/\"api-requests.json\").read_text())\nassert results[\"servers_stopped\"] and not results[\"console_errors\"] and not results[\"page_errors\"] and not results[\"external_requests\"]\nassert len(results[\"measurements\"])==4 and all(r[\"status\"]==200 for r in api)\nbodies=[]\nfor body in sources[\"bodies\"]:\n    if \"file\" in body:\n        p=pathlib.Path(body[\"file\"]); assert p.is_relative_to(browser)\n        assert sha(p)==body[\"sha256\"] and p.stat().st_size==body[\"bytes\"]\n    else:\n        assert body[\"status\"] is None and body[\"bytes\"]==0 and body[\"code\"]==\"sec_rate_limited\"\n    bodies.append(body)\nassert len(bodies)==25 and len([r for r in bodies if \"file\" in r])==20\nfor case in results[\"measurements\"]:\n    batch=case[\"batch\"][\"data\"][\"last_attempt\"]\n    assert case[\"dirty_budget\"]==\"150\" and case[\"geometry\"][\"overlap\"]==case[\"geometry\"][\"clipped\"]==[]\n    assert batch[\"status\"]==\"partial\" and batch[\"request_count\"]==5 and batch[\"filing_count\"]==52 and batch[\"fact_count\"]==45\n    attempts=[r for r in bodies if r[\"phase\"]==case[\"case\"]+\"-schedule\"]\n    assert [r[\"url\"] for r in attempts]==case[\"body_requests\"] and len(attempts)==5\n    assert all(r[\"kind\"]==\"metadata\" and \"-submissions-\" not in r[\"url\"] and \"/Archives/\" not in r[\"url\"] for r in attempts)\nscreenshots=sorted(browser.glob(\"*.png\")); assert len(screenshots)==16\nartifacts=[dict(path=str(p.relative_to(work)),bytes=p.stat().st_size,sha256=sha(p)) for p in sorted(browser.iterdir()) if p.is_file()]\nhelpers=[dict(path=str(p.relative_to(work)),sha256=sha(p)) for p in [work/\"browser_check.py\",work/\"browser_fixture.py\",work/\"vite-preview.mjs\",work/\"browser-fixture/main.tsx\",work/\"browser-fixture/index.html\"]]\nfreeze=json.loads((work/\"task7-fix1-proof-readback.json\").read_text())\nassert all(sha(root/r[\"path\"])==r[\"sha256\"] for r in freeze[\"sources\"])\nprint(json.dumps(dict(runner=\"task7-fix1-29-browser-final\",source_freeze_matches=True,sources=freeze[\"sources\"],cases=[r[\"case\"] for r in results[\"measurements\"]],api_count=len(api),api_owners=dict(collections.Counter(r[\"owner\"] for r in api)),api_statuses=dict(collections.Counter(r[\"status\"] for r in api)),metadata_attempts=len(sources[\"source_dispatches\"]),document_seed_attempts=len(sources[\"document_dispatches\"]),generated_bodies=20,typed_failures=5,confirmed_live_http=0,all_body_hashes_and_lengths_verified=True,bodies=bodies,artifacts=artifacts,helpers=helpers,servers_stopped=True,verification_scope=results[\"verification_scope\"],unrelated_generated_endpoints=results[\"unrelated_generated_endpoints\"])))\n'",
+  "runner": "task7-fix1-29-browser-final",
+  "source_freeze_matches": true,
+  "sources": [
+    {
+      "path": "src/sec_research/issuer_store.py",
+      "sha256": "75e5864b8955b1178a72c0333d5832faf6e62af1df7c3ce9a34afb37e1610e12"
+    },
+    {
+      "path": "src/sec_research/scheduled.py",
+      "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+    },
+    {
+      "path": "src/sec_research/schedule_store.py",
+      "sha256": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed"
+    },
+    {
+      "path": "tests/test_sec_research_schedule.py",
+      "sha256": "50db19f7a2f26138cc08e39c1c5deb04664374206f7586d0b09b894012f9e32e"
+    },
+    {
+      "path": "tests/test_sec_research_schedule_runtime.py",
+      "sha256": "60ae64c7982de33de2235971a32c3dc01edbf541db2701fd8dafb1a4a52f0d3d"
+    }
+  ],
+  "cases": [
+    "en-1280x960",
+    "en-390x844",
+    "zh-Hant-1280x960",
+    "zh-Hant-390x844"
+  ],
+  "api_count": 168,
+  "api_owners": {
+    "unrelated-empty-fixture": 64,
+    "real-route": 104
+  },
+  "api_statuses": {
+    "200": 168
+  },
+  "metadata_attempts": 23,
+  "document_seed_attempts": 2,
+  "generated_bodies": 20,
+  "typed_failures": 5,
+  "confirmed_live_http": 0,
+  "all_body_hashes_and_lengths_verified": true,
+  "bodies": [
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+      "bytes": 3030,
+      "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+      "status": 200,
+      "phase": "seed"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "bytes": 7730,
+      "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+      "status": 200,
+      "phase": "seed"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000320193-submissions-001.json",
+      "status": null,
+      "code": "sec_rate_limited",
+      "phase": "seed",
+      "bytes": 0
+    },
+    {
+      "kind": "document",
+      "url": "/Archives/edgar/data/320193/000032019326000001/index.json",
+      "bytes": 205,
+      "sha256": "28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/28a948277e05bcdfed29b3de9f1d85bee33fa179dcb5988ddb4a61a00a8b5487.body",
+      "status": 200,
+      "phase": "seed"
+    },
+    {
+      "kind": "document",
+      "url": "/Archives/edgar/data/320193/000032019326000001/fixture-1.htm",
+      "bytes": 25268,
+      "sha256": "fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/fdf23dbbe843709ac372138b85dd06e62d54cbfe9ecdd506bf962681e37c1085.body",
+      "status": 200,
+      "phase": "seed"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://www.sec.gov/files/company_tickers.json",
+      "bytes": 118,
+      "sha256": "9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef.body",
+      "status": 200,
+      "phase": "en-1280x960-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+      "bytes": 3030,
+      "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+      "status": 200,
+      "phase": "en-1280x960-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "bytes": 7730,
+      "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+      "status": 200,
+      "phase": "en-1280x960-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000789019.json",
+      "bytes": 3030,
+      "sha256": "94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea.body",
+      "status": 200,
+      "phase": "en-1280x960-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+      "status": null,
+      "code": "sec_rate_limited",
+      "phase": "en-1280x960-schedule",
+      "bytes": 0
+    },
+    {
+      "kind": "metadata",
+      "url": "https://www.sec.gov/files/company_tickers.json",
+      "bytes": 118,
+      "sha256": "9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef.body",
+      "status": 200,
+      "phase": "en-390x844-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+      "bytes": 3030,
+      "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+      "status": 200,
+      "phase": "en-390x844-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "bytes": 7730,
+      "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+      "status": 200,
+      "phase": "en-390x844-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000789019.json",
+      "bytes": 3030,
+      "sha256": "94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea.body",
+      "status": 200,
+      "phase": "en-390x844-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+      "status": null,
+      "code": "sec_rate_limited",
+      "phase": "en-390x844-schedule",
+      "bytes": 0
+    },
+    {
+      "kind": "metadata",
+      "url": "https://www.sec.gov/files/company_tickers.json",
+      "bytes": 118,
+      "sha256": "9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef.body",
+      "status": 200,
+      "phase": "zh-Hant-1280x960-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+      "bytes": 3030,
+      "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+      "status": 200,
+      "phase": "zh-Hant-1280x960-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "bytes": 7730,
+      "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+      "status": 200,
+      "phase": "zh-Hant-1280x960-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000789019.json",
+      "bytes": 3030,
+      "sha256": "94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea.body",
+      "status": 200,
+      "phase": "zh-Hant-1280x960-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+      "status": null,
+      "code": "sec_rate_limited",
+      "phase": "zh-Hant-1280x960-schedule",
+      "bytes": 0
+    },
+    {
+      "kind": "metadata",
+      "url": "https://www.sec.gov/files/company_tickers.json",
+      "bytes": 118,
+      "sha256": "9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/9f7d9650f0ab46621784df987e17b2c68decdc22c97b92ef19bf6bd8be9bd3ef.body",
+      "status": 200,
+      "phase": "zh-Hant-390x844-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+      "bytes": 3030,
+      "sha256": "46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/46784ee128c9121901e8c095e67e37c71331466d1bc2f0a7d57eedc05e1cbf7e.body",
+      "status": 200,
+      "phase": "zh-Hant-390x844-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json",
+      "bytes": 7730,
+      "sha256": "ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/ddda2f71cd096996d8678b4cb46d79b1d63e534d65a0917d2f0341c11e7f0593.body",
+      "status": 200,
+      "phase": "zh-Hant-390x844-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/submissions/CIK0000789019.json",
+      "bytes": 3030,
+      "sha256": "94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea",
+      "file": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-29-browser-final/browser/stores/94f86f9a98c3b4e1d7e62b68e54ec06381aea607d7a01a3c694d6f9498a4deea.body",
+      "status": 200,
+      "phase": "zh-Hant-390x844-schedule"
+    },
+    {
+      "kind": "metadata",
+      "url": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000789019.json",
+      "status": null,
+      "code": "sec_rate_limited",
+      "phase": "zh-Hant-390x844-schedule",
+      "bytes": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "task7-fix1-29-browser-final/browser/api-requests.json",
+      "bytes": 51539,
+      "sha256": "a57630581af57b2853c3ead5a0069437ded159adac3fd3d32d3264dbaec6fb52"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/browser-results.json",
+      "bytes": 33716,
+      "sha256": "f26ae9d6e28977c7974b991878c6f1c987c483c38c23fe433a10d52af1ee6bd8"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/en-1280x960-controls-source.png",
+      "bytes": 122339,
+      "sha256": "1b11b5395fe11eea8f511f33b5ec9d67c9f435dfe98d19bbcbb5c04fddee6871"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/en-1280x960-controls.png",
+      "bytes": 122339,
+      "sha256": "1b11b5395fe11eea8f511f33b5ec9d67c9f435dfe98d19bbcbb5c04fddee6871"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/en-1280x960-pinned.png",
+      "bytes": 126872,
+      "sha256": "7108c5bc72fe6e33527031fd9e956a59a2021d6ed342b50b7ee0e26247cc4438"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/en-1280x960-status.png",
+      "bytes": 92233,
+      "sha256": "9a8c9180666866f53b3a250d36358d63522dbe9d266c9ae26a4571f03dc0d2fc"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/en-390x844-controls-source.png",
+      "bytes": 66795,
+      "sha256": "582297a236a01bba3f2c1cf5928ab162111fb14417d7ccf1934c413457cc3bd3"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/en-390x844-controls.png",
+      "bytes": 49348,
+      "sha256": "e0dda8507f545fffd5358a66fbaaaee249390abed75cce3bbf185441238d3136"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/en-390x844-pinned.png",
+      "bytes": 54684,
+      "sha256": "6ffb63fb42395eecdfe958de3399aa2337aa7555c1ec02313cb4aaad0633b6cb"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/en-390x844-status.png",
+      "bytes": 55735,
+      "sha256": "ea1d5c9495a949be8e8a3245cdab7f70c8bf5d16a03515b4e1a17a493d2c0df9"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/seed.json",
+      "bytes": 24534,
+      "sha256": "b385f7f42ea6df9559907278963a2eb74baa70490f17f4f320f88a6553ba9699"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/server-command.json",
+      "bytes": 568,
+      "sha256": "19fc2ce914e540e0603fb0b119d970cf21415a0d9ae4a94fdd09d76509beaca0"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/source-inventory.json",
+      "bytes": 13482,
+      "sha256": "4d96552fad88b1a4a65f77a1c9153f1324f6818edafd8c55b2d2f6d19389e993"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/vite.log",
+      "bytes": 161,
+      "sha256": "a38763986794c1105eab938a053474d5fcaf391d7718e278a28a03ece7dc011d"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/zh-Hant-1280x960-controls-source.png",
+      "bytes": 135477,
+      "sha256": "63b77070850581072d5025fb7f78b3b9eb9a6d23d4f1880e163b523f55835c0d"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/zh-Hant-1280x960-controls.png",
+      "bytes": 135477,
+      "sha256": "63b77070850581072d5025fb7f78b3b9eb9a6d23d4f1880e163b523f55835c0d"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/zh-Hant-1280x960-pinned.png",
+      "bytes": 128397,
+      "sha256": "298ab97f94b0343ad70b8e9c6d266947e58f1072c3e171cbebc451cbfb18318a"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/zh-Hant-1280x960-status.png",
+      "bytes": 101280,
+      "sha256": "8018939869810b68dc78a8e76cec357733f96b8b699ef3d00c81fa2d413afa74"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/zh-Hant-390x844-controls-source.png",
+      "bytes": 83591,
+      "sha256": "25a855980a2f5bffcd1aa61a6c8b0bb907e2f9267221bc8b4cd13efe70c3260f"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/zh-Hant-390x844-controls.png",
+      "bytes": 64908,
+      "sha256": "bcaab9ad86cbbf2b5177b45a9a93d9f1994fefeb6be16c896c349ac075ddccc9"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/zh-Hant-390x844-pinned.png",
+      "bytes": 55775,
+      "sha256": "b37f4803fdb360974c2ee8575291ba6735d257185b1a6f8b3d6842d31e44c5b8"
+    },
+    {
+      "path": "task7-fix1-29-browser-final/browser/zh-Hant-390x844-status.png",
+      "bytes": 62869,
+      "sha256": "84692818e51014560923e2102cfc2e4a89ad0f37d48fcf8b58c42899a37dccd0"
+    }
+  ],
+  "helpers": [
+    {
+      "path": "browser_check.py",
+      "sha256": "70c00873df3bd427cc8d290569f9c37504d3faf915423ef0c70f552a58f0c6ba"
+    },
+    {
+      "path": "browser_fixture.py",
+      "sha256": "16cbae676518717d9fb6a3cb5d8703444c0b5fc3c060c6d49a456e020aa6d44b"
+    },
+    {
+      "path": "vite-preview.mjs",
+      "sha256": "83e6f8d1550668d0eae50f78445f5133a30cd3438a9be853beb1c52f63d2eb88"
+    },
+    {
+      "path": "browser-fixture/main.tsx",
+      "sha256": "6c7f1848b53f400c9edc7037a07850ee4c320d10932980fa1a14897744f1bbcd"
+    },
+    {
+      "path": "browser-fixture/index.html",
+      "sha256": "db2c03027fe176293e041b710a40f816ac459317722c448420297289dc1c9c12"
+    }
+  ],
+  "servers_stopped": true,
+  "verification_scope": "Actual Settings SEC panel and shared scheduler only; unrelated sections use generated empty/disabled fixture responses, not product health evidence.",
+  "unrelated_generated_endpoints": [
+    "/config/model-catalog",
+    "/macro/snapshot",
+    "/macro/status",
+    "/market-data/price-repair/operations",
+    "/market-data/status",
+    "/market-data/trading-days",
+    "/news/status",
+    "/providers/config",
+    "/providers/health",
+    "/sa/extension-health",
+    "/security-lifecycle/automation",
+    "/security-lifecycle/cases"
+  ],
+  "visual_inspection": {
+    "files": [
+      "zh-Hant-390x844-status.png",
+      "zh-Hant-1280x960-status.png",
+      "en-1280x960-controls.png",
+      "en-390x844-pinned.png"
+    ],
+    "finding": "SEC status and shared controls fit; no unrelated request-failure/loading banner in viewed status screenshots. Existing responsive schedule table scrolls on mobile; no product UI changes in this fix."
+  }
+}

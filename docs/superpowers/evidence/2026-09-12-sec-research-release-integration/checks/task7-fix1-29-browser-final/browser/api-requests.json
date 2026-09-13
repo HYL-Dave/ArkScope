@@ -1,0 +1,1546 @@
+[
+  {
+    "method": "GET",
+    "path": "/config/model-catalog",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "bb07120007501716bc3206bced4ab0d7e7a6119c24ff6c38219d0f6b1abbbd01"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/sa/extension-health",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "0f4e4e90491379a021baa8fad2d86611bc7ca1aab7a7dd6b17d2c4f87df72474"
+  },
+  {
+    "method": "GET",
+    "path": "/security-lifecycle/cases?limit=1",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "d0fb98d572d04369f77dc57297115c7fa63178a4f04a1f3e17891552d7e7f1a9"
+  },
+  {
+    "method": "GET",
+    "path": "/security-lifecycle/automation",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "cf69ceae7ba827d05e0ed71eefc25050f97754261625ddc58cf8be44b1f1cc99"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/trading-days?lookback_days=15&interval=15min",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "a7bbfb1791ecfb689df6204d796a8c4fdcfc2b0b70fffff51213943ead85318a"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/status",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "755f62df27fcc039e5486475c99d5744d95d9b9d8f67d79c6c46d2a64d20ff08"
+  },
+  {
+    "method": "GET",
+    "path": "/news/status",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "b41fb3e65eb1df72650464f22f1063fe6ce40e0697739ad14caa07fbbde42565"
+  },
+  {
+    "method": "GET",
+    "path": "/macro/status",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "0eef65e41db52e94dcd6e1cfc1e4f81185c01a7e7c1c57b8febd2198ee05c367"
+  },
+  {
+    "method": "GET",
+    "path": "/macro/snapshot",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "b61b78eb7804bf20609dede4268d9dd4e7a1c2073a30fc1e62f0c0dd103b0b66"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/schedule-status",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "c2cf45cfe51bc169a0a658d935ba4eb0410838c83709a0350e28ef5d470270ad"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "d0a1ce90ad613a4ddd7b8c0a25e5deae35ed44d48257a3dcdc9e571dbbf81bde"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/price-repair/operations?limit=5&offset=0",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "ea08eb4537de18823f8911bdb3ca4672dda836ae5aadeac34ec4c4999f52e788"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "8abe1fb10508cc0ae1d8775bcdd21579b9415061cf31cbd17db01f9514ea2fd3"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "8abe1fb10508cc0ae1d8775bcdd21579b9415061cf31cbd17db01f9514ea2fd3"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "enabled": true
+    },
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e71a02a12111ef093b29da04bc8a0b42a810e42bc061c323181cc81ae3e26cd9"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "cd9ca78de7094525980eb286136d501212561f8983ef3998fcc2e786d6f7bdac"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "enabled": false
+    },
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e1ee2cda7a1fa639e608c4a266fbc4bb6e58c3553f94315da4768ea28873ea80"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "8abe1fb10508cc0ae1d8775bcdd21579b9415061cf31cbd17db01f9514ea2fd3"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "interval_minutes": 720
+    },
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "4a6254c3af8679bd12ccc731b86749679c8d40a75df2edb9be508fc9377dda33"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "a058d69ec67114d0c350143c006e2bedcecd3a94692a8b23388f156cd760044f"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "interval_minutes": 1440
+    },
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e1ee2cda7a1fa639e608c4a266fbc4bb6e58c3553f94315da4768ea28873ea80"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "8abe1fb10508cc0ae1d8775bcdd21579b9415061cf31cbd17db01f9514ea2fd3"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "25969258465d04f54b6e28ad20caffc88326801ae22094f09897e0dffaef997a"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "1f9992fdbf43d2c753803050482fd1ae08aa7ebe7b543b272847aafda85aa45c"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&max_chars=6000",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "d97bf9bf4619db124ba97e10afc71dcc6a0b84358569aee3c7fb623b3521eb3e"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000&cursor=eyJjYXB0dXJlX2lkIjoic2VjZG9jXzk1Yzg2Njc0N2YzZmM2ODJhYzEzNWIwZDJkNzExN2M4ZDlhZTJiZjVlMjQ2YTA0ZGJmNTk1N2M2NGMyNmM2NTMiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "72790b5ae16901de2a998d93bd7a35d996f922787cd73a3d5e8a543fd7d08315"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "d97bf9bf4619db124ba97e10afc71dcc6a0b84358569aee3c7fb623b3521eb3e"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000&cursor=eyJjYXB0dXJlX2lkIjoic2VjZG9jXzk1Yzg2Njc0N2YzZmM2ODJhYzEzNWIwZDJkNzExN2M4ZDlhZTJiZjVlMjQ2YTA0ZGJmNTk1N2M2NGMyNmM2NTMiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "72790b5ae16901de2a998d93bd7a35d996f922787cd73a3d5e8a543fd7d08315"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiI1ZGRkZWU4OWYxODE4NDk5ZDhjZTg0YzlmMGJkMTFmOWVlYmUyMzk0OGY3ZmVhOTVmYjliMDYxYWFkNTk4ZTM0IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjQsInYiOjF9",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "a18ac5795c6880686cd92de5ff3a4112643f977b54623501a305d42c53322828"
+  },
+  {
+    "method": "POST",
+    "path": "/schedule/run/sec_research_filings",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "e5a1cdf14f84ebec48b9d916a7e143194ec5e216036273aa2fed9aa355428a90"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "beea11f388a65e7ef8193a04e4da42e2b3ce8970b3f5655a6713112e65c8a0f3"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "beea11f388a65e7ef8193a04e4da42e2b3ce8970b3f5655a6713112e65c8a0f3"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "1d08eccac75956cdbdb1abc129a45e4f620a9f8c4cbdbe6a7e1504007626259a"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "1d08eccac75956cdbdb1abc129a45e4f620a9f8c4cbdbe6a7e1504007626259a"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "7b2ce02e05a462c4a4287a539fe4591dda469d626a0fac5319ffbb414d346900"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/schedule-status",
+    "body": null,
+    "status": 200,
+    "phase": "en-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "364be70dbb248f89cd8964372293c936081fa523a387b5f281637d8e25bcbdf8"
+  },
+  {
+    "method": "GET",
+    "path": "/config/model-catalog",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "bb07120007501716bc3206bced4ab0d7e7a6119c24ff6c38219d0f6b1abbbd01"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/sa/extension-health",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "0f4e4e90491379a021baa8fad2d86611bc7ca1aab7a7dd6b17d2c4f87df72474"
+  },
+  {
+    "method": "GET",
+    "path": "/security-lifecycle/cases?limit=1",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "d0fb98d572d04369f77dc57297115c7fa63178a4f04a1f3e17891552d7e7f1a9"
+  },
+  {
+    "method": "GET",
+    "path": "/security-lifecycle/automation",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "cf69ceae7ba827d05e0ed71eefc25050f97754261625ddc58cf8be44b1f1cc99"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/trading-days?lookback_days=15&interval=15min",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "a7bbfb1791ecfb689df6204d796a8c4fdcfc2b0b70fffff51213943ead85318a"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/status",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "755f62df27fcc039e5486475c99d5744d95d9b9d8f67d79c6c46d2a64d20ff08"
+  },
+  {
+    "method": "GET",
+    "path": "/news/status",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "b41fb3e65eb1df72650464f22f1063fe6ce40e0697739ad14caa07fbbde42565"
+  },
+  {
+    "method": "GET",
+    "path": "/macro/status",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "0eef65e41db52e94dcd6e1cfc1e4f81185c01a7e7c1c57b8febd2198ee05c367"
+  },
+  {
+    "method": "GET",
+    "path": "/macro/snapshot",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "b61b78eb7804bf20609dede4268d9dd4e7a1c2073a30fc1e62f0c0dd103b0b66"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "7b2ce02e05a462c4a4287a539fe4591dda469d626a0fac5319ffbb414d346900"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/price-repair/operations?limit=5&offset=0",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "ea08eb4537de18823f8911bdb3ca4672dda836ae5aadeac34ec4c4999f52e788"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "1d08eccac75956cdbdb1abc129a45e4f620a9f8c4cbdbe6a7e1504007626259a"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/schedule-status",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "364be70dbb248f89cd8964372293c936081fa523a387b5f281637d8e25bcbdf8"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "1d08eccac75956cdbdb1abc129a45e4f620a9f8c4cbdbe6a7e1504007626259a"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "enabled": true
+    },
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "e71a02a12111ef093b29da04bc8a0b42a810e42bc061c323181cc81ae3e26cd9"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "02a04b8c76cdfc5d5546e947b46009dbd4b4aa3ae0d2b5991bcab77a8b0910f4"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "enabled": false
+    },
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "e1ee2cda7a1fa639e608c4a266fbc4bb6e58c3553f94315da4768ea28873ea80"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "1d08eccac75956cdbdb1abc129a45e4f620a9f8c4cbdbe6a7e1504007626259a"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "interval_minutes": 720
+    },
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "4a6254c3af8679bd12ccc731b86749679c8d40a75df2edb9be508fc9377dda33"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "ff3fabd110754803cb26d3b9aa5b4987cd2da62353ec015d68fa25985b518285"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "interval_minutes": 1440
+    },
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "e1ee2cda7a1fa639e608c4a266fbc4bb6e58c3553f94315da4768ea28873ea80"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "1d08eccac75956cdbdb1abc129a45e4f620a9f8c4cbdbe6a7e1504007626259a"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "abd6e4b5781f211870608062eacad58b15185f94291326e937985e638e1f808d"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "6b905531f6fe211f940ff08536c46521a8d3670f63e8720f4f60fa4e41b6325c"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&max_chars=6000",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "d97bf9bf4619db124ba97e10afc71dcc6a0b84358569aee3c7fb623b3521eb3e"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000&cursor=eyJjYXB0dXJlX2lkIjoic2VjZG9jXzk1Yzg2Njc0N2YzZmM2ODJhYzEzNWIwZDJkNzExN2M4ZDlhZTJiZjVlMjQ2YTA0ZGJmNTk1N2M2NGMyNmM2NTMiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "72790b5ae16901de2a998d93bd7a35d996f922787cd73a3d5e8a543fd7d08315"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "d97bf9bf4619db124ba97e10afc71dcc6a0b84358569aee3c7fb623b3521eb3e"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000&cursor=eyJjYXB0dXJlX2lkIjoic2VjZG9jXzk1Yzg2Njc0N2YzZmM2ODJhYzEzNWIwZDJkNzExN2M4ZDlhZTJiZjVlMjQ2YTA0ZGJmNTk1N2M2NGMyNmM2NTMiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "72790b5ae16901de2a998d93bd7a35d996f922787cd73a3d5e8a543fd7d08315"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiJmMGIxYWVhMjVlODA1MWUyYTBiZTFhZmVjOGI4NDA4ODBhMDYyZTI2NDM2N2JmOWVmMTJlZTQyZTBmOGJjOWUyIiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjcsInYiOjF9",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "832aca0b0b0b97c15bcdd25dd9c1047ec12baea61bebf0b59655cf8d5d2fa28e"
+  },
+  {
+    "method": "POST",
+    "path": "/schedule/run/sec_research_filings",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "e5a1cdf14f84ebec48b9d916a7e143194ec5e216036273aa2fed9aa355428a90"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "222db1ce87942301a7a8418323f2d129ca8d06e63bc2b099e4a392c4272da0f2"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "222db1ce87942301a7a8418323f2d129ca8d06e63bc2b099e4a392c4272da0f2"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "e36049b7928875d08ebe1233344b5f55b9e3b32ce23bd2aed215d3f5c371d7a5"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/config",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "7b2ce02e05a462c4a4287a539fe4591dda469d626a0fac5319ffbb414d346900"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "e36049b7928875d08ebe1233344b5f55b9e3b32ce23bd2aed215d3f5c371d7a5"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/schedule-status",
+    "body": null,
+    "status": 200,
+    "phase": "en-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "3cee3ac3fcc6da48dddda2e592ff1d9bb05eee3d282105feae4a7ca521e2b618"
+  },
+  {
+    "method": "GET",
+    "path": "/config/model-catalog",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "bb07120007501716bc3206bced4ab0d7e7a6119c24ff6c38219d0f6b1abbbd01"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/sa/extension-health",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "0f4e4e90491379a021baa8fad2d86611bc7ca1aab7a7dd6b17d2c4f87df72474"
+  },
+  {
+    "method": "GET",
+    "path": "/security-lifecycle/cases?limit=1",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "d0fb98d572d04369f77dc57297115c7fa63178a4f04a1f3e17891552d7e7f1a9"
+  },
+  {
+    "method": "GET",
+    "path": "/security-lifecycle/automation",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "cf69ceae7ba827d05e0ed71eefc25050f97754261625ddc58cf8be44b1f1cc99"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/trading-days?lookback_days=15&interval=15min",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "a7bbfb1791ecfb689df6204d796a8c4fdcfc2b0b70fffff51213943ead85318a"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "755f62df27fcc039e5486475c99d5744d95d9b9d8f67d79c6c46d2a64d20ff08"
+  },
+  {
+    "method": "GET",
+    "path": "/news/status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "b41fb3e65eb1df72650464f22f1063fe6ce40e0697739ad14caa07fbbde42565"
+  },
+  {
+    "method": "GET",
+    "path": "/macro/status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "0eef65e41db52e94dcd6e1cfc1e4f81185c01a7e7c1c57b8febd2198ee05c367"
+  },
+  {
+    "method": "GET",
+    "path": "/macro/snapshot",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "b61b78eb7804bf20609dede4268d9dd4e7a1c2073a30fc1e62f0c0dd103b0b66"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "7b2ce02e05a462c4a4287a539fe4591dda469d626a0fac5319ffbb414d346900"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e36049b7928875d08ebe1233344b5f55b9e3b32ce23bd2aed215d3f5c371d7a5"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/price-repair/operations?limit=5&offset=0",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "ea08eb4537de18823f8911bdb3ca4672dda836ae5aadeac34ec4c4999f52e788"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/schedule-status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "3cee3ac3fcc6da48dddda2e592ff1d9bb05eee3d282105feae4a7ca521e2b618"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e36049b7928875d08ebe1233344b5f55b9e3b32ce23bd2aed215d3f5c371d7a5"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "enabled": true
+    },
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e71a02a12111ef093b29da04bc8a0b42a810e42bc061c323181cc81ae3e26cd9"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "6ca06d6d3a5e8e85be40381d438e2e56c844a4b9dec3ed9b3c7b85ee11643736"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "enabled": false
+    },
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e1ee2cda7a1fa639e608c4a266fbc4bb6e58c3553f94315da4768ea28873ea80"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e36049b7928875d08ebe1233344b5f55b9e3b32ce23bd2aed215d3f5c371d7a5"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "interval_minutes": 720
+    },
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "4a6254c3af8679bd12ccc731b86749679c8d40a75df2edb9be508fc9377dda33"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "406cafcda4e30ad9c697bdce6953c3b1084ebd0f73bac63fea1a1e61d82594d9"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "interval_minutes": 1440
+    },
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e1ee2cda7a1fa639e608c4a266fbc4bb6e58c3553f94315da4768ea28873ea80"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "e36049b7928875d08ebe1233344b5f55b9e3b32ce23bd2aed215d3f5c371d7a5"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "6312df3b02e535c199275d41755c5bb064d487d12bb077c0bd81f9a6a9630190"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "3e4fcae890291429791bad2bc30201e74f7ea7b047d94d88804d291a5390eaad"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&max_chars=6000",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "d97bf9bf4619db124ba97e10afc71dcc6a0b84358569aee3c7fb623b3521eb3e"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000&cursor=eyJjYXB0dXJlX2lkIjoic2VjZG9jXzk1Yzg2Njc0N2YzZmM2ODJhYzEzNWIwZDJkNzExN2M4ZDlhZTJiZjVlMjQ2YTA0ZGJmNTk1N2M2NGMyNmM2NTMiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "72790b5ae16901de2a998d93bd7a35d996f922787cd73a3d5e8a543fd7d08315"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "d97bf9bf4619db124ba97e10afc71dcc6a0b84358569aee3c7fb623b3521eb3e"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000&cursor=eyJjYXB0dXJlX2lkIjoic2VjZG9jXzk1Yzg2Njc0N2YzZmM2ODJhYzEzNWIwZDJkNzExN2M4ZDlhZTJiZjVlMjQ2YTA0ZGJmNTk1N2M2NGMyNmM2NTMiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "72790b5ae16901de2a998d93bd7a35d996f922787cd73a3d5e8a543fd7d08315"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiIzZDRmMzg3ZmI2ZDMzNmE3OTgxMGEzOTkwYTYzMWQzMjAxMjUyNzQ3MjgyNzY1MzFlZWI0MmM5MzQzOWFlNDM2IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjEzLCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-stored",
+    "owner": "real-route",
+    "response_sha256": "7ce771ad7c90fd3af520ac2b224da88e358b9ed96c019eb6a43976b8315baac0"
+  },
+  {
+    "method": "POST",
+    "path": "/schedule/run/sec_research_filings",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "e5a1cdf14f84ebec48b9d916a7e143194ec5e216036273aa2fed9aa355428a90"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "3b3e16d61bf8d69c4f1ff79cca839a4b0f9f30b7c61ce91893dbe6983f874f36"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "3b3e16d61bf8d69c4f1ff79cca839a4b0f9f30b7c61ce91893dbe6983f874f36"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "394cc5cdd270562fbacc852603384dcc621384e914f8d2f1923522fb31774bb1"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "394cc5cdd270562fbacc852603384dcc621384e914f8d2f1923522fb31774bb1"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "7b2ce02e05a462c4a4287a539fe4591dda469d626a0fac5319ffbb414d346900"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/schedule-status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-1280x960-schedule",
+    "owner": "real-route",
+    "response_sha256": "41dda54396e85d73ab0ace15dd06c13882b0d30bc4e9cb068b9e651ba9e1534e"
+  },
+  {
+    "method": "GET",
+    "path": "/config/model-catalog",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "bb07120007501716bc3206bced4ab0d7e7a6119c24ff6c38219d0f6b1abbbd01"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/sa/extension-health",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "0f4e4e90491379a021baa8fad2d86611bc7ca1aab7a7dd6b17d2c4f87df72474"
+  },
+  {
+    "method": "GET",
+    "path": "/security-lifecycle/cases?limit=1",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "d0fb98d572d04369f77dc57297115c7fa63178a4f04a1f3e17891552d7e7f1a9"
+  },
+  {
+    "method": "GET",
+    "path": "/security-lifecycle/automation",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "cf69ceae7ba827d05e0ed71eefc25050f97754261625ddc58cf8be44b1f1cc99"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/trading-days?lookback_days=15&interval=15min",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "a7bbfb1791ecfb689df6204d796a8c4fdcfc2b0b70fffff51213943ead85318a"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "755f62df27fcc039e5486475c99d5744d95d9b9d8f67d79c6c46d2a64d20ff08"
+  },
+  {
+    "method": "GET",
+    "path": "/news/status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "b41fb3e65eb1df72650464f22f1063fe6ce40e0697739ad14caa07fbbde42565"
+  },
+  {
+    "method": "GET",
+    "path": "/macro/status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "0eef65e41db52e94dcd6e1cfc1e4f81185c01a7e7c1c57b8febd2198ee05c367"
+  },
+  {
+    "method": "GET",
+    "path": "/macro/snapshot",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "b61b78eb7804bf20609dede4268d9dd4e7a1c2073a30fc1e62f0c0dd103b0b66"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "7b2ce02e05a462c4a4287a539fe4591dda469d626a0fac5319ffbb414d346900"
+  },
+  {
+    "method": "GET",
+    "path": "/market-data/price-repair/operations?limit=5&offset=0",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "ea08eb4537de18823f8911bdb3ca4672dda836ae5aadeac34ec4c4999f52e788"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "394cc5cdd270562fbacc852603384dcc621384e914f8d2f1923522fb31774bb1"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/schedule-status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "41dda54396e85d73ab0ace15dd06c13882b0d30bc4e9cb068b9e651ba9e1534e"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "394cc5cdd270562fbacc852603384dcc621384e914f8d2f1923522fb31774bb1"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "enabled": true
+    },
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "e71a02a12111ef093b29da04bc8a0b42a810e42bc061c323181cc81ae3e26cd9"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "57de944369c680c8c289e83ed9106fa4c5e64bb30a137a6067ba82ee01f08342"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "enabled": false
+    },
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "e1ee2cda7a1fa639e608c4a266fbc4bb6e58c3553f94315da4768ea28873ea80"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "394cc5cdd270562fbacc852603384dcc621384e914f8d2f1923522fb31774bb1"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "interval_minutes": 720
+    },
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "4a6254c3af8679bd12ccc731b86749679c8d40a75df2edb9be508fc9377dda33"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "bf47019e1b8e3b6fa9da1d57c9f7a3acd51170d22ee29053bf71c6f66955b6b7"
+  },
+  {
+    "method": "PUT",
+    "path": "/schedule/sec_research_filings",
+    "body": {
+      "interval_minutes": 1440
+    },
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "e1ee2cda7a1fa639e608c4a266fbc4bb6e58c3553f94315da4768ea28873ea80"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "394cc5cdd270562fbacc852603384dcc621384e914f8d2f1923522fb31774bb1"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "1e85d952238e65b92ecb2d7b273110686e9b73b46d3230de9cdde8c4b6cd4adc"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "de89b6eded911decb3b0460a73b67484e30218f3e13a89d99baf254fa2c2b908"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&max_chars=6000",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "d97bf9bf4619db124ba97e10afc71dcc6a0b84358569aee3c7fb623b3521eb3e"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000&cursor=eyJjYXB0dXJlX2lkIjoic2VjZG9jXzk1Yzg2Njc0N2YzZmM2ODJhYzEzNWIwZDJkNzExN2M4ZDlhZTJiZjVlMjQ2YTA0ZGJmNTk1N2M2NGMyNmM2NTMiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "72790b5ae16901de2a998d93bd7a35d996f922787cd73a3d5e8a543fd7d08315"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "d97bf9bf4619db124ba97e10afc71dcc6a0b84358569aee3c7fb623b3521eb3e"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/filings/0000320193%3A0000320193-26-000001/document?document_id=primary&capture_id=secdoc_95c866747f3fc682ac135b0d2d7117c8d9ae2bf5e246a04dbf5957c64c26c653&max_chars=6000&cursor=eyJjYXB0dXJlX2lkIjoic2VjZG9jXzk1Yzg2Njc0N2YzZmM2ODJhYzEzNWIwZDJkNzExN2M4ZDlhZTJiZjVlMjQ2YTA0ZGJmNTk1N2M2NGMyNmM2NTMiLCJkb2N1bWVudF9pZCI6InByaW1hcnkiLCJmaWxpbmdfaWQiOiIwMDAwMzIwMTkzOjAwMDAzMjAxOTMtMjYtMDAwMDAxIiwiZmlsdGVyc19oYXNoIjoiNjUzN2UwNjQ1YzJlNTgzNmU2MmJjZTZhMTA2NjNhY2Q0ODJjZmRlYThkMzFmYjk0NjMyZjJjN2NjNmJiODMxNiIsIm1vZGUiOiJ0ZXh0Iiwib2Zmc2V0IjowLCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "72790b5ae16901de2a998d93bd7a35d996f922787cd73a3d5e8a543fd7d08315"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/0000320193/filings?include_amendments=true&limit=20&cursor=eyJiaW5kaW5nc19kaWdlc3QiOiIzYzEwODAxNDMzOTg1YTE5N2Q2NGZhMmI4NzM2YzI0MGUwZjYzZTQyMDU1NjM4YzcwZjdjMDRmOGY3NTYwYTU5IiwiY2lrIjoiMDAwMDMyMDE5MyIsImZpbHRlcnNfaGFzaCI6IjgyYzNlMmNmNzgyNDk2ZmVlMzgxNWU1N2IxZmMxMjAxZGFiMjNiYjQ2NDFjNzkyNzE5N2QxNjU2NmE3YmVhMmEiLCJraW5kIjoiZmlsaW5ncyIsIm9mZnNldCI6MjAsInJlY2VpcHRfaWQiOjE5LCJ2IjoxfQ",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-stored",
+    "owner": "real-route",
+    "response_sha256": "c6832fbe90bfaf1b702c7444c1898fc714e42e67ea5954df7ce95a5b597f6c2b"
+  },
+  {
+    "method": "POST",
+    "path": "/schedule/run/sec_research_filings",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "e5a1cdf14f84ebec48b9d916a7e143194ec5e216036273aa2fed9aa355428a90"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "8e2cebce5182f73afd697071b58ec0f2c43390b497d49bded6344e55379b3f6f"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "8e2cebce5182f73afd697071b58ec0f2c43390b497d49bded6344e55379b3f6f"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "d9205df6817c32679fc9fd8260a4fec14cce543ad52610195bca05b8a5f0450e"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/health",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "236f81f950e27c79feb73c887e2a208ad13e1e44da4a1b38b76acd642d2ee108"
+  },
+  {
+    "method": "GET",
+    "path": "/providers/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "unrelated-empty-fixture",
+    "response_sha256": "2d3e4679e312e521f3e6eb653d8ddab40150abd9175251dc56094bb50c19da8c"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/config",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "7b2ce02e05a462c4a4287a539fe4591dda469d626a0fac5319ffbb414d346900"
+  },
+  {
+    "method": "GET",
+    "path": "/schedule",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "d9205df6817c32679fc9fd8260a4fec14cce543ad52610195bca05b8a5f0450e"
+  },
+  {
+    "method": "GET",
+    "path": "/sec-research/schedule-status",
+    "body": null,
+    "status": 200,
+    "phase": "zh-Hant-390x844-schedule",
+    "owner": "real-route",
+    "response_sha256": "d9dcbcd087cf95e36c07142ebd08f6ede39a258523eb33f338ea2c97d595eb12"
+  }
+]

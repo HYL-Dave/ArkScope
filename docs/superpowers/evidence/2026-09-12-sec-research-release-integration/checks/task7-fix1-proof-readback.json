@@ -1,0 +1,240 @@
+{
+  "collection_command": "env HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task7-fix1-27-backend-cover/home /home/hyl/.virtualenvs/llm_app/bin/python -B -c 'import ast,hashlib,json,pathlib,subprocess\nroot=pathlib.Path.cwd(); work=root/\".superpowers/sdd/2026-09-12-sec-research-release-integration\"\nbase=\"936ede10f04c370bf2322ee70833f9e0f29b7a44\"\nfiles=[\"src/sec_research/issuer_store.py\",\"src/sec_research/scheduled.py\",\"src/sec_research/schedule_store.py\",\"tests/test_sec_research_schedule.py\",\"tests/test_sec_research_schedule_runtime.py\"]\ndef sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()\nsources=[dict(path=p,sha256=sha(root/p)) for p in files]\nproofs=[]\nfor filename in [\"task7-fix1-inverses.json\",\"task7-fix1-refreshed-inverses.json\"]:\n    for r in json.loads((work/filename).read_text()):\n        for f in r[\"files\"]:\n            assert sha(root/f[\"file\"])==f[\"before\"]==f[\"restored\"]\n            original=work/f[\"original_artifact\"]; mutant=work/f[\"mutant_artifact\"]\n            assert sha(original)==f[\"before\"] and sha(mutant)==f[\"mutant\"]\n            text=original.read_text()\n            for replacement in f[\"replacements\"]:\n                assert text.count(replacement[\"original\"])==1\n                text=text.replace(replacement[\"original\"],replacement[\"mutant\"])\n            assert text==mutant.read_text()\n        for key,expected in [(\"red\",1),(\"green\",0)]:\n            record=json.loads((work/r[key]/\"command.json\").read_text())\n            assert record[\"exit_code\"]==expected\n        proofs.append(dict(name=r[\"name\"],recipe_ledger=filename,source_artifacts_verified=True,recipes_exact=True,restored_to_current=True,red=r[\"red\"],green=r[\"green\"]))\nunchanged=[]\nfor r in json.loads((work/\"task7-final-inverses.json\").read_text()):\n    if r[\"name\"] not in {\"enable-by-default\",\"drop-partial\",\"reset-pins\",\"reset-draft\"}: continue\n    for f in r[\"files\"]:\n        assert sha(root/f[\"file\"])==f[\"before\"]==f[\"restored\"]\n        assert sha(work/f[\"original_artifact\"])==f[\"before\"]\n        assert sha(work/f[\"mutant_artifact\"])==f[\"mutant\"]\n    commands=[]\n    for key,expected in [(\"red\",1),(\"green\",0)]:\n        p=work/r[key]/\"command.json\"; c=json.loads(p.read_text())\n        assert c[\"exit_code\"]==expected\n        commands.append(dict(name=c[\"name\"],exit_code=c[\"exit_code\"],command_sha256=sha(p)))\n    unchanged.append(dict(name=r[\"name\"],disposition=\"unchanged-source proof readback; not re-executed\",files=[dict(path=f[\"file\"],current_sha256=sha(root/f[\"file\"]),original_sha256=f[\"before\"],mutant_sha256=f[\"mutant\"]) for f in r[\"files\"]],commands=commands))\ndef tests(text):\n    found={}\n    for n in ast.walk(ast.parse(text)):\n        if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name.startswith(\"test_\"):\n            count=1\n            for d in n.decorator_list:\n                if isinstance(d,ast.Call) and isinstance(d.func,ast.Attribute) and d.func.attr==\"parametrize\":\n                    assert isinstance(d.args[1],(ast.List,ast.Tuple))\n                    count*=len(d.args[1].elts)\n            found[n.name]=(count,ast.dump(n))\n    return found\ninventory=[]\nfor p in files:\n    if not p.startswith(\"tests/\"): continue\n    before=tests(subprocess.check_output([\"git\",\"show\",base+\":\"+p],text=True));after=tests((root/p).read_text())\n    assert all(k in after and v==after[k] for k,v in before.items()), \"existing test changed\"\n    inventory.append(dict(file=p,before_cases=sum(v[0] for v in before.values()),after_cases=sum(v[0] for v in after.values()),added={k:v[0] for k,v in after.items() if k not in before},removed=[],existing_tests_ast_unchanged=True))\nguards={\"run_checks.py\":\"2c1cc48b15f817b02cc70a99cad757a0962e875e37381fa122fca8b89796247f\",\"offline_pytest.py\":\"4c74153e1ef86c35f7bbc923586de624c0ffe3f577c2853e6e4c0a78426c95ff\",\"offline_node.cjs\":\"35f45243a42cf069225ff91e726779333c33bb9a3abc4c1f694404c3810b728b\"}\nassert all(sha(work/file)==expected for file,expected in guards.items())\nprint(json.dumps(dict(base=base,sources=sources,refreshed_proofs=proofs,unchanged_proof_readback=unchanged,tests=inventory,guard_hashes=guards,guards_unchanged=True)))\n'",
+  "base": "936ede10f04c370bf2322ee70833f9e0f29b7a44",
+  "sources": [
+    {
+      "path": "src/sec_research/issuer_store.py",
+      "sha256": "75e5864b8955b1178a72c0333d5832faf6e62af1df7c3ce9a34afb37e1610e12"
+    },
+    {
+      "path": "src/sec_research/scheduled.py",
+      "sha256": "87fc0ddc17948308f7c38acf44021575636d3d58eb6770850e0eedaf89293c2b"
+    },
+    {
+      "path": "src/sec_research/schedule_store.py",
+      "sha256": "810cfc86b6de4c837a0ccb5e888f61b4b3bc643c1947271b118be668e37e85ed"
+    },
+    {
+      "path": "tests/test_sec_research_schedule.py",
+      "sha256": "50db19f7a2f26138cc08e39c1c5deb04664374206f7586d0b09b894012f9e32e"
+    },
+    {
+      "path": "tests/test_sec_research_schedule_runtime.py",
+      "sha256": "60ae64c7982de33de2235971a32c3dc01edbf541db2701fd8dafb1a4a52f0d3d"
+    }
+  ],
+  "refreshed_proofs": [
+    {
+      "name": "mixed-stop",
+      "recipe_ledger": "task7-fix1-inverses.json",
+      "source_artifacts_verified": true,
+      "recipes_exact": true,
+      "restored_to_current": true,
+      "red": "task7-fix1-09-mixed-stop-inverse",
+      "green": "task7-fix1-10-mixed-stop-restored"
+    },
+    {
+      "name": "map-dispatch",
+      "recipe_ledger": "task7-fix1-inverses.json",
+      "source_artifacts_verified": true,
+      "recipes_exact": true,
+      "restored_to_current": true,
+      "red": "task7-fix1-11-map-dispatch-inverse",
+      "green": "task7-fix1-12-map-dispatch-restored"
+    },
+    {
+      "name": "map-resolver",
+      "recipe_ledger": "task7-fix1-inverses.json",
+      "source_artifacts_verified": true,
+      "recipes_exact": true,
+      "restored_to_current": true,
+      "red": "task7-fix1-13-map-resolver-inverse",
+      "green": "task7-fix1-14-map-resolver-restored"
+    },
+    {
+      "name": "terminal-coverage",
+      "recipe_ledger": "task7-fix1-inverses.json",
+      "source_artifacts_verified": true,
+      "recipes_exact": true,
+      "restored_to_current": true,
+      "red": "task7-fix1-15-terminal-coverage-inverse",
+      "green": "task7-fix1-16-terminal-coverage-restored"
+    },
+    {
+      "name": "aborted-membership",
+      "recipe_ledger": "task7-fix1-inverses.json",
+      "source_artifacts_verified": true,
+      "recipes_exact": true,
+      "restored_to_current": true,
+      "red": "task7-fix1-17-aborted-membership-inverse",
+      "green": "task7-fix1-18-aborted-membership-restored"
+    },
+    {
+      "name": "refresh-traverse-actual-historical-pointer",
+      "recipe_ledger": "task7-fix1-refreshed-inverses.json",
+      "source_artifacts_verified": true,
+      "recipes_exact": true,
+      "restored_to_current": true,
+      "red": "task7-fix1-19-refresh-traverse-actual-historical-pointer-inverse",
+      "green": "task7-fix1-20-refresh-traverse-actual-historical-pointer-restored"
+    },
+    {
+      "name": "refresh-erase-success",
+      "recipe_ledger": "task7-fix1-refreshed-inverses.json",
+      "source_artifacts_verified": true,
+      "recipes_exact": true,
+      "restored_to_current": true,
+      "red": "task7-fix1-21-refresh-erase-success-inverse",
+      "green": "task7-fix1-22-refresh-erase-success-restored"
+    },
+    {
+      "name": "refresh-reuse-membership",
+      "recipe_ledger": "task7-fix1-refreshed-inverses.json",
+      "source_artifacts_verified": true,
+      "recipes_exact": true,
+      "restored_to_current": true,
+      "red": "task7-fix1-23-refresh-reuse-membership-inverse",
+      "green": "task7-fix1-24-refresh-reuse-membership-restored"
+    },
+    {
+      "name": "refresh-reject-observed-space-symbol",
+      "recipe_ledger": "task7-fix1-refreshed-inverses.json",
+      "source_artifacts_verified": true,
+      "recipes_exact": true,
+      "restored_to_current": true,
+      "red": "task7-fix1-25-refresh-reject-observed-space-symbol-inverse",
+      "green": "task7-fix1-26-refresh-reject-observed-space-symbol-restored"
+    }
+  ],
+  "unchanged_proof_readback": [
+    {
+      "name": "enable-by-default",
+      "disposition": "unchanged-source proof readback; not re-executed",
+      "files": [
+        {
+          "path": "src/service/data_scheduler.py",
+          "current_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+          "original_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+          "mutant_sha256": "8bdca544b1f9100f9eb74bf8117114b7039efbbda247778d8152afa80e80fa71"
+        }
+      ],
+      "commands": [
+        {
+          "name": "task7-63-final-enable-by-default-inverse",
+          "exit_code": 1,
+          "command_sha256": "8f7f739962d8c146fa364901965dafd3fb2603e640a7d1e07556c7fc53a5c562"
+        },
+        {
+          "name": "task7-64-final-enable-by-default-restored",
+          "exit_code": 0,
+          "command_sha256": "1f28fbc7c735a6e7aa90e5eaa5484620f315f67103fd345c1fe44af946b3faad"
+        }
+      ]
+    },
+    {
+      "name": "drop-partial",
+      "disposition": "unchanged-source proof readback; not re-executed",
+      "files": [
+        {
+          "path": "src/service/data_scheduler.py",
+          "current_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+          "original_sha256": "d93bccda70b4976806cabd49fb8245757f940d53d9ee349112b7a6a0f21bf9fa",
+          "mutant_sha256": "160f501f0992bdcc583ec33ec0068a536c0340cef5c0fe7e5cd0e68c95bedcc3"
+        }
+      ],
+      "commands": [
+        {
+          "name": "task7-67-final-drop-partial-inverse",
+          "exit_code": 1,
+          "command_sha256": "e5abfbc5bfcaa5b5187bf078f5e523ac213da703cd6be96b52a83a42c59c6401"
+        },
+        {
+          "name": "task7-68-final-drop-partial-restored",
+          "exit_code": 0,
+          "command_sha256": "c36537cee1ec0410e88d8339215407621dbf9e216cda9f6cc1637ff1a0946a2e"
+        }
+      ]
+    },
+    {
+      "name": "reset-pins",
+      "disposition": "unchanged-source proof readback; not re-executed",
+      "files": [
+        {
+          "path": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+          "current_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+          "original_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+          "mutant_sha256": "8e09e7845ab748abb96c94a4352ce834bb9b7292265efb2ea8a3612ed7c474af"
+        }
+      ],
+      "commands": [
+        {
+          "name": "task7-73-final-reset-pins-inverse",
+          "exit_code": 1,
+          "command_sha256": "76f6525268b6a7e08ae56f27bf356e8e68a699ebf34338851340d2847cdd420c"
+        },
+        {
+          "name": "task7-74-final-reset-pins-restored",
+          "exit_code": 0,
+          "command_sha256": "62c00a20eecb96facbb76c9dc4e14e48298a7953f21290a9e08d2ac72d1de352"
+        }
+      ]
+    },
+    {
+      "name": "reset-draft",
+      "disposition": "unchanged-source proof readback; not re-executed",
+      "files": [
+        {
+          "path": "apps/arkscope-web/src/settings/SecResearchPanel.tsx",
+          "current_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+          "original_sha256": "6bb1b86911e180f0000624b756696cdc99408569e50a83494a061de850908bde",
+          "mutant_sha256": "d6058729f868d11e0a372fb3edf49bd8cfee8706e43b804b0de4585531e1319c"
+        }
+      ],
+      "commands": [
+        {
+          "name": "task7-75-final-reset-draft-inverse",
+          "exit_code": 1,
+          "command_sha256": "2f70295ede38b3c338fb5467470d076fb121a9e7f5f5e50b0d36e870e49f7c6b"
+        },
+        {
+          "name": "task7-76-final-reset-draft-restored",
+          "exit_code": 0,
+          "command_sha256": "6053585ac6b840eea5c637db76c1b104360fbdb5edfa8edd0081489469ec1a73"
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "file": "tests/test_sec_research_schedule.py",
+      "before_cases": 36,
+      "after_cases": 77,
+      "added": {
+        "test_schedule_resolution_stays_bound_to_returned_map": 12,
+        "test_mixed_transport_storage_gaps_keep_terminal_batch": 4,
+        "test_terminal_membership_witness_is_rejected": 20,
+        "test_terminal_membership_cik_partition_is_validated": 3,
+        "test_running_membership_checkpoint_does_not_claim_terminal_coverage": 1,
+        "test_map_lease_abort_accounts_unresolved_members_and_retains_rotation": 1
+      },
+      "removed": [],
+      "existing_tests_ast_unchanged": true
+    },
+    {
+      "file": "tests/test_sec_research_schedule_runtime.py",
+      "before_cases": 19,
+      "after_cases": 23,
+      "added": {
+        "test_uncovered_membership_adapter_result_is_rejected": 4
+      },
+      "removed": [],
+      "existing_tests_ast_unchanged": true
+    }
+  ],
+  "guard_hashes": {
+    "run_checks.py": "2c1cc48b15f817b02cc70a99cad757a0962e875e37381fa122fca8b89796247f",
+    "offline_pytest.py": "4c74153e1ef86c35f7bbc923586de624c0ffe3f577c2853e6e4c0a78426c95ff",
+    "offline_node.cjs": "35f45243a42cf069225ff91e726779333c33bb9a3abc4c1f694404c3810b728b"
+  },
+  "guards_unchanged": true
+}

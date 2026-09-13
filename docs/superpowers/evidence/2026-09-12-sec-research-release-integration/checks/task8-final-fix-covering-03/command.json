@@ -1,0 +1,42 @@
+{
+  "name": "task8-final-fix-covering-03",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+    "-q",
+    "tests/test_subagent.py",
+    "tests/test_fable_5_1_runtime.py",
+    "tests/test_sec_research_delegated_dispatch.py",
+    "tests/test_sec_research_delegated_trace.py",
+    "tests/test_sec_research_native_dispatch.py",
+    "tests/test_sec_research_tool_adapters.py",
+    "tests/test_sec_research_tool_results.py",
+    "tests/test_sec_research_tool_service.py",
+    "tests/test_sec_research_output_integration.py",
+    "tests/test_output_boundary.py",
+    "tests/test_tool_output_policy.py",
+    "tests/test_tool_output_channels.py",
+    "tests/test_research_output_events.py",
+    "tests/test_research_output_lifetimes.py",
+    "tests/test_task_runtime_binding.py",
+    "tests/test_sec_research_trace.py",
+    "tests/test_sec_research_operations.py",
+    "tests/test_sec_research_operation_admission.py",
+    "tests/test_sec_research_release_workflow.py",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 128.402,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task8-final-fix-covering-03/output.log"
+}
