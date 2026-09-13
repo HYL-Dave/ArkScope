@@ -373,6 +373,14 @@ Name `test_sec_pages_remain_complete_json_through_bridge_reduction`,
 
 ### Task 3: Durable Research Citation References
 
+Completed through `5235705c` under the focused
+`2026-09-13-sec-research-citations.md` plan. Full backend10583P/12 unchanged S,
+frontend1824P and four real-service/store browser workflows pass. Final review
+found and closed cancellation between hook publication and queue consumption;
+both deterministic cases now preserve durable ends, messages and closure roots.
+Evidence: `../evidence/2026-09-13-sec-research-citations/README.md`.
+This closes the citation prerequisite, not Tasks5/6 maintenance authorization.
+
 **Files:** Create `src/sec_research/citations.py`, `references.py`; modify API and
 OAuth event producers in `src/agents/openai_agent/agent.py`,
 `src/agents/anthropic_agent/agent.py`, both OAuth drivers, query accumulation in
@@ -441,12 +449,13 @@ and object hashes. Include receipt source_snapshots and all document catalog
 sources, not only original/text hashes. This interface is consumed by Tasks5/6.
 It does not delete anything or drop unreferenced retained history.
 
-- [ ] Write named RED owners using actual durable generated source fixtures:
+- [x] Write named RED owners using actual durable generated source fixtures:
   `test_sec_citations_roundtrip_event_message_and_legacy_rows`,
   `test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls`,
   `test_sec_tool_end_preserves_whole_citations_by_call_id`,
   `test_completed_openai_sec_tool_survives_later_cancel`,
-  `test_sec_mcp_text_blocks_preserve_call_bound_citations`,
+  `test_four_channels_keep_whole_refs_and_call_inputs` (Claude MCP text blocks),
+  `test_queued_openai_completions_survive_executor_cancellation`,
   `test_research_citation_reopens_exact_bytes_after_refresh_and_relocation`,
   `test_reference_closure_retains_directory_catalog_and_fact_objects`.
 
@@ -458,17 +467,17 @@ def test_duplicate_tool_names_do_not_exchange_citations(events):
     assert calls[1]["sec_citations"] == events.second_refs
 ```
 
-- [ ] Record RED for lost refs/wrong ID matching/restart truncation, not mocked
+- [x] Record RED for lost refs/wrong ID matching/restart truncation, not mocked
   store assertions. Run real per-channel event flows with fake provider messages.
-- [ ] Implement refs, exact read, persistence/recovery and a concise drawer
+- [x] Implement refs, exact read, persistence/recovery and a concise drawer
   citation control. Stored passage text rendered as text, no remote HTML. Display
   source/form/period concisely; keyboard focus/close restore, stale response and
   selected-message guards. Missing evidence gets an actionable typed state.
-- [ ] GREEN relevant backend and frontend owners. Inverses remove the optional
+- [x] GREEN relevant backend and frontend owners. Inverses remove the optional
   field projection, match wrong call ID, drop event-only roots, ignore a bound
   hash, slice 500 recovery events. Each must kill its named owner. Browser real
   API/store read demonstrates reopened UTF-8 bytes, not fixture invented hashes.
-- [ ] Commit, report API count collateral and reference-closure contract to
+- [x] Commit, report API count collateral and reference-closure contract to
   downstream operations. Citation persistence is now the maintenance milestone;
   no further waiting on an undefined future citation system.
 

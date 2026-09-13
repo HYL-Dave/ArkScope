@@ -1,51 +1,40 @@
 # SEC Research Data And Tools
 
-Status: product direction and cleanup boundary approved. Typed capacity and
-portable paths are implemented under `2026-09-11-current-journal-and-sec-foundation`.
-Exact original-byte catalog and Company Facts parsers are now implemented under
-`docs/superpowers/plans/2026-09-11-sec-structured-source-core.md` with independent
-review and fresh full backend 8,292 passed / 12 unchanged skips. Historical
-pointer presence is recorded separately from an observed empty list, without a
-whole-history completeness claim. The subsequent
-`docs/superpowers/plans/2026-09-11-sec-durable-acquisition.md` implements canonical
-immutable storage, capacity-accounted captures, governed structured traversal,
-durable continuation and explicit GET/POST application commands. Task and whole
-change and collateral reviews approved; a fresh complete run passed **8434 tests
-with 12 unchanged skips**, with exact node/source reconciliation after route-count
-test collateral and an offline-runner path correction. The next plan,
-`docs/superpowers/plans/2026-09-11-sec-query-settings.md`, now implements immutable
-receipt/source bindings, snapshot-bound catalog/facts pagination, retained fact-id
-reopening and an explicit CIK Settings management surface with adjustable capacity,
-stored queries, refresh and resume. Full backend **8811 passed / 12 unchanged
-skips** reconciles exactly8823 nodes,377added/zero removed. Final frontend-only
-catalog rendering correction preserves conflicting variants without stale rows;
-fresh frontend **1738 passed**, typecheck/i18n and four desktop/mobile fixture
-workflows pass. Backend source/tests remain byte-identical across that correction.
-Task reviews and the final scoped correction review are approved, with no
-remaining findings in this batch.
-The subsequent `2026-09-12-sec-document-reading.md` now implements bounded
-directory/HTML/XHTML/iXBRL extraction, immutable original/text captures, exact
-UTF-8 passage citations, capture/filter-bound pagination and a Settings filing
-reader through `02a0fff4`. Stored GET never acquires; explicit primary-document
-POST uses the managed SEC identity/pacing. Old pins survive new/failed refreshes;
-source faults and uncertain sections remain explicit rather than substituted text.
-All four task reviews and the integrated review approve this subsystem. Fresh
-frontend **1776 passed**, typecheck/i18n and all four actual-service/store browser
-fixtures pass. Fresh complete backend **9168 passed /12 unchanged skips** and
-exact reconciliation cover9180nodes,357added/zero removed;1102source/test hashes
-remain frozen and17current-source inverses each kill their named owners.
-This is still not the complete end-to-end workflow: issuer resolution, export,
-three tools/four transports and subagents, persisted Research citations and the
-default-disabled schedule remain open. Settings now includes a retained-document
-reader, not complete Research admission. No unfinished replacement tool is
-registered; earlier foundations and all eight SEC management/query routes have
-real consumers. No production activation occurred. Current document evidence is
-under `../evidence/2026-09-12-sec-document-reading/README.md`.
-Base inspected: `30bb31c7`. The user approved the product direction on September
-10, including useful tool access rather than collection without consumers.
-Original specification-tree review: `fef26dcf`; current query/Settings evidence
-is `../evidence/2026-09-11-sec-query-settings/README.md` at source `5d03c57e`.
-The prior durable-acquisition checkpoint remains independently archived.
+Status: product direction and cleanup boundary approved; durable Research
+citations complete through `5235705c`. The three SEC tools are registered across
+both API-key and both OAuth transports and deep_researcher. Issuer resolution,
+immutable acquisition, snapshot-bound queries, document/TOC reading,100GiB
+adjustable capacity and Settings consumers are implemented. Whole admitted SEC
+results now produce validated references retained in Research event/message JSON;
+the drawer reopens exact stored facts, filing observations and UTF-8 passages.
+Cancellation, restart, archive, later refresh and root relocation preserve pins.
+Missing or malformed evidence is an explicit typed gap, never latest substitution.
+
+Current acceptance: full backend **10583 passed /12 unchanged skips** at
+`dbc8f7e5`, exact10595 collected/executed IDs,272added/zero removed and1142 frozen
+source paths. Final source removes only an ineffective CSS rule; backend bytes
+are unchanged. Fresh frontend **1824 passed**, typecheck/build/i18n and four
+en/zh-Hant desktop/mobile actual temporary API/store workflows pass. Five
+reference/recovery inverses kill their owners. Final review's queued-completion
+cancellation P1 is reproduced, repaired and independently approved. Evidence:
+`../evidence/2026-09-13-sec-research-citations/README.md`; focused plan:
+`../plans/2026-09-13-sec-research-citations.md`.
+
+This is not the complete first release. Operation leases, portable export/restore,
+orphan cleanup, schema reset and the default-disabled schedule remain open under
+release Tasks5-7. Wider abandoned-surface cleanup, cross-platform native acceptance
+and SQLite runtime activation remain separate work. No production activation,
+provider-data call, real cleanup, App restart, merge or push occurred here.
+
+Historical checkpoints remain independently archived: structured source core
+`../evidence/2026-09-11-sec-structured-source-core/README.md`, durable acquisition
+`../evidence/2026-09-11-sec-durable-acquisition/README.md`, query/Settings
+`../evidence/2026-09-11-sec-query-settings/README.md`, document reading
+`../evidence/2026-09-12-sec-document-reading/README.md` and three-tool/four-channel
+integration `../evidence/2026-09-12-sec-integration/README.md`. These retain their
+original source anchors, failures, limits and verification counts. The initial
+inspection base was `30bb31c7`; original specification-tree review was `fef26dcf`.
+The user approved useful tool access, not collection without consumers.
 On September 10 the user selected
 a **100 GiB adjustable capture budget**, replacing the proposed 20 GiB default.
 The subsequent user decision supersedes the retired-wrapper design: physically
