@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
@@ -18,6 +18,7 @@ from src.lifecycle_public_sources import PublicSourceReader
 from src.lifecycle_web_sec_sources import SecSourcePolicy
 from src.sec_research import schema
 from src.sec_research.captures import CaptureStore
+from src.sec_research.citations import CitationError, decode_citation_query, read_sec_citation
 from src.sec_research.common import normalize_cik
 from src.sec_research.config import MAX_CAPTURE_BUDGET_BYTES, get_capture_budget_bytes, set_capture_budget_bytes
 from src.sec_research.document_queries import DocumentQueries, validate_document_query
@@ -84,6 +85,23 @@ def put_config(request: ConfigRequest):
         return {"capture_budget_bytes": saved}
     except (ValueError, sqlite3.Error, OSError):
         raise HTTPException(503, detail={"code": "sec_research_config_unavailable"}) from None
+
+
+@router.get("/sec-research/citation")
+def stored_citation(request: Request):
+    try:
+        if set(request.query_params) != {"ref"} or len(request.query_params.getlist("ref")) != 1:
+            raise CitationError("sec_citation_query_invalid")
+        citation = decode_citation_query(request.query_params["ref"])
+    except CitationError:
+        raise HTTPException(422, detail={"code": "sec_citation_query_invalid"}) from None
+    try:
+        store = Store(SecResearchPaths.resolve())
+        if not _installed(store):
+            return _unavailable("sec_research_not_installed")
+        return read_sec_citation(store, CaptureStore(store, budget=None), citation=citation)
+    except (ValueError, sqlite3.Error, OSError):
+        return _unavailable("sec_citation_integrity_failed")
 
 
 @router.get("/sec-research/{cik}")
