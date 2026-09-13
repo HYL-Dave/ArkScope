@@ -15,10 +15,39 @@ from src.sec_research.paths import SecResearchPaths
 from src.sec_research.store import Store
 from tests.test_lifecycle_public_sources import Response
 from tests.test_sec_research_document_service import FILING_ID, ROOT_URL, rig  # noqa: F401
+from tests.test_sec_research_citations import evidence  # noqa: F401
 
 
 URL = f"/sec-research/filings/{FILING_ID}/document"
 ENVELOPE = {"status", "data", "gaps", "observed_at", "coverage", "next_cursor"}
+
+
+def test_citation_get_reopens_real_retained_source_before_dynamic_cik_route(route, evidence, monkeypatch):
+    import base64
+    from tests.test_sec_research_citations import TEXT
+
+    forbid_get_writes(route, monkeypatch)
+    before = snapshot(route.paths)
+    canonical = json.dumps(evidence.document_ref, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    token = base64.urlsafe_b64encode(canonical.encode()).decode().rstrip("=")
+    response = route.client.get("/sec-research/citation", params={"ref": token})
+    assert response.status_code == 200, response.text
+    page = response.json()
+    assert set(page) == ENVELOPE and page["status"] == "ok"
+    assert page["data"]["text"] == TEXT and page["data"]["citation"] == evidence.document_ref
+    assert snapshot(route.paths) == before
+
+
+@pytest.mark.parametrize("params", [{}, {"ref": "PRIVATE"}, {"ref": "a" * 8193},
+    {"ref": "e30="}, {"ref": "e30", "path": "/PRIVATE"},
+    [("ref", "e30"), ("ref", "e30")]])
+def test_citation_query_errors_are_closed_before_store_access(route, monkeypatch, params):
+    forbid_get_writes(route, monkeypatch)
+    monkeypatch.setattr(route.module.SecResearchPaths, "resolve", route.forbidden)
+    response = route.client.get("/sec-research/citation", params=params)
+    assert response.status_code == 422
+    assert response.json() == {"detail": {"code": "sec_citation_query_invalid"}}
+    assert not route.paths.market_db_path.exists() and not route.paths.capture_root.exists()
 
 
 class ForbiddenAccess(RuntimeError):
