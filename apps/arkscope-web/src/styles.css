@@ -3960,7 +3960,6 @@ a.news-title:hover { color: var(--accent); text-decoration: underline; }
 .research-evidence-input { margin: 4px 0 0; word-break: break-all; opacity: 0.8; white-space: pre-wrap; }
 .research-evidence-preview { margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
 .research-evidence-tool-head > .mono { min-width: 0; overflow-wrap: anywhere; }
-.research-evidence-tool-head .ui-status { flex-shrink: 0; }
 .sec-citation-open { display: flex; max-width: 100%; height: auto; margin-top: 4px; text-align: left; white-space: normal; }
 .sec-citation-open > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .sec-citation-view { border-block: 1px solid var(--border); padding-block: 8px; }
