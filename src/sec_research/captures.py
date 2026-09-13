@@ -60,6 +60,9 @@ class CaptureStore:
 
     def _recover(self, directory):
         # Owning the root lease proves that no live writer owns these reservations.
+        # An absent entry may be an unlink whose parent fsync failed. Do not erase
+        # its durable charge until the namespace itself has become durable.
+        directory.sync()
         files = directory.files()
         with self._write() as conn:
             registered = {row[0] for row in conn.execute("SELECT object_key FROM sec_research_objects")}

@@ -9,6 +9,7 @@ import errno
 import hashlib
 import os
 from pathlib import Path
+import re
 import stat
 import threading
 
@@ -251,6 +252,77 @@ class CaptureDirectory:
                     raise ValueError("capture_path_unsafe")
                 rows.append((key, info.st_size, (info.st_dev, info.st_ino)))
         return rows
+
+    def sync(self):
+        """Resolve directory durability before retiring any absent-file charge."""
+        self.assert_current()
+        for fd in self.children.values():
+            os.fsync(fd)
+        os.fsync(self.root_fd)
+        self.assert_current()
+
+    @staticmethod
+    def _identity(info):
+        return [info.st_dev, info.st_ino, info.st_size, info.st_nlink,
+                info.st_mtime_ns, info.st_ctime_ns]
+
+    def inspect_owned(self, key):
+        if re.fullmatch(r"(?:objects/[0-9a-f]{64}|staging/[0-9a-f]{32})", key) is None:
+            raise ValueError("capture_path_unsafe")
+        parent, name = self._key(key)
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise ValueError("capture_path_unsafe")
+            digest = hashlib.sha256()
+            with os.fdopen(fd, "rb", closefd=False) as handle:
+                while chunk := handle.read(1024 * 1024):
+                    digest.update(chunk)
+            identity = self._identity(info)
+            current = os.stat(name, dir_fd=parent, follow_symlinks=False)
+            if identity != self._identity(os.fstat(fd)) or identity != self._identity(current):
+                raise ValueError("capture_path_unsafe")
+            return {"key": key, "size_bytes": info.st_size,
+                    "sha256": digest.hexdigest(), "identity": identity}
+        finally:
+            os.close(fd)
+
+    def inventory(self):
+        """Strict admin inventory, not the writer's interrupted-hardlink recovery."""
+        self.assert_current()
+        if set(os.listdir(self.root_fd)) != {"objects", "staging"}:
+            raise ValueError("capture_path_unsafe")
+        result = [self.inspect_owned(key) for key, _, _ in self.files()]
+        identities = [tuple(item["identity"][:2]) for item in result]
+        if len(set(identities)) != len(identities):
+            raise ValueError("capture_path_unsafe")
+        self.assert_current()
+        return sorted(result, key=lambda item: item["key"])
+
+    def remove_owned(self, item):
+        """Unlink only an approved descriptor-bound identity, then sync its parent."""
+        self.assert_current()
+        if self.inspect_owned(item["key"]) != item:
+            raise ValueError("sec_research_preview_stale")
+        parent, name = self._key(item["key"])
+        os.unlink(name, dir_fd=parent)
+        os.fsync(parent)
+        self.assert_current()
+        try:
+            os.stat(name, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        raise ValueError("capture_path_unsafe")
+
+    def confirm_absent(self, key):
+        self.sync()
+        parent, name = self._key(key)
+        try:
+            os.stat(name, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        raise ValueError("sec_research_preview_stale")
 
 
 @contextmanager
