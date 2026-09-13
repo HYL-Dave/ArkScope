@@ -13,7 +13,8 @@ Tests cover:
 9. 1M context beta support
 """
 
-from unittest.mock import MagicMock, patch, PropertyMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 import pytest
 
@@ -369,7 +370,7 @@ class TestAnthropicSubagentRunner:
             name="test", description="", model="claude-opus-4-7",
             system_prompt="test",
         )
-        result = _run_anthropic_subagent(config, "test question", dal=None)
+        result = asyncio.run(_run_anthropic_subagent(config, "test question", dal=None))
         assert result["answer"] == "Analysis complete"
 
     @patch("src.agents.anthropic_agent.tools.get_anthropic_tools")
@@ -409,7 +410,7 @@ class TestAnthropicSubagentRunner:
             name="test", description="", model="claude-opus-4-7",
             system_prompt="test", max_turns=5,
         )
-        result = _run_anthropic_subagent(config, "test", dal=None)
+        result = asyncio.run(_run_anthropic_subagent(config, "test", dal=None))
         assert result["answer"] == "Here is the analysis"
         assert "get_ticker_news" in result["tools_used"]
 
@@ -442,7 +443,7 @@ class TestAnthropicSubagentRunner:
             name="test", description="", model="claude-opus-4-7",
             system_prompt="test", max_turns=2,
         )
-        result = _run_anthropic_subagent(config, "test", dal=None)
+        result = asyncio.run(_run_anthropic_subagent(config, "test", dal=None))
         assert "maximum" in result["answer"].lower()
 
     @patch("src.agents.anthropic_agent.tools.get_anthropic_tools")
@@ -468,7 +469,7 @@ class TestAnthropicSubagentRunner:
             name="test", description="", model="claude-opus-4-7",
             system_prompt="test", extended_context=True,
         )
-        result = _run_anthropic_subagent(config, "test", dal=None)
+        result = asyncio.run(_run_anthropic_subagent(config, "test", dal=None))
 
         # 1M context GA: standard stream, not beta
         mock_client.messages.stream.assert_called_once()
@@ -493,16 +494,16 @@ class TestOpenaiSubagentRunner:
         mock_result = MagicMock()
         mock_result.final_output = "The Sharpe ratio is 1.5"
         mock_result.raw_responses = []
-        mock_runner_cls.run_sync.return_value = mock_result
+        mock_runner_cls.run = AsyncMock(return_value=mock_result)
 
         from src.agents.shared.subagent import _run_openai_subagent
         config = SubagentConfig(
             name="code_analyst", description="", model="gpt-5.2-codex",
             system_prompt="test", reasoning_effort="xhigh",
         )
-        result = _run_openai_subagent(config, "calculate Sharpe", dal=None)
+        result = asyncio.run(_run_openai_subagent(config, "calculate Sharpe", dal=None))
         assert "1.5" in result["answer"]
-        mock_runner_cls.run_sync.assert_called_once()
+        mock_runner_cls.run.assert_awaited_once()
 
     @patch("src.agents.openai_agent.agent._get_openai_max_output")
     @patch("src.agents.openai_agent.tools.create_openai_tools")
@@ -528,14 +529,14 @@ class TestOpenaiSubagentRunner:
         mock_result = MagicMock()
         mock_result.final_output = "done"
         mock_result.raw_responses = [mock_output]
-        mock_runner_cls.run_sync.return_value = mock_result
+        mock_runner_cls.run = AsyncMock(return_value=mock_result)
 
         from src.agents.shared.subagent import _run_openai_subagent
         config = SubagentConfig(
             name="code_analyst", description="", model="gpt-5.2-codex",
             system_prompt="test",
         )
-        result = _run_openai_subagent(config, "test", dal=None)
+        result = asyncio.run(_run_openai_subagent(config, "test", dal=None))
         assert "tool_get_ticker_prices" in result["tools_used"]
 
 

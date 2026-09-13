@@ -1309,10 +1309,10 @@ async def execute_tool_async(
     tool_input: Dict[str, Any],
     dal: "DataAccessLayer",
 ) -> str:
-    """Await owned SEC work; other tools retain their synchronous dispatch."""
+    """Await SEC work and delegated children within the caller's lifetime."""
     from src.sec_research.tool_results import SEC_TOOL_NAMES
 
-    if tool_name not in SEC_TOOL_NAMES:
+    if tool_name not in SEC_TOOL_NAMES and tool_name != "delegate_to_subagent":
         return execute_tool(tool_name, tool_input, dal)
 
     from src.agents.shared.output_boundary import OutputBoundaryError
@@ -1324,7 +1324,17 @@ async def execute_tool_async(
     except OutputBoundaryError as exc:
         return json.dumps({"error": exc.code})
     try:
-        result = await invoke_sec_tool(tool_name, tool_input)
+        if tool_name == "delegate_to_subagent":
+            from src.agents.shared.subagent import dispatch_subagent_async
+
+            result = await dispatch_subagent_async(
+                subagent_name=tool_input["subagent"],
+                task=tool_input["task"],
+                context_json=tool_input.get("context_json", ""),
+                dal=dal,
+            )
+        else:
+            result = await invoke_sec_tool(tool_name, tool_input)
         return _serialize_result(result, tool_name=tool_name)
     except Exception as exc:
         from src.tools.result_policy import sanitize_tool_error

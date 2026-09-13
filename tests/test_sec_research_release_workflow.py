@@ -58,7 +58,7 @@ def release_fixture(tmp_path, monkeypatch):
     transport = Transport({MAP_URL: map_body(("AAPL", 320193)),
                            SUBMISSIONS: catalog(), FACTS: facts_body()})
     f = SimpleNamespace(store=store, captures=captures, transport=transport,
-                        profile=profile, now=NOW, responses=[], connections=[])
+                        profile=profile, now=NOW, responses=[], connections=[], acquisitions=0)
 
     def connect(host, address, *, timeout):
         assert host == "www.sec.gov" and address[1][0] == PUBLIC_IP
@@ -85,6 +85,7 @@ def release_fixture(tmp_path, monkeypatch):
 
     @contextmanager
     def acquire():
+        f.acquisitions += 1
         yield captures, transport, reader_factory
 
     service = ToolService(store, acquisition_factory=acquire, clock=lambda: f.now)
@@ -249,10 +250,12 @@ def test_interrupted_refresh_keeps_stored_references_out_of_cleanup(release_fixt
     assert f.captures.status()["reserved_bytes"] == len(changed)
 
     requests = list(f.transport.calls)
+    acquisitions = f.acquisitions
     assert reopen_saved(f.profile, f.store.paths.market_db_path) == before
     stored = unwrap(f.invoke("get_sec_financial_facts", issuer=CIK, freshness="stored"))
     assert stored["status"] == "unavailable" and stored["data"] == [], stored
     assert f.transport.calls == requests
+    assert f.acquisitions == acquisitions
     recovered = f.captures.recover()
     assert recovered["reserved_bytes"] == 0 and recovered["orphan_bytes"] == len(changed)
 
@@ -279,3 +282,4 @@ def test_interrupted_refresh_keeps_stored_references_out_of_cleanup(release_fixt
     assert f.captures.status()["charged_bytes"] == recovered["charged_bytes"] - result["freed_bytes"]
     assert reopen_saved(f.profile, f.store.paths.market_db_path) == before
     assert f.transport.calls == requests
+    assert f.acquisitions == acquisitions
