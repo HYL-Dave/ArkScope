@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.sec_research.captures import CaptureStore
+from src.sec_research.catalog import parse_submissions
 from src.sec_research.document_queries import DocumentQueries
 from src.sec_research.facts import parse_companyfacts
 from src.sec_research.paths import SecResearchPaths
@@ -175,6 +176,108 @@ def test_malformed_owned_evidence_is_a_typed_event_gap(evidence, mode):
         api.sec_citations_from_result("get_sec_financial_facts", result)
     assert api.citation_event_fields("get_sec_financial_facts", result) == {
         "sec_citation_gaps": ["sec_citation_result_invalid"]}
+
+
+@pytest.mark.parametrize("kind,change", [
+    pytest.param("facts", {"fiscal_year": True}, id="fact-fiscal-year-bool"),
+    pytest.param("facts", {"fiscal_year": 0}, id="fact-fiscal-year-zero"),
+    pytest.param("facts", {"fiscal_year": 10000}, id="fact-fiscal-year-overflow"),
+    pytest.param("facts", {"fiscal_year": 2025.0}, id="fact-fiscal-year-float"),
+    pytest.param("facts", {"fiscal_year": "2025"}, id="fact-fiscal-year-text"),
+    pytest.param("facts", {"start": "2026-01-01"}, id="fact-reversed-period"),
+    pytest.param("facts", {"start": ""}, id="fact-unnormalized-start"),
+    pytest.param("facts", {"fiscal_period": 2025}, id="fact-fiscal-period-type"),
+    pytest.param("facts", {"fiscal_period": ""}, id="fact-fiscal-period-empty"),
+    pytest.param("facts", {"fiscal_period": "FY\u0000"}, id="fact-fiscal-period-control"),
+    pytest.param("facts", {"frame": {}}, id="fact-frame-type"),
+    pytest.param("facts", {"frame": ""}, id="fact-frame-empty"),
+    pytest.param("facts", {"frame": "CY2025\u200b"}, id="fact-frame-control"),
+    pytest.param("filings", {"primary_document": {}}, id="filing-document-type"),
+    pytest.param("filings", {"primary_document": "../PRIVATE.htm"}, id="filing-document-path"),
+    pytest.param("filings", {"primary_document": "", "primary_url": None}, id="filing-unnormalized-document"),
+    pytest.param("filings", {"report_date": "2025-02-30"}, id="filing-report-date-calendar"),
+    pytest.param("filings", {"report_date": True}, id="filing-report-date-type"),
+    pytest.param("filings", {"report_date": ""}, id="filing-unnormalized-report-date"),
+    pytest.param("filings", {"accepted_at": {}}, id="filing-accepted-at-type"),
+    pytest.param("filings", {"accepted_at": "2026-02-30T12:00:00Z"}, id="filing-accepted-at-calendar"),
+    pytest.param("filings", {"accepted_at": "2026-05-01T12:00:00"}, id="filing-accepted-at-naive"),
+    pytest.param("filings", {"accepted_at": ""}, id="filing-unnormalized-accepted-at"),
+    pytest.param("filings", {"accepted_at": "2026-05-01T12:00:00-04:00"}, id="filing-unnormalized-timezone"),
+    pytest.param("filings", {"primary_document": None}, id="filing-url-without-document"),
+    pytest.param("filings", {"primary_url": None}, id="filing-document-without-url"),
+    pytest.param("filings", {"primary_url": {}}, id="filing-url-type"),
+    pytest.param("filings", {"primary_document": "other.htm"}, id="filing-document-url-mismatch"),
+    pytest.param("filings", {"primary_url": "https://evil.example/actual.htm"}, id="filing-url-host"),
+    pytest.param("filings", {"primary_url": "https://www.sec.gov/Archives/edgar/data/1/000095017026000001/actual.htm"}, id="filing-url-cik"),
+    pytest.param("filings", {"primary_url": "https://www.sec.gov/Archives/edgar/data/320193/000095017026000002/actual.htm"}, id="filing-url-accession"),
+])
+def test_complete_native_row_mutations_are_closed_gaps(evidence, kind, change):
+    api = owner("citations")
+    tool = "get_sec_financial_facts" if kind == "facts" else "list_sec_filings"
+    page = deepcopy(getattr(evidence, kind))
+    assert api.sec_citations_from_envelope(tool, page)
+    # Keep a valid row first: one malformed complete row must discard every ref.
+    page["data"].append(deepcopy(page["data"][0]) | change)
+    with pytest.raises(api.CitationError, match="^sec_citation_result_invalid$") as error:
+        api.sec_citations_from_envelope(tool, page)
+    assert error.value.code == "sec_citation_result_invalid"
+    assert api.citation_event_fields(tool, page) == {
+        "sec_citation_gaps": ["sec_citation_result_invalid"]}
+
+
+@pytest.mark.parametrize("optional", [
+    pytest.param({}, id="omitted"),
+    pytest.param({"start": None, "fy": None, "fp": None, "frame": None}, id="nulls"),
+    pytest.param({"start": "", "fy": 1, "fp": "custom period", "frame": "custom frame"}, id="lower-year-and-open-text"),
+    pytest.param({"start": "2025-12-31", "fy": 9999, "fp": "FY", "frame": "CY2025"}, id="upper-year-and-equal-dates"),
+])
+def test_native_nullable_facts_preserve_query_annotations(rig, optional):
+    values = {"val": 123, "end": "2025-12-31", "filed": "2026-05-01", "form": "10-K",
+              "accn": FILING_ID.split(":")[1]} | optional
+    raw = json.dumps({"cik": 320193, "facts": {"us-gaap": {"Revenues": {
+        "units": {"USD": [values]}}}}}).encode()
+    parsed = parse_companyfacts(raw, cik=CIK)
+    sid = rig.store.publish(parsed, object_sha256=rig.captures.put(raw),
+                            observed_at=NOW, source_url=FACT_URL)
+    bind_sources(rig, {"companyfacts": {"snapshot_id": sid, "observed_at": NOW}})
+    page = StoredQueries(rig.store).facts(CIK, concepts=["us-gaap:Revenues"])
+    assert len(page["data"]) == 1
+    row = page["data"][0]
+    for field in ("start", "fiscal_year", "fiscal_period", "frame"):
+        assert row[field] == getattr(parsed.facts[0], field)
+    assert {"period", "metrics"} <= row.keys()
+    before = deepcopy(page)
+    api = owner("citations")
+    assert api.sec_citations_from_envelope("get_sec_financial_facts", page) == [fact_ref(row)]
+    assert api.citation_event_fields("get_sec_financial_facts", page) == {"sec_citations": [fact_ref(row)]}
+    assert page == before
+
+
+@pytest.mark.parametrize("optional", [
+    pytest.param({}, id="omitted"),
+    pytest.param({"reportDate": None, "acceptanceDateTime": None, "primaryDocument": None}, id="nulls"),
+    pytest.param({"reportDate": "", "acceptanceDateTime": "", "primaryDocument": ""}, id="normalized-empty"),
+    pytest.param({"reportDate": "2025-12-31", "acceptanceDateTime": "2026-05-01T18:30:00.123-04:00",
+                  "primaryDocument": "annual_2025.htm"}, id="normalized-offset-and-document"),
+])
+def test_native_nullable_filings_preserve_normalized_fields(rig, optional):
+    columns = {"accessionNumber": [FILING_ID.split(":")[1]], "filingDate": ["2026-05-01"],
+               "form": ["10-K"]} | {key: [value] for key, value in optional.items()}
+    raw = json.dumps({"cik": 320193, "filings": {"recent": columns}}).encode()
+    parsed = parse_submissions(raw, cik=CIK)
+    sid = rig.store.publish(parsed, object_sha256=rig.captures.put(raw), observed_at=NOW,
+                            source_url=f"https://data.sec.gov/submissions/CIK{CIK}.json")
+    bind_sources(rig, {"submissions": {"snapshot_id": sid, "observed_at": NOW}})
+    page = StoredQueries(rig.store).filings(CIK)
+    assert len(page["data"]) == 1
+    row = page["data"][0]
+    for field in ("report_date", "accepted_at", "primary_document", "primary_url"):
+        assert row[field] == getattr(parsed.filings[0], field)
+    before = deepcopy(page)
+    api = owner("citations")
+    assert api.sec_citations_from_envelope("list_sec_filings", page) == filing_refs(page)
+    assert api.citation_event_fields("list_sec_filings", page) == {"sec_citations": filing_refs(page)}
+    assert page == before
 
 
 @pytest.mark.parametrize("tool", ["get_sec_financial_facts", "list_sec_filings", "read_sec_filing"])
