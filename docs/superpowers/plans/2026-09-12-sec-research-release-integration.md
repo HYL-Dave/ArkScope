@@ -80,7 +80,7 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 - [x] Task 3: persistent Research citations (7401e656; sealed acceptance10583P/12S, frontend1824P)
 - [x] Task 4: TOC recognition (ba5a3356,5518ae21; focused338P; independent review approved)
 - [x] Task 5: operation leases/export/restore (4dfa0d37; initial1390P plus fix629P/104UI/typecheck; independent review approved; full continuation gate pending)
-- [ ] Task 6: cleanup/reset
+- [x] Task 6: cleanup/reset (78157e62; covering1064P, scoped review approved; actual-store rollout unperformed, full continuation gate pending)
 - [ ] Task 7: schedule/Settings
 - [ ] Task 8: cleanup and full verification
 
@@ -696,7 +696,7 @@ only to that preview, no automatic confirm. Actual production execution is NOT
 authorized by this plan. This completes SEC-RECOVERY-001/002 implementation by
 this task, before scheduling/final release verification.
 
-- [ ] RED owners: `test_cleanup_preserves_every_retained_reference_class`,
+- [x] RED owners: `test_cleanup_preserves_every_retained_reference_class`,
   `test_new_reference_invalidates_cleanup_preview`,
   `test_registered_orphan_unlink_failure_remains_charged`,
   `test_cleanup_restores_immutability_after_rollback`,
@@ -715,15 +715,15 @@ def test_new_reference_invalidates_cleanup_preview(maintenance_fixture):
     assert maintenance_fixture.original_object_still_exists()
 ```
 
-- [ ] Record concrete RED before implementing operations. Small fixture stores
+- [x] Record concrete RED before implementing operations. Small fixture stores
   only; inject failure between DB/file/receipt stages and retry explicitly.
-- [ ] Implement inspect/approval/recheck/backup/phase receipts, not a permanent
+- [x] Implement inspect/approval/recheck/backup/phase receipts, not a permanent
   old-schema execution branch. Cancellation never silently abandons a destructive
   stage; report its last durable phase accurately.
-- [ ] GREEN all maintenance/admin/CLI/capture/citation controls. Inverses skip
+- [x] GREEN all maintenance/admin/CLI/capture/citation controls. Inverses skip
   recheck, ignore event-only citations, clear charge before unlink, omit backup,
   drop unknown prefix, ignore active lease. Named behavioral failures required.
-- [ ] Commit and mark the two operational owners implemented, separately from
+- [x] Commit and mark the two operational owners implemented, separately from
   their unperformed actual-store rollout. Unrecoverable unknown schema retains an
   explicit blocked diagnostic plus safety-backup path, not raw SQL instructions.
 
