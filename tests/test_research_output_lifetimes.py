@@ -587,7 +587,7 @@ def test_threaded_child_retains_captured_secret_for_late_parent_callback(make_pr
 
     parent_secret = "parent-synthetic-key"
     child_secret = parent_secret if child_provider == "openai" else SECRET
-    make_producer(child_provider, answer="Public child answer", secret=child_secret)
+    producer = make_producer(child_provider, answer="Public child answer", secret=child_secret)
     add_key(isolated.credentials, "anthropic", SECRET)
     model = "gpt-5.4-mini" if child_provider == "openai" else "claude-sonnet-4-6"
     monkeypatch.setattr(config, "get_agent_config", lambda: config.AgentConfig(
@@ -600,6 +600,9 @@ def test_threaded_child_retains_captured_secret_for_late_parent_callback(make_pr
             result = await asyncio.to_thread(subagent.dispatch_subagent, "code_analyst", "Public question", dal=object())
             assert result["error"] is None, result
             assert result["answer"] == "Public child answer"
+            assert len(producer.requests) == 1
+            assert producer.registration_codes == ["known_secret"]
+            assert producer.guards == [guard]
             assert current_runtime_auth("openai") is parent
             assert current_output_guard() is guard
             with pytest.raises(OutputBoundaryError, match="^known_secret$"):

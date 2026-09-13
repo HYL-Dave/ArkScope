@@ -147,7 +147,7 @@ def make_producer(monkeypatch, isolated):
                 "Public question", model="gpt-5.4-mini", reasoning_effort="low", dal=object(),
             )
         elif channel == "anthropic":
-            from anthropic import Anthropic
+            from anthropic import Anthropic, AsyncAnthropic
             from src.tools import news_tools
 
             monkeypatch.setattr(news_tools, "get_news_brief", lambda *a, **kw: {"count": 0})
@@ -171,8 +171,12 @@ def make_producer(monkeypatch, isolated):
                 )
 
             client = Anthropic(api_key=secret, http_client=httpx2.Client(transport=httpx2.MockTransport(reply)))
-            clients.append(client)
+            async_client = AsyncAnthropic(
+                api_key=secret, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(reply)),
+            )
+            clients.extend((client, async_client))
             monkeypatch.setattr(live_resolver, "live_anthropic_client", lambda: client)
+            monkeypatch.setattr(live_resolver, "live_anthropic_async_client", lambda: async_client)
             state.stream = lambda: anthropic_agent.run_query_stream(
                 "Public question", model="claude-sonnet-4-6", effort="low", dal=object(),
             )
