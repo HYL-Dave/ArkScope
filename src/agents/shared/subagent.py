@@ -5,22 +5,117 @@ The main agent can delegate tasks to subagents via the `delegate_to_subagent` to
 Each subagent has its own model, system prompt, tool subset, and token tracker.
 Subagents start from clean state and return structured JSON results.
 
-Subagent communication: only structured JSON results, no message history sharing.
+Model communication stays structured JSON, with no message history sharing.
+Native parents may observe admitted SEC completions independently of that JSON.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from copy import copy
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
+from .events import AgentEvent, EventType
 from .output_boundary import output_scope
 from .output_events import check_output_value, protect_output_text
 from src.auth_drivers.runtime_binding import register_output_api_key
 
 logger = logging.getLogger(__name__)
+
+_sec_completion_observer = ContextVar("subagent_sec_completion_observer", default=None)
+_delegated_call_owner = ContextVar("subagent_call_owner", default=None)
+
+
+class _SubagentCalls:
+    """Retain invocation tasks the SDK may cancel without joining."""
+
+    def __init__(self):
+        self.owner = asyncio.current_task()
+        self.tasks = set()
+        self.active = True
+
+    def track(self):
+        if not self.active:
+            raise asyncio.CancelledError
+        task = asyncio.current_task()
+        if task is not self.owner:
+            self.tasks.add(task)
+            task.add_done_callback(self.tasks.discard)
+
+    async def close(self):
+        self.active = False
+        pending = [task for task in self.tasks if not task.done()]
+        for task in pending:
+            task.cancel()
+        if not pending:
+            return
+        joining = asyncio.gather(*pending, return_exceptions=True)
+        try:
+            await asyncio.shield(joining)
+        except asyncio.CancelledError:
+            while not joining.done():
+                try:
+                    await asyncio.shield(joining)
+                except asyncio.CancelledError:
+                    continue
+            joining.result()
+            raise
+
+
+@asynccontextmanager
+async def observe_subagent_sec(publish, *, enabled=lambda: True):
+    """Borrow a native parent's sink only for this awaited invocation."""
+    active = True
+
+    def completed(name, arguments, call_id, result):
+        if not active or not enabled():
+            return
+        from src.sec_research.citations import citation_event_fields
+        from src.sec_research.tool_results import SEC_TOOL_NAMES
+
+        if name.removeprefix("tool_") not in SEC_TOOL_NAMES:
+            return
+        result = check_output_value(result)
+        arguments = check_output_value(arguments)
+        if isinstance(arguments, str):
+            arguments = json.loads(arguments)
+        fields = citation_event_fields(name, result)
+        text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
+        publish(AgentEvent(EventType.tool_end, check_output_value({
+            "tool": name, "input": arguments, "call_id": call_id,
+            "summary": text[:200], "chars": len(text), **fields,
+        })))
+
+    token = _sec_completion_observer.set(completed)
+    calls = _SubagentCalls()
+    owner_token = _delegated_call_owner.set(calls)
+    try:
+        yield
+    finally:
+        active = False
+        _sec_completion_observer.reset(token)
+        _delegated_call_owner.reset(owner_token)
+        await calls.close()
+
+
+class _ChildSecCompletions:
+    """Isolate SDK call IDs and fence callbacks before child client cleanup."""
+
+    def __init__(self):
+        self.observer = _sec_completion_observer.get()
+        self.namespace = uuid4().hex
+        self.active = True
+
+    def complete(self, name, arguments, call_id, result):
+        if self.active and self.observer is not None:
+            self.observer(name, arguments, f"delegate:{self.namespace}:{call_id}", result)
+
 
 # ── 1M context ─────────────────────────────────────────────────
 # GA models need no beta header; legacy beta models still do. Membership is a
@@ -329,6 +424,16 @@ def dispatch_subagent(
     context_json: str = "",
     dal: Any = None,
 ) -> Dict[str, Any]:
+    """Synchronous entrypoint for callers outside an event loop."""
+    return asyncio.run(dispatch_subagent_async(subagent_name, task, context_json, dal))
+
+
+async def dispatch_subagent_async(
+    subagent_name: str,
+    task: str,
+    context_json: str = "",
+    dal: Any = None,
+) -> Dict[str, Any]:
     """
     Dispatch a task to a specialized subagent.
 
@@ -345,6 +450,9 @@ def dispatch_subagent(
         Dict with: subagent, answer, tools_used, model, provider,
         token_usage, error
     """
+    owner = _delegated_call_owner.get()
+    if owner is not None:
+        owner.track()
     if subagent_name not in SUBAGENT_REGISTRY:
         available = ", ".join(sorted(SUBAGENT_REGISTRY.keys()))
         return {
@@ -388,9 +496,9 @@ def dispatch_subagent(
         child_auth = capture_child_runtime_auth(provider)
         with output_scope(inherit=True), activate_runtime_auth(child_auth):
             if provider == "openai":
-                result = _run_openai_subagent(config, subagent_input, dal)
+                result = await _run_openai_subagent(config, subagent_input, dal)
             else:
-                result = _run_anthropic_subagent(config, subagent_input, dal)
+                result = await _run_anthropic_subagent(config, subagent_input, dal)
             result = {**result, "answer": protect_output_text(result.get("answer", ""))}
             check_output_value(result)
 
@@ -419,7 +527,7 @@ def dispatch_subagent(
 
 # ── Anthropic subagent runner ──────────────────────────────────
 
-def _run_anthropic_subagent(
+async def _run_anthropic_subagent(
     config: SubagentConfig,
     question: str,
     dal: Any,
@@ -428,130 +536,160 @@ def _run_anthropic_subagent(
     execution_detail = model_execution_admission_detail(config.model)
     if execution_detail is not None:
         raise ValueError(execution_detail)
-    from anthropic import Anthropic
-
     from ..anthropic_agent.agent import (
         _build_thinking_param,
         _prepare_cached_system,
         _prepare_cached_tools,
         _supports_effort,
     )
-    from ..anthropic_agent.tools import execute_tool, get_anthropic_tools
+    from ..anthropic_agent.tools import execute_tool_async, get_anthropic_tools
     from ..config import get_agent_config
     from ..shared.token_tracker import TokenTracker
 
     agent_config = get_agent_config()
     from src.auth_drivers.live_resolver import live_anthropic_client
     client = live_anthropic_client()
-    register_output_api_key(client)
+    cancelled = False
+    completions = _ChildSecCompletions()
+    try:
+        register_output_api_key(client)
 
-    # Filter tools to subagent's allowed subset
-    all_tools = get_anthropic_tools()
-    tools = _filter_anthropic_tools(all_tools, config.tool_names)
+        # Filter tools to subagent's allowed subset
+        all_tools = get_anthropic_tools()
+        tools = _filter_anthropic_tools(all_tools, config.tool_names)
 
-    # Hosted server tools — single source of truth in shared/server_tools.py.
-    from .server_tools import anthropic_server_tools
-    for _kind, tool_def in anthropic_server_tools(agent_config):
-        tools.append(tool_def)
+        # Hosted server tools — single source of truth in shared/server_tools.py.
+        from .server_tools import anthropic_server_tools
+        for _kind, tool_def in anthropic_server_tools(agent_config):
+            tools.append(tool_def)
 
-    # Apply prompt caching: cache_control on tools (last) + system prompt
-    tools = _prepare_cached_tools(tools)
-    cached_system = _prepare_cached_system(config.system_prompt)
+        # Apply prompt caching: cache_control on tools (last) + system prompt
+        tools = _prepare_cached_tools(tools)
+        cached_system = _prepare_cached_system(config.system_prompt)
 
-    messages: List[dict] = [{"role": "user", "content": question}]
-    tools_used: List[str] = []
-    tracker = TokenTracker()
+        messages: List[dict] = [{"role": "user", "content": question}]
+        tools_used: List[str] = []
+        tracker = TokenTracker()
 
-    # Build API kwargs (effort + thinking)
-    api_kwargs: Dict[str, Any] = {}
+        # Build API kwargs (effort + thinking)
+        api_kwargs: Dict[str, Any] = {}
 
-    if config.anthropic_effort and _supports_effort(config.model):
-        api_kwargs["output_config"] = {"effort": config.anthropic_effort}
+        if config.anthropic_effort and _supports_effort(config.model):
+            api_kwargs["output_config"] = {"effort": config.anthropic_effort}
 
-    thinking_param, effective_max_tokens = _build_thinking_param(
-        config.model, config.anthropic_thinking, agent_config,
-    )
-    if thinking_param:
-        api_kwargs["thinking"] = thinking_param
+        thinking_param, effective_max_tokens = _build_thinking_param(
+            config.model, config.anthropic_thinking, agent_config,
+        )
+        if thinking_param:
+            api_kwargs["thinking"] = thinking_param
 
-    # 1M context: GA for 4.6 (no header). Legacy models still need beta header.
-    use_beta = _use_extended_context_beta(config.model, config.extended_context)
+        # 1M context: GA for 4.6 (no header). Legacy models still need beta header.
+        use_beta = _use_extended_context_beta(config.model, config.extended_context)
 
-    for turn in range(config.max_turns):
-        if use_beta:
-            stream_ctx = client.beta.messages.stream(
-                model=config.model,
-                max_tokens=effective_max_tokens,
-                system=cached_system,
-                tools=tools,
-                messages=messages,
-                betas=[_EXTENDED_CONTEXT_BETA],
-                **api_kwargs,
-            )
-        else:
-            stream_ctx = client.messages.stream(
-                model=config.model,
-                max_tokens=effective_max_tokens,
-                system=cached_system,
-                tools=tools,
-                messages=messages,
-                **api_kwargs,
-            )
+        for turn in range(config.max_turns):
+            if use_beta:
+                stream_ctx = client.beta.messages.stream(
+                    model=config.model,
+                    max_tokens=effective_max_tokens,
+                    system=cached_system,
+                    tools=tools,
+                    messages=messages,
+                    betas=[_EXTENDED_CONTEXT_BETA],
+                    **api_kwargs,
+                )
+            else:
+                stream_ctx = client.messages.stream(
+                    model=config.model,
+                    max_tokens=effective_max_tokens,
+                    system=cached_system,
+                    tools=tools,
+                    messages=messages,
+                    **api_kwargs,
+                )
 
-        with stream_ctx as stream:
-            response = stream.get_final_message()
+            with stream_ctx as stream:
+                response = stream.get_final_message()
 
-        tracker.record_anthropic(response, model=config.model)
+            tracker.record_anthropic(response, model=config.model)
 
-        # Handle pause_turn (Claude web search server tool mid-turn pause)
-        if response.stop_reason == "pause_turn":
+            # Handle pause_turn (Claude web search server tool mid-turn pause)
+            if response.stop_reason == "pause_turn":
+                messages.append({"role": "assistant", "content": response.content})
+                continue
+
+            if response.stop_reason != "tool_use":
+                final_text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        final_text += block.text
+                return {
+                    "answer": final_text,
+                    "tools_used": list(set(tools_used)),
+                    "token_usage": tracker.summary(),
+                }
+
+            # Process tool calls
+            tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+            tool_results = []
+            for tool_use in tool_use_blocks:
+                check_output_value({"tool": tool_use.name, "input": tool_use.input, "call_id": tool_use.id})
+                tools_used.append(tool_use.name)
+                logger.debug(f"Subagent tool call: {tool_use.name}")
+                result = await execute_tool_async(tool_use.name, tool_use.input, dal)
+                completions.complete(tool_use.name, tool_use.input, f"{turn}:{tool_use.id}", result)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.id,
+                    "content": result,
+                })
+
             messages.append({"role": "assistant", "content": response.content})
-            continue
+            messages.append({"role": "user", "content": tool_results})
 
-        if response.stop_reason != "tool_use":
-            final_text = ""
-            for block in response.content:
-                if hasattr(block, "text"):
-                    final_text += block.text
-            return {
-                "answer": final_text,
-                "tools_used": list(set(tools_used)),
-                "token_usage": tracker.summary(),
-            }
-
-        # Process tool calls
-        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
-        tool_results = []
-        for tool_use in tool_use_blocks:
-            check_output_value({"tool": tool_use.name, "input": tool_use.input, "call_id": tool_use.id})
-            tools_used.append(tool_use.name)
-            logger.debug(f"Subagent tool call: {tool_use.name}")
-            result = execute_tool(tool_use.name, tool_use.input, dal)
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": tool_use.id,
-                "content": result,
-            })
-
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append({"role": "user", "content": tool_results})
-
-    return {
-        "answer": "Subagent reached maximum tool calls.",
-        "tools_used": list(set(tools_used)),
-        "token_usage": tracker.summary(),
-    }
+        return {
+            "answer": "Subagent reached maximum tool calls.",
+            "tools_used": list(set(tools_used)),
+            "token_usage": tracker.summary(),
+        }
+    except asyncio.CancelledError:
+        cancelled = True
+        raise
+    finally:
+        completions.active = False
+        try:
+            client.close()
+        except Exception:
+            if not cancelled:
+                raise
 
 
 # ── OpenAI subagent runner ─────────────────────────────────────
 
-def _run_openai_subagent(
+async def _close_async_client(client) -> None:
+    """Join this client's finalizer before releasing child auth/output scope."""
+    closing = asyncio.create_task(client.close())
+    try:
+        await asyncio.shield(closing)
+    except asyncio.CancelledError:
+        while not closing.done():
+            try:
+                await asyncio.shield(closing)
+            except asyncio.CancelledError:
+                continue
+            except BaseException:
+                break
+        if not closing.cancelled():
+            closing.exception()
+        raise
+
+
+async def _run_openai_subagent(
     config: SubagentConfig,
     question: str,
     dal: Any,
 ) -> Dict[str, Any]:
-    """Run a subagent using the OpenAI Agents SDK (Runner.run_sync)."""
-    from agents import Agent, ModelSettings, OpenAIResponsesModel, RunConfig, Runner
+    """Run a subagent using the awaited OpenAI Agents SDK loop."""
+    from agents import Agent, ModelSettings, OpenAIResponsesModel, RunConfig, RunHooks, Runner
     from openai.types.shared import Reasoning
     from src.auth_drivers.live_resolver import live_openai_async_client
 
@@ -565,6 +703,16 @@ def _run_openai_subagent(
     # Create and filter tools
     all_tools = create_openai_tools(dal)
     tools = _filter_openai_tools(all_tools, config.tool_names)
+    sec_calls = _SubagentCalls()
+    from src.sec_research.tool_results import SEC_TOOL_NAMES
+
+    for tool in tools:
+        if getattr(tool, "name", "").removeprefix("tool_") in SEC_TOOL_NAMES:
+            async def invoke_owned(context, arguments, invoke=tool.on_invoke_tool):
+                sec_calls.track()
+                return await invoke(context, arguments)
+
+            tool.on_invoke_tool = invoke_owned
 
     # Build reasoning settings
     effort = config.reasoning_effort or agent_config.reasoning_effort
@@ -574,40 +722,65 @@ def _run_openai_subagent(
         effective_max_tokens = _get_openai_max_output(config.model)
 
     client = live_openai_async_client()
-    register_output_api_key(client)
-    agent = Agent(
-        name=f"ArkScope Subagent: {config.name}",
-        instructions=config.system_prompt,
-        model=OpenAIResponsesModel(model=config.model, openai_client=client),
-        tools=tools,
-        model_settings=ModelSettings(
-            reasoning=Reasoning(effort=effort),
-            max_tokens=effective_max_tokens,
-        ),
-    )
+    cancelled = False
+    completions = _ChildSecCompletions()
 
-    result = Runner.run_sync(
-        agent,
-        input=question,
-        max_turns=config.max_turns,
-        auto_previous_response_id=True,
-        run_config=RunConfig(trace_include_sensitive_data=False),
-    )
+    class SecCompletions(RunHooks):
+        async def on_tool_end(self, context, agent, tool, result):
+            completions.complete(tool.name, context.tool_arguments, context.tool_call_id, result)
 
-    # Extract tools used and token usage
-    tracker = TokenTracker()
-    tools_used: List[str] = []
-    if hasattr(result, "raw_responses"):
-        tracker.record_openai_result(result, model=config.model)
-        for response in result.raw_responses:
-            if hasattr(response, "output"):
-                for item in response.output:
-                    if hasattr(item, "name"):
-                        tools_used.append(item.name)
+    try:
+        register_output_api_key(client)
+        agent = Agent(
+            name=f"ArkScope Subagent: {config.name}",
+            instructions=config.system_prompt,
+            model=OpenAIResponsesModel(model=config.model, openai_client=client),
+            tools=tools,
+            model_settings=ModelSettings(
+                reasoning=Reasoning(effort=effort),
+                max_tokens=effective_max_tokens,
+            ),
+        )
 
-    answer = str(result.final_output) if result.final_output else ""
-    return {
-        "answer": answer,
-        "tools_used": list(set(tools_used)),
-        "token_usage": tracker.summary(),
-    }
+        result = await Runner.run(
+            agent,
+            input=question,
+            max_turns=config.max_turns,
+            auto_previous_response_id=True,
+            run_config=RunConfig(trace_include_sensitive_data=False),
+            hooks=SecCompletions(),
+        )
+
+        # Extract tools used and token usage
+        tracker = TokenTracker()
+        tools_used: List[str] = []
+        if hasattr(result, "raw_responses"):
+            tracker.record_openai_result(result, model=config.model)
+            for response in result.raw_responses:
+                if hasattr(response, "output"):
+                    for item in response.output:
+                        if hasattr(item, "name"):
+                            tools_used.append(item.name)
+
+        answer = str(result.final_output) if result.final_output else ""
+        return {
+            "answer": answer,
+            "tools_used": list(set(tools_used)),
+            "token_usage": tracker.summary(),
+        }
+    except asyncio.CancelledError:
+        cancelled = True
+        raise
+    finally:
+        completions.active = False
+        try:
+            await sec_calls.close()
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
+        finally:
+            try:
+                await _close_async_client(client)
+            except Exception:
+                if not cancelled:
+                    raise

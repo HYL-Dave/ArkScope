@@ -546,7 +546,24 @@ async def run_query_stream(
                 })
 
                 # Execute the tool
-                result = await execute_tool_async(tool_name, tool_input, dal)
+                if tool_name == "delegate_to_subagent":
+                    from ..shared.subagent import observe_subagent_sec
+
+                    child_events = []
+                    try:
+                        async with observe_subagent_sec(child_events.append):
+                            result = await execute_tool_async(tool_name, tool_input, dal)
+                    except (Exception, asyncio.CancelledError):
+                        # Retain admitted completions before the terminal. Never
+                        # yield on GeneratorExit from an explicit stream close.
+                        for event in child_events:
+                            yield event
+                        raise
+                    else:
+                        for event in child_events:
+                            yield event
+                else:
+                    result = await execute_tool_async(tool_name, tool_input, dal)
                 result = check_output_value(result)
                 from src.sec_research.citations import citation_event_fields
 

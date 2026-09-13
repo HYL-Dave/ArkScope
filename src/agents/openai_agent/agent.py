@@ -718,7 +718,16 @@ async def run_query_stream(
         for _attempt in range(_max_retries):
             try:
                 hooks = ToolEvents(_attempt)
-                worker = asyncio.create_task(Runner.run(agent, hooks=hooks, **runner_kwargs))
+                async def run_with_child_events():
+                    from ..shared.subagent import observe_subagent_sec
+
+                    async with observe_subagent_sec(
+                        lambda event: hooks.publish(event.type, event.data),
+                        enabled=lambda: hooks.active,
+                    ):
+                        return await Runner.run(agent, hooks=hooks, **runner_kwargs)
+
+                worker = asyncio.create_task(run_with_child_events())
                 worker.add_done_callback(lambda done, ready=hooks.ready: ready.set())
                 try:
                     while True:

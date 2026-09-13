@@ -79,11 +79,11 @@ def test_anthropic_subagent_rejects_history_only_model_before_client(monkeypatch
     )
 
     with pytest.raises(ValueError) as exc:
-        subagent._run_anthropic_subagent(
+        asyncio.run(subagent._run_anthropic_subagent(
             SimpleNamespace(model="claude-fable-5"),
             "question",
             object(),
-        )
+        ))
 
     assert exc.value.args[0] == {"code": "model_retired", "field": "model"}
     assert calls == []

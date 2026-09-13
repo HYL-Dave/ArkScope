@@ -652,7 +652,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     # ================================================================
 
     @function_tool
-    def tool_delegate_to_subagent(
+    async def tool_delegate_to_subagent(
         subagent: str,
         task: str,
         context_json: str = "",
@@ -670,8 +670,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             task: Natural language task description for the subagent
             context_json: Optional JSON data context from earlier tool calls (max 5000 chars)
         """
-        from src.agents.shared.subagent import dispatch_subagent
-        result = dispatch_subagent(
+        from src.agents.shared.subagent import dispatch_subagent_async
+        result = await dispatch_subagent_async(
             subagent_name=subagent,
             task=task,
             context_json=context_json,
