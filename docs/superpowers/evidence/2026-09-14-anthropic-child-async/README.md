@@ -60,7 +60,18 @@ runner helpers were copied byte-for-byte from the preceding reviewed checkpoint.
   HTTP client; it does not construct a second connection pool or select auth.
   Expanded covering: **317 passed**, including six unchanged-retry controls
   (400 once, 429/500 three attempts with a two-retry budget, both native parents).
-- [ ] Scoped re-review and complete backend acceptance.
+- [x] Scoped independent re-review at `24c10280`: P2 addressed, no new
+  actionable findings. This was source/evidence review, not a full-suite run.
+- [x] First complete backend run: **11049 passed / 1 failed / 12 skipped**.
+  The delayed-child output-guard test still replaced only the synchronous
+  Anthropic resolver; its async child therefore missed the mocked HTTP entry.
+  Isolated rerun reproduced that failure (1 pass / 1 failure). Both resolver
+  surfaces now use actual SDK clients over the same mocked response handler;
+  every original boundary assertion remains, with explicit request/guard
+  controls added. Expanded output-lifetime/delegation covering: **593 passed**.
+  This is a real missed test collateral, not an environmental waiver or a
+  product connection-error fix. No product source changed after `24c10280`.
+- [ ] Re-run one complete backend suite after the fixture correction.
 - [ ] Seal evidence and update the release checkpoint.
 
 ## Remaining Scope
