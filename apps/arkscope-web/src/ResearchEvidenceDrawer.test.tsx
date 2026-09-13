@@ -6,8 +6,9 @@ import i18n from "i18next";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ResearchRunDTO } from "./api";
-import { ResearchEvidenceDrawer } from "./ResearchEvidenceDrawer";
+import { ResearchEvidenceDrawer, researchEvidenceRows } from "./ResearchEvidenceDrawer";
 import type { Message, TraceRow } from "./researchReducer";
+import { citationRead, documentCitation, factCitation, filingCitation } from "./secCitationTestUtils";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -193,6 +194,154 @@ afterEach(async () => {
 });
 
 describe("Research Evidence drawer", () => {
+  function sourceMessage(over: Partial<Message> = {}): Message {
+    return message({ tool_calls: [{ name: "read_sec_filing", call_id: "saved-call", result_preview: "Legacy preview", sec_citations: [documentCitation, factCitation, filingCitation], sec_citation_gaps: ["sec_citation_result_invalid"] }], ...over });
+  }
+
+  function stubSources(response: Response | Promise<Response>, runResponse: Response | Promise<Response> = json({}, 503)) {
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/sec-research/citation") return (await response).clone();
+      if (url.pathname.startsWith("/research/runs/")) return (await runResponse).clone();
+      throw new Error(`Unexpected request ${url.pathname}`);
+    });
+    vi.stubGlobal("fetch", fetch);
+    return fetch;
+  }
+
+  function sourceButtons() {
+    return Array.from(document.querySelectorAll<HTMLButtonElement>("button[data-sec-citation-open]"));
+  }
+
+  async function openSource(index = 0) {
+    expect(sourceButtons()).toHaveLength(3);
+    await act(async () => { sourceButtons()[index].focus(); sourceButtons()[index].click(); });
+    await flush();
+  }
+
+  it("projects saved and live references without dropping optional metadata", () => {
+    const saved = sourceMessage();
+    expect(researchEvidenceRows(saved, [])[0]).toMatchObject({ call_id: "saved-call", sec_citations: saved.tool_calls[0].sec_citations, sec_citation_gaps: ["sec_citation_result_invalid"] });
+    const live: TraceRow[] = [{ kind: "tool", name: "read_sec_filing", call_id: "live-call", done: true, sec_citations: [factCitation], sec_citation_gaps: [] }];
+    expect(researchEvidenceRows(null, live)[0]).toMatchObject({ call_id: "live-call", sec_citations: [factCitation], sec_citation_gaps: [] });
+    expect(researchEvidenceRows(saved, live)[0]).toMatchObject({ call_id: "saved-call" });
+  });
+
+  it.each(["en", "zh-Hant"])("distinguishes same-CIK facts by localized ordinal and opens only the chosen ref in %s", async (locale) => {
+    await i18n.changeLanguage(locale);
+    const secondFact = { ...factCitation, fact_id: `secfact_${"9".repeat(64)}` };
+    const fetch = stubSources(json(citationRead(secondFact)));
+    await mountEvidence({ message: message({ tool_calls: [{ name: "get_sec_financial_facts", call_id: "facts", sec_citations: [factCitation, secondFact] }] }) });
+    const buttons = sourceButtons();
+    expect(buttons).toHaveLength(2);
+    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual(locale === "en"
+      ? ["Open SEC source: Fact 1: 0000000123", "Open SEC source: Fact 2: 0000000123"]
+      : ["開啟 SEC 來源：財務事實 1：0000000123", "開啟 SEC 來源：財務事實 2：0000000123"]);
+    expect(fetch.mock.calls.filter(([url]) => new URL(String(url)).pathname === "/sec-research/citation")).toHaveLength(0);
+    await act(async () => { buttons[1].click(); });
+    await flush();
+    const requests = fetch.mock.calls.filter(([url]) => new URL(String(url)).pathname === "/sec-research/citation");
+    expect(requests).toHaveLength(1);
+    const token = new URL(String(requests[0][0])).searchParams.get("ref")!;
+    expect(JSON.parse(atob(token.replace(/-/g, "+").replace(/_/g, "/")))).toEqual(secondFact);
+    expect(document.querySelector("[data-sec-citation-view]")?.textContent).toContain("12345678901234567890.00100");
+  });
+
+  it.each(["pending", "failed"])("opens saved passages with %s run details and renders remote markup only as text", async (state) => {
+    await i18n.changeLanguage("en");
+    const pending = deferred<Response>();
+    stubSources(json(citationRead(documentCitation, '<img src=x onerror="alert(1)"> Retained passage')), state === "pending" ? pending.promise : json({}, 503));
+    await mountEvidence({ message: sourceMessage() });
+    await openSource();
+    const view = document.querySelector("[data-sec-citation-view]")!;
+    expect(view?.textContent).toContain('<img src=x onerror="alert(1)"> Retained passage');
+    expect(view.querySelector("img, script, iframe")).toBeNull();
+    expect(view.textContent).toContain("10-K");
+    expect(document.body.textContent).toContain("Legacy preview");
+    expect(document.body.textContent).toContain("sec_citation_result_invalid");
+    await act(async () => { pending.resolve(json({}, 503)); });
+  });
+
+  it.each([factCitation, filingCitation])("shows native saved $kind metadata and exact decimal text", async (citation) => {
+    await i18n.changeLanguage("en");
+    stubSources(json(citationRead(citation)));
+    await mountEvidence({ message: sourceMessage() });
+    await openSource(citation.kind === "fact" ? 1 : 2);
+    const view = document.querySelector("[data-sec-citation-view]")!;
+    expect(view?.textContent).toContain("10-K");
+    expect(view.textContent).toContain("2025-12-31");
+    expect(view.textContent).toContain(citation.kind === "fact" ? "12345678901234567890.00100" : "annual.htm");
+  });
+
+  it.each(["switch", "close"])("revokes a pending source on %s then ignores late completion", async (change) => {
+    await i18n.changeLanguage("en");
+    const pending = deferred<Response>();
+    stubSources(pending.promise);
+    const original = sourceMessage();
+    await mountEvidence({ message: original });
+    await openSource();
+    expect(document.querySelector("[data-sec-citation-view]")?.textContent).toContain("Loading");
+    await rerenderEvidence(change === "switch" ? { message: message({ runId: "other" }) } : { open: false });
+    await act(async () => { pending.resolve(json(citationRead(documentCitation, "STALE_PASSAGE"))); });
+    await flush();
+    await rerenderEvidence({ open: true, message: original });
+    expect(document.querySelector("[data-sec-citation-view]")).toBeNull();
+    expect(document.body.textContent).not.toContain("STALE_PASSAGE");
+  });
+
+  it("ignores an earlier source after a different source resolves", async () => {
+    await i18n.changeLanguage("en");
+    const pending = deferred<Response>();
+    const fetch = stubSources(pending.promise);
+    await mountEvidence({ message: sourceMessage() });
+    await openSource();
+    fetch.mockImplementation(async (input) => new URL(String(input)).pathname === "/sec-research/citation" ? json(citationRead(factCitation)) : json({}, 503));
+    await openSource(1);
+    await act(async () => { pending.resolve(json(citationRead(documentCitation, "STALE_DOCUMENT"))); });
+    await flush();
+    expect(document.querySelector("[data-sec-citation-view]")?.textContent).toContain("12345678901234567890.00100");
+    expect(document.body.textContent).not.toContain("STALE_DOCUMENT");
+  });
+
+  it.each(["transport", "sec_citation_missing", "sec_citation_integrity_failed"])("offers retry for %s without exposing raw diagnostics", async (failure) => {
+    await i18n.changeLanguage("en");
+    const fetch = stubSources(failure === "transport" ? json({ detail: { message: "RAW_SECRET" } }, 503) : json({ status: "unavailable", data: null, gaps: [{ code: failure }], observed_at: null, coverage: { complete: false }, next_cursor: null }));
+    await mountEvidence({ message: sourceMessage() });
+    await openSource();
+    expect(document.body.textContent).not.toContain("RAW_SECRET");
+    if (failure !== "transport") expect(document.querySelector("[data-sec-citation-view]")?.textContent).toContain(failure);
+    const retry = document.querySelector<HTMLButtonElement>('button[aria-label="Retry SEC source"]');
+    expect(retry).not.toBeNull();
+    fetch.mockImplementation(async () => json(citationRead(documentCitation, "RETRIED_SOURCE")));
+    await act(async () => { retry!.click(); });
+    await flush();
+    expect(document.querySelector("[data-sec-citation-view]")?.textContent).toContain("RETRIED_SOURCE");
+  });
+
+  it("restores source and drawer keyboard focus and retains source owner across pinning", async () => {
+    await i18n.changeLanguage("en");
+    stubSources(json(citationRead(documentCitation)));
+    const trigger = document.createElement("button");
+    document.body.append(trigger);
+    trigger.focus();
+    await mountEvidence({ message: sourceMessage(), returnFocusRef: { current: trigger } });
+    await openSource();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close SEC source");
+    await rerenderEvidence({ pinned: true });
+    expect(document.querySelector('[role="complementary"] [data-sec-citation-view]')?.textContent).toContain("Retained passage");
+    await rerenderEvidence({ pinned: false });
+    document.querySelector<HTMLButtonElement>('button[aria-label="Close SEC source"]')!.focus();
+    await act(async () => { document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); });
+    await flush();
+    expect(document.querySelector("[data-sec-citation-view]")).toBeNull();
+    expect(document.activeElement).toBe(sourceButtons()[0]);
+    expect(currentProps!.onClose).not.toHaveBeenCalled();
+    await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); });
+    expect(currentProps!.onClose).toHaveBeenCalledOnce();
+    await rerenderEvidence({ open: false });
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it("localizes headings token statistics and timing labels in both locales", async () => {
     await i18n.changeLanguage("zh-Hant");
     stubEvidenceFetch();
