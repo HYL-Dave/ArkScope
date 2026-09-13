@@ -21,6 +21,272 @@ CHANNELS = ("openai", "anthropic", "chatgpt", "claude")
 SECRET = "trace-private-fixture-value"
 
 
+def test_sec_tool_end_preserves_whole_citations_by_call_id(evidence):
+    from src.api.routes.query import accumulate_tool_calls
+
+    events = [
+        ("tool_start", {"tool": "read_sec_filing", "call_id": "first", "input": {"index": 1}}),
+        ("tool_start", {"tool": "read_sec_filing", "call_id": "second", "input": {"index": 2}}),
+        ("tool_end", {"tool": "read_sec_filing", "call_id": "first", "summary": "first preview",
+                      "sec_citations": [evidence.document_ref]}),
+        ("tool_end", {"tool": "read_sec_filing", "call_id": "second", "summary": "second preview",
+                      "sec_citation_gaps": ["sec_citation_result_invalid"]}),
+    ]
+    before = deepcopy(events)
+    rows = accumulate_tool_calls(events)
+    assert rows == [
+        {"name": "read_sec_filing", "input": {"index": 1}, "call_id": "first",
+         "result_preview": "first preview", "sec_citations": [evidence.document_ref]},
+        {"name": "read_sec_filing", "input": {"index": 2}, "call_id": "second",
+         "result_preview": "second preview", "sec_citation_gaps": ["sec_citation_result_invalid"]},
+    ]
+    assert accumulate_tool_calls(events[:2] + list(reversed(events[2:]))) == rows
+    assert events == before
+    rows[0]["sec_citations"][0]["start_byte"] = -1
+    assert events == before
+
+
+def test_idless_events_never_consume_identified_calls(evidence):
+    from src.api.routes.query import accumulate_tool_calls
+
+    events = [
+        ("tool_start", {"tool": "legacy", "input": {"legacy": True}}),
+        ("tool_start", {"tool": "read_sec_filing", "call_id": "pending", "input": {"index": 0}}),
+        ("tool_end", {"tool": "read_sec_filing", "call_id": "end-only", "input": {"index": 1},
+                      "summary": "cited", "sec_citations": [evidence.document_ref]}),
+        ("tool_end", {"tool": "legacy", "summary": "legacy done"}),
+    ]
+    assert accumulate_tool_calls(events) == [
+        {"name": "legacy", "input": {"legacy": True}, "result_preview": "legacy done"},
+        {"name": "read_sec_filing", "call_id": "pending", "input": {"index": 0}, "result_preview": None},
+        {"name": "read_sec_filing", "call_id": "end-only", "input": {"index": 1},
+         "result_preview": "cited", "sec_citations": [evidence.document_ref]},
+    ]
+
+
+def test_duplicate_identified_events_do_not_duplicate_or_exchange_references(evidence):
+    from src.api.routes.query import accumulate_tool_calls
+
+    start = ("tool_start", {"tool": "read_sec_filing", "call_id": "same", "input": {"index": 0}})
+    end = ("tool_end", {"tool": "read_sec_filing", "call_id": "same", "input": {"index": 0},
+                        "summary": "cited", "sec_citations": [evidence.document_ref]})
+    conflict = ("tool_end", {**end[1], "summary": "wrong", "sec_citations": [evidence.fact_ref]})
+    expected = [{"name": "read_sec_filing", "call_id": "same", "input": {"index": 0},
+                 "result_preview": "cited", "sec_citations": [evidence.document_ref]}]
+    assert accumulate_tool_calls([start, start, end, start, end, conflict]) == expected
+    assert accumulate_tool_calls([end, start, end]) == expected
+
+
+@pytest.mark.parametrize("name,want", [
+    ("mcp__ark__tool_read_sec_filing", "read_sec_filing"),
+    ("tool_read_sec_filing", "read_sec_filing"),
+    ("mcp__foreign__read_sec_filing", "mcp__foreign__read_sec_filing"),
+    ("prefix_tool_read_sec_filing", "prefix_tool_read_sec_filing"),
+    ("tool_tool_read_sec_filing", "tool_read_sec_filing"),
+])
+def test_trace_normalizes_only_owned_prefixes(name, want):
+    from src.api.routes.query import accumulate_tool_calls
+
+    assert accumulate_tool_calls([("tool_end", {"tool": name, "input": {"x": 1}})]) == [
+        {"name": want, "input": {"x": 1}, "result_preview": None}]
+
+
+@pytest.fixture
+def trace_stores(tmp_path):
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore
+
+    db = tmp_path / "trace-profile.db"
+    runs, threads = ResearchRunStore(db), ResearchThreadStore(db)
+    threads.ensure_thread(id="trace-thread", title="Question")
+    runs.create_run(id="trace-run", thread_id="trace-thread", question="Question", ticker=None,
+        provider="openai", model="gpt-5.4-mini", effort="low", auth_mode="api_key", credential_id=None)
+    threads.append_message(thread_id="trace-thread", role="user", content="Question")
+    return runs, threads
+
+
+def test_sec_citations_roundtrip_event_message_and_legacy_rows(evidence, trace_stores):
+    from src.api.routes import query, research
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore, build_thread_history
+
+    runs, threads = trace_stores
+    events = [
+        ("tool_end", {"tool": "read_sec_filing", "call_id": "document", "input": {"part": 1},
+                      "summary": "preview", "sec_citations": [evidence.document_ref]}),
+        ("tool_end", {"tool": "get_sec_financial_facts", "call_id": "facts", "input": {},
+                      "summary": "facts", "sec_citations": [evidence.fact_ref]}),
+        ("tool_end", {"tool": "list_sec_filings", "call_id": "filings", "input": {},
+                      "summary": "filings", "sec_citations": evidence.filing_refs}),
+        ("tool_end", {"tool": "list_sec_filings", "call_id": "gap", "summary": "bad",
+                      "sec_citation_gaps": ["sec_citation_result_invalid"]}),
+        ("tool_end", {"tool": "legacy", "summary": "old"}),
+    ]
+    for kind, data in events:
+        runs.append_event("trace-run", kind, data)
+    reopened = ResearchRunStore(runs.db_path)
+    assert [(event.type, event.data) for event in reopened.list_events("trace-run")] == events
+    query._persist_assistant_turn(threads, thread_id="trace-thread", run_id="trace-run",
+        done_data={"answer": "Answer", "provider": "openai", "model": "gpt-5.4-mini"},
+        collected=[(event.type, event.data) for event in reopened.list_events("trace-run")], elapsed=1)
+    reopened.mark_terminal("trace-run", "succeeded")
+    threads = ResearchThreadStore(threads.db_path)
+    message = research.list_research_messages("trace-thread", store=threads)["messages"][-1]
+    assert message["tool_calls"][0] == {"name": "read_sec_filing", "call_id": "document",
+        "input": {"part": 1}, "result_preview": "preview", "sec_citations": [evidence.document_ref]}
+    assert message["tool_calls"][1]["sec_citations"] == [evidence.fact_ref]
+    assert message["tool_calls"][2]["sec_citations"] == evidence.filing_refs
+    assert message["tool_calls"][3]["sec_citation_gaps"] == ["sec_citation_result_invalid"]
+    assert message["tool_calls"][4] == {"name": "legacy", "input": None, "result_preview": "old"}
+    assert build_thread_history(threads, "trace-thread") == [
+        {"role": "user", "content": "Question"}, {"role": "assistant", "content": "Answer"}]
+    threads.set_thread_archived("trace-thread", archived=True)
+    assert research.list_research_messages("trace-thread", store=threads)["messages"][-1] == message
+
+
+@pytest.mark.parametrize("terminal", ["restart", "no-task-cancel"])
+def test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls(terminal, evidence, trace_stores):
+    from src.api.routes import research
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore
+
+    runs, threads = trace_stores
+    # 602 events, with the only citation in the very last completion.
+    for index in range(301):
+        data = {"tool": "read_sec_filing", "call_id": f"call-{index}", "input": {"index": index}}
+        runs.append_event("trace-run", "tool_start", data)
+        runs.append_event("trace-run", "tool_end", {**data, "summary": f"preview-{index}",
+            **({"sec_citations": [evidence.document_ref]} if index == 300 else {})})
+    assert len(runs.list_events("trace-run")) == 500
+    runs = ResearchRunStore(runs.db_path)
+    if terminal == "restart":
+        assert runs.reconcile_interrupted(thread_store=threads) == ["trace-run"]
+        assert runs.reconcile_interrupted(thread_store=threads) == []
+    else:
+        research.cancel_research_run_route("trace-run", run_store=runs, thread_store=threads)
+        research.cancel_research_run_route("trace-run", run_store=runs, thread_store=threads)
+    messages = ResearchThreadStore(threads.db_path).list_messages("trace-thread")
+    assert len(messages) == 2
+    assert len(messages[-1].tool_calls) == 301
+    assert messages[-1].tool_calls[-1] == {"name": "read_sec_filing", "call_id": "call-300",
+        "input": {"index": 300}, "result_preview": "preview-300", "sec_citations": [evidence.document_ref]}
+    assert messages[-1].error_code == ("run_interrupted" if terminal == "restart" else "run_cancelled")
+    assert len(runs.list_events("trace-run")) == 500
+    assert len(runs.list_events("trace-run", after=500)) == 103
+
+
+@pytest.mark.parametrize("partial", [None, [], [
+    {"name": "read_sec_filing", "call_id": "saved", "input": {}, "result_preview": None},
+    {"name": "other", "call_id": "caller-only", "input": {"x": 1}, "result_preview": "extra"},
+]])
+def test_terminalization_reconciles_partial_caller_trace(evidence, trace_stores, partial):
+    runs, threads = trace_stores
+    runs.append_event("trace-run", "tool_end", {"tool": "read_sec_filing", "call_id": "saved",
+        "input": {"retained": True}, "summary": "saved", "sec_citations": [evidence.document_ref]})
+    runs.terminalize_error_with_message(thread_store=threads, run_id="trace-run", status="failed",
+        error="failure", error_code="provider_call_failed", tool_calls=partial)
+    calls = threads.list_messages("trace-thread")[-1].tool_calls
+    assert calls[0] == {"name": "read_sec_filing", "call_id": "saved", "input": {"retained": True},
+                        "result_preview": "saved", "sec_citations": [evidence.document_ref]}
+    if partial:
+        assert calls[1:] == [partial[1]]
+    else:
+        assert len(calls) == 1
+
+
+def test_terminal_trace_reads_uncommitted_events_and_rolls_back_atomically(evidence, trace_stores):
+    runs, threads = trace_stores
+    with runs._connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        runs._append_event_on_connection(conn, "trace-run", "tool_end", {
+            "tool": "read_sec_filing", "call_id": "transaction-only", "summary": "saved",
+            "sec_citations": [evidence.document_ref]})
+        runs._terminalize_error_on_connection(conn, thread_store=threads, run_id="trace-run",
+            status="interrupted", error="restart", error_code="run_interrupted", expected_statuses=("queued",))
+        saved = json.loads(conn.execute(
+            "SELECT tool_calls_json FROM research_messages WHERE role='assistant'").fetchone()[0])
+        assert saved and saved[0]["sec_citations"] == [evidence.document_ref]
+        assert saved[0]["call_id"] == "transaction-only"
+        assert runs.get_run("trace-run").status == "queued"
+        assert len(threads.list_messages("trace-thread")) == 1
+        conn.rollback()
+    assert runs.get_run("trace-run").status == "queued"
+    assert runs.list_events("trace-run") == []
+    assert len(threads.list_messages("trace-thread")) == 1
+
+
+def test_partial_trace_cannot_replace_durable_refs_or_consume_identified_rows(evidence, trace_stores):
+    runs, threads = trace_stores
+    runs.append_event("trace-run", "tool_end", {"tool": "read_sec_filing", "call_id": "saved",
+        "input": {}, "summary": "saved", "sec_citations": [evidence.document_ref]})
+    runs.append_event("trace-run", "tool_start", {"tool": "list_sec_filings", "call_id": "pending"})
+    partial = [
+        {"name": "read_sec_filing", "call_id": "saved", "input": {}, "result_preview": "wrong",
+         "sec_citations": [evidence.fact_ref]},
+        {"name": "read_sec_filing", "input": {}, "result_preview": "legacy"},
+        {"name": "list_sec_filings", "call_id": "pending", "input": {"x": 1}, "result_preview": "bad",
+         "sec_citation_gaps": ["sec_citation_result_invalid"]},
+    ]
+    runs.terminalize_error_with_message(thread_store=threads, run_id="trace-run", status="cancelled",
+        error="cancel", error_code="run_cancelled", tool_calls=partial)
+    calls = threads.list_messages("trace-thread")[-1].tool_calls
+    assert len(calls) == 3
+    assert calls[0]["sec_citations"] == [evidence.document_ref]
+    assert calls[0]["result_preview"] == "saved"
+    assert calls[1] == partial[2]
+    assert calls[2] == partial[1]
+
+
+@pytest.mark.parametrize("terminal", ["success", "error", "cancel"])
+def test_executor_retains_citations_and_gaps_through_terminal_and_archive(
+    terminal, evidence, trace_stores, monkeypatch,
+):
+    from src.api.routes import research
+    from src.auth_drivers.runtime_binding import RuntimeAuthBinding
+    from src.research_run_manager import execute_research_run
+    from src.research_threads import ResearchThreadStore
+
+    runs, threads = trace_stores
+    monkeypatch.setattr("src.api.personalization.resolve_personalization", lambda _: ("", {
+        "profile_active": False, "assistant_stance": "off", "skill_mode": "off",
+        "suggested_skills": [], "applied_skills": [], "context_snapshot": ""}))
+
+    async def stream(**kwargs):
+        yield AgentEvent(EventType.tool_start, {"tool": "read_sec_filing", "call_id": "saved", "input": {}})
+        yield AgentEvent(EventType.tool_end, {"tool": "read_sec_filing", "call_id": "saved", "input": {},
+            "summary": "preview", "sec_citations": [evidence.document_ref]})
+        yield AgentEvent(EventType.tool_end, {"tool": "list_sec_filings", "call_id": "gap", "input": {},
+            "summary": "bad", "sec_citation_gaps": ["sec_citation_result_invalid"]})
+        if terminal == "cancel":
+            raise asyncio.CancelledError
+        if terminal == "error":
+            yield AgentEvent(EventType.error, {"error": "provider failed"})
+        else:
+            yield AgentEvent(EventType.done, {"answer": "Answer", "provider": "openai", "model": "gpt-5.4-mini"})
+
+    async def execute():
+        task = execute_research_run(run_id="trace-run", run_store=runs, thread_store=threads,
+            dal=object(), history=[], stream_factory=stream,
+            auth_binding=RuntimeAuthBinding("openai", "db_api_key", "api_key", None, _api_key="offline-key"))
+        if terminal == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            await task
+
+    asyncio.run(execute())
+    assert runs.get_run("trace-run").status == {"success": "succeeded", "error": "failed", "cancel": "cancelled"}[terminal]
+    threads.set_thread_archived("trace-thread", archived=True)
+    messages = research.list_research_messages("trace-thread", store=ResearchThreadStore(threads.db_path))["messages"]
+    assert len(messages) == 2
+    assert messages[-1]["tool_calls"] == [
+        {"name": "read_sec_filing", "call_id": "saved", "input": {}, "result_preview": "preview",
+         "sec_citations": [evidence.document_ref]},
+        {"name": "list_sec_filings", "call_id": "gap", "input": {}, "result_preview": "bad",
+         "sec_citation_gaps": ["sec_citation_result_invalid"]},
+    ]
+
+
 @pytest.fixture
 def producer(monkeypatch, isolated):
     from src.agents import config

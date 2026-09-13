@@ -1,6 +1,7 @@
 """Read-only verification and transitive retained SEC source identities."""
 
 from contextlib import closing, contextmanager
+from collections.abc import Iterator
 from dataclasses import asdict
 import hashlib
 import sqlite3
@@ -8,7 +9,7 @@ import sqlite3
 from . import schema
 from .captures import CaptureStore, MAX_OBJECT_BYTES
 from .catalog import parse_submissions
-from .citations import CitationError, _json, _time, validate_citation
+from .citations import CitationError, _json, _time, validate_citation, validate_citation_event_fields
 from .document_store import DocumentStore
 from .documents import parse_document_directory, parse_filing_id
 from .facts import parse_companyfacts
@@ -30,6 +31,38 @@ def _retained_errors():
 def _require(condition):
     if not condition:
         raise CitationError("sec_citation_integrity_failed")
+
+
+def iter_research_sec_citations(profile_connection: sqlite3.Connection) -> Iterator[dict]:
+    """Yield validated refs from every retained message and event JSON root.
+
+    The caller owns an explicitly query-only connection and its read snapshot.
+    Legacy absent fields are valid; malformed JSON/fields and recorded gaps fail
+    closed. No active-thread join, preview parsing, or source acquisition occurs.
+    """
+    with _retained_errors():
+        _require(profile_connection.execute("PRAGMA query_only").fetchone()[0] == 1)
+        for record in profile_connection.execute(
+            "SELECT tool_calls_json FROM research_messages WHERE tool_calls_json IS NOT NULL ORDER BY id"
+        ):
+            calls = _json(record[0])
+            _require(type(calls) is list)
+            for call in calls:
+                _require(type(call) is dict)
+                yield from _profile_citations(call.get("name"), call)
+        for record in profile_connection.execute(
+            "SELECT data_json FROM research_run_events ORDER BY run_id, seq"
+        ):
+            data = _json(record[0])
+            _require(type(data) is dict)
+            yield from _profile_citations(data.get("tool"), data)
+
+
+def _profile_citations(name, data):
+    validate_citation_event_fields(name, data)
+    _require(not data.get("sec_citation_gaps"))
+    for ref in data.get("sec_citations", []):
+        yield validate_citation(ref)
 
 
 def _range(raw, start, end):

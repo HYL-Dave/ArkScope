@@ -1,7 +1,8 @@
-"""Fail-closed maintenance roots, without any cleanup or profile iteration."""
+"""Fail-closed maintenance roots, including retained profile JSON; no cleanup."""
 
 from copy import deepcopy
 import json
+import sqlite3
 
 import pytest
 
@@ -9,6 +10,111 @@ from src.sec_research.document_store import DocumentStore
 from tests.test_sec_research_citations import evidence, publish_facts, fact_ref, bind_sources, FACT_URL, LATER
 from tests.test_sec_research_document_service import CIK, FILING_ID, NOW, bind_catalog, owner, rig
 from src.sec_research.queries import StoredQueries
+
+
+@pytest.fixture
+def profile(tmp_path):
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore
+
+    db = tmp_path / "profile.db"
+    runs, threads = ResearchRunStore(db), ResearchThreadStore(db)
+    threads.ensure_thread(id="roots", title="Retained roots")
+    runs.create_run(id="roots-run", thread_id="roots", question="Q", ticker=None,
+        provider="openai", model="gpt-5.4-mini", effort="low", auth_mode="api_key", credential_id=None)
+    return runs, threads
+
+
+def profile_refs(conn):
+    iterator = getattr(owner("references"), "iter_research_sec_citations", None)
+    assert callable(iterator), "missing query-only retained Research citation iterator"
+    return list(iterator(conn))
+
+
+def test_profile_iterator_enumerates_message_and_event_only_roots(evidence, profile):
+    runs, threads = profile
+    threads.append_message(thread_id="roots", role="assistant", content="saved",
+        tool_calls=[{"name": "get_sec_financial_facts", "sec_citations": [evidence.fact_ref]}])
+    runs.append_event("roots-run", "tool_end", {"tool": "read_sec_filing", "call_id": "event-only",
+        "summary": "no message contains this reference", "sec_citations": [evidence.document_ref]})
+    runs.mark_terminal("roots-run", "interrupted", error_code="run_interrupted")
+    threads.set_thread_archived("roots", archived=True)
+    with sqlite3.connect(runs.db_path) as conn:
+        conn.execute("PRAGMA query_only=ON")
+        refs = profile_refs(conn)
+        assert refs == [evidence.fact_ref, evidence.document_ref]
+        closure = owner("references").sec_reference_closure(evidence.rig.store, citations=iter(refs))
+        assert closure["capture_ids"] == [evidence.document_ref["capture_id"]]
+        assert conn.execute("PRAGMA query_only").fetchone()[0] == 1
+
+
+def test_profile_iterator_requires_explicit_query_only_even_for_readonly_uri(profile):
+    runs, _ = profile
+    for uri, use_uri in [(runs.db_path, False), (f"file:{runs.db_path}?mode=ro", True)]:
+        with sqlite3.connect(uri, uri=use_uri) as conn:
+            with pytest.raises(owner("citations").CitationError, match="^sec_citation_integrity_failed$"):
+                profile_refs(conn)
+            assert conn.execute("PRAGMA query_only").fetchone()[0] == 0
+            conn.execute("PRAGMA query_only=ON")
+            assert profile_refs(conn) == []
+
+
+def test_profile_iterator_legacy_absence_is_valid_and_never_mines_prose(evidence, profile):
+    runs, threads = profile
+    prose = json.dumps({"sec_citations": [evidence.document_ref]})
+    threads.append_message(thread_id="roots", role="assistant", content=prose)
+    threads.append_message(thread_id="roots", role="assistant", content="legacy",
+        tool_calls=[{"name": "legacy", "result_preview": prose},
+                    {"name": "read_sec_filing", "sec_citations": [], "sec_citation_gaps": []}])
+    runs.append_event("roots-run", "tool_end", {"tool": "legacy", "summary": prose})
+    with sqlite3.connect(runs.db_path) as conn:
+        conn.execute("PRAGMA query_only=ON")
+        assert profile_refs(conn) == []
+
+
+@pytest.mark.parametrize("root", ["message", "event"])
+@pytest.mark.parametrize("fields", [
+    {"sec_citations": None}, {"sec_citations": {}}, {"sec_citations": [None]},
+    {"sec_citations": [{}]}, {"sec_citation_gaps": None}, {"sec_citation_gaps": "bad"},
+    {"sec_citation_gaps": ["unknown"]}, {"sec_citation_gaps": ["sec_citation_result_invalid"]},
+])
+def test_profile_iterator_rejects_malformed_present_fields_and_gaps(root, fields, profile):
+    runs, threads = profile
+    if root == "message":
+        threads.append_message(thread_id="roots", role="assistant", content="saved",
+            tool_calls=[{"name": "read_sec_filing", **fields}])
+    else:
+        runs.append_event("roots-run", "tool_end", {"tool": "read_sec_filing", **fields})
+    with sqlite3.connect(runs.db_path) as conn:
+        conn.execute("PRAGMA query_only=ON")
+        with pytest.raises(owner("citations").CitationError):
+            profile_refs(conn)
+
+
+@pytest.mark.parametrize("root,raw", [
+    ("message", ""), ("message", "null"), ("message", "{}"), ("message", "[null]"),
+    ("message", '[{"sec_citations":[{}],"sec_citations":[]}]'),
+    ("message", '[{"input":{"invalid":NaN}}]'),
+    ("event", ""), ("event", "null"), ("event", "[]"), ("event", "{") ,
+    ("event", '{"sec_citations":[{}],"sec_citations":[]}'),
+    ("event", '{"input":{"invalid":Infinity}}'),
+])
+def test_profile_iterator_rejects_malformed_retained_json(root, raw, profile):
+    runs, threads = profile
+    if root == "message":
+        threads.append_message(thread_id="roots", role="assistant", content="saved")
+    else:
+        # Even non-tool events are retained JSON roots, not a reason to skip validation.
+        runs.append_event("roots-run", "thinking", {})
+    with sqlite3.connect(runs.db_path) as conn:
+        if root == "message":
+            conn.execute("UPDATE research_messages SET tool_calls_json=?", (raw,))
+        else:
+            conn.execute("UPDATE research_run_events SET data_json=?", (raw,))
+        conn.commit()
+        conn.execute("PRAGMA query_only=ON")
+        with pytest.raises(owner("citations").CitationError):
+            profile_refs(conn)
 
 
 def test_reference_closure_retains_directory_catalog_and_fact_objects(evidence):
