@@ -82,7 +82,7 @@ redispatched. Specification: `docs/superpowers/specs/2026-09-10-sec-research-sub
 - [x] Task 5: operation leases/export/restore (4dfa0d37; independent review approved; final continuation10827P/12unchangedS, frontend1830P)
 - [x] Task 6: cleanup/reset (78157e62; covering1064P, scoped review approved; same complete continuation gate passed; interrupted-publication follow-up d2f491c1 independently approved with1092 focused passes; actual-store rollout unperformed)
 - [x] Task 7: schedule/Settings (936ede10,883b0185; focused2493P/449P; independent scoped re-review approved; full release gate remains Task8)
-- [ ] Task 8: workflow/census/frontend checkpoints complete; final acceptance blocked by re-review N1 at911d69a2, full backend not run
+- [ ] Task 8: N1/P2 and route collateral closed by the September 14 follow-up; full Linux backend11050P/12unchangedS at39b6587f, frontend1833P; broader final-release checklist and actual activation are not implied complete
 
 ### Resolved Security Dependency
 
@@ -895,6 +895,22 @@ owned cancellation. It was put to the user; it is not implemented by this plan's
 final fix wave. Full release acceptance and merge remain blocked. The fresh
 frontend1833P/typecheck/build/literal checks and11023-node collection do not
 replace the deliberately unrun final complete backend gate.
+
+**September 14 follow-up:** The user approved the awaitable child scope.
+`e447d394` and `24c10280` repair N1 and the independently discovered pre-stream
+error cleanup P2. Scoped re-review accepts P2. The first full run found one
+missed async SDK fixture entry, reproduced in isolation and repaired without
+weakening its existing output-guard assertions in `39b6587f`. The second single
+complete run passes11050/12unchanged skips with exact11062-node reconciliation,
+unchanged1160 source paths/runtime/runners, and no duplicate or missing nodes.
+Fresh frontend1833P/typecheck/build/i18n checks have unchanged UI source through
+the final anchor. The current census has no new delta versus the integration
+checkpoint, not zero repository-wide cleanup debt. See the separately sealed
+`docs/superpowers/evidence/2026-09-14-anthropic-child-async/README.md` for all26
+finished receipts, including8 classified nonzero attempts. This closes N1/P2
+and supplies the missing complete Linux gate; the other checklist items below
+retain their historical proof anchors and are not silently waived. No merge,
+restart, actual-store action, SQLite activation or cross-platform proof occurred.
 
 - [ ] Re-run mechanical repository census against the sealed document baseline;
   classify every new candidate, dependency change and coverage reduction with a
