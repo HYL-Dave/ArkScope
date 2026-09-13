@@ -734,6 +734,17 @@ async def run_query_stream(
                         if worker.done():
                             result = worker.result()
                             break
+                except asyncio.CancelledError:
+                    # A completion may already be admitted when cancellation
+                    # interrupts ready.wait(). Deliver that finite queue before
+                    # the executor persists its cancelled terminal, not late output.
+                    hooks.active = False
+                    while not hooks.queue.empty():
+                        event = hooks.queue.get_nowait()
+                        if event.type == EventType.tool_end:
+                            tools_used.append(event.data["tool"])
+                        yield event
+                    raise
                 finally:
                     hooks.active = False
                     if not worker.done():

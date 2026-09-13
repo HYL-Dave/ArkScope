@@ -542,6 +542,77 @@ def test_real_openai_sdk_completion_precedes_cancelled_followup(stop, producer, 
     asyncio.run(drive())
 
 
+@pytest.mark.parametrize("repeat_cancel", [False, True])
+def test_queued_openai_completions_survive_executor_cancellation(
+    repeat_cancel, producer, evidence, trace_stores, monkeypatch,
+):
+    import sqlite3
+
+    from agents import Runner
+    from agents.tool_context import ToolContext
+    from src.auth_drivers.runtime_binding import RuntimeAuthBinding
+    from src.research_run_manager import execute_research_run
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore
+    from src.sec_research.references import iter_research_sec_citations, sec_reference_closure
+
+    runs, threads = trace_stores
+    raw = json.dumps(evidence.filings)
+    state = producer("openai", "list_sec_filings", [raw])
+    monkeypatch.setattr("src.api.personalization.resolve_personalization", lambda _: ("", {
+        "profile_active": False, "assistant_stance": "off", "skill_mode": "off",
+        "suggested_skills": [], "applied_skills": [], "context_snapshot": ""}))
+
+    async def run(agent, *, hooks, **kwargs):
+        try:
+            for index in range(2):
+                context = ToolContext(context=None, tool_name="tool_list_sec_filings",
+                    tool_call_id=f"queued-{index}", tool_arguments=json.dumps({"index": index}))
+                await hooks.on_tool_start(context, agent, agent.tools[0])
+                await hooks.on_tool_end(context, agent, agent.tools[0], raw)
+            # No await between publication and cancel: the consumer cannot drain.
+            assert not any(event.type == "tool_end" for event in runs.list_events("trace-run"))
+            state.executor.cancel()
+            await asyncio.Event().wait()
+        finally:
+            if repeat_cancel:
+                for _ in range(2):
+                    state.executor.cancel()
+                    await asyncio.sleep(0)
+            # Cleanup must neither publish a new result nor admit its secret.
+            await hooks.on_tool_end(context, agent, agent.tools[0], SECRET)
+            state.closed = True
+
+    monkeypatch.setattr(Runner, "run", run)
+
+    async def execute():
+        state.executor = asyncio.create_task(execute_research_run(
+            run_id="trace-run", run_store=runs, thread_store=threads, dal=object(), history=[],
+            stream_factory=lambda **kwargs: state.stream(),
+            auth_binding=RuntimeAuthBinding("openai", "db_api_key", "api_key", None,
+                                           _api_key=SECRET)))
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(state.executor, 2)
+        assert state.closed
+
+    asyncio.run(execute())
+    runs = ResearchRunStore(runs.db_path)
+    ends = [event.data for event in runs.list_events("trace-run") if event.type == "tool_end"]
+    assert [end["call_id"] for end in ends] == ["openai:0:queued-0", "openai:0:queued-1"]
+    assert [end["sec_citations"] for end in ends] == [evidence.filing_refs] * 2
+    assert [end["input"] for end in ends] == [{"index": 0}, {"index": 1}]
+    assert runs.get_run("trace-run").status == "cancelled"
+    message = ResearchThreadStore(threads.db_path).list_messages("trace-thread")[-1]
+    assert message.error_code == "run_cancelled"
+    assert [call["call_id"] for call in message.tool_calls] == [end["call_id"] for end in ends]
+    assert [call["sec_citations"] for call in message.tool_calls] == [evidence.filing_refs] * 2
+    with sqlite3.connect(runs.db_path) as conn:
+        conn.execute("PRAGMA query_only=ON")
+        refs = list(iter_research_sec_citations(conn))
+    assert refs == evidence.filing_refs * 4  # Two durable ends and two message calls.
+    assert sec_reference_closure(evidence.rig.store, citations=refs)["filing_ids"]
+
+
 def test_repeated_close_cancellation_awaits_same_openai_worker(producer, evidence, monkeypatch):
     from agents import Runner
     from agents.tool_context import ToolContext
