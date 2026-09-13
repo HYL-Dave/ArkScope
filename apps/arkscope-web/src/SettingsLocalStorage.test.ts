@@ -169,6 +169,9 @@ vi.mock("./api", async (importOriginal) => {
   return {
     ...actual,
     getSecResearchConfig: vi.fn(async () => ({ capture_budget_bytes: 107374182400, capacity: null })),
+    getSecResearchScheduleStatus: vi.fn(async () => ({ status: "unavailable",
+      data: { last_attempt: null, last_acquisition_at: null, last_completed_batch: null },
+      gaps: [{ code: "sec_schedule_unobserved" }], observed_at: null, coverage: {}, next_cursor: null })),
     getModelCatalog: vi.fn(async () => emptyCatalog),
     getMarketDataStatus: vi.fn(async () => {
       if (mocked.marketError) throw mocked.marketError;
@@ -196,6 +199,7 @@ import {
 } from "./api";
 import { SettingsView } from "./Settings";
 import { DataStorageSection } from "./settings/DataStorageSection";
+import { DataScheduleControlsProvider } from "./settings/dataScheduleControls";
 import { withTestUiLocale } from "./test/testUiLocale";
 
 let root: ReturnType<typeof createRoot> | null = null;
@@ -255,13 +259,13 @@ async function renderDataStorage(
   document.body.append(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(withTestUiLocale(React.createElement(
+    root!.render(withTestUiLocale(React.createElement(DataScheduleControlsProvider, { settingsReadCache, children: React.createElement(
       DataStorageSection as React.ComponentType<Record<string, unknown>>,
       {
       developerMode: false,
       settingsReadCache,
       onNavigateTarget,
-    })));
+    }) })));
   });
   await act(async () => { await Promise.resolve(); });
   return { onNavigateTarget };

@@ -13,6 +13,11 @@ const secDocumentKeys = [
   "next", "source", "citation", "attempt", "unknownOutcome", "noCapture",
   "sectionUnavailable", "sectionAmbiguous", "indexEntryTooLarge", "pageInsufficient",
 ] as const;
+const secScheduleKeys = [
+  "title", "lastAttempt", "lastAcquisition", "lastCompleted", "nextEligible", "eligible", "disabled",
+  "succeeded", "failed", "running", "universe", "attempted", "confirmed", "failedIssuers", "deferred",
+  "filings", "facts", "requests", "unresolved", "stop", "unavailable",
+];
 const secResearchKeys = [
   "title", "cik", "load", "refresh", "resume", "reread", "budget", "unit", "bytes", "gib",
   "save", "saved", "reloadConfig", "invalidBudget", "configError", "saveError", "readError", "confirmationMismatch",
@@ -753,7 +758,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1014,
+      settings: 1037,
       research: 236,
       explore: 1219,
       portfolio: 374,
@@ -839,8 +844,9 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2986);
-      expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys].sort());
+      expect(total, `${locale}.total`).toBe(3009);
+      expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys, "schedule"].sort());
+      expect(Object.keys(resources[locale].settings.secResearch.schedule).sort()).toEqual([...secScheduleKeys].sort());
       expect(Object.keys(resources[locale].settings.secDocument).sort()).toEqual([...secDocumentKeys].sort());
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
@@ -1215,6 +1221,9 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      ...secScheduleKeys.map((key) => `secResearch.schedule.${key}`),
+      "dataSources.schedule.sources.secResearch.label",
+      "dataSources.schedule.sources.secResearch.description",
       ...secResearchKeys.map((key) => `secResearch.${key}`),
       ...secDocumentKeys.map((key) => `secDocument.${key}`),
       "workspace.routes.savedRefreshFailed",

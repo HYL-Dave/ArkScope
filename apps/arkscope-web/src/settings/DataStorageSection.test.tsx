@@ -16,6 +16,7 @@ import type {
   TradingDayCoverage,
 } from "../api";
 import { createSettingsReadCache } from "./settingsReadCache";
+import { DataScheduleControlsProvider } from "./dataScheduleControls";
 
 const stylesCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../styles.css"), "utf8");
 
@@ -131,6 +132,9 @@ vi.mock("../api", async (importOriginal) => {
   return {
     ...actual,
     getSecResearchConfig: vi.fn(async () => ({ capture_budget_bytes: 107374182400, capacity: null })),
+    getSecResearchScheduleStatus: vi.fn(async () => ({ status: "unavailable", data: {
+      last_attempt: null, last_acquisition_at: null, last_completed_batch: null,
+    }, observed_at: null, coverage: {}, gaps: [], next_cursor: null })),
     getMarketDataStatus: vi.fn(async () => EMPTY_MARKET_STATUS),
     listSecurityLifecycleCases: vi.fn(async () => CASES),
     getTradingDayCoverage: vi.fn(async () => COVERAGE),
@@ -190,12 +194,13 @@ async function renderSection(
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
+  const cache = createSettingsReadCache();
   await act(async () => {
     root!.render(
-      <DataStorageSection
-        settingsReadCache={createSettingsReadCache()}
+      <DataScheduleControlsProvider settingsReadCache={cache}><DataStorageSection
+        settingsReadCache={cache}
         onNavigateTarget={onNavigateTarget}
-      />,
+      /></DataScheduleControlsProvider>,
     );
   });
   await flush();

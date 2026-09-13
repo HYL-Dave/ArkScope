@@ -74,8 +74,10 @@ class ResearchService:
         self.transport = transport
         self.clock = clock
 
-    def refresh(self, cik, *, max_sources=4, resume=False, check=None):
+    def refresh(self, cik, *, max_sources=4, resume=False, check=None, scope="full"):
         cik = normalize_cik(cik)
+        if scope not in ("full", "recent"):
+            raise ValueError("invalid_scope")
         if type(max_sources) is not int or not 1 <= max_sources <= 16:
             raise ValueError("invalid_max_sources")
         if type(resume) is not bool:
@@ -84,10 +86,10 @@ class ResearchService:
             raise ValueError("invalid_check")
 
         with issuer_refresh(self.store.paths.capture_root, cik):
-            return self._refresh(cik, max_sources=max_sources, resume=resume, check=check)
+            return self._refresh(cik, max_sources=max_sources, resume=resume, check=check, scope=scope)
 
-    def _refresh(self, cik, *, max_sources, resume, check):
-        prior = self.store.latest_receipt(cik) if resume else None
+    def _refresh(self, cik, *, max_sources, resume, check, scope):
+        prior = self.store.latest_receipt(cik, scope=scope) if resume else None
         completed = list(prior["completed"]) if prior else []
         source_snapshots = dict(prior["source_snapshots"]) if prior else {}
         pending = list(prior["pending"]) if prior else ["submissions", "companyfacts"]
@@ -108,6 +110,7 @@ class ResearchService:
                 completed=completed, pending=pending, gaps=gaps,
                 observed_at=self.clock(),
                 source_snapshots=source_snapshots,
+                scope=scope,
             )
 
         def gap(source, code):
@@ -180,7 +183,7 @@ class ResearchService:
             completed.append(source)
             source_snapshots[source] = {"snapshot_id": snapshot_id, "observed_at": observed_at}
             gaps[:] = [item for item in gaps if item["source"] != source]
-            if source == "submissions":
+            if source == "submissions" and scope == "full":
                 for historical in snapshot.historical_files:
                     if historical.name not in pending and historical.name not in completed:
                         pending.append(historical.name)

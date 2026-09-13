@@ -39,6 +39,7 @@ if _renameat2 is not None:
     _renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
     _renameat2.restype = ctypes.c_int
 _COUNTS = {
+    "schedule_batches": "sec_research_schedule_batches",
     "objects": "sec_research_objects", "snapshots": "sec_research_snapshots",
     "receipts": "sec_research_receipts", "issuer_maps": "sec_research_issuer_maps",
     "filing_observations": "sec_research_filings", "fact_observations": "sec_research_facts",
@@ -285,6 +286,12 @@ def _verify_database(store):
         _require([row[0] for row in conn.execute("PRAGMA integrity_check")] == ["ok"])
         _require(conn.execute("PRAGMA foreign_key_check").fetchone() is None)
         counts = {key: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for key, table in _COUNTS.items()}
+        from .schedule_store import validate_batch
+        batch_receipts = {}
+        for row in conn.execute("SELECT * FROM sec_research_schedule_batches ORDER BY checkpoint_id"):
+            batch = validate_batch(_json(row["payload"]), store, cache=batch_receipts)
+            _require(all(row[key] == batch[key] for key in ("batch_id", "status", "acquired_at")),
+                     "sec_schedule_batch_invalid")
         for row in conn.execute("SELECT cik,snapshot_id FROM sec_research_snapshots ORDER BY snapshot_id"):
             reader._snapshot(row["cik"], row["snapshot_id"])
         for row in conn.execute("SELECT * FROM sec_research_receipts ORDER BY receipt_id"):

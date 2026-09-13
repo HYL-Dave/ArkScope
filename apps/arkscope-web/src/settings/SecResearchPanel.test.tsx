@@ -5,6 +5,9 @@ import i18n from "i18next";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DataScheduleControlsProvider, DataScheduleTable, useSharedDataScheduleControls } from "./dataScheduleControls";
+import { createSettingsReadCache } from "./settingsReadCache";
+import type { ScheduleSourceState } from "../api";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -22,6 +25,12 @@ let budget: number;
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot> | undefined;
 let stylesheet: HTMLStyleElement | undefined;
+let scheduled: ScheduleSourceState;
+let batchStatus: unknown;
+
+function ScheduleOwner() {
+  return <DataScheduleTable controller={useSharedDataScheduleControls()} scope="non_macro" />;
+}
 
 function applyPanelStyles() {
   stylesheet = document.createElement("style");
@@ -30,6 +39,9 @@ function applyPanelStyles() {
 }
 
 function fallback(url: URL) {
+  if (url.pathname === "/schedule") return { sources: { sec_research_filings: scheduled } };
+  if (url.pathname === "/sec-research/schedule-status") return { ...envelope("ok", batchStatus),
+    gaps: (batchStatus as { last_attempt: { gaps: unknown[] } | null }).last_attempt?.gaps ?? [] };
   if (url.pathname === "/sec-research/config") return { capture_budget_bytes: budget, capacity };
   if (url.pathname.endsWith("/refresh")) return receipt;
   if (url.pathname.endsWith("/filings")) return envelope("ok", [filing("first")], "opaque+/= &token");
@@ -38,6 +50,12 @@ function fallback(url: URL) {
   throw new Error(`unmocked route: ${url}`);
 }
 beforeEach(() => {
+  scheduled = { label: "SEC", description: "", ibkr: false, provider_fetch: true,
+    source_mode: "provider_fetch", write_target: "market_data.db", source_badges: ["SEC"],
+    enabled: false, interval_minutes: 1440, default_interval_minutes: 1440,
+    running: false, progress: null, last_attempt_at: null, last_result: null,
+    durable_state: null, job_name: "collect.sec_research_filings" };
+  batchStatus = { last_attempt: null, last_acquisition_at: null, last_completed_batch: null };
   budget = 107374182400;
   requests = [];
   handler = fallback;
@@ -56,14 +74,16 @@ afterEach(async () => {
   stylesheet = undefined;
   vi.unstubAllGlobals();
 });
-async function render(language = "en") {
+async function render(language = "en", withControls = false) {
   // Dynamic import makes the absent panel an explicit RED test failure.
   const { SecResearchPanel } = await import("./SecResearchPanel");
   await i18n.changeLanguage(language);
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => root!.render(<SecResearchPanel />));
+  await act(async () => root!.render(<DataScheduleControlsProvider settingsReadCache={createSettingsReadCache()}>
+    {withControls && <ScheduleOwner />}<SecResearchPanel />
+  </DataScheduleControlsProvider>));
 }
 function button(name: string) {
   const result = [...host.querySelectorAll<HTMLButtonElement>("button")].find((el) => (el.getAttribute("aria-label") ?? el.textContent) === name);
@@ -96,6 +116,70 @@ function deferred<T>() {
 }
 
 describe("SEC structured storage", () => {
+  it("ignores unrelated source completion", async () => {
+    let news = { ...scheduled, running: true };
+    handler = (url) => url.pathname === "/schedule"
+      ? { sources: { sec_research_filings: scheduled, polygon_news: news } } : fallback(url);
+    await render(); await load(); await change("Capture budget", "150");
+    const before = requests.filter(({ url }) => url.pathname.startsWith("/sec-research"));
+    news = { ...news, running: false, last_result: { source: "polygon_news", status: "succeeded", at: "2026-09-13T02:00:00Z" } };
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    expect(requests.filter(({ url }) => url.pathname.startsWith("/sec-research"))).toEqual(before);
+    expect(input("Capture budget").value).toBe("150");
+  });
+
+  it("defers completion capacity refresh until an in-flight budget save settles", async () => {
+    const saved = deferred<unknown>();
+    handler = (url, init) => url.pathname === "/sec-research/config" && init.method === "PUT"
+      ? saved.promise : fallback(url);
+    await render(); await load(); await change("Capture budget", "150");
+    scheduled = { ...scheduled, running: true };
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    await click("Save budget");
+    expect(input("Capture budget").disabled).toBe(true);
+    const configReads = () => requests.filter(({ url, init }) => url.pathname === "/sec-research/config" && init.method !== "PUT").length;
+    const before = configReads();
+    scheduled = { ...scheduled, running: false, last_result: { source: "sec_research_filings", status: "succeeded", at: "2026-09-13T02:00:00Z" } };
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    expect(configReads()).toBe(before);
+    expect(input("Capture budget").value).toBe("150");
+    budget = 150 * 1024**3;
+    await act(async () => saved.resolve({ capture_budget_bytes: budget, capacity }));
+    // Save confirmation and deferred schedule capacity observation have separate ownership.
+    expect(configReads()).toBe(before + 2);
+    expect(input("Capture budget").value).toBe("150");
+    expect(input("Capture budget").disabled).toBe(false);
+  });
+
+  it("uses shared SEC controls and refreshes only batch status/capacity after its terminal transition", async () => {
+    await render("en", true);
+    expect(host.querySelector('[data-source-id="sec_research_filings"]')?.textContent).toContain("SEC Research");
+    expect(host.querySelector(".sec-schedule-status")).not.toBeNull();
+    await load(); await click("Next page");
+    await change("Capture budget", "150");
+    const beforeRecords = host.querySelector(".sec-record-scroll")?.textContent;
+    const localReads = () => requests.filter(({ url }) => /\/sec-research\/\d/.test(url.pathname)).length;
+    const beforeReads = localReads();
+    scheduled = { ...scheduled, running: true };
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    const beforeStatus = requests.filter(({ url }) => url.pathname.endsWith("schedule-status")).length;
+    batchStatus = { last_acquisition_at: "2026-09-13T01:00:00Z", last_completed_batch: null,
+      last_attempt: { status: "partial", started_at: "2026-09-13T01:00:00Z", finished_at: "2026-09-13T02:00:00Z",
+        universe_tickers: ["ONE", "TWO", "MISSING"], universe_status: "available",
+        attempted_ciks: ["1", "2"], confirmed_ciks: ["1"], failed_ciks: ["2"], deferred_ciks: [],
+        unresolved: [{ ticker: "MISSING", code: "issuer_not_found", candidates: [] }],
+        filing_count: 4, fact_count: 9, request_count: 5, gaps: [{ code: "sec_rate_limited" }], stop_reason: null } };
+    scheduled = { ...scheduled, running: false, last_attempt_at: "2026-09-13T01:00:00Z",
+      last_result: { source: "sec_research_filings", status: "partial", at: "2026-09-13T02:00:00Z" } };
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    expect(requests.filter(({ url }) => url.pathname.endsWith("schedule-status"))).toHaveLength(beforeStatus + 1);
+    expect(input("Capture budget").value).toBe("150");
+    expect(host.querySelector(".sec-record-scroll")?.textContent).toBe(beforeRecords);
+    expect(localReads()).toBe(beforeReads);
+    expect(host.querySelector(".sec-schedule-status")?.textContent).toContain("sec_rate_limited");
+    expect(host.querySelector(".sec-schedule-status")?.textContent).toContain("MISSING");
+    expect(requests.filter(({ init }) => init.method === "POST")).toHaveLength(0);
+  });
   it("limits pagination counter sizing to the counter, excluding button icon wrappers", async () => {
     applyPanelStyles();
     await render(); await load();
@@ -171,9 +255,11 @@ describe("SEC structured storage", () => {
     expect(button("Next page").disabled).toBe(true);
   });
 
-  it("mounts with only config GET, actual accounting, and no issuer guessing", async () => {
+  it("mounts with only stored config/schedule GETs, actual accounting, and no issuer guessing", async () => {
     await render();
-    expect(requests.map(({ url, init }) => [url.pathname, init.method ?? "GET"])).toEqual([["/sec-research/config", "GET"]]);
+    expect(requests.map(({ url, init }) => [url.pathname, init.method ?? "GET"])).toEqual([
+      ["/sec-research/config", "GET"], ["/sec-research/schedule-status", "GET"], ["/schedule", "GET"],
+    ]);
     expect(input("CIK").value).toBe("");
     expect(input("Capture budget").value).toBe("100");
     for (const [label, value] of [["Stored objects", "120"], ["Reservations", "30"], ["Orphans", "7"], ["Accounted usage", "157"]]) {
@@ -224,7 +310,7 @@ describe("SEC structured storage", () => {
     };
     await render(); await change("Capture budget", "150"); await click("Save budget");
     expect(requests.find(({ init }) => init.method === "PUT")?.init.body).toBe('{"capture_budget_bytes":161061273600}');
-    expect(requests.map(({ init }) => init.method ?? "GET")).toEqual(["GET", "PUT", "GET"]);
+    expect(requests.map(({ init }) => init.method ?? "GET")).toEqual(["GET", "GET", "GET", "PUT", "GET"]);
     expect(host.textContent).toContain("Budget saved");
     expect(input("Capture budget").value).toBe("150");
   });

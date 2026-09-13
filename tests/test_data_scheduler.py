@@ -23,6 +23,7 @@ from src.service.security_lifecycle_automation_config import ENABLED_KEY
 _NOW = datetime(2026, 6, 11, 12, 0, tzinfo=timezone.utc)
 _REAL_RESOLVE_PRICE_SCOPE = ds._resolve_price_scope
 ACTIVE_SOURCE_IDS = {
+    "sec_research_filings",
     "polygon_news",
     "finnhub_news",
     "ibkr_news",
@@ -159,6 +160,26 @@ def test_defaults_everything_disabled():
         cfg = ds.source_config(source)
         assert cfg["enabled"] is False  # nothing fetches until the user opts in
         assert cfg["interval_minutes"] == ds.SOURCES[source].default_interval_min
+
+
+@pytest.mark.parametrize("journal_installed", (False, True))
+def test_sec_schedule_disabled_even_with_old_enabled_key(hermetic, monkeypatch, journal_installed):
+    from src.lifecycle_investigation.schema import install_journal
+    from src.security_lifecycle_schema import create_profile_schema
+
+    if journal_installed:
+        with sqlite3.connect(hermetic.db_path) as conn:
+            create_profile_schema(conn)
+            install_journal(conn, at="2026-09-08T00:00:00Z")
+    hermetic.set_setting("schedule.sec_corporate_actions.enabled", "true")
+    assert "sec_research_filings" in ds.SOURCES, "new default-disabled source absent"
+    cfg = ds.source_config("sec_research_filings")
+    assert cfg["enabled"] is False and cfg["interval_minutes"] == 1440
+    calls = []
+    ds.tick_once(now=_NOW, fire=calls.append)
+    assert calls == []
+    assert ds.SOURCES["sec_research_filings"].writes_market_db is True
+    assert ds.SOURCES["sec_research_filings"].universe_tickers is False
 
 
 @pytest.mark.parametrize("journal_installed", (False, True))

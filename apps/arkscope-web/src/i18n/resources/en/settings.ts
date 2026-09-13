@@ -17,6 +17,16 @@ const settings = {
     pageInsufficient: "Page size insufficient for this passage",
   },
   secResearch: {
+    schedule: {
+      title: "Daily structured acquisition", lastAttempt: "Last attempt",
+      lastAcquisition: "Last successful issuer acquisition", lastCompleted: "Last completed batch",
+      nextEligible: "Next eligible time", eligible: "Eligible now", disabled: "Disabled",
+      succeeded: "Succeeded", failed: "Failed", running: "Running",
+      universe: "Active symbols", attempted: "Attempted issuers", confirmed: "Confirmed issuers",
+      failedIssuers: "Failed or partial issuers", deferred: "Deferred issuers",
+      filings: "Scoped filings", facts: "Scoped facts", requests: "Admitted source attempts",
+      unresolved: "Unresolved symbols", stop: "Stop reason", unavailable: "Schedule status unavailable",
+    },
     title: "SEC structured data", cik: "CIK", load: "Load local",
     refresh: "Refresh structured data", resume: "Resume refresh", reread: "Reread stored status",
     budget: "Capture budget", unit: "Budget unit", bytes: "Bytes", gib: "GiB",
@@ -739,6 +749,10 @@ const settings = {
         ibkrPrices: {
           label: "IBKR Prices",
           description: "Collect 15-minute prices for the current Universe directly into the local market database.",
+        },
+        secResearch: {
+          label: "SEC Research",
+          description: "Current-universe recent 10-K, 10-Q, 20-F, 40-F and amendments; structured facts.",
         },
       },
       unknownSourceDescription: "Data source {{sourceId}} has no reviewed description.",

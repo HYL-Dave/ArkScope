@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SecResearchPanel } from "./SecResearchPanel";
+import { DataScheduleControlsProvider } from "./dataScheduleControls";
+import { createSettingsReadCache } from "./settingsReadCache";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const filing = (id = "123:000-1", primary_document = "annual.htm") => ({ filing_id: id, accession: "000-1", form: "10-K", primary_document, primary_url: "https://untrusted.example/not-authority" });
@@ -21,6 +23,9 @@ let requests: { url: URL; init: RequestInit }[];
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 function fallback(url: URL) {
+  if (url.pathname === "/schedule") return { sources: {} };
+  if (url.pathname === "/sec-research/schedule-status") return { ...unavailable(),
+    data: { last_attempt: null, last_acquisition_at: null, last_completed_batch: null } };
   if (url.pathname.endsWith("/config")) return { capture_budget_bytes: 107374182400, capacity: null };
   if (url.pathname.endsWith("/filings")) return { ...index(), data: [filing(), filing("123:000-1", "conflicting.htm"), filing("123:000-2", "second.htm")] };
   if (url.pathname.endsWith("/document")) return url.searchParams.has("cursor") || url.searchParams.has("section_id") || url.searchParams.has("query") ? textPage() : index();
@@ -35,7 +40,7 @@ beforeEach(async () => {
   }));
   await i18n.changeLanguage("en");
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
-  await act(async () => root.render(<SecResearchPanel />));
+  await act(async () => root.render(<DataScheduleControlsProvider settingsReadCache={createSettingsReadCache()}><SecResearchPanel /></DataScheduleControlsProvider>));
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 function button(name: string, n = 0) {

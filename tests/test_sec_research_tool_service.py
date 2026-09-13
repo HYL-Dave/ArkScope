@@ -376,3 +376,22 @@ def test_auto_retries_failed_map_in_next_invocation_not_same_call(tool_fixture):
     second = f.service.invoke("list_sec_filings", dict(issuer="AAPL"))
     assert second["status"] == "ok"
     assert f.transport.calls == [MAP_URL, MAP_URL, SUBMISSIONS, FACTS]
+
+
+def test_recent_schedule_never_satisfies_tool_history_resume_or_changes_cursor(tool_fixture):
+    f = tool_fixture
+    f.transport.responses[SUBMISSIONS] = catalog(history=1)
+    history_url = f"https://data.sec.gov/submissions/CIK{CIK}-submissions-000.json"
+    f.transport.responses[history_url] = b'{"accessionNumber":[],"filingDate":[],"form":[]}'
+    research = ResearchService(f.store, f.captures, f.transport, clock=lambda: NOW)
+    full = research.refresh(CIK, max_sources=2)
+    page = f.service.invoke("list_sec_filings", dict(issuer=CIK, freshness="stored", limit=1))
+    assert page["next_cursor"]
+    research.refresh(CIK, scope="recent")
+    f.transport.calls.clear()
+    pinned = f.service.invoke("list_sec_filings", dict(issuer=CIK, cursor=page["next_cursor"], limit=1))
+    assert pinned["coverage"]["receipt_id"] == full["receipt_id"]
+    assert f.transport.calls == []
+    result = f.service.invoke("list_sec_filings", dict(issuer=CIK))
+    assert f.transport.calls == [history_url], "recent receipt hid full-history continuation"
+    assert result["status"] == "ok"

@@ -130,6 +130,13 @@ SOURCES: Dict[str, SourceDef] = {
     s.name: s
     for s in (
         SourceDef(
+            "sec_research_filings", "SEC Research",
+            adapter=("src.sec_research.scheduled", "run_incremental"),
+            default_interval_min=1440, writes_market_db=True,
+            source_badges=("SEC", "market_data.db"),
+            description="Current active-universe recent filings and structured facts",
+        ),
+        SourceDef(
             "polygon_news", "Massive 新聞",
             adapter=("src.collectors.polygon_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
@@ -1447,6 +1454,20 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                     # NOT to re-acquire it (non-reentrant; would self-deadlock).
                     kwargs["acquire_gateway_lock"] = False
                 result["collect"] = fn(**kwargs)  # raises on failure (e.g. missing key)
+                if source == "sec_research_filings":
+                    from src.sec_research.schedule_store import validate_batch
+                    try:
+                        collection = validate_batch(result["collect"])
+                        if collection["status"] not in {"succeeded", "partial", "failed"}:
+                            raise ValueError("sec_schedule_result_invalid")
+                    except ValueError:
+                        result["collect"] = {"status": "failed", "code": "sec_schedule_result_invalid"}
+                        ok, error = False, "sec_schedule_result_invalid"
+                    else:
+                        ok = collection["status"] != "failed"
+                        error = {"failed": "sec_schedule_failed", "partial": "sec_schedule_partial"}.get(collection["status"])
+                    if error:
+                        result["error"] = error
                 adapter_partial = (
                     isinstance(result["collect"], dict)
                     and result["collect"].get("status") == "partial"
@@ -1467,7 +1488,8 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
                 error = None
             else:
                 ok = False
-                error = "macro_collection_failed" if d.writes_macro_db else str(e)[:_ERROR_TAIL]
+                error = ("sec_schedule_failed" if source == "sec_research_filings" else
+                         "macro_collection_failed" if d.writes_macro_db else str(e)[:_ERROR_TAIL])
                 result["error"] = error
                 logger.warning(f"scheduler source {source} failed: {error}")
 
@@ -1499,7 +1521,7 @@ def run_source(source: str, trigger_source: str = "scheduler", *,
             logger.debug("scheduler_state record_outcome failed for %s", source, exc_info=True)
         if store is not None and run_id is not None:
             try:
-                audit_failed = (not ok) or price_partial or macro_partial
+                audit_failed = (not ok) or price_partial or macro_partial or (source == "sec_research_filings" and adapter_partial)
                 audit_error = price_audit_error if price_partial else error
                 store.finish_run(
                     run_id,

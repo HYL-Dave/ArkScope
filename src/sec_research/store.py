@@ -73,7 +73,8 @@ def _receipt(row) -> dict | None:
         return None
     result = dict(row)
     try:
-        if (type(result["receipt_id"]) is not int or not 1 <= result["receipt_id"] <= 2**63 - 1
+        if (result["scope"] not in ("full", "recent")
+                or type(result["receipt_id"]) is not int or not 1 <= result["receipt_id"] <= 2**63 - 1
                 or normalize_cik(result["cik"]) != result["cik"]):
             raise ValueError
         for key in ("completed", "pending", "gaps", "source_snapshots"):
@@ -81,6 +82,8 @@ def _receipt(row) -> dict | None:
                 raise ValueError
             result[key] = json.loads(result[key])
         _receipt_fields(result["cik"], result["status"], result["completed"], result["pending"], result["gaps"])
+        if result["scope"] == "recent" and set(result["completed"] + result["pending"]) - {"submissions", "companyfacts"}:
+            raise ValueError
         for key in ("observed_at", "recorded_at"):
             _timestamp(result[key])
         bindings = result["source_snapshots"]
@@ -301,9 +304,13 @@ class Store:
         return self._observations(cik, "sec_research_facts")
 
     def record_receipt(self, cik, *, status, completed, pending, gaps, observed_at,
-                       source_snapshots=None):
+                       source_snapshots=None, scope="full"):
         """Append coverage; omitted bindings are explicitly unbound, not query authority."""
         cik = normalize_cik(cik)
+        if scope not in ("full", "recent"):
+            raise ValueError("invalid_scope")
+        if scope == "recent" and set(completed + pending) - {"submissions", "companyfacts"}:
+            raise ValueError("sec_research_receipt_invalid")
         _receipt_fields(cik, status, completed, pending, gaps)
         if len(completed) + len(pending) + len(gaps) > MAX_SNAPSHOT_ROWS:
             raise ValueError("sec_research_snapshot_rows_exceeded")
@@ -321,8 +328,8 @@ class Store:
                 _bound_snapshot(conn, cik, locator, binding)
             recorded_at = datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
             cursor = conn.execute("""INSERT INTO sec_research_receipts
-                (cik, status, completed, pending, gaps, observed_at, recorded_at, source_snapshots)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", (cik, status, *encoded, observed_at, recorded_at, _json(bindings)))
+                (cik, status, completed, pending, gaps, observed_at, recorded_at, source_snapshots, scope)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (cik, status, *encoded, observed_at, recorded_at, _json(bindings), scope))
             result = _receipt(conn.execute("SELECT * FROM sec_research_receipts WHERE receipt_id=?", (cursor.lastrowid,)).fetchone())
         return result
 
@@ -337,10 +344,14 @@ class Store:
                 "SELECT * FROM sec_research_receipts WHERE cik=? AND receipt_id=?",
                 (cik, receipt_id)).fetchone())
 
-    def latest_receipt(self, cik):
+    def latest_receipt(self, cik, *, scope=None):
         """Return the last durable append; timestamps are diagnostic metadata."""
         cik = normalize_cik(cik)
+        if scope is not None and scope not in ("full", "recent"):
+            raise ValueError("invalid_scope")
+        selection = " AND scope=?" if scope is not None else ""
+        parameters = (cik, scope) if scope is not None else (cik,)
         with self.connect(readonly=True) as conn:
             schema.verify(conn)
-            return _receipt(conn.execute("""SELECT * FROM sec_research_receipts WHERE cik=?
-                ORDER BY receipt_id DESC LIMIT 1""", (cik,)).fetchone())
+            return _receipt(conn.execute(f"""SELECT * FROM sec_research_receipts WHERE cik=?{selection}
+                ORDER BY receipt_id DESC LIMIT 1""", parameters).fetchone())

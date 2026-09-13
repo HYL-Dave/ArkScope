@@ -190,21 +190,22 @@ describe("Settings backend copy boundary", () => {
     expect(source).not.toContain("$.dataSources.providers.config.testUnavailable");
   });
 
-  it("maps exactly four active schedule source ids without backend labels", () => {
+  it("maps exactly five active non-macro schedule source ids without backend labels", () => {
     const ids = [
       "polygon_news",
       "finnhub_news",
       "ibkr_news",
       "ibkr_prices",
+      "sec_research_filings",
     ];
     const cases = [
       {
         locale: "zh-Hant" as const,
-        labels: ["Massive 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價"],
+        labels: ["Massive 新聞", "Finnhub 新聞", "IBKR 新聞", "IBKR 股價", "SEC 財務研究"],
       },
       {
         locale: "en" as const,
-        labels: ["Massive News", "Finnhub News", "IBKR News", "IBKR Prices"],
+        labels: ["Massive News", "Finnhub News", "IBKR News", "IBKR Prices", "SEC Research"],
       },
     ];
 
