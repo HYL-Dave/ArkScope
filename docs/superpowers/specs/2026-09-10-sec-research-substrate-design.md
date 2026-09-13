@@ -513,17 +513,19 @@ SEC has no API-key requirement, but valid contact identification and fair-access
 pacing still apply. Read it through profile configuration, not a new `.env`
 fallback. No Massive/EODHD request or LLM spend belongs in this collector.
 
-### Open Recovery Owners (2026-09-12)
+### Recovery Owners (2026-09-13)
 
 - **SEC-RECOVERY-001, capture-store maintenance:** explicit orphan/unreferenced
-  object cleanup is not implemented. Recovery accounts interrupted objects and
-  can adopt identical content, but changed-content orphans remain charged.
-  Its owner must provide a dry-run, explicit confirmation and an audit receipt;
+  object cleanup is implemented and reviewed through `78157e62`.
+  Recovery accounts interrupted objects; explicit cleanup can now reclaim
+  eligible changed-content orphans. Its owner provides an observational preview,
+  exact digest approval and an external audit receipt. The implementation must
   recheck all snapshot/document/citation/pin/export references under the root
   lease before removal. Registered objects without a published snapshot are
   distinct from unregistered filesystem orphans. No automatic cited/pinned
   deletion, quota evasion or general filesystem cleanup is permitted.
-- **SEC-RECOVERY-002, schema administration:** reset/uninstall is not implemented.
+- **SEC-RECOVERY-002, schema administration:** reset/uninstall is implemented and
+  reviewed through `78157e62`.
   Canonical shape mismatch deliberately rejects instead of repairing silently.
   The operator workflow must inspect owned objects, preview impact, back up before
   destructive work, coordinate live users, and preserve unrelated prices/news/SA,
@@ -532,9 +534,14 @@ fallback. No Massive/EODHD request or LLM spend belongs in this collector.
   This is an explicit current-schema recovery operation, not a migration chain
   or a startup DROP. No production installation/reset is implied or authorized.
 
-Both remain first-release operational work. The document-reading plan
-`2026-09-12-sec-document-reading.md` adds reference consumers but does not claim
-to complete either recovery path.
+Both source implementations are accepted by the Task6 review and its1064-test
+covering run; the complete maintenance continuation regression remains pending.
+Actual-store execution is separate and unperformed. The operator workflow is
+documented in `docs/design/SEC_RESEARCH_OPERATIONS.md`; an unknown owned schema
+may produce only an explicitly approved raw safety backup and must remain
+blocked, never become a prefix-based DROP. Failure audit retains the original
+SEC-exclusive lease; long file operations do not hold the market writer lock.
+Output paths protect both market/profile database files and SQLite sidecars.
 
 ## 11. Acceptance And Rollout
 
