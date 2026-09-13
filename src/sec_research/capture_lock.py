@@ -3,13 +3,126 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from functools import wraps
+import asyncio
 import errno
 import hashlib
 import os
 from pathlib import Path
 import stat
+import threading
 
 from src.ibkr_gateway_lock import lock_dir
+
+
+_operations = threading.local()
+
+
+def _owner():
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:
+        task = None
+    return os.getpid(), threading.get_ident(), task
+
+
+def _check_root(root):
+    # Missing stored roots (and parents) are valid, but existing symlinks are not.
+    fd = os.open(root.anchor, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in root.parts[1:]:
+            try:
+                child = _directory(fd, part)
+            except FileNotFoundError:
+                return
+            os.close(fd)
+            fd = child
+    finally:
+        os.close(fd)
+
+
+@contextmanager
+def research_operation(root: Path, *, exclusive=False, create=False):
+    """Crash-released maintenance exclusion, reentrant only in this thread/task.
+
+    Order: operation -> issuer/document -> capture writer -> market -> SQLite.
+    Active ownership is thread-local and keyed by process and async task, never
+    inherited through Context copies. Shared-to-exclusive upgrades fail.
+    """
+    if not _supported():
+        raise ValueError("capture_platform_unsupported")
+    if type(exclusive) is not bool or type(create) is not bool:
+        raise ValueError("sec_research_operation_invalid")
+    root = Path(root).absolute()
+    if ".." in root.parts:
+        raise ValueError("capture_path_unsafe")
+    owner = (root, _owner())
+    if not hasattr(_operations, "held"):
+        _operations.held = {}
+    held = _operations.held
+    inherited = held.get(owner)
+    if inherited is not None and exclusive and not inherited:
+        raise ValueError("sec_research_operation_busy")
+    fd = parent = None
+    registered = False
+    acquired = False
+    try:
+        _check_root(root)
+        if inherited is None:
+            import fcntl
+            path = lock_dir().absolute()
+            parent = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
+            for part in path.parts[1:]:
+                try:
+                    child = _directory(parent, part)
+                except FileNotFoundError:
+                    child = _directory(parent, part, create=True)
+                os.close(parent)
+                parent = child
+            key = "sec-research-" + hashlib.sha256(str(root).encode()).hexdigest() + ".operation.lock"
+            fd = os.open(key, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
+                         0o600, dir_fd=parent)
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise ValueError("capture_path_unsafe")
+            fcntl.flock(fd, (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH) | fcntl.LOCK_NB)
+            held[owner] = exclusive
+            registered = True
+        if create:
+            directory = CaptureDirectory(root, create=True)
+            directory.close()
+        acquired = True
+    except BlockingIOError:
+        if fd is not None:
+            os.close(fd)
+            fd = None
+        raise ValueError("sec_research_operation_busy") from None
+    except OSError as exc:
+        raise _io_failure(exc) from None
+    finally:
+        if parent is not None:
+            os.close(parent)
+        if not acquired:
+            if registered:
+                del held[owner]
+            if fd is not None:
+                os.close(fd)
+    try:
+        yield
+    finally:
+        if registered:
+            del held[owner]
+        if fd is not None:
+            os.close(fd)
+
+
+def store_operation(function):
+    """Protect a whole synchronous store/service/query operation, not each read."""
+    @wraps(function)
+    def protected(owner, *args, **kwargs):
+        store = owner if hasattr(owner, "paths") else owner.store
+        with research_operation(store.paths.capture_root):
+            return function(owner, *args, **kwargs)
+    return protected
 
 
 def _io_failure(exc):
@@ -142,6 +255,13 @@ class CaptureDirectory:
 
 @contextmanager
 def _lease(root: Path, name: str, busy_code: str):
+    with research_operation(root):
+        with _capture_lease(root, name, busy_code) as directory:
+            yield directory
+
+
+@contextmanager
+def _capture_lease(root: Path, name: str, busy_code: str):
     directory = CaptureDirectory(root, create=True)
     fd = None
     lock_parent = None

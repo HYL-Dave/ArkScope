@@ -507,8 +507,11 @@ class ResearchRunStore:
         personalization: Optional[dict] = None,
     ) -> Optional[ResearchRun]:
         """Atomically persist terminal status, replay event, and linked turn."""
+        from src.sec_research.capture_lock import research_operation
+        from src.sec_research.paths import SecResearchPaths
+
         self._require_shared_database(thread_store)
-        with self._write_lock, thread_store._write_lock, self._connect() as conn:
+        with research_operation(SecResearchPaths.resolve().capture_root), self._write_lock, thread_store._write_lock, self._connect() as conn:
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 terminal = self._terminalize_error_on_connection(
@@ -757,7 +760,10 @@ class ResearchRunStore:
         )
 
     def append_event(self, run_id: str, type: str, data: dict) -> ResearchRunEvent:
-        with self._write_lock, self._connect() as conn:
+        from src.sec_research.capture_lock import research_operation
+        from src.sec_research.paths import SecResearchPaths
+
+        with research_operation(SecResearchPaths.resolve().capture_root), self._write_lock, self._connect() as conn:
             event = self._append_event_on_connection(conn, run_id, type, data)
             conn.commit()
         return event

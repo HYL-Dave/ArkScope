@@ -501,6 +501,16 @@ async def query_agent_stream(
     persist = valid_thread_id(request.thread_id)
 
     async def event_generator():
+        from contextlib import aclosing
+        from src.sec_research.capture_lock import research_operation
+        from src.sec_research.paths import SecResearchPaths
+
+        with research_operation(SecResearchPaths.resolve().capture_root):
+            async with aclosing(protected_event_generator()) as events:
+                async for event in events:
+                    yield event
+
+    async def protected_event_generator():
         import time as _time
 
         # Multi-turn (C-2c): prior thread turns seed the agent. Fetch BEFORE

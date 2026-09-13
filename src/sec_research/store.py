@@ -11,6 +11,7 @@ import re
 import sqlite3
 
 from src.market_data_direct import market_write_lock
+from .capture_lock import research_operation, store_operation
 
 from . import schema
 from .catalog import CatalogSnapshot
@@ -129,6 +130,12 @@ class Store:
 
     @contextmanager
     def connect(self, readonly=False):
+        with research_operation(self.paths.capture_root):
+            with self._connect(readonly) as conn:
+                yield conn
+
+    @contextmanager
+    def _connect(self, readonly=False):
         """Yield a caller-committed connection and always explicitly close it."""
         path = self.paths.market_db_path
         conn = sqlite3.connect(
@@ -145,14 +152,14 @@ class Store:
             conn.close()
 
     def install(self):
-        with market_write_lock():
+        with research_operation(self.paths.capture_root), market_write_lock():
             self.paths.market_db_path.parent.mkdir(parents=True, exist_ok=True)
             with self.connect() as conn:
                 schema.install(conn)
 
     @contextmanager
     def _write(self):
-        with market_write_lock(), self.connect() as conn:
+        with research_operation(self.paths.capture_root), market_write_lock(), self.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 schema.verify(conn)
@@ -243,6 +250,7 @@ class Store:
             schema.verify(conn)
             return _bound_snapshot(conn, cik, locator, binding)
 
+    @store_operation
     def snapshot_observations(self, cik, snapshot_id):
         """Read only the named snapshot's rows; missing/foreign snapshots have no rows."""
         snapshot = self.snapshot(cik, snapshot_id)

@@ -397,7 +397,10 @@ class ResearchThreadStore:
         personalization: Optional[dict] = None,
         now: Optional[str] = None,
     ) -> ResearchMessage:
-        with self._write_lock, self._connect() as conn:
+        from src.sec_research.capture_lock import research_operation
+        from src.sec_research.paths import SecResearchPaths
+
+        with research_operation(SecResearchPaths.resolve().capture_root), self._write_lock, self._connect() as conn:
             message = self._append_message_on_connection(
                 conn,
                 thread_id=thread_id,

@@ -6,7 +6,7 @@ import re
 
 from data_sources.sec_transport import SecTransportFailure
 
-from .capture_lock import issuer_refresh
+from .capture_lock import issuer_refresh, store_operation
 from .catalog import parse_submissions
 from .common import SourceError, normalize_cik
 from .facts import parse_companyfacts
@@ -19,6 +19,7 @@ _TRANSPORT_CODES = frozenset({
     "sec_request_cancelled",
 })
 _STORAGE_CODES = frozenset({
+    "sec_research_operation_busy",
     "capture_budget_exceeded", "storage_space_insufficient", "capture_store_write_failed",
     "capture_store_busy", "capture_path_unsafe", "capture_integrity_failed",
     "capture_platform_unsupported", "capture_body_invalid",
@@ -62,8 +63,9 @@ class ResearchService:
 
     Completion covers only the current structured-source traversal, never all
     filings/documents for an issuer. Store and capture methods own short writes;
-    no transaction or capture lease spans transport or parsing here.
-    A separate per-issuer lease serializes receipt ownership across invocations.
+    no transaction or writer lease spans transport or parsing here. The outer
+    operation protects acquisition through receipt publication; the per-issuer
+    lease separately serializes refresh ownership across invocations.
     """
 
     def __init__(self, store, captures, transport, *, clock=_now):
@@ -188,6 +190,7 @@ class ResearchService:
 
         return self.store.latest_receipt(cik)
 
+    @store_operation
     def stored(self, cik):
         """Read receipt coverage and retained counts, never unpaged observations.
 

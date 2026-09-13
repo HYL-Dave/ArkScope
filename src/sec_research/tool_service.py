@@ -4,6 +4,7 @@ from contextlib import ExitStack
 from datetime import datetime
 
 from . import schema
+from .capture_lock import research_operation
 from .captures import CaptureStore
 from .document_queries import DocumentQueries, validate_document_query
 from .document_service import DocumentService, _catalog
@@ -92,11 +93,12 @@ class ToolService:
             code = getattr(exc, "code", str(exc))
             return _unavailable(code if code in _QUERY_CODES else "sec_research_query_invalid")
         try:
-            installed = _installed(self.store)
-            stored_only = freshness == "stored" or pinned
-            if not installed and stored_only:
-                return _unavailable("sec_research_not_installed")
             with ExitStack() as stack:
+                stack.enter_context(research_operation(self.store.paths.capture_root))
+                installed = _installed(self.store)
+                stored_only = freshness == "stored" or pinned
+                if not installed and stored_only:
+                    return _unavailable("sec_research_not_installed")
                 acquisition = None
 
                 def acquire():

@@ -24,6 +24,8 @@ from src.api.routes.query import accumulate_tool_calls, _persist_assistant_turn,
 from src.research_errors import ResearchFailure, classify_research_failure
 from src.research_runs import ResearchRunStore
 from src.research_threads import MAX_TOOL_CALLS_SENTINEL, ResearchThreadStore
+from src.sec_research.capture_lock import research_operation
+from src.sec_research.paths import SecResearchPaths
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +86,7 @@ async def execute_research_run(
     stream_factory: Optional[StreamFactory] = None,
 ) -> None:
     """Execute one run and persist both replay events and terminal transcript."""
-    with output_scope(inherit=True):
+    with research_operation(SecResearchPaths.resolve().capture_root), output_scope(inherit=True):
         await _execute_research_run(
             run_id=run_id, run_store=run_store, thread_store=thread_store,
             dal=dal, history=history, auth_binding=auth_binding, stream_factory=stream_factory,

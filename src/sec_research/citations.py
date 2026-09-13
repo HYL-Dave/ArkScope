@@ -9,6 +9,7 @@ import re
 from urllib.parse import urlsplit
 
 from .captures import MAX_OBJECT_BYTES
+from .capture_lock import research_operation
 from .catalog import Filing, _accepted_at, _primary_document
 from .common import accession_value, date_value, normalize_cik, text_value
 from .documents import directory_url, parse_filing_id
@@ -404,7 +405,7 @@ def read_sec_citation(store, captures, *, citation) -> dict:
 
     ref = validate_citation(citation)
     try:
-        with _retained_errors():
+        with _retained_errors(), research_operation(store.paths.capture_root):
             reader = _ReferenceReader(store, captures)
             data, observed_at = reader.read(ref)
         return {"status": "ok", "data": data, "gaps": [], "observed_at": observed_at,

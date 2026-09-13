@@ -7,6 +7,7 @@ import hashlib
 import sqlite3
 
 from . import schema
+from .capture_lock import store_operation
 from .captures import CaptureStore, MAX_OBJECT_BYTES
 from .catalog import parse_submissions
 from .citations import CitationError, _json, _time, validate_citation, validate_citation_event_fields
@@ -294,6 +295,7 @@ class _ReferenceReader:
             "object_sha256s": sorted(self.objects), "object_keys": ["objects/" + sha for sha in sorted(self.objects)]}
 
 
+@store_operation
 def sec_reference_closure(store, *, citations) -> dict:
     """Sorted exact roots for later export/cleanup; missing/corrupt nodes raise.
 
