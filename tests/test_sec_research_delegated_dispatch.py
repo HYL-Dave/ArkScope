@@ -32,7 +32,7 @@ DELEGATE = dict(subagent="deep_researcher", task="Read retained SEC evidence.", 
 
 @pytest.fixture
 def delegated(isolated, monkeypatch):
-    from anthropic import Anthropic
+    from anthropic import Anthropic, AsyncAnthropic
     from src.agents import config
     from src.agents.anthropic_agent import agent
 
@@ -75,12 +75,19 @@ def delegated(isolated, monkeypatch):
             if state.close_error:
                 raise OSError("fixture client-close failure")
 
-    def construct(**kwargs):
-        client = Anthropic(**kwargs, http_client=httpx2.Client(transport=Transport(reply)))
+        async def aclose(self):
+            state.closed.append((current_runtime_auth("anthropic"), current_output_guard()))
+            await super().aclose()
+            if state.close_error:
+                raise OSError("fixture client-close failure")
+
+    def construct(cls, http_cls, **kwargs):
+        client = cls(**kwargs, http_client=http_cls(transport=Transport(reply)))
         state.clients.append(client)
         return client
 
-    monkeypatch.setattr("anthropic.Anthropic", construct)
+    monkeypatch.setattr("anthropic.Anthropic", lambda **kw: construct(Anthropic, httpx2.Client, **kw))
+    monkeypatch.setattr("anthropic.AsyncAnthropic", lambda **kw: construct(AsyncAnthropic, httpx2.AsyncClient, **kw))
 
     async def parent():
         return await collect(agent.run_query_stream("Read the SEC evidence.",
@@ -90,7 +97,10 @@ def delegated(isolated, monkeypatch):
     yield state
     state.close_error = False
     for client in state.clients:
-        client.close()
+        if asyncio.iscoroutinefunction(client.close):
+            asyncio.run(client.close())
+        else:
+            client.close()
 
 
 @pytest.mark.parametrize("entrypoint", ["parent", "sync-dispatch", "sync-tool", "openai-tool"])

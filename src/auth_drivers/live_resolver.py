@@ -154,6 +154,25 @@ def live_openai_client(*, store: Optional[CredentialStore] = None) -> Any:
     return OpenAI()  # genuinely no active credential → env fallback (OPENAI_API_KEY)
 
 
+def live_anthropic_async_client(*, store: Optional[CredentialStore] = None) -> Any:
+    """Async child client with the same captured/active/env authority as sync."""
+    from anthropic import AsyncAnthropic
+
+    binding = current_runtime_auth("anthropic")
+    if binding is not None:
+        if binding.auth_mode != "api_key":
+            raise SubscriptionDriverNotWiredError(_ANTHROPIC_OAUTH_FAILCLOSED_MSG)
+        return binding.api_client(asynchronous=True)
+    store = store or CredentialStore()
+    res = resolve_live_auth("anthropic", store=store)
+    if res.source == "db_api_key":
+        cred = store.get(res.credential_id)
+        return build_driver(provider="anthropic", auth_mode="api_key", credential=cred).client()
+    if res.source == "oauth_driver_unwired":
+        raise SubscriptionDriverNotWiredError(_ANTHROPIC_OAUTH_FAILCLOSED_MSG)
+    return AsyncAnthropic()
+
+
 def live_openai_async_client(*, store: Optional[CredentialStore] = None) -> Any:
     """Per-agent client, never the Agents SDK process-global default."""
     from openai import AsyncOpenAI
