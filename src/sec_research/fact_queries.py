@@ -13,6 +13,7 @@ from data_sources.sec_edgar_financials import (
 )
 
 from .common import normalize_cik
+from .capture_lock import store_operation
 from .queries import (
     open_fact_ids_query, open_query, page_envelope, query_date,
     read_bound_sources, unavailable_envelope, validate_query,
@@ -187,6 +188,7 @@ def _selection(rows, filters, gaps):
     return rows
 
 
+@store_operation
 def query_facts(store, cik, *, metrics=None, concepts=None, fact_ids=None, accession=None,
                 as_of=None, period="all", start=None, end=None, revisions="latest",
                 cursor=None, limit=40, result_fits=None):

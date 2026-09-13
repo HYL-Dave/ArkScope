@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from contextlib import closing
+from .capture_lock import store_operation
 from datetime import date
 import base64
 import binascii
@@ -344,6 +345,7 @@ class StoredQueries:
                            accession=accession, as_of=as_of, period=period, start=start, end=end,
                            revisions=revisions, cursor=cursor, limit=limit, result_fits=result_fits)
 
+    @store_operation
     def filings(self, cik, *, forms=None, filed_from=None, filed_to=None,
                 include_amendments=True, cursor=None, limit=20, result_fits=None):
         cik = normalize_cik(cik)

@@ -10,7 +10,7 @@ import sqlite3
 import uuid
 
 from src.market_data_direct import market_write_lock
-from src.sec_research.capture_lock import CaptureDirectory, capture_writer
+from src.sec_research.capture_lock import CaptureDirectory, capture_writer, store_operation
 from src.sec_research.config import _validate_capture_budget_bytes
 
 
@@ -105,6 +105,7 @@ class CaptureStore:
             raise ValueError("capture_integrity_failed")
         return body
 
+    @store_operation
     def read(self, sha):
         if not isinstance(sha, str) or len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha):
             raise ValueError("capture_id_invalid")

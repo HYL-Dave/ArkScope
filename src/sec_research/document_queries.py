@@ -7,6 +7,7 @@ import json
 import re
 
 from .catalog import _primary_document
+from .capture_lock import research_operation
 from .document_store import DocumentStore
 from .documents import parse_document_directory, parse_filing_id
 from .queries import MAX_ENVELOPE_BYTES, _digest, _encode
@@ -140,12 +141,13 @@ class DocumentQueries:
         if token:
             capture_id = token["capture_id"]
         try:
-            opened, unavailable = self._open(filing_id, document_id, capture_id)
-            if unavailable is not None:
-                return unavailable
-            record, canonical = opened
-            return self._page(record, canonical, document_id=document_id, section_id=section_id,
-                              query=query, token=token, max_chars=max_chars, result_fits=result_fits)
+            with research_operation(self.store.paths.capture_root):
+                opened, unavailable = self._open(filing_id, document_id, capture_id)
+                if unavailable is not None:
+                    return unavailable
+                record, canonical = opened
+                return self._page(record, canonical, document_id=document_id, section_id=section_id,
+                                  query=query, token=token, max_chars=max_chars, result_fits=result_fits)
         except Exception as error:
             if str(error) in {"sec_research_cursor_invalid", "sec_research_cursor_mismatch"}:
                 raise

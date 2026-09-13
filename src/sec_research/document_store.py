@@ -3,6 +3,7 @@
 import json
 
 from . import schema
+from .capture_lock import store_operation
 from .catalog import _primary_document
 from .documents import parse_filing_id
 from .queries import _digest
@@ -35,6 +36,7 @@ class DocumentStore:
     def __init__(self, store):
         self.store = store
 
+    @store_operation
     def capture(self, capture_id):
         with self.store.connect(readonly=True) as conn:
             schema.verify(conn)

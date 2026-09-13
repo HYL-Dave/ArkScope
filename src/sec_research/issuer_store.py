@@ -5,7 +5,7 @@ import json
 from data_sources.sec_transport import SecTransportFailure
 
 from . import schema
-from .capture_lock import _lease
+from .capture_lock import _lease, store_operation
 from .common import SourceError
 from .issuers import TICKER_MAP_URL, parse_issuer, parse_ticker_map
 from .service import _TRANSPORT_CODES, _storage_code
@@ -32,6 +32,7 @@ class IssuerStore:
         result["gaps"] = json.loads(result["gaps"])
         return result
 
+    @store_operation
     def resolve(self, issuer: str) -> dict:
         """Return a stored resolution observation; explicit CIKs need no map I/O."""
         kind, value = parse_issuer(issuer)
