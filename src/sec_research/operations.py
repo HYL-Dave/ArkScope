@@ -13,6 +13,7 @@ import shutil
 import sqlite3
 import stat
 import struct
+import uuid
 
 from src.market_data_direct import backup_market_db
 from . import schema
@@ -143,6 +144,68 @@ def _new_destination(path):
         raise ValueError("sec_research_bundle_destination_exists")
     finally:
         os.close(parent)
+
+
+class OperationReceipt:
+    """Create-only audit identity with atomic, synced JSON phase updates."""
+
+    def __init__(self, path):
+        self.path = _path(path)
+        _new_destination(self.path)
+        self.parent = _directory(self.path.parent)
+        self.identity = None
+        self.phase = "not_started"
+        self.failed = False
+
+    def write(self, result):
+        _require(not self.failed, "sec_research_admin_receipt_failed")
+        current = dict(result, receipt_phase=result["phase"])
+        raw = json.dumps(current, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        _require(len(raw) <= MAX_MANIFEST_BYTES, "sec_research_admin_receipt_failed")
+        try:
+            _current(self.path.parent, self.parent)
+            if self.identity is None:
+                with _file(self.path, create=True) as handle:
+                    info = os.fstat(handle.fileno())
+                    self.identity = (info.st_dev, info.st_ino)
+                    handle.write(raw)
+            else:
+                info = os.stat(self.path.name, dir_fd=self.parent, follow_symlinks=False)
+                _require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and
+                         (info.st_dev, info.st_ino) == self.identity, "sec_research_admin_receipt_failed")
+                pending = self.path.with_name(self.path.name + ".pending-" + uuid.uuid4().hex)
+                with _file(pending, create=True) as handle:
+                    handle.write(raw)
+                    info = os.fstat(handle.fileno())
+                    identity = (info.st_dev, info.st_ino)
+                _current(self.path.parent, self.parent)
+                info = os.stat(self.path.name, dir_fd=self.parent, follow_symlinks=False)
+                _require((info.st_dev, info.st_ino) == self.identity, "sec_research_admin_receipt_failed")
+                os.replace(pending.name, self.path.name, src_dir_fd=self.parent, dst_dir_fd=self.parent)
+                self.identity = identity
+                os.fsync(self.parent)
+            self.phase = result["phase"]
+            result["receipt_phase"] = self.phase
+        except BaseException:
+            self.failed = True
+            raise
+
+    def close(self):
+        os.close(self.parent)
+
+
+def write_operator_json(path, value):
+    """Publish a new operator preview; never overwrite an earlier approval."""
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    _require(len(raw) <= MAX_MANIFEST_BYTES, "sec_research_preview_invalid")
+    with _file(_path(path), create=True) as handle:
+        handle.write(raw)
+
+
+def read_operator_json(path):
+    with _file(_path(path)) as handle:
+        _require(os.fstat(handle.fileno()).st_size <= MAX_MANIFEST_BYTES, "sec_research_preview_invalid")
+        return _json(handle.read(MAX_MANIFEST_BYTES + 1).decode("utf-8"))
 
 
 @contextmanager
@@ -373,7 +436,7 @@ def _rename_new(fd, source, destination):
         raise OSError(error, "bundle publication failed")
 
 
-def _publish(path, fd, manifest):
+def _publish(path, fd, manifest, *, marker=MANIFEST):
     raw = json.dumps(manifest, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     _require(len(raw) <= MAX_MANIFEST_BYTES, "sec_research_bundle_manifest_too_large")
     with _file(path / ".manifest.pending", create=True) as handle:
@@ -383,18 +446,57 @@ def _publish(path, fd, manifest):
     try:
         os.unlink(".incomplete", dir_fd=fd)
         os.fsync(fd)
-        _rename_new(fd, ".manifest.pending", MANIFEST)
+        _rename_new(fd, ".manifest.pending", marker)
         linked = True
         os.fsync(fd)
     except BaseException:
         if linked:
-            os.unlink(MANIFEST, dir_fd=fd)
+            os.unlink(marker, dir_fd=fd)
         try:
             marker = os.open(".incomplete", os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600, dir_fd=fd)
             os.close(marker)
         except OSError:
             pass
         raise
+
+
+def raw_backup(paths, destination, *, observed_sha256, recheck):
+    """Unnormalized SQLite safety backup plus *all* admitted capture files.
+
+    This marker deliberately cannot be consumed as a canonical portable export.
+    The schema administrator supplies a fresh relevant-state recheck before the
+    completion marker; destructive administration also rechecks inside its write.
+    """
+    destination = _path(destination)
+    _require(not destination.is_relative_to(paths.capture_root), "sec_research_bundle_path_invalid")
+    with research_operation(paths.capture_root, exclusive=True):
+        directory = CaptureDirectory(paths.capture_root)
+        try:
+            inventory = directory.inventory()
+            with Store(paths).connect(readonly=True) as conn:
+                size = conn.execute("PRAGMA page_count").fetchone()[0] * conn.execute("PRAGMA page_size").fetchone()[0]
+            _space(destination.parent, size, sum(item["size_bytes"] for item in inventory), None)
+            with _owned_destination(destination) as fd:
+                staged = Store(SecResearchPaths.from_market_db(destination / "market_data.db"))
+                _require(backup_market_db(str(paths.market_db_path), str(staged.paths.market_db_path), overwrite=False)
+                         is not None, "sec_research_admin_backup_failed")
+                _current(destination, fd)
+                CaptureDirectory(staged.paths.capture_root, create=True).close()
+                for item in inventory:
+                    _copy_member(paths.capture_root / item["key"], staged.paths.capture_root / item["key"], item)
+                _require(directory.inventory() == inventory, "sec_research_preview_stale")
+                manifest = {"format": "arkscope-sec-research-raw-backup", "version": 1,
+                    "scope": _scope(),
+                    "database": {"name": "market_data.db", **_digest(staged.paths.market_db_path)},
+                    "database_bytes": "sqlite-backup-unnormalized", "observed_sha256": observed_sha256,
+                    "captures": [{k: item[k] for k in ("key", "sha256", "size_bytes")} for item in inventory]}
+                with _file(staged.paths.market_db_path) as handle:
+                    os.fsync(handle.fileno())
+                recheck()
+                _publish(destination, fd, manifest, marker="raw-backup.json")
+                return manifest
+        finally:
+            directory.close()
 
 
 def export_bundle(paths, destination: Path, *, free_bytes=None) -> dict:
