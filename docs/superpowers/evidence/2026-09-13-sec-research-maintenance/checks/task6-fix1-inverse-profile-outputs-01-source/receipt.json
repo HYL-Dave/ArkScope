@@ -1,0 +1,56 @@
+{
+  "run": "task6-fix1-inverse-profile-outputs-01",
+  "case": "profile-outputs",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+    "task6-fix1-inverse-profile-outputs-01",
+    "backend",
+    "-q",
+    "tests/test_sec_research_maintenance.py::test_cleanup_receipt_rejects_profile_sqlite_namespace",
+    "tests/test_sec_research_schema_admin.py::test_schema_outputs_reject_profile_sqlite_namespace",
+    "tests/test_sec_research_cli.py::test_cli_outputs_reject_profile_sqlite_namespace"
+  ],
+  "exit_code": 1,
+  "restored": {
+    "src/sec_research/maintenance.py": "0d64f3d0c8b3bc50df5c5d7cc96a8e826e2e710078c518459e5d5350b96c0a90"
+  },
+  "mutated": {
+    "src/sec_research/maintenance.py": "8ae02afa2b8e541c9efa3830207613961fdb122fb88b83c8dce3060dafd3bea0"
+  },
+  "tests": {
+    "tests/test_sec_research_maintenance.py": "f9f5f5bf54c8d4808bf8b9caa19347844a5a6b1fd4242b1ea2847543995f15d3",
+    "tests/test_sec_research_schema_admin.py": "9cfc414192921510d0c29f61310dd2933aff2efe114939e132ec64255c7e1236",
+    "tests/test_sec_research_cli.py": "0f05033f1e945dfd48c7e9bb9a909bc5171009ae799ae27cf1073403a5163634"
+  },
+  "failed_testcases": [
+    "tests.test_sec_research_maintenance::test_cleanup_receipt_rejects_profile_sqlite_namespace[-journal]",
+    "tests.test_sec_research_maintenance::test_cleanup_receipt_rejects_profile_sqlite_namespace[-wal]",
+    "tests.test_sec_research_maintenance::test_cleanup_receipt_rejects_profile_sqlite_namespace[-shm]",
+    "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[receipt--journal]",
+    "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[receipt--wal]",
+    "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[receipt--shm]",
+    "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[backup--journal]",
+    "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[backup--wal]",
+    "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[backup--shm]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview--journal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview--wal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview--shm]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-preview--journal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-preview--wal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-preview--shm]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt--journal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt--wal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt--shm]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt--journal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt--wal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt--shm]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-backup--journal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-backup--wal]",
+    "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-backup--shm]"
+  ],
+  "error_testcases": [],
+  "mutation_script": "task6-inverses.py",
+  "source_bytes": "task6-fix1-inverse-profile-outputs-01-source"
+}

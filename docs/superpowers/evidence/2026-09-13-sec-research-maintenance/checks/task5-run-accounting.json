@@ -1,0 +1,1087 @@
+{
+  "counting_policy": "Only the named final full backend run owns its total. Focused runs are not added.",
+  "process_limit": "Receipt accounting does not establish absence of unrelated external processes.",
+  "runs": [
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "9f38eb83fba2f8a958ec2f441f87eaa4348a98387493664902391453863b55b0",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 8
+      },
+      "run": "task5-admission-asgi-green-01",
+      "seconds": 3.288
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "2bb29fa91caa5a9f99d1f035e91182ff2712635d02ee59c93cee65e58b1a56eb",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 1270
+      },
+      "run": "task5-bundle-checkpoint-01",
+      "seconds": 134.68
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "d0607236d01b481da9962d2ba5cee808eae100f59e020f853647a83c60366877",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_export_preserves_nonempty_issuer_map",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_export_preserves_large_utf8_document",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 2,
+        "passed": 2
+      },
+      "run": "task5-bundle-content-red-01",
+      "seconds": 3.671
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "364a0b00494c9df97a9f7853c67fac5d4dafaed1cca2af07ce9028de10d28539",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 19
+      },
+      "run": "task5-bundle-green-01",
+      "seconds": 9.336
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "c03c5d9c1680b74d6d00f5e25d17d2262729d2a5c332316760cd024089e2abee",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 50
+      },
+      "run": "task5-bundle-green-02",
+      "seconds": 14.742
+    },
+    {
+      "classification": "UTF-8 fixture selected no query result; corrected fixture, receipt retained",
+      "command_sha256": "bf26c132a6e39496b66a7f9e38a8b38ea13d7542eb9af3928671b050ef2b3f21",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_export_preserves_large_utf8_document",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1,
+        "passed": 65
+      },
+      "run": "task5-bundle-green-03",
+      "seconds": 16.571
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "0bdc86ebb8af198b9a11b0c258afa3c788651f373f19c3f9f5821060c019cde9",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 66
+      },
+      "run": "task5-bundle-green-04",
+      "seconds": 16.847
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "5bc255aa5488e0905fc9cf7d3bddbbdc1ac14c962fbfefbeb7c8e4bd29b0b6c1",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_success_marker_is_atomic_final_publication",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1,
+        "passed": 13
+      },
+      "run": "task5-bundle-hardening-red-01",
+      "seconds": 5.908
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "5d000878de2a09d78a7c8965491ce32cef6c0d8f76aa8b14e814dd362aefa0d5",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_export_restore_preserves_wal_and_historical_citations",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_export_uses_backup_inventory_during_concurrent_publish",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_restore_renamed_database_reopens_same_capture",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[missing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[corrupt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[db-corrupt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[symlink]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[fifo]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[extra]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[traversal]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[duplicate]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[version]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_missing_corrupt_and_unsafe_members[unknown-field]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_create_only_publication_never_overwrites_competing_destination[export]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_create_only_publication_never_overwrites_competing_destination[restore]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_incomplete_bundle_has_no_success_marker[enospc]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_incomplete_bundle_has_no_success_marker[fsync]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_incomplete_bundle_has_no_success_marker[interrupt]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_space_preflight_is_independent_of_capture_quota",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 19
+      },
+      "run": "task5-bundle-red-01",
+      "seconds": 7.153
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "21f966808eb82cef0e31c2ade7659d9ff6b91bbf98a1b7dd60e9b96312d1a6d8",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task5-census-baseline",
+      "seconds": 15.708
+    },
+    {
+      "classification": "review_required; see separate census adjudication",
+      "command_sha256": "748f7ddee6c98bb51802aa418b73e9afbb6b44ff0abbb5b7337f838ab4b88036",
+      "exit_code": 2,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task5-census-checkpoint",
+      "seconds": 13.406
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "ee0435bd750ec1f309ce3095cb723646012412ebb35f1e7ce48ca38d667e1fa8",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 629
+      },
+      "run": "task5-fix1-checkpoint-01",
+      "seconds": 70.486
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "83955200aa761aee2e4d8f0738af906855b0fdabad7d4c1813fb7de339a09aa0",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 629
+      },
+      "run": "task5-fix1-green-01",
+      "seconds": 70.708
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "40735796cc7ca1dbd05e26f821c94b556068a846b3a4c9281ccb757d71f3b18b",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-direct]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-scheduled]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-sse-2.3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-sse-2.4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-direct]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-scheduled]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-sse-2.3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-sse-2.4]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 8
+      },
+      "run": "task5-fix1-inverse-admission-01",
+      "seconds": 3.463
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "3022458811a692bc8e242cc2ea58d2231cb08d49386fcd168e9d0df14e0e3752",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_empty_restore_requires_directory_members_before_destination[objects-file]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_empty_restore_requires_directory_members_before_destination[staging-file]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 2,
+        "passed": 1
+      },
+      "run": "task5-fix1-inverse-members-01",
+      "seconds": 3.375
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "3b9491f60aedb4653c040d6b972c6027c5c70b944bca93d645306936b0609515",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-direct]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-scheduled]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-sse-2.3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-sse-2.4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-direct]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-scheduled]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-sse-2.3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-sse-2.4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[invalid-direct]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[invalid-scheduled]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[invalid-sse-2.3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[invalid-sse-2.4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[space-direct]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[space-scheduled]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[space-sse-2.3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[space-sse-2.4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[lock-direct]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[lock-scheduled]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[lock-sse-2.3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operation_admission",
+          "test_closed_admission_failure_has_truthful_terminal_without_dispatch[lock-sse-2.4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_empty_restore_requires_directory_members_before_destination[objects-file]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_empty_restore_requires_directory_members_before_destination[staging-file]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 22,
+        "passed": 9
+      },
+      "run": "task5-fix1-red-01",
+      "seconds": 4.538
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "5c97c511c364c35ab5062d7c9f7a10146d042313c40ebcf81aad76a21cb58773",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task5-fix1-typecheck-01",
+      "seconds": 11.474
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "4abc32d75f0f349a70218ecdb6490263c32cffaf7fef43aab236d4632b00ab1b",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task5-fix1-ui-green-01",
+      "seconds": 0.761
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "36218f85af091d05578de929ad5bc8feee7f1272fce04ae980cdf0462b329382",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task5-fix1-ui-red-01",
+      "seconds": 0.731
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "17c93608ce777bf3a44939ad3d418bb378b64dae38268613c570bca7215fbba7",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_research_busy_admission_terminalizes_without_dispatch[maintenance-direct]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_research_busy_admission_terminalizes_without_dispatch[maintenance-scheduled]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_legacy_busy_admission_completes_http_sse_without_dispatch[2.4-maintenance]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 3
+      },
+      "run": "task5-inverse-busy-admission-01",
+      "seconds": 3.302
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "13e99079a9bbe5df0de30d1f6639bb767c23f5ea2a4f5e5452c003a0baff0f11",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_rejects_corrupt_unreferenced_registered_object",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task5-inverse-bypass-hash-01",
+      "seconds": 3.608
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "9559ecc5e1bb81b7a618ca37b4bf247a590ed277de65ae12aa7313e3b111f35f",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_export_restore_preserves_wal_and_historical_citations",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task5-inverse-catalog-source-01",
+      "seconds": 3.407
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "bc106f96493c28310c484fb9930108bdb2abe19a1fe18439c39c012ba0ff0df1",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_create_only_publication_never_overwrites_competing_destination[empty-export]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_create_only_publication_never_overwrites_competing_destination[empty-restore]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 2
+      },
+      "run": "task5-inverse-existing-destination-01",
+      "seconds": 4.078
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "58dbbaca56a39962894e16e0ecc9c27c90aa56815b1e01a213c3792464696f33",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_export_uses_backup_inventory_during_concurrent_publish",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task5-inverse-live-inventory-01",
+      "seconds": 3.36
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "a59420829c9452542b374b8e6ee8c9898de77d799eb724542054315f2bcc083f",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_maintenance_cannot_enter_put_to_publish_gap",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_legacy_stream_keeps_result_lease_until_transcript",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_research_result_lease_reaches_durable_commit[success]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_research_result_lease_reaches_durable_commit[error]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_research_result_lease_reaches_durable_commit[cancel]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 5
+      },
+      "run": "task5-inverse-outer-lease-01",
+      "seconds": 4.487
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "e1f86c1b832b6ba519feba87100e42615d414c2804962628be739e1bc020b0f0",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[.-export]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[.-restore]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[child-export]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[child-restore]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[objects/child-export]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[objects/child-restore]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 6
+      },
+      "run": "task5-inverse-source-overlap-01",
+      "seconds": 5.47
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "4437e2064fed1fa24c7cf58f56e96f7e2aa7b6cb4b90bfd61f0ef0a5a3e08530",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_export_does_not_checkpoint_stranded_source_wal",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task5-inverse-stranded-wal-01",
+      "seconds": 3.448
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "8f2b48bbe4136b9f11e7df4d41b0ff9ee4e7a45d6847c921ace72a59e06c073d",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task5-maintenance-ui-green-01",
+      "seconds": 0.774
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "f25ec34a7826ca7bc823abf23099b12c1c54e2dcb6c810f4210998bbe9f8af76",
+      "exit_code": 1,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task5-maintenance-ui-red-01",
+      "seconds": 0.702
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "5cbdeae6aa944c84fcb7f35b76463a80ffc18bf74e2a4f1b4c5c56c9de5e3a19",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": null,
+      "run": "task5-maintenance-ui-typecheck-01",
+      "seconds": 11.593
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "2170be5ff4e182daad2637713a0c93d7001a8ee4696c94a0bc7f5ec4d0a9daa6",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 1119
+      },
+      "run": "task5-operation-checkpoint-01",
+      "seconds": 106.891
+    },
+    {
+      "classification": "validation order/read fsync regression; product corrected, receipt retained",
+      "command_sha256": "341766e87f5de215b583027bfda0e1eb5598c4b303143142e5ceb444ad51cd8c",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_captures",
+          "test_directory_sync_failure_then_retry_never_publishes_missing_bytes",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_queries",
+          "test_pure_validation_rejects_before_storage[changes0]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_queries",
+          "test_pure_validation_rejects_before_storage[changes1]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_queries",
+          "test_pure_validation_rejects_before_storage[changes2]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_queries",
+          "test_pure_validation_rejects_before_storage[changes3]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_queries",
+          "test_pure_validation_rejects_before_storage[changes4]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_queries",
+          "test_pure_validation_rejects_before_storage[changes5]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_queries",
+          "test_pure_validation_rejects_before_storage[changes6]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_queries",
+          "test_pure_validation_rejects_before_storage[changes7]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_document_queries",
+          "test_pure_validation_rejects_before_storage[changes8]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_every_union_member_is_closed_and_validation_precedes_reads[extra-document]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_every_union_member_is_closed_and_validation_precedes_reads[extra-fact]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_every_union_member_is_closed_and_validation_precedes_reads[extra-filing]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_every_union_member_is_closed_and_validation_precedes_reads[missing-document]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_every_union_member_is_closed_and_validation_precedes_reads[missing-fact]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_citations",
+          "test_every_union_member_is_closed_and_validation_precedes_reads[missing-filing]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 16,
+        "passed": 625
+      },
+      "run": "task5-operation-green-01",
+      "seconds": 62.69
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "153443f8facea2080ecbc88d72ef2de808f5765a3d0fda6ce3cd9d7bd539c2e8",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 756
+      },
+      "run": "task5-operation-green-02",
+      "seconds": 88.191
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "e7c880f00f38a59b0e7ca777d890fd70aacd58259235607bd329b195b43aaf01",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_maintenance_cannot_enter_put_to_publish_gap",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_stored_reader_lease_does_not_create_capture_root",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_capture_read_retains_lease_through_bytes",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_operation_reentrancy_is_thread_and_task_owned",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_shared_operations_coexist_but_never_upgrade",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_operation_exception_releases_and_rejects_unsafe_root",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_operation_unsupported_platform_fails_closed",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 7
+      },
+      "run": "task5-operation-red-01",
+      "seconds": 0.87
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "136f85ed0cf0c6162cf1a79f988a649d1b6f3d67a52b9a810353de6a6819b6b2",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 89
+      },
+      "run": "task5-owner-green-01",
+      "seconds": 9.749
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "8b42b330d0398d5c0bb057d298cc429b4844f683e80b57d7781937e6f1a09eef",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_stale_copied_context_cannot_reuse_released_lease",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_direct_reference_publication_holds_operation[message]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_direct_reference_publication_holds_operation[event]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 3
+      },
+      "run": "task5-owner-red-01",
+      "seconds": 3.479
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "03a328a0317d3be6732a0f399daeef975374870c482f9dd760d4dd3becd1a8df",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 1390
+      },
+      "run": "task5-repair-checkpoint-01",
+      "seconds": 153.15
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "f53f27923c95969407e3168b9fad2c797030bc9732fd345fbf6379cdb21d4593",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_research_result_lease_reaches_durable_commit[success]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_research_result_lease_reaches_durable_commit[error]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_research_result_lease_reaches_durable_commit[cancel]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 3
+      },
+      "run": "task5-research-red-01",
+      "seconds": 3.935
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "c1604e1029facd8f3ccf19915251bd2bf4ca6be0f50539175232b391647ba96f",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 214
+      },
+      "run": "task5-resume-baseline",
+      "seconds": 29.113
+    },
+    {
+      "classification": "completed check; scope from exact command",
+      "command_sha256": "218afbd44f18a36efcf5d5e3a711c5290acabbcec0cebbe044525f07d6e2be64",
+      "exit_code": 0,
+      "failed_nodes": [],
+      "junit_counts": {
+        "passed": 80
+      },
+      "run": "task5-review-green-01",
+      "seconds": 20.385
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "c83a9892554346ade84f7fda767e0ddaae8a0a23107fc63c41e83b77ad909582",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_research_busy_admission_terminalizes_without_dispatch[maintenance-direct]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_research_busy_admission_terminalizes_without_dispatch[maintenance-scheduled]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_legacy_busy_admission_completes_http_sse_without_dispatch[maintenance]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[.-export]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[.-restore]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[child-export]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[child-restore]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[objects/child-export]",
+          "failure"
+        ],
+        [
+          "tests.test_sec_research_operations",
+          "test_bundle_destination_cannot_mutate_source[objects/child-restore]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 9,
+        "passed": 3
+      },
+      "run": "task5-review-red-01",
+      "seconds": 5.857
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "4b52c6d36e5bd9f824877c094e3615c28b202fec61d128374fc7f7c6f52d65ab",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_export_does_not_checkpoint_stranded_source_wal",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task5-stranded-wal-red-01",
+      "seconds": 3.464
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "cc5319a2cf375dfbd7f326a52b4f5bba02776fd23b20f7c82aaaa09a61bb0024",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_direct_reference_publication_holds_operation[terminal]",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1,
+        "passed": 3
+      },
+      "run": "task5-terminal-red-01",
+      "seconds": 4.008
+    },
+    {
+      "classification": "retained RED/inverse; intended assertion must be read in the task report",
+      "command_sha256": "1c16eb4709edd56af9fe8998440029304f6ea8f5d23cec2bee717bc73108e8ed",
+      "exit_code": 1,
+      "failed_nodes": [
+        [
+          "tests.test_sec_research_operations",
+          "test_restore_rejects_wal_bundle_before_sqlite_open",
+          "failure"
+        ]
+      ],
+      "junit_counts": {
+        "failure": 1
+      },
+      "run": "task5-wal-admission-red-01",
+      "seconds": 3.372
+    }
+  ],
+  "unclassified_failures": [],
+  "unfinished": []
+}

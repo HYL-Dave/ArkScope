@@ -1,0 +1,39 @@
+{
+  "run": "task6-fix1-inverse-failure-audit-lease-01",
+  "case": "failure-audit-lease",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+    "task6-fix1-inverse-failure-audit-lease-01",
+    "backend",
+    "-q",
+    "tests/test_sec_research_maintenance.py::test_cleanup_failure_audit_keeps_original_exclusive_lease",
+    "tests/test_sec_research_schema_admin.py::test_schema_failure_audit_keeps_original_exclusive_lease",
+    "tests/test_sec_research_maintenance.py::test_admin_admission_failure_has_no_lease_or_audit"
+  ],
+  "exit_code": 1,
+  "restored": {
+    "src/sec_research/maintenance.py": "0d64f3d0c8b3bc50df5c5d7cc96a8e826e2e710078c518459e5d5350b96c0a90",
+    "src/sec_research/schema_admin.py": "963276ac7f1a086451e056c349beda08e93151f5f2ffe2ee095018ae301c305b"
+  },
+  "mutated": {
+    "src/sec_research/maintenance.py": "b082a5668910e5cccd770ead23664b28d2813cabbb4ad9fd0c32d89ada92aef7",
+    "src/sec_research/schema_admin.py": "c8bd0e9dd5cd48028aa36a2f10e40677d8c873a561996990ddd813e899683532"
+  },
+  "tests": {
+    "tests/test_sec_research_maintenance.py": "f9f5f5bf54c8d4808bf8b9caa19347844a5a6b1fd4242b1ea2847543995f15d3",
+    "tests/test_sec_research_schema_admin.py": "9cfc414192921510d0c29f61310dd2933aff2efe114939e132ec64255c7e1236",
+    "tests/test_sec_research_cli.py": "0f05033f1e945dfd48c7e9bb9a909bc5171009ae799ae27cf1073403a5163634"
+  },
+  "failed_testcases": [
+    "tests.test_sec_research_maintenance::test_cleanup_failure_audit_keeps_original_exclusive_lease[unlink-charged]",
+    "tests.test_sec_research_maintenance::test_cleanup_failure_audit_keeps_original_exclusive_lease[transaction-prepared]",
+    "tests.test_sec_research_schema_admin::test_schema_failure_audit_keeps_original_exclusive_lease[backup-prepared]",
+    "tests.test_sec_research_schema_admin::test_schema_failure_audit_keeps_original_exclusive_lease[transaction-backed_up]",
+    "tests.test_sec_research_schema_admin::test_schema_failure_audit_keeps_original_exclusive_lease[stale-backed_up]"
+  ],
+  "error_testcases": [],
+  "mutation_script": "task6-inverses.py",
+  "source_bytes": "task6-fix1-inverse-failure-audit-lease-01-source"
+}

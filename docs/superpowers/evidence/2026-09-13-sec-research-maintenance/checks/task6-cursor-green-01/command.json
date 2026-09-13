@@ -1,0 +1,27 @@
+{
+  "name": "task6-cursor-green-01",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/offline_pytest.py",
+    "-q",
+    "tests/test_sec_research_maintenance.py::test_unfinished_autocommit_cursor_is_not_a_fresh_profile_snapshot",
+    "tests/test_sec_research_maintenance.py::test_stale_caller_read_transaction_is_not_a_fresh_recheck",
+    "tests/test_sec_research_maintenance.py::test_new_reference_invalidates_cleanup_preview",
+    "tests/test_sec_research_maintenance.py::test_cleanup_colocated_empty_research_roots_use_query_only_snapshot",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task6-cursor-green-01/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 2.158,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task6-cursor-green-01",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task6-cursor-green-01/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/task6-cursor-green-01/output.log"
+}

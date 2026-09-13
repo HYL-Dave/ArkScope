@@ -1,0 +1,1163 @@
+{
+  "added": [
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_explicit_preview_approval_and_receipt[cleanup]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_explicit_preview_approval_and_receipt[schema]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_help_does_not_resolve_stores[None]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_help_does_not_resolve_stores[cleanup-apply]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_help_does_not_resolve_stores[cleanup-preview]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_help_does_not_resolve_stores[schema-apply]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_help_does_not_resolve_stores[schema-preview]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_invalid_requests_never_resolve_or_open_databases[args0]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_invalid_requests_never_resolve_or_open_databases[args1]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_invalid_requests_never_resolve_or_open_databases[args2]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_missing_profile_never_initializes"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview--journal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview--shm]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview--wal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview-]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt--journal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt--shm]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt--wal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt-]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-backup--journal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-backup--shm]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-backup--wal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-backup-]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-preview--journal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-preview--shm]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-preview--wal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-preview-]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt--journal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt--shm]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt--wal]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt-]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_rejects_nonclosed_preview_before_resolving_database[candidate]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_rejects_nonclosed_preview_before_resolving_database[object]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_rejects_nonclosed_preview_before_resolving_database[reference_count]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_rejects_nonclosed_preview_before_resolving_database[status]"
+    ],
+    [
+      "tests.test_sec_research_cli",
+      "test_cli_unknown_schema_requires_disclosed_digest_approval"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_admin_admission_failure_has_no_lease_or_audit[cleanup]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_admin_admission_failure_has_no_lease_or_audit[schema]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_changed_capture_identity_invalidates_approval"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_approval_and_receipt_are_create_only[digest]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_approval_and_receipt_are_create_only[existing_receipt]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_approval_and_receipt_are_create_only[extra_field]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_blocks_unsafe_or_ambiguous_file_inventory[hardlink]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_blocks_unsafe_or_ambiguous_file_inventory[missing_child]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_blocks_unsafe_or_ambiguous_file_inventory[missing_root]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_blocks_unsafe_or_ambiguous_file_inventory[symlink]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_blocks_unsafe_or_ambiguous_file_inventory[unknown_key]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_blocks_unsafe_or_ambiguous_file_inventory[unknown_root]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_cancellation_after_charge_is_explicitly_resumable"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_colocated_empty_research_roots_use_query_only_snapshot"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_database_mutation_excludes_ordinary_writer"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_expensive_io_allows_ordinary_market_writer[capture]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_expensive_io_allows_ordinary_market_writer[receipt]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_expensive_io_allows_ordinary_market_writer[unlink]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_external_cascade_cannot_delete_unrelated_rows[SeC_ReSeArCh_ObJeCtS]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_external_cascade_cannot_delete_unrelated_rows[sec_research_objects]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_failure_audit_keeps_original_exclusive_lease[transaction-prepared]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_failure_audit_keeps_original_exclusive_lease[unlink-charged]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_final_receipt_failure_does_not_claim_durable_completion"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_preserves_every_retained_reference_class"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_receipt_failure_reports_last_durable_resource_phase[charged-prepared-True]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_receipt_failure_reports_last_durable_resource_phase[files_removed-charged-False]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_receipt_rejects_profile_sqlite_namespace[-journal]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_receipt_rejects_profile_sqlite_namespace[-shm]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_receipt_rejects_profile_sqlite_namespace[-wal]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_receipt_rejects_profile_sqlite_namespace[]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_requires_fresh_exclusive_lease"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_cleanup_restores_immutability_after_rollback"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_corrupt_retained_reference_never_becomes_empty[object]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_corrupt_retained_reference_never_becomes_empty[profile_json]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_corrupt_retained_reference_never_becomes_empty[receipt]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_explicit_cleanup_retry_resolves_absent_charge_only_after_directory_sync"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_failed_directory_durability_charge_survives_ordinary_recovery"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_first_receipt_failure_never_claims_a_durable_prepared_phase[cleanup]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_first_receipt_failure_never_claims_a_durable_prepared_phase[schema]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_invalid_preview_headers_are_not_echoed_in_receipts"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_maintenance_preview_is_observational"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_malformed_apply_input_blocks_without_io[None]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_malformed_apply_input_blocks_without_io[unknown]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_malformed_apply_input_blocks_without_io[value1]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_malformed_apply_input_blocks_without_io[value3]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_new_reference_invalidates_cleanup_preview"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_profile_roots_fail_closed[corrupt_json]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_profile_roots_fail_closed[not_query_only]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_profile_roots_fail_closed[partial]"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_receipt_cannot_occupy_sqlite_journal"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_recovery_cannot_clear_absent_charge_without_directory_sync"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_registered_orphan_unlink_failure_remains_charged"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_stale_caller_read_transaction_is_not_a_fresh_recheck"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_unfinished_autocommit_cursor_is_not_a_fresh_profile_snapshot"
+    ],
+    [
+      "tests.test_sec_research_maintenance",
+      "test_unrelated_market_rows_do_not_invalidate_approval"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[invalid-direct]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[invalid-scheduled]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[invalid-sse-2.3]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[invalid-sse-2.4]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[lock-direct]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[lock-scheduled]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[lock-sse-2.3]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[lock-sse-2.4]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[space-direct]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[space-scheduled]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[space-sse-2.3]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[space-sse-2.4]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unknown-runtime-direct]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unknown-runtime-scheduled]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unknown-runtime-sse-2.3]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unknown-runtime-sse-2.4]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unknown-value-direct]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unknown-value-scheduled]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unknown-value-sse-2.3]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unknown-value-sse-2.4]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-direct]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-scheduled]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-sse-2.3]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsafe-sse-2.4]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-direct]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-scheduled]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-sse-2.3]"
+    ],
+    [
+      "tests.test_sec_research_operation_admission",
+      "test_closed_admission_failure_has_truthful_terminal_without_dispatch[unsupported-sse-2.4]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_cli_uses_same_owners_and_reports_scope"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_destination_cannot_mutate_source[.-export]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_destination_cannot_mutate_source[.-restore]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_destination_cannot_mutate_source[child-export]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_destination_cannot_mutate_source[child-restore]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_destination_cannot_mutate_source[objects/child-export]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_destination_cannot_mutate_source[objects/child-restore]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_corrupt_unreferenced_registered_object"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_dangling_json_and_catalog_sources[catalog-source]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_dangling_json_and_catalog_sources[directory-json]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_dangling_json_and_catalog_sources[receipt-json]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[corrupt]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[db-corrupt]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[duplicate]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[extra]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[fifo]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[missing]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[symlink]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[traversal]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[unknown-field]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_rejects_missing_corrupt_and_unsafe_members[version]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_bundle_space_preflight_is_independent_of_capture_quota"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_capture_read_retains_lease_through_bytes"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_create_only_destination_race_after_space_admission"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_create_only_publication_never_overwrites_competing_destination[empty-export]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_create_only_publication_never_overwrites_competing_destination[empty-restore]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_create_only_publication_never_overwrites_competing_destination[store-export]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_create_only_publication_never_overwrites_competing_destination[store-restore]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_direct_reference_publication_holds_operation[event]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_direct_reference_publication_holds_operation[message]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_direct_reference_publication_holds_operation[terminal]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_empty_export_never_creates_source_capture_root"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_empty_restore_requires_directory_members_before_destination[objects-file]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_empty_restore_requires_directory_members_before_destination[staging-file]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_empty_restore_requires_directory_members_before_destination[valid]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_export_does_not_checkpoint_stranded_source_wal"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_export_preserves_large_utf8_document"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_export_preserves_nonempty_issuer_map"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_export_restore_preserves_wal_and_historical_citations"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_export_uses_backup_inventory_during_concurrent_publish"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_final_marker_fsync_failure_withdraws_success"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_incomplete_bundle_has_no_success_marker[enospc]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_incomplete_bundle_has_no_success_marker[fsync]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_incomplete_bundle_has_no_success_marker[interrupt]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_legacy_busy_admission_completes_http_sse_without_dispatch[2.3-available]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_legacy_busy_admission_completes_http_sse_without_dispatch[2.3-maintenance]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_legacy_busy_admission_completes_http_sse_without_dispatch[2.4-available]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_legacy_busy_admission_completes_http_sse_without_dispatch[2.4-maintenance]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_legacy_stream_keeps_result_lease_until_transcript"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_maintenance_cannot_enter_put_to_publish_gap"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_operation_exception_releases_and_rejects_unsafe_root"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_operation_reentrancy_is_thread_and_task_owned"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_operation_unsupported_platform_fails_closed"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_publication_platform_failure_precedes_database_open"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_research_busy_admission_terminalizes_without_dispatch[available-direct]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_research_busy_admission_terminalizes_without_dispatch[available-scheduled]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_research_busy_admission_terminalizes_without_dispatch[maintenance-direct]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_research_busy_admission_terminalizes_without_dispatch[maintenance-scheduled]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_research_result_lease_reaches_durable_commit[cancel]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_research_result_lease_reaches_durable_commit[error]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_research_result_lease_reaches_durable_commit[success]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_restore_invalid_basename_precedes_database_open[../escape.db]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_restore_invalid_basename_precedes_database_open[CON]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_restore_invalid_basename_precedes_database_open[]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_restore_invalid_basename_precedes_database_open[bad\\\\name]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_restore_invalid_basename_precedes_database_open[manifest.json]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_restore_invalid_basename_precedes_database_open[market.db-wal/other]"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_restore_rejects_wal_bundle_before_sqlite_open"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_restore_renamed_database_reopens_same_capture"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_shared_operations_coexist_but_never_upgrade"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_stale_copied_context_cannot_reuse_released_lease"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_stored_reader_lease_does_not_create_capture_root"
+    ],
+    [
+      "tests.test_sec_research_operations",
+      "test_success_marker_is_atomic_final_publication"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_backup_failure_precedes_any_drop_and_can_retry"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_database_mutation_excludes_ordinary_writer"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_expensive_io_allows_ordinary_market_writer[backup]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_expensive_io_allows_ordinary_market_writer[capture]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_expensive_io_allows_ordinary_market_writer[receipt]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_failure_audit_keeps_original_exclusive_lease[backup-prepared]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_failure_audit_keeps_original_exclusive_lease[stale-backed_up]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_failure_audit_keeps_original_exclusive_lease[transaction-backed_up]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_final_receipt_failure_reports_committed_schema_not_completion"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_outputs_reject_profile_sqlite_namespace[backup--journal]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_outputs_reject_profile_sqlite_namespace[backup--shm]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_outputs_reject_profile_sqlite_namespace[backup--wal]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_outputs_reject_profile_sqlite_namespace[backup-]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_outputs_reject_profile_sqlite_namespace[receipt--journal]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_outputs_reject_profile_sqlite_namespace[receipt--shm]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_outputs_reject_profile_sqlite_namespace[receipt--wal]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_outputs_reject_profile_sqlite_namespace[receipt-]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_receipt_failure_after_commit_keeps_backup_and_charges"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_rechecks_after_backup"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_accepts_known_definition_mismatch_not_a_legacy_lane[reset]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_accepts_known_definition_mismatch_not_a_legacy_lane[uninstall]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_blocks_external_dependencies[mixed_fk]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_blocks_external_dependencies[trigger]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_blocks_external_dependencies[view]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_cannot_erase_unresolved_absent_file_charge"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_preserves_unrelated_rows_and_sqlite_sequence[False-reset]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_preserves_unrelated_rows_and_sqlite_sequence[False-uninstall]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_preserves_unrelated_rows_and_sqlite_sequence[True-reset]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_preserves_unrelated_rows_and_sqlite_sequence[True-uninstall]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_refuses_colocated_research_references"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_refuses_research_references"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_reset_requires_backup_and_exclusive_lease"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_schema_transaction_failure_restores_original_and_audit_survives"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_owned_objects_are_not_prefix_drop_targets"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_backup_failure_leaves_no_success_marker[capture]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_backup_failure_leaves_no_success_marker[database]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_backup_failure_leaves_no_success_marker[marker]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_backup_keeps_reference_findings_visible"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_backup_rechecks_before_success_marker"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_discloses_backup_only_and_preserves_source[reset]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_discloses_backup_only_and_preserves_source[uninstall]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[caller_transaction]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[digest]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[existing_backup]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[lease]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[missing_backup]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[missing_profile]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[missing_root]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[partial_profile]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[stale]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[unsafe_backup]"
+    ],
+    [
+      "tests.test_sec_research_schema_admin",
+      "test_unknown_schema_missing_unsafe_or_stale_inputs_never_back_up[unsafe_capture]"
+    ]
+  ],
+  "backend": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 10827,
+    "skipped": 12
+  },
+  "baseline": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 10583,
+    "skipped": 12
+  },
+  "baseline_junit_gzip_sha256": "f5cab007e5d5157d16e8f957365cc6a3d94cb1afdc942891c0fbd142be628d42",
+  "checks": {
+    "collected_equals_executed": true,
+    "complete_commands_succeeded": true,
+    "explicit_tests_directory": true,
+    "immutable_source_anchor_matches": true,
+    "maintenance_operation_and_citation_regression_suites_ran": true,
+    "no_backend_failures_or_errors": true,
+    "no_duplicate_nodes": true,
+    "no_source_runtime_or_runner_drift": true,
+    "retained_safety_owners_ran": true,
+    "unchanged_skip_ids": true
+  },
+  "collected": 10839,
+  "collection_run": "task6-final-collection",
+  "executed": 10839,
+  "junit_sha256": "a57426fb64b235f69be2e870f007c4b4d040ed4ff092387ec59138104f4dfd28",
+  "limit": "Frozen offline maintenance implementation acceptance, not actual-store cleanup/reset, complete SEC release or SQLite activation.",
+  "new_suites": {
+    "test_sec_research_citations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 143,
+      "skipped": 0
+    },
+    "test_sec_research_cli": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 36,
+      "skipped": 0
+    },
+    "test_sec_research_maintenance": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 55,
+      "skipped": 0
+    },
+    "test_sec_research_operation_admission": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 28,
+      "skipped": 0
+    },
+    "test_sec_research_operations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 73,
+      "skipped": 0
+    },
+    "test_sec_research_references": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 47,
+      "skipped": 0
+    },
+    "test_sec_research_schema_admin": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 52,
+      "skipped": 0
+    },
+    "test_sec_research_trace": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 75,
+      "skipped": 0
+    }
+  },
+  "removed": [],
+  "retained_safety_owners": {
+    "test_api_fixed_dispatch_pins_complete_selection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0
+    },
+    "test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_failed_generation_redacts_selected_key_after_activation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_openai_retry_key_echo_is_private_without_changing_retry_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_original_oauth_id_can_refresh_normally_without_reselection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    }
+  },
+  "seconds": 1320.185,
+  "skipped": [
+    [
+      "tests.test_detailed_financials.TestLiveTechMetrics",
+      "test_nvda_tech_metrics"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_basic_stock_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_connection"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_iv_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_filter"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_quote"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_volume_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_put_call_ratio_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_scanner_parameters"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_unusual_activity"
+    ],
+    [
+      "tests.test_option_chain_tools.TestLiveOptionChain",
+      "test_spy_option_chain"
+    ],
+    [
+      "tests.test_peer_comparison.TestLivePeerComparison",
+      "test_nvda_peer_comparison"
+    ]
+  ],
+  "source_anchor": "78157e62f0526b90898a2a4b77c1d6ffe6a9a15b",
+  "source_collection_sha256": "93c470af219d947f4d25842ae942c9d9d3fa2d40649531cf6b5044e2ceae8c91",
+  "source_drift": [],
+  "source_files": 1151,
+  "source_snapshot_after": "task6-full-after.json",
+  "source_snapshot_before": "task6-full-before.json",
+  "sqlite": "3.37.2"
+}

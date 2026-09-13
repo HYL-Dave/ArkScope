@@ -1,0 +1,2149 @@
+{
+  "base_counts": {
+    "candidates": 4330,
+    "uncertainties": 3469
+  },
+  "comparison": {
+    "coverage_reductions": [],
+    "dependency_metadata_changed": [],
+    "new_candidates": [
+      "i18n:apps/arkscope-web/src/i18n/resources/en/research.ts:en:research:errors.maintenanceDetail",
+      "i18n:apps/arkscope-web/src/i18n/resources/en/research.ts:en:research:errors.maintenanceTitle",
+      "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/research.ts:zh-Hant:research:errors.maintenanceDetail",
+      "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/research.ts:zh-Hant:research:errors.maintenanceTitle",
+      "python:src.sec_research.__main__"
+    ],
+    "new_uncertainties": [
+      "frontend:0819d293dd5f7e4d",
+      "frontend:08d86c355b49145d",
+      "frontend:0b628bb7e7ce953f",
+      "frontend:1e5ec587ed0b31cc",
+      "frontend:1edfeebc869290e6",
+      "frontend:2909db153a4dac0d",
+      "frontend:35d240524a68b9a0",
+      "frontend:39f68b5ebf08c444",
+      "frontend:5aca9d7a013ee96c",
+      "frontend:5c8c32ede8bfdc5c",
+      "frontend:5d1da6060ff35da8",
+      "frontend:66c33ea09cda9c11",
+      "frontend:6d36633db512492e",
+      "frontend:7a7d81d59898546b",
+      "frontend:895e7bc077d13761",
+      "frontend:941a456ff5bd2f57",
+      "frontend:9cc0707bfa4318a6",
+      "frontend:9f3f3f5026ee1d8d",
+      "frontend:a3da37385d9a9bf4",
+      "frontend:c395a4de4fa6f24d",
+      "frontend:c3e7afb28679a85f",
+      "frontend:cff1a9588c902364",
+      "frontend:d2cbd35341a43b37",
+      "frontend:e7360e4055059ef4",
+      "frontend:f155f43289426997",
+      "sql:0217c98f731b6399",
+      "sql:059b3af96422cb2e",
+      "sql:0e85629b19addba7",
+      "sql:1055a98e60283c94",
+      "sql:1155a4c018ff551f",
+      "sql:12ed8e4286634074",
+      "sql:13d3c2a19a47b19b",
+      "sql:15b8de39da7006af",
+      "sql:176b86be958d730b",
+      "sql:1786b7e9494a2f2a",
+      "sql:1e1f6f38abcb6fb2",
+      "sql:1f64e36753387c67",
+      "sql:21948b8d5ab8e259",
+      "sql:22f332ed651f8733",
+      "sql:27b28e4356668d07",
+      "sql:2880aaba5cc0b991",
+      "sql:2882395c83ef45f8",
+      "sql:2b51606f35567e86",
+      "sql:3158cf9311b87093",
+      "sql:33a9057161f09f96",
+      "sql:3603f926549ff14b",
+      "sql:3be44854583d1aca",
+      "sql:3e3eb0472f73581f",
+      "sql:41c29a465dceaeee",
+      "sql:41c3b5b925c7765f",
+      "sql:467ddfc938784da7",
+      "sql:4ce4cc8f5a6fe5ff",
+      "sql:4d397433e99051a7",
+      "sql:50e2880ff820d461",
+      "sql:53405b7133d8f6d4",
+      "sql:591590a18bc61c26",
+      "sql:5b1c3ab7d116a7dd",
+      "sql:5cb8c251aaefb8ac",
+      "sql:5da5c669abca1420",
+      "sql:66c5199bb850fc0c",
+      "sql:6ae564f71054ab3a",
+      "sql:6bccdebc1a8e1253",
+      "sql:6d397df4d3f5b1b8",
+      "sql:73439f96d79c3e07",
+      "sql:7372304518693cd8",
+      "sql:74e64661fa6c64b9",
+      "sql:76652fa1a6458db7",
+      "sql:76abb17978189065",
+      "sql:7afbc029f4a82f18",
+      "sql:7b2ba42d099c084d",
+      "sql:7ebc7214a9ee3dc4",
+      "sql:7fa35e9bcdbe5ecd",
+      "sql:86cb220d28f2fe7f",
+      "sql:88333fbc126729b6",
+      "sql:8b617116c1ac9f84",
+      "sql:8d6637d4f9683e38",
+      "sql:91aa9f7c8739877f",
+      "sql:9238b89c2ba0693a",
+      "sql:9452d43753faff18",
+      "sql:9468aff5a6f9fb14",
+      "sql:9610201358ff8922",
+      "sql:9d41d932a28ac3e0",
+      "sql:9f60cd810ce96064",
+      "sql:a002159d0b07c3e9",
+      "sql:a1ad1f7cadc6775e",
+      "sql:a5fb8f1b02e027dd",
+      "sql:ac79f0c6d2e03773",
+      "sql:b45d16f637147401",
+      "sql:b4ccc078ab660a0e",
+      "sql:b72a29a3b59cca48",
+      "sql:b8b3985746740bdd",
+      "sql:ba4157232db97d8e",
+      "sql:bc1098eec1459077",
+      "sql:bc7468843bc954e3",
+      "sql:c52970fb8285a493",
+      "sql:c915f00cc67daa20",
+      "sql:caf2bb847bc3d3f2",
+      "sql:cbdd1a0f97f49c3b",
+      "sql:cd4b800f14e95f62",
+      "sql:cfb83f17e5b2888f",
+      "sql:d110601739fb67c6",
+      "sql:d30007f9784f4a4d",
+      "sql:d7e2bcb542e7924e",
+      "sql:d9a296a2fe3f7189",
+      "sql:db1300b7931a8482",
+      "sql:dc76c9c04182d3f9",
+      "sql:dd61303851472f7a",
+      "sql:deb3e1e4f32585dc",
+      "sql:df63b4e4fb7ac628",
+      "sql:e1cf27a828cb3350",
+      "sql:e4e0b787a1ceff70",
+      "sql:e5bb1def5e2fc4e3",
+      "sql:ebb48d7da898c572",
+      "sql:ed24577fe6602591",
+      "sql:f41788eea5df6bd7",
+      "sql:f43ad83015ddcead",
+      "sql:f684b9c6ac7d3731",
+      "sql:f837a6edb8f2b025",
+      "sql:f8ec70480da1b7ca",
+      "sql:f910e19ab7dacbfe",
+      "sql:fbda6a47eae36cdd",
+      "sql:fe97006e2dba409f"
+    ],
+    "new_untracked_paths": [],
+    "review_required": true
+  },
+  "current_counts": {
+    "candidates": 4335,
+    "uncertainties": 3495
+  },
+  "method": "Identical non-position metadata; SQL additionally maps unchanged source lines and identical source AST fragments. This is not scanner completeness or deletion authority.",
+  "new_or_changed": [
+    {
+      "axis": "i18n",
+      "column": 16,
+      "expression": "t(($) => $.errors.maintenanceTitle)",
+      "file": "apps/arkscope-web/src/researchErrors.ts",
+      "id": "frontend:9f3f3f5026ee1d8d",
+      "key": "errors.maintenanceTitle",
+      "line": 124,
+      "namespaces": null,
+      "reason": "dynamic-translation-namespace"
+    },
+    {
+      "axis": "i18n",
+      "column": 17,
+      "expression": "t(($) => $.errors.maintenanceDetail)",
+      "file": "apps/arkscope-web/src/researchErrors.ts",
+      "id": "frontend:c395a4de4fa6f24d",
+      "key": "errors.maintenanceDetail",
+      "line": 125,
+      "namespaces": null,
+      "reason": "dynamic-translation-namespace"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:0217c98f731b6399",
+      "kind": "sql_prepare_failed",
+      "line": 227,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:059b3af96422cb2e",
+      "kind": "unmodeled_sql_statement",
+      "line": 223,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:0e85629b19addba7",
+      "kind": "sql_prepare_failed",
+      "line": 427,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:1055a98e60283c94",
+      "kind": "sql_prepare_failed",
+      "line": 423,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:1155a4c018ff551f",
+      "kind": "unmodeled_sql_statement",
+      "line": 361,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:13d3c2a19a47b19b",
+      "kind": "unmodeled_sql_statement",
+      "line": 412,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:1786b7e9494a2f2a",
+      "kind": "dynamic_sql",
+      "line": 224,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:1f64e36753387c67",
+      "kind": "sql_prepare_failed",
+      "line": 245,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:33a9057161f09f96",
+      "kind": "sql_prepare_failed",
+      "line": 225,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:3be44854583d1aca",
+      "kind": "unmodeled_sql_statement",
+      "line": 222,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:6bccdebc1a8e1253",
+      "kind": "sql_prepare_failed",
+      "line": 196,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:6d397df4d3f5b1b8",
+      "kind": "unmodeled_sql_statement",
+      "line": 425,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:76652fa1a6458db7",
+      "kind": "sql_prepare_failed",
+      "line": 359,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:9f60cd810ce96064",
+      "kind": "sql_prepare_failed",
+      "line": 195,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:bc1098eec1459077",
+      "kind": "sql_prepare_failed",
+      "line": 360,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:cfb83f17e5b2888f",
+      "kind": "sql_prepare_failed",
+      "line": 257,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:d7e2bcb542e7924e",
+      "kind": "sql_prepare_failed",
+      "line": 233,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:db1300b7931a8482",
+      "kind": "sql_prepare_failed",
+      "line": 259,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:ed24577fe6602591",
+      "kind": "unmodeled_sql_statement",
+      "line": 399,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:f41788eea5df6bd7",
+      "kind": "sql_prepare_failed",
+      "line": 426,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:f43ad83015ddcead",
+      "kind": "sql_prepare_failed",
+      "line": 413,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:f684b9c6ac7d3731",
+      "kind": "sql_prepare_failed",
+      "line": 422,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "id": "sql:f8ec70480da1b7ca",
+      "kind": "unmodeled_sql_statement",
+      "line": 424,
+      "path": "src/sec_research/operations.py"
+    },
+    {
+      "axis": "sql",
+      "error_type": "OperationalError",
+      "id": "sql:fe97006e2dba409f",
+      "kind": "sql_prepare_failed",
+      "line": 239,
+      "path": "src/sec_research/operations.py"
+    }
+  ],
+  "position_only": [
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "t(($) => $.errors.providerSettingsAction)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:0819d293dd5f7e4d",
+        "key": "errors.providerSettingsAction",
+        "line": 102,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "t(($) => $.errors.providerSettingsAction)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:a0a8ff2226292ca1",
+        "key": "errors.providerSettingsAction",
+        "line": 98,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.reauthDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:08d86c355b49145d",
+        "key": "errors.reauthDetail",
+        "line": 95,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.reauthDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:9d336af887cc9195",
+        "key": "errors.reauthDetail",
+        "line": 91,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.timeoutTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:0b628bb7e7ce953f",
+        "key": "errors.timeoutTitle",
+        "line": 106,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.timeoutTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:2fa9cc085d4da08f",
+        "key": "errors.timeoutTitle",
+        "line": 102,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.cancelledTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:1e5ec587ed0b31cc",
+        "key": "errors.cancelledTitle",
+        "line": 136,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.cancelledTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:a5f76fb286f7995b",
+        "key": "errors.cancelledTitle",
+        "line": 126,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 92,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchErrors.test.tsx",
+        "id": "frontend:1edfeebc869290e6",
+        "line": 97,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 94,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchErrors.test.tsx",
+        "id": "frontend:0426cb2acc245750",
+        "line": 84,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 94,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchErrors.test.tsx",
+        "id": "frontend:2909db153a4dac0d",
+        "line": 98,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 92,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchErrors.test.tsx",
+        "id": "frontend:32ae075b6bb29e69",
+        "line": 83,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.reauthTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:35d240524a68b9a0",
+        "key": "errors.reauthTitle",
+        "line": 94,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.reauthTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:cc6b06f5012ac7ff",
+        "key": "errors.reauthTitle",
+        "line": 90,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.providerCallFailedTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:39f68b5ebf08c444",
+        "key": "errors.providerCallFailedTitle",
+        "line": 118,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.providerCallFailedTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:04209904b9dd4956",
+        "key": "errors.providerCallFailedTitle",
+        "line": 114,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "t(($) => $.errors.reauthAction)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:5aca9d7a013ee96c",
+        "key": "errors.reauthAction",
+        "line": 96,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "t(($) => $.errors.reauthAction)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:c963657139169c56",
+        "key": "errors.reauthAction",
+        "line": 92,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.missingCredentialTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:5c8c32ede8bfdc5c",
+        "key": "errors.missingCredentialTitle",
+        "line": 100,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.missingCredentialTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:dd2b6e1b9a9c25fb",
+        "key": "errors.missingCredentialTitle",
+        "line": 96,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.cancelledDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:5d1da6060ff35da8",
+        "key": "errors.cancelledDetail",
+        "line": 137,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.cancelledDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:665a50e3e393f921",
+        "key": "errors.cancelledDetail",
+        "line": 127,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.providerCallFailedDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:66c33ea09cda9c11",
+        "key": "errors.providerCallFailedDetail",
+        "line": 119,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.providerCallFailedDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:a1d88718b6113f3c",
+        "key": "errors.providerCallFailedDetail",
+        "line": 115,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.maxTurnsTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:6d36633db512492e",
+        "key": "errors.maxTurnsTitle",
+        "line": 130,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.maxTurnsTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:6e787b28cdd28e66",
+        "key": "errors.maxTurnsTitle",
+        "line": 120,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.maxTurnsDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:7a7d81d59898546b",
+        "key": "errors.maxTurnsDetail",
+        "line": 131,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.maxTurnsDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:12cfe76c9d3f1aa3",
+        "key": "errors.maxTurnsDetail",
+        "line": 121,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "t(($) => $.errors.retryAction)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:895e7bc077d13761",
+        "key": "errors.retryAction",
+        "line": 132,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "t(($) => $.errors.retryAction)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:1f27137d4b987fd6",
+        "key": "errors.retryAction",
+        "line": 122,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.timeoutDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:941a456ff5bd2f57",
+        "key": "errors.timeoutDetail",
+        "line": 107,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.timeoutDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:a70076fd5a1e23bc",
+        "key": "errors.timeoutDetail",
+        "line": 103,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.interruptedTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:9cc0707bfa4318a6",
+        "key": "errors.interruptedTitle",
+        "line": 142,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.interruptedTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:43c389fd5f8c12f7",
+        "key": "errors.interruptedTitle",
+        "line": 132,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.refusalTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:a3da37385d9a9bf4",
+        "key": "errors.refusalTitle",
+        "line": 112,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 16,
+        "expression": "t(($) => $.errors.refusalTitle)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:9060876f69f6c284",
+        "key": "errors.refusalTitle",
+        "line": 108,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.interruptedDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:c3e7afb28679a85f",
+        "key": "errors.interruptedDetail",
+        "line": 143,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.interruptedDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:7af466ba8ca88a93",
+        "key": "errors.interruptedDetail",
+        "line": 133,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 43,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:cff1a9588c902364",
+        "line": 171,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 43,
+        "expression": "t",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:1d0ce24f07a5c0d9",
+        "line": 161,
+        "namespaces": null,
+        "reason": "escaped-translation-binding"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.missingCredentialDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:d2cbd35341a43b37",
+        "key": "errors.missingCredentialDetail",
+        "line": 101,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.missingCredentialDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:17e32e178858287b",
+        "key": "errors.missingCredentialDetail",
+        "line": 97,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.refusalDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:e7360e4055059ef4",
+        "key": "errors.refusalDetail",
+        "line": 113,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 17,
+        "expression": "t(($) => $.errors.refusalDetail)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:6419db9dd0a6d8ae",
+        "key": "errors.refusalDetail",
+        "line": 109,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "t(($) => $.errors.runtimeSettingsAction)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:f155f43289426997",
+        "key": "errors.runtimeSettingsAction",
+        "line": 108,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      },
+      "old": {
+        "axis": "i18n",
+        "column": 22,
+        "expression": "t(($) => $.errors.runtimeSettingsAction)",
+        "file": "apps/arkscope-web/src/researchErrors.ts",
+        "id": "frontend:f78e10adb88aba8d",
+        "key": "errors.runtimeSettingsAction",
+        "line": 104,
+        "namespaces": null,
+        "reason": "dynamic-translation-namespace"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:12ed8e4286634074",
+        "kind": "dynamic_sql",
+        "line": 559,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:591d87868661c5ab",
+        "kind": "dynamic_sql",
+        "line": 553,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:15b8de39da7006af",
+        "kind": "unmodeled_sql_statement",
+        "line": 500,
+        "path": "src/research_threads.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:7fcb6e169c0f13bf",
+        "kind": "unmodeled_sql_statement",
+        "line": 497,
+        "path": "src/research_threads.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:176b86be958d730b",
+        "kind": "sql_prepare_failed",
+        "line": 212,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:435fa5f4dc21141f",
+        "kind": "sql_prepare_failed",
+        "line": 205,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:1e1f6f38abcb6fb2",
+        "kind": "unmodeled_sql_statement",
+        "line": 45,
+        "path": "src/sec_research/references.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:17326cff3d410b05",
+        "kind": "unmodeled_sql_statement",
+        "line": 44,
+        "path": "src/sec_research/references.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:21948b8d5ab8e259",
+        "kind": "dynamic_sql",
+        "line": 614,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:4846552cc6117be6",
+        "kind": "dynamic_sql",
+        "line": 608,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:22f332ed651f8733",
+        "kind": "dynamic_sql",
+        "line": 502,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:992a706acfc5a204",
+        "kind": "dynamic_sql",
+        "line": 501,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:27b28e4356668d07",
+        "kind": "unmodeled_sql_statement",
+        "line": 653,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:bd59a81c4190098e",
+        "kind": "unmodeled_sql_statement",
+        "line": 652,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:2880aaba5cc0b991",
+        "kind": "dynamic_sql",
+        "line": 658,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:38ec9e1ca6c08a6d",
+        "kind": "dynamic_sql",
+        "line": 657,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:2882395c83ef45f8",
+        "kind": "sql_prepare_failed",
+        "line": 210,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:5f20cd823fc6b1ac",
+        "kind": "sql_prepare_failed",
+        "line": 203,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:2b51606f35567e86",
+        "kind": "sql_prepare_failed",
+        "line": 62,
+        "path": "src/sec_research/issuer_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:76123830b27ebffa",
+        "kind": "sql_prepare_failed",
+        "line": 61,
+        "path": "src/sec_research/issuer_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:3158cf9311b87093",
+        "kind": "unmodeled_sql_statement",
+        "line": 193,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:16352ebc57deabb5",
+        "kind": "unmodeled_sql_statement",
+        "line": 192,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:3603f926549ff14b",
+        "kind": "sql_prepare_failed",
+        "line": 97,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:02df2b045332477c",
+        "kind": "sql_prepare_failed",
+        "line": 95,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:3e3eb0472f73581f",
+        "kind": "unmodeled_sql_statement",
+        "line": 698,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:eb2c77974dada3d5",
+        "kind": "unmodeled_sql_statement",
+        "line": 697,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:41c29a465dceaeee",
+        "kind": "dynamic_sql",
+        "line": 529,
+        "path": "src/research_threads.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:7a67f66929d481c3",
+        "kind": "dynamic_sql",
+        "line": 526,
+        "path": "src/research_threads.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:41c3b5b925c7765f",
+        "kind": "sql_prepare_failed",
+        "line": 125,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:badef9310968e342",
+        "kind": "sql_prepare_failed",
+        "line": 123,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:467ddfc938784da7",
+        "kind": "sql_prepare_failed",
+        "line": 114,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:d9637c8e960966a2",
+        "kind": "sql_prepare_failed",
+        "line": 112,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:4ce4cc8f5a6fe5ff",
+        "kind": "sql_prepare_failed",
+        "line": 392,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:eda8edebf54341e2",
+        "kind": "sql_prepare_failed",
+        "line": 391,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:4d397433e99051a7",
+        "kind": "dynamic_sql",
+        "line": 273,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:7d872d3f8434d29d",
+        "kind": "dynamic_sql",
+        "line": 265,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:50e2880ff820d461",
+        "kind": "dynamic_sql",
+        "line": 528,
+        "path": "src/research_threads.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:5973df414a4a83a8",
+        "kind": "dynamic_sql",
+        "line": 525,
+        "path": "src/research_threads.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:53405b7133d8f6d4",
+        "kind": "sql_prepare_failed",
+        "line": 323,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:8e6fab6741bf0d72",
+        "kind": "sql_prepare_failed",
+        "line": 315,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:591590a18bc61c26",
+        "kind": "dynamic_sql",
+        "line": 488,
+        "path": "src/research_threads.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:7eec007942044c0b",
+        "kind": "dynamic_sql",
+        "line": 485,
+        "path": "src/research_threads.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:5b1c3ab7d116a7dd",
+        "kind": "unmodeled_sql_statement",
+        "line": 163,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:3f1be162238ad1d5",
+        "kind": "unmodeled_sql_statement",
+        "line": 156,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:5cb8c251aaefb8ac",
+        "kind": "sql_prepare_failed",
+        "line": 135,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:a0d7fd9bb572157d",
+        "kind": "sql_prepare_failed",
+        "line": 133,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:5da5c669abca1420",
+        "kind": "unmodeled_sql_statement",
+        "line": 147,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:adbf35316e51f1f4",
+        "kind": "unmodeled_sql_statement",
+        "line": 140,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:66c5199bb850fc0c",
+        "kind": "unmodeled_sql_statement",
+        "line": 696,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:7e6bf142a16a801b",
+        "kind": "unmodeled_sql_statement",
+        "line": 695,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:6ae564f71054ab3a",
+        "kind": "unmodeled_sql_statement",
+        "line": 497,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:4c5fa3d4caf90c40",
+        "kind": "unmodeled_sql_statement",
+        "line": 496,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:73439f96d79c3e07",
+        "kind": "sql_prepare_failed",
+        "line": 66,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:f71430931449d9e0",
+        "kind": "sql_prepare_failed",
+        "line": 64,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:7372304518693cd8",
+        "kind": "sql_prepare_failed",
+        "line": 267,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:4a85129a50e3bfbe",
+        "kind": "sql_prepare_failed",
+        "line": 259,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:74e64661fa6c64b9",
+        "kind": "sql_prepare_failed",
+        "line": 91,
+        "path": "src/sec_research/references.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:c703e1d56d09bb50",
+        "kind": "sql_prepare_failed",
+        "line": 90,
+        "path": "src/sec_research/references.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:76abb17978189065",
+        "kind": "sql_prepare_failed",
+        "line": 199,
+        "path": "src/sec_research/references.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:27036ff0f00fffbf",
+        "kind": "sql_prepare_failed",
+        "line": 198,
+        "path": "src/sec_research/references.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:7afbc029f4a82f18",
+        "kind": "dynamic_sql",
+        "line": 558,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:e76df689c89969d4",
+        "kind": "dynamic_sql",
+        "line": 552,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:7b2ba42d099c084d",
+        "kind": "dynamic_sql",
+        "line": 487,
+        "path": "src/research_threads.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:40dc18e1eade58aa",
+        "kind": "dynamic_sql",
+        "line": 484,
+        "path": "src/research_threads.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:7ebc7214a9ee3dc4",
+        "kind": "sql_prepare_failed",
+        "line": 336,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:72f35ed6ef8e7fd5",
+        "kind": "sql_prepare_failed",
+        "line": 328,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:7fa35e9bcdbe5ecd",
+        "kind": "sql_prepare_failed",
+        "line": 326,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:6e1b65089b417813",
+        "kind": "sql_prepare_failed",
+        "line": 318,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:86cb220d28f2fe7f",
+        "kind": "sql_prepare_failed",
+        "line": 102,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:0e0a2a02f4fad01c",
+        "kind": "sql_prepare_failed",
+        "line": 100,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:88333fbc126729b6",
+        "kind": "sql_prepare_failed",
+        "line": 201,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:6a70c7f8d539874c",
+        "kind": "sql_prepare_failed",
+        "line": 194,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:8b617116c1ac9f84",
+        "kind": "dynamic_sql",
+        "line": 520,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:51c415e84c0b0804",
+        "kind": "dynamic_sql",
+        "line": 519,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:8d6637d4f9683e38",
+        "kind": "sql_prepare_failed",
+        "line": 165,
+        "path": "src/sec_research/queries.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:0414ae17e5466012",
+        "kind": "sql_prepare_failed",
+        "line": 164,
+        "path": "src/sec_research/queries.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:91aa9f7c8739877f",
+        "kind": "unmodeled_sql_statement",
+        "line": 204,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:72b4cecdbbb58ee9",
+        "kind": "unmodeled_sql_statement",
+        "line": 203,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:9238b89c2ba0693a",
+        "kind": "unmodeled_sql_statement",
+        "line": 519,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:ef76a89c9f8cfe33",
+        "kind": "unmodeled_sql_statement",
+        "line": 513,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:9452d43753faff18",
+        "kind": "sql_prepare_failed",
+        "line": 52,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:78e2a840b5d91de4",
+        "kind": "sql_prepare_failed",
+        "line": 50,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:9468aff5a6f9fb14",
+        "kind": "unmodeled_sql_statement",
+        "line": 655,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:d9ec16d922dc7562",
+        "kind": "unmodeled_sql_statement",
+        "line": 654,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:9610201358ff8922",
+        "kind": "unmodeled_sql_statement",
+        "line": 461,
+        "path": "src/research_threads.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:76a74f58f07b2401",
+        "kind": "unmodeled_sql_statement",
+        "line": 458,
+        "path": "src/research_threads.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:9d41d932a28ac3e0",
+        "kind": "sql_prepare_failed",
+        "line": 242,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:14d5bdcb360700e8",
+        "kind": "sql_prepare_failed",
+        "line": 235,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:a002159d0b07c3e9",
+        "kind": "sql_prepare_failed",
+        "line": 94,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:cf824545a90ed4b7",
+        "kind": "sql_prepare_failed",
+        "line": 92,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:a1ad1f7cadc6775e",
+        "kind": "dynamic_sql",
+        "line": 288,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:255816d3a673467f",
+        "kind": "dynamic_sql",
+        "line": 280,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:a5fb8f1b02e027dd",
+        "kind": "sql_prepare_failed",
+        "line": 65,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:9ddf4f859655b579",
+        "kind": "sql_prepare_failed",
+        "line": 63,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:ac79f0c6d2e03773",
+        "kind": "dynamic_sql",
+        "line": 705,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:79ec60265da480b4",
+        "kind": "dynamic_sql",
+        "line": 704,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:b45d16f637147401",
+        "kind": "sql_prepare_failed",
+        "line": 162,
+        "path": "src/sec_research/queries.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:28ddc34977a32631",
+        "kind": "sql_prepare_failed",
+        "line": 161,
+        "path": "src/sec_research/queries.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:b4ccc078ab660a0e",
+        "kind": "dynamic_sql",
+        "line": 223,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:6763c54a40b6f902",
+        "kind": "dynamic_sql",
+        "line": 216,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:b72a29a3b59cca48",
+        "kind": "dynamic_sql",
+        "line": 619,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:3a573a58f940ae1e",
+        "kind": "dynamic_sql",
+        "line": 613,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:b8b3985746740bdd",
+        "kind": "unmodeled_sql_statement",
+        "line": 149,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:0ffcc3a16260ac8a",
+        "kind": "unmodeled_sql_statement",
+        "line": 142,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:ba4157232db97d8e",
+        "kind": "sql_prepare_failed",
+        "line": 118,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:d2254004dc4f10db",
+        "kind": "sql_prepare_failed",
+        "line": 116,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:bc7468843bc954e3",
+        "kind": "sql_prepare_failed",
+        "line": 155,
+        "path": "src/sec_research/captures.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:9bfbd1e694dcf906",
+        "kind": "sql_prepare_failed",
+        "line": 154,
+        "path": "src/sec_research/captures.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:c52970fb8285a493",
+        "kind": "dynamic_sql",
+        "line": 700,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:21a9a970eeed1d22",
+        "kind": "dynamic_sql",
+        "line": 694,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:c915f00cc67daa20",
+        "kind": "sql_prepare_failed",
+        "line": 345,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:c493df8eb56c602a",
+        "kind": "sql_prepare_failed",
+        "line": 337,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:caf2bb847bc3d3f2",
+        "kind": "dynamic_sql",
+        "line": 699,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:56d90ed3c8f7aeab",
+        "kind": "dynamic_sql",
+        "line": 693,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:cbdd1a0f97f49c3b",
+        "kind": "dynamic_sql",
+        "line": 622,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:6c3bbae585d95cad",
+        "kind": "dynamic_sql",
+        "line": 616,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:cd4b800f14e95f62",
+        "kind": "sql_prepare_failed",
+        "line": 131,
+        "path": "src/sec_research/captures.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:f3c63e5bbe271879",
+        "kind": "sql_prepare_failed",
+        "line": 130,
+        "path": "src/sec_research/captures.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:d110601739fb67c6",
+        "kind": "sql_prepare_failed",
+        "line": 177,
+        "path": "src/sec_research/references.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:aac9e96fa4488372",
+        "kind": "sql_prepare_failed",
+        "line": 176,
+        "path": "src/sec_research/references.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:d30007f9784f4a4d",
+        "kind": "sql_prepare_failed",
+        "line": 497,
+        "path": "src/market_data_direct.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:f58e8bacc6eaa371",
+        "kind": "sql_prepare_failed",
+        "line": 496,
+        "path": "src/market_data_direct.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:d9a296a2fe3f7189",
+        "kind": "sql_prepare_failed",
+        "line": 268,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:a61e695b0f371401",
+        "kind": "sql_prepare_failed",
+        "line": 260,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:dc76c9c04182d3f9",
+        "kind": "dynamic_sql",
+        "line": 169,
+        "path": "src/sec_research/queries.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:d4f7dfc021f11245",
+        "kind": "dynamic_sql",
+        "line": 168,
+        "path": "src/sec_research/queries.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:dd61303851472f7a",
+        "kind": "sql_prepare_failed",
+        "line": 498,
+        "path": "src/research_threads.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:fd538c822b9fdece",
+        "kind": "sql_prepare_failed",
+        "line": 495,
+        "path": "src/research_threads.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:deb3e1e4f32585dc",
+        "kind": "unmodeled_sql_statement",
+        "line": 826,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:afdd26fe2d1d05e2",
+        "kind": "unmodeled_sql_statement",
+        "line": 817,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:df63b4e4fb7ac628",
+        "kind": "sql_prepare_failed",
+        "line": 118,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:b23a7d69a0d5a4f7",
+        "kind": "sql_prepare_failed",
+        "line": 117,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:e1cf27a828cb3350",
+        "kind": "sql_prepare_failed",
+        "line": 43,
+        "path": "src/sec_research/document_store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:bed29015a3b09da5",
+        "kind": "sql_prepare_failed",
+        "line": 41,
+        "path": "src/sec_research/document_store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:e4e0b787a1ceff70",
+        "kind": "sql_prepare_failed",
+        "line": 233,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:d047e50c0a1232f8",
+        "kind": "sql_prepare_failed",
+        "line": 226,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:e5bb1def5e2fc4e3",
+        "kind": "sql_prepare_failed",
+        "line": 232,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:36ed319b759febde",
+        "kind": "sql_prepare_failed",
+        "line": 225,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:ebb48d7da898c572",
+        "kind": "unmodeled_sql_statement",
+        "line": 801,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:a823ffa8b09f019f",
+        "kind": "unmodeled_sql_statement",
+        "line": 792,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:f837a6edb8f2b025",
+        "kind": "sql_prepare_failed",
+        "line": 241,
+        "path": "src/sec_research/store.py"
+      },
+      "old": {
+        "axis": "sql",
+        "error_type": "OperationalError",
+        "id": "sql:3fddb59f6f5fe479",
+        "kind": "sql_prepare_failed",
+        "line": 234,
+        "path": "src/sec_research/store.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:f910e19ab7dacbfe",
+        "kind": "unmodeled_sql_statement",
+        "line": 376,
+        "path": "src/research_runs.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:0019c341ee1f2707",
+        "kind": "unmodeled_sql_statement",
+        "line": 375,
+        "path": "src/research_runs.py"
+      }
+    },
+    {
+      "new": {
+        "axis": "sql",
+        "id": "sql:fbda6a47eae36cdd",
+        "kind": "dynamic_sql",
+        "line": 110,
+        "path": "src/sec_research/references.py"
+      },
+      "old": {
+        "axis": "sql",
+        "id": "sql:3f38ae5446deb18f",
+        "kind": "dynamic_sql",
+        "line": 109,
+        "path": "src/sec_research/references.py"
+      }
+    }
+  ],
+  "position_only_by_axis": {
+    "i18n": 23,
+    "sql": 73
+  },
+  "position_only_count": 96
+}

@@ -1,0 +1,33 @@
+{
+  "run": "task6-inverse-charge-01",
+  "case": "charge",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+    "task6-inverse-charge-01",
+    "backend",
+    "-q",
+    "tests/test_sec_research_maintenance.py::test_registered_orphan_unlink_failure_remains_charged",
+    "tests/test_sec_research_maintenance.py::test_failed_directory_durability_charge_survives_ordinary_recovery"
+  ],
+  "exit_code": 1,
+  "restored": {
+    "src/sec_research/maintenance.py": "9c6625f9501b4c0c8f99333c6af7f10994e482b3ccf7f937c65f19c7baa32844"
+  },
+  "mutated": {
+    "src/sec_research/maintenance.py": "3eec7046bbd182e81bda86c9462a06e625d1796c1197804316b6cf5838ee0383"
+  },
+  "tests": {
+    "tests/test_sec_research_maintenance.py": "e6c02bfda17ea0a87461629110da354d36a3d113f84c98b4415d8be36440e254",
+    "tests/test_sec_research_schema_admin.py": "350f31e1417517bc7a00350271a334b12a1f8e87b8890b57fa668b4a32b669bf",
+    "tests/test_sec_research_cli.py": "becd375d73ccf1b5df496fdc4534beafc723cb33bd9997b8a4326336cd71ba66"
+  },
+  "failed_testcases": [
+    "tests.test_sec_research_maintenance::test_registered_orphan_unlink_failure_remains_charged",
+    "tests.test_sec_research_maintenance::test_failed_directory_durability_charge_survives_ordinary_recovery"
+  ],
+  "error_testcases": [],
+  "mutation_script": "task6-inverses.py",
+  "source_bytes": "task6-inverse-charge-01-source"
+}

@@ -1,0 +1,26 @@
+{
+  "run": "task6-inverse-skip-recheck-01",
+  "case": "skip-recheck",
+  "status": "aborted_before_runner",
+  "provenance_complete": true,
+  "runner_invoked": false,
+  "exit_code": null,
+  "driver_exit_code": 1,
+  "command": ["/home/hyl/.virtualenvs/llm_app/bin/python", "-B", ".superpowers/sdd/2026-09-12-sec-research-release-integration/task6-inverses.py", "skip-recheck", "task6-inverse-skip-recheck-01"],
+  "mutation_script": "task6-inverses.py",
+  "mutation_script_sha256_at_abort": "ecd39e58759549d199a2ca24cd46d8a3205fb3e8aee4bc618f95cf3f5eea3152",
+  "source_bytes": "task6-inverse-skip-recheck-01-source",
+  "restored": {"src/sec_research/maintenance.py": "9c6625f9501b4c0c8f99333c6af7f10994e482b3ccf7f937c65f19c7baa32844"},
+  "mutated": {"src/sec_research/maintenance.py": "3c7d32050b45995d2ef8d1740a0c468cfc37455282980e191e476ec240b46a28"},
+  "tests": {
+    "tests/test_sec_research_maintenance.py": "e6c02bfda17ea0a87461629110da354d36a3d113f84c98b4415d8be36440e254",
+    "tests/test_sec_research_schema_admin.py": "350f31e1417517bc7a00350271a334b12a1f8e87b8890b57fa668b4a32b669bf",
+    "tests/test_sec_research_cli.py": "becd375d73ccf1b5df496fdc4534beafc723cb33bd9997b8a4326336cd71ba66"
+  },
+  "failed_testcases": [],
+  "error_testcases": [],
+  "failure": "apply_patch rejected numbered unified hunk: Failed to find context '-389,7 +389,7 @@' in src/sec_research/maintenance.py; subprocess.CalledProcessError: Command ['apply_patch'] returned non-zero exit status 1.",
+  "source_mutation_applied": false,
+  "restoration_evidence": "driver finally asserted all original bytes and test hashes; subsequent cmp maintenance.py maintenance.py.original exited 0; runner directory absence test exited 0",
+  "recovery": "Driver now emits bare @@ hunk headers; retry uses task6-inverse-skip-recheck-02. No test result is attributed to this aborted invocation."
+}

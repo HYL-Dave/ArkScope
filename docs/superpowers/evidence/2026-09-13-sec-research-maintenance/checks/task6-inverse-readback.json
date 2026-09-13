@@ -1,0 +1,157 @@
+{
+  "accepted_inverses": 6,
+  "limit": "Receipt/source readback, not a fresh mutation run or actual-store validation.",
+  "passed": true,
+  "records": [
+    {
+      "case": "backup",
+      "checks": {
+        "exact_failed_nodes": true,
+        "no_reported_errors": true,
+        "runner_failed_behaviorally": true,
+        "src/sec_research/schema_admin.py:distinct": true,
+        "src/sec_research/schema_admin.py:mutated": true,
+        "src/sec_research/schema_admin.py:original": true,
+        "src/sec_research/schema_admin.py:restored_current": true,
+        "tests/test_sec_research_cli.py:unchanged": true,
+        "tests/test_sec_research_maintenance.py:unchanged": true,
+        "tests/test_sec_research_schema_admin.py:unchanged": true
+      },
+      "classification": "killed_inverse",
+      "failed_nodes": [
+        "tests.test_sec_research_schema_admin::test_schema_reset_requires_backup_and_exclusive_lease"
+      ],
+      "receipt_sha256": "670d94809dbf7074d1e6de7061288f8816d0bdcb6ae0115cb0204683001816a5",
+      "run": "task6-inverse-backup-01"
+    },
+    {
+      "case": "charge",
+      "checks": {
+        "exact_failed_nodes": true,
+        "no_reported_errors": true,
+        "runner_failed_behaviorally": true,
+        "src/sec_research/maintenance.py:distinct": true,
+        "src/sec_research/maintenance.py:mutated": true,
+        "src/sec_research/maintenance.py:original": true,
+        "src/sec_research/maintenance.py:restored_current": true,
+        "tests/test_sec_research_cli.py:unchanged": true,
+        "tests/test_sec_research_maintenance.py:unchanged": true,
+        "tests/test_sec_research_schema_admin.py:unchanged": true
+      },
+      "classification": "killed_inverse",
+      "failed_nodes": [
+        "tests.test_sec_research_maintenance::test_registered_orphan_unlink_failure_remains_charged",
+        "tests.test_sec_research_maintenance::test_failed_directory_durability_charge_survives_ordinary_recovery"
+      ],
+      "receipt_sha256": "541d461933e25ab40ce8cf731df9441b9421192381ab7678d6cb61d8e2ca151a",
+      "run": "task6-inverse-charge-01"
+    },
+    {
+      "case": "event-only",
+      "checks": {
+        "exact_failed_nodes": true,
+        "no_reported_errors": true,
+        "runner_failed_behaviorally": true,
+        "src/sec_research/references.py:distinct": true,
+        "src/sec_research/references.py:mutated": true,
+        "src/sec_research/references.py:original": true,
+        "src/sec_research/references.py:restored_current": true,
+        "tests/test_sec_research_cli.py:unchanged": true,
+        "tests/test_sec_research_maintenance.py:unchanged": true,
+        "tests/test_sec_research_schema_admin.py:unchanged": true
+      },
+      "classification": "killed_inverse",
+      "failed_nodes": [
+        "tests.test_sec_research_maintenance::test_new_reference_invalidates_cleanup_preview",
+        "tests.test_sec_research_schema_admin::test_schema_reset_refuses_research_references"
+      ],
+      "receipt_sha256": "66ca7cd2bed24c32519812da03455875b3f3f6e3287eb972c312f90ab445a19e",
+      "run": "task6-inverse-event-only-01"
+    },
+    {
+      "case": "lease",
+      "checks": {
+        "exact_failed_nodes": true,
+        "no_reported_errors": true,
+        "runner_failed_behaviorally": true,
+        "src/sec_research/maintenance.py:distinct": true,
+        "src/sec_research/maintenance.py:mutated": true,
+        "src/sec_research/maintenance.py:original": true,
+        "src/sec_research/maintenance.py:restored_current": true,
+        "tests/test_sec_research_cli.py:unchanged": true,
+        "tests/test_sec_research_maintenance.py:unchanged": true,
+        "tests/test_sec_research_schema_admin.py:unchanged": true
+      },
+      "classification": "killed_inverse",
+      "failed_nodes": [
+        "tests.test_sec_research_maintenance::test_cleanup_requires_fresh_exclusive_lease"
+      ],
+      "receipt_sha256": "9d550e58c98df883760e526bcdb1f9ef30e3f3dddda68bf21a0b0ab2f1f3e7ff",
+      "run": "task6-inverse-lease-01"
+    },
+    {
+      "case": "skip-recheck",
+      "checks": {
+        "abort_no_runner_or_applied_mutation": true,
+        "src/sec_research/maintenance.py:distinct": true,
+        "src/sec_research/maintenance.py:mutated": true,
+        "src/sec_research/maintenance.py:original": true,
+        "src/sec_research/maintenance.py:restored_current": true,
+        "tests/test_sec_research_cli.py:unchanged": true,
+        "tests/test_sec_research_maintenance.py:unchanged": true,
+        "tests/test_sec_research_schema_admin.py:unchanged": true
+      },
+      "classification": "aborted_before_runner",
+      "failed_nodes": [],
+      "receipt_sha256": "88a412c7397bdc42388bab5e2d296b7872639649ec0e2e5313edadeabce7884c",
+      "run": "task6-inverse-skip-recheck-01"
+    },
+    {
+      "case": "skip-recheck",
+      "checks": {
+        "exact_failed_nodes": true,
+        "no_reported_errors": true,
+        "runner_failed_behaviorally": true,
+        "src/sec_research/maintenance.py:distinct": true,
+        "src/sec_research/maintenance.py:mutated": true,
+        "src/sec_research/maintenance.py:original": true,
+        "src/sec_research/maintenance.py:restored_current": true,
+        "tests/test_sec_research_cli.py:unchanged": true,
+        "tests/test_sec_research_maintenance.py:unchanged": true,
+        "tests/test_sec_research_schema_admin.py:unchanged": true
+      },
+      "classification": "killed_inverse",
+      "failed_nodes": [
+        "tests.test_sec_research_maintenance::test_new_reference_invalidates_cleanup_preview"
+      ],
+      "receipt_sha256": "1087ea130e3c204068e1f7a2647de47d47936fd3e0746678dfc12652a3a060fa",
+      "run": "task6-inverse-skip-recheck-02"
+    },
+    {
+      "case": "unknown-prefix",
+      "checks": {
+        "exact_failed_nodes": true,
+        "no_reported_errors": true,
+        "runner_failed_behaviorally": true,
+        "src/sec_research/maintenance.py:distinct": true,
+        "src/sec_research/maintenance.py:mutated": true,
+        "src/sec_research/maintenance.py:original": true,
+        "src/sec_research/maintenance.py:restored_current": true,
+        "src/sec_research/schema_admin.py:distinct": true,
+        "src/sec_research/schema_admin.py:mutated": true,
+        "src/sec_research/schema_admin.py:original": true,
+        "src/sec_research/schema_admin.py:restored_current": true,
+        "tests/test_sec_research_cli.py:unchanged": true,
+        "tests/test_sec_research_maintenance.py:unchanged": true,
+        "tests/test_sec_research_schema_admin.py:unchanged": true
+      },
+      "classification": "killed_inverse",
+      "failed_nodes": [
+        "tests.test_sec_research_schema_admin::test_unknown_owned_objects_are_not_prefix_drop_targets"
+      ],
+      "receipt_sha256": "6b63d1f4791697fdab0fe7df3febebafcb6783af9509918d07bb9e6045bfbbcf",
+      "run": "task6-inverse-unknown-prefix-01"
+    }
+  ],
+  "retained_aborts": 1
+}

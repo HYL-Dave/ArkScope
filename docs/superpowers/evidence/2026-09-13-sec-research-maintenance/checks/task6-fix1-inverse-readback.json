@@ -1,0 +1,82 @@
+{
+  "accepted_inverses": 2,
+  "limit": "Receipt/source readback, not a fresh mutation run or actual-store validation.",
+  "passed": true,
+  "records": [
+    {
+      "case": "failure-audit-lease",
+      "checks": {
+        "exact_failed_nodes": true,
+        "no_reported_errors": true,
+        "runner_failed_behaviorally": true,
+        "src/sec_research/maintenance.py:distinct": true,
+        "src/sec_research/maintenance.py:mutated": true,
+        "src/sec_research/maintenance.py:original": true,
+        "src/sec_research/maintenance.py:restored_checkpoint": true,
+        "src/sec_research/schema_admin.py:distinct": true,
+        "src/sec_research/schema_admin.py:mutated": true,
+        "src/sec_research/schema_admin.py:original": true,
+        "src/sec_research/schema_admin.py:restored_checkpoint": true,
+        "tests/test_sec_research_cli.py:unchanged": true,
+        "tests/test_sec_research_maintenance.py:unchanged": true,
+        "tests/test_sec_research_schema_admin.py:unchanged": true
+      },
+      "classification": "killed_inverse",
+      "failed_nodes": [
+        "tests.test_sec_research_maintenance::test_cleanup_failure_audit_keeps_original_exclusive_lease[unlink-charged]",
+        "tests.test_sec_research_maintenance::test_cleanup_failure_audit_keeps_original_exclusive_lease[transaction-prepared]",
+        "tests.test_sec_research_schema_admin::test_schema_failure_audit_keeps_original_exclusive_lease[backup-prepared]",
+        "tests.test_sec_research_schema_admin::test_schema_failure_audit_keeps_original_exclusive_lease[transaction-backed_up]",
+        "tests.test_sec_research_schema_admin::test_schema_failure_audit_keeps_original_exclusive_lease[stale-backed_up]"
+      ],
+      "receipt_sha256": "73707be01e8bbe024b0f351dd4f7d3b08386a3d3ae99b5cbe1201ed767c34689",
+      "run": "task6-fix1-inverse-failure-audit-lease-01"
+    },
+    {
+      "case": "profile-outputs",
+      "checks": {
+        "exact_failed_nodes": true,
+        "no_reported_errors": true,
+        "runner_failed_behaviorally": true,
+        "src/sec_research/maintenance.py:distinct": true,
+        "src/sec_research/maintenance.py:mutated": true,
+        "src/sec_research/maintenance.py:original": true,
+        "src/sec_research/maintenance.py:restored_checkpoint": true,
+        "tests/test_sec_research_cli.py:unchanged": true,
+        "tests/test_sec_research_maintenance.py:unchanged": true,
+        "tests/test_sec_research_schema_admin.py:unchanged": true
+      },
+      "classification": "killed_inverse",
+      "failed_nodes": [
+        "tests.test_sec_research_maintenance::test_cleanup_receipt_rejects_profile_sqlite_namespace[-journal]",
+        "tests.test_sec_research_maintenance::test_cleanup_receipt_rejects_profile_sqlite_namespace[-wal]",
+        "tests.test_sec_research_maintenance::test_cleanup_receipt_rejects_profile_sqlite_namespace[-shm]",
+        "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[receipt--journal]",
+        "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[receipt--wal]",
+        "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[receipt--shm]",
+        "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[backup--journal]",
+        "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[backup--wal]",
+        "tests.test_sec_research_schema_admin::test_schema_outputs_reject_profile_sqlite_namespace[backup--shm]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview--journal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview--wal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-preview--shm]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-preview--journal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-preview--wal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-preview--shm]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt--journal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt--wal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[cleanup-receipt--shm]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt--journal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt--wal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-receipt--shm]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-backup--journal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-backup--wal]",
+        "tests.test_sec_research_cli::test_cli_outputs_reject_profile_sqlite_namespace[schema-backup--shm]"
+      ],
+      "receipt_sha256": "8ee7cad9496993c6e4c546f1abdebd0558077d40c23acb308775148cafd0ccdb",
+      "run": "task6-fix1-inverse-profile-outputs-01"
+    }
+  ],
+  "retained_aborts": 0,
+  "source_anchor": "78157e62"
+}

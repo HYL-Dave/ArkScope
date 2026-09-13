@@ -1,0 +1,31 @@
+{
+  "run": "task6-inverse-backup-01",
+  "case": "backup",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-12-sec-research-release-integration/run_checks.py",
+    "task6-inverse-backup-01",
+    "backend",
+    "-q",
+    "tests/test_sec_research_schema_admin.py::test_schema_reset_requires_backup_and_exclusive_lease"
+  ],
+  "exit_code": 1,
+  "restored": {
+    "src/sec_research/schema_admin.py": "99ee5862e13ade64bc7afce061238845e3ef53c47393a01056c3d46989051a5f"
+  },
+  "mutated": {
+    "src/sec_research/schema_admin.py": "37db592f7161d94008fe2cc9160a6555c1a1e5fbff7c877e98f8c3e735c60e93"
+  },
+  "tests": {
+    "tests/test_sec_research_maintenance.py": "e6c02bfda17ea0a87461629110da354d36a3d113f84c98b4415d8be36440e254",
+    "tests/test_sec_research_schema_admin.py": "350f31e1417517bc7a00350271a334b12a1f8e87b8890b57fa668b4a32b669bf",
+    "tests/test_sec_research_cli.py": "becd375d73ccf1b5df496fdc4534beafc723cb33bd9997b8a4326336cd71ba66"
+  },
+  "failed_testcases": [
+    "tests.test_sec_research_schema_admin::test_schema_reset_requires_backup_and_exclusive_lease"
+  ],
+  "error_testcases": [],
+  "mutation_script": "task6-inverses.py",
+  "source_bytes": "task6-inverse-backup-01-source"
+}
