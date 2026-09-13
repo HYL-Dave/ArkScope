@@ -17,6 +17,16 @@ const settings = {
     pageInsufficient: "頁面大小不足以容納此段落",
   },
   secResearch: {
+    schedule: {
+      title: "每日結構化資料擷取", lastAttempt: "最近嘗試",
+      lastAcquisition: "最近成功擷取發行人", lastCompleted: "最近完成批次",
+      nextEligible: "下次可執行時間", eligible: "現在可執行", disabled: "已停用",
+      succeeded: "成功", failed: "失敗", running: "執行中",
+      universe: "目前股票代號", attempted: "已嘗試發行人", confirmed: "已確認發行人",
+      failedIssuers: "失敗或部分完成發行人", deferred: "延後發行人",
+      filings: "範圍內申報", facts: "範圍內財務事實", requests: "已准入來源嘗試",
+      unresolved: "未解析股票代號", stop: "停止原因", unavailable: "排程狀態無法取得",
+    },
     title: "SEC 結構化資料", cik: "CIK", load: "讀取本機",
     refresh: "更新結構化資料", resume: "接續更新", reread: "重新讀取儲存狀態",
     budget: "擷取容量上限", unit: "容量單位", bytes: "位元組", gib: "GiB",
@@ -738,6 +748,10 @@ const settings = {
         ibkrPrices: {
           label: "IBKR 股價",
           description: "為目前全部標的擷取 15 分鐘價格並直接寫入本機市場資料庫。",
+        },
+        secResearch: {
+          label: "SEC 財務研究",
+          description: "目前標的近期 10-K、10-Q、20-F、40-F 與修訂申報及結構化財務事實。",
         },
       },
       unknownSourceDescription: "資料來源 {{sourceId}} 沒有已審核的說明。",

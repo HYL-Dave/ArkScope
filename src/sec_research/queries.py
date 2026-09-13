@@ -294,6 +294,7 @@ def page_envelope(context, rows, *, limit, gaps, available, coverage=None, resul
         raise ValueError("sec_research_cursor_invalid")
     receipt = context.receipt
     base_coverage = {**(coverage or {}), "receipt_id": receipt["receipt_id"] if receipt else None,
+                     "scope": receipt["scope"] if receipt else None,
                      "bindings_digest": context.bindings_digest, "selection_total": len(rows)}
 
     def envelope(data, page_gaps, offset):
@@ -384,7 +385,10 @@ class StoredQueries:
             if source_gaps:
                 gaps.append({"code": "catalog_source_gaps", "count": source_gaps})
         missing = required - sources.keys()
-        if missing:
+        if context.receipt and context.receipt["scope"] == "recent":
+            gaps = [gap for gap in gaps if gap["code"] != "historical_files_unobserved"]
+            gaps.append({"code": "historical_not_requested"})
+        elif missing:
             gaps.append({"code": "catalog_sources_pending", "count": len(missing)})
 
         # Compare filing metadata independently of provenance; retain all sources

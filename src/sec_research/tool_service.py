@@ -144,7 +144,7 @@ class ToolService:
                     if resolution["status"] != "ok":
                         return _unavailable("issuer_unavailable", resolution=resolution)
                     cik = resolution["cik"]
-                receipt = self.store.latest_receipt(cik) if installed else None
+                receipt = self.store.latest_receipt(cik, scope="full") if installed else None
                 recent = receipt is not None and _recent(receipt["observed_at"], self.clock())
                 if not stored_only and (freshness == "refresh" or not recent or receipt["pending"]):
                     captures, transport, _ = acquire()
@@ -164,7 +164,7 @@ class ToolService:
         if freshness == "auto" and attempt is not None and attempt["capture_id"] is not None:
             return queries.read(filing_id, **params, result_fits=fits)
         cik, _ = parse_filing_id(filing_id)
-        receipt = self.store.latest_receipt(cik) if installed else None
+        receipt = self.store.latest_receipt(cik, scope="full") if installed else None
         recent = receipt is not None and _recent(receipt["observed_at"], self.clock())
         authority = _catalog(self.store, filing_id)[0] if installed and recent else None
         captures, transport, reader_factory = acquire()

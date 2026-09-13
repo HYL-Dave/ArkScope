@@ -1130,6 +1130,41 @@ export interface SecResearchConfig {
   capture_budget_bytes: number;
   capacity: SecResearchCapacity | null;
 }
+export interface SecResearchBatch {
+  batch_id: string;
+  status: "running" | "succeeded" | "partial" | "failed";
+  scope: "recent";
+  forms: string[];
+  started_at: string;
+  finished_at: string | null;
+  acquired_at: string | null;
+  universe_status: "unknown" | "available" | "unavailable";
+  universe_tickers: string[];
+  attempted_ciks: string[];
+  confirmed_ciks: string[];
+  failed_ciks: string[];
+  deferred_ciks: string[];
+  rotation: { cik: string; tickers: string[] }[];
+  unresolved: { ticker: string; code: string; candidates: string[] }[];
+  outcomes: { cik: string; receipt_id: number | null; status: SecResearchState;
+    completed_sources: number; filing_count: number; fact_count: number }[];
+  filing_count: number;
+  fact_count: number;
+  request_count: number;
+  gaps: SecResearchGap[];
+  stop_reason: string | null;
+  elapsed_seconds: number;
+  issuer_map_observation_id: number | null;
+}
+export type SecResearchScheduleStatus = SecResearchEnvelope<{
+  last_attempt: SecResearchBatch | null;
+  last_acquisition_at: string | null;
+  last_completed_batch: SecResearchBatch | null;
+} | null>;
+
+export function getSecResearchScheduleStatus(): Promise<SecResearchScheduleStatus> {
+  return getJSON("/sec-research/schedule-status");
+}
 export interface SecResearchFiling {
   filing_id: string;
   accession: string;

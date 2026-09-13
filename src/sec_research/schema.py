@@ -6,6 +6,9 @@ import sqlite3
 
 
 _TABLES = {
+    "sec_research_schedule_batches": """checkpoint_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        batch_id TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('running','succeeded','partial','failed')),
+        acquired_at TEXT, payload TEXT NOT NULL CHECK(length(CAST(payload AS BLOB))<=16777216)""",
     "sec_research_objects": "sha256 TEXT PRIMARY KEY, object_key TEXT UNIQUE NOT NULL, size_bytes INTEGER NOT NULL CHECK(size_bytes>=0)",
     "sec_research_reservations": "reservation_id TEXT PRIMARY KEY, size_bytes INTEGER NOT NULL CHECK(size_bytes>=0)",
     "sec_research_orphans": "object_key TEXT PRIMARY KEY, size_bytes INTEGER NOT NULL CHECK(size_bytes>=0)",
@@ -36,6 +39,7 @@ _TABLES = {
         source_sha256 TEXT NOT NULL REFERENCES sec_research_objects(sha256),
         source_pointer TEXT NOT NULL, PRIMARY KEY(snapshot_id, ordinal)""",
     "sec_research_receipts": """receipt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope TEXT NOT NULL DEFAULT 'full' CHECK(scope IN ('full','recent')),
         cik TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('ok','partial','unavailable')),
         completed TEXT NOT NULL, pending TEXT NOT NULL, gaps TEXT NOT NULL,
         observed_at TEXT NOT NULL, recorded_at TEXT NOT NULL,
@@ -73,7 +77,7 @@ for _table, _columns in (
     _DDL[_name] = ("index", _owner, f"CREATE INDEX {_name} ON {_owner}({_columns})")
 
 for _table in ("objects", "issuer_maps", "snapshots", "filings", "facts", "receipts",
-               "document_directories", "documents", "document_sources", "document_attempts"):
+               "document_directories", "documents", "document_sources", "document_attempts", "schedule_batches"):
     for _operation in ("UPDATE", "DELETE"):
         _name = f"sec_research_{_table}_no_{_operation.lower()}"
         _owner = f"sec_research_{_table}"
@@ -83,6 +87,7 @@ for _table in ("objects", "issuer_maps", "snapshots", "filings", "facts", "recei
 
 # REPLACE's implicit deletion does not fire DELETE triggers by default.
 for _table, _conflict in (
+    ("schedule_batches", "checkpoint_id=NEW.checkpoint_id"),
     ("objects", "sha256=NEW.sha256 OR object_key=NEW.object_key"),
     ("issuer_maps", "observation_id=NEW.observation_id"),
     ("snapshots", "snapshot_id=NEW.snapshot_id"),

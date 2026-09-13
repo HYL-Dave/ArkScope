@@ -27,6 +27,7 @@ from src.sec_research.paths import SecResearchPaths
 from src.sec_research.queries import StoredQueries, query_date, validate_query
 from src.sec_research.service import ResearchService
 from src.sec_research.store import Store
+from src.sec_research.schedule_store import ScheduleStore, FORMS
 
 
 router = APIRouter(tags=["sec-research"])
@@ -104,6 +105,22 @@ def stored_citation(request: Request):
         return _unavailable("sec_citation_integrity_failed")
 
 
+@router.get("/sec-research/schedule-status")
+def schedule_status():
+    try:
+        result = ScheduleStore(Store(SecResearchPaths.resolve())).status()
+        attempt = result["last_attempt"]
+        status = {"succeeded": "ok", "partial": "partial", "failed": "unavailable",
+                  "running": "partial"}.get(attempt["status"] if attempt else None, "unavailable")
+        return {"status": status, "data": result,
+                "gaps": attempt["gaps"] if attempt else [{"code": "sec_schedule_unobserved"}],
+                "observed_at": attempt["finished_at"] or attempt["started_at"] if attempt else None,
+                "coverage": {"scope": "recent", "forms": list(FORMS), "history_requested": False},
+                "next_cursor": None}
+    except (ValueError, sqlite3.Error, OSError):
+        return _unavailable("sec_schedule_store_unavailable")
+
+
 @router.get("/sec-research/{cik}")
 def stored_status(cik: str):
     cik = _cik(cik)
@@ -117,7 +134,7 @@ def stored_status(cik: str):
             return _unavailable("sec_research_unobserved")
         return {"status": result["status"], "data": {"cik": cik, "snapshots": result["snapshot_counts"]},
                 "gaps": receipt["gaps"], "observed_at": receipt["observed_at"],
-                "coverage": {"completed": receipt["completed"], "pending": receipt["pending"]},
+                "coverage": {"scope": receipt["scope"], "completed": receipt["completed"], "pending": receipt["pending"]},
                 "next_cursor": None}
     except (ValueError, sqlite3.Error, OSError):
         return _unavailable("sec_research_store_unavailable")

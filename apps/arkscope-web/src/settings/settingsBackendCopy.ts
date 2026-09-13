@@ -324,6 +324,11 @@ export function scheduleSourceCopy(
   t: SettingsT,
 ): { label: string; description: string } {
   switch (id) {
+    case "sec_research_filings":
+      return {
+        label: t(($) => $.dataSources.schedule.sources.secResearch.label),
+        description: t(($) => $.dataSources.schedule.sources.secResearch.description),
+      };
     case "polygon_news":
       return {
         label: t(($) => $.dataSources.schedule.sources.polygonNews.label),

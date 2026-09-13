@@ -3,16 +3,18 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft, ArrowRight, BookOpen, Database, ExternalLink, Play, RefreshCw, Save } from "lucide-react";
 import {
   ApiError, getSecResearchConfig, getSecResearchFacts, getSecResearchFilings,
-  getSecResearchStatus, refreshSecResearch, setSecResearchBudget,
+  getSecResearchStatus, getSecResearchScheduleStatus, refreshSecResearch, setSecResearchBudget,
   type SecResearchConfig, type SecResearchEnvelope, type SecResearchFact,
   type SecResearchFiling, type SecResearchReceipt, type SecResearchState,
   type SecResearchStoredStatus,
+  type SecResearchScheduleStatus, type ScheduleSourceState,
 } from "../api";
 import { formatSystemTimestamp } from "../timeDisplay";
 import { Button, IconButton } from "../ui/Button";
 import { Tabs } from "../ui/Tabs";
 import type { SettingsT } from "./settingsCopy";
 import { SecDocumentReader, type SecDocumentLocator } from "./SecDocumentReader";
+import { useSharedDataScheduleControls, terminalRevision } from "./dataScheduleControls";
 import "./secResearch.css";
 
 type Unit = "bytes" | "gib";
@@ -111,8 +113,58 @@ function Records({ page, view, t, onOpen }: { page: Page | null; view: View; t: 
   </>;
 }
 
+function ScheduleObservation({ value, source, t }: {
+  value: SecResearchScheduleStatus | null; source: ScheduleSourceState | undefined; t: SettingsT;
+}) {
+  const batch = value?.data?.last_attempt;
+  const unknown = t(($) => $.secResearch.unknown);
+  const timestamp = (time: string | null | undefined) => time ? formatSystemTimestamp(time) : unknown;
+  const due = source?.last_attempt_at ? Date.parse(source.last_attempt_at) + source.interval_minutes * 60000 : null;
+  const next = !source ? unknown : !source.enabled ? t(($) => $.secResearch.schedule.disabled)
+    : due !== null && due > Date.now() ? timestamp(new Date(due).toISOString()) : t(($) => $.secResearch.schedule.eligible);
+  const status = batch?.status === "succeeded" ? t(($) => $.secResearch.schedule.succeeded)
+    : batch?.status === "failed" ? t(($) => $.secResearch.schedule.failed)
+    : batch?.status === "running" ? t(($) => $.secResearch.schedule.running)
+    : batch?.status === "partial" ? t(($) => $.secResearch.partial) : unknown;
+  const counts = [
+    [t(($) => $.secResearch.schedule.universe), batch?.universe_status === "available" ? batch.universe_tickers.length : unknown],
+    [t(($) => $.secResearch.schedule.attempted), batch?.attempted_ciks.length ?? unknown],
+    [t(($) => $.secResearch.schedule.confirmed), batch?.confirmed_ciks.length ?? unknown],
+    [t(($) => $.secResearch.schedule.failedIssuers), batch?.failed_ciks.length ?? unknown],
+    [t(($) => $.secResearch.schedule.deferred), batch?.deferred_ciks.length ?? unknown],
+    [t(($) => $.secResearch.schedule.filings), batch?.filing_count ?? unknown],
+    [t(($) => $.secResearch.schedule.facts), batch?.fact_count ?? unknown],
+    [t(($) => $.secResearch.schedule.requests), batch?.request_count ?? unknown],
+  ];
+  return <div className="sec-schedule-status" data-batch-status={batch?.status ?? "unknown"}>
+    <h4>{t(($) => $.secResearch.schedule.title)}</h4><span role="status">{status}</span>
+    <dl className="sec-capacity">
+      {[
+        [t(($) => $.secResearch.schedule.nextEligible), next],
+        [t(($) => $.secResearch.schedule.lastAttempt), timestamp(batch?.started_at)],
+        [t(($) => $.secResearch.schedule.lastAcquisition), timestamp(value?.data?.last_acquisition_at)],
+        [t(($) => $.secResearch.schedule.lastCompleted), timestamp(value?.data?.last_completed_batch?.finished_at)],
+        ...counts,
+      ].map(([label, content]) => <div className="sec-capacity-pair" key={label}><dt>{label}</dt><dd>{content}</dd></div>)}
+    </dl>
+    {batch?.stop_reason && <p>{t(($) => $.secResearch.schedule.stop)}: <code>{batch.stop_reason}</code></p>}
+    {Boolean(batch?.unresolved.length) && <details><summary>{t(($) => $.secResearch.schedule.unresolved)} ({batch!.unresolved.length})</summary>
+      <ul>{batch!.unresolved.slice(0, 20).map((row) => <li key={row.ticker}>{row.ticker}: <code>{row.code}</code></li>)}</ul>
+    </details>}
+    {Boolean(value?.gaps.length) && <details><summary>{t(($) => $.secResearch.gaps)} ({value!.gaps.length})</summary>
+      <ul>{value!.gaps.slice(0, 20).map((gap, index) => <li key={index}><code>{String(gap.cik ?? "")} {gap.code}</code></li>)}</ul>
+    </details>}
+  </div>;
+}
+
 export function SecResearchPanel() {
   const { t } = useTranslation("settings");
+  const source = useSharedDataScheduleControls().schedule?.sec_research_filings;
+  const previousSource = useRef<ScheduleSourceState | undefined>(undefined);
+  const scheduleGeneration = useRef(0);
+  const pendingConfigRefresh = useRef(false);
+  const [scheduleStatus, setScheduleStatus] = useState<SecResearchScheduleStatus | null>(null);
+  const [scheduleError, setScheduleError] = useState(false);
   const mounted = useRef(false);
   const generation = useRef(0);
   const issuerGeneration = useRef(0);
@@ -178,11 +230,35 @@ export function SecResearchPanel() {
     }
   }
 
+  async function loadScheduleStatus() {
+    const request = ++scheduleGeneration.current;
+    try {
+      const result = await getSecResearchScheduleStatus();
+      if (mounted.current && request === scheduleGeneration.current) {
+        setScheduleStatus(result); setScheduleError(false);
+      }
+    } catch {
+      if (mounted.current && request === scheduleGeneration.current) setScheduleError(true);
+    }
+  }
+
   useEffect(() => {
     mounted.current = true;
     void loadConfig();
-    return () => { mounted.current = false; generation.current++; issuerGeneration.current++; configGeneration.current++; };
+    void loadScheduleStatus();
+    return () => { mounted.current = false; generation.current++; issuerGeneration.current++; configGeneration.current++; scheduleGeneration.current++; };
   }, []);
+
+  useEffect(() => {
+    const before = previousSource.current;
+    previousSource.current = source;
+    const terminal = source?.last_result?.status ?? source?.durable_state?.last_status;
+    if (!before || !source || source.running || !["succeeded", "partial", "failed"].includes(terminal ?? "")) return;
+    if (!before.running && terminalRevision(before) === terminalRevision(source)) return;
+    void loadScheduleStatus();
+    if (budgetSaving.current) pendingConfigRefresh.current = true;
+    else void loadConfig();
+  }, [source]);
 
   async function saveBudget() {
     if (bytes == null || !config || budgetSaving.current) return;
@@ -199,7 +275,13 @@ export function SecResearchPanel() {
       applyBudget(confirmed.capture_budget_bytes); dirty.current = false; setSaved(true);
     } catch (error) {
       if (mounted.current && request === configGeneration.current) setSaveError(error);
-    } finally { budgetSaving.current = false; if (mounted.current) setSaving(false); }
+    } finally {
+      budgetSaving.current = false;
+      if (mounted.current) {
+        setSaving(false);
+        if (pendingConfigRefresh.current) { pendingConfigRefresh.current = false; void loadConfig(); }
+      }
+    }
   }
 
   function invalidate(issuer = false) {
@@ -299,6 +381,8 @@ export function SecResearchPanel() {
 
   return <section className="sec-storage" aria-label={t(($) => $.secResearch.title)}>
     <h3>{t(($) => $.secResearch.title)}</h3>
+    <ScheduleObservation value={scheduleStatus} source={source} t={t} />
+    {scheduleError && <p role="alert">{t(($) => $.secResearch.schedule.unavailable)}</p>}
     <div className="sec-fields">
       <label><span>{t(($) => $.secResearch.budget)}</span><input aria-label={t(($) => $.secResearch.budget)} inputMode="decimal" maxLength={100} value={draft} disabled={saving} onChange={(event) => { setDraft(event.target.value); dirty.current = true; setSaved(false); setSaveError(null); }} /></label>
       <label><span>{t(($) => $.secResearch.unit)}</span><select aria-label={t(($) => $.secResearch.unit)} value={unit} disabled={saving} onChange={(event) => {

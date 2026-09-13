@@ -5,6 +5,7 @@ from dataclasses import asdict
 import errno
 import hashlib
 import importlib
+import inspect
 import json
 from types import SimpleNamespace
 
@@ -50,13 +51,13 @@ class MemoryStore:
         self.published.append((snapshot, observed_at, source_url))
         return str(len(self.published))
 
-    def record_receipt(self, cik, *, status, completed, pending, gaps, observed_at, source_snapshots=None):
-        self.receipts.append(deepcopy(dict(cik=cik, status=status, completed=completed,
+    def record_receipt(self, cik, *, status, completed, pending, gaps, observed_at, source_snapshots=None, scope="full"):
+        self.receipts.append(deepcopy(dict(cik=cik, scope=scope, status=status, completed=completed,
                                           pending=pending, gaps=gaps, observed_at=observed_at,
                                           source_snapshots=source_snapshots or {})))
 
-    def latest_receipt(self, cik):
-        rows = [row for row in self.receipts if row["cik"] == cik]
+    def latest_receipt(self, cik, *, scope=None):
+        rows = [row for row in self.receipts if row["cik"] == cik and (scope is None or row["scope"] == scope)]
         return deepcopy(rows[-1]) if rows else None
 
     def snapshots(self, cik, kind):
@@ -695,3 +696,42 @@ def test_resume_explicitly_unbound_receipt_reacquires_instead_of_blessing_it(dur
     resumed = service.refresh(CIK, resume=True, max_sources=1)
     assert [url for url, _ in transport.calls] == [SUBMISSIONS_URL]
     assert set(resumed["source_snapshots"]) == {"submissions"}
+
+
+def test_recent_schedule_preserves_explicit_history_continuation(durable):
+    from src.sec_research.queries import StoredQueries
+
+    service, store, captures, transport = durable
+    assert "scope" in inspect.signature(service.refresh).parameters, "explicit acquisition scope missing"
+    full = service.refresh(CIK, max_sources=2)
+    assert full["pending"] == [HISTORY]
+    transport.calls.clear()
+    recent = service.refresh(CIK, scope="recent")
+    assert [url for url, _ in transport.calls] == [SUBMISSIONS_URL, FACTS_URL]
+    assert recent["scope"] == "recent"
+    assert recent["status"] == "ok"
+    assert recent["pending"] == []
+    assert store.latest_receipt(CIK) == recent
+    assert store.latest_receipt(CIK, scope="full") == full
+    assert store.receipt(CIK, full["receipt_id"]) == full
+    local = StoredQueries(store).filings(CIK)
+    assert local["coverage"]["scope"] == "recent"
+    assert local["coverage"]["complete"] is False
+    assert {g["code"] for g in local["gaps"]} == {"historical_not_requested"}
+    assert StoredQueries(store).facts(CIK)["data"][0]["value"] == "9007199254740993.123456789"
+    transport.calls.clear()
+    resumed = service.refresh(CIK, resume=True)
+    assert [url for url, _ in transport.calls] == [HISTORY_URL]
+    assert resumed["scope"] == "full"
+    assert resumed["source_snapshots"]["submissions"] == full["source_snapshots"]["submissions"]
+    assert captures.read(hashlib.sha256(EXACT_FACTS).hexdigest()) == EXACT_FACTS
+
+
+@pytest.mark.parametrize("scope", [None, "history", "", True])
+def test_invalid_receipt_scope_rejected_before_acquisition(durable, scope):
+    service, store, _, transport = durable
+    assert "scope" in inspect.signature(service.refresh).parameters, "explicit acquisition scope missing"
+    with pytest.raises(ValueError, match="invalid_scope"):
+        service.refresh(CIK, scope=scope)
+    assert transport.calls == []
+    assert store.latest_receipt(CIK) is None

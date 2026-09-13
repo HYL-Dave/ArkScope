@@ -84,7 +84,7 @@ function terminalStatus(source: ScheduleSourceState): string | null {
   return source.last_result?.status ?? source.durable_state?.last_status ?? null;
 }
 
-function terminalRevision(source: ScheduleSourceState): string {
+export function terminalRevision(source: ScheduleSourceState): string {
   return [
     terminalStatus(source) ?? "",
     source.last_attempt_at ?? "",
@@ -140,7 +140,10 @@ export function useDataScheduleControls(
     scheduleRef.current = next;
     setSchedule(next);
     for (const candidate of invalidationCandidates(previous, next)) {
-      settingsReadCache.invalidateDataSource(candidate.source, candidate.writeTarget);
+      // SEC owns local status/capacity reads; completion must not invalidate pins.
+      if (candidate.source !== "sec_research_filings") {
+        settingsReadCache.invalidateDataSource(candidate.source, candidate.writeTarget);
+      }
     }
     const lifecycleChanged = dataSourceScheduleLifecycleChanged(previous, next);
     if (lifecycleChanged) setLifecycleVersion((value) => value + 1);

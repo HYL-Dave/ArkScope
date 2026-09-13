@@ -60,3 +60,11 @@
 @media (max-width: 480px) {
   .sec-fields label { flex-basis: 100%; }
 }
+.sec-schedule-status {
+  border-block: 1px solid var(--border);
+  padding-block: 12px;
+  margin-block: 12px;
+  overflow-wrap: anywhere;
+}
+.sec-schedule-status h4 { margin: 0 0 8px; }
+.sec-schedule-status .sec-capacity { margin-block: 8px; }
