@@ -33,11 +33,14 @@ and `tests/test_abandoned_surface_cleanup.py`.
   Remove the converter's now-stale brand allowlist entry.
 - [x] Preserve and run `test_massive_is_the_only_current_config_namespace` and
   `test_store_startup_does_not_implicitly_migrate_a_legacy_row` unchanged.
-- [ ] Run absence, brand, provider config and current lifecycle schema/migration,
+- [x] Run absence, brand, provider config and current lifecycle schema/migration,
   investigation-retirement and listing-authority controls in one offline session.
   Expect zero failures. Full collection must lose only the ten obsolete cases
   and gain the two absence cases (net -8).
 - [x] Repeat unbounded source/registration/current-doc reference searches; only
   absence guards may mention the deleted modules. Historical evidence remains.
-- [ ] Record exact commands/results and remaining boundaries; commit only this
+- [x] Record exact commands/results and remaining boundaries; commit only this
   reviewed scope. No master merge or live operational changes.
+
+Completed at `c4cb7109`; combined frozen acceptance and exact removed-node
+inventory: `docs/superpowers/evidence/2026-09-14-runtime-cleanup-closeout/README.md`.
