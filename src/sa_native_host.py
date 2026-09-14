@@ -51,6 +51,9 @@ def _init_script_runtime():
     module (tests, the extension-health probe) must stay side-effect-free:
     no chdir, no mkdir, no root-logger reconfiguration.
     """
+    from src.sqlite_runtime.contract import require_selected_runtime
+
+    require_selected_runtime()
     os.chdir(PROJECT_ROOT)
     log_dir = os.path.join(PROJECT_ROOT, "data", "logs")
     os.makedirs(log_dir, exist_ok=True)
