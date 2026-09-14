@@ -17,6 +17,12 @@ def prepared(tmp_path_factory):
     from src.sqlite_runtime.build import build_package
     archive = os.environ.get("ARKSCOPE_TEST_SQLITE_ARCHIVE")
     if not archive:
+        from src.sqlite_runtime.contract import require_selected_runtime
+        if require_selected_runtime() is not None:
+            pytest.fail(
+                "selected-runtime acceptance requires the offline SQLite source archive",
+                pytrace=False,
+            )
         pytest.skip("final-artifact acceptance needs explicit offline SQLite source archive")
     root = tmp_path_factory.mktemp("sqlite-package") / "generation"
     build_package(Path(archive), root, Path(sys.executable))
@@ -41,6 +47,28 @@ def test_real_python_and_descendant_use_same_engine(prepared, child_env):
     rows = [json.loads(line) for line in result.stdout.splitlines()]
     assert rows == [["3.53.4", sys.executable]] * 2
     assert "LD_LIBRARY_PATH" not in child_env
+
+
+@pytest.mark.parametrize("selected", [True, False], ids=["selected-required", "unmanaged-skip"])
+def test_missing_archive_is_not_selected_runtime_acceptance(prepared, child_env, tmp_path, selected):
+    repo = Path(__file__).resolve().parents[1]
+    node = "tests/test_sqlite_runtime_launch.py::test_real_python_and_descendant_use_same_engine"
+    script = (
+        "from src import env_keys; env_keys._loaded = True; import pytest; "
+        f"raise SystemExit(pytest.main(['-p', 'no:cacheprovider', '-q', '-rs', '--tb=short', {node!r}]))"
+    )
+    executable = str(prepared / "python") if selected else sys.executable
+    env = dict(child_env, PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", TMPDIR=str(tmp_path))
+    child = subprocess.run([executable, "-B", "-c", script], cwd=repo, env=env,
+                           capture_output=True, timeout=30)
+    if selected:
+        assert child.returncode == 1, child.stdout.decode() + child.stderr.decode()
+        assert b"selected-runtime acceptance requires the offline SQLite source archive" in child.stdout
+        assert b"1 skipped" not in child.stdout
+    else:
+        assert child.returncode == 0, child.stdout.decode() + child.stderr.decode()
+        assert b"1 skipped" in child.stdout
+        assert b"final-artifact acceptance needs explicit offline SQLite source archive" in child.stdout
 
 
 @pytest.mark.parametrize("args,stdin,code,stdout", [
