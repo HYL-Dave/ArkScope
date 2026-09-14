@@ -68,4 +68,11 @@
 
   Also cover malformed/missing cursor fallback, recent and older cursors, exact Massive timestamp retention, source/ticker isolation and writer deduplication. Feed IBKR a saturated seven-day page while requesting fourteen days; consume observed headlines, then assert `IBKRNewsCoverageIncomplete("ibkr_news_window_incomplete")`. Preserve unknown-completion, no-entitled-provider, and non-strict fallback behavior. Run existing direct/normalized writer, adapter, IBKR worker, scheduler and telemetry tests unchanged alongside the new owner.
 
-- [ ] **Step 4: Acceptance and evidence.** Freeze product/test sources; run the complete backend suite once, with no concurrent pytest sessions. Retain RED/GREEN command records and JUnit results. Update current-state documents to mark only the shared target complete, with remaining policy work explicit. Review the diff, run `git diff --check`, and commit the bounded change after verification.
+- [x] **Step 4: Acceptance and evidence.** Freeze product/test sources; run the complete backend suite once, with no concurrent pytest sessions. Retain RED/GREEN command records and JUnit results. Update current-state documents to mark only the shared target complete, with remaining policy work explicit. Review the diff, run `git diff --check`, and commit the bounded change after verification.
+
+## Result
+
+Source commit `8b468771`. RED 5 failed -> GREEN 5 passed; expanded controls
+304 passed. Full backend 11,114 passed / 12 unchanged skips, exact 11,126 nodes,
++48/-0. No source/runtime/runner drift or new census findings. Evidence:
+`docs/superpowers/evidence/2026-09-14-news-bootstrap-policy/README.md`.
