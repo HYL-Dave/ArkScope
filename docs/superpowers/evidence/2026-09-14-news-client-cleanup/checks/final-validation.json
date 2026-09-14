@@ -1,0 +1,542 @@
+{
+  "added": [
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_empty_active_scope_exits_before_environment_provider_and_telemetry"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_explicit_tickers_override_unavailable_active_scope"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_retains_news_and_job_telemetry_and_preserves_outcome_exit_codes[failed-1-failed]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_retains_news_and_job_telemetry_and_preserves_outcome_exit_codes[partial-1-failed]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_retains_news_and_job_telemetry_and_preserves_outcome_exit_codes[skipped-1-failed]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_retains_news_and_job_telemetry_and_preserves_outcome_exit_codes[succeeded-0-succeeded]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[False-flags0-sources0]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[False-flags1-sources1]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[False-flags2-sources2]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[False-flags3-sources3]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[False-flags4-sources4]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[False-flags5-sources5]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[False-flags6-sources6]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[False-flags7-sources7]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[False-flags8-sources8]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[True-flags0-sources0]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[True-flags1-sources1]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[True-flags2-sources2]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[True-flags3-sources3]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[True-flags4-sources4]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[True-flags5-sources5]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[True-flags6-sources6]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[True-flags7-sources7]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_routes_sources_and_scope_and_records_real_summary[True-flags8-sources8]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_scope_and_dry_run_guards_precede_environment_provider_and_telemetry[flags0-1]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_scope_and_dry_run_guards_precede_environment_provider_and_telemetry[flags1-1]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_main_scope_and_dry_run_guards_precede_environment_provider_and_telemetry[flags2-0]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_recent_articles_and_successful_runs_do_not_prove_news_completeness"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_malformed_telemetry_is_unavailable_not_empty_or_successful[rows]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_malformed_telemetry_is_unavailable_not_empty_or_successful[schema]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_meta_only_error_does_not_invent_an_aggregate_run"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_never_scans_retained_parquet_archives"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_reads_real_writer_telemetry_once_and_retains_articles[False-direct-polygon-MASSIVE]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_reads_real_writer_telemetry_once_and_retains_articles[False-normalized-finnhub-FINNHUB]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_reads_real_writer_telemetry_once_and_retains_articles[True-direct-polygon-MASSIVE]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_reads_real_writer_telemetry_once_and_retains_articles[True-normalized-finnhub-FINNHUB]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_redacts_stored_provider_diagnostics_without_mutating_them[provider failed: Bearer synthetic-token-123456]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_redacts_stored_provider_diagnostics_without_mutating_them[provider failed: api_key=AbCdEf0123456789Synthetic]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_reports_latest_run_not_historical_rows_or_price_telemetry[failed-2026-09-14T11:01:00Z-2026-09-14T11:01:00Z]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_reports_latest_run_not_historical_rows_or_price_telemetry[running-None-2026-09-14T11:00:00Z]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_reports_latest_run_not_historical_rows_or_price_telemetry[succeeded-2026-09-14T11:01:00Z-2026-09-14T11:01:00Z]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_without_telemetry_does_not_claim_no_articles[articles-without-telemetry]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_without_telemetry_does_not_claim_no_articles[empty-telemetry]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_without_telemetry_does_not_claim_no_articles[missing]"
+    ],
+    [
+      "tests.test_daily_update_wrapper",
+      "test_status_without_telemetry_does_not_claim_no_articles[no-tables]"
+    ],
+    [
+      "tests.test_data_scheduler",
+      "test_normalized_news_route_calls_writer_under_market_lock[finnhub_news-finnhub-src.news_clients.finnhub-FinnhubConfig-FinnhubNewsCollector-FinnhubNormalizedProvider]"
+    ],
+    [
+      "tests.test_data_scheduler",
+      "test_normalized_news_route_calls_writer_under_market_lock[polygon_news-polygon-src.news_clients.polygon-CollectionConfig-PolygonNewsCollector-PolygonNormalizedProvider]"
+    ],
+    [
+      "tests.test_news_client_cleanup",
+      "test_current_cli_does_not_advertise_old_collection_entrypoint"
+    ],
+    [
+      "tests.test_news_client_cleanup",
+      "test_current_cli_has_no_obsolete_step_wrapper_or_config_path"
+    ],
+    [
+      "tests.test_news_client_cleanup",
+      "test_news_source_has_no_retired_adapter_target[finnhub_news]"
+    ],
+    [
+      "tests.test_news_client_cleanup",
+      "test_news_source_has_no_retired_adapter_target[polygon_news]"
+    ],
+    [
+      "tests.test_news_client_cleanup",
+      "test_old_collector_modules_are_physically_absent[__init__.py]"
+    ],
+    [
+      "tests.test_news_client_cleanup",
+      "test_old_collector_modules_are_physically_absent[finnhub_news.py]"
+    ],
+    [
+      "tests.test_news_client_cleanup",
+      "test_old_collector_modules_are_physically_absent[polygon_news.py]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_clients_expose_only_transport_parser_and_credential_contract[src.news_clients.finnhub-FinnhubConfig-FinnhubNewsCollector]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_clients_expose_only_transport_parser_and_credential_contract[src.news_clients.polygon-CollectionConfig-PolygonNewsCollector]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_finnhub_parser_preserves_truncation_filter_and_metadata[100-False]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_finnhub_parser_preserves_truncation_filter_and_metadata[500-False]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_finnhub_parser_preserves_truncation_filter_and_metadata[501-True]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_finnhub_parser_preserves_truncation_filter_and_metadata[99-True]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_finnhub_transport_preserves_requested_window_without_old_cli_clamp"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_fresh_client_import_does_not_configure_logging_write_files_or_start_provider[finnhub]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_fresh_client_import_does_not_configure_logging_write_files_or_start_provider[polygon]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_massive_news_transport_builds_requests_on_the_current_api_host"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_massive_nonempty_pages_preserve_timestamp_and_pagination[False]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_massive_nonempty_pages_preserve_timestamp_and_pagination[True]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_massive_parser_preserves_native_metadata_and_fallback_id"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_normalized_client_missing_key_fails_before_constructing_session[finnhub-src.news_clients.finnhub-FINNHUB_API_KEY]"
+    ],
+    [
+      "tests.test_news_clients",
+      "test_normalized_client_missing_key_fails_before_constructing_session[polygon-src.news_clients.polygon-MASSIVE_API_KEY]"
+    ]
+  ],
+  "backend": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 11168,
+    "skipped": 12
+  },
+  "baseline": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 11114,
+    "skipped": 12
+  },
+  "baseline_junit_gzip_sha256": "716c41b8b65c9f7861c91f28f02cea7302d22f5ab283bd925a262723a30e1b47",
+  "checks": {
+    "collected_equals_executed": true,
+    "complete_commands_succeeded": true,
+    "explicit_tests_directory": true,
+    "immutable_source_anchor_matches": true,
+    "maintenance_operation_and_citation_regression_suites_ran": true,
+    "no_backend_failures_or_errors": true,
+    "no_duplicate_nodes": true,
+    "no_source_runtime_or_runner_drift": true,
+    "retained_safety_owners_ran": true,
+    "unchanged_skip_ids": true
+  },
+  "collected": 11180,
+  "collection_run": "final-collection",
+  "executed": 11180,
+  "junit_sha256": "4dacdf537e9a01d5dde306e112d7925fa29fb4803487ed8d445c9362ff4eed5d",
+  "limit": "Frozen offline C12 acceptance; not provider entitlement/coverage, runtime activation or complete project cleanup.",
+  "new_suites": {
+    "test_daily_update_wrapper": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 53,
+      "skipped": 0
+    },
+    "test_news_client_cleanup": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 7,
+      "skipped": 0
+    },
+    "test_news_clients": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 15,
+      "skipped": 0
+    },
+    "test_sec_research_citations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 143,
+      "skipped": 0
+    },
+    "test_sec_research_cli": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 36,
+      "skipped": 0
+    },
+    "test_sec_research_maintenance": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 60,
+      "skipped": 0
+    },
+    "test_sec_research_operation_admission": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 28,
+      "skipped": 0
+    },
+    "test_sec_research_operations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 73,
+      "skipped": 0
+    },
+    "test_sec_research_references": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 47,
+      "skipped": 0
+    },
+    "test_sec_research_schema_admin": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 52,
+      "skipped": 0
+    },
+    "test_sec_research_trace": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 75,
+      "skipped": 0
+    }
+  },
+  "removed": [
+    [
+      "tests.test_collector_adapters",
+      "test_collectors_expose_contract_from_src_package"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_finnhub_incremental_window_capped_at_7_days"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_finnhub_missing_key_raises"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_finnhub_unavailable_scope_exits_before_provider_construction"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_finnhub_up_to_date_short_circuit"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_import_is_side_effect_free"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_load_tickers_active_universe"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_load_tickers_requires_explicit_scope"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_massive_news_transport_builds_requests_on_the_current_api_host"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_paths_are_repo_anchored"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_polygon_missing_key_raises"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_polygon_unavailable_scope_exits_before_provider_construction"
+    ],
+    [
+      "tests.test_collector_adapters",
+      "test_polygon_up_to_date_short_circuit"
+    ],
+    [
+      "tests.test_data_scheduler",
+      "test_normalized_news_route_calls_writer_under_market_lock[finnhub_news-finnhub-src.collectors.finnhub_news-FinnhubConfig-FinnhubNewsCollector-FinnhubNormalizedProvider]"
+    ],
+    [
+      "tests.test_data_scheduler",
+      "test_normalized_news_route_calls_writer_under_market_lock[polygon_news-polygon-src.collectors.polygon_news-CollectionConfig-PolygonNewsCollector-PolygonNormalizedProvider]"
+    ]
+  ],
+  "retained_safety_owners": {
+    "test_api_fixed_dispatch_pins_complete_selection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0
+    },
+    "test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_failed_generation_redacts_selected_key_after_activation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_openai_retry_key_echo_is_private_without_changing_retry_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_original_oauth_id_can_refresh_normally_without_reselection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    }
+  },
+  "seconds": 1419.277,
+  "skipped": [
+    [
+      "tests.test_detailed_financials.TestLiveTechMetrics",
+      "test_nvda_tech_metrics"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_basic_stock_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_connection"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_iv_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_filter"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_quote"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_volume_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_put_call_ratio_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_scanner_parameters"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_unusual_activity"
+    ],
+    [
+      "tests.test_option_chain_tools.TestLiveOptionChain",
+      "test_spy_option_chain"
+    ],
+    [
+      "tests.test_peer_comparison.TestLivePeerComparison",
+      "test_nvda_peer_comparison"
+    ]
+  ],
+  "source_anchor": "c30c5bb89e55e2da8ade503f98e52b715bb2c2d2",
+  "source_collection_sha256": "72334fb784a6eaa3eed11c75493f0f09b68c9095b0e147e3e40616f0c0fa63a3",
+  "source_drift": [],
+  "source_files": 1161,
+  "source_snapshot_after": "final-after.json",
+  "source_snapshot_before": "final-before.json",
+  "sqlite": "3.37.2"
+}

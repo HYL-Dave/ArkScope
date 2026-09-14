@@ -186,9 +186,14 @@ The runtime location/approach and old-CLI capability retirement are no longer
 pending user choices. Engineering must still provide reviewed executable plans
 and RED-first owners before changing these shared contracts.
 
-1. C12: move live clients, remove old CLI/storage owners, fix current CLI status
-   truth, and implement/verify the recent-source policy without reviving global
-   file cursors or copying unverified subscription restrictions.
+1. C12 code/entrypoint cleanup is CLOSED at `c30c5bb8`: live clients relocated,
+   old CLI/storage owners physically removed, and current CLI news status reads
+   durable telemetry without claiming completeness. Fresh full backend:
+   11,168 passed / 12 unchanged skips; see the
+   [C12 receipt](../superpowers/evidence/2026-09-14-news-client-cleanup/README.md).
+   The shared fourteen-day request target remains intact. Account-limit
+   reporting and durable initial-interval retries are separate unfinished
+   recent-source policy work, not implied by the CLI cleanup.
 2. Linux runtime: prepare and admit the final package and entrypoint checks;
    arrange the production cutover separately. This does not block independent
    C12/C15/C20 source cleanup.

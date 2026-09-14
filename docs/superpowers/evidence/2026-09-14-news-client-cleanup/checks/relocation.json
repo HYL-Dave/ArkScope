@@ -1,0 +1,97 @@
+{
+  "base": "8c64f884",
+  "comparisons": [
+    {
+      "source": "polygon",
+      "definition": "NewsArticle",
+      "same": true
+    },
+    {
+      "source": "polygon",
+      "definition": "RateLimiter",
+      "same": true
+    },
+    {
+      "source": "polygon",
+      "definition": "load_env",
+      "same": true
+    },
+    {
+      "source": "polygon",
+      "definition": "CollectionConfig",
+      "same": true
+    },
+    {
+      "source": "polygon",
+      "definition": "PolygonNewsCollector.__init__",
+      "same": true
+    },
+    {
+      "source": "polygon",
+      "definition": "PolygonNewsCollector.fetch_news_range",
+      "same": true
+    },
+    {
+      "source": "polygon",
+      "definition": "PolygonNewsCollector.parse_article",
+      "same": true
+    },
+    {
+      "source": "polygon",
+      "definition": "PolygonNewsCollector.BASE_URL",
+      "same": true
+    },
+    {
+      "source": "finnhub",
+      "definition": "NewsArticle",
+      "same": true
+    },
+    {
+      "source": "finnhub",
+      "definition": "FinnhubRateLimiter",
+      "same": true
+    },
+    {
+      "source": "finnhub",
+      "definition": "load_env",
+      "same": true
+    },
+    {
+      "source": "finnhub",
+      "definition": "FinnhubConfig",
+      "same": true
+    },
+    {
+      "source": "finnhub",
+      "definition": "FinnhubNewsCollector.__init__",
+      "same": true
+    },
+    {
+      "source": "finnhub",
+      "definition": "FinnhubNewsCollector.fetch_news",
+      "same": true
+    },
+    {
+      "source": "finnhub",
+      "definition": "FinnhubNewsCollector.parse_article",
+      "same": true
+    },
+    {
+      "source": "finnhub",
+      "definition": "FinnhubNewsCollector.BASE_URL",
+      "same": true
+    },
+    {
+      "source": "daily_update",
+      "definition": "main",
+      "same": true,
+      "comparison": "exact_source"
+    },
+    {
+      "source": "daily_update",
+      "definition": "get_ibkr_prices_status",
+      "same": true,
+      "comparison": "exact_source"
+    }
+  ]
+}

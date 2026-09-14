@@ -1,0 +1,38 @@
+{
+  "name": "cleanup-final-controls",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-news-client-cleanup/offline_pytest.py",
+    "-q",
+    "tests/test_daily_update_wrapper.py",
+    "tests/test_news_client_cleanup.py",
+    "tests/test_news_clients.py",
+    "tests/test_news_sync_status.py",
+    "tests/test_data_scheduler.py",
+    "tests/test_news_bootstrap_policy.py",
+    "tests/test_collector_load_env.py",
+    "tests/test_news_providers.py",
+    "tests/test_news_normalized_provider_adapters.py",
+    "tests/test_news_direct.py",
+    "tests/test_active_universe.py",
+    "tests/test_security_lifecycle_terminal_workflow.py",
+    "tests/test_legacy_score_retirement.py",
+    "tests/test_trading_day_coverage.py",
+    "tests/test_job_runs.py",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-news-client-cleanup/cleanup-final-controls/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 19.721,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-news-client-cleanup/cleanup-final-controls",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-news-client-cleanup/cleanup-final-controls/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-news-client-cleanup/cleanup-final-controls/output.log"
+}
