@@ -1,6 +1,11 @@
 # Private SQLite Runtime Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Superseded deployment direction, 2026-09-15.** Completed tasks below are
+> historical evidence, not instructions to resume self-built runtime activation.
+> The user approved prebuilt-first evaluation to reduce maintenance. Follow
+> [the current runtime policy](../../design/RUNTIME_AND_RECENT_COLLECTION_POLICY.md)
+> and [evaluation/removal boundary](../../design/SQLITE_RUNTIME_OPERATIONS.md).
+> No replacement is admitted or installed by this documentation change.
 
 **Goal:** Deliver an executable, verified Linux SQLite package without activating it on production writers.
 

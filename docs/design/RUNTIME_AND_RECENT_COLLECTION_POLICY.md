@@ -1,50 +1,80 @@
 # Runtime And Recent Collection Policy
 
-Date: 2026-09-14. Policy source review: `d90c13fa`,
-`codex/sec-research-integration`. Status: user decisions accepted; the shared
-fourteen-day request target and C12 collector retirement are complete as recorded
-below. Linux runtime preparation/startup checks are now implemented and verified
-at `292ef27f`. Production activation, entitlement reporting and SA targeting remain open.
-This supersedes the two pending choices in the
+Date: 2026-09-14; runtime decision revised 2026-09-15 on
+`codex/sec-research-integration` at `8ef04a60`. The user prioritizes lower
+maintenance cost and accepts retreating from the self-built SQLite plan.
+Prebuilt runtime evaluation replaces preparation for self-built activation;
+no replacement artifact has been admitted or installed. The shared fourteen-day
+request target and C12 retirement remain complete. Entitlement reporting and
+SA targeting remain open. The original policy superseded the pending choices in the
 [September 14 closeout](../superpowers/evidence/2026-09-14-runtime-cleanup-closeout/README.md).
-Its historical test results and operational boundaries remain unchanged.
+Historical test results and operational boundaries remain unchanged.
 
 ## SQLite: Upgradeable, Not Frozen
 
-Adopt the Linux-only app-private SQLite library plus executable launcher under
-`~/.local/share/arkscope/runtimes/`. The current source tree, Python and numpy are
-not bundled or upgraded as a side effect. Ordinary source edits do not require
-rebuilding the SQLite package. This is not the packaged Python sandbox project.
+App-private runtime isolation does not require building SQLite ourselves.
+The previous private shared-library/build/launcher deployment choice is
+superseded, not queued for production activation. Normal installation, source
+development and application acceptance must not require a SQLite source archive,
+compiler or custom SQLite build recipe. Do not silently fall back to a source
+build when a matching binary is unavailable.
 
-Pin one admitted package identity per process generation, not one version for
-the rest of pre-release development. Prefer reviewing current stable upstream
-fixes rather than indefinitely retaining the first admitted version. Prepare a
-new immutable version directory, verify it, then deliberately switch generations.
-Do not overwrite an active library or download/select an unverified latest build
-at startup. A subsequent Python/numpy/SDK upgrade remains possible through its
-own scoped admission; this SQLite change does not freeze those dependencies.
+Evaluate a maintained prebuilt CPython distribution and a separate project
+virtual environment first, preserving ordinary `import sqlite3` and existing
+executable selectors. This is a candidate approach, not an approved Python or
+dependency replacement. Check the actual bundled SQLite, supported platform,
+Python compatibility and existing dependency versions before selecting an
+artifact. Keep the installed Python/numpy/SDK environment untouched during
+disposable evaluation. Prefer the distribution manager's existing download,
+checksum and environment mechanisms over another custom runtime manager.
+
+The [uv distribution documentation](https://docs.astral.sh/uv/concepts/python-versions/#cpython-distributions)
+confirms it downloads prebuilt CPython from `python-build-standalone`. This
+establishes a no-local-build route, not a particular SQLite version or ArkScope
+compatibility. A prebuilt SQLite DBAPI wheel is a secondary alternative requiring
+explicit import/connection ownership across all writers. It is not a drop-in
+upgrade of the standard library merely because a wheel was installed. The
+[pysqlite3 maintainer](https://github.com/coleifer/pysqlite3) now directs new
+development to `cysqlite`; do not select an older package name without checking
+maintenance and Python/platform support. Both sources were checked on September 15.
+
+A limited disposable probe of `python-build-standalone` 20260901 ran without
+compilation: Python 3.10.21/SQLite 3.53.1 passed the five archived UPSERT cases
+and in-memory FTS5/JSON/decimal checks. Its lower parameter limit, absent optional
+UPDATE LIMIT grammar and lag behind SQLite 3.53.4 still need review, together
+with dependencies and real App paths. See the
+[scope and raw results](SQLITE_RUNTIME_OPERATIONS.md#limited-feasibility-probe-september-15).
+This is feasibility evidence only; no replacement is admitted or deployed.
+
+Record one admitted artifact identity per environment, not one version for the
+rest of pre-release development. Review newer stable distributions and upstream
+fixes regularly. Validate a separate candidate environment before switching;
+do not overwrite the active interpreter or resolve an unverified latest build
+at startup. Python/numpy/SDK updates remain possible through scoped acceptance.
 
 Admission requirements:
 
 - Before application initialization can write, verify the engine actually
-  loaded by the selected interpreter. Version alone is insufficient: compare
-  source ID and required compile features/limits with the admitted package,
-  alongside artifact hashes. A mismatch fails visibly, never silently falls
-  back. Do not use the standalone SQLite CLI's identity as Python's identity.
+  loaded by the selected interpreter against the admitted artifact and required
+  application behavior. Record source ID and compile options; do not require
+  equality with the old distribution's entire flag list. Requirements such as
+  parameter capacity and SQL grammar need actual consumer/test owners, not just
+  inheritance from `src/sqlite_runtime/contract.py`. Missing required behavior
+  or an unexpected engine fails visibly, never silently falls back. Do not use
+  the standalone SQLite CLI's identity as Python's identity.
 - Desktop, the SA native host, supported operator/development/test entrypoints
   and normal writer children must resolve the intended engine. Preserve argv,
   cwd, signals and native-host stdout. Verify the real launch/child paths, not
   only a parent-process mock. Tests on the system engine are not new-runtime
   admission evidence.
-- Set loader variables only for the selected Python process and intended
-  children. Do not modify shell profiles, global service-manager environment,
-  `ldconfig`, Electron's environment or isolated OAuth provider environments.
-  A future service may invoke the approved launcher; that is different from
-  installing a global loader override.
-- A manifest enumerates owned package objects but cannot by itself authorize
-  arbitrary deletion. Validate paths beneath the managed runtime root, ownership
-  and actual object shape, and exclude active generations and retained recovery
-  packages. Never delete unrelated files, application databases or captures.
+- Prefer no loader override. Do not modify shell profiles, global service-manager
+  environment, `ldconfig`, Electron's environment or isolated OAuth provider
+  environments. A manager's optional global PATH/setup actions are not part of
+  scoped candidate evaluation or application installation.
+- Use the selected manager's package inventory and removal mechanism where
+  possible. Any cleanup must still verify its scope and protect active/recovery
+  environments. A manifest or lockfile cannot authorize arbitrary deletion of
+  unrelated files, application databases or captures.
 - Review relocation, compile profile, native dependency compatibility and
   descendant loading using the existing
   [admission preflight](../superpowers/evidence/2026-09-13-maintenance-closures/checks/sqlite-admission-preflight.md).
@@ -52,17 +82,18 @@ Admission requirements:
   deferred replacement is distinguished below; do not widen its closed
   environment or reconnect it to make an engine-coverage claim.
 
-The source-only deployment decision is approved. Production selector/store
-inspection, writer shutdown, backups, full integrity checks and actual activation
-still require the separately agreed operational window. Engine replacement does
-not repair already-damaged data. Rollback after writes is not equivalent to merely
-changing a launcher path; preserve the existing recovery acceptance boundary.
+Only the prebuilt-first direction is approved; a specific distribution, version
+and installation layout remain unselected. Production selector/store inspection,
+writer shutdown, backups, full integrity checks and activation still require the
+separately agreed operational window. Engine replacement does not repair
+already-damaged data. Rollback after writes is not equivalent to merely changing
+an executable path; preserve the existing recovery acceptance boundary.
 
 Windows/macOS runtime admission and the Python sandbox are deferred. Other
 platforms do not inherit Linux validation or a same-version guarantee. Do not
 make their admission a prerequisite for current Linux code cleanup.
 
-### Prepared Runtime Checkpoint
+### Superseded Self-Build Checkpoint And Removal Scope
 
 The offline builder, manifest-bound executable selector and early process guards
 are implemented at `292ef27f`. The final SQLite 3.53.4 package passed its exact
@@ -73,19 +104,29 @@ loaded the package library; the separate unmanaged Python still loads system
 unchanged. Bootstrap review findings and actual SQL grammar validation are
 included in the [preparation receipt](../superpowers/evidence/2026-09-14-private-sqlite-runtime/README.md).
 
-The existing Desktop and SA executable selectors can use the new package;
-their real launchers were tested with disposable fixtures. Neither installed
-selector was inspected or switched. Follow
-`docs/design/SQLITE_RUNTIME_OPERATIONS.md` for preparation and the separate
-stopped-writer backup/integrity/activation window. A prepared package does not
-mean the running App is upgraded or its retained databases have been checked.
+This is historical evidence for the self-built package, not replacement-runtime
+acceptance or an instruction to deploy it. Neither installed selector was
+inspected or switched. `docs/design/SQLITE_RUNTIME_OPERATIONS.md` now describes
+candidate selection and the replacement/removal boundary. SEC, completed cleanup,
+the archived UPSERT reproducer and data-safety evidence are not rolled back.
 
 The September 15 [acceptance/cleanup follow-up](../superpowers/evidence/2026-09-15-runtime-acceptance-cleanup/README.md)
-now rejects missing source archives in selected-runtime artifact acceptance.
+rejects missing source archives in selected-runtime artifact acceptance.
 Its single full backend passed 11,204 cases with twelve unchanged skips; all
-31 artifact cases executed. Production startup with both selection variables
-absent is still an activation blocker: implement an independent durable
-production requirement before switching, not another optional wrapper variable.
+31 artifact cases executed. That fixture rebuilds a disposable package: the
+source requirement is a property of that test design, not SQLite execution or
+acceptance of a prebuilt artifact. The gate still exists in product/test source
+at this policy revision; do not claim this documentation change removed it.
+
+The replacement patch owns removing the self-build recipe, custom bootstrap and
+obsolete build-only tests once a prebuilt candidate is admitted. It must replace
+the early `src/__init__.py` check and transfer real engine/child/startup safety
+tests together, not remove the guard in isolation or retain the old builder as
+a permanent fallback. Separate testing a supplied binary from building one;
+ordinary selected-runtime acceptance must not depend on a source archive.
+Before activation, prove that supported production startup cannot silently use
+an unadmitted system engine. The exact replacement mechanism belongs to candidate
+integration, not another extension of the superseded loader architecture.
 
 ### Internal Analysis Library And Sandbox Ownership
 
@@ -115,7 +156,7 @@ and containment admission before registration or execution.
 The sandbox workstream owns removal of the old execution implementation and its
 superseded direct-library tests, with preservation of useful historical result
 readers. This is an explicit replacement task, not forgotten cleanup. Existing
-financial calculators and the separate SQLite package work do not wait for it.
+financial calculators and prebuilt runtime evaluation do not wait for it.
 
 ## News: A Recent Target Subject To Real Access
 
@@ -238,9 +279,10 @@ Acceptance distinguishes membership from best-effort content:
 
 ## Work Order And Completion Accounting
 
-The runtime location/approach and old-CLI capability retirement are no longer
-pending user choices. Engineering must still provide reviewed executable plans
-and RED-first owners before changing these shared contracts.
+Old-CLI capability retirement remains approved. The September 15 decision
+supersedes the self-built runtime approach; only prebuilt-first evaluation is
+approved, not a particular replacement or production switch. Implementation
+must provide scoped executable changes and RED-first owners for shared contracts.
 
 1. C12 code/entrypoint cleanup is CLOSED at `c30c5bb8`: live clients relocated,
    old CLI/storage owners physically removed, and current CLI news status reads
@@ -250,10 +292,12 @@ and RED-first owners before changing these shared contracts.
    The shared fourteen-day request target remains intact. Account-limit
    reporting and durable initial-interval retries are separate unfinished
    recent-source policy work, not implied by the CLI cleanup.
-2. Linux runtime preparation and selected-process startup checks are CLOSED at
-   `292ef27f`; final artifact/full-backend evidence is linked above. Arrange the
-   production cutover separately, after closing the unselected-production
-   startup blocker in the runtime runbook. C15/C20 cleanup remains independent.
+2. Self-built runtime activation is CANCELLED in favor of prebuilt evaluation.
+   Its completed preparation at `292ef27f` remains historical, not the active
+   deployment plan. First evaluate a binary against actual App requirements;
+   then integrate it while removing the superseded runtime code/build-only tests
+   and preserving startup/child safety owners. Arrange production cutover only
+   after replacement acceptance. C15/C20 cleanup remains independent.
 3. SA Open-first initialization: a separate scoped follow-up; preserve current
    collection while proving new targeting and explicit unfinished work.
 4. Three additional C15 migration/recovery bundles are physically removed at
