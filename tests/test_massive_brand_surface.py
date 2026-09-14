@@ -39,9 +39,9 @@ _ALLOWLIST = {
 }
 _LOWERCASE_COPY_ALLOWLIST = {
     Occurrence(
-        "src/daily_update.py",
-        "Get Massive news data status from the durable polygon source path.",
-    ): "This explains the existing durable storage path.",
+        "src/news_clients/polygon.py",
+        "Massive API client with the durable polygon source identity.",
+    ): "This explains the retained source identity, not provider-facing branding.",
     Occurrence(
         "src/tools/backends/__init__.py",
         "source: Data source (IBKR, Massive, auto; Massive uses the legacy polygon wire value)",
