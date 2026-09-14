@@ -53,8 +53,8 @@ Final focused acceptance: 427 passed, including the additional absence owner.
 
 - [x] Repoint current provider/catalog/vision/data documents and remove current advertisements for retired commands. Keep historical specs/evidence archival; record source-anchor distinctions. Do not rewrite historical reports as if new paths existed then.
 - [x] Scope review: base-to-tip diff, deleted-test ownership mapping, AST preservation, unbounded source/reference search. Resolve actionable findings before full acceptance.
-- [ ] Commit product source; freeze source/runtime/runners. Collect and execute the full backend once, reconcile every node and unchanged skip identity. Run the same scanner against the preceding census and attribute intentional deleted-file reductions.
-- [ ] Publish selected RED/GREEN/full results and update priority/current policy. C12 code/entrypoint cleanup can close independently; provider-limit reporting, initial-window persistence, C15/C20, SQLite activation and SA targeting remain separate.
+- [x] Commit product source; freeze source/runtime/runners. Collect and execute the full backend, reconcile every node and unchanged skip identity. First full: 11,167P/1F/12S; fix the stale exact brand-copy allowance at `c30c5bb8`, then repeat the entire suite: 11,168P/12 unchangedS, 11,180 exact nodes, no source/runtime/runner drift. Same-scanner comparison has zero new candidates; all 17 new uncertainty IDs and four intentional deleted-file reductions are attributed.
+- [x] Publish selected RED/GREEN/full results and update priority/current policy. C12 code/entrypoint cleanup is CLOSED; provider-limit reporting, initial-window persistence, C15/C20, SQLite activation and SA targeting remain separate. Evidence: `docs/superpowers/evidence/2026-09-14-news-client-cleanup/README.md`.
 
 ## Preflight
 
