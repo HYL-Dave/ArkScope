@@ -30,16 +30,13 @@ source 不會雙抓——但會被 skip，所以仍建議錯開。
     # 模擬執行 (印出 per-source 計畫，不碰 IBKR/DB/job_runs)
     python -m src.daily_update --all --scope active-universe --dry-run
 
-重要限制 — 新 Ticker 的歷史資料:
-    --all / --news 底層用 --incremental，以「全域最新文章時間」為起點。
-    新加入的 ticker 不會被自動補抓歷史新聞。補抓方式 (Massive 為例):
-        python -m src.collectors.polygon_news \\
-            --tickers GM,NEM,AFRM --start 2022-01-01
+News collection:
+    Incremental cursors are independent per source and ticker. New tickers use
+    the shared INITIAL_NEWS_LOOKBACK target in src/news_collection_policy.py.
+    Requested windows and recorded successes do not establish complete coverage.
 """
 
-import os
 import sys
-import json
 import logging
 import argparse
 from datetime import datetime, date, timezone
@@ -58,7 +55,6 @@ logger = logging.getLogger(__name__)
 # Script directory
 SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent
-CONFIG_DIR = REPO_ROOT / "config"
 
 # Repo root on sys.path so `--scope active-universe` can read the local
 # profile-state DB when this module is executed from outside the repo root.
@@ -66,16 +62,11 @@ sys.path.insert(0, str(REPO_ROOT))
 
 
 class _RunTelemetry:
-    """Best-effort job_runs telemetry for the backfill runner (slice 3e-B).
+    """Best-effort job_runs summary for the current CLI.
 
-    Before this, a failed collection run left ZERO queryable trace (the only
-    signal was the process exit code). Each step now lands one terminal-state
-    ``job_runs`` row (``daily_update.<step>``, trigger_source='cli') via
-    record_completed_run — the same terminal-only pattern the Chrome extension
-    uses. STRICTLY additive: never raises, never alters flags/exit-code
-    semantics, and is fully disabled on --dry-run (dry runs must not touch the
-    DB — protected contract). The app's provider-health/ops views read these
-    rows; the runner itself behaves byte-identically.
+    run_source owns per-source rows; main records one daily_update.run summary.
+    Recording never raises or changes the collection exit status. Disabled
+    telemetry does not construct a DAL or access its stores.
     """
 
     def __init__(self, enabled: bool, payload: Dict):
@@ -112,122 +103,6 @@ class _RunTelemetry:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"job telemetry record failed for {step}: {e}")
 
-    def timed(self, step: str, fn, *args, **kwargs) -> bool:
-        """Run one step, record its outcome with real timing, return it unchanged."""
-        t0 = datetime.now(timezone.utc)
-        ok = fn(*args, **kwargs)
-        self.record(step, bool(ok), t0)
-        return ok
-
-
-def get_polygon_status() -> Dict:
-    """Get Massive news data status from the durable polygon source path."""
-    data_dir = Path("data/news/raw/polygon")
-
-    if not data_dir.exists():
-        return {'exists': False, 'total_articles': 0, 'latest_date': None}
-
-    total = 0
-    latest_date = None
-
-    try:
-        import pandas as pd
-
-        for year_dir in data_dir.iterdir():
-            if not year_dir.is_dir():
-                continue
-            for pq in year_dir.glob("*.parquet"):
-                df = pd.read_parquet(pq)
-                total += len(df)
-
-                if 'published_at' in df.columns:
-                    df['_dt'] = pd.to_datetime(df['published_at'], errors='coerce')
-                    max_dt = df['_dt'].max()
-                    if pd.notna(max_dt):
-                        if latest_date is None or max_dt > latest_date:
-                            latest_date = max_dt
-    except Exception as e:
-        logger.warning(f"Error reading Massive data: {e}")
-
-    return {
-        'exists': True,
-        'total_articles': total,
-        'latest_date': latest_date.date() if latest_date else None,
-    }
-
-
-def get_finnhub_status() -> Dict:
-    """Get Finnhub news data status."""
-    data_dir = Path("data/news/raw/finnhub")
-
-    if not data_dir.exists():
-        return {'exists': False, 'total_articles': 0, 'latest_date': None}
-
-    total = 0
-    latest_date = None
-
-    try:
-        import pandas as pd
-
-        for year_dir in data_dir.iterdir():
-            if not year_dir.is_dir():
-                continue
-            for pq in year_dir.glob("*.parquet"):
-                df = pd.read_parquet(pq)
-                total += len(df)
-
-                if 'published_at' in df.columns:
-                    df['_dt'] = pd.to_datetime(df['published_at'], errors='coerce')
-                    max_dt = df['_dt'].max()
-                    if pd.notna(max_dt):
-                        if latest_date is None or max_dt > latest_date:
-                            latest_date = max_dt
-    except Exception as e:
-        logger.warning(f"Error reading Finnhub data: {e}")
-
-    return {
-        'exists': True,
-        'total_articles': total,
-        'latest_date': latest_date.date() if latest_date else None,
-    }
-
-
-def get_ibkr_news_status() -> Dict:
-    """Get IBKR news data status."""
-    data_dir = Path("data/news/raw/ibkr")
-
-    if not data_dir.exists():
-        return {'exists': False, 'total_articles': 0, 'latest_date': None}
-
-    total = 0
-    latest_date = None
-
-    try:
-        import pandas as pd
-
-        for year_dir in data_dir.iterdir():
-            if not year_dir.is_dir():
-                continue
-            for pq in year_dir.glob("*.parquet"):
-                df = pd.read_parquet(pq)
-                total += len(df)
-
-                if 'published_at' in df.columns:
-                    df['_dt'] = pd.to_datetime(df['published_at'], errors='coerce')
-                    max_dt = df['_dt'].max()
-                    if pd.notna(max_dt):
-                        if latest_date is None or max_dt > latest_date:
-                            latest_date = max_dt
-    except Exception as e:
-        logger.warning(f"Error reading IBKR news data: {e}")
-
-    return {
-        'exists': True,
-        'total_articles': total,
-        'latest_date': latest_date.date() if latest_date else None,
-    }
-
-
 def get_ibkr_prices_status() -> Dict:
     """Get price status from the current local SQLite authority."""
     stats = local_market_stats()
@@ -248,44 +123,46 @@ def get_ibkr_prices_status() -> Dict:
 
 
 def show_status():
-    """Display status of all data sources."""
+    """Display recorded news collection telemetry and current SQLite price status."""
+    from src.auth_drivers.probe_harness import redact
+    from src.market_data_admin import resolve_market_db_path
+    from src.news_sync_status import read_news_sync_status
+
     logger.info("\n" + "=" * 70)
     logger.info("DATA STATUS SUMMARY")
     logger.info("=" * 70)
 
     today = date.today()
 
-    # Massive status (durable source ID: polygon)
-    polygon = get_polygon_status()
-    if polygon['exists']:
-        days_behind = (today - polygon['latest_date']).days if polygon['latest_date'] else '?'
-        logger.info(f"\n📰 MASSIVE NEWS:")
-        logger.info(f"   Total articles: {polygon['total_articles']:,}")
-        logger.info(f"   Latest data:    {polygon['latest_date']} ({days_behind} days ago)")
-    else:
-        logger.info(f"\n📰 MASSIVE NEWS: No data found")
+    news_unavailable = False
+    try:
+        news = read_news_sync_status(resolve_market_db_path())
+    except Exception:
+        news = None
+        news_unavailable = True
+        logger.warning("News status unavailable")
 
-    # Finnhub status
-    finnhub = get_finnhub_status()
-    if finnhub['exists']:
-        days_behind = (today - finnhub['latest_date']).days if finnhub['latest_date'] else '?'
-        logger.info(f"\n📰 FINNHUB NEWS:")
-        logger.info(f"   Total articles: {finnhub['total_articles']:,}")
-        logger.info(f"   Latest data:    {finnhub['latest_date']} ({days_behind} days ago)")
-        logger.info(f"   Note: Finnhub only provides ~7 days of history")
-    else:
-        logger.info(f"\n📰 FINNHUB NEWS: No data found")
-
-    # IBKR news status
-    ibkr_news = get_ibkr_news_status()
-    if ibkr_news['exists'] and ibkr_news['total_articles'] > 0:
-        days_behind = (today - ibkr_news['latest_date']).days if ibkr_news['latest_date'] else '?'
-        logger.info(f"\n📰 IBKR NEWS (Dow Jones, Briefing, The Fly):")
-        logger.info(f"   Total articles: {ibkr_news['total_articles']:,}")
-        logger.info(f"   Latest data:    {ibkr_news['latest_date']} ({days_behind} days ago)")
-        logger.info(f"   Note: IBKR provides ~1 month of high-quality news history")
-    else:
-        logger.info(f"\n📰 IBKR NEWS: No data found (requires TWS/Gateway)")
+    providers = news["providers"] if news is not None else {}
+    for provider, label in (
+        ("polygon", "MASSIVE"),
+        ("finnhub", "FINNHUB"),
+        ("ibkr", "IBKR"),
+    ):
+        logger.info("\n%s NEWS:", label)
+        if news_unavailable:
+            logger.info("   Status unavailable")
+            continue
+        recorded = providers.get(provider)
+        if recorded is None:
+            logger.info("   No recorded telemetry")
+            continue
+        logger.info("   Recorded collection status: %s", recorded["status"])
+        logger.info("   Last attempt: %s", recorded["last_attempt"] or "Not recorded")
+        logger.info("   Last success: %s", recorded["last_success"] or "Not recorded")
+        rows_added = f"{recorded['rows_added']:,}" if recorded["last_attempt"] else "Not recorded"
+        logger.info("   Rows added by run: %s", rows_added)
+        if recorded["last_error"]:
+            logger.info("   Last error: %s", redact(recorded["last_error"]))
 
     # IBKR prices status
     ibkr_prices = get_ibkr_prices_status()
@@ -303,23 +180,8 @@ def show_status():
     # Recommendations
     logger.info("\n📋 RECOMMENDED ACTIONS:")
 
-    if not polygon['exists'] or (polygon['latest_date'] and (today - polygon['latest_date']).days > 1):
-        logger.info("   - Run: python -m src.daily_update --massive")
-
-    if not finnhub['exists'] or (finnhub['latest_date'] and (today - finnhub['latest_date']).days > 1):
-        logger.info("   - Run: python -m src.daily_update --finnhub")
-
-    if not ibkr_news['exists'] or (ibkr_news['latest_date'] and (today - ibkr_news['latest_date']).days > 1):
-        logger.info("   - Run: python -m src.daily_update --ibkr-news (requires TWS/Gateway)")
-
     if not ibkr_prices['exists'] or (ibkr_prices['latest_date'] and (today - ibkr_prices['latest_date']).days > 1):
         logger.info("   - Run: python -m src.daily_update --ibkr-prices --scope active-universe (requires TWS/Gateway)")
-
-    if polygon['exists'] and finnhub['exists'] and ibkr_news['exists']:
-        if (polygon['latest_date'] and (today - polygon['latest_date']).days <= 1 and
-            finnhub['latest_date'] and (today - finnhub['latest_date']).days <= 1 and
-            ibkr_news['latest_date'] and (today - ibkr_news['latest_date']).days <= 1):
-            logger.info("   ✅ News data is up to date!")
 
     logger.info("")
 

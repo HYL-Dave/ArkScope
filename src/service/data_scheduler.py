@@ -7,9 +7,8 @@ daily_update just ran them serially), with its OWN enable flag + interval set in
 Settings, executing in parallel where safe.
 
 Sources v1:
-  - polygon_news / finnhub_news      — IN-PROCESS adapters (the collector modules
-    are import-safe; run_incremental() returns structured stats like new_articles
-    instead of an opaque exit code); independent, can run concurrently
+  - polygon_news / finnhub_news      — in-process news clients and local writers;
+    independent sources, serialized by the per-source and market write locks
   - ibkr_news                         — sanitized src.news_normalized.ibkr_cli
     subprocess, serialized behind ONE shared IBKR lock (one Gateway session;
     client-id hygiene + the ib_insync asyncio loop is safer in its own process)
@@ -101,10 +100,7 @@ class SourceDef:
     # list; the universe is the in-app authority.
     universe_tickers: bool = False
     # In-process provider adapter: (module, function) resolved lazily at run time.
-    # The news collectors are import-safe modules now — calling run_incremental()
-    # in-process gives structured stats (new_articles) instead of an opaque exit
-    # code, with zero logic duplication. IBKR sources deliberately STAY subprocess:
-    # process isolation is a feature there (ib_insync asyncio + client-id hygiene).
+    # Used by SEC research; news is dispatched through news_direct_source.
     adapter: Optional[tuple] = None
     # Direct-local prices worker: run through a sanitized subprocess so ib_insync
     # stays out of scheduler worker threads.
@@ -138,7 +134,6 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "polygon_news", "Massive 新聞",
-            adapter=("src.collectors.polygon_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="polygon",
             writes_market_db=True,
             source_badges=("Massive", "直寫本地"),
@@ -146,7 +141,6 @@ SOURCES: Dict[str, SourceDef] = {
         ),
         SourceDef(
             "finnhub_news", "Finnhub 新聞",
-            adapter=("src.collectors.finnhub_news", "run_incremental"),
             universe_tickers=True, default_interval_min=60, news_direct_source="finnhub",
             writes_market_db=True,
             source_badges=("Finnhub", "直寫本地"),
@@ -435,7 +429,7 @@ _PROVIDER_WORKER_ERROR_CODES = frozenset({"ibkr_gateway_unavailable"})
 def _make_normalized_news_provider(source: str):
     """Build the Parquet-free normalized REST provider for a scheduler news source."""
     if source == "polygon":
-        from src.collectors.polygon_news import (
+        from src.news_clients.polygon import (
             CollectionConfig,
             PolygonNewsCollector,
             load_env,
@@ -449,7 +443,7 @@ def _make_normalized_news_provider(source: str):
             )
         return PolygonNormalizedProvider(PolygonNewsCollector(api_key, CollectionConfig()))
     if source == "finnhub":
-        from src.collectors.finnhub_news import (
+        from src.news_clients.finnhub import (
             FinnhubConfig,
             FinnhubNewsCollector,
             load_env,
@@ -988,7 +982,7 @@ def _normalized_worker_retryable_skip_reason(payload: Dict[str, Any]) -> Optiona
 
 def _resolve_price_scope() -> List[str]:
     """Active-universe tickers — delegates to the ONE shared resolver
-    (src.universe_scope), same contract as the collectors' --scope flag.
+    (src.universe_scope), same contract as daily_update's --scope flag.
 
     ``ActiveUniverseUnavailable`` deliberately propagates to ``run_source``'s
     existing failure boundary; an unavailable snapshot must never become ``[]``.

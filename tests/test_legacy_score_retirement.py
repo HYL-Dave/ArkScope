@@ -122,7 +122,7 @@ def test_ordinary_news_contract_has_no_legacy_score_fields():
 
 
 def test_provider_native_sentiment_and_investor_risk_contracts_are_preserved():
-    from src.collectors.polygon_news import NewsArticle as PolygonNewsArticle
+    from src.news_clients.polygon import NewsArticle as PolygonNewsArticle
     from src.investor_profile import InvestorProfile
     from src.tools.schemas import NewsArticle
 
@@ -207,7 +207,7 @@ def test_runtime_legacy_score_consumer_writer_census_is_closed_and_empty():
     }
     allowed = {
         "src/evidence_packet.py": {"score_api", "signal_runtime"},
-        "src/collectors/polygon_news.py": {"score_api"},
+        "src/news_clients/polygon.py": {"score_api"},  # provider-native sentiment
     }
     rows: list[tuple[str, str]] = []
     for root_name in runtime_roots:

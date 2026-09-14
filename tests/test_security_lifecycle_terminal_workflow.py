@@ -81,7 +81,7 @@ def setup_workflow(tmp_path, *, ticker="OLD", ended="2025-01-15", event_availabl
 
 @pytest.mark.parametrize("ticker,ended", [("ARCH", "2025-01-15"), ("LTHM", "2024-01-05"), ("TA", "2023-05-16")])
 def test_reviewed_legacy_delisting_stops_shared_scope_and_sa_sync_cannot_resurrect(tmp_path, monkeypatch, ticker, ended):
-    from src.collectors import finnhub_news, polygon_news
+    from tests.news_scope_support import assert_news_cli_scope
     from src.service import data_scheduler
     from src.sa_tracking_memberships import reconcile_sa_tracking
     from src.tools.backends.sa_capture_backend import SACaptureBackend
@@ -135,8 +135,7 @@ def test_reviewed_legacy_delisting_stops_shared_scope_and_sa_sync_cannot_resurre
         assert reconcile_sa_tracking(profile_db=c["profile"], sa_db=c["sa"], at=at)
         assert c["sources"]() == {"LIVE": ("manual_lists",)}
         assert data_scheduler._resolve_price_scope() == ["LIVE"]
-        assert polygon_news.load_tickers(scope="active-universe") == ["LIVE"]
-        assert finnhub_news.load_tickers(scope="active-universe") == ["LIVE"]
+        assert_news_cli_scope(monkeypatch, ["LIVE"])
     assert ProfileStateStore(c["profile"]).get_ticker(ticker).lists == []
     assert ProfileStateStore(c["profile"]).get_ticker("LIVE").lists == ["Manual"]
     with sqlite3.connect(c["market"]) as conn:

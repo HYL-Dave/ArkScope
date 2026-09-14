@@ -112,12 +112,6 @@ def hermetic(tmp_path, monkeypatch):
     # active-universe scope: stub a non-empty default so price/universe sources are
     # hermetic (no real profile DB). Tests asserting the empty-scope path override this.
     monkeypatch.setattr(ds, "_resolve_price_scope", lambda: ["AAPL", "NVDA"])
-    import src.collectors.finnhub_news as cfn
-    import src.collectors.polygon_news as cpn
-    monkeypatch.setattr(cpn, "run_incremental",
-                        lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
-    monkeypatch.setattr(cfn, "run_incremental",
-                        lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
     monkeypatch.setattr("src.news_providers.make_news_provider",
                         lambda source, **k: object())
     monkeypatch.setattr(
@@ -1123,7 +1117,7 @@ def test_polygon_news_keeps_its_source_id_but_uses_massive_config_authority():
 def test_normalized_massive_provider_missing_key_names_only_canonical_bridge(
     monkeypatch,
 ):
-    monkeypatch.setattr("src.collectors.polygon_news.load_env", lambda: "")
+    monkeypatch.setattr("src.news_clients.polygon.load_env", lambda: "")
 
     with pytest.raises(RuntimeError) as captured:
         ds._make_normalized_news_provider("polygon")
@@ -1134,11 +1128,11 @@ def test_normalized_massive_provider_missing_key_names_only_canonical_bridge(
 
 
 def test_run_source_news_direct_when_normalized_writes_unset(monkeypatch, hermetic):
-    # The current default selects the direct-local writer, never collector storage.
-    import src.collectors.polygon_news as cpn
-    calls = {"run_incremental": 0, "subprocess": 0, "direct": 0, "provider": None}
-    monkeypatch.setattr(cpn, "run_incremental",
-                        lambda *a, **k: calls.__setitem__("run_incremental", calls["run_incremental"] + 1))
+    # The selected provider factory owns client construction; no second client.
+    import src.news_clients.polygon as cpn
+    calls = {"client": 0, "subprocess": 0, "direct": 0, "provider": None}
+    monkeypatch.setattr(cpn, "PolygonNewsCollector",
+                        lambda *a, **k: calls.__setitem__("client", calls["client"] + 1))
 
     def _subproc(argv, **kwargs):
         calls["subprocess"] += 1
@@ -1155,7 +1149,7 @@ def test_run_source_news_direct_when_normalized_writes_unset(monkeypatch, hermet
     res = ds.run_source("polygon_news", trigger_source="api")
     assert res["status"] == "succeeded"
     assert calls["direct"] == 1 and calls["provider"] == "polygon"   # direct writer + provider used
-    assert calls["run_incremental"] == 0                             # NOT the Parquet adapter
+    assert calls["client"] == 0  # factory was injected above
     assert calls["subprocess"] == 0
     assert "local_refresh" not in res
     assert res["collect"]["source"] == "polygon" and res["ticker_count"] == 2
@@ -1257,8 +1251,8 @@ def test_unknown_news_write_mode_fails_before_provider_adapter_worker_and_teleme
         lambda dal: _Telemetry(),
     )
     monkeypatch.setattr(
-        "src.collectors.polygon_news.run_incremental",
-        _called("adapter", {"mode": "up_to_date", "new_articles": 0}),
+        "src.news_clients.polygon.PolygonNewsCollector",
+        _called("adapter", object()),
     )
     monkeypatch.setattr(
         "src.news_providers.make_news_provider",
@@ -1296,9 +1290,9 @@ def test_unknown_news_write_mode_fails_before_provider_adapter_worker_and_teleme
     ("source", "direct_source", "collector_module", "config_name", "collector_name",
      "provider_name"),
     [
-        ("polygon_news", "polygon", "src.collectors.polygon_news",
+        ("polygon_news", "polygon", "src.news_clients.polygon",
          "CollectionConfig", "PolygonNewsCollector", "PolygonNormalizedProvider"),
-        ("finnhub_news", "finnhub", "src.collectors.finnhub_news",
+        ("finnhub_news", "finnhub", "src.news_clients.finnhub",
          "FinnhubConfig", "FinnhubNewsCollector", "FinnhubNormalizedProvider"),
     ],
 )
@@ -1320,10 +1314,7 @@ def test_normalized_news_route_calls_writer_under_market_lock(
 
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.NORMALIZED,
                                           "normalized test route")
-    legacy_module = importlib.import_module(collector_module)
-    monkeypatch.setattr(legacy_module, "run_incremental",
-                        lambda *a, **k: (_ for _ in ()).throw(
-                            AssertionError("legacy run_incremental must not run")))
+    client_module = importlib.import_module(collector_module)
     monkeypatch.setattr("src.news_direct.backfill_news_direct",
                         lambda *a, **k: (_ for _ in ()).throw(
                             AssertionError("legacy direct writer must not run")))
@@ -1382,9 +1373,9 @@ def test_normalized_news_route_calls_writer_under_market_lock(
         def operation(self):
             return nullcontext()
 
-    monkeypatch.setattr(legacy_module, "load_env", lambda: f"{direct_source}-key")
-    monkeypatch.setattr(legacy_module, config_name, FakeConfig)
-    monkeypatch.setattr(legacy_module, collector_name, FakeCollector)
+    monkeypatch.setattr(client_module, "load_env", lambda: f"{direct_source}-key")
+    monkeypatch.setattr(client_module, config_name, FakeConfig)
+    monkeypatch.setattr(client_module, collector_name, FakeCollector)
     monkeypatch.setattr(adapters, provider_name, FakeProvider)
 
     def _write_news_batch(store, provider, scope, budget, *, project_legacy=False,
@@ -1588,7 +1579,7 @@ def test_legacy_local_news_route_runs_despite_stale_normalized_continuation(monk
 
 
 def test_blocked_news_route_fails_despite_stale_normalized_continuation(monkeypatch):
-    import src.collectors.polygon_news as cpn
+    import src.news_clients.polygon as cpn
     import src.news_normalized.routing as routing
 
     continuation = {
@@ -1611,7 +1602,7 @@ def test_blocked_news_route_fails_despite_stale_normalized_continuation(monkeypa
     monkeypatch.setattr(ds, "_run_normalized_news_writer",
                         lambda *a, **k: calls.__setitem__(
                             "normalized", calls["normalized"] + 1))
-    monkeypatch.setattr(cpn, "run_incremental",
+    monkeypatch.setattr(cpn, "PolygonNewsCollector",
                         lambda *a, **k: calls.__setitem__(
                             "adapter", calls["adapter"] + 1))
     monkeypatch.setattr("src.news_direct.backfill_news_direct",
@@ -1844,15 +1835,15 @@ def test_normalized_news_partial_without_continuation_stays_partial(monkeypatch)
 
 
 def test_local_news_route_keeps_single_direct_writer(monkeypatch):
-    import src.collectors.polygon_news as cpn
+    import src.news_clients.polygon as cpn
     import src.news_normalized.routing as routing
 
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.LEGACY_LOCAL,
                                           "legacy local test route")
-    calls = {"run_incremental": 0, "subprocess": 0, "direct": 0, "provider": None}
-    monkeypatch.setattr(cpn, "run_incremental",
-                        lambda *a, **k: calls.__setitem__("run_incremental",
-                                                          calls["run_incremental"] + 1))
+    calls = {"client": 0, "subprocess": 0, "direct": 0, "provider": None}
+    monkeypatch.setattr(cpn, "PolygonNewsCollector",
+                        lambda *a, **k: calls.__setitem__("client",
+                                                          calls["client"] + 1))
 
     def _subproc(argv, **kwargs):
         calls["subprocess"] += 1
@@ -1873,7 +1864,7 @@ def test_local_news_route_keeps_single_direct_writer(monkeypatch):
 
     assert res["status"] == "succeeded"
     assert len(route_calls) == 1
-    assert calls == {"run_incremental": 0, "subprocess": 0, "direct": 1,
+    assert calls == {"client": 0, "subprocess": 0, "direct": 1,
                      "provider": "polygon"}
     assert res["collect"]["source"] == "polygon"
     assert "local_refresh" not in res
@@ -2181,13 +2172,13 @@ def test_ibkr_legacy_local_route_is_retired_before_collector_sync_and_mirror(
 
 def test_post_exit_blocked_news_route_fails_closed_and_records_failure(monkeypatch):
     # BLOCKED must fail closed before any provider, subprocess, or mirror work starts.
-    import src.collectors.polygon_news as cpn
+    import src.news_clients.polygon as cpn
     import src.news_normalized.routing as routing
 
     route_calls = _patch_news_write_route(monkeypatch, routing.NewsWriteMode.BLOCKED,
                                           "blocked test route")
     provider_calls = {"adapter": 0, "direct": 0, "subprocess": 0}
-    monkeypatch.setattr(cpn, "run_incremental",
+    monkeypatch.setattr(cpn, "PolygonNewsCollector",
                         lambda *a, **k: provider_calls.__setitem__(
                             "adapter", provider_calls["adapter"] + 1))
     monkeypatch.setattr("src.news_direct.backfill_news_direct",
@@ -2529,7 +2520,7 @@ def test_adapter_gets_universe_tickers_and_progress(monkeypatch):
 def test_adapter_universe_unavailable_fails_loud(monkeypatch):
     # A typed source-read failure reaches run_source's generic failure boundary:
     # it never becomes an empty scope and never reaches provider work.
-    import src.collectors.finnhub_news as cfn
+    import src.news_clients.finnhub as cfn
     import src.universe_scope as universe_scope
 
     calls = {
@@ -2559,7 +2550,7 @@ def test_adapter_universe_unavailable_fails_loud(monkeypatch):
 
     monkeypatch.setattr(universe_scope, "resolve_active_universe", _unavailable_scope)
     monkeypatch.setattr(ds, "_resolve_price_scope", _REAL_RESOLVE_PRICE_SCOPE)
-    monkeypatch.setattr(cfn, "run_incremental", _called("adapter"))
+    monkeypatch.setattr(cfn, "FinnhubNewsCollector", _called("adapter"))
     monkeypatch.setattr("src.news_providers.make_news_provider", _called("provider"))
     monkeypatch.setattr("src.news_direct.backfill_news_direct", _called("writer"))
     monkeypatch.setattr(ds, "_run_sanitized_json_subprocess", _called("json_worker"))
@@ -2944,9 +2935,6 @@ def test_price_partial_projection_does_not_change_normalized_news_audit_status(
 
 def test_run_source_persists_attempt_and_outcome_to_local_state(monkeypatch):
     # a real run_source records last_attempt + the succeeded outcome in the LOCAL state store
-    import src.collectors.polygon_news as cpn
-    monkeypatch.setattr(cpn, "run_incremental",
-                        lambda *a, **k: {"mode": "up_to_date", "new_articles": 0})
     ds.run_source("polygon_news", trigger_source="api")
     row = ds._state_store().get("polygon_news")
     assert row is not None

@@ -155,7 +155,7 @@ below are the dated December 2025 provider evaluation, not a fresh provider chec
 |-------|-------|
 | **provider** | Finnhub. |
 | **implementation_status** | **live**. |
-| **connected_via** | `src/collectors/finnhub_news.py` (news fetch/parse used by `src/news_providers.py` and normalized adapters) + `data_sources/finnhub_calendar_client.py` (calendar). REST. |
+| **connected_via** | `src/news_clients/finnhub.py` (news fetch/parse used by `src/news_providers.py` and normalized adapters) + `data_sources/finnhub_calendar_client.py` (calendar). REST. |
 | **asset_classes** | US equities. |
 | **data_types** | News; **economic / earnings / IPO calendar** (`/calendar/economic` with `actual`/`estimate`/`prev`, UTC-stamped). The standalone quote/fundamentals source class is not a current integration. |
 | **history_depth** | **News ~7 days in practice** (despite a documented 1-year claim — verified 2025-12-14). Calendar covers upcoming + historical. |

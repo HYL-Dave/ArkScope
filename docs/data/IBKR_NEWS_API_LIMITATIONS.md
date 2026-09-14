@@ -451,7 +451,7 @@ BroadTape 是即時串流，無法查詢過去的新聞。
 
 以下保留 2026-01-03 的歷史比較與當時觀察，不代表現行產品 adapter、
 現行價格或重新驗證的 API 能力。C09 已移除舊 unified-source classes/factory；
-現行 Finnhub 新聞由 `src/collectors/finnhub_news.py` 提供 fetch/parse，日曆由
+現行 Finnhub 新聞由 `src/news_clients/finnhub.py` 提供 fetch/parse，日曆由
 `data_sources/finnhub_calendar_client.py` 提供。EODHD 保留的是
 `data_sources/lifecycle_provider_census_transport.py` 的 lifecycle census 與
 Settings 金鑰支援，不是下表的舊新聞 adapter。已收集資料不因原始碼清理而刪除。

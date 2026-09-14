@@ -1310,10 +1310,12 @@ def test_run_telemetry_disabled_is_inert(monkeypatch):
     t = mod._RunTelemetry(enabled=False, payload={})
     assert t._store is None
     t.record("x", True, datetime.now(timezone.utc))  # no-op, no raise
-    assert t.timed("y", lambda: True) is True        # passthrough unchanged
+    t.record("y", False, datetime.now(timezone.utc))
 
 
 def test_run_telemetry_records_terminal_rows(monkeypatch):
+    from datetime import datetime, timezone
+
     mod = _load_daily_update()
     calls = []
 
@@ -1331,13 +1333,15 @@ def test_run_telemetry_records_terminal_rows(monkeypatch):
     monkeypatch.setattr("src.service.job_runs_store.JobRunsLocalStore", _FakeStore)
     monkeypatch.setattr("src.tools.data_access.DataAccessLayer", lambda *a, **k: MagicMock())
     t = mod._RunTelemetry(enabled=True, payload={"scope": "active-universe"})
-    assert t.timed("polygon", lambda: True) is True
-    assert t.timed("finnhub", lambda: False) is False
-    assert [c[0] for c in calls] == ["daily_update.polygon", "daily_update.finnhub"]
+    started = datetime(2026, 9, 14, tzinfo=timezone.utc)
+    t.record("run", True, started)
+    t.record("run", False, started)
+    assert [c[0] for c in calls] == ["daily_update.run", "daily_update.run"]
     ok_kw, fail_kw = calls[0][1], calls[1][1]
     assert ok_kw["status"] == "succeeded" and ok_kw["trigger_source"] == "cli"
     assert ok_kw["error"] is None and ok_kw["payload"] == {"scope": "active-universe"}
     assert fail_kw["status"] == "failed" and "exit" in fail_kw["error"]
+    assert ok_kw["started_at"] == fail_kw["started_at"] == started
     assert ok_kw["started_at"] <= ok_kw["finished_at"]
 
 
@@ -1345,6 +1349,8 @@ def test_run_telemetry_store_failure_never_breaks_the_step(monkeypatch):
     # Telemetry is strictly additive: a recording failure must not alter the
     # step result or raise (the protected runner's exit-code semantics depend
     # only on the steps themselves).
+    from datetime import datetime, timezone
+
     mod = _load_daily_update()
 
     class _BoomStore:
@@ -1360,5 +1366,5 @@ def test_run_telemetry_store_failure_never_breaks_the_step(monkeypatch):
     monkeypatch.setattr("src.service.job_runs_store.JobRunsLocalStore", _BoomStore)
     monkeypatch.setattr("src.tools.data_access.DataAccessLayer", lambda *a, **k: MagicMock())
     t = mod._RunTelemetry(enabled=True, payload={})
-    assert t.timed("x", lambda: True) is True
-    assert t.timed("y", lambda: False) is False
+    assert t.record("run", True, datetime.now(timezone.utc)) is None
+    assert t.record("run", False, datetime.now(timezone.utc)) is None
