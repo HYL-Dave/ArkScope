@@ -138,3 +138,7 @@ are in `checks/validation.json`. Temporary database fixtures, isolated homes and
 build outputs are deliberately excluded. Retained runners are provenance copies;
 their working-directory convention is `.superpowers/sdd/<batch>/`, not execution
 from the evidence archive. All published bytes were read back and checked.
+
+Git-blob readback caught 20 `output.log.gz` artifacts excluded by the repository's
+`*.log.*` ignore rule in the initial evidence commit. Only those manifest-listed,
+hash-verified logs were explicitly added; no ignore rule or source file changed.
