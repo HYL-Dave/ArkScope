@@ -10,6 +10,11 @@ failed attempts and limitations are recorded in the
 [preparation receipt](../superpowers/evidence/2026-09-14-private-sqlite-runtime/README.md).
 This is not evidence that any installed App selector has switched.
 
+The [September 15 follow-up](../superpowers/evidence/2026-09-15-runtime-acceptance-cleanup/README.md)
+passed 11,204 cases with the same twelve skips, including all 31 current artifact
+cases. It adds the missing-archive gate below and removes three obsolete
+migration bundles; it does not activate production or close the startup blocker.
+
 ## Prepare A New Generation
 
 Requirements: existing Python 3.10+, `/usr/bin/cc`, GNU make, binutils `readelf`,
@@ -78,8 +83,10 @@ disposable final artifact. Under a selected runtime, an absent archive now fails
 fixture setup with `selected-runtime acceptance requires the offline SQLite
 source archive`; it cannot produce a successful skipped acceptance run. Plain
 unmanaged development still reports an explicit skip. Neither path downloads
-the archive or inspects an installed runtime. A skipped unmanaged run is not
-final-artifact acceptance. A supplied invalid archive fails the pinned hash check.
+the archive or automatically discovers an installed runtime. The selected path
+does verify its explicitly selected package; that is not a substitute for the
+source archive or disposable build. A skipped unmanaged run is not final-artifact
+acceptance. A supplied invalid archive fails the pinned hash check.
 
 The artifact module currently contains 31 cases (the original 29 plus two
 missing-archive controls). Acceptance must collect and execute every current
@@ -127,8 +134,9 @@ exclusive coherent WAL-safe backups and run full integrity checks on verificatio
 copies. Retain SEC referenced content and the old source/selector bindings.
 Do not use `immutable=1` on live WAL stores, clobber backups or silently repair data.
 
-After the startup blocker above is closed, install a new generation, change both executable selectors, verify
-their actual loaded engines and resume writes on the approved source revision.
+After the startup blocker above is closed, install a new generation, change
+both executable selectors, verify their actual loaded engines and resume writes
+on the approved source revision.
 After resumed writes, changing a selector alone is not a proved rollback. A
 restore/repair decision remains separate. No automatic fallback, REINDEX,
 VACUUM, schema reset or database deletion belongs to engine activation.
