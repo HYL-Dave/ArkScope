@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 import re
 from typing import Any, Optional
+
+from src import news_collection_policy
 
 from .ibkr_adapter import IBKRHeadline
 
 
 _ARTICLE_ID_RE = re.compile(r"^\[Article ID:\s*([^\]\s]+)\]$")
-_BOOTSTRAP_LOOKBACK = timedelta(days=7)
 
 
 class IBKRNewsCoverageIncomplete(RuntimeError):
@@ -145,7 +146,7 @@ class IBKRRuntimeGateway:
         elif callable(getattr(self.source, "fetch_news_page_strict", None)):
             now = datetime.now(timezone.utc)
             coverage_start = _datetime_from_value(since_iso) or (
-                now - _BOOTSTRAP_LOOKBACK
+                now - news_collection_policy.INITIAL_NEWS_LOOKBACK
             )
             provider_codes = tuple(sorted(self._provider_codes or ()))
             self._headline_pages_requested += 1

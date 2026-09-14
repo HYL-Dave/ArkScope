@@ -1,9 +1,10 @@
 # Runtime And Recent Collection Policy
 
-Date: 2026-09-14. Source review: `d90c13fa`,
-`codex/sec-research-integration`. Status: user decisions accepted; deployment,
-collector retirement and the revised initialization behavior are not implemented
-by this document. This supersedes the two pending choices in the
+Date: 2026-09-14. Policy source review: `d90c13fa`,
+`codex/sec-research-integration`. Status: user decisions accepted; the shared
+fourteen-day request target is implemented as described below. Deployment,
+collector retirement, entitlement reporting and SA targeting remain open.
+This supersedes the two pending choices in the
 [September 14 closeout](../superpowers/evidence/2026-09-14-runtime-cleanup-closeout/README.md).
 Its historical test results and operational boundaries remain unchanged.
 
@@ -98,11 +99,24 @@ budget does not prove that the provider exposes more historical articles.
 
 ### Source Facts Checked Here
 
-The existing first-fetch defaults are still seven days in all three owners:
-`src/news_providers.py`, `src/news_normalized/provider_adapters.py` and
-`src/news_normalized/ibkr_runtime.py`. Thus changing a single constant would not
-produce consistent behavior. IBKR additionally has headline-tail/coverage limits;
-its documented runbook-only boundary is not removed by a larger time window.
+The three former seven-day defaults now consult
+`src/news_collection_policy.py::INITIAL_NEWS_LOOKBACK`, a single fourteen-day
+`timedelta`. The direct Massive/Finnhub adapters, normalized Massive/Finnhub
+adapters and strict IBKR gateway read it at request construction. Their date and
+timestamp parsing remain distinct; saved cursors are not clamped to this target.
+The non-strict IBKR compatibility path still delegates a missing start date to
+its source; this change does not give that fallback strict coverage semantics.
+IBKR additionally has headline-tail/coverage limits; its documented runbook-only
+boundary is not removed by a larger time window. Saturated seven-day results
+cannot prove completion of a fourteen-day strict request.
+
+`tests/test_news_bootstrap_policy.py` owns the five real adapter paths, shared
+authority, saved/invalid cursors, per-source/ticker initialization, writer
+deduplication and incomplete IBKR results. The bounded implementation plan is
+`docs/superpowers/plans/2026-09-14-news-bootstrap-policy.md`. This delivers the
+request target only: it does not discover account entitlements, report an
+effective shorter REST window, persist a first-run interval for retries, or
+guarantee fourteen days of returned data. Those parts of the policy remain open.
 
 [Massive's News endpoint](https://massive.com/docs/rest/stocks/news) currently
 documents date filters, continuation via `next_url`, and history access exceeding
@@ -190,9 +204,9 @@ plan. Include empty-store/new-ticker behavior, both REST writer routes, known
 short entitlements, unknown capability, empty responses, pagination/caps,
 interrupted work, de-duplication, Open members older than a year and retained data.
 
-At review time, master remains an ancestor with `0 / 157` unique commits. No
-divergent master commits were found; no merge, push, runtime installation,
-production database/configuration read or application restart occurred. The
-previous backend/frontend acceptance remains historical; this is a policy-only
-change and does not claim that fourteen-day initialization or runtime switching
-has been delivered.
+At the original policy review, master was an ancestor with `0 / 157` unique
+commits. No merge, push, runtime installation, production database/configuration
+read or application restart is authorized merely by this policy. See the
+implementation evidence for fresh acceptance; the prior backend/frontend
+results remain historical. Runtime switching and the full recent-collection
+policy are not complete merely because the shared request target is implemented.
