@@ -1,0 +1,34 @@
+{
+  "reports_verified": {
+    "full-valid": {
+      "tests": 11216,
+      "errors": 26,
+      "failures": 0,
+      "skipped": 43
+    },
+    "repaired-preflight": {
+      "tests": 915,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0
+    },
+    "large-inputs-confirm": {
+      "tests": 5,
+      "errors": 0,
+      "failures": 5,
+      "skipped": 0
+    },
+    "large-inputs-control-confirm": {
+      "tests": 5,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0
+    }
+  },
+  "unique_full_test_ids": 11216,
+  "local_links_verified": 25,
+  "script_digests_verified": 6,
+  "sqlite_upsert_cases": 5,
+  "synthetic_cases": 8,
+  "dependency_versions": 89
+}

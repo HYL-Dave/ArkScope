@@ -1,0 +1,505 @@
+{
+  "source_revision": "f42e79099e47c0cebb45f340599ec212c62d73d5",
+  "candidate_admitted": false,
+  "production_activated": false,
+  "runtime": {
+    "python": "/tmp/arkscope-prebuilt-compat.oCmRRHrQ/venv/bin/python",
+    "python_version": "3.10.21 (main, Sep  1 2026, 14:16:49) [Clang 22.1.3 ]",
+    "engine": [
+      "3.53.1",
+      "2026-05-05 10:34:17 c88b22011a54b4f6fbd149e9f8e4de77658ce58143a1af0e3785e4e6475127e9"
+    ],
+    "compile_options": [
+      "ATOMIC_INTRINSICS=1",
+      "COMPILER=clang-22.1.3",
+      "DEFAULT_AUTOVACUUM",
+      "DEFAULT_CACHE_SIZE=-2000",
+      "DEFAULT_FILE_FORMAT=4",
+      "DEFAULT_JOURNAL_SIZE_LIMIT=-1",
+      "DEFAULT_MMAP_SIZE=0",
+      "DEFAULT_PAGE_SIZE=4096",
+      "DEFAULT_PCACHE_INITSZ=20",
+      "DEFAULT_RECURSIVE_TRIGGERS",
+      "DEFAULT_SECTOR_SIZE=4096",
+      "DEFAULT_SYNCHRONOUS=2",
+      "DEFAULT_WAL_AUTOCHECKPOINT=1000",
+      "DEFAULT_WAL_SYNCHRONOUS=2",
+      "DEFAULT_WORKER_THREADS=0",
+      "DIRECT_OVERFLOW_READ",
+      "ENABLE_DBSTAT_VTAB",
+      "ENABLE_FTS3",
+      "ENABLE_FTS3_PARENTHESIS",
+      "ENABLE_FTS4",
+      "ENABLE_FTS5",
+      "ENABLE_GEOPOLY",
+      "ENABLE_MATH_FUNCTIONS",
+      "ENABLE_PERCENTILE",
+      "ENABLE_RTREE",
+      "MALLOC_SOFT_LIMIT=1024",
+      "MAX_ATTACHED=10",
+      "MAX_COLUMN=2000",
+      "MAX_COMPOUND_SELECT=500",
+      "MAX_DEFAULT_PAGE_SIZE=8192",
+      "MAX_EXPR_DEPTH=1000",
+      "MAX_FUNCTION_ARG=1000",
+      "MAX_LENGTH=1000000000",
+      "MAX_LIKE_PATTERN_LENGTH=50000",
+      "MAX_MMAP_SIZE=0x7fff0000",
+      "MAX_PAGE_COUNT=0xfffffffe",
+      "MAX_PAGE_SIZE=65536",
+      "MAX_SQL_LENGTH=1000000000",
+      "MAX_TRIGGER_DEPTH=1000",
+      "MAX_VARIABLE_NUMBER=32766",
+      "MAX_VDBE_OP=250000000",
+      "MAX_WORKER_THREADS=8",
+      "MUTEX_PTHREADS",
+      "SYSTEM_MALLOC",
+      "TEMP_STORE=1",
+      "THREADSAFE=1"
+    ],
+    "ld_library_path": null,
+    "ld_preload": null
+  },
+  "control_runtime": {
+    "python": "/tmp/arkscope-prebuilt-compat.oCmRRHrQ/control-venv/bin/python",
+    "python_version": "3.10.12 (main, Aug 31 2026, 10:18:17) [GCC 11.4.0]",
+    "engine": [
+      "3.37.2",
+      "2022-01-06 13:25:41 872ba256cbf61d9290b571c0e6d82a20c224ca3ad82971edc46b29818d5dalt1"
+    ],
+    "compile_options": [
+      "ATOMIC_INTRINSICS=1",
+      "COMPILER=gcc-11.4.0",
+      "DEFAULT_AUTOVACUUM",
+      "DEFAULT_CACHE_SIZE=-2000",
+      "DEFAULT_FILE_FORMAT=4",
+      "DEFAULT_JOURNAL_SIZE_LIMIT=-1",
+      "DEFAULT_MMAP_SIZE=0",
+      "DEFAULT_PAGE_SIZE=4096",
+      "DEFAULT_PCACHE_INITSZ=20",
+      "DEFAULT_RECURSIVE_TRIGGERS",
+      "DEFAULT_SECTOR_SIZE=4096",
+      "DEFAULT_SYNCHRONOUS=2",
+      "DEFAULT_WAL_AUTOCHECKPOINT=1000",
+      "DEFAULT_WAL_SYNCHRONOUS=2",
+      "DEFAULT_WORKER_THREADS=0",
+      "ENABLE_COLUMN_METADATA",
+      "ENABLE_DBSTAT_VTAB",
+      "ENABLE_FTS3",
+      "ENABLE_FTS3_PARENTHESIS",
+      "ENABLE_FTS3_TOKENIZER",
+      "ENABLE_FTS4",
+      "ENABLE_FTS5",
+      "ENABLE_JSON1",
+      "ENABLE_LOAD_EXTENSION",
+      "ENABLE_MATH_FUNCTIONS",
+      "ENABLE_PREUPDATE_HOOK",
+      "ENABLE_RTREE",
+      "ENABLE_SESSION",
+      "ENABLE_STMTVTAB",
+      "ENABLE_UNLOCK_NOTIFY",
+      "ENABLE_UPDATE_DELETE_LIMIT",
+      "HAVE_ISNAN",
+      "LIKE_DOESNT_MATCH_BLOBS",
+      "MALLOC_SOFT_LIMIT=1024",
+      "MAX_ATTACHED=10",
+      "MAX_COLUMN=2000",
+      "MAX_COMPOUND_SELECT=500",
+      "MAX_DEFAULT_PAGE_SIZE=32768",
+      "MAX_EXPR_DEPTH=1000",
+      "MAX_FUNCTION_ARG=127",
+      "MAX_LENGTH=1000000000",
+      "MAX_LIKE_PATTERN_LENGTH=50000",
+      "MAX_MMAP_SIZE=0x7fff0000",
+      "MAX_PAGE_COUNT=1073741823",
+      "MAX_PAGE_SIZE=65536",
+      "MAX_SCHEMA_RETRY=25",
+      "MAX_SQL_LENGTH=1000000000",
+      "MAX_TRIGGER_DEPTH=1000",
+      "MAX_VARIABLE_NUMBER=250000",
+      "MAX_VDBE_OP=250000000",
+      "MAX_WORKER_THREADS=8",
+      "MUTEX_PTHREADS",
+      "OMIT_LOOKASIDE",
+      "SECURE_DELETE",
+      "SOUNDEX",
+      "SYSTEM_MALLOC",
+      "TEMP_STORE=1",
+      "THREADSAFE=1",
+      "USE_URI"
+    ],
+    "ld_library_path": null,
+    "ld_preload": null
+  },
+  "selected_dependency_count": 89,
+  "version_drift": {},
+  "candidate_control_versions_equal": true,
+  "selected_dependencies": {
+    "annotated-doc": "0.0.4",
+    "annotated-types": "0.7.0",
+    "anthropic": "1.4.0",
+    "anyio": "4.14.2",
+    "attrs": "25.3.0",
+    "backports-tarfile": "1.2.0",
+    "beautifulsoup4": "4.13.4",
+    "certifi": "2025.7.9",
+    "cffi": "1.17.1",
+    "charset-normalizer": "3.4.2",
+    "claude-agent-sdk": "0.2.152",
+    "click": "8.2.1",
+    "cryptography": "43.0.3",
+    "defusedxml": "0.7.1",
+    "docstring-parser": "0.17.0",
+    "eventkit": "1.0.3",
+    "exceptiongroup": "1.3.0",
+    "exchange-calendars": "4.13.2",
+    "fastapi": "0.128.0",
+    "greenlet": "3.3.1",
+    "griffelib": "2.0.2",
+    "h11": "0.16.0",
+    "httpcore": "1.0.9",
+    "httpcore2": "2.10.0",
+    "httptools": "0.7.1",
+    "httpx": "0.28.1",
+    "httpx-sse": "0.4.1",
+    "httpx2": "2.10.0",
+    "ib-insync": "0.9.86",
+    "idna": "3.18",
+    "importlib-metadata": "8.7.0",
+    "iniconfig": "2.1.0",
+    "jaraco-classes": "3.4.0",
+    "jaraco-context": "6.1.1",
+    "jaraco-functools": "4.4.0",
+    "jeepney": "0.9.0",
+    "jiter": "0.16.0",
+    "jsonschema": "4.25.0",
+    "jsonschema-specifications": "2025.4.1",
+    "keyring": "25.7.0",
+    "korean-lunar-calendar": "0.4.0",
+    "mcp": "1.26.0",
+    "more-itertools": "10.8.0",
+    "nest-asyncio": "1.6.0",
+    "numpy": "1.26.4",
+    "openai": "3.11.0",
+    "openai-agents": "0.22.2",
+    "openai-codex": "0.147.0",
+    "openai-codex-cli-bin": "0.147.0",
+    "packaging": "25.0",
+    "pandas": "2.3.1",
+    "playwright": "1.58.0",
+    "pluggy": "1.6.0",
+    "pycparser": "2.22",
+    "pydantic": "2.12.5",
+    "pydantic-core": "2.41.5",
+    "pydantic-settings": "2.10.1",
+    "pyee": "13.0.1",
+    "pygments": "2.19.2",
+    "pyjwt": "2.11.0",
+    "pyluach": "2.3.0",
+    "pytest": "8.4.1",
+    "python-dateutil": "2.9.0.post0",
+    "python-dotenv": "1.1.1",
+    "python-multipart": "0.0.20",
+    "pytz": "2025.2",
+    "pyyaml": "6.0.2",
+    "referencing": "0.36.2",
+    "requests": "2.32.4",
+    "rpds-py": "0.26.0",
+    "scipy": "1.15.3",
+    "secretstorage": "3.5.0",
+    "six": "1.17.0",
+    "sniffio": "1.3.1",
+    "soupsieve": "2.7",
+    "sse-starlette": "3.0.0",
+    "starlette": "0.47.2",
+    "tomli": "2.2.1",
+    "toolz": "1.1.0",
+    "truststore": "0.10.4",
+    "typing-extensions": "4.14.1",
+    "typing-inspection": "0.4.2",
+    "tzdata": "2025.2",
+    "urllib3": "2.5.0",
+    "uvicorn": "0.35.0",
+    "uvloop": "0.22.1",
+    "watchfiles": "1.1.1",
+    "websockets": "15.0.1",
+    "zipp": "3.23.0"
+  },
+  "sdk_hook_digests": {
+    "agents/lifecycle.py": {
+      "original": "5bbf13d8390ddad8a2678351919068230b8cdfb943001e387f894500cf94d4bd",
+      "candidate": "5bbf13d8390ddad8a2678351919068230b8cdfb943001e387f894500cf94d4bd"
+    },
+    "agents/tool_context.py": {
+      "original": "bfc613da331f13f9fd58b7dd84c7098bec43d6227e856bedf935f5be680a1303",
+      "candidate": "bfc613da331f13f9fd58b7dd84c7098bec43d6227e856bedf935f5be680a1303"
+    },
+    "agents/run_internal/tool_execution.py": {
+      "original": "86b91c62df0779e896143e5bc841a962d436099d79365497377dd9a233b02946",
+      "candidate": "86b91c62df0779e896143e5bc841a962d436099d79365497377dd9a233b02946"
+    }
+  },
+  "reports": {
+    "repaired-preflight": {
+      "tests": 915,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 915,
+      "exit_code": 0,
+      "pytest_main_entries": 1,
+      "started_utc": "2026-09-14T20:01:56.413191+00:00",
+      "junit_seconds": 83.815,
+      "issues": []
+    },
+    "full-valid": {
+      "tests": 11216,
+      "failures": 0,
+      "errors": 26,
+      "skipped": 43,
+      "passed": 11147,
+      "exit_code": 1,
+      "pytest_main_entries": 1,
+      "started_utc": "2026-09-14T20:10:48.794080+00:00",
+      "junit_seconds": 1393.629,
+      "issues": [
+        {
+          "kind": "skipped",
+          "module": "tests.test_detailed_financials.TestLiveTechMetrics",
+          "message": "Live SEC EDGAR test \u2014 run manually",
+          "count": 1
+        },
+        {
+          "kind": "skipped",
+          "module": "tests.test_ibkr_scanner",
+          "message": "manual test script \u2014 requires IBKR TWS",
+          "count": 9
+        },
+        {
+          "kind": "skipped",
+          "module": "tests.test_option_chain_tools.TestLiveOptionChain",
+          "message": "Live IBKR test \u2014 run manually",
+          "count": 1
+        },
+        {
+          "kind": "skipped",
+          "module": "tests.test_peer_comparison.TestLivePeerComparison",
+          "message": "Live SEC EDGAR test \u2014 run manually",
+          "count": 1
+        },
+        {
+          "kind": "error",
+          "module": "tests.test_sqlite_runtime_contract",
+          "message": "failed on setup with \"AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?\"",
+          "count": 26
+        },
+        {
+          "kind": "skipped",
+          "module": "tests.test_sqlite_runtime_launch",
+          "message": "final-artifact acceptance needs explicit offline SQLite source archive",
+          "count": 31
+        }
+      ]
+    },
+    "large-inputs-confirm": {
+      "tests": 5,
+      "failures": 5,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 0,
+      "exit_code": 1,
+      "pytest_main_entries": 1,
+      "started_utc": "2026-09-14T20:34:38.464154+00:00",
+      "junit_seconds": 1.798,
+      "issues": [
+        {
+          "kind": "failure",
+          "module": "test_large_inputs",
+          "message": "RuntimeError: sa_market_news_recovery_unavailable",
+          "count": 2
+        },
+        {
+          "kind": "failure",
+          "module": "test_large_inputs",
+          "message": "sqlite3.OperationalError: too many SQL variables",
+          "count": 3
+        }
+      ]
+    },
+    "large-inputs-control-confirm": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 5,
+      "exit_code": 0,
+      "pytest_main_entries": 1,
+      "started_utc": "2026-09-14T20:34:54.353846+00:00",
+      "junit_seconds": 3.11,
+      "issues": []
+    }
+  },
+  "synthetic_probe": {
+    "exit_code": 0,
+    "cases": [
+      {
+        "test": "json_decimal_text",
+        "status": "pass",
+        "details": {
+          "exact_decimal_text": "12345678901234567890.12345678901234567890",
+          "trailing_zeros_preserved": true,
+          "invalid_json_rejected": true
+        }
+      },
+      {
+        "test": "fts_external_content",
+        "status": "pass",
+        "details": {
+          "porter_stemming": true,
+          "unicode61_diacritics": true,
+          "insert_update_delete_triggers": true,
+          "fts_external_content_integrity": "ok"
+        }
+      },
+      {
+        "test": "foreign_keys",
+        "status": "pass",
+        "details": {
+          "orphan_rejected": true,
+          "delete_cascade": true,
+          "foreign_key_check": []
+        }
+      },
+      {
+        "test": "transactions",
+        "status": "pass",
+        "details": {
+          "commit": true,
+          "savepoint_rollback": true,
+          "exception_context_rollback": true
+        }
+      },
+      {
+        "test": "wal_locking",
+        "status": "pass",
+        "details": {
+          "busy_wait_seconds": 0.150795,
+          "reader_snapshot_preserved": true,
+          "uncommitted_crash_exit": -9,
+          "post_crash_lock_reacquired": true,
+          "rows": 2
+        }
+      },
+      {
+        "test": "wal_concurrency",
+        "status": "pass",
+        "details": {
+          "writers": [
+            {
+              "worker": 0,
+              "commits": 100
+            },
+            {
+              "worker": 1,
+              "commits": 100
+            },
+            {
+              "worker": 2,
+              "commits": 100
+            }
+          ],
+          "checkpoints": {
+            "attempts": 150,
+            "mode_attempts": {
+              "PASSIVE": 50,
+              "RESTART": 50,
+              "TRUNCATE": 50
+            },
+            "busy_results": 0,
+            "complete_checkpoints": 150,
+            "partial_observations": 101,
+            "observed_rows_min": 1,
+            "observed_rows_max": 300
+          },
+          "group_counts_sums": [
+            [
+              0,
+              100,
+              4950
+            ],
+            [
+              1,
+              100,
+              4950
+            ],
+            [
+              2,
+              100,
+              4950
+            ]
+          ],
+          "final_checkpoint": [
+            0,
+            0,
+            0
+          ],
+          "integrity_check": "ok",
+          "limitation": "bounded stress, not a deterministic upstream WAL-reset reproducer"
+        }
+      },
+      {
+        "test": "backup_uncheckpointed_wal",
+        "status": "pass",
+        "details": {
+          "uncheckpointed_wal_bytes": 8272,
+          "main_only_rows": 1,
+          "backup_rows": 3,
+          "progress": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              101,
+              0,
+              2
+            ]
+          ],
+          "integrity_check": "ok"
+        }
+      },
+      {
+        "test": "posix_process_lock",
+        "status": "pass",
+        "details": {
+          "cross_process_exclusion": true,
+          "released_after_sigkill": true,
+          "platform": "Linux only"
+        }
+      }
+    ]
+  },
+  "upsert_probe": {
+    "exit_code": 0,
+    "cases": 5,
+    "classification": "all_pass"
+  },
+  "input_sha256": {
+    "python.tar.gz": "73cc92db5e6fb07ba611dca3709956d57cc2ed74ebcc01515b550ea89dfe9cba",
+    "source-complete.tar": "4e5d12535633d5cc3e3ddca736830401965421dd711c95ee43abc70c61781512",
+    "offline_pytest.py": "f4a11cb4d047c7218de45a3e4779b23ec5e51c647ce44df01225fda2b1aec993",
+    "offline_pytest.INVALID.py": "855f4221eb6f01ff3f0a86e4ea0d73ad99e22a0f29763ba77c5f4ae17505d3cd",
+    "run_tests.sh": "87f98442ad9da666111b360536f227804b7c705dd1572f86f1526ec87fa1f4de",
+    "test_large_inputs.py": "a4b1db8af36bcd9d841b178ce09112892fbb0f736b81a051b0e0be27275f5a8e",
+    "synthetic/synthetic_probe.py": "cb7608899f564a1bdc275faf4c18df54e92f91fce994bae2c7274ddbc71c8be9",
+    "synthetic/run_prebuilt.py": "8ba1db1dddc48a9a9b10d0386bc9e27ba84a357dee579af91a58619bb1479a32"
+  },
+  "invalid_first_full_run": {
+    "admitted_as_evidence": false,
+    "counts_not_used": true,
+    "termination_exit_code": 143,
+    "reason": "Missing __main__ guard reentered pytest from multiprocessing spawn workers; shared fixture state was contaminated."
+  }
+}
+

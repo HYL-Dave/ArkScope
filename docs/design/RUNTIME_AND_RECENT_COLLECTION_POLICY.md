@@ -38,13 +38,19 @@ upgrade of the standard library merely because a wheel was installed. The
 development to `cysqlite`; do not select an older package name without checking
 maintenance and Python/platform support. Both sources were checked on September 15.
 
-A limited disposable probe of `python-build-standalone` 20260901 ran without
-compilation: Python 3.10.21/SQLite 3.53.1 passed the five archived UPSERT cases
-and in-memory FTS5/JSON/decimal checks. Its lower parameter limit, absent optional
-UPDATE LIMIT grammar and lag behind SQLite 3.53.4 still need review, together
-with dependencies and real App paths. See the
-[scope and raw results](SQLITE_RUNTIME_OPERATIONS.md#limited-feasibility-probe-september-15).
-This is feasibility evidence only; no replacement is admitted or deployed.
+The disposable `python-build-standalone` 20260901 evaluation now includes 89
+version-matched dependency wheels, five archived UPSERT cases and eight database
+behavior probes without compilation. A single unchanged backend run produced
+**11,147 pass / 26 setup errors / 43 skips**: 26 old fixture cases assume
+`_sqlite3.__file__`, 31 launch cases require the obsolete source archive, and
+12 skips are existing manual checks. This is not green admission. Five additional
+large-ID cases fail against the candidate's 32,766 parameter limit and pass on
+the system-engine control. Their three product owners and proposed JSON-parameter
+repair are recorded, pending confirmation. See the
+[compatibility receipt](../superpowers/evidence/2026-09-15-prebuilt-runtime-compatibility/README.md).
+The lag behind SQLite 3.53.4, replacement safety owners and real App launch paths
+remain open. No replacement is admitted or deployed; superseded tests must be
+replaced with useful safety coverage, not silently skipped or kept build-dependent.
 
 Record one admitted artifact identity per environment, not one version for the
 rest of pre-release development. Review newer stable distributions and upstream

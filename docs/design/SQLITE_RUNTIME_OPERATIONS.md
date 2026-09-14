@@ -54,8 +54,9 @@ the chosen platform/Python version has no matching binary.
 6. Run full application acceptance serially against the supplied binary. No
    SQLite archive or compiler is needed for binary acceptance. Report exactly
    which behavioral owners run, move or are removed; no hidden skips to make a
-   replacement appear accepted. Full candidate acceptance has not run; the
-   narrower feasibility probe below is not a substitute.
+   replacement appear accepted. The unchanged full backend has now run, with
+   the errors/skips and additional large-ID failures classified below. Full
+   candidate admission, including real entrypoints, has not passed.
 
 ## Limited Feasibility Probe, September 15
 
@@ -73,8 +74,44 @@ search outside the old runtime found no explicit occurrences, but does not prove
 dynamic SQL or parameter workloads fit. It also contains 3.53.1 rather than the
 newer 3.53.4 in [upstream release history](https://www.sqlite.org/changes.html).
 Review required fixes and actual consumers before admitting this or another
-candidate. No project dependencies, App tests, real entrypoints, WAL/backup tests
-or production stores were exercised. Nothing was deployed.
+candidate. That initial spike exercised no project dependencies, App tests, real
+entrypoints, WAL/backup tests or production stores. Nothing was deployed. The
+subsequent project evaluation is recorded separately below.
+
+## Project Compatibility Evaluation, September 15
+
+At `f42e7909`, the same artifact ran a disposable 89-wheel project environment
+without compilation or dependency version drift. Eight reused database behavior
+probes and the five unchanged UPSERT cases passed. The single full backend run
+returned **11,147 pass / 26 setup errors / 43 skips**, exit 1, exactly 11,216
+cases. This is evaluation evidence, not green acceptance:
+
+- All 26 errors come from the old contract fixture's `_sqlite3.__file__`
+  assumption. This CPython has a built-in module; the fixture fails before its
+  behavioral checks. Transfer useful startup/engine/safety owners during the
+  replacement, rather than inventing a module path to make the fixture pass.
+- Of 43 skips, 31 are source-dependent old launch tests and 12 are existing
+  manual IBKR/SEC checks. No new skip or changed expectation was introduced.
+  Do not rebuild SQLite to satisfy a fixture being replaced.
+- Five additional large-ID cases fail at the candidate's 32,766 parameter limit
+  and pass in a disposable system-engine control with the same wheels. Owners:
+  `sa_capture_backend`, `sa_article_reconciliation_store` and
+  `security_lifecycle_fact_kernel`. A single JSON-bound ID set is proposed,
+  pending confirmation, with ordering/limits, empty inputs, integer range and
+  citation-preserving deletion semantics retained. No product SQL was changed.
+
+The first attempted full run was invalidated because a temporary runner missing
+its main guard reentered pytest from spawn workers. None of its counts are used.
+After correction, the affected-module preflight passed 915 cases and the new
+full run had exactly one main entry. The current receipt preserves the runners,
+source identity, isolated environment, raw results and failure cases:
+[prebuilt project compatibility](../superpowers/evidence/2026-09-15-prebuilt-runtime-compatibility/README.md).
+
+SQLite 3.53.1 still needs review against subsequent fixes; neither the full suite
+nor bounded WAL stress proves all those fixes irrelevant. Desktop/SA/production
+writer entrypoint acceptance, the replacement/removal patch and production
+cutover remain open. No installed interpreter, original dependency environment,
+selector, production store or running App was changed by this evaluation.
 
 ## Replacement And Removal Boundary
 
