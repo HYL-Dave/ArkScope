@@ -1,0 +1,573 @@
+{
+  "added": [
+    [
+      "tests.test_sqlite_runtime_build",
+      "test_build_recipe_retains_critical_baseline_limits"
+    ],
+    [
+      "tests.test_sqlite_runtime_build",
+      "test_existing_destination_is_never_reused"
+    ],
+    [
+      "tests.test_sqlite_runtime_build",
+      "test_missing_or_unverified_archive_never_creates_package"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[bad_digest]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[bad_soname]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[changed_launcher]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[changed_library]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[duplicate_json]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[extra_library]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[extra_root]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[file_symlink]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[hardlink]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[root_symlink]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[writable_dir]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_actual_filesystem_is_revalidated[writable_file]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_exact_package_inventory_is_accepted"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_loaded_engine_is_not_inferred_from_manifest"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[absolute_payload]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[bad_sha]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[bad_source]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[bad_version]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[boolean_format]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[duplicate_options]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[extra_field]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[extra_python_field]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[relative_python]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[traversal]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[unsorted_options]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_manifest_rejects_invalid_shapes[wrong_format]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_no_selection_is_explicitly_unmanaged"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_partial_or_empty_selection_is_not_unmanaged[values0]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_partial_or_empty_selection_is_not_unmanaged[values1]"
+    ],
+    [
+      "tests.test_sqlite_runtime_contract",
+      "test_partial_or_empty_selection_is_not_unmanaged[values2]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_bootstrap_fifo_is_rejected_without_blocking[contract.py]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_bootstrap_fifo_is_rejected_without_blocking[launch.py]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_bootstrap_fifo_is_rejected_without_blocking[manifest.json]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_changed_bootstrap_is_rejected_before_execution[contract.py]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_changed_bootstrap_is_rejected_before_execution[launch.py]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_desktop_spawn_keeps_loader_out_of_electron"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_direct_python_child_rechecks_loader_authority[LD_AUDIT]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_direct_python_child_rechecks_loader_authority[LD_PRELOAD]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_drift_stops_before_user_code[extension_hash]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_drift_stops_before_user_code[extra_library]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_drift_stops_before_user_code[library]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_drift_stops_before_user_code[manifest]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_drift_stops_before_user_code[source_id]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_existing_sa_selector_launches_selected_python"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_extra_module_has_no_bootstrap_import_authority"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_limit_grammar_is_real_not_just_a_compile_option"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_native_imports_and_important_sql_features"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_oauth_child_environments_do_not_inherit_loader"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_preload_is_not_a_second_loader_authority"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_python_cli_semantics[args0-None-19-['a b', '--flag']\\n]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_python_cli_semantics[args1-print('from stdin')\\n-0-from stdin\\n]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_python_cli_semantics[args2-{\"x\":1}-0-{\\n    \"x\": 1\\n}\\n]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_real_python_and_descendant_use_same_engine"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_real_worker_help_paths_are_admitted_before_dispatch[src.lifecycle_investigation]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_real_worker_help_paths_are_admitted_before_dispatch[src.news_normalized.ibkr_cli]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_real_worker_help_paths_are_admitted_before_dispatch[src.prices_runtime]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_relocation_cwd_and_external_selector_symlink"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_same_version_copy_is_not_the_loaded_artifact"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_signals_reach_execed_python"
+    ],
+    [
+      "tests.test_sqlite_runtime_startup",
+      "test_native_host_script_rejects_before_chdir_or_logging"
+    ],
+    [
+      "tests.test_sqlite_runtime_startup",
+      "test_src_rejects_selection_before_following_user_code"
+    ],
+    [
+      "tests.test_sqlite_runtime_startup",
+      "test_supported_module_imports_fail_before_dependency_import[src.api.__main__]"
+    ],
+    [
+      "tests.test_sqlite_runtime_startup",
+      "test_supported_module_imports_fail_before_dependency_import[src.api.app]"
+    ],
+    [
+      "tests.test_sqlite_runtime_startup",
+      "test_supported_module_imports_fail_before_dependency_import[src.daily_update]"
+    ],
+    [
+      "tests.test_sqlite_runtime_startup",
+      "test_supported_module_imports_fail_before_dependency_import[src.lifecycle_investigation.__main__]"
+    ],
+    [
+      "tests.test_sqlite_runtime_startup",
+      "test_supported_module_imports_fail_before_dependency_import[src.news_normalized.ibkr_cli]"
+    ],
+    [
+      "tests.test_sqlite_runtime_startup",
+      "test_supported_module_imports_fail_before_dependency_import[src.prices_runtime]"
+    ]
+  ],
+  "backend": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 11238,
+    "skipped": 12
+  },
+  "baseline": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 11168,
+    "skipped": 12
+  },
+  "baseline_junit_gzip_sha256": "af0cc4318a5608d06a168d98121f431705541a8cf2475f4545c4b84fb5894ffc",
+  "checks": {
+    "actual_loaded_engine_matches_manifest": true,
+    "actual_loaded_library_is_package": true,
+    "actual_package_selector_used": true,
+    "artifact_tests_explicitly_enabled": true,
+    "collected_equals_executed": true,
+    "complete_commands_succeeded": true,
+    "explicit_tests_directory": true,
+    "final_package_payload_hashes_match": true,
+    "immutable_source_anchor_matches": true,
+    "maintenance_operation_and_citation_regression_suites_ran": true,
+    "no_backend_failures_or_errors": true,
+    "no_duplicate_nodes": true,
+    "no_existing_nodes_removed": true,
+    "no_source_runtime_or_runner_drift": true,
+    "retained_safety_owners_ran": true,
+    "selection_verified": true,
+    "unchanged_skip_ids": true
+  },
+  "collected": 11250,
+  "collection_run": "final-collect",
+  "executed": 11250,
+  "junit_sha256": "3417f2abeeec102d7bcef3234cbf7f1df2b2f5ab10475b40691f90f4de2a5166",
+  "limit": "Final-package Linux preparation and selected-runtime backend acceptance; not production activation, retained-data health, all child processes, full cleanup, cross-platform or Python sandbox admission.",
+  "new_suites": {
+    "test_sec_research_citations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 143,
+      "skipped": 0
+    },
+    "test_sec_research_cli": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 36,
+      "skipped": 0
+    },
+    "test_sec_research_maintenance": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 60,
+      "skipped": 0
+    },
+    "test_sec_research_operation_admission": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 28,
+      "skipped": 0
+    },
+    "test_sec_research_operations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 73,
+      "skipped": 0
+    },
+    "test_sec_research_references": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 47,
+      "skipped": 0
+    },
+    "test_sec_research_schema_admin": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 52,
+      "skipped": 0
+    },
+    "test_sec_research_trace": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 75,
+      "skipped": 0
+    },
+    "test_sqlite_runtime_build": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_sqlite_runtime_contract": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 30,
+      "skipped": 0
+    },
+    "test_sqlite_runtime_launch": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 29,
+      "skipped": 0
+    },
+    "test_sqlite_runtime_startup": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    }
+  },
+  "removed": [],
+  "retained_safety_owners": {
+    "test_api_fixed_dispatch_pins_complete_selection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0
+    },
+    "test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_failed_generation_redacts_selected_key_after_activation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_openai_retry_key_echo_is_private_without_changing_retry_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_original_oauth_id_can_refresh_normally_without_reselection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    }
+  },
+  "seconds": 1493.761,
+  "selected_runtime": {
+    "engine": {
+      "compile_options": [
+        "ATOMIC_INTRINSICS=1",
+        "COMPILER=gcc-11.4.0",
+        "DEFAULT_AUTOVACUUM",
+        "DEFAULT_CACHE_SIZE=-2000",
+        "DEFAULT_FILE_FORMAT=4",
+        "DEFAULT_JOURNAL_SIZE_LIMIT=-1",
+        "DEFAULT_MMAP_SIZE=0",
+        "DEFAULT_PAGE_SIZE=4096",
+        "DEFAULT_PCACHE_INITSZ=20",
+        "DEFAULT_RECURSIVE_TRIGGERS",
+        "DEFAULT_SECTOR_SIZE=4096",
+        "DEFAULT_SYNCHRONOUS=2",
+        "DEFAULT_WAL_AUTOCHECKPOINT=1000",
+        "DEFAULT_WAL_SYNCHRONOUS=2",
+        "DEFAULT_WORKER_THREADS=0",
+        "DIRECT_OVERFLOW_READ",
+        "ENABLE_COLUMN_METADATA",
+        "ENABLE_DBSTAT_VTAB",
+        "ENABLE_FTS3",
+        "ENABLE_FTS3_PARENTHESIS",
+        "ENABLE_FTS3_TOKENIZER",
+        "ENABLE_FTS4",
+        "ENABLE_FTS5",
+        "ENABLE_MATH_FUNCTIONS",
+        "ENABLE_PREUPDATE_HOOK",
+        "ENABLE_RTREE",
+        "ENABLE_SESSION",
+        "ENABLE_STMTVTAB",
+        "ENABLE_UNLOCK_NOTIFY",
+        "ENABLE_UPDATE_DELETE_LIMIT",
+        "HAVE_ISNAN",
+        "LIKE_DOESNT_MATCH_BLOBS",
+        "MALLOC_SOFT_LIMIT=1024",
+        "MAX_ATTACHED=10",
+        "MAX_COLUMN=2000",
+        "MAX_COMPOUND_SELECT=500",
+        "MAX_DEFAULT_PAGE_SIZE=32768",
+        "MAX_EXPR_DEPTH=1000",
+        "MAX_FUNCTION_ARG=127",
+        "MAX_LENGTH=1000000000",
+        "MAX_LIKE_PATTERN_LENGTH=50000",
+        "MAX_MMAP_SIZE=0x7fff0000",
+        "MAX_PAGE_COUNT=1073741823",
+        "MAX_PAGE_SIZE=65536",
+        "MAX_SCHEMA_RETRY=25",
+        "MAX_SQL_LENGTH=1000000000",
+        "MAX_TRIGGER_DEPTH=1000",
+        "MAX_VARIABLE_NUMBER=250000",
+        "MAX_VDBE_OP=250000000",
+        "MAX_WORKER_THREADS=8",
+        "MUTEX_PTHREADS",
+        "OMIT_LOOKASIDE",
+        "SECURE_DELETE",
+        "SOUNDEX",
+        "SYSTEM_MALLOC",
+        "TEMP_STORE=1",
+        "THREADSAFE=1",
+        "USE_URI"
+      ],
+      "source_id": "2026-07-24 19:02:57 bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc",
+      "version": "3.53.4"
+    },
+    "library": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/package/lib/libsqlite3.so.3.53.4",
+    "python": "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "selection": {
+      "library": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/package/lib/libsqlite3.so.3.53.4",
+      "manifest_sha256": "6bcf7a2d170d7d8aae4c6a9ade2d844c934eb361932020f2dc0165ec4feb53b3",
+      "source_id": "2026-07-24 19:02:57 bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc",
+      "status": "verified",
+      "version": "3.53.4"
+    }
+  },
+  "skipped": [
+    [
+      "tests.test_detailed_financials.TestLiveTechMetrics",
+      "test_nvda_tech_metrics"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_basic_stock_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_connection"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_iv_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_filter"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_quote"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_volume_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_put_call_ratio_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_scanner_parameters"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_unusual_activity"
+    ],
+    [
+      "tests.test_option_chain_tools.TestLiveOptionChain",
+      "test_spy_option_chain"
+    ],
+    [
+      "tests.test_peer_comparison.TestLivePeerComparison",
+      "test_nvda_peer_comparison"
+    ]
+  ],
+  "source_anchor": "292ef27f3ef363d5bd2f586e6a7435b0785ccd16",
+  "source_collection_sha256": "d33ad1515ccc7391d0ef16be843e7a1c6c7d7b01b6e283a0093bd18d26246dd4",
+  "source_drift": [],
+  "source_files": 1169,
+  "source_snapshot_after": "freeze-after.json",
+  "source_snapshot_before": "freeze-before.json",
+  "unmanaged_freeze_sqlite": "3.37.2"
+}

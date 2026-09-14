@@ -1,0 +1,29 @@
+
+Dynamic section at offset 0x177dc8 contains 26 entries:
+  Tag        Type                         Name/Value
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x000000000000000e (SONAME)             Library soname: [libsqlite3.so.0]
+ 0x000000000000000c (INIT)               0x12000
+ 0x000000000000000d (FINI)               0x139714
+ 0x0000000000000019 (INIT_ARRAY)         0x1760b0
+ 0x000000000000001b (INIT_ARRAYSZ)       8 (bytes)
+ 0x000000000000001a (FINI_ARRAY)         0x1760b8
+ 0x000000000000001c (FINI_ARRAYSZ)       8 (bytes)
+ 0x000000006ffffef5 (GNU_HASH)           0x2f0
+ 0x0000000000000005 (STRTAB)             0x3738
+ 0x0000000000000006 (SYMTAB)             0xd98
+ 0x000000000000000a (STRSZ)              8605 (bytes)
+ 0x000000000000000b (SYMENT)             24 (bytes)
+ 0x0000000000000003 (PLTGOT)             0x179000
+ 0x0000000000000002 (PLTRELSZ)           5664 (bytes)
+ 0x0000000000000014 (PLTREL)             RELA
+ 0x0000000000000017 (JMPREL)             0x10470
+ 0x0000000000000007 (RELA)               0x5d00
+ 0x0000000000000008 (RELASZ)             42864 (bytes)
+ 0x0000000000000009 (RELAENT)            24 (bytes)
+ 0x000000006ffffffe (VERNEED)            0x5c50
+ 0x000000006fffffff (VERNEEDNUM)         2
+ 0x000000006ffffff0 (VERSYM)             0x58d6
+ 0x000000006ffffff9 (RELACOUNT)          1462
+ 0x0000000000000000 (NULL)               0x0

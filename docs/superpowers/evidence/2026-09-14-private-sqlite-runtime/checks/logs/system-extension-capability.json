@@ -1,0 +1,30 @@
+{
+  "label": "system-extension-capability",
+  "started_utc": "2026-09-14T14:23:19.825051+00:00",
+  "argv": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-I",
+    "-S",
+    "-B",
+    "-c",
+    "import json, sqlite3; c=sqlite3.connect(\":memory:\"); c.enable_load_extension(True); c.enable_load_extension(False); print(json.dumps(dict(sqlite=sqlite3.sqlite_version, extension_toggle=True, actual_extension_loaded=False))); c.close()"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/home",
+    "TMPDIR": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/tmp",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "shell_command": "env -i PATH=/usr/bin:/bin HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/home TMPDIR=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/tmp LC_ALL=C PYTHONDONTWRITEBYTECODE=1 /home/hyl/.virtualenvs/llm_app/bin/python -I -S -B -c 'import json, sqlite3; c=sqlite3.connect(\":memory:\"); c.enable_load_extension(True); c.enable_load_extension(False); print(json.dumps(dict(sqlite=sqlite3.sqlite_version, extension_toggle=True, actual_extension_loaded=False))); c.close()'",
+  "stdin_path": null,
+  "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "expected_exit": 0,
+  "timeout_seconds": 30,
+  "exit_code": 0,
+  "timed_out": false,
+  "elapsed_seconds": 0.013755,
+  "stdout_sha256": "d5293940e8f0ecae763ecdc4438b532c34ffedef8599a5d4ab98d809de9f7663",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

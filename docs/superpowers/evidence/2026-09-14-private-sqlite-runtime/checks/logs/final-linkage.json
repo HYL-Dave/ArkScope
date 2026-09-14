@@ -1,0 +1,27 @@
+{
+  "label": "final-linkage",
+  "started_utc": "2026-09-14T14:22:38.848191+00:00",
+  "argv": [
+    "/usr/bin/readelf",
+    "-d",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/package/lib/libsqlite3.so.3.53.4"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime",
+  "environment": {
+    "PATH": "/usr/bin:/bin",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/home",
+    "TMPDIR": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/tmp",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "shell_command": "env -i PATH=/usr/bin:/bin HOME=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/home TMPDIR=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/tmp LC_ALL=C PYTHONDONTWRITEBYTECODE=1 /usr/bin/readelf -d /tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/package/lib/libsqlite3.so.3.53.4",
+  "stdin_path": null,
+  "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "expected_exit": 0,
+  "timeout_seconds": 30,
+  "exit_code": 0,
+  "timed_out": false,
+  "elapsed_seconds": 0.0015,
+  "stdout_sha256": "c760503ef9054d12865595769ec629a524df92649e84d110a7cdf82db4b5228c",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

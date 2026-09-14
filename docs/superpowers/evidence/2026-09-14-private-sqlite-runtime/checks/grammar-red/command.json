@@ -1,0 +1,27 @@
+{
+  "name": "grammar-red",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/offline_pytest.py",
+    "-q",
+    "tests/test_sqlite_runtime_launch.py",
+    "-k",
+    "grammar or same_version",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/grammar-red/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 1,
+  "seconds": 20.699,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/grammar-red",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/grammar-red/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "ARKSCOPE_TEST_SQLITE_ARCHIVE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/sqlite-autoconf-3530400.tar.gz"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/grammar-red/output.log"
+}

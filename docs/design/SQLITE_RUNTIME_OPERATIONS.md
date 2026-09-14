@@ -4,6 +4,12 @@ Linux x86_64 preparation is implemented by `src.sqlite_runtime.build`.
 This is not production activation, a Python distribution, or a Python sandbox.
 The selected Python installation and its numpy/SDK dependencies remain separate.
 
+The implemented preparation checkpoint is `292ef27f`. Its selected-runtime
+full backend passed 11,238 cases with twelve unchanged skips; the exact artifact,
+failed attempts and limitations are recorded in the
+[preparation receipt](../superpowers/evidence/2026-09-14-private-sqlite-runtime/README.md).
+This is not evidence that any installed App selector has switched.
+
 ## Prepare A New Generation
 
 Requirements: existing Python 3.10+, `/usr/bin/cc`, GNU make, binutils `readelf`,

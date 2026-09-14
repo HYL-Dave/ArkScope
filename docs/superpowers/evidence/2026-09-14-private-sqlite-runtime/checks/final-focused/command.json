@@ -1,0 +1,36 @@
+{
+  "name": "final-focused",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/offline_pytest.py",
+    "-q",
+    "tests/test_sqlite_runtime_contract.py",
+    "tests/test_sqlite_runtime_build.py",
+    "tests/test_sqlite_runtime_launch.py",
+    "tests/test_sqlite_runtime_startup.py",
+    "tests/test_sa_native_host_telemetry.py",
+    "tests/test_sa_native_host_diagnostics.py",
+    "tests/test_provider_config_startup.py",
+    "tests/test_sa_extension_health.py",
+    "tests/test_codex_app_server_runtime.py",
+    "tests/test_claude_agent_sdk_runtime.py",
+    "tests/test_prices_runtime.py",
+    "tests/test_data_scheduler.py",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/final-focused/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 43.634,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/final-focused",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/final-focused/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "ARKSCOPE_TEST_SQLITE_ARCHIVE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/sqlite-src-3530400.zip"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-private-sqlite-runtime/final-focused/output.log"
+}

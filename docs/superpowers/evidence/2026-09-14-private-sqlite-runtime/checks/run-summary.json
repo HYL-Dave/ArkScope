@@ -1,0 +1,151 @@
+{
+  "bootstrap-green": {
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 61,
+    "seconds": 30.699,
+    "skipped": 0
+  },
+  "bootstrap-red": {
+    "errors": 0,
+    "exit_code": 1,
+    "failed": 2,
+    "passed": 0,
+    "seconds": 26.565,
+    "skipped": 0
+  },
+  "build-red": {
+    "errors": 13,
+    "exit_code": 1,
+    "failed": 3,
+    "passed": 0,
+    "seconds": 0.56,
+    "skipped": 0
+  },
+  "contract-green": {
+    "errors": 0,
+    "exit_code": 1,
+    "failed": 14,
+    "passed": 16,
+    "seconds": 0.789,
+    "skipped": 0
+  },
+  "contract-green-02": {
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 30,
+    "seconds": 0.636,
+    "skipped": 0
+  },
+  "contract-red": {
+    "errors": 0,
+    "exit_code": 1,
+    "failed": 30,
+    "passed": 0,
+    "seconds": 0.739,
+    "skipped": 0
+  },
+  "fifo-red": {
+    "errors": 0,
+    "exit_code": 1,
+    "failed": 3,
+    "passed": 0,
+    "seconds": 32.529,
+    "skipped": 0
+  },
+  "final-collect": {
+    "exit_code": 0,
+    "junit_absent": true,
+    "seconds": 7.606
+  },
+  "final-focused": {
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 278,
+    "seconds": 43.634,
+    "skipped": 0
+  },
+  "full-admitted": {
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 11238,
+    "seconds": 1493.761,
+    "skipped": 12
+  },
+  "grammar-green": {
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 15,
+    "seconds": 28.022,
+    "skipped": 0
+  },
+  "grammar-red": {
+    "errors": 0,
+    "exit_code": 1,
+    "failed": 1,
+    "passed": 1,
+    "seconds": 20.699,
+    "skipped": 0
+  },
+  "launch-green": {
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 46,
+    "seconds": 22.322,
+    "skipped": 0
+  },
+  "review-green": {
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 67,
+    "seconds": 30.735,
+    "skipped": 0
+  },
+  "review-red": {
+    "errors": 0,
+    "exit_code": 1,
+    "failed": 3,
+    "passed": 0,
+    "seconds": 26.816,
+    "skipped": 0
+  },
+  "runtime-focused": {
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 270,
+    "seconds": 43.07,
+    "skipped": 0
+  },
+  "startup-green": {
+    "errors": 0,
+    "exit_code": 4,
+    "failed": 0,
+    "passed": 0,
+    "seconds": 0.277,
+    "skipped": 0
+  },
+  "startup-green-02": {
+    "errors": 0,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 38,
+    "seconds": 0.99,
+    "skipped": 0
+  },
+  "startup-red": {
+    "errors": 0,
+    "exit_code": 1,
+    "failed": 8,
+    "passed": 0,
+    "seconds": 0.726,
+    "skipped": 0
+  }
+}

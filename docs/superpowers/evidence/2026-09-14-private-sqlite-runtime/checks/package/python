@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+SELF=$(readlink -f -- "$0")
+ROOT=$(dirname -- "$SELF")
+fail() { echo sqlite_runtime_artifact_changed >&2; exit 78; }
+check() {
+  [ -f "$ROOT/$1" ] && [ ! -L "$ROOT/$1" ] || fail
+  SIZE=$(/usr/bin/stat -c%s -- "$ROOT/$1" 2>/dev/null) || fail
+  [ "$SIZE" -le 524288 ] || fail
+  SUM=$(/usr/bin/timeout -k 1 5 /usr/bin/sha256sum -- "$ROOT/$1" 2>/dev/null) || fail
+  [ "${SUM%% *}" = "$2" ] || fail
+}
+check manifest.json 6bcf7a2d170d7d8aae4c6a9ade2d844c934eb361932020f2dc0165ec4feb53b3
+check contract.py ebb048a197ecb077320a4ad355043691033205d6b32576d5de05b2f0d7bc168b
+check launch.py 2ecc01e0e0eb165c8e3fc2c4676f2feca6202698695bb93962dbc900f0174eff
+exec /home/hyl/.virtualenvs/llm_app/bin/python -I -S -B "$ROOT/launch.py" 6bcf7a2d170d7d8aae4c6a9ade2d844c934eb361932020f2dc0165ec4feb53b3 "$@"
