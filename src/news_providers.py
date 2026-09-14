@@ -2,12 +2,9 @@
 
 The direct-local writer (`news_direct.backfill_news_direct`) wants a provider with
 ``fetch_news(ticker, since_iso) -> list[raw article dict]``. These adapters wrap the EXISTING
-collectors' fetch+parse (the legacy-named ``PolygonNewsCollector.fetch_news_range`` /
-``FinnhubNewsCollector.fetch_news``
-+ ``parse_article``) but DELIBERATELY never call ``StorageManager.save_articles`` — so the direct
-path writes only the local SQLite ``news`` table, no Parquet, and is cursored against the local DB
-(``backfill_news_direct`` passes the local newest-published_at as ``since_iso``), not the Parquet
-``get_latest_timestamp``.
+clients' fetch+parse (``PolygonNewsCollector.fetch_news_range`` /
+``FinnhubNewsCollector.fetch_news`` + ``parse_article``). The writer owns storage
+and per-source/ticker SQLite cursors; clients do not write Parquet or keep cursors.
 
 The collector ``NewsArticle`` is mapped to the local news-row contract using the canonical SHA-256
 identity used by the local store; ``description`` falls back to ``content``.
@@ -80,14 +77,14 @@ class _CollectorNewsProvider:
 
 def make_news_provider(source: str, collector: Any = None) -> _CollectorNewsProvider:
     """Direct-local provider for ``'polygon'`` | ``'finnhub'``. ``collector`` is injectable for
-    tests; otherwise the real collector is built lazily (needs the provider API key in config/.env)."""
+    tests; otherwise the real client is built lazily using its credential authority."""
     if collector is None:
         if source == "polygon":
-            from src.collectors.polygon_news import (
+            from src.news_clients.polygon import (
                 CollectionConfig, PolygonNewsCollector, load_env)
             collector = PolygonNewsCollector(load_env(), CollectionConfig())
         elif source == "finnhub":
-            from src.collectors.finnhub_news import (
+            from src.news_clients.finnhub import (
                 FinnhubConfig, FinnhubNewsCollector, load_env)
             collector = FinnhubNewsCollector(load_env(), FinnhubConfig())
         else:

@@ -697,7 +697,7 @@ def test_route_coverage_path_is_pure_local_read_without_provider_or_scheduler(
 
     forbidden_prefixes = (
         "ib_insync",
-        "src.collectors",
+        "src.news_clients",
         "src.scheduler_planner",
         "src.service.data_scheduler",
     )

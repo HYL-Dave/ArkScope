@@ -225,7 +225,7 @@ review 對照 canonical docs 找出的衝突，**已逐條對 SPEC 驗證屬實*
 - `data_sources/sec_edgar_*`（financials/source/insider/filings/earnings）— SEC 是鎖定 layer-4 源；XBRL 基本面 + 季報已實作
 - `data_sources/fred_client.py` + `src/macro_calendar/fred_ingestion.py` — FRED 鎖定；對應 S7 宏觀卡
 - `data_sources/polygon_source.py` + `src/market_data_direct.py` - 現行價格 transport
-- `src/collectors/finnhub_news.py`、`src/collectors/polygon_news.py` + `data_sources/finnhub_calendar_client.py` - 現行新聞 fetch/parse 與財報日曆；collector CLI 的清理另屬 C12
+- `src/news_clients/finnhub.py`、`src/news_clients/polygon.py` + `data_sources/finnhub_calendar_client.py` - 現行新聞 fetch/parse 與財報日曆；舊 collector CLI 已移除，收集由排程與 `src.daily_update` 負責
 - `data_sources/lifecycle_provider_census_transport.py` + `src/security_lifecycle_provider_scan.py` - 保留 EODHD lifecycle census 與現行金鑰路徑
 - `data_sources/financial_datasets_client.py` + `financial_metrics_calculator.py` — SEC→FD fallback 鏈，已本地快取，符合 vault 故事
 

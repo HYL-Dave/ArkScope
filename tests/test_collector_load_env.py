@@ -1,13 +1,8 @@
-"""Slice B: news collectors resolve the API key os.environ-FIRST.
+"""News clients preserve their existing credential authorities.
 
-The sidecar's apply_env() injects DB-managed provider values into os.environ with the
-documented precedence (real env > app-DB > config/.env). The collectors' load_env()
-used to read config/.env FIRST, which inverted that order: a DB-managed key was
-shadowed by the file, so the Settings "test connection" button (os.getenv) and actual
-news collection could silently diverge. load_env() must now prefer os.environ and fall
-back to reading config/.env directly only for standalone runs that never went through
-the env bridge. A placeholder ('your_'-prefixed) or empty env value must NOT shadow a
-real key in the file.
+Massive uses only its canonical process bridge. Finnhub prefers the process
+bridge but retains file fallback for callers without injected credentials.
+An empty or placeholder Finnhub value must not shadow a real file value.
 """
 from __future__ import annotations
 
@@ -23,7 +18,7 @@ def _write_env(tmp_path, key, value):
 # --- polygon ---------------------------------------------------------------
 
 def test_polygon_uses_only_massive_process_bridge(tmp_path, monkeypatch):
-    cpn = importlib.import_module("src.collectors.polygon_news")
+    cpn = importlib.import_module("src.news_clients.polygon")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MASSIVE_API_KEY", "massive_bridge")
@@ -32,7 +27,7 @@ def test_polygon_uses_only_massive_process_bridge(tmp_path, monkeypatch):
 
 
 def test_polygon_legacy_runtime_alias_is_not_resolved(tmp_path, monkeypatch):
-    cpn = importlib.import_module("src.collectors.polygon_news")
+    cpn = importlib.import_module("src.news_clients.polygon")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_legacy")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("POLYGON_API_KEY", "env_legacy")
@@ -41,7 +36,7 @@ def test_polygon_legacy_runtime_alias_is_not_resolved(tmp_path, monkeypatch):
 
 
 def test_polygon_does_not_read_config_file_when_env_absent(tmp_path, monkeypatch):
-    cpn = importlib.import_module("src.collectors.polygon_news")
+    cpn = importlib.import_module("src.news_clients.polygon")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("POLYGON_API_KEY", raising=False)
@@ -49,7 +44,7 @@ def test_polygon_does_not_read_config_file_when_env_absent(tmp_path, monkeypatch
 
 
 def test_polygon_placeholder_process_bridge_does_not_revive_file(tmp_path, monkeypatch):
-    cpn = importlib.import_module("src.collectors.polygon_news")
+    cpn = importlib.import_module("src.news_clients.polygon")
     _write_env(tmp_path, "POLYGON_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MASSIVE_API_KEY", "your_key_here")
@@ -59,7 +54,7 @@ def test_polygon_placeholder_process_bridge_does_not_revive_file(tmp_path, monke
 # --- finnhub ---------------------------------------------------------------
 
 def test_finnhub_env_wins_over_file(tmp_path, monkeypatch):
-    cfn = importlib.import_module("src.collectors.finnhub_news")
+    cfn = importlib.import_module("src.news_clients.finnhub")
     _write_env(tmp_path, "FINNHUB_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FINNHUB_API_KEY", "env_key")
@@ -67,7 +62,7 @@ def test_finnhub_env_wins_over_file(tmp_path, monkeypatch):
 
 
 def test_finnhub_falls_back_to_file_when_env_absent(tmp_path, monkeypatch):
-    cfn = importlib.import_module("src.collectors.finnhub_news")
+    cfn = importlib.import_module("src.news_clients.finnhub")
     _write_env(tmp_path, "FINNHUB_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
@@ -75,7 +70,7 @@ def test_finnhub_falls_back_to_file_when_env_absent(tmp_path, monkeypatch):
 
 
 def test_finnhub_placeholder_env_does_not_shadow_file(tmp_path, monkeypatch):
-    cfn = importlib.import_module("src.collectors.finnhub_news")
+    cfn = importlib.import_module("src.news_clients.finnhub")
     _write_env(tmp_path, "FINNHUB_API_KEY", "file_key")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FINNHUB_API_KEY", "your_key_here")

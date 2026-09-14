@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 
-from src.collectors.finnhub_news import (
+from src.news_clients.finnhub import (
     FinnhubNewsCollector,
     NewsArticle as FinnhubArticle,
 )
-from src.collectors.polygon_news import NewsArticle as PolygonArticle
+from src.news_clients.polygon import NewsArticle as PolygonArticle
 from src.news_normalized.models import BodyStatus
 from src.news_normalized.provider_adapters import (
     FinnhubNormalizedProvider,

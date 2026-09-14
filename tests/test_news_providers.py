@@ -7,7 +7,7 @@ description=description or content.
 from __future__ import annotations
 
 import src.news_providers as np
-from src.collectors.polygon_news import NewsArticle
+from src.news_clients.polygon import NewsArticle
 from src.news_identity import canonical_article_hash
 
 

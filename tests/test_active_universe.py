@@ -457,8 +457,7 @@ def test_former_alpha_pick_crosses_real_news_and_price_scope_consumers(
     monkeypatch,
     tmp_path,
 ):
-    import src.collectors.finnhub_news as finnhub_news
-    import src.collectors.polygon_news as massive_news
+    from tests.news_scope_support import assert_news_cli_scope
     import src.market_data_direct as market_data_direct
 
     _insert_pick(
@@ -471,8 +470,7 @@ def test_former_alpha_pick_crosses_real_news_and_price_scope_consumers(
     monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(databases.profile_path))
     monkeypatch.setenv("ARKSCOPE_SA_DB", str(databases.sa_path))
 
-    assert massive_news.load_tickers(scope="active-universe") == ["FORMER"]
-    assert finnhub_news.load_tickers(scope="active-universe") == ["FORMER"]
+    assert_news_cli_scope(monkeypatch, ["FORMER"])
 
     observed: dict[str, object] = {}
 
@@ -502,7 +500,7 @@ def test_provider_marked_former_pick_merges_with_manual_identity_for_consumers(
     monkeypatch,
     tmp_path,
 ):
-    import src.collectors.polygon_news as massive_news
+    from tests.news_scope_support import assert_news_cli_scope
     import src.market_data_direct as market_data_direct
 
     databases.profile.import_lists(
@@ -534,7 +532,7 @@ def test_provider_marked_former_pick_merges_with_manual_identity_for_consumers(
     assert snapshot.sources_by_ticker == {
         "SMCI": tuple(sorted(("manual_lists", FORMER_SA_SOURCE))),
     }
-    assert massive_news.load_tickers(scope="active-universe") == ["SMCI"]
+    assert_news_cli_scope(monkeypatch, ["SMCI"])
 
     observed: dict[str, object] = {}
 
