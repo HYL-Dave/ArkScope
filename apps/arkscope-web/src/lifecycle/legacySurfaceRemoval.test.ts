@@ -51,6 +51,34 @@ it.each([null, [], {}, { run_id: "li_new", created: "true" }, { run_id: "", crea
 });
 
 const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../../../tests/fixtures/lifecycle_current_v1.json"), "utf8"));
+const obsoleteLifecycleCopy = [
+  "title", "aria", "queues.aria",
+  "automationControl.stages.preparing", "automationControl.stages.sec",
+  "automationControl.stages.listing", "automationControl.stages.ibkr",
+  "automationControl.stages.evaluate", "automationControl.stages.persist",
+  "automationControl.stages.approve", "automationControl.stages.finalize",
+  "actions.reopen", "actions.openEvidence", "filters.ticker",
+  "sections.acknowledgement", "sections.facts", "fields.extractionRule",
+  "states.revalidation", "states.zeroResults", "states.notAvailable",
+  "acknowledgementReasons.evidenceInsufficient",
+  "translation.routeUnavailable", "translation.credentialMissing", "translation.authRejected",
+  "translation.rateLimited", "translation.quotaExhausted", "translation.modelUnavailable",
+  "translation.timeout", "translation.outputInvalid", "translation.contextWindowExceeded",
+  "translation.protocolResourceExhausted", "translation.providerError",
+  "translation.evidenceChanged", "translation.unknown",
+  "transition.caveats.providerOwnedSourcesRetained",
+  "transition.caveats.portfolioPositionRetained", "transition.caveats.successorAlreadyTracked",
+  "transition.effects.add", "transition.effects.archive",
+  "transition.effects.reactivate", "transition.effects.unchanged",
+];
+it.each([["en", en], ["zh-Hant", zh]] as const)("removes reviewed obsolete leaf copy without removing shared %s labels", (_locale, copy) => {
+  for (const key of obsoleteLifecycleCopy) expect(copy.lifecycle).not.toHaveProperty(key);
+  for (const key of [
+    "current.checkPrompt", "current.checkIncomplete", "fields.successorTicker", "fields.effectiveDate",
+    "listingEvidence.authorities.eodhd", "listingEvidence.authorities.nasdaqTrader",
+    "listingEvidence.authorities.massive", "translation.providers.anthropic", "translation.providers.openai",
+  ]) expect(copy.lifecycle).toHaveProperty(key, expect.any(String));
+});
 it.each([["en", en], ["zh-Hant", zh]] as const)("removes only the old screen's review-list and run controls from %s copy", (_locale, copy) => {
   for (const key of ["reasons", "collections", "checks", "attention", "nextCheck", "audit", "auditUnavailable"]) {
     expect(copy.lifecycle.current).not.toHaveProperty(key);

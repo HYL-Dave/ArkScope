@@ -117,7 +117,7 @@ describe("bundled i18n resources", () => {
       home: 23,
       watchlist: 71,
       universe: 38,
-      lifecycle: 662,
+      lifecycle: 621,
       alphaTracking: 34,
       news: 45,
       tickerDetail: 89,
@@ -288,7 +288,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(1219);
+      expect(flattened.size, `${locale}.explore`).toBe(1178);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -760,7 +760,7 @@ describe("bundled i18n resources", () => {
       shell: 37,
       settings: 1037,
       research: 236,
-      explore: 1219,
+      explore: 1178,
       portfolio: 374,
       system: 24,
     } as const;
@@ -844,7 +844,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3009);
+      expect(total, `${locale}.total`).toBe(2968);
       expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys, "schedule"].sort());
       expect(Object.keys(resources[locale].settings.secResearch.schedule).sort()).toEqual([...secScheduleKeys].sort());
       expect(Object.keys(resources[locale].settings.secDocument).sort()).toEqual([...secDocumentKeys].sort());
