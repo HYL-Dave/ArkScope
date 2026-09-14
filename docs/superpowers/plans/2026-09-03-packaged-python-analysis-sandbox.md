@@ -10,6 +10,19 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-03-packaged-cross-platform-python-sandbox-design.md`
 
+**Replacement ownership (2026-09-14 clarification):** This workstream also owns
+physical removal of the old `src/tools/code_executor.py` and its superseded
+direct-library tests when replacing the execution path. Its present retention
+is transitional, not permanent compatibility or permission to reconnect it.
+It is currently test-only and does not block SQLite admission for current App
+writers. No loader injection or immediate deletion is requested by this note.
+Task 7 must recheck callers, replace the two direct-library tests in
+`tests/test_tool_calling.py`, remove `tests/test_code_executor.py`, and retain
+useful historical result readers in the compressor. No-fallback tests must
+detect a forbidden host-process dispatch, not merely an import of a deleted
+module. Rebase the deferred plan against current code before execution; this
+note does not start sandbox implementation or admit its pinned dependencies.
+
 ## Global Constraints
 
 - Complete `docs/superpowers/plans/2026-09-03-desktop-distribution-foundation.md` first.

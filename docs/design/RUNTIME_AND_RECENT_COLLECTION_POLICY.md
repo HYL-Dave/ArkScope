@@ -2,8 +2,8 @@
 
 Date: 2026-09-14. Policy source review: `d90c13fa`,
 `codex/sec-research-integration`. Status: user decisions accepted; the shared
-fourteen-day request target is implemented as described below. Deployment,
-collector retirement, entitlement reporting and SA targeting remain open.
+fourteen-day request target and C12 collector retirement are complete as recorded
+below. Deployment, entitlement reporting and SA targeting remain open.
 This supersedes the two pending choices in the
 [September 14 closeout](../superpowers/evidence/2026-09-14-runtime-cleanup-closeout/README.md).
 Its historical test results and operational boundaries remain unchanged.
@@ -47,9 +47,9 @@ Admission requirements:
 - Review relocation, compile profile, native dependency compatibility and
   descendant loading using the existing
   [admission preflight](../superpowers/evidence/2026-09-13-maintenance-closures/checks/sqlite-admission-preflight.md).
-  The sanitized internal analysis child remains an explicit exception to solve
-  or restrict before claiming complete writer coverage; do not widen its closed
-  environment implicitly.
+  The internal analysis library is not a current application writer. Its
+  deferred replacement is distinguished below; do not widen its closed
+  environment or reconnect it to make an engine-coverage claim.
 
 The source-only deployment decision is approved. Production selector/store
 inspection, writer shutdown, backups, full integrity checks and actual activation
@@ -60,6 +60,36 @@ changing a launcher path; preserve the existing recovery acceptance boundary.
 Windows/macOS runtime admission and the Python sandbox are deferred. Other
 platforms do not inherit Linux validation or a same-version guarantee. Do not
 make their admission a prerequisite for current Linux code cleanup.
+
+### Internal Analysis Library And Sandbox Ownership
+
+The user clarified that retaining `src/tools/code_executor.py` was transitional:
+replace and remove it when implementing the planned Python sandbox, not maintain
+it as a permanent compatibility layer. SQLite deployment and sandbox development
+remain separate workstreams. This clarification does not delete the library,
+admit arbitrary Python execution, or change its environment policy now.
+
+Source review at `84f52f60` found direct callers only in
+`tests/test_code_executor.py` and `tests/test_tool_calling.py`; the sealed
+[C12 census](../superpowers/evidence/2026-09-14-news-client-cleanup/checks/census.json.gz)
+classifies it as `test_only`. The compressor references its historical result
+shape without importing or executing the library. Registry, bridges, prompts and
+subagents keep arbitrary Python unavailable. The future
+[sandbox plan](../superpowers/plans/2026-09-03-packaged-python-analysis-sandbox.md)
+explicitly forbids using this executor as its transport or fallback.
+
+Therefore this dormant library does not block admission of the current supported
+application writers. Do not add loader inheritance solely for its tests, show it
+as an active Research engine in Settings, or claim that every importable Python
+library/child has been upgraded. An upgraded-parent test run may still exercise
+this library's system-engine child; record that scope rather than treating it as
+new-runtime child evidence. Any future production caller would reopen runtime
+and containment admission before registration or execution.
+
+The sandbox workstream owns removal of the old execution implementation and its
+superseded direct-library tests, with preservation of useful historical result
+readers. This is an explicit replacement task, not forgotten cleanup. Existing
+financial calculators and the separate SQLite package work do not wait for it.
 
 ## News: A Recent Target Subject To Real Access
 
