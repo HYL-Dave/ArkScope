@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 import json
 import re
 from typing import Any, Callable, Iterable, Optional
 
+from src import news_collection_policy
+
 from .models import ArticleCandidate, BodyCandidate, BodyStatus
 
 
-_DEFAULT_LOOKBACK_DAYS = 7
 _HTML_TAG = re.compile(r"<\s*[A-Za-z][^>]*>")
 
 
@@ -86,7 +87,7 @@ def _cursor_bounds(
                 return date.fromisoformat(value[:10]), None
             except ValueError:
                 pass
-    return today - timedelta(days=_DEFAULT_LOOKBACK_DAYS), None
+    return today - news_collection_policy.INITIAL_NEWS_LOOKBACK, None
 
 
 class _NormalizedRestProvider:

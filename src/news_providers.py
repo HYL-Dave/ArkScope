@@ -14,14 +14,14 @@ identity used by the local store; ``description`` falls back to ``content``.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from src import news_collection_policy
 from src.news_identity import canonical_article_hash
 
 _TRUTHY = ("1", "true", "yes", "on")
 _FALSY = ("0", "false", "no", "off")
-_DEFAULT_LOOKBACK_DAYS = 7   # first run (no local cursor for this source/ticker) → look back a week
 
 
 def parse_news_toggle(value: Any) -> Optional[bool]:
@@ -56,7 +56,7 @@ def _since_to_start(since_iso: Optional[str], today: date) -> date:
             return date.fromisoformat(since_iso[:10])
         except ValueError:
             pass
-    return today - timedelta(days=_DEFAULT_LOOKBACK_DAYS)
+    return today - news_collection_policy.INITIAL_NEWS_LOOKBACK
 
 
 class _CollectorNewsProvider:
