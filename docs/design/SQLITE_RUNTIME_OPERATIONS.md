@@ -73,10 +73,49 @@ drift, not hostile code running with the installation owner's privileges.
   that the App-private runtime is active. The dormant analysis executor and
   isolated provider CLI environments are not new-runtime writer coverage.
 
-Tests accept an explicit `ARKSCOPE_TEST_SQLITE_ARCHIVE` to compile and exercise a
-disposable final artifact. If absent, the artifact tests explicitly skip rather
-than downloading, inspecting an installed runtime or passing against the system
-library. Release acceptance must supply it and account for those test nodes.
+Tests require an explicit `ARKSCOPE_TEST_SQLITE_ARCHIVE` to compile and exercise a
+disposable final artifact. Under a selected runtime, an absent archive now fails
+fixture setup with `selected-runtime acceptance requires the offline SQLite
+source archive`; it cannot produce a successful skipped acceptance run. Plain
+unmanaged development still reports an explicit skip. Neither path downloads
+the archive or inspects an installed runtime. A skipped unmanaged run is not
+final-artifact acceptance. A supplied invalid archive fails the pinned hash check.
+
+The artifact module currently contains 31 cases (the original 29 plus two
+missing-archive controls). Acceptance must collect and execute every current
+node in `tests/test_sqlite_runtime_launch.py`, with zero module skips. Record
+the source archive hash, selected package manifest, actual loaded engine, node
+identities and results, rather than relying on exit status or a historical count.
+
+## Pre-Activation Blocker: Unselected Production Startup
+
+`require_selected_runtime()` still returns `None` when both selection variables
+are absent. This preserves unmanaged development **before activation**; it does
+not prevent a production shortcut, direct Python command or service from
+bypassing the launcher. Selected-engine tests do not cover this gap.
+
+Do not activate production until a startup requirement independent of the
+launcher's inherited environment has been implemented and verified. The
+activation work must own a durable installation binding and an explicit
+production/development boundary. Another optional environment variable is not
+sufficient: bypassing the launcher would lose that variable too.
+
+The activation acceptance must demonstrate all of the following before any
+production writes resume:
+
+- Every supported production entrypoint refuses an absent or partial selection
+  before opening writable application stores, including Desktop, SA and writer
+  children. A correct selection still verifies the actual library and manifest.
+- Direct invocations and old shortcuts using the approved source tree, with
+  selection variables removed, fail visibly. Inventory any cron/service entry
+  as a separate launch path; do not infer coverage from Desktop alone.
+- Isolated tests/development remain usable without silently granting access to
+  production stores. Old source revisions outside this guard are not covered by
+  a new-source check; retire or explicitly exclude their writer entrypoints.
+- The exact offline source archive is available and all artifact cases execute.
+
+These are pending activation requirements, not implemented protections in the
+preparation checkpoint. The dormant analysis library remains separately scoped.
 
 ## Activation Window Still Required
 
@@ -88,7 +127,7 @@ exclusive coherent WAL-safe backups and run full integrity checks on verificatio
 copies. Retain SEC referenced content and the old source/selector bindings.
 Do not use `immutable=1` on live WAL stores, clobber backups or silently repair data.
 
-Only then install a new generation, change both executable selectors, verify
+After the startup blocker above is closed, install a new generation, change both executable selectors, verify
 their actual loaded engines and resume writes on the approved source revision.
 After resumed writes, changing a selector alone is not a proved rollback. A
 restore/repair decision remains separate. No automatic fallback, REINDEX,
