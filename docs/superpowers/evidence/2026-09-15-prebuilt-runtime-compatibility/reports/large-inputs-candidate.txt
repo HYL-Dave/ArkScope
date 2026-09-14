@@ -1,0 +1,54 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+__ test_recovery_large_frozen_target_set[query_sa_market_news_recovery_rows] ___
+src/tools/backends/sa_capture_backend.py:916: in query_sa_market_news_recovery_rows
+    rows = conn.execute(
+E   sqlite3.OperationalError: too many SQL variables
+
+The above exception was the direct cause of the following exception:
+../test_large_inputs.py:26: in test_recovery_large_frozen_target_set
+    result = getattr(backend, method)([str(value) for value in range(33000)])
+src/tools/backends/sa_capture_backend.py:942: in query_sa_market_news_recovery_rows
+    raise RuntimeError("sa_market_news_recovery_unavailable") from exc
+E   RuntimeError: sa_market_news_recovery_unavailable
+------------------------------ Captured log call -------------------------------
+ERROR    src.tools.backends.sa_capture_backend:sa_capture_backend.py:941 Failed to query exact Market News repair rows: too many SQL variables
+__ test_recovery_large_frozen_target_set[query_sa_market_news_body_presence] ___
+src/tools/backends/sa_capture_backend.py:954: in query_sa_market_news_body_presence
+    rows = conn.execute(
+E   sqlite3.OperationalError: too many SQL variables
+
+The above exception was the direct cause of the following exception:
+../test_large_inputs.py:26: in test_recovery_large_frozen_target_set
+    result = getattr(backend, method)([str(value) for value in range(33000)])
+src/tools/backends/sa_capture_backend.py:971: in query_sa_market_news_body_presence
+    raise RuntimeError("sa_market_news_recovery_unavailable") from exc
+E   RuntimeError: sa_market_news_recovery_unavailable
+------------------------------ Captured log call -------------------------------
+ERROR    src.tools.backends.sa_capture_backend:sa_capture_backend.py:970 Failed to read Market News repair body state: too many SQL variables
+_______________________ test_lineage_filter_large_input ________________________
+../test_large_inputs.py:37: in test_lineage_filter_large_input
+    events = sa.reconciliation_store.list_events(conn, lineage_ids=range(1, 33001))
+src/sa_article_reconciliation_store.py:59: in list_events
+    rows = conn.execute(
+E   sqlite3.OperationalError: too many SQL variables
+______________ test_article_filter_large_input_keeps_global_limit ______________
+../test_large_inputs.py:50: in test_article_filter_large_input_keeps_global_limit
+    rows = sa.reconciliation_store._candidate_rows(
+src/sa_article_reconciliation_store.py:188: in _candidate_rows
+    return conn.execute(
+E   sqlite3.OperationalError: too many SQL variables
+______________ test_many_pinned_citations_survive_family_refresh _______________
+../test_large_inputs.py:102: in test_many_pinned_citations_survive_family_refresh
+    kernel.complete_run(
+src/security_lifecycle_fact_kernel.py:2266: in complete_run
+    self.conn.execute(
+E   sqlite3.OperationalError: too many SQL variables
+- generated xml file: /tmp/arkscope-prebuilt-compat.oCmRRHrQ/large-inputs-confirm/junit.xml -
+=========================== short test summary info ============================
+FAILED ../test_large_inputs.py::test_recovery_large_frozen_target_set[query_sa_market_news_recovery_rows]
+FAILED ../test_large_inputs.py::test_recovery_large_frozen_target_set[query_sa_market_news_body_presence]
+FAILED ../test_large_inputs.py::test_lineage_filter_large_input - sqlite3.Ope...
+FAILED ../test_large_inputs.py::test_article_filter_large_input_keeps_global_limit
+FAILED ../test_large_inputs.py::test_many_pinned_citations_survive_family_refresh
+5 failed in 1.80s

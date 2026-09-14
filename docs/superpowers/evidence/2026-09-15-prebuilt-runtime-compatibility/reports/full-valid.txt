@@ -1,0 +1,290 @@
+........................................................................ [  0%]
+........................................................................ [  1%]
+........................................................................ [  1%]
+........................................................................ [  2%]
+........................................................................ [  3%]
+........................................................................ [  3%]
+........................................................................ [  4%]
+........................................................................ [  5%]
+........................................................................ [  5%]
+........................................................................ [  6%]
+........................................................................ [  7%]
+........................................................................ [  7%]
+........................................................................ [  8%]
+........................................................................ [  8%]
+........................................................................ [  9%]
+........................................................................ [ 10%]
+........................................................................ [ 10%]
+........................................................................ [ 11%]
+........................................................................ [ 12%]
+........................................................................ [ 12%]
+.............................s.......................................... [ 13%]
+........................................................................ [ 14%]
+........................................................................ [ 14%]
+........................................................................ [ 15%]
+........................................................................ [ 16%]
+...................................................sssssssss............ [ 16%]
+........................................................................ [ 17%]
+........................................................................ [ 17%]
+........................................................................ [ 18%]
+........................................................................ [ 19%]
+........................................................................ [ 19%]
+........................................................................ [ 20%]
+........................................................................ [ 21%]
+........................................................................ [ 21%]
+........................................................................ [ 22%]
+........................................................................ [ 23%]
+........................................................................ [ 23%]
+........................................................................ [ 24%]
+........................................................................ [ 25%]
+........................................................................ [ 25%]
+........................................................................ [ 26%]
+........................................................................ [ 26%]
+........................................................................ [ 27%]
+........................................................................ [ 28%]
+........................................................................ [ 28%]
+........................................................................ [ 29%]
+........................................................................ [ 30%]
+........................................................................ [ 30%]
+........................................................................ [ 31%]
+........................................................................ [ 32%]
+........................................................................ [ 32%]
+........................................................................ [ 33%]
+........................................................................ [ 34%]
+........................................................................ [ 34%]
+........................................................................ [ 35%]
+........................................................................ [ 35%]
+........................................................................ [ 36%]
+........................................................................ [ 37%]
+........................................................................ [ 37%]
+........................................................................ [ 38%]
+........................................................................ [ 39%]
+........................................................................ [ 39%]
+........................................................................ [ 40%]
+...................................s.................................... [ 41%]
+........................................................................ [ 41%]
+....................................................s................... [ 42%]
+........................................................................ [ 43%]
+........................................................................ [ 43%]
+........................................................................ [ 44%]
+........................................................................ [ 44%]
+........................................................................ [ 45%]
+........................................................................ [ 46%]
+........................................................................ [ 46%]
+........................................................................ [ 47%]
+........................................................................ [ 48%]
+........................................................................ [ 48%]
+........................................................................ [ 49%]
+........................................................................ [ 50%]
+........................................................................ [ 50%]
+........................................................................ [ 51%]
+........................................................................ [ 51%]
+........................................................................ [ 52%]
+........................................................................ [ 53%]
+........................................................................ [ 53%]
+........................................................................ [ 54%]
+........................................................................ [ 55%]
+........................................................................ [ 55%]
+........................................................................ [ 56%]
+........................................................................ [ 57%]
+........................................................................ [ 57%]
+........................................................................ [ 58%]
+........................................................................ [ 59%]
+........................................................................ [ 59%]
+........................................................................ [ 60%]
+........................................................................ [ 60%]
+........................................................................ [ 61%]
+........................................................................ [ 62%]
+........................................................................ [ 62%]
+........................................................................ [ 63%]
+........................................................................ [ 64%]
+........................................................................ [ 64%]
+........................................................................ [ 65%]
+........................................................................ [ 66%]
+........................................................................ [ 66%]
+........................................................................ [ 67%]
+........................................................................ [ 68%]
+........................................................................ [ 68%]
+........................................................................ [ 69%]
+........................................................................ [ 69%]
+........................................................................ [ 70%]
+........................................................................ [ 71%]
+........................................................................ [ 71%]
+........................................................................ [ 72%]
+........................................................................ [ 73%]
+........................................................................ [ 73%]
+........................................................................ [ 74%]
+........................................................................ [ 75%]
+........................................................................ [ 75%]
+........................................................................ [ 76%]
+........................................................................ [ 77%]
+........................................................................ [ 77%]
+........................................................................ [ 78%]
+........................................................................ [ 78%]
+........................................................................ [ 79%]
+........................................................................ [ 80%]
+........................................................................ [ 80%]
+........................................................................ [ 81%]
+........................................................................ [ 82%]
+........................................................................ [ 82%]
+........................................................................ [ 83%]
+........................................................................ [ 84%]
+........................................................................ [ 84%]
+........................................................................ [ 85%]
+........................................................................ [ 86%]
+........................................................................ [ 86%]
+........................................................................ [ 87%]
+........................................................................ [ 87%]
+........................................................................ [ 88%]
+........................................................................ [ 89%]
+........................................................................ [ 89%]
+........................................................................ [ 90%]
+.............................................................EEEEEEEEEEE [ 91%]
+EEEEEEEEEEEEEE....Esssssssssssssssssssssssssssssss...................... [ 91%]
+........................................................................ [ 92%]
+........................................................................ [ 93%]
+........................................................................ [ 93%]
+........................................................................ [ 94%]
+........................................................................ [ 95%]
+........................................................................ [ 95%]
+........................................................................ [ 96%]
+........................................................................ [ 96%]
+........................................................................ [ 97%]
+........................................................................ [ 98%]
+........................................................................ [ 98%]
+........................................................................ [ 99%]
+........................................................                 [100%]
+==================================== ERRORS ====================================
+__________ ERROR at setup of test_exact_package_inventory_is_accepted __________
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+_____ ERROR at setup of test_manifest_rejects_invalid_shapes[extra_field] ______
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+_____ ERROR at setup of test_manifest_rejects_invalid_shapes[wrong_format] _____
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+____ ERROR at setup of test_manifest_rejects_invalid_shapes[boolean_format] ____
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+_____ ERROR at setup of test_manifest_rejects_invalid_shapes[bad_version] ______
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+______ ERROR at setup of test_manifest_rejects_invalid_shapes[bad_source] ______
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+_______ ERROR at setup of test_manifest_rejects_invalid_shapes[bad_sha] ________
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+___ ERROR at setup of test_manifest_rejects_invalid_shapes[relative_python] ____
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+__ ERROR at setup of test_manifest_rejects_invalid_shapes[extra_python_field] __
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+__ ERROR at setup of test_manifest_rejects_invalid_shapes[duplicate_options] ___
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+___ ERROR at setup of test_manifest_rejects_invalid_shapes[unsorted_options] ___
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+______ ERROR at setup of test_manifest_rejects_invalid_shapes[traversal] _______
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+___ ERROR at setup of test_manifest_rejects_invalid_shapes[absolute_payload] ___
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+____ ERROR at setup of test_actual_filesystem_is_revalidated[extra_library] ____
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+_____ ERROR at setup of test_actual_filesystem_is_revalidated[extra_root] ______
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+___ ERROR at setup of test_actual_filesystem_is_revalidated[changed_library] ___
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+_____ ERROR at setup of test_actual_filesystem_is_revalidated[bad_soname] ______
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+______ ERROR at setup of test_actual_filesystem_is_revalidated[hardlink] _______
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+____ ERROR at setup of test_actual_filesystem_is_revalidated[file_symlink] _____
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+____ ERROR at setup of test_actual_filesystem_is_revalidated[root_symlink] _____
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+____ ERROR at setup of test_actual_filesystem_is_revalidated[writable_dir] _____
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+____ ERROR at setup of test_actual_filesystem_is_revalidated[writable_file] ____
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+__ ERROR at setup of test_actual_filesystem_is_revalidated[changed_launcher] ___
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+_____ ERROR at setup of test_actual_filesystem_is_revalidated[bad_digest] ______
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+___ ERROR at setup of test_actual_filesystem_is_revalidated[duplicate_json] ____
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+______ ERROR at setup of test_loaded_engine_is_not_inferred_from_manifest ______
+tests/test_sqlite_runtime_contract.py:40: in package
+    "extension_path": _sqlite3.__file__,
+E   AttributeError: module '_sqlite3' has no attribute '__file__'. Did you mean: '__name__'?
+- generated xml file: /tmp/arkscope-prebuilt-compat.oCmRRHrQ/full-valid/junit.xml -
+=========================== short test summary info ============================
+ERROR tests/test_sqlite_runtime_contract.py::test_exact_package_inventory_is_accepted
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[extra_field]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[wrong_format]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[boolean_format]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[bad_version]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[bad_source]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[bad_sha]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[relative_python]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[extra_python_field]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[duplicate_options]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[unsorted_options]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[traversal]
+ERROR tests/test_sqlite_runtime_contract.py::test_manifest_rejects_invalid_shapes[absolute_payload]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[extra_library]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[extra_root]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[changed_library]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[bad_soname]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[hardlink]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[file_symlink]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[root_symlink]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[writable_dir]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[writable_file]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[changed_launcher]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[bad_digest]
+ERROR tests/test_sqlite_runtime_contract.py::test_actual_filesystem_is_revalidated[duplicate_json]
+ERROR tests/test_sqlite_runtime_contract.py::test_loaded_engine_is_not_inferred_from_manifest
+11147 passed, 43 skipped, 26 errors in 1394.16s (0:23:14)

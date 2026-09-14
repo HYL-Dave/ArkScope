@@ -98,7 +98,7 @@ After checking the process group belonged exclusively to the disposable bwrap
 run, it was terminated (exit 143); the parent and observed spawn workers were
 confirmed gone. Its source snapshot was retired locally. The faulty entry is
 retained only as [non-executable historical text](checks/invalid-runner.txt);
-[the invalid log](reports/INVALID-full.log.gz) is not an acceptance report.
+[the invalid log](reports/INVALID-full.txt.gz) is not an acceptance report.
 
 The corrected runner executes pytest only from `main()` under the standard
 guard. Loading it as `__mp_main__` was checked to leave pytest unimported, cwd
