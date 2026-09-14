@@ -118,6 +118,11 @@ request target only: it does not discover account entitlements, report an
 effective shorter REST window, persist a first-run interval for retries, or
 guarantee fourteen days of returned data. Those parts of the policy remain open.
 
+Fresh acceptance and exact limits are recorded in the
+[shared-target closeout](../superpowers/evidence/2026-09-14-news-bootstrap-policy/README.md):
+11,114 backend cases passed, 12 unchanged skips; the new 48 cases cover the
+bounded request-target contract without removing any existing tests.
+
 [Massive's News endpoint](https://massive.com/docs/rest/stocks/news) currently
 documents date filters, continuation via `next_url`, and history access exceeding
 the fourteen-day target even for its Basic plan. That public contract supports

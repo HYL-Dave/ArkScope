@@ -1,0 +1,161 @@
+{
+  "files": [
+    {
+      "bytes": 178329,
+      "path": "news-source-before.json",
+      "sha256": "21c228221d77f8960b214460671756a5550c3398db617ef247194cc4bcfe3f66",
+      "source_sha256": "21c228221d77f8960b214460671756a5550c3398db617ef247194cc4bcfe3f66"
+    },
+    {
+      "bytes": 178329,
+      "path": "news-source-after.json",
+      "sha256": "21c228221d77f8960b214460671756a5550c3398db617ef247194cc4bcfe3f66",
+      "source_sha256": "21c228221d77f8960b214460671756a5550c3398db617ef247194cc4bcfe3f66"
+    },
+    {
+      "bytes": 11693,
+      "path": "news-validation.json",
+      "sha256": "8c7df666d7f6eb78aa84e71c5e581390beba62daafe3d2c735ddfce8406c6946",
+      "source_sha256": "8c7df666d7f6eb78aa84e71c5e581390beba62daafe3d2c735ddfce8406c6946"
+    },
+    {
+      "bytes": 909,
+      "path": "news-review.md",
+      "sha256": "ded4dd313da72a0ff37494c8606bd4d12ec828d3ef8ed1914e2904bb27c342b2",
+      "source_sha256": "ded4dd313da72a0ff37494c8606bd4d12ec828d3ef8ed1914e2904bb27c342b2"
+    },
+    {
+      "bytes": 606059,
+      "path": "news-census.json.gz",
+      "sha256": "1dd20bdff918e6c48a6ad58e09619c2c304fc0553a08722898ff2d00626edc53",
+      "source_sha256": "1dd20bdff918e6c48a6ad58e09619c2c304fc0553a08722898ff2d00626edc53"
+    },
+    {
+      "bytes": 3644,
+      "path": "run_checks.py",
+      "sha256": "1236c33f53c675c2ed2d783dacceb41a22ced47f043785af30c16fdcba535ed6",
+      "source_sha256": "1236c33f53c675c2ed2d783dacceb41a22ced47f043785af30c16fdcba535ed6"
+    },
+    {
+      "bytes": 2570,
+      "path": "offline_pytest.py",
+      "sha256": "4c74153e1ef86c35f7bbc923586de624c0ffe3f577c2853e6e4c0a78426c95ff",
+      "source_sha256": "4c74153e1ef86c35f7bbc923586de624c0ffe3f577c2853e6e4c0a78426c95ff"
+    },
+    {
+      "bytes": 479,
+      "path": "offline_node.cjs",
+      "sha256": "35f45243a42cf069225ff91e726779333c33bb9a3abc4c1f694404c3810b728b",
+      "source_sha256": "35f45243a42cf069225ff91e726779333c33bb9a3abc4c1f694404c3810b728b"
+    },
+    {
+      "bytes": 3218,
+      "path": "run_census.py",
+      "sha256": "fb84ea83f32c43e357c6f73350b745ae9e4f50820e30f5ac18ccb331d441c28b",
+      "source_sha256": "fb84ea83f32c43e357c6f73350b745ae9e4f50820e30f5ac18ccb331d441c28b"
+    },
+    {
+      "bytes": 2931,
+      "path": "maintenance_freeze.py",
+      "sha256": "6e7f8046981dfb26de2ccd21dc586f34abbcf3f14913b5062b7e7eecefcca286",
+      "source_sha256": "6e7f8046981dfb26de2ccd21dc586f34abbcf3f14913b5062b7e7eecefcca286"
+    },
+    {
+      "bytes": 6556,
+      "path": "maintenance_validate.py",
+      "sha256": "b5527f03be5185049109e2aba767e1efc641874d4d30a18225eb17e647c8c9a0",
+      "source_sha256": "b5527f03be5185049109e2aba767e1efc641874d4d30a18225eb17e647c8c9a0"
+    },
+    {
+      "bytes": 2115,
+      "path": "archive_news_checks.py",
+      "sha256": "461d502fedde0d819f3514a61a0e7e05677035d8409d868ce6ad61da8a49ff9e",
+      "source_sha256": "461d502fedde0d819f3514a61a0e7e05677035d8409d868ce6ad61da8a49ff9e"
+    },
+    {
+      "bytes": 1177,
+      "path": "news-bootstrap-red/command.json",
+      "sha256": "6764511036853340490a2246c364ed234d20d854823fb70df060de3f600057b9",
+      "source_sha256": "6764511036853340490a2246c364ed234d20d854823fb70df060de3f600057b9"
+    },
+    {
+      "bytes": 648,
+      "path": "news-bootstrap-red/output.log.gz",
+      "sha256": "e459c3b731d9c9bee1709243c4aed3c976221643a386aeb36bad711981ef1e62",
+      "source_sha256": "2ea10639f0ec8a52cbd7fc97551a2b1b17d3b461e188a387d44ad8e6cfe17b8b"
+    },
+    {
+      "bytes": 648,
+      "path": "news-bootstrap-red/results.xml.gz",
+      "sha256": "3f88d1ba8afbc5533fefa0056210351d5177f4479986e8f63f9128c4dae13bea",
+      "source_sha256": "8c11439d9375b6029a5e9ca25f659a0963b18fa1202cdb33a0a801b60b9410ef"
+    },
+    {
+      "bytes": 1189,
+      "path": "news-bootstrap-green/command.json",
+      "sha256": "9ff50107112841af822ace2bebc4e63ac2e5af679495c24abbcc0afa1151a81b",
+      "source_sha256": "9ff50107112841af822ace2bebc4e63ac2e5af679495c24abbcc0afa1151a81b"
+    },
+    {
+      "bytes": 166,
+      "path": "news-bootstrap-green/output.log.gz",
+      "sha256": "44380fa0ea50f3b0977520629dba8461caf822d1f1facd707d95e12597a4bb31",
+      "source_sha256": "f0e9eadb3f8ae43ac648a927c83c9575d266ac08ce9a1bcf5ba47cea29609a5f"
+    },
+    {
+      "bytes": 298,
+      "path": "news-bootstrap-green/results.xml.gz",
+      "sha256": "025609fcf8145d725fa55c7f4c376df1b9ee2a45e27a69a0c357cfd162668916",
+      "source_sha256": "22176a39f3419e9c8135dbb408817c0593a5e6596979548879a565101f802d91"
+    },
+    {
+      "bytes": 1545,
+      "path": "news-bootstrap-controls/command.json",
+      "sha256": "e6681d5628a3f6be2fe78df416401bd08983e3c1609dbba04ad81e7620815657",
+      "source_sha256": "e6681d5628a3f6be2fe78df416401bd08983e3c1609dbba04ad81e7620815657"
+    },
+    {
+      "bytes": 192,
+      "path": "news-bootstrap-controls/output.log.gz",
+      "sha256": "8d54781e5c915158d93bb01e7f12e1a11988cd8fb50aeecc4a2cc0b999f5baaa",
+      "source_sha256": "acf9487c6a957ac626b00a8ff6bc667395b97531194751c6a9b597bf2422a8ca"
+    },
+    {
+      "bytes": 6184,
+      "path": "news-bootstrap-controls/results.xml.gz",
+      "sha256": "b07ae488a8b05c0cb8213791700f602cac31cdc813af8a15bb0bc52d7d096db5",
+      "source_sha256": "b9989b019814d398ecbebef45e336e6aa1a1b85d891fcfd47f43db4bbebcd3db"
+    },
+    {
+      "bytes": 1017,
+      "path": "news-collection/command.json",
+      "sha256": "ebb01073c5765fb98653b3f430644a62763378cd6a31236e5d74b8a512461baa",
+      "source_sha256": "ebb01073c5765fb98653b3f430644a62763378cd6a31236e5d74b8a512461baa"
+    },
+    {
+      "bytes": 163038,
+      "path": "news-collection/output.log.gz",
+      "sha256": "ec2abbf2dba680ae8d0d76e58279da3347560ab443ca3af40625f56d344d149f",
+      "source_sha256": "15f6d654ea61b993e3ec51ddd57dabe5b9523c66f7af4fad2b73f55c8f6f9cdb"
+    },
+    {
+      "bytes": 1147,
+      "path": "news-backend-full/command.json",
+      "sha256": "1f6d286245bfe60c4a97e2288d328e01be46977162b163856caf491f872d376b",
+      "source_sha256": "1f6d286245bfe60c4a97e2288d328e01be46977162b163856caf491f872d376b"
+    },
+    {
+      "bytes": 502,
+      "path": "news-backend-full/output.log.gz",
+      "sha256": "1e677ce76befc3768927d76817c9422011bd44868e7ff00ac36928a9abf55b0a",
+      "source_sha256": "f54ec0b16aa67088cc25ccde2586401be5db332173483dd27ae24f3d3461e8bc"
+    },
+    {
+      "bytes": 187571,
+      "path": "news-backend-full/results.xml.gz",
+      "sha256": "716c41b8b65c9f7861c91f28f02cea7302d22f5ab283bd925a262723a30e1b47",
+      "source_sha256": "cd67ec9fb191d8ef20abc3a27ceac60d4c2af083e093dfa5e66ab9e546724cbe"
+    }
+  ],
+  "format": 1
+}
