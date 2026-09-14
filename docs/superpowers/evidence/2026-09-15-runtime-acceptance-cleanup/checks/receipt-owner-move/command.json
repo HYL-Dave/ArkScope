@@ -1,0 +1,26 @@
+{
+  "name": "receipt-owner-move",
+  "command": [
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/package/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/offline_pytest.py",
+    "-q",
+    "tests/test_security_lifecycle_schema.py::test_incomplete_receipt_blocks_all_lifecycle_writes",
+    "tests/test_security_lifecycle_migration.py::test_incomplete_receipt_blocks_all_lifecycle_writes",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/receipt-owner-move/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 0.897,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/receipt-owner-move",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/receipt-owner-move/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "ARKSCOPE_TEST_SQLITE_ARCHIVE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/sqlite-src-3530400.zip"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/receipt-owner-move/output.log"
+}

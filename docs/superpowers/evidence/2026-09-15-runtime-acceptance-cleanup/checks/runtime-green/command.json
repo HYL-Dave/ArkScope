@@ -1,0 +1,28 @@
+{
+  "name": "runtime-green",
+  "command": [
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/package/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/offline_pytest.py",
+    "-q",
+    "tests/test_sqlite_runtime_contract.py",
+    "tests/test_sqlite_runtime_build.py",
+    "tests/test_sqlite_runtime_launch.py",
+    "tests/test_sqlite_runtime_startup.py",
+    "--junitxml=/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/runtime-green/results.xml"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 32.24,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/runtime-green",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/runtime-green/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei",
+    "ARKSCOPE_TEST_SQLITE_ARCHIVE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/sqlite-src-3530400.zip"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/runtime-green/output.log"
+}

@@ -1,0 +1,496 @@
+{
+  "added": [
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_abandoned_leaf_is_physically_absent[src/security_lifecycle_automation_migration.py]"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_abandoned_leaf_is_physically_absent[src/security_lifecycle_migration.py]"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_abandoned_leaf_is_physically_absent[src/ticker_identity_migration.py]"
+    ],
+    [
+      "tests.test_security_lifecycle_schema",
+      "test_incomplete_receipt_blocks_all_lifecycle_writes"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_missing_archive_is_not_selected_runtime_acceptance[selected-required]"
+    ],
+    [
+      "tests.test_sqlite_runtime_launch",
+      "test_missing_archive_is_not_selected_runtime_acceptance[unmanaged-skip]"
+    ]
+  ],
+  "approved_retired_modules": [
+    "tests.test_security_lifecycle_automation_migration",
+    "tests.test_security_lifecycle_migration",
+    "tests.test_ticker_identity_migration"
+  ],
+  "backend": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 11204,
+    "skipped": 12
+  },
+  "baseline": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 11238,
+    "skipped": 12
+  },
+  "baseline_junit_gzip_sha256": "494dc2885a06eb87766d9e2c8879aab69036a4dac528fe054abac494da0f925e",
+  "checks": {
+    "actual_loaded_engine_matches_manifest": true,
+    "actual_loaded_library_is_package": true,
+    "actual_package_selector_used": true,
+    "artifact_tests_explicitly_enabled": true,
+    "collected_equals_executed": true,
+    "complete_commands_succeeded": true,
+    "explicit_tests_directory": true,
+    "final_package_payload_hashes_match": true,
+    "immutable_source_anchor_matches": true,
+    "maintenance_operation_and_citation_regression_suites_ran": true,
+    "no_backend_failures_or_errors": true,
+    "no_duplicate_nodes": true,
+    "no_source_runtime_or_runner_drift": true,
+    "only_exact_approved_modules_removed": true,
+    "retained_safety_owners_ran": true,
+    "retired_modules_existed_in_baseline": true,
+    "selection_verified": true,
+    "unchanged_skip_ids": true
+  },
+  "collected": 11216,
+  "collection_run": "final-collect",
+  "executed": 11216,
+  "junit_sha256": "77f181d2c63a1335e73cbc57214a6ea328bd94d842ebb9d303f4276e47d643e6",
+  "limit": "Selected Linux runtime acceptance and three obsolete C15 bundle removals only; not production activation, C15/C20 full closure, data disposal or sandbox admission.",
+  "new_suites": {
+    "test_sec_research_citations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 143,
+      "skipped": 0
+    },
+    "test_sec_research_cli": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 36,
+      "skipped": 0
+    },
+    "test_sec_research_maintenance": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 60,
+      "skipped": 0
+    },
+    "test_sec_research_operation_admission": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 28,
+      "skipped": 0
+    },
+    "test_sec_research_operations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 73,
+      "skipped": 0
+    },
+    "test_sec_research_references": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 47,
+      "skipped": 0
+    },
+    "test_sec_research_schema_admin": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 52,
+      "skipped": 0
+    },
+    "test_sec_research_trace": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 75,
+      "skipped": 0
+    },
+    "test_security_lifecycle_schema": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 6,
+      "skipped": 0
+    },
+    "test_sqlite_runtime_build": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_sqlite_runtime_contract": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 30,
+      "skipped": 0
+    },
+    "test_sqlite_runtime_launch": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 31,
+      "skipped": 0
+    },
+    "test_sqlite_runtime_startup": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    }
+  },
+  "removed": [
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_backup_and_restore_are_bound_and_fail_before_target_mutation"
+    ],
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_fault_injection_rolls_back_every_ddl_and_row_change"
+    ],
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_mapping_assigns_legacy_acceptance_without_inventing_automation_provenance"
+    ],
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_mapping_preserves_every_legacy_lifecycle_row_and_four_accepted_assessments"
+    ],
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_mapping_preserves_manual_evidence_and_attended_transition_authority"
+    ],
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_migration_rebuilds_exact_owned_components_and_preserves_unrelated_rows"
+    ],
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_migration_revalidates_owned_digest_under_begin_immediate"
+    ],
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_preflight_is_read_only_deterministic_and_hashes_only_owned_components"
+    ],
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_preflight_rejects_stored_tavily_or_retired_web_evidence_before_writes"
+    ],
+    [
+      "tests.test_security_lifecycle_automation_migration",
+      "test_public_automation_migration_paths_are_keyword_only_and_have_no_defaults"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_incomplete_receipt_blocks_all_lifecycle_writes"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_legacy_relationship_and_review_schema_is_absent_after_migration"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_legacy_row_mapping_is_complete_deterministic_and_stably_sorted"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_collapses_ccl_only_after_core_fields_match"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_manifest_limits_changes_to_authorized_tables"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_maps_ambiguous_transfer_review_without_inventing_precision"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_maps_inactive_review_without_synthesizing_a_proposal"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_preflight_maps_37_rows_to_36_observations_37_kinds_and_4_reviews"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_preserves_every_source_field_kind_date_and_old_row_mapping"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_receipt_binds_market_snapshot_hash_and_complete_case_keys"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_rejects_conflicting_duplicate_fields_kinds_or_reviews"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_rejects_nonempty_relationship_table_before_either_store_changes"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_rejects_unknown_review_and_nul_identity_before_either_store_changes"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_restore_requires_both_databases_before_reopen"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_resumes_after_phase_one_without_duplicate_profile_rows"
+    ],
+    [
+      "tests.test_security_lifecycle_migration",
+      "test_migration_resumes_after_phase_two_and_verifies_cross_store_keys"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_backup_is_logically_bound_and_restore_fails_before_target_mutation"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_interrupted_ddl_rolls_back_all_identity_tables"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_malformed_preexisting_identity_component_stops_fail_closed[changed]"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_malformed_preexisting_identity_component_stops_fail_closed[extended]"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_malformed_preexisting_identity_component_stops_fail_closed[partial]"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_migration_does_not_recreate_profile_removed_after_preflight"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_migration_is_additive_exact_and_idempotent"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_migration_is_profile_path_scoped_and_network_free"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_migration_rejects_stale_approval_before_any_schema_change"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_preflight_is_read_only_deterministic_and_reports_exact_profile_shape"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_public_migration_paths_are_keyword_only_and_have_no_defaults"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_restore_fsyncs_copy_and_parent_before_reporting_success"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_restore_rechecks_sidecars_after_copy_before_install"
+    ],
+    [
+      "tests.test_ticker_identity_migration",
+      "test_restore_refuses_an_existing_idle_database_without_sidecars"
+    ]
+  ],
+  "retained_safety_owners": {
+    "test_api_fixed_dispatch_pins_complete_selection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0
+    },
+    "test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_failed_generation_redacts_selected_key_after_activation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_incomplete_receipt_blocks_all_lifecycle_writes": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 1,
+      "skipped": 0
+    },
+    "test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_openai_retry_key_echo_is_private_without_changing_retry_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_original_oauth_id_can_refresh_normally_without_reselection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    }
+  },
+  "seconds": 1493.359,
+  "selected_runtime": {
+    "engine": {
+      "compile_options": [
+        "ATOMIC_INTRINSICS=1",
+        "COMPILER=gcc-11.4.0",
+        "DEFAULT_AUTOVACUUM",
+        "DEFAULT_CACHE_SIZE=-2000",
+        "DEFAULT_FILE_FORMAT=4",
+        "DEFAULT_JOURNAL_SIZE_LIMIT=-1",
+        "DEFAULT_MMAP_SIZE=0",
+        "DEFAULT_PAGE_SIZE=4096",
+        "DEFAULT_PCACHE_INITSZ=20",
+        "DEFAULT_RECURSIVE_TRIGGERS",
+        "DEFAULT_SECTOR_SIZE=4096",
+        "DEFAULT_SYNCHRONOUS=2",
+        "DEFAULT_WAL_AUTOCHECKPOINT=1000",
+        "DEFAULT_WAL_SYNCHRONOUS=2",
+        "DEFAULT_WORKER_THREADS=0",
+        "DIRECT_OVERFLOW_READ",
+        "ENABLE_COLUMN_METADATA",
+        "ENABLE_DBSTAT_VTAB",
+        "ENABLE_FTS3",
+        "ENABLE_FTS3_PARENTHESIS",
+        "ENABLE_FTS3_TOKENIZER",
+        "ENABLE_FTS4",
+        "ENABLE_FTS5",
+        "ENABLE_MATH_FUNCTIONS",
+        "ENABLE_PREUPDATE_HOOK",
+        "ENABLE_RTREE",
+        "ENABLE_SESSION",
+        "ENABLE_STMTVTAB",
+        "ENABLE_UNLOCK_NOTIFY",
+        "ENABLE_UPDATE_DELETE_LIMIT",
+        "HAVE_ISNAN",
+        "LIKE_DOESNT_MATCH_BLOBS",
+        "MALLOC_SOFT_LIMIT=1024",
+        "MAX_ATTACHED=10",
+        "MAX_COLUMN=2000",
+        "MAX_COMPOUND_SELECT=500",
+        "MAX_DEFAULT_PAGE_SIZE=32768",
+        "MAX_EXPR_DEPTH=1000",
+        "MAX_FUNCTION_ARG=127",
+        "MAX_LENGTH=1000000000",
+        "MAX_LIKE_PATTERN_LENGTH=50000",
+        "MAX_MMAP_SIZE=0x7fff0000",
+        "MAX_PAGE_COUNT=1073741823",
+        "MAX_PAGE_SIZE=65536",
+        "MAX_SCHEMA_RETRY=25",
+        "MAX_SQL_LENGTH=1000000000",
+        "MAX_TRIGGER_DEPTH=1000",
+        "MAX_VARIABLE_NUMBER=250000",
+        "MAX_VDBE_OP=250000000",
+        "MAX_WORKER_THREADS=8",
+        "MUTEX_PTHREADS",
+        "OMIT_LOOKASIDE",
+        "SECURE_DELETE",
+        "SOUNDEX",
+        "SYSTEM_MALLOC",
+        "TEMP_STORE=1",
+        "THREADSAFE=1",
+        "USE_URI"
+      ],
+      "source_id": "2026-07-24 19:02:57 bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc",
+      "version": "3.53.4"
+    },
+    "library": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/package/lib/libsqlite3.so.3.53.4",
+    "python": "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "selection": {
+      "library": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-acceptance-gate/package/lib/libsqlite3.so.3.53.4",
+      "manifest_sha256": "6bcf7a2d170d7d8aae4c6a9ade2d844c934eb361932020f2dc0165ec4feb53b3",
+      "source_id": "2026-07-24 19:02:57 bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc",
+      "status": "verified",
+      "version": "3.53.4"
+    }
+  },
+  "skipped": [
+    [
+      "tests.test_detailed_financials.TestLiveTechMetrics",
+      "test_nvda_tech_metrics"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_basic_stock_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_connection"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_iv_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_filter"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_quote"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_volume_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_put_call_ratio_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_scanner_parameters"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_unusual_activity"
+    ],
+    [
+      "tests.test_option_chain_tools.TestLiveOptionChain",
+      "test_spy_option_chain"
+    ],
+    [
+      "tests.test_peer_comparison.TestLivePeerComparison",
+      "test_nvda_peer_comparison"
+    ]
+  ],
+  "source_anchor": "d208eeb762d8275dc3d0abdf65d5e504d2a608e4",
+  "source_collection_sha256": "cb2fda1db34e143b1aa1f0f58c8b518fc78489c4fdade4b6ed9e7f5b0b8c801b",
+  "source_drift": [],
+  "source_files": 1163,
+  "source_snapshot_after": "full-after.json",
+  "source_snapshot_before": "full-before.json",
+  "unmanaged_freeze_sqlite": "3.37.2"
+}

@@ -80,6 +80,13 @@ selector was inspected or switched. Follow
 stopped-writer backup/integrity/activation window. A prepared package does not
 mean the running App is upgraded or its retained databases have been checked.
 
+The September 15 [acceptance/cleanup follow-up](../superpowers/evidence/2026-09-15-runtime-acceptance-cleanup/README.md)
+now rejects missing source archives in selected-runtime artifact acceptance.
+Its single full backend passed 11,204 cases with twelve unchanged skips; all
+31 artifact cases executed. Production startup with both selection variables
+absent is still an activation blocker: implement an independent durable
+production requirement before switching, not another optional wrapper variable.
+
 ### Internal Analysis Library And Sandbox Ownership
 
 The user clarified that retaining `src/tools/code_executor.py` was transitional:
@@ -245,11 +252,15 @@ and RED-first owners before changing these shared contracts.
    recent-source policy work, not implied by the CLI cleanup.
 2. Linux runtime preparation and selected-process startup checks are CLOSED at
    `292ef27f`; final artifact/full-backend evidence is linked above. Arrange the
-   production cutover separately. C15/C20 source cleanup remains independent.
+   production cutover separately, after closing the unselected-production
+   startup blocker in the runtime runbook. C15/C20 cleanup remains independent.
 3. SA Open-first initialization: a separate scoped follow-up; preserve current
    collection while proving new targeting and explicit unfinished work.
-4. Finish remaining C15/C20 retained-data/ownership decisions before claiming all
-   cleanup complete. Cross-platform and Python sandbox remain deferred.
+4. Three additional C15 migration/recovery bundles are physically removed at
+   `d208eeb7`; current write guards and recovery are preserved. Finish the
+   remaining evidence-script/helper chains and C20 retained-data disposition
+   before claiming all cleanup complete. Cross-platform and Python sandbox
+   remain deferred.
 
 Suggested behavioral owners for the subsequent plans: existing
 `tests/test_news_providers.py`, `tests/test_news_normalized_provider_adapters.py`,
