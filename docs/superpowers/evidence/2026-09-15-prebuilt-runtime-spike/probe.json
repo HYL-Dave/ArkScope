@@ -1,0 +1,256 @@
+{
+  "scope": "Disposable prebuilt feasibility probe only; no App imports, project dependency installation, production data access, or deployment.",
+  "source_revision": "8ef04a605b766efc7f3fc06a4bb2346aa34fb83d",
+  "artifact": {
+    "publisher": "astral-sh/python-build-standalone",
+    "release": "20260901",
+    "release_url": "https://github.com/astral-sh/python-build-standalone/releases/tag/20260901",
+    "published_at": "2026-09-01T17:48:48Z",
+    "name": "cpython-3.10.21+20260901-x86_64-unknown-linux-gnu-install_only.tar.gz",
+    "download_url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.10.21%2B20260901-x86_64-unknown-linux-gnu-install_only.tar.gz",
+    "bytes": 43730914,
+    "release_asset_sha256": "73cc92db5e6fb07ba611dca3709956d57cc2ed74ebcc01515b550ea89dfe9cba",
+    "downloaded_sha256": "73cc92db5e6fb07ba611dca3709956d57cc2ed74ebcc01515b550ea89dfe9cba",
+    "hash_verified_before_extraction": true,
+    "local_compilation": false
+  },
+  "isolation": {
+    "tool": "bwrap",
+    "namespaces": "--unshare-all",
+    "network": "unshared during extraction and execution",
+    "environment": "--clearenv; PATH=/usr/bin:/bin; HOME=/tmp; Python -I -S -B",
+    "extraction": "Only newly created scratch directory writable; system /usr and loader cache read-only; no home, App source, selectors or production data mounted.",
+    "execution": "Candidate and archived reproducer read-only; system /usr and loader cache read-only; disposable /tmp tmpfs; no home, App source, selectors or production data mounted.",
+    "sqlite_database_targets": [
+      ":memory:"
+    ],
+    "loader_override": false
+  },
+  "archived_reproducer": {
+    "path": "docs/superpowers/evidence/2026-09-11-sec-structured-source-core/sqlite_upsert_repro.py",
+    "git_blob": "cd2a0e50f7c23a9a89e750b8b4780415f7259a64",
+    "subprocess_exit_code": 0,
+    "result": {
+      "cases": [
+        {
+          "classification": "pass",
+          "error": null,
+          "indexed_count": 2,
+          "integrity_check": [
+            "ok"
+          ],
+          "journal_mode": "memory",
+          "name": "upstream_replace_duplicate",
+          "quick_check": [
+            "ok"
+          ],
+          "role": "reproducer",
+          "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY ON CONFLICT REPLACE,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nREPLACE INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2 ON CONFLICT(c2) DO UPDATE SET c1=c1,c2=c1;",
+          "sqlite_source_id": "2026-05-05 10:34:17 c88b22011a54b4f6fbd149e9f8e4de77658ce58143a1af0e3785e4e6475127e9",
+          "sqlite_version": "3.53.1",
+          "table_count": 2,
+          "table_rows": [
+            [
+              0,
+              11
+            ],
+            [
+              11,
+              22
+            ]
+          ]
+        },
+        {
+          "classification": "pass",
+          "error": null,
+          "indexed_count": 2,
+          "integrity_check": [
+            "ok"
+          ],
+          "journal_mode": "memory",
+          "name": "insert_schema_replace_duplicate",
+          "quick_check": [
+            "ok"
+          ],
+          "role": "reproducer",
+          "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY ON CONFLICT REPLACE,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nINSERT INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2 ON CONFLICT(c2) DO UPDATE SET c1=c1,c2=c1;",
+          "sqlite_source_id": "2026-05-05 10:34:17 c88b22011a54b4f6fbd149e9f8e4de77658ce58143a1af0e3785e4e6475127e9",
+          "sqlite_version": "3.53.1",
+          "table_count": 2,
+          "table_rows": [
+            [
+              0,
+              11
+            ],
+            [
+              11,
+              22
+            ]
+          ]
+        },
+        {
+          "classification": "pass",
+          "error": null,
+          "indexed_count": 2,
+          "integrity_check": [
+            "ok"
+          ],
+          "journal_mode": "memory",
+          "name": "insert_or_replace_duplicate",
+          "quick_check": [
+            "ok"
+          ],
+          "role": "reproducer",
+          "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nINSERT OR REPLACE INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2 ON CONFLICT(c2) DO UPDATE SET c1=c1,c2=c1;",
+          "sqlite_source_id": "2026-05-05 10:34:17 c88b22011a54b4f6fbd149e9f8e4de77658ce58143a1af0e3785e4e6475127e9",
+          "sqlite_version": "3.53.1",
+          "table_count": 2,
+          "table_rows": [
+            [
+              0,
+              11
+            ],
+            [
+              11,
+              22
+            ]
+          ]
+        },
+        {
+          "classification": "pass",
+          "error": null,
+          "indexed_count": 2,
+          "integrity_check": [
+            "ok"
+          ],
+          "journal_mode": "memory",
+          "name": "replace_single_clause",
+          "quick_check": [
+            "ok"
+          ],
+          "role": "control",
+          "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY ON CONFLICT REPLACE,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nREPLACE INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2;",
+          "sqlite_source_id": "2026-05-05 10:34:17 c88b22011a54b4f6fbd149e9f8e4de77658ce58143a1af0e3785e4e6475127e9",
+          "sqlite_version": "3.53.1",
+          "table_count": 2,
+          "table_rows": [
+            [
+              0,
+              11
+            ],
+            [
+              11,
+              22
+            ]
+          ]
+        },
+        {
+          "classification": "pass",
+          "error": null,
+          "indexed_count": 2,
+          "integrity_check": [
+            "ok"
+          ],
+          "journal_mode": "memory",
+          "name": "insert_single_clause",
+          "quick_check": [
+            "ok"
+          ],
+          "role": "control",
+          "sql": "CREATE TABLE v0(c1 INTEGER PRIMARY KEY ON CONFLICT REPLACE,c2 UNIQUE);\nINSERT INTO v0 VALUES(0,33),(11,22);\nINSERT INTO v0 VALUES(0,11) ON CONFLICT(c2) DO UPDATE SET c1=c2,c2=c2;",
+          "sqlite_source_id": "2026-05-05 10:34:17 c88b22011a54b4f6fbd149e9f8e4de77658ce58143a1af0e3785e4e6475127e9",
+          "sqlite_version": "3.53.1",
+          "table_count": 2,
+          "table_rows": [
+            [
+              0,
+              11
+            ],
+            [
+              11,
+              22
+            ]
+          ]
+        }
+      ],
+      "classification": "all_pass",
+      "error": null,
+      "exit_code": 0,
+      "python_executable": "/candidate/bin/python3",
+      "python_flags": {
+        "dont_write_bytecode": 1,
+        "isolated": 1,
+        "no_site": 1
+      },
+      "python_version": "3.10.21 (main, Sep  1 2026, 14:16:49) [Clang 22.1.3 ]",
+      "reproduction_command": "env -i PATH=/usr/bin:/bin /candidate/bin/python3 -I -S -B /repro.py",
+      "scope": "synthetic :memory: SQLite only; no App runtime or user-data assessment"
+    }
+  },
+  "memory_capability_probe": {
+    "compile_options": [
+      "ATOMIC_INTRINSICS=1",
+      "COMPILER=clang-22.1.3",
+      "DEFAULT_AUTOVACUUM",
+      "DEFAULT_CACHE_SIZE=-2000",
+      "DEFAULT_FILE_FORMAT=4",
+      "DEFAULT_JOURNAL_SIZE_LIMIT=-1",
+      "DEFAULT_MMAP_SIZE=0",
+      "DEFAULT_PAGE_SIZE=4096",
+      "DEFAULT_PCACHE_INITSZ=20",
+      "DEFAULT_RECURSIVE_TRIGGERS",
+      "DEFAULT_SECTOR_SIZE=4096",
+      "DEFAULT_SYNCHRONOUS=2",
+      "DEFAULT_WAL_AUTOCHECKPOINT=1000",
+      "DEFAULT_WAL_SYNCHRONOUS=2",
+      "DEFAULT_WORKER_THREADS=0",
+      "DIRECT_OVERFLOW_READ",
+      "ENABLE_DBSTAT_VTAB",
+      "ENABLE_FTS3",
+      "ENABLE_FTS3_PARENTHESIS",
+      "ENABLE_FTS4",
+      "ENABLE_FTS5",
+      "ENABLE_GEOPOLY",
+      "ENABLE_MATH_FUNCTIONS",
+      "ENABLE_PERCENTILE",
+      "ENABLE_RTREE",
+      "MALLOC_SOFT_LIMIT=1024",
+      "MAX_ATTACHED=10",
+      "MAX_COLUMN=2000",
+      "MAX_COMPOUND_SELECT=500",
+      "MAX_DEFAULT_PAGE_SIZE=8192",
+      "MAX_EXPR_DEPTH=1000",
+      "MAX_FUNCTION_ARG=1000",
+      "MAX_LENGTH=1000000000",
+      "MAX_LIKE_PATTERN_LENGTH=50000",
+      "MAX_MMAP_SIZE=0x7fff0000",
+      "MAX_PAGE_COUNT=0xfffffffe",
+      "MAX_PAGE_SIZE=65536",
+      "MAX_SQL_LENGTH=1000000000",
+      "MAX_TRIGGER_DEPTH=1000",
+      "MAX_VARIABLE_NUMBER=32766",
+      "MAX_VDBE_OP=250000000",
+      "MAX_WORKER_THREADS=8",
+      "MUTEX_PTHREADS",
+      "SYSTEM_MALLOC",
+      "TEMP_STORE=1",
+      "THREADSAFE=1"
+    ],
+    "decimal_text": true,
+    "fts5": true,
+    "integrity": "ok",
+    "json": true,
+    "python": "3.10.21",
+    "source_id": "2026-05-05 10:34:17 c88b22011a54b4f6fbd149e9f8e4de77658ce58143a1af0e3785e4e6475127e9",
+    "sqlite": "3.53.1",
+    "update_limit": false
+  },
+  "system_python_sqlite_after_probe": "3.37.2",
+  "limitations": [
+    "SQLite 3.53.1 is older than the reviewed upstream 3.53.4 release; no complete fixes assessment or production admission.",
+    "MAX_VARIABLE_NUMBER is 32766, not the old runtime verifier's 250000; real App workloads and batching still need review.",
+    "UPDATE ORDER BY LIMIT is unavailable; a textual source scan is not proof that all dynamically constructed SQL avoids this syntax.",
+    "No full App suite, project dependency/native extension checks, Desktop/SA/writer child acceptance, disposable WAL/backup tests, or production integrity checks were run.",
+    "The self-built runtime code and source-dependent tests remain unchanged; replacement/removal is pending."
+  ]
+}

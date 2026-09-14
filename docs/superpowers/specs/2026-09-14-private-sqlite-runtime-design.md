@@ -1,5 +1,12 @@
 # Private SQLite Runtime Preparation
 
+> **Superseded deployment direction, 2026-09-15.** This describes the historical
+> self-built package, not the current deployment target. The user approved
+> prebuilt-first evaluation and retreat from the custom build plan. Follow
+> [the current runtime policy](../../design/RUNTIME_AND_RECENT_COLLECTION_POLICY.md)
+> and [evaluation/removal boundary](../../design/SQLITE_RUNTIME_OPERATIONS.md).
+> Earlier evidence remains intact; replacement and production activation are open.
+
 This implements the approved SQLite section of
 `docs/design/RUNTIME_AND_RECENT_COLLECTION_POLICY.md` at `42b7ce93`.
 Linux only. Preparation is separate from production admission and activation.

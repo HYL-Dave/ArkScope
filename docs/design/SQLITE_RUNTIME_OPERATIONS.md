@@ -1,146 +1,118 @@
-# Private SQLite Runtime Operations
+# SQLite Runtime Evaluation And Operations
 
-Linux x86_64 preparation is implemented by `src.sqlite_runtime.build`.
-This is not production activation, a Python distribution, or a Python sandbox.
-The selected Python installation and its numpy/SDK dependencies remain separate.
+Status, 2026-09-15: the user approved reducing maintenance by preferring a
+prebuilt runtime and accepts replacing the self-built deployment plan. No
+replacement distribution/version is selected and no production switch is
+authorized. The current decision is in
+[Runtime And Recent Collection Policy](RUNTIME_AND_RECENT_COLLECTION_POLICY.md).
 
-The implemented preparation checkpoint is `292ef27f`. Its selected-runtime
-full backend passed 11,238 cases with twelve unchanged skips; the exact artifact,
-failed attempts and limitations are recorded in the
-[preparation receipt](../superpowers/evidence/2026-09-14-private-sqlite-runtime/README.md).
-This is not evidence that any installed App selector has switched.
+## What Changes
 
-The [September 15 follow-up](../superpowers/evidence/2026-09-15-runtime-acceptance-cleanup/README.md)
-passed 11,204 cases with the same twelve skips, including all 31 current artifact
-cases. It adds the missing-archive gate below and removes three obsolete
-migration bundles; it does not activate production or close the startup blocker.
+Do not continue preparation for activation of the custom SQLite-only library.
+Its build commands are no longer the installation instructions for ArkScope.
+Keep the installed App, Python/numpy/SDK environment, executable selectors and
+retained databases unchanged during candidate evaluation. This does not undo
+SEC features, completed cleanup or the archived SQLite defect reproducer.
 
-## Prepare A New Generation
+Evaluate maintained prebuilt CPython plus a project virtual environment first.
+This can preserve ordinary `import sqlite3` and reuse Desktop's `ARKSCOPE_PYTHON`
+and the SA native host's `python_path` instead of introducing another loader.
+Neither selector is changed in this step. Reuse the distribution manager's
+existing installation, checksum and package inventory facilities where possible;
+do not build a second manager around them.
 
-Requirements: existing Python 3.10+, `/usr/bin/cc`, GNU make, binutils `readelf`,
-coreutils (`readlink`, `dirname`, `sha256sum`, `stat`, `timeout`) and a local copy
-of the reviewed official source ZIP. No Python dependency installation is needed.
-Upstream's bundled JimTCL is built only inside the disposable build directory.
-No Tcl extension or SQLite CLI is installed.
+A prebuilt SQLite DBAPI wheel is another candidate, not an automatic standard
+library replacement. Its import/connection ownership, maintenance status and
+all writer subprocesses would need their own acceptance. Do not select it merely
+because it avoids a compiler. Do not silently compile a source distribution if
+the chosen platform/Python version has no matching binary.
 
-The current recipe accepts only the official `sqlite-src-3530400.zip` with
-SHA3-256 `b834d474b9b393d85a9e3ee4cc11f1329e007e9376a424ee740796f5c4bda3a8`.
-The archive is verified before source extraction or generator execution.
-The generated amalgamation includes the UPDATE/DELETE LIMIT grammar. Merely
-setting a C compiler flag on the default downloaded amalgamation does not.
-The upstream explanation is in
-[compile options](https://www.sqlite.org/compile.html#enable_update_delete_limit).
+## Candidate Acceptance
 
-From the reviewed source root, with deliberately supplied absolute paths:
+1. Record the publisher, artifact/version, platform/Python support, published
+   checksum and update process. Pin the candidate artifact without freezing
+   pre-release upgrades. Keep downloads/environments separate from installed
+   production paths; do not alter global PATH, shell profiles or loader settings.
+2. Probe the actual candidate interpreter's `sqlite3`, not a standalone CLI.
+   Record SQLite version/source ID/options and required fixes. Re-run the exact
+   archived UPSERT reproducer and disposable WAL, backup, FTS5, JSON, transaction,
+   foreign-key and precision checks. A version string is not complete acceptance;
+   a candidate is not required to reproduce every old distro compilation flag.
+3. Tie parameter limits and optional SQL grammar to real App consumers and
+   behavior tests before treating them as requirements. The old verifier's
+   `MAX_VARIABLE_NUMBER=250000` and UPDATE/DELETE LIMIT probes are not by themselves
+   evidence that every replacement must implement those exact choices. Do not
+   weaken required behavior or silently change SQL to make a candidate pass.
+4. Verify current dependencies in a disposable project environment, including
+   numpy/pandas and SDK/native extensions. Start from existing dependency versions;
+   any necessary Python minor/dependency change must be reported and reviewed,
+   not applied to the working environment as an incidental installer action.
+5. Prove Desktop, SA and current writer children resolve the same admitted engine
+   with preserved argv, cwd, signals and native-host stdout. Prove supported
+   production entrypoints cannot silently run on an unadmitted system engine.
+   Keep unmanaged development explicit without granting production-store access.
+6. Run full application acceptance serially against the supplied binary. No
+   SQLite archive or compiler is needed for binary acceptance. Report exactly
+   which behavioral owners run, move or are removed; no hidden skips to make a
+   replacement appear accepted. Full candidate acceptance has not run; the
+   narrower feasibility probe below is not a substitute.
 
-```bash
-python -m src.sqlite_runtime.build \
-  --archive /absolute/staging/sqlite-src-3530400.zip \
-  --destination /absolute/staging/new-generation \
-  --python /absolute/existing-venv/bin/python
-```
+## Limited Feasibility Probe, September 15
 
-The destination must not exist, including an empty directory or dangling
-symlink. It is not overwritten on retries. A failed preparation may leave an
-incomplete, never-selected destination; inspect it and use a new destination.
-The compiler/generator scratch is automatically removed. The tool does not
-delete old generations, modify executable selectors or automatically activate
-anything. Its successful output says `prepared_not_activated`.
+A disposable `python-build-standalone` 20260901 Linux x86_64 artifact was checked
+against its published SHA-256 before sandboxed extraction. Its Python 3.10.21
+loads SQLite 3.53.1 without compilation or a loader override. The unchanged
+archived UPSERT matrix passed all five cases; in-memory FTS5, JSON and decimal
+TEXT checks also passed. The system Python still reports SQLite 3.37.2.
+Artifact identity, isolation, raw matrix output and observed options are in
+[the probe receipt](../superpowers/evidence/2026-09-15-prebuilt-runtime-spike/probe.json).
 
-The package contains only `manifest.json`, `python`, `contract.py`, `launch.py`
-and a SQLite-only `lib/` with its relative SONAME symlink. Use the package's
-`python` as an executable selector. Source files can change without rebuilding
-this package unless the runtime contract/build recipe itself changes.
+This proves a no-local-build route, not App compatibility. The candidate has
+`MAX_VARIABLE_NUMBER=32766` and no UPDATE ORDER BY LIMIT grammar. A targeted text
+search outside the old runtime found no explicit occurrences, but does not prove
+dynamic SQL or parameter workloads fit. It also contains 3.53.1 rather than the
+newer 3.53.4 in [upstream release history](https://www.sqlite.org/changes.html).
+Review required fixes and actual consumers before admitting this or another
+candidate. No project dependencies, App tests, real entrypoints, WAL/backup tests
+or production stores were exercised. Nothing was deployed.
 
-```bash
-/absolute/staging/new-generation/python -c 'import sqlite3; print(sqlite3.sqlite_version)'
-/absolute/staging/new-generation/python -m src.daily_update --help
-```
+## Replacement And Removal Boundary
 
-The launcher verifies fixed bootstrap hashes, package inventory and interpreter
-identity, probes the actual loaded engine and execs the original Python CLI.
-Application imports recheck the selected engine. Fixed error codes on stderr
-stop startup; the native-host stdout protocol is not used for diagnostics.
-Hashing is bounded and rejects non-regular bootstrap files. Digests detect
-drift, not hostile code running with the installation owner's privileges.
+Current source at `8ef04a60` still contains `src/sqlite_runtime/build.py`,
+`contract.py`, `launch.py`, package initialization and the early check in
+`src/__init__.py`. The corresponding tests are `test_sqlite_runtime_build.py`,
+`test_sqlite_runtime_contract.py`, `test_sqlite_runtime_launch.py` and
+`test_sqlite_runtime_startup.py`. This policy revision changes none of them.
 
-## Supported Selectors And Scope
+Once the candidate passes, the replacement patch owns removing superseded
+self-build/custom-loader code and build-only tests, together with their obsolete
+archive environment variable and source-only acceptance gate. Do not retain a
+permanent fallback builder or forwarding aliases. Replace early engine checks
+and preserve real startup, corruption/mismatch, descendant and native-host
+behavioral tests in the same change; do not just delete their coverage.
 
-- Desktop: existing `ARKSCOPE_PYTHON` points to the package's `python` executable.
-  Do not put `LD_LIBRARY_PATH` on Electron/npm or in a shell profile.
-- SA: existing native-host JSON `python_path` points to the same generation's
-  selector. Its `project_root` and `host_script` remain unchanged. Reinstallation
-  of the extension can reset this field; verify the installed selector again.
-- Supported operator/test CLI: invoke the same selector explicitly. Scheduled
-  Python children inherit the pinned package and loader environment and recheck
-  when they import application code.
-- Plain unselected Python remains an unmanaged development path, not evidence
-  that the App-private runtime is active. The dormant analysis executor and
-  isolated provider CLI environments are not new-runtime writer coverage.
+The current launch-test fixture rebuilds its own disposable package and still
+requires `ARKSCOPE_TEST_SQLITE_ARCHIVE` when a custom runtime is selected. That
+is an existing self-build-test dependency, not a general requirement to execute
+SQLite. Its September 15 evidence remains valid for the old artifact only.
+Existing preparation commands and test receipts are retained in the
+[historical preparation evidence](../superpowers/evidence/2026-09-14-private-sqlite-runtime/README.md)
+and [acceptance evidence](../superpowers/evidence/2026-09-15-runtime-acceptance-cleanup/README.md),
+not as an active deployment recipe.
 
-Tests require an explicit `ARKSCOPE_TEST_SQLITE_ARCHIVE` to compile and exercise a
-disposable final artifact. Under a selected runtime, an absent archive now fails
-fixture setup with `selected-runtime acceptance requires the offline SQLite
-source archive`; it cannot produce a successful skipped acceptance run. Plain
-unmanaged development still reports an explicit skip. Neither path downloads
-the archive or automatically discovers an installed runtime. The selected path
-does verify its explicitly selected package; that is not a substitute for the
-source archive or disposable build. A skipped unmanaged run is not final-artifact
-acceptance. A supplied invalid archive fails the pinned hash check.
+## Production Window Remains Separate
 
-The artifact module currently contains 31 cases (the original 29 plus two
-missing-archive controls). Acceptance must collect and execute every current
-node in `tests/test_sqlite_runtime_launch.py`, with zero module skips. Record
-the source archive hash, selected package manifest, actual loaded engine, node
-identities and results, rather than relying on exit status or a historical count.
+After replacement acceptance and separate approval of the operational window,
+inventory supported writers/stores, stop writers, make coherent WAL-safe backups
+and run full integrity checks on verification copies before changing selectors.
+Retain referenced SEC content and recovery bindings. Do not use `immutable=1`
+on live WAL stores or silently repair data. No new production access is implied
+by the prebuilt-first decision.
 
-## Pre-Activation Blocker: Unselected Production Startup
+Verify actual App/SA/child engine identity before resuming writes. After resumed
+writes, changing an executable path alone is not proved rollback. No automatic
+fallback, REINDEX, VACUUM, schema reset or database deletion belongs to activation.
 
-`require_selected_runtime()` still returns `None` when both selection variables
-are absent. This preserves unmanaged development **before activation**; it does
-not prevent a production shortcut, direct Python command or service from
-bypassing the launcher. Selected-engine tests do not cover this gap.
-
-Do not activate production until a startup requirement independent of the
-launcher's inherited environment has been implemented and verified. The
-activation work must own a durable installation binding and an explicit
-production/development boundary. Another optional environment variable is not
-sufficient: bypassing the launcher would lose that variable too.
-
-The activation acceptance must demonstrate all of the following before any
-production writes resume:
-
-- Every supported production entrypoint refuses an absent or partial selection
-  before opening writable application stores, including Desktop, SA and writer
-  children. A correct selection still verifies the actual library and manifest.
-- Direct invocations and old shortcuts using the approved source tree, with
-  selection variables removed, fail visibly. Inventory any cron/service entry
-  as a separate launch path; do not infer coverage from Desktop alone.
-- Isolated tests/development remain usable without silently granting access to
-  production stores. Old source revisions outside this guard are not covered by
-  a new-source check; retire or explicitly exclude their writer entrypoints.
-- The exact offline source archive is available and all artifact cases execute.
-
-These are pending activation requirements, not implemented protections in the
-preparation checkpoint. The dormant analysis library remains separately scoped.
-
-## Activation Window Still Required
-
-The durable target is `~/.local/share/arkscope/runtimes/`. Preparing a package
-does not authorize writing that installation or inspecting private selectors.
-During the separately agreed window, inventory all supported writers/stores,
-stop API, browser native-host requests and standalone/maintenance workers, take
-exclusive coherent WAL-safe backups and run full integrity checks on verification
-copies. Retain SEC referenced content and the old source/selector bindings.
-Do not use `immutable=1` on live WAL stores, clobber backups or silently repair data.
-
-After the startup blocker above is closed, install a new generation, change
-both executable selectors, verify their actual loaded engines and resume writes
-on the approved source revision.
-After resumed writes, changing a selector alone is not a proved rollback. A
-restore/repair decision remains separate. No automatic fallback, REINDEX,
-VACUUM, schema reset or database deletion belongs to engine activation.
-
-Future stable SQLite releases require a new reviewed source hash/recipe and
-fresh artifact/engine tests. This is an upgradeable pre-release runtime, not a
-promise to keep 3.53.4 indefinitely. Windows/macOS admission is separate.
+Linux remains the initial target. Windows/macOS acceptance and the Python sandbox
+are separate workstreams; a publisher offering those binaries does not prove
+ArkScope support. Do not reconnect or widen the dormant analysis executor.
