@@ -1,0 +1,350 @@
+{
+  "added": [
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_abandoned_leaf_is_physically_absent[src/massive_config_migration.py]"
+    ],
+    [
+      "tests.test_abandoned_surface_cleanup",
+      "test_abandoned_leaf_is_physically_absent[src/security_lifecycle_retirement.py]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_actual_retained_translation_join_is_observed_without_importing_store"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_schema_expression_uses_its_assignment_time_enum_not_later_rebinding"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_static_quoted_enum_schema_keeps_joined_select_star_readers"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_static_schema_resolution_never_executes_product_module"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[class_scope]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[conditional_helper]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[conditional_sort]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[conversion]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[decorated]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[dynamic_enum]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[exception_binding]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[imported_frozenset]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[lazy_generator]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[local_enum]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[local_helper]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[match_capture]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[match_mapping]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[match_star]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[mutable_enum]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[rebound_helper]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[rebound_sort]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[same_assignment_walrus]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[side_effect]"
+    ],
+    [
+      "tests.test_repository_inventory",
+      "test_unproved_schema_expressions_remain_unknown[unknown_helper]"
+    ]
+  ],
+  "backend": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 11066,
+    "skipped": 12
+  },
+  "baseline": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 11050,
+    "skipped": 12
+  },
+  "baseline_junit_gzip_sha256": "00a28cc265ee9edb29078c745af89a693723c88791f78895fc9f67c8d1df49b7",
+  "checks": {
+    "collected_equals_executed": true,
+    "complete_commands_succeeded": true,
+    "explicit_tests_directory": true,
+    "immutable_source_anchor_matches": true,
+    "maintenance_operation_and_citation_regression_suites_ran": true,
+    "no_backend_failures_or_errors": true,
+    "no_duplicate_nodes": true,
+    "no_source_runtime_or_runner_drift": true,
+    "retained_safety_owners_ran": true,
+    "unchanged_skip_ids": true
+  },
+  "collected": 11078,
+  "collection_run": "collection",
+  "executed": 11078,
+  "junit_sha256": "1ace14ed1da31fa13f28071bcec5f28b40fc545d51ac5a04d3b7f84112093fad",
+  "limit": "Offline cleanup acceptance only: two C15 leaves, original i18n candidate disposition, and SQL JOIN census repair. Not complete C12/C15/C20 cleanup, database disposition, SQLite deployment, cross-platform admission, hand testing, or master merge.",
+  "new_suites": {
+    "test_abandoned_surface_cleanup": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 22,
+      "skipped": 0
+    },
+    "test_massive_config_authority": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_repository_inventory": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 59,
+      "skipped": 0
+    },
+    "test_sec_research_citations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 143,
+      "skipped": 0
+    },
+    "test_sec_research_cli": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 36,
+      "skipped": 0
+    },
+    "test_sec_research_maintenance": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 60,
+      "skipped": 0
+    },
+    "test_sec_research_operation_admission": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 28,
+      "skipped": 0
+    },
+    "test_sec_research_operations": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 73,
+      "skipped": 0
+    },
+    "test_sec_research_references": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 47,
+      "skipped": 0
+    },
+    "test_sec_research_schema_admin": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 52,
+      "skipped": 0
+    },
+    "test_sec_research_trace": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 75,
+      "skipped": 0
+    }
+  },
+  "removed": [
+    [
+      "tests.test_massive_config_authority",
+      "test_absent_or_current_only_migration_is_an_idempotent_noop[None]"
+    ],
+    [
+      "tests.test_massive_config_authority",
+      "test_absent_or_current_only_migration_is_an_idempotent_noop[massive]"
+    ],
+    [
+      "tests.test_massive_config_authority",
+      "test_apply_rejects_a_stale_preflight_under_the_write_lock"
+    ],
+    [
+      "tests.test_massive_config_authority",
+      "test_different_duplicate_fails_closed_without_writes"
+    ],
+    [
+      "tests.test_massive_config_authority",
+      "test_equal_duplicate_keeps_current_row_and_removes_legacy"
+    ],
+    [
+      "tests.test_massive_config_authority",
+      "test_legacy_only_row_moves_exactly_and_preserves_timestamp"
+    ],
+    [
+      "tests.test_tavily_retirement",
+      "test_preflight_accepts_empty_legacy_storage_without_writes"
+    ],
+    [
+      "tests.test_tavily_retirement",
+      "test_preflight_rejects_stored_tavily_evidence_with_exact_counts"
+    ],
+    [
+      "tests.test_tavily_retirement",
+      "test_preflight_rejects_stored_tavily_runs_with_exact_counts"
+    ],
+    [
+      "tests.test_tavily_retirement",
+      "test_preflight_requires_explicit_existing_profile_path_and_never_creates"
+    ]
+  ],
+  "retained_safety_owners": {
+    "test_api_fixed_dispatch_pins_complete_selection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 16,
+      "skipped": 0
+    },
+    "test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 3,
+      "skipped": 0
+    },
+    "test_enabled_sdk_tracing_excludes_sensitive_data_preserves_metadata": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_failed_generation_redacts_selected_key_after_activation": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_native_key_echo_is_redacted_before_logs_scratchpad_and_public_errors": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 8,
+      "skipped": 0
+    },
+    "test_openai_retry_key_echo_is_private_without_changing_retry_policy": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    },
+    "test_original_oauth_id_can_refresh_normally_without_reselection": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 2,
+      "skipped": 0
+    }
+  },
+  "seconds": 1388.227,
+  "skipped": [
+    [
+      "tests.test_detailed_financials.TestLiveTechMetrics",
+      "test_nvda_tech_metrics"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_basic_stock_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_connection"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_iv_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_filter"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_quote"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_option_volume_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_put_call_ratio_scan"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_scanner_parameters"
+    ],
+    [
+      "tests.test_ibkr_scanner",
+      "test_unusual_activity"
+    ],
+    [
+      "tests.test_option_chain_tools.TestLiveOptionChain",
+      "test_spy_option_chain"
+    ],
+    [
+      "tests.test_peer_comparison.TestLivePeerComparison",
+      "test_nvda_peer_comparison"
+    ]
+  ],
+  "source_anchor": "eed65fb806234ca779922abdaa6e526727d57e3b",
+  "source_collection_sha256": "d7ec1a4b98051b0d73231977149bc134091938baacd52a0f704513719ae45291",
+  "source_drift": [],
+  "source_files": 1157,
+  "source_snapshot_after": "source-after.json",
+  "source_snapshot_before": "source-before.json",
+  "sqlite": "3.37.2"
+}

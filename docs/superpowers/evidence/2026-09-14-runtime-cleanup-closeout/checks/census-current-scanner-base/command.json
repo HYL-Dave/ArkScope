@@ -1,0 +1,30 @@
+{
+  "name": "census-current-scanner-base",
+  "command": [
+    "/home/hyl/.virtualenvs/llm_app/bin/python",
+    "-B",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-cleanup-closeout/run_census.py",
+    "--root",
+    ".",
+    "--output",
+    "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-cleanup-closeout/census-current-scanner-base/census.json.gz",
+    "--untracked-root",
+    "/mnt/md0/PycharmProjects/ArkScope",
+    "--revision",
+    "a065a0c30a4f75995215cabc0e39dd2579c17c3d",
+    "--current-scanner-on-revision"
+  ],
+  "cwd": "/tmp/arkscope-research-output-boundary",
+  "exit_code": 0,
+  "seconds": 16.827,
+  "environment": {
+    "PATH": "/home/hyl/.virtualenvs/llm_app/bin:/home/hyl/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "ARKSCOPE_OFFLINE_TEST_WORKSPACE": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-cleanup-closeout/census-current-scanner-base",
+    "HOME": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-cleanup-closeout/census-current-scanner-base/home",
+    "CI": "1",
+    "TZ": "Asia/Taipei"
+  },
+  "log": "/tmp/arkscope-research-output-boundary/.superpowers/sdd/2026-09-14-runtime-cleanup-closeout/census-current-scanner-base/output.log"
+}

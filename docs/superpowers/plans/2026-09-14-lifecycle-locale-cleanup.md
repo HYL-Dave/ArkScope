@@ -43,4 +43,7 @@ Modify `apps/arkscope-web/src/i18n/resources/{en,zh-Hant}/explore.ts`,
 - [x] Re-run source census, record the original 100 dispositions as 82 removed
   and 18 retained with consumer names. Do not treat new SEC/Research labels or
   dynamic unresolved candidates elsewhere as obsolete by association.
-- [ ] Record evidence and commit this scope independently of SQLite deployment.
+- [x] Record evidence and commit this scope independently of SQLite deployment.
+
+Completed at `4d121b17`; paired disposition manifest, retained consumers and
+acceptance: `docs/superpowers/evidence/2026-09-14-runtime-cleanup-closeout/README.md`.

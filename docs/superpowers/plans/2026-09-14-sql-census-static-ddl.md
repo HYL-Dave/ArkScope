@@ -40,5 +40,9 @@ Modify `tests/repository_inventory.py` and `tests/test_repository_inventory.py`.
   attribution. Confirm the retained translation reader is observed, its columns
   leave the false-positive queue, and every row still has
   `deletion_authorized=False`. Other unresolved SQL remains visible.
-- [ ] Record test evidence, limits and candidate delta; commit separately from
+- [x] Record test evidence, limits and candidate delta; commit separately from
   product-schema disposal and SQLite runtime deployment.
+
+Completed at `eed65fb8`; both review findings have RED/green owners. Exact
+scanner-vs-source attribution and remaining uncertainties:
+`docs/superpowers/evidence/2026-09-14-runtime-cleanup-closeout/README.md`.

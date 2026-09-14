@@ -1,0 +1,779 @@
+{
+  "baseline_source": "a065a0c30a4f75995215cabc0e39dd2579c17c3d",
+  "cleanup_delta_same_scanner": {
+    "coverage_reductions": [
+      "src/massive_config_migration.py",
+      "src/security_lifecycle_retirement.py",
+      "tests/test_tavily_retirement.py"
+    ],
+    "dependency_metadata_changed": [],
+    "new_candidates": [
+      "column:data_provider_config.updated_at"
+    ],
+    "new_uncertainties": [],
+    "new_untracked_paths": [],
+    "review_required": true
+  },
+  "cleanup_removed_candidates": [
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.acknowledgementReasons.evidenceInsufficient",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.actions.openEvidence",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.actions.reopen",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.aria",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.approve",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.evaluate",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.finalize",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.ibkr",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.listing",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.persist",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.preparing",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.sec",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.fields.extractionRule",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.filters.ticker",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.queues.aria",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.sections.acknowledgement",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.sections.facts",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.states.notAvailable",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.states.revalidation",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.states.zeroResults",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.title",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.caveats.portfolioPositionRetained",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.caveats.providerOwnedSourcesRetained",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.caveats.successorAlreadyTracked",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.effects.add",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.effects.archive",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.effects.reactivate",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.effects.unchanged",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.authRejected",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.contextWindowExceeded",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.credentialMissing",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.evidenceChanged",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.modelUnavailable",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.outputInvalid",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.protocolResourceExhausted",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.providerError",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.quotaExhausted",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.rateLimited",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.routeUnavailable",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.timeout",
+    "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.unknown",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.acknowledgementReasons.evidenceInsufficient",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.actions.openEvidence",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.actions.reopen",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.aria",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.approve",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.evaluate",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.finalize",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.ibkr",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.listing",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.persist",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.preparing",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.sec",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.fields.extractionRule",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.filters.ticker",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.queues.aria",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.sections.acknowledgement",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.sections.facts",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.states.notAvailable",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.states.revalidation",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.states.zeroResults",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.title",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.caveats.portfolioPositionRetained",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.caveats.providerOwnedSourcesRetained",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.caveats.successorAlreadyTracked",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.effects.add",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.effects.archive",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.effects.reactivate",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.effects.unchanged",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.authRejected",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.contextWindowExceeded",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.credentialMissing",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.evidenceChanged",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.modelUnavailable",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.outputInvalid",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.protocolResourceExhausted",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.providerError",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.quotaExhausted",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.rateLimited",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.routeUnavailable",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.timeout",
+    "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.unknown",
+    "python:src.massive_config_migration",
+    "python:src.security_lifecycle_retirement"
+  ],
+  "global_cleanup_complete": false,
+  "original_i18n_queue": [
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.current.checkPrompt",
+      "key": "lifecycle.current.checkPrompt",
+      "locale": "en"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.current.checkIncomplete",
+      "key": "lifecycle.current.checkIncomplete",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.title",
+      "key": "lifecycle.title",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.aria",
+      "key": "lifecycle.aria",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.queues.aria",
+      "key": "lifecycle.queues.aria",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.preparing",
+      "key": "lifecycle.automationControl.stages.preparing",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.sec",
+      "key": "lifecycle.automationControl.stages.sec",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.listing",
+      "key": "lifecycle.automationControl.stages.listing",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.ibkr",
+      "key": "lifecycle.automationControl.stages.ibkr",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.evaluate",
+      "key": "lifecycle.automationControl.stages.evaluate",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.persist",
+      "key": "lifecycle.automationControl.stages.persist",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.approve",
+      "key": "lifecycle.automationControl.stages.approve",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.automationControl.stages.finalize",
+      "key": "lifecycle.automationControl.stages.finalize",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.actions.reopen",
+      "key": "lifecycle.actions.reopen",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.actions.openEvidence",
+      "key": "lifecycle.actions.openEvidence",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.filters.ticker",
+      "key": "lifecycle.filters.ticker",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.sections.acknowledgement",
+      "key": "lifecycle.sections.acknowledgement",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.sections.facts",
+      "key": "lifecycle.sections.facts",
+      "locale": "en"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.fields.successorTicker",
+      "key": "lifecycle.fields.successorTicker",
+      "locale": "en"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.fields.effectiveDate",
+      "key": "lifecycle.fields.effectiveDate",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.fields.extractionRule",
+      "key": "lifecycle.fields.extractionRule",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.states.revalidation",
+      "key": "lifecycle.states.revalidation",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.states.zeroResults",
+      "key": "lifecycle.states.zeroResults",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.states.notAvailable",
+      "key": "lifecycle.states.notAvailable",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.acknowledgementReasons.evidenceInsufficient",
+      "key": "lifecycle.acknowledgementReasons.evidenceInsufficient",
+      "locale": "en"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.listingEvidence.authorities.eodhd",
+      "key": "lifecycle.listingEvidence.authorities.eodhd",
+      "locale": "en"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.listingEvidence.authorities.nasdaqTrader",
+      "key": "lifecycle.listingEvidence.authorities.nasdaqTrader",
+      "locale": "en"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.listingEvidence.authorities.massive",
+      "key": "lifecycle.listingEvidence.authorities.massive",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.routeUnavailable",
+      "key": "lifecycle.translation.routeUnavailable",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.credentialMissing",
+      "key": "lifecycle.translation.credentialMissing",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.authRejected",
+      "key": "lifecycle.translation.authRejected",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.rateLimited",
+      "key": "lifecycle.translation.rateLimited",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.quotaExhausted",
+      "key": "lifecycle.translation.quotaExhausted",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.modelUnavailable",
+      "key": "lifecycle.translation.modelUnavailable",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.timeout",
+      "key": "lifecycle.translation.timeout",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.outputInvalid",
+      "key": "lifecycle.translation.outputInvalid",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.contextWindowExceeded",
+      "key": "lifecycle.translation.contextWindowExceeded",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.protocolResourceExhausted",
+      "key": "lifecycle.translation.protocolResourceExhausted",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.providerError",
+      "key": "lifecycle.translation.providerError",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.evidenceChanged",
+      "key": "lifecycle.translation.evidenceChanged",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.unknown",
+      "key": "lifecycle.translation.unknown",
+      "locale": "en"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.providers.anthropic",
+      "key": "lifecycle.translation.providers.anthropic",
+      "locale": "en"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.translation.providers.openai",
+      "key": "lifecycle.translation.providers.openai",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.caveats.providerOwnedSourcesRetained",
+      "key": "lifecycle.transition.caveats.providerOwnedSourcesRetained",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.caveats.portfolioPositionRetained",
+      "key": "lifecycle.transition.caveats.portfolioPositionRetained",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.caveats.successorAlreadyTracked",
+      "key": "lifecycle.transition.caveats.successorAlreadyTracked",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.effects.add",
+      "key": "lifecycle.transition.effects.add",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.effects.archive",
+      "key": "lifecycle.transition.effects.archive",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.effects.reactivate",
+      "key": "lifecycle.transition.effects.reactivate",
+      "locale": "en"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/en/explore.ts:en:explore:lifecycle.transition.effects.unchanged",
+      "key": "lifecycle.transition.effects.unchanged",
+      "locale": "en"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.current.checkPrompt",
+      "key": "lifecycle.current.checkPrompt",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.current.checkIncomplete",
+      "key": "lifecycle.current.checkIncomplete",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.title",
+      "key": "lifecycle.title",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.aria",
+      "key": "lifecycle.aria",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.queues.aria",
+      "key": "lifecycle.queues.aria",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.preparing",
+      "key": "lifecycle.automationControl.stages.preparing",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.sec",
+      "key": "lifecycle.automationControl.stages.sec",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.listing",
+      "key": "lifecycle.automationControl.stages.listing",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.ibkr",
+      "key": "lifecycle.automationControl.stages.ibkr",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.evaluate",
+      "key": "lifecycle.automationControl.stages.evaluate",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.persist",
+      "key": "lifecycle.automationControl.stages.persist",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.approve",
+      "key": "lifecycle.automationControl.stages.approve",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.automationControl.stages.finalize",
+      "key": "lifecycle.automationControl.stages.finalize",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.actions.reopen",
+      "key": "lifecycle.actions.reopen",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.actions.openEvidence",
+      "key": "lifecycle.actions.openEvidence",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.filters.ticker",
+      "key": "lifecycle.filters.ticker",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.sections.acknowledgement",
+      "key": "lifecycle.sections.acknowledgement",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.sections.facts",
+      "key": "lifecycle.sections.facts",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.fields.successorTicker",
+      "key": "lifecycle.fields.successorTicker",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.fields.effectiveDate",
+      "key": "lifecycle.fields.effectiveDate",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.fields.extractionRule",
+      "key": "lifecycle.fields.extractionRule",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.states.revalidation",
+      "key": "lifecycle.states.revalidation",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.states.zeroResults",
+      "key": "lifecycle.states.zeroResults",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.states.notAvailable",
+      "key": "lifecycle.states.notAvailable",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.acknowledgementReasons.evidenceInsufficient",
+      "key": "lifecycle.acknowledgementReasons.evidenceInsufficient",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.listingEvidence.authorities.eodhd",
+      "key": "lifecycle.listingEvidence.authorities.eodhd",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.listingEvidence.authorities.nasdaqTrader",
+      "key": "lifecycle.listingEvidence.authorities.nasdaqTrader",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.listingEvidence.authorities.massive",
+      "key": "lifecycle.listingEvidence.authorities.massive",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.routeUnavailable",
+      "key": "lifecycle.translation.routeUnavailable",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.credentialMissing",
+      "key": "lifecycle.translation.credentialMissing",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.authRejected",
+      "key": "lifecycle.translation.authRejected",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.rateLimited",
+      "key": "lifecycle.translation.rateLimited",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.quotaExhausted",
+      "key": "lifecycle.translation.quotaExhausted",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.modelUnavailable",
+      "key": "lifecycle.translation.modelUnavailable",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.timeout",
+      "key": "lifecycle.translation.timeout",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.outputInvalid",
+      "key": "lifecycle.translation.outputInvalid",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.contextWindowExceeded",
+      "key": "lifecycle.translation.contextWindowExceeded",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.protocolResourceExhausted",
+      "key": "lifecycle.translation.protocolResourceExhausted",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.providerError",
+      "key": "lifecycle.translation.providerError",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.evidenceChanged",
+      "key": "lifecycle.translation.evidenceChanged",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.unknown",
+      "key": "lifecycle.translation.unknown",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.providers.anthropic",
+      "key": "lifecycle.translation.providers.anthropic",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "retained_shared_consumer",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.translation.providers.openai",
+      "key": "lifecycle.translation.providers.openai",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.caveats.providerOwnedSourcesRetained",
+      "key": "lifecycle.transition.caveats.providerOwnedSourcesRetained",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.caveats.portfolioPositionRetained",
+      "key": "lifecycle.transition.caveats.portfolioPositionRetained",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.caveats.successorAlreadyTracked",
+      "key": "lifecycle.transition.caveats.successorAlreadyTracked",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.effects.add",
+      "key": "lifecycle.transition.effects.add",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.effects.archive",
+      "key": "lifecycle.transition.effects.archive",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.effects.reactivate",
+      "key": "lifecycle.transition.effects.reactivate",
+      "locale": "zh-Hant"
+    },
+    {
+      "disposition": "removed",
+      "id": "i18n:apps/arkscope-web/src/i18n/resources/zh-Hant/explore.ts:zh-Hant:explore:lifecycle.transition.effects.unchanged",
+      "key": "lifecycle.transition.effects.unchanged",
+      "locale": "zh-Hant"
+    }
+  ],
+  "retained_translation_reader": {
+    "columns": [
+      "evidence_content_sha256",
+      "evidence_id",
+      "harness",
+      "locale",
+      "model",
+      "provider",
+      "translated_at",
+      "translated_text"
+    ],
+    "columns_without_observed_read": [],
+    "database_scope": "not_resolved",
+    "declarations": [
+      {
+        "line": 556,
+        "path": "src/security_lifecycle_schema.py"
+      }
+    ],
+    "deletion_authorized": false,
+    "read_columns": [
+      "evidence_content_sha256",
+      "evidence_id",
+      "harness",
+      "locale",
+      "model",
+      "provider",
+      "translated_at",
+      "translated_text"
+    ],
+    "reads": [
+      {
+        "line": 762,
+        "path": "src/security_lifecycle_investigation.py"
+      },
+      {
+        "line": 763,
+        "path": "src/security_lifecycle_investigation.py"
+      }
+    ],
+    "sqlite_table_kind": "table",
+    "state": "reader_observed",
+    "table": "security_lifecycle_evidence_translations",
+    "writes": []
+  },
+  "scanner_delta_same_source": {
+    "coverage_reductions": [],
+    "dependency_metadata_changed": [],
+    "new_candidates": [
+      "column:ticker_identity_transition_attempts.observed_preview_sha256",
+      "column:ticker_identity_transition_attempts.trigger"
+    ],
+    "new_uncertainties": [
+      "sql:ae1232c169d8dcf9"
+    ],
+    "new_untracked_paths": [],
+    "review_required": true
+  },
+  "scanner_removed_candidates": [
+    "column:security_lifecycle_evidence_translations.evidence_content_sha256",
+    "column:security_lifecycle_evidence_translations.evidence_id",
+    "column:security_lifecycle_evidence_translations.harness",
+    "column:security_lifecycle_evidence_translations.locale",
+    "column:security_lifecycle_evidence_translations.model",
+    "column:security_lifecycle_evidence_translations.provider",
+    "column:security_lifecycle_evidence_translations.translated_at",
+    "column:security_lifecycle_evidence_translations.translated_text",
+    "column:ticker_identity_links.created_at",
+    "column:ticker_identity_links.effective_date",
+    "column:ticker_identity_links.link_id",
+    "column:ticker_identity_links.relationship",
+    "table:security_lifecycle_evidence_translations"
+  ]
+}
