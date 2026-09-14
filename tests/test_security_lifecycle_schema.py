@@ -314,3 +314,71 @@ def test_schema_verifiers_do_not_create_missing_databases(tmp_path):
     assert not market.exists()
     assert not profile.exists()
     assert not market.parent.exists()
+
+
+def _new_observation():
+    from src.security_lifecycle import LifecycleObservation, ObservationKind
+
+    return LifecycleObservation(
+        ticker="EA",
+        cik="0000712515",
+        issuer_name="Electronic Arts Inc.",
+        filing_date="2026-08-04",
+        source="sec_edgar",
+        source_ref="ref",
+        filing_form="8-K",
+        filing_items=("2.01",),
+        evidence_url="https://www.sec.gov/example",
+        description="evidence",
+        observed_at="2026-08-20T00:00:00Z",
+        kinds=(ObservationKind("acquisition_completed", "2026-08-04"),),
+    )
+
+
+def test_incomplete_receipt_blocks_all_lifecycle_writes(tmp_path):
+    from src.security_lifecycle import SecurityLifecycleStore
+    from src.security_lifecycle_investigation import (
+        LifecycleWritesUnavailable,
+        SecurityLifecycleInvestigationStore,
+    )
+    from src.security_lifecycle_schema import create_market_schema, create_profile_schema
+
+    market = sqlite3.connect(tmp_path / "market_data.db")
+    market.row_factory = sqlite3.Row
+    create_market_schema(market)
+    profile = sqlite3.connect(tmp_path / "profile_state.db")
+    profile.row_factory = sqlite3.Row
+    create_profile_schema(profile)
+    profile.execute(
+        "INSERT INTO security_lifecycle_migration_receipts VALUES "
+        "(?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            "legacy-v1",
+            "a" * 64,
+            "b" * 64,
+            "profile_written",
+            37,
+            36,
+            37,
+            4,
+            "2026-08-20T00:00:00Z",
+            "2026-08-20T00:00:00Z",
+            None,
+        ),
+    )
+    profile.commit()
+    try:
+        with pytest.raises(LifecycleWritesUnavailable):
+            SecurityLifecycleInvestigationStore(profile).ensure_case(
+                source="sec_edgar",
+                source_ref="ref",
+                ticker="EA",
+                at="2026-08-20T00:00:00Z",
+            )
+        with pytest.raises(LifecycleWritesUnavailable):
+            SecurityLifecycleStore(market, migration_conn=profile).upsert_observation(
+                _new_observation()
+            )
+    finally:
+        profile.close()
+        market.close()
