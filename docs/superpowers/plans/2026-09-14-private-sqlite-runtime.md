@@ -28,7 +28,8 @@ choose it without rewriting Desktop or SA routing.
   `verify_package(root: Path, expected_sha256: str) -> dict`,
   `verify_runtime(root: Path, expected_sha256: str) -> dict`,
   `require_selected_runtime() -> dict | None`; failures use `RuntimeAdmissionError`.
-- `src/sqlite_runtime/launch.py`: packaged exec launcher, imports adjacent contract.
+- `src/sqlite_runtime/launch.py`: packaged exec launcher, loads the explicitly
+  hash-verified contract source without adding a directory to the import path.
 - `src/sqlite_runtime/build.py`: pinned source recipe, offline compilation and exclusive package preparation.
   `build_package(archive: Path, destination: Path, python: Path) -> Path`.
 - `src/sqlite_runtime/__init__.py`: package documentation only.
@@ -90,10 +91,10 @@ assert result.stdout == b""
 - [x] Prove actual API, SA and worker import paths reject wrong engine before
   stores/provider modules start. Check OAuth closed environments and dormant
   analysis executor unchanged.
-- [ ] Run final-artifact UPSERT, synthetic DB and numpy/pandas probes, focused
+- [x] Run final-artifact UPSERT, synthetic DB and numpy/pandas probes, focused
   launch/auth/startup collateral, then serial full backend with existing offline
   controls. Record exact failures if any, do not normalize expectations blindly.
-- [ ] Seal evidence and commit source/test/docs. Keep branch unmerged and real
+- [x] Seal evidence and commit source/test/docs. Keep branch unmerged and real
   activation pending its separately agreed window.
 
 ```python
@@ -107,3 +108,7 @@ assert not (tmp_path / "sentinel").exists()
 
 This plan closes package preparation and selected-process startup enforcement,
 not production activation, C15/C20 cleanup, cross-platform or sandbox work.
+
+Product/test checkpoint `292ef27f`; final selected-runtime full backend
+11,238 passed / 12 unchanged skips, exact 11,250 nodes (+70/-0).
+Evidence: `docs/superpowers/evidence/2026-09-14-private-sqlite-runtime/README.md`.

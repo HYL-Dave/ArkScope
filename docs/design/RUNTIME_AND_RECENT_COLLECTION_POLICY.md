@@ -3,7 +3,8 @@
 Date: 2026-09-14. Policy source review: `d90c13fa`,
 `codex/sec-research-integration`. Status: user decisions accepted; the shared
 fourteen-day request target and C12 collector retirement are complete as recorded
-below. Deployment, entitlement reporting and SA targeting remain open.
+below. Linux runtime preparation/startup checks are now implemented and verified
+at `292ef27f`. Production activation, entitlement reporting and SA targeting remain open.
 This supersedes the two pending choices in the
 [September 14 closeout](../superpowers/evidence/2026-09-14-runtime-cleanup-closeout/README.md).
 Its historical test results and operational boundaries remain unchanged.
@@ -60,6 +61,24 @@ changing a launcher path; preserve the existing recovery acceptance boundary.
 Windows/macOS runtime admission and the Python sandbox are deferred. Other
 platforms do not inherit Linux validation or a same-version guarantee. Do not
 make their admission a prerequisite for current Linux code cleanup.
+
+### Prepared Runtime Checkpoint
+
+The offline builder, manifest-bound executable selector and early process guards
+are implemented at `292ef27f`. The final SQLite 3.53.4 package passed its exact
+UPSERT/synthetic checks and the single complete backend: 11,238 passed with
+twelve unchanged skips, 11,250 identities (+70/-0). The final process actually
+loaded the package library; the separate unmanaged Python still loads system
+3.37.2. Original Python/numpy/SDK installations and the dormant executor are
+unchanged. Bootstrap review findings and actual SQL grammar validation are
+included in the [preparation receipt](../superpowers/evidence/2026-09-14-private-sqlite-runtime/README.md).
+
+The existing Desktop and SA executable selectors can use the new package;
+their real launchers were tested with disposable fixtures. Neither installed
+selector was inspected or switched. Follow
+`docs/design/SQLITE_RUNTIME_OPERATIONS.md` for preparation and the separate
+stopped-writer backup/integrity/activation window. A prepared package does not
+mean the running App is upgraded or its retained databases have been checked.
 
 ### Internal Analysis Library And Sandbox Ownership
 
@@ -224,9 +243,9 @@ and RED-first owners before changing these shared contracts.
    The shared fourteen-day request target remains intact. Account-limit
    reporting and durable initial-interval retries are separate unfinished
    recent-source policy work, not implied by the CLI cleanup.
-2. Linux runtime: prepare and admit the final package and entrypoint checks;
-   arrange the production cutover separately. This does not block independent
-   C12/C15/C20 source cleanup.
+2. Linux runtime preparation and selected-process startup checks are CLOSED at
+   `292ef27f`; final artifact/full-backend evidence is linked above. Arrange the
+   production cutover separately. C15/C20 source cleanup remains independent.
 3. SA Open-first initialization: a separate scoped follow-up; preserve current
    collection while proving new targeting and explicit unfinished work.
 4. Finish remaining C15/C20 retained-data/ownership decisions before claiming all
