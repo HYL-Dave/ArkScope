@@ -2,6 +2,7 @@
 
 import importlib
 import importlib.util
+from pathlib import Path
 
 import pytest
 
@@ -134,6 +135,99 @@ def test_dynamic_sql_and_unknown_tables_are_explicit_gaps():
         {"path": "src/read.py", "line": 2, "text": "SELECT * FROM undefined", "dynamic": False},
     ])
     assert {row["kind"] for row in report["unresolved"]} >= {"dynamic_sql", "sql_prepare_failed"}
+
+
+QUOTED_ENUM_SCHEMA = '''
+KINDS = frozenset({"document", "manual"})
+def quoted(values: frozenset[str]) -> str:
+    return ", ".join(f"'{value}'" for value in sorted(values))
+DDL = f"CREATE TABLE evidence(id TEXT, kind TEXT CHECK(kind IN ({quoted(KINDS)})))"
+TRANSLATIONS = "CREATE TABLE translations(evidence_id TEXT, translated TEXT)"
+READ = "SELECT t.* FROM translations t JOIN evidence e ON e.id=t.evidence_id"
+'''
+
+
+def test_static_quoted_enum_schema_keeps_joined_select_star_readers():
+    python = inventory().python_inventory({"src/schema.py": QUOTED_ENUM_SCHEMA})
+    ddl = next(site for site in python["sql_sites"] if "CREATE TABLE evidence" in site["text"])
+    assert ddl["dynamic"] is False
+    assert ddl["text"] == "CREATE TABLE evidence(id TEXT, kind TEXT CHECK(kind IN ('document', 'manual')))"
+    sql = inventory().sql_inventory(python["sql_sites"])
+    tables = {row["table"]: row for row in sql["tables"]}
+    assert tables["translations"]["read_columns"] == ["evidence_id", "translated"]
+    assert tables["translations"]["state"] == "reader_observed"
+    assert tables["evidence"]["read_columns"] == ["id"]
+    assert all(row["deletion_authorized"] is False for row in tables.values())
+
+
+@pytest.mark.parametrize("source", [
+    QUOTED_ENUM_SCHEMA.replace('    return ', '    side_effect()\n    return '),
+    QUOTED_ENUM_SCHEMA.replace('def quoted', '@decorator\ndef quoted'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'quoted = other\nDDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'KINDS = load_values()\nDDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'sorted = other\nDDL = f'),
+    'from other import frozenset\n' + QUOTED_ENUM_SCHEMA,
+    QUOTED_ENUM_SCHEMA.replace('frozenset({"document", "manual"})', '["document", "manual"]'),
+    QUOTED_ENUM_SCHEMA.replace('{quoted(KINDS)}', '{quoted(KINDS)!r}'),
+    QUOTED_ENUM_SCHEMA.replace('{quoted(KINDS)}', '{unknown(KINDS)}'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'def local(quoted):\n    DDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'def local(KINDS):\n    DDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'if condition:\n    def quoted(values):\n        return other(values)\nDDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'if condition:\n    def sorted(values):\n        return other(values)\nDDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'class Local:\n    DDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'DDL = (f').replace(')))"\n', ')))" for KINDS in supplied)\n'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'match subject:\n    case KINDS:\n        pass\nDDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'match subject:\n    case [*KINDS]:\n        pass\nDDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'match subject:\n    case {**KINDS}:\n        pass\nDDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'try:\n    action()\nexcept Exception as KINDS:\n    pass\nDDL = f'),
+    QUOTED_ENUM_SCHEMA.replace('DDL = f', 'DDL = [(KINDS := load_values()), f').replace(')))"\n', ')))"]\n'),
+], ids=["side_effect", "decorated", "rebound_helper", "dynamic_enum", "rebound_sort",
+        "imported_frozenset", "mutable_enum", "conversion", "unknown_helper",
+        "local_helper", "local_enum", "conditional_helper", "conditional_sort",
+        "class_scope", "lazy_generator", "match_capture", "match_star", "match_mapping",
+        "exception_binding", "same_assignment_walrus"])
+def test_unproved_schema_expressions_remain_unknown(source):
+    python = inventory().python_inventory({"src/schema.py": source})
+    ddl = next(site for site in python["sql_sites"] if "CREATE TABLE evidence" in site["text"])
+    assert ddl["dynamic"] is True
+    sql = inventory().sql_inventory(python["sql_sites"])
+    assert {row["kind"] for row in sql["unresolved"]} >= {"dynamic_sql", "sql_prepare_failed"}
+    assert not any(row["table"] == "evidence" for row in sql["tables"])
+
+
+def test_static_schema_resolution_never_executes_product_module(tmp_path):
+    sentinel = tmp_path / "must-not-exist"
+    source = QUOTED_ENUM_SCHEMA + f'\nopen({str(sentinel)!r}, "w").write("executed")\n'
+    result = inventory().python_inventory({"src/schema.py": source})
+    assert not sentinel.exists()
+    assert any(not row["dynamic"] and "CREATE TABLE evidence" in row["text"] for row in result["sql_sites"])
+
+
+def test_schema_expression_uses_its_assignment_time_enum_not_later_rebinding():
+    source = QUOTED_ENUM_SCHEMA + '''
+KINDS = frozenset({"listing"})
+NEXT = f"CREATE TABLE newer(kind TEXT CHECK(kind IN ({quoted(KINDS)})))"
+KINDS = load_values()
+UNKNOWN = f"CREATE TABLE unknown(kind TEXT CHECK(kind IN ({quoted(KINDS)})))"
+'''
+    sites = inventory().python_inventory({"src/schema.py": source})["sql_sites"]
+    original = next(row for row in sites if "CREATE TABLE evidence" in row["text"])
+    newer = next(row for row in sites if "CREATE TABLE newer" in row["text"])
+    unknown = next(row for row in sites if "CREATE TABLE unknown" in row["text"])
+    assert original["dynamic"] is False and "'document', 'manual'" in original["text"]
+    assert newer["dynamic"] is False and "'listing'" in newer["text"]
+    assert unknown["dynamic"] is True
+
+
+def test_actual_retained_translation_join_is_observed_without_importing_store():
+    root = Path(__file__).resolve().parents[1]
+    paths = ("src/security_lifecycle_schema.py", "src/security_lifecycle_investigation.py")
+    python = inventory().python_inventory({path: (root / path).read_text() for path in paths})
+    sql = inventory().sql_inventory(python["sql_sites"])
+    table = next(row for row in sql["tables"] if row["table"] == "security_lifecycle_evidence_translations")
+    assert any(row["path"] == paths[1] for row in table["reads"])
+    assert table["columns_without_observed_read"] == []
+    assert table["deletion_authorized"] is False
 
 
 def test_source_inventory_excludes_private_and_generated_content():

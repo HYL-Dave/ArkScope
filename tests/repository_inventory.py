@@ -101,6 +101,99 @@ def literal(node, constants):
     return None
 
 
+def sql_literal(node, constants, helpers):
+    """Resolve closed string expressions, never execute a source expression."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name) and isinstance(constants.get(node.id), str):
+        return constants[node.id]
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = sql_literal(node.left, constants, helpers)
+        right = sql_literal(node.right, constants, helpers)
+        return left + right if left is not None and right is not None else None
+    if isinstance(node, ast.JoinedStr):
+        parts = []
+        for part in node.values:
+            if isinstance(part, ast.FormattedValue):
+                if part.conversion != -1 or part.format_spec is not None:
+                    return None
+                part = part.value
+            value = sql_literal(part, constants, helpers)
+            if value is None:
+                return None
+            parts.append(value)
+        return "".join(parts)
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id in helpers and len(node.args) == 1 and not node.keywords
+            and isinstance(node.args[0], ast.Name)):
+        values = constants.get(node.args[0].id)
+        if isinstance(values, frozenset) and all(isinstance(value, str) for value in values):
+            return ", ".join("'" + value + "'" for value in sorted(values))
+    return None
+
+
+def sql_literal_contexts(tree):
+    # This deliberately recognizes one exact pure helper idiom, not arbitrary
+    # Python functions. Rebinding or shadowing falls back to dynamic SQL.
+    expected = ast.dump(ast.parse('''
+def quoted(values):
+    return ", ".join(f"'{value}'" for value in sorted(values))
+''').body[0].body[0])
+    constants, helpers, bound, contexts = {}, set(), set(), {}
+    for node in tree.body:
+        # Module assignments evaluate eagerly. Keep the context at that point,
+        # not the last version of a schema enum rebound later in the module.
+        contexts[node] = (dict(constants), set(helpers))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names = {node.name}
+        else:
+            names = {item.id for item in ast.walk(node) if isinstance(item, ast.Name)
+                     and isinstance(item.ctx, (ast.Store, ast.Del))}
+            for item in ast.walk(node):
+                if isinstance(item, (ast.Import, ast.ImportFrom)):
+                    names.update(alias.asname or alias.name.split(".")[0] for alias in item.names)
+                elif isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    names.add(item.name)
+                elif isinstance(item, (ast.MatchAs, ast.MatchStar, ast.ExceptHandler)) and item.name:
+                    names.add(item.name)
+                elif isinstance(item, ast.MatchMapping) and item.rest:
+                    names.add(item.rest)
+        if "*" in names:
+            constants.clear()
+            helpers.clear()
+            bound.update({"sorted", "frozenset"})
+        previous = dict(constants)
+        for name in names:
+            constants.pop(name, None)
+            helpers.discard(name)
+        if "sorted" in names:
+            helpers.clear()
+        bound.update(names)
+        if isinstance(node, ast.FunctionDef) and "sorted" not in bound:
+            args = node.args
+            if (not node.decorator_list and len(args.args) == 1 and args.args[0].arg == "values"
+                    and not (args.posonlyargs or args.kwonlyargs or args.defaults
+                             or args.kw_defaults or args.vararg or args.kwarg)
+                    and len(node.body) == 1 and ast.dump(node.body[0]) == expected):
+                helpers.add(node.name)
+        if (not isinstance(node, ast.Assign) or len(node.targets) != 1
+                or not isinstance(node.targets[0], ast.Name)):
+            continue
+        target, value = node.targets[0], node.value
+        if ("frozenset" not in bound and isinstance(value, ast.Call)
+                and isinstance(value.func, ast.Name) and value.func.id == "frozenset"
+                and len(value.args) == 1 and not value.keywords
+                and isinstance(value.args[0], (ast.Set, ast.Tuple, ast.List))
+                and all(isinstance(item, ast.Constant) and isinstance(item.value, str)
+                        for item in value.args[0].elts)):
+            constants[target.id] = frozenset(item.value for item in value.args[0].elts)
+        else:
+            resolved = sql_literal(value, previous, contexts[node][1])
+            if resolved is not None:
+                constants[target.id] = resolved
+    return contexts
+
+
 def python_inventory(files):
     sources = {name: text for name, text in sorted(files.items()) if name.endswith(".py")}
     paths = {module_name(name): name for name in sources}
@@ -132,6 +225,7 @@ def python_inventory(files):
             continue
         parsed += 1
         constants, router_prefix = {}, {}
+        sql_contexts = sql_literal_contexts(tree)
         parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
         scope_types = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
 
@@ -156,6 +250,20 @@ def python_inventory(files):
                 for name in locals_by_scope.get(cursor, ()):
                     scoped.pop(name, None)
             return literal(node, scoped)
+
+        def scoped_sql_literal(node):
+            cursor = node
+            while cursor in parents and parents[cursor] is not tree:
+                if isinstance(cursor, (ast.Lambda, ast.GeneratorExp, ast.ListComp,
+                                       ast.SetComp, ast.DictComp)):
+                    return None
+                cursor = parents[cursor]
+            if not isinstance(cursor, ast.Assign):
+                return None
+            if any(isinstance(item, ast.NamedExpr) for item in ast.walk(cursor.value)):
+                return None
+            sql_constants, sql_helpers = sql_contexts[cursor]
+            return sql_literal(node, sql_constants, sql_helpers)
 
         for node in tree.body:
             if isinstance(node, ast.Assign):
@@ -227,7 +335,9 @@ def python_inventory(files):
             elif isinstance(node, ast.JoinedStr) and not path.startswith("tests/"):
                 prefix = "".join(n.value for n in node.values if isinstance(n, ast.Constant) and isinstance(n.value, str))
                 if re.match(r"\s*(?:CREATE|SELECT|WITH|INSERT|REPLACE|UPDATE|DELETE|ALTER|DROP)\s", prefix, re.I):
-                    sql_sites.append({**where, "text": prefix, "dynamic": True})
+                    resolved = scoped_sql_literal(node)
+                    sql_sites.append({**where, "text": prefix if resolved is None else resolved,
+                                      "dynamic": resolved is None, "origin": "sql_expression"})
             if isinstance(node, ast.Call):
                 name = ast.unparse(node.func)
                 first, *tail = name.split(".")
