@@ -17,6 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
     "data_sources/alpha_vantage_source.py",
     "data_sources/finnhub_source.py",
     "data_sources/source_factory.py",
+    "src/massive_config_migration.py",
+    "src/security_lifecycle_retirement.py",
 ])
 def test_abandoned_leaf_is_physically_absent(relative):
     assert not (ROOT / relative).exists(), f"abandoned leaf remains: {relative}"

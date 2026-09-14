@@ -21,10 +21,6 @@ class Occurrence:
 
 _ALLOWLIST = {
     Occurrence(
-        "src/massive_config_migration.py",
-        '"""Explicit migration from the legacy Polygon credential namespace to Massive."""',
-    ): "This names the retired credential namespace at the migration boundary.",
-    Occurrence(
         "docs/design/ARKSCOPE_PROVIDER_CATALOG.md",
         "| **provider** | Massive.com (formerly Polygon.io). |",
     ): "The canonical provider catalog records the former legal brand once.",
