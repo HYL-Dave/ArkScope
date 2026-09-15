@@ -58,6 +58,8 @@ Subsequent user ruling: delete the two old rows and table directly, with no
 archive or content inspection. Remove the final old-table allowlist entry.
 The running old-master App can still recreate the table; perform the scoped
 transaction after normal App shutdown, then hand test the updated branch.
+Execution completed after the user closed the App: exactly two rows and the
+old table removed; a fresh protected read confirmed absence. C20 is closed.
 Execution status: `../evidence/2026-09-15-c20-disposal/README.md`.
 The earlier inventory-first/archive proposal below is historical, not an
 additional approval requirement after this ruling.

@@ -60,9 +60,12 @@ The A+B/C15 source checkpoint `2aeed54a` now has paired full offline acceptance:
 **11,245 passed / 12 unchanged manual skips** on each engine, with identical
 case identities, interpreter-consistent PATH and unchanged source bytes.
 Frontend tests, typecheck and build also pass. This is compatibility evidence,
-not runtime admission or activation. Current-engine hand testing and C20's two
-retained query records remain outstanding; no archive or DROP is authorized by
-these results. See the [final cleanup receipt](../superpowers/evidence/2026-09-15-prebuilt-transition-cleanup/README.md).
+not runtime admission or activation. Current-engine hand testing remains.
+C20's two old query rows and table were subsequently removed under separate
+explicit user authorization, without an archive, after normal App shutdown.
+Fresh read-only verification confirmed absence; this is not authority for any
+other deletion. See the [final cleanup receipt](../superpowers/evidence/2026-09-15-prebuilt-transition-cleanup/README.md)
+and [C20 execution receipt](../superpowers/evidence/2026-09-15-c20-disposal/README.md).
 
 Record one admitted artifact identity per environment, not one version for the
 rest of pre-release development. Review newer stable distributions and upstream

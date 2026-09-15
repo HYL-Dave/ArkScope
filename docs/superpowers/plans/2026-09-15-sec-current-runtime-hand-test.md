@@ -7,6 +7,11 @@ schema reset/cleanup just to start this check. Production restart remains a
 separately agreed user action; verify the App is actually running the tested
 branch, not the old master worktree.
 
+C20's old query table and two rows have now been removed under separate user
+authorization. Do not restart old master for this check: its old store
+initialization can recreate an empty legacy table. No interpreter switch or
+automatic App restart accompanied that removal.
+
 ## Settings And Local Data
 
 1. Open Settings > Data & Sync > SEC structured data. Verify capacity, stored
@@ -35,8 +40,8 @@ branch, not the old master worktree.
    work. The 33,000-ID and integer-boundary stress cases are automated tests,
    not a requirement to create that much live data for hand testing.
 3. Revisit an existing report/memory and a current Research conversation. Confirm
-   they remain readable. Old `agent_queries` archives are separate from current
-   conversations; do not delete them as a manual test step.
+   they remain readable. The disposed `agent_queries` table was separate from
+   current conversations; do not restore it or repeat disposal as a test step.
 4. Optionally run one SEC daily job manually and inspect attempted/confirmed/
    failed/deferred counts. A partial result must not masquerade as complete.
    Enabling a recurring schedule is optional and not implied by saving capacity.
