@@ -41,6 +41,18 @@ or credentials are mounted into test runs. Each run is serial in that snapshot.
 | C20 GREEN, candidate | 51 passed |
 | B+C20 control, 3.37.2 | 236 passed |
 | Combined parent checkpoint, candidate | 497 passed |
+| Affinity/index and tail-strengthened A, candidate/control | 18 passed each |
+| Disposable cap mutation, candidate | 5 failed / 13 passed |
+| Restored A, candidate/control | 18 passed each |
+
+Independent parent review accepted A/B/C20 implementation and closed its P3
+finding after the tail-test follow-up. Its original coverage
+finding (only prefix IDs had matching fixture rows) is repaired in `fe871bff`:
+the tail must match in recovery/lineage and win article ordering. In a disposable
+copy only, truncating both set encoders at 32,766 breaks all five large-set cases.
+The copy was restored byte-for-byte before the last two passing runs. Raw
+mutation output is gzip-preserved because pytest includes trailing whitespace;
+the contents are not reformatted to satisfy a whitespace check.
 
 The first A invocation had an incorrect test-module import and did not collect;
 the valid RED run above followed its correction. The first B run additionally
@@ -49,6 +61,16 @@ instead of explicitly blanking inherited values; corrected to its real closed
 environment contract, no product security code changed. The first C20 focused
 GREEN invocation named a nonexistent test file and ran zero tests; the corrected
 invocation above supplies the result. None is counted as product acceptance.
+
+Frontend verification used the same locked dependencies and source, isolated
+from production. The initial clear-environment run lacked a timezone and
+reported 1,831 passed / 4 failed, all four expecting Asia/Taipei rather than UTC.
+Adding only `TZ=Asia/Taipei` to the test environment produced **1,835 passed
+across 126 files**. Product code and assertions were unchanged. Both outputs
+are preserved, not represented as two different product states.
+`npm run build --workspace apps/arkscope-web` also passed, including
+`tsc --noEmit`. Vite still reports the existing large-chunk advisory; no bundling
+refactor was mixed into this backend cleanup.
 
 The 33,000 historical citation test is structural retention stress, not a claim
 to generate that many independently authenticated assessment digests. It checks
@@ -77,7 +99,7 @@ rows. Until granted and actually executed, keep the table and generic reader.
 
 ## Still Pending
 
-Independent parent review, C15 current-installation cleanup/integration, final
+C15 current-installation cleanup/integration and independent review, final
 serial full-suite receipts and the user's SEC/current-feature hand test. C,
 Windows/macOS and Python sandbox remain explicitly separate. No merge/push,
 App restart, production schema change or runtime activation occurred.
