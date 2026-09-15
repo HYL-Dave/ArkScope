@@ -563,3 +563,74 @@ Quick Update once. Verify it before News, then perform background Quick/News on
 the untouched second case. Successful bounded repetitions are still needed for
 a stability claim. No matched live run, merge, push or interpreter switch has
 occurred at this checkpoint.
+
+## Matched Foreground Quick Readback, September 16
+
+The user reloaded the disposable extension and completed the foreground Quick
+control. The 27-file extension overlay and 412 readonly base files still match
+their inventories. Only this foreground case received the new capture; the
+background case remains at the matched starting state.
+
+Persisted job 6 is `sa_alpha_picks_refresh`, `quick`, `succeeded / complete`,
+82,061 ms, all four phases complete, zero recorded or omitted diagnostics. The
+native host's single completed-event receipt reports `persisted=True`, run 6,
+and its client event identity matches the stored `extension_event`. The private
+save-check helper initially assumed separate start/finish events; source review
+and the actual log establish one completed event containing both timestamps.
+The check was corrected to that existing contract, without product or DB edits.
+
+The seeded article's 3,684-character body is byte-identical to the original,
+SHA-256 `a5c4bf3c0c2d5526f41f6e4ab32691e7f0fec9882a47edb57e6ce72b9e16bd40`.
+All ten long paragraphs appear exactly once; no comment heading or complete
+comment text is included. The body was NULL before the run, so this is actual
+acquisition. Authenticated API readback matches the stored body exactly.
+
+Four fresh comment submissions were observed: the seeded body target (62 rows),
+the two previously failed comment targets (124 and 92), and one additional
+incremental comment target (48). Native save logs independently report the same
+prepared counts: **326 submitted/prepared rows, 50 net new comments**. Every
+submitted text hash is present in the stored collection and exact API readback;
+all prior comment IDs and rows remain. The three seeded targets' checkpoints
+advance. Scraper IDs use `syn_...` while the native host/backend deliberately
+normalize them into persistent IDs. Consequently raw-vs-stored ID hashes all
+differ; the unmodified raw mismatch metrics are retained, not misrepresented as
+lost comments. Cross-mode comparison must compare like identity namespaces.
+
+This is a **passing bounded foreground Quick acquisition/save control**, not
+complete historical-comment coverage. The two previously pending recovery
+targets remain pending. The additional target changes `repaired -> pending`:
+48 fresh texts have no overlap with its 23 older retained comments; all 23 remain,
+giving 71 stored comments against an observed provider count of 77. The absence
+of overlap is real new content, not merely regenerated IDs for identical text.
+It is preserved as a coverage observation for the background comparison, not
+silently cleared, diagnosed as data loss, or counted as fully recovered history.
+
+The foreground focus receipt is
+`e7ae248e-c8a3-4d4f-b815-2425173a6a91`: one collector activation, zero suppressed
+activations, 97 samples (82 active, 75 visible, 12 hidden), no navigation/script/
+observation errors, no truncation or removal failure. Its interval and all four
+fresh submissions bind to the persisted job window. Samples do not establish
+continuous visibility between observations or background equivalence.
+
+All six copied SA/profile databases pass `integrity_check`. Full retained-row
+and schema comparisons show **no changes to the background case or original
+fixture**. The original market main/WAL hashes are unchanged; foreground and
+background market hashes match. Foreground changes comprise 50 added comments,
+60 updated article rows, pick/refresh metadata and one added pick/link/lineage;
+its profile changes only by job 6. No prior article/news IDs or nonempty bodies
+are lost or changed, and news rows remain unchanged.
+
+Private readback:
+`data/matched-ab/foreground/evidence/after-quick-g89moqb9/` under the existing
+private fixture, with six checkpoint copies, `readback.json`,
+`fresh-submissions.json`, `native-save-check.json` and
+`comment-window-check.json`. `ab_quick_readback.py` verifies host-side API
+ownership before its contained worker, uses query-only sources/WAL-safe copies
+and authenticated loopback GETs, and emits no article/comment prose.
+`ab_quick_savecheck.py` correlates the native saves and persisted receipt;
+`ab_comment_windows.py` compares only closed checkpoints. No provider credential,
+production DB, source parser, browser mode or production configuration changed.
+
+Next: foreground `Sync Latest News`, then background Quick/News on the untouched
+case. Background equivalence and repeated-run stability remain unaccepted; no
+merge or interpreter switch has occurred.
