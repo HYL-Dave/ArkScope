@@ -22,6 +22,7 @@ def directory(items, *, path=DIRECTORY_PATH):
 @pytest.mark.parametrize("name,path", [
     ("../other.htm", DIRECTORY_PATH), ("/other.htm", DIRECTORY_PATH),
     ("a/b.htm", DIRECTORY_PATH), ("a\\b.htm", DIRECTORY_PATH),
+    ("xslF345X06/form4.xml", DIRECTORY_PATH),
     ("%2e%2e.htm", DIRECTORY_PATH), ("a%252f.htm", DIRECTORY_PATH),
     ("a.htm?x=1", DIRECTORY_PATH), ("a.htm#x", DIRECTORY_PATH),
     ("https:other.htm", DIRECTORY_PATH), ("a\n.htm", DIRECTORY_PATH),

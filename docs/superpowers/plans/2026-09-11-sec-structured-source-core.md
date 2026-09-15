@@ -162,8 +162,13 @@ claim on this snapshot type; its historical pointers are explicit pending work.
   filingDate, form; optional reportDate/acceptanceDateTime/primaryDocument are
   None when absent/empty. All present array columns must share the row count.
   Preserve actual dates; aware accepted timestamps normalize to UTC.
-- [x] Validate accession shape and real document basename (no traversal,
-  slash, encoded path tricks, query/fragment, control or unsafe URL component).
+- [x] Validate accession shape and actual document locator. The 2026-09-15
+  hand test corrected the basename-only assumption: submissions may contain
+  safe accession-relative paths such as `xslF345X06/form4.xml`. Preserve each
+  literal safe component; reject empty/dot/traversal components, encoded path
+  tricks, query/fragment, control characters and absolute URLs. This metadata
+  does not authorize acquisition; observed directory entries and explicit
+  document-read IDs still require single basenames.
   Form actual SEC directory URL only with validated CIK/accession/document.
   No inferred XML URL. Validate historical names against the same CIK and
   `CIK##########-submissions-<digits>.json`; retain declared counts/date bounds.

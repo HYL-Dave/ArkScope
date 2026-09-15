@@ -259,6 +259,7 @@ def test_native_nullable_facts_preserve_query_annotations(rig, optional):
     pytest.param({"reportDate": "", "acceptanceDateTime": "", "primaryDocument": ""}, id="normalized-empty"),
     pytest.param({"reportDate": "2025-12-31", "acceptanceDateTime": "2026-05-01T18:30:00.123-04:00",
                   "primaryDocument": "annual_2025.htm"}, id="normalized-offset-and-document"),
+    pytest.param({"primaryDocument": "xslF345X06/form4.xml"}, id="source-relative-document"),
 ])
 def test_native_nullable_filings_preserve_normalized_fields(rig, optional):
     columns = {"accessionNumber": [FILING_ID.split(":")[1]], "filingDate": ["2026-05-01"],
@@ -296,7 +297,7 @@ def test_document_index_and_empty_search_do_not_invent_passage_citations(evidenc
         assert api.citation_event_fields("read_sec_filing", query.read(FILING_ID, **params)) == {}
 
 
-@pytest.mark.parametrize("mode", ["document_type", "document_fields", "document_hash", "coverage", "section", "directory_source"])
+@pytest.mark.parametrize("mode", ["document_type", "document_fields", "document_hash", "coverage", "section", "directory_source", "nested_directory_entry"])
 def test_malformed_no_passage_document_evidence_is_not_silently_ignored(evidence, mode):
     api, r = owner("citations"), evidence.rig
     page = DocumentQueries(r.store, r.captures).read(FILING_ID)
@@ -311,6 +312,10 @@ def test_malformed_no_passage_document_evidence_is_not_silently_ignored(evidence
         page["coverage"]["capture_id"] = "secdoc_" + "0" * 64
     elif mode == "section":
         page["data"]["sections"] = [{"section_id": "item_1", "label": "Item 1", "start_byte": True, "end_byte": 999999}]
+    elif mode == "nested_directory_entry":
+        page["data"]["documents"][0].update(
+            name="xslF345X06/form4.xml", document_id="file:xslF345X06/form4.xml",
+            url="https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/xslF345X06/form4.xml")
     else:
         page["data"]["documents"][0]["source"]["sha256"] = "0" * 64
     assert api.citation_event_fields("read_sec_filing", page) == {

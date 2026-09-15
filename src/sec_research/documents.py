@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import re
 
-from .catalog import _primary_document
+from .catalog import _document_basename
 from .common import (
     SourceError, SourceRef, accession_value, decode_object, json_pointer,
     normalize_cik, source_ref, text_value,
@@ -83,7 +83,7 @@ def parse_document_directory(body: bytes, *, filing_id: str) -> DocumentDirector
         pointer = json_pointer("directory", "item", index)
         if not isinstance(item, dict):
             raise SourceError("invalid_directory_item", pointer)
-        name = _primary_document(item.get("name"), pointer + "/name")
+        name = _document_basename(item.get("name"), pointer + "/name")
         if name is None:
             raise SourceError("invalid_document", pointer + "/name")
         kind = text_value(item.get("type"), pointer + "/type")

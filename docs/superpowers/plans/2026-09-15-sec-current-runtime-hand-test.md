@@ -12,6 +12,14 @@ authorization. Do not restart old master for this check: its old store
 initialization can recreate an empty legacy table. No interpreter switch or
 automatic App restart accompanied that removal.
 
+The first isolated hand test exposed a submissions parser defect: a valid
+`xslF345X06/form4.xml` primary-document path rejected the whole catalog while
+companyfacts succeeded. See the [repair evidence](../evidence/2026-09-15-sec-primary-path/README.md).
+After restarting the corrected hand-test sidecar, use Resume once to continue
+the pending submissions source. Keep the already completed companyfacts capture;
+do not clear/reset the store. A pending receipt stays pending until actual
+acquisition/persistence succeeds, regardless of the parser repair.
+
 ## Settings And Local Data
 
 1. Open Settings > Data & Sync > SEC structured data. Verify capacity, stored
