@@ -5,7 +5,7 @@ an article-body capture defect. Integration acceptance is blocked on its repair
 and live revalidation. The optional background-tab experiment is not accepted.
 
 Base revision: `4d4a5e2c997576acb3f2d98141b641612e029c95`.
-Final tested product: `13248718b0a91fede0219c8b6ca742d74eb12627`.
+Last fully tested product: `13248718b0a91fede0219c8b6ca742d74eb12627`.
 Current interpreter: Python 3.10.12, linked SQLite 3.37.2. No runtime replacement.
 The user explicitly approved reuse of existing API credentials and App OAuth.
 
@@ -309,7 +309,8 @@ recursive filtering. No live DOM snapshot was captured: the exact winning
 selector/ancestry is not established. Existing identity/scraper tests still
 pass (10 cases in an isolated baseline), demonstrating missing coverage rather
 than remediation. A bounded structure-aware fix and same-article live retest
-have been proposed; product code has not changed for this defect yet.
+were proposed at that checkpoint; the subsequent approved repair is recorded
+below. Those earlier passing tests did not establish remediation.
 
 Private evidence: `FOCUS-PROBE.md`; checkpoints
 `data/evidence/after-focus-background-quick-cz4dt24g` and
@@ -320,9 +321,61 @@ databases or credentials are committed. Both working DB integrity checks are
 `ok`; market main/WAL hashes are unchanged. Production data did not receive
 these test writes. The private `stop.sh` still targets only this fixture.
 
+### Approved Body Repair, September 16
+
+The user approved repairing article-body selection and retesting the same
+article in the disposable copy, without shipping the no-focus experiment.
+The product change is confined to `scrape_detail.js`, with 45 new regression
+cases in `tests/test_sa_extension_article_body.py`.
+
+Known comment rows anchor bottom-up sibling groups. Recognized heading/control
+units join those groups only with row evidence; unclassified prose stops their
+growth and mixed parents remain available. Root/ancestor checks prevent a
+provider-marked descendant from re-entering a rejected comment context. Ranking
+uses retained text instead of the raw comment-inflated length, preserves the
+provider-first tiers and keeps the existing 200-character threshold. Row-bearing
+contexts additionally require retained narrative structure; ambiguous div/span
+UI without such evidence returns unavailable. This is not a claim that arbitrary
+unmarked UI prose can always be distinguished from article prose.
+
+Review exposed and tests reproduced nested-candidate bypass, incidental class
+substring rejection (`no-sidebar`, `commentary-layout`), lost direct/inline prose,
+nested comment-table cells, the first retained table-row separator, and rendered
+text reconstruction problems. The correction uses semantic class tokens,
+preserves direct text around nested wrappers, enumerates table-owned rows/cells,
+keeps rendered separators, treats HTML comments as non-rendering, and excludes
+`display:none` content. Extraction does not mutate the DOM used afterward by
+the comment scraper. No collector navigation, scroll, retry, save or scheduling
+behavior changes in this repair.
+
+Reproducible local evidence under `/tmp/arkscope-sa-body-repair.CGUODf5P`:
+
+- `red-body.xml`: 20 failures / 18 passes, including the original ten passing
+  identity/scraper cases. `red-groups.xml`: four additional failing cases.
+- `red-review.xml`: eleven review regressions fail; `red-render.xml` confirms
+  the table-separator defect with a whitespace-insensitive expectation and the
+  added hidden-content defect. `red-separators.xml`: the added duplicated-block
+  separator regression fails. These overlapping runs are not summed as a suite.
+- `related-final.xml`: one serial run, **266 passed, zero failures/skips**,
+  55.26 seconds, over `tests/test_sa_extension*.py` and `tests/test_sa_tools.py`.
+- `rendered_probe.py` / `run-browser.sh`: actual Chrome 151.0.7922.137 via
+  Playwright, fresh disposable profile, network disabled, Chrome sandbox enabled,
+  no logged-in browser/private-data mounts. Native `innerText` tests initially
+  passed 1/5, then 3/5; the final identical five cases all pass in
+  `native-final.json`. They cover HTML-comment/BR handling, pruned inline/block
+  separators, hidden text, row-anchored grouping, all article paragraphs exactly
+  once, and unchanged DOM. These are synthetic rendering checks, not live-site
+  or background-tab stability acceptance.
+
+Parser SHA-256 verified by the final native-browser run:
+`5f46c807fc8c4c3b45f58dd0751f1e719722c776024e0cb3a894621a3a6fe8bc`.
+The earlier 11,360-test full-suite result belongs to `13248718`; no new full
+backend run or same-article logged-in pass is claimed for this parser repair.
+
 ## Pending
 
-- Repair and live-retest fresh SA article-body capture before acceptance.
+- Live-retest fresh SA article-body capture with the reviewed repair, then run
+  final-revision integration acceptance before merging.
 - The optional no-focus experiment remains failed; no background News run or
   repeated/matched-input stability claim has been made.
 - Integration decision after acceptance.
