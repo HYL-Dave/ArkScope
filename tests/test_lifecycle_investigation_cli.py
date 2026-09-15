@@ -49,3 +49,31 @@ def test_operator_cli_never_guesses_database_paths_or_app_stop_permission():
         main(["install-preview", "--output", "unused"])
     with pytest.raises(SystemExit):
         main(["install", "--profile", "unused", "--backup", "unused-backup", "--approval-sha256", "a" * 64])
+
+
+@pytest.mark.parametrize("command,aliased", (("install-preview", "profile"),
+    ("disposal-preview", "profile"), ("disposal-preview", "market")))
+def test_operator_preview_rejects_input_output_alias_before_creating_it(tmp_path, command, aliased):
+    profile, market = tmp_path / "profile.db", tmp_path / "market.db"
+    output = profile if aliased == "profile" else market
+    args = [command, "--profile", str(profile), "--output", str(output)]
+    if command == "disposal-preview":
+        args += ["--market", str(market)]
+    with pytest.raises(ValueError, match="installation_output_alias"):
+        main(args)
+    assert not profile.exists() and not market.exists()
+
+
+@pytest.mark.parametrize("command", ("install-preview", "disposal-preview"))
+def test_operator_failed_preview_leaves_no_artifact_and_preserves_prior_outputs(tmp_path, command):
+    output = tmp_path / "preview.json"
+    args = [command, "--profile", str(tmp_path / "absent-profile.db"), "--output", str(output)]
+    if command == "disposal-preview":
+        args += ["--market", str(tmp_path / "absent-market.db")]
+    with pytest.raises((OSError, ValueError, sqlite3.Error, RuntimeError)):
+        main(args)
+    assert not output.exists()
+    output.write_text("retained approval")
+    with pytest.raises(FileExistsError):
+        main(args)
+    assert output.read_text() == "retained approval"

@@ -1,6 +1,7 @@
 """Exercise the current operator entrypoint, not a test-only installation caller."""
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -109,3 +110,103 @@ def test_current_module_cli_has_discoverable_install_options():
     assert result.returncode == 0
     for flag in ("--profile", "--sa", "--backup", "--cutover-sha256", "--app-stopped"):
         assert flag in result.stdout
+
+
+@pytest.mark.parametrize("command", ("inspect", "install-preview"))
+@pytest.mark.parametrize("malformed", (False, True))
+def test_failed_profile_preview_leaves_no_artifact_and_can_retry(tmp_path, command, malformed):
+    profile = tmp_path / "profile.db"
+    output = tmp_path / "preview.json"
+    sa = capture(tmp_path)
+    if malformed:
+        profile.write_bytes(b"not a database")
+    args = [command, "--profile", profile, "--output", output]
+    if command == "install-preview":
+        args += ["--sa", sa]
+    result = invoke(*args)
+    assert result.returncode != 0
+    assert not output.exists()
+    assert profile.exists() is malformed
+    if malformed:
+        assert profile.read_bytes() == b"not a database"
+        profile.unlink()
+    seeded_current_profile(tmp_path)
+    value = receipt(*args)
+    assert json.loads(output.read_text()) == value
+
+
+@pytest.mark.parametrize("malformed", (False, True))
+def test_failed_sa_preview_leaves_no_artifact_and_can_retry(tmp_path, malformed):
+    profile = seeded_current_profile(tmp_path)
+    sa, output = tmp_path / "sa.db", tmp_path / "preview.json"
+    if malformed:
+        sa.write_bytes(b"not a capture database")
+    args = ["install-preview", "--profile", profile, "--sa", sa, "--output", output]
+    result = invoke(*args)
+    assert result.returncode != 0
+    assert not output.exists()
+    assert sa.exists() is malformed
+    if malformed:
+        assert sa.read_bytes() == b"not a capture database"
+        sa.unlink()
+    capture(tmp_path)
+    assert receipt(*args)["lineage_count"] == 3
+
+
+@pytest.mark.parametrize("command,aliased", (("inspect", "profile"),
+    ("install-preview", "profile"), ("install-preview", "sa")))
+@pytest.mark.parametrize("symlink", (False, True))
+def test_preview_refuses_input_output_alias_without_creating_input(tmp_path, command, aliased, symlink):
+    paths = {name: tmp_path / f"{name}.db" for name in ("profile", "sa")}
+    output = paths[aliased]
+    if symlink:
+        output = tmp_path / "output.json"
+        output.symlink_to(paths[aliased])
+    args = [command, "--profile", paths["profile"], "--output", output]
+    if command == "install-preview":
+        args += ["--sa", paths["sa"]]
+    result = invoke(*args)
+    assert result.returncode != 0 and "installation_output_alias" in result.stderr
+    assert not paths["profile"].exists() and not paths["sa"].exists()
+    if symlink:
+        assert output.is_symlink()
+
+
+@pytest.mark.parametrize("replaced", (False, True))
+def test_preview_write_failure_removes_only_its_own_partial_file(tmp_path, monkeypatch, replaced):
+    from src import sa_tracking_installation as installation
+
+    profile = seeded_current_profile(tmp_path)
+    output = tmp_path / "preview.json"
+    original_open = Path.open
+
+    @contextmanager
+    def failing_output(path, *args, **kwargs):
+        with original_open(path, *args, **kwargs) as handle:
+            if path != output or args != ("x",):
+                yield handle
+                return
+
+            class InterruptedWrite:
+                def fileno(self):
+                    return handle.fileno()
+
+                def write(self, value):
+                    handle.write(value[:5])
+                    if replaced:
+                        output.unlink()
+                        with original_open(output, "x") as replacement:
+                            replacement.write("unrelated replacement")
+                    raise OSError("interrupted preview write")
+
+            yield InterruptedWrite()
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "open", failing_output)
+        with pytest.raises(OSError, match="interrupted preview write"):
+            installation.main(["inspect", "--profile", str(profile), "--output", str(output)])
+    if replaced:
+        assert output.read_text() == "unrelated replacement"
+    else:
+        assert not output.exists()
+        assert receipt("inspect", "--profile", profile, "--output", output)["schema_version"] == "v4"
