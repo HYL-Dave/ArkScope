@@ -459,6 +459,44 @@ def test_real_persistence_reopens_bytes_precision_receipts_and_resume(durable, s
     assert second.stored(CIK)["fact_count"] == 1
 
 
+def test_relative_primary_document_does_not_discard_other_filings(durable):
+    from src.sec_research.citations import sec_citations_from_envelope
+    from src.sec_research.queries import StoredQueries
+
+    service, store, captures, transport = durable
+    payload = json.loads(submissions(history=False))
+    payload["filings"]["recent"] = {
+        "accessionNumber": ["0000950170-26-000001", "0000320193-26-000002"],
+        "filingDate": ["2026-05-01", "2026-04-30"],
+        "form": ["4", "10-K"],
+        "primaryDocument": ["xslF345X06/form4.xml", "annual.htm"],
+    }
+    raw = json.dumps(payload).encode()
+    # Match the hand-test checkpoint: financial facts already retained,
+    # submissions still pending. Resuming must not reacquire the facts.
+    transport.responses[SUBMISSIONS_URL] = SecResponse(503, b"unavailable")
+    service.refresh(CIK)
+    transport.responses[SUBMISSIONS_URL] = raw
+    assert store.latest_receipt(CIK)["completed"] == ["companyfacts"]
+    before_facts = store.facts(CIK)
+    transport.calls.clear()
+
+    receipt = service.refresh(CIK, resume=True)
+
+    assert receipt["status"] == "ok"
+    assert receipt["gaps"] == [] and receipt["pending"] == []
+    assert [url for url, _ in transport.calls] == [SUBMISSIONS_URL]
+    assert store.facts(CIK) == before_facts
+    assert captures.read(hashlib.sha256(raw).hexdigest()) == raw
+    page = StoredQueries(store).filings(CIK)
+    assert {row["primary_document"] for row in page["data"]} == {
+        "xslF345X06/form4.xml", "annual.htm"}
+    assert len(sec_citations_from_envelope("list_sec_filings", page)) == 2
+    annual = StoredQueries(store).filings(CIK, forms=["10-K"])
+    assert annual["status"] == "ok"
+    assert [row["primary_document"] for row in annual["data"]] == ["annual.htm"]
+
+
 def test_real_provider_and_parser_run_outside_sqlite_market_and_capture_write_locks(durable, monkeypatch):
     from src.market_data_direct import market_write_lock
     from src.sec_research.capture_lock import capture_writer

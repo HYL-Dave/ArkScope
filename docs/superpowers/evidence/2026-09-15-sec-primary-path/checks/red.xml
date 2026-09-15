@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="66" time="1.290" timestamp="2026-09-15T15:28:14.959606+08:00" hostname="ais"><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[issuer-20260331.htm-False]" time="0.022" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[issuer-20260331.htm-True]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[real_document.xml-False]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[real_document.xml-True]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[exhibit.htm-False]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[exhibit.htm-True]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[xslF345X06/form4.xml-False]" time="0.002"><failure message="src.sec_research.common.SourceError: ('invalid_document', '/filings/recent/primaryDocument/0')">catalog = &lt;module 'src.sec_research.catalog' from '/tmp/arkscope-research-output-boundary/src/sec_research/catalog.py'&gt;
+name = 'xslF345X06/form4.xml', historical = False
+
+    @pytest.mark.parametrize("historical", [False, True])
+    @pytest.mark.parametrize("name", ["issuer-20260331.htm", "real_document.xml", "exhibit.htm",
+                                    "xslF345X06/form4.xml", "a/b.htm", "a/b/c.htm"])
+    def test_primary_url_uses_actual_document_name(catalog, name, historical):
+        rows = arrays(primaryDocument=[name])
+        raw = body(rows if historical else document(rows))
+&gt;       filing, = catalog.parse_submissions(raw, cik=CIK, historical_name=HISTORY if historical else None).filings
+
+tests/test_sec_research_catalog.py:115:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/sec_research/catalog.py:155: in parse_submissions
+    filings = _filings(container.get("recent"), cik=cik, sha256=sha256, parts=("filings", "recent"))
+src/sec_research/catalog.py:104: in _filings
+    document = _primary_document(optional("primaryDocument"), pointer("primaryDocument"))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = 'xslF345X06/form4.xml', pointer = '/filings/recent/primaryDocument/0'
+
+    def _primary_document(value, pointer):
+        if value is None or value == "":
+            return None
+        # A conservative literal basename avoids decoding or rewriting URL components.
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*", value):
+&gt;           raise SourceError("invalid_document", pointer)
+E           src.sec_research.common.SourceError: ('invalid_document', '/filings/recent/primaryDocument/0')
+
+src/sec_research/catalog.py:72: SourceError</failure></testcase><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[xslF345X06/form4.xml-True]" time="0.002"><failure message="src.sec_research.common.SourceError: ('invalid_document', '/primaryDocument/0')">catalog = &lt;module 'src.sec_research.catalog' from '/tmp/arkscope-research-output-boundary/src/sec_research/catalog.py'&gt;
+name = 'xslF345X06/form4.xml', historical = True
+
+    @pytest.mark.parametrize("historical", [False, True])
+    @pytest.mark.parametrize("name", ["issuer-20260331.htm", "real_document.xml", "exhibit.htm",
+                                    "xslF345X06/form4.xml", "a/b.htm", "a/b/c.htm"])
+    def test_primary_url_uses_actual_document_name(catalog, name, historical):
+        rows = arrays(primaryDocument=[name])
+        raw = body(rows if historical else document(rows))
+&gt;       filing, = catalog.parse_submissions(raw, cik=CIK, historical_name=HISTORY if historical else None).filings
+
+tests/test_sec_research_catalog.py:115:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/sec_research/catalog.py:150: in parse_submissions
+    filings = _filings(columns, cik=cik, sha256=sha256, parts=())
+src/sec_research/catalog.py:104: in _filings
+    document = _primary_document(optional("primaryDocument"), pointer("primaryDocument"))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = 'xslF345X06/form4.xml', pointer = '/primaryDocument/0'
+
+    def _primary_document(value, pointer):
+        if value is None or value == "":
+            return None
+        # A conservative literal basename avoids decoding or rewriting URL components.
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*", value):
+&gt;           raise SourceError("invalid_document", pointer)
+E           src.sec_research.common.SourceError: ('invalid_document', '/primaryDocument/0')
+
+src/sec_research/catalog.py:72: SourceError</failure></testcase><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[a/b.htm-False]" time="0.002"><failure message="src.sec_research.common.SourceError: ('invalid_document', '/filings/recent/primaryDocument/0')">catalog = &lt;module 'src.sec_research.catalog' from '/tmp/arkscope-research-output-boundary/src/sec_research/catalog.py'&gt;
+name = 'a/b.htm', historical = False
+
+    @pytest.mark.parametrize("historical", [False, True])
+    @pytest.mark.parametrize("name", ["issuer-20260331.htm", "real_document.xml", "exhibit.htm",
+                                    "xslF345X06/form4.xml", "a/b.htm", "a/b/c.htm"])
+    def test_primary_url_uses_actual_document_name(catalog, name, historical):
+        rows = arrays(primaryDocument=[name])
+        raw = body(rows if historical else document(rows))
+&gt;       filing, = catalog.parse_submissions(raw, cik=CIK, historical_name=HISTORY if historical else None).filings
+
+tests/test_sec_research_catalog.py:115:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/sec_research/catalog.py:155: in parse_submissions
+    filings = _filings(container.get("recent"), cik=cik, sha256=sha256, parts=("filings", "recent"))
+src/sec_research/catalog.py:104: in _filings
+    document = _primary_document(optional("primaryDocument"), pointer("primaryDocument"))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = 'a/b.htm', pointer = '/filings/recent/primaryDocument/0'
+
+    def _primary_document(value, pointer):
+        if value is None or value == "":
+            return None
+        # A conservative literal basename avoids decoding or rewriting URL components.
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*", value):
+&gt;           raise SourceError("invalid_document", pointer)
+E           src.sec_research.common.SourceError: ('invalid_document', '/filings/recent/primaryDocument/0')
+
+src/sec_research/catalog.py:72: SourceError</failure></testcase><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[a/b.htm-True]" time="0.002"><failure message="src.sec_research.common.SourceError: ('invalid_document', '/primaryDocument/0')">catalog = &lt;module 'src.sec_research.catalog' from '/tmp/arkscope-research-output-boundary/src/sec_research/catalog.py'&gt;
+name = 'a/b.htm', historical = True
+
+    @pytest.mark.parametrize("historical", [False, True])
+    @pytest.mark.parametrize("name", ["issuer-20260331.htm", "real_document.xml", "exhibit.htm",
+                                    "xslF345X06/form4.xml", "a/b.htm", "a/b/c.htm"])
+    def test_primary_url_uses_actual_document_name(catalog, name, historical):
+        rows = arrays(primaryDocument=[name])
+        raw = body(rows if historical else document(rows))
+&gt;       filing, = catalog.parse_submissions(raw, cik=CIK, historical_name=HISTORY if historical else None).filings
+
+tests/test_sec_research_catalog.py:115:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/sec_research/catalog.py:150: in parse_submissions
+    filings = _filings(columns, cik=cik, sha256=sha256, parts=())
+src/sec_research/catalog.py:104: in _filings
+    document = _primary_document(optional("primaryDocument"), pointer("primaryDocument"))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = 'a/b.htm', pointer = '/primaryDocument/0'
+
+    def _primary_document(value, pointer):
+        if value is None or value == "":
+            return None
+        # A conservative literal basename avoids decoding or rewriting URL components.
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*", value):
+&gt;           raise SourceError("invalid_document", pointer)
+E           src.sec_research.common.SourceError: ('invalid_document', '/primaryDocument/0')
+
+src/sec_research/catalog.py:72: SourceError</failure></testcase><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[a/b/c.htm-False]" time="0.002"><failure message="src.sec_research.common.SourceError: ('invalid_document', '/filings/recent/primaryDocument/0')">catalog = &lt;module 'src.sec_research.catalog' from '/tmp/arkscope-research-output-boundary/src/sec_research/catalog.py'&gt;
+name = 'a/b/c.htm', historical = False
+
+    @pytest.mark.parametrize("historical", [False, True])
+    @pytest.mark.parametrize("name", ["issuer-20260331.htm", "real_document.xml", "exhibit.htm",
+                                    "xslF345X06/form4.xml", "a/b.htm", "a/b/c.htm"])
+    def test_primary_url_uses_actual_document_name(catalog, name, historical):
+        rows = arrays(primaryDocument=[name])
+        raw = body(rows if historical else document(rows))
+&gt;       filing, = catalog.parse_submissions(raw, cik=CIK, historical_name=HISTORY if historical else None).filings
+
+tests/test_sec_research_catalog.py:115:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/sec_research/catalog.py:155: in parse_submissions
+    filings = _filings(container.get("recent"), cik=cik, sha256=sha256, parts=("filings", "recent"))
+src/sec_research/catalog.py:104: in _filings
+    document = _primary_document(optional("primaryDocument"), pointer("primaryDocument"))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = 'a/b/c.htm', pointer = '/filings/recent/primaryDocument/0'
+
+    def _primary_document(value, pointer):
+        if value is None or value == "":
+            return None
+        # A conservative literal basename avoids decoding or rewriting URL components.
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*", value):
+&gt;           raise SourceError("invalid_document", pointer)
+E           src.sec_research.common.SourceError: ('invalid_document', '/filings/recent/primaryDocument/0')
+
+src/sec_research/catalog.py:72: SourceError</failure></testcase><testcase classname="tests.test_sec_research_catalog" name="test_primary_url_uses_actual_document_name[a/b/c.htm-True]" time="0.002"><failure message="src.sec_research.common.SourceError: ('invalid_document', '/primaryDocument/0')">catalog = &lt;module 'src.sec_research.catalog' from '/tmp/arkscope-research-output-boundary/src/sec_research/catalog.py'&gt;
+name = 'a/b/c.htm', historical = True
+
+    @pytest.mark.parametrize("historical", [False, True])
+    @pytest.mark.parametrize("name", ["issuer-20260331.htm", "real_document.xml", "exhibit.htm",
+                                    "xslF345X06/form4.xml", "a/b.htm", "a/b/c.htm"])
+    def test_primary_url_uses_actual_document_name(catalog, name, historical):
+        rows = arrays(primaryDocument=[name])
+        raw = body(rows if historical else document(rows))
+&gt;       filing, = catalog.parse_submissions(raw, cik=CIK, historical_name=HISTORY if historical else None).filings
+
+tests/test_sec_research_catalog.py:115:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/sec_research/catalog.py:150: in parse_submissions
+    filings = _filings(columns, cik=cik, sha256=sha256, parts=())
+src/sec_research/catalog.py:104: in _filings
+    document = _primary_document(optional("primaryDocument"), pointer("primaryDocument"))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = 'a/b/c.htm', pointer = '/primaryDocument/0'
+
+    def _primary_document(value, pointer):
+        if value is None or value == "":
+            return None
+        # A conservative literal basename avoids decoding or rewriting URL components.
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*", value):
+&gt;           raise SourceError("invalid_document", pointer)
+E           src.sec_research.common.SourceError: ('invalid_document', '/primaryDocument/0')
+
+src/sec_research/catalog.py:72: SourceError</failure></testcase><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[../a.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[/a.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a/../b.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a/./b.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a//b.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a/]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[//other.example/a.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a/%2e%2e/b.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a/b.htm?x=1]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a/b.htm#x]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a\\b.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[%2e%2e.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a%252f.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a.htm?x=1]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a.htm#x]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a\n.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[a b.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[https:a.htm]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[.]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[..]" time="0.002" /><testcase classname="tests.test_sec_research_catalog" name="test_primary_document_rejects_unsafe_url_components[1]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[../other.htm-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[/other.htm-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[a/b.htm-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[a\\b.htm-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[xslF345X06/form4.xml-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[%2e%2e.htm-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[a%252f.htm-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[a.htm?x=1-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[a.htm#x-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[https:other.htm-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[a\n.htm-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[a b.htm-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[.-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[..-/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[primary.htm-/Archives/edgar/data/320193/000095017026000002]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[primary.htm-/Archives/edgar/data/1/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_documents" name="test_directory_rejects_escape_and_cross_accession[primary.htm-https://www.sec.gov/Archives/edgar/data/320193/000095017026000001]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes0]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes1]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes2]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes3]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes4]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes5]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes6]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes7]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes8]" time="0.002" /><testcase classname="tests.test_sec_research_document_queries" name="test_pure_validation_rejects_before_storage[changes9]" time="0.003" /><testcase classname="tests.test_sec_research_citations" name="test_native_nullable_filings_preserve_normalized_fields[omitted]" time="0.158" /><testcase classname="tests.test_sec_research_citations" name="test_native_nullable_filings_preserve_normalized_fields[nulls]" time="0.049" /><testcase classname="tests.test_sec_research_citations" name="test_native_nullable_filings_preserve_normalized_fields[normalized-empty]" time="0.047" /><testcase classname="tests.test_sec_research_citations" name="test_native_nullable_filings_preserve_normalized_fields[normalized-offset-and-document]" time="0.048" /><testcase classname="tests.test_sec_research_citations" name="test_native_nullable_filings_preserve_normalized_fields[source-relative-document]" time="0.029"><failure message="src.sec_research.common.SourceError: ('invalid_document', '/filings/recent/primaryDocument/0')">rig = namespace(store=&lt;src.sec_research.store.Store object at 0x75f55d17cd90&gt;, queue=[], requests=[], readers=[], before=Non..., factory=&lt;function rig.&lt;locals&gt;.factory at 0x75f55d16ed40&gt;, enqueue=&lt;function rig.&lt;locals&gt;.enqueue at 0x75f55d16ef80&gt;)
+optional = {'primaryDocument': 'xslF345X06/form4.xml'}
+
+    @pytest.mark.parametrize("optional", [
+        pytest.param({}, id="omitted"),
+        pytest.param({"reportDate": None, "acceptanceDateTime": None, "primaryDocument": None}, id="nulls"),
+        pytest.param({"reportDate": "", "acceptanceDateTime": "", "primaryDocument": ""}, id="normalized-empty"),
+        pytest.param({"reportDate": "2025-12-31", "acceptanceDateTime": "2026-05-01T18:30:00.123-04:00",
+                      "primaryDocument": "annual_2025.htm"}, id="normalized-offset-and-document"),
+        pytest.param({"primaryDocument": "xslF345X06/form4.xml"}, id="source-relative-document"),
+    ])
+    def test_native_nullable_filings_preserve_normalized_fields(rig, optional):
+        columns = {"accessionNumber": [FILING_ID.split(":")[1]], "filingDate": ["2026-05-01"],
+                   "form": ["10-K"]} | {key: [value] for key, value in optional.items()}
+        raw = json.dumps({"cik": 320193, "filings": {"recent": columns}}).encode()
+&gt;       parsed = parse_submissions(raw, cik=CIK)
+
+tests/test_sec_research_citations.py:268:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src/sec_research/catalog.py:155: in parse_submissions
+    filings = _filings(container.get("recent"), cik=cik, sha256=sha256, parts=("filings", "recent"))
+src/sec_research/catalog.py:104: in _filings
+    document = _primary_document(optional("primaryDocument"), pointer("primaryDocument"))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+value = 'xslF345X06/form4.xml', pointer = '/filings/recent/primaryDocument/0'
+
+    def _primary_document(value, pointer):
+        if value is None or value == "":
+            return None
+        # A conservative literal basename avoids decoding or rewriting URL components.
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*", value):
+&gt;           raise SourceError("invalid_document", pointer)
+E           src.sec_research.common.SourceError: ('invalid_document', '/filings/recent/primaryDocument/0')
+
+src/sec_research/catalog.py:72: SourceError</failure></testcase><testcase classname="tests.test_sec_research_service" name="test_relative_primary_document_does_not_discard_other_filings" time="0.071"><failure message="AssertionError: assert 'partial' == 'ok'&#10;  &#10;  - ok&#10;  + partial">durable = (&lt;src.sec_research.service.ResearchService object at 0x75f557f24c70&gt;, &lt;src.sec_research.store.Store object at 0x75f557....captures.CaptureStore object at 0x75f557f24c40&gt;, &lt;tests.test_sec_research_service.Transport object at 0x75f557f24b80&gt;)
+
+    def test_relative_primary_document_does_not_discard_other_filings(durable):
+        from src.sec_research.citations import sec_citations_from_envelope
+        from src.sec_research.queries import StoredQueries
+
+        service, store, captures, transport = durable
+        payload = json.loads(submissions(history=False))
+        payload["filings"]["recent"] = {
+            "accessionNumber": ["0000950170-26-000001", "0000320193-26-000002"],
+            "filingDate": ["2026-05-01", "2026-04-30"],
+            "form": ["4", "10-K"],
+            "primaryDocument": ["xslF345X06/form4.xml", "annual.htm"],
+        }
+        raw = json.dumps(payload).encode()
+        # Match the hand-test checkpoint: financial facts already retained,
+        # submissions still pending. Resuming must not reacquire the facts.
+        transport.responses[SUBMISSIONS_URL] = SecResponse(503, b"unavailable")
+        service.refresh(CIK)
+        transport.responses[SUBMISSIONS_URL] = raw
+        assert store.latest_receipt(CIK)["completed"] == ["companyfacts"]
+        before_facts = store.facts(CIK)
+        transport.calls.clear()
+
+        receipt = service.refresh(CIK, resume=True)
+
+&gt;       assert receipt["status"] == "ok"
+E       AssertionError: assert 'partial' == 'ok'
+E
+E         - ok
+E         + partial
+
+tests/test_sec_research_service.py:486: AssertionError</failure></testcase></testsuite></testsuites>

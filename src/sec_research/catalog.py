@@ -64,12 +64,25 @@ def _accepted_at(value, pointer):
         raise SourceError("invalid_timestamp", pointer) from None
 
 
-def _primary_document(value, pointer):
+def _document_basename(value, pointer):
     if value is None or value == "":
         return None
     # A conservative literal basename avoids decoding or rewriting URL components.
     if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_.-]*", value):
         raise SourceError("invalid_document", pointer)
+    return value
+
+
+def _primary_document(value, pointer):
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        raise SourceError("invalid_document", pointer)
+    # Submissions can name an XSL-rendered path, e.g. xslF345X06/form4.xml.
+    # Preserve it as metadata; it does not authorize a document download.
+    for part in value.split("/"):
+        if _document_basename(part, pointer) is None:
+            raise SourceError("invalid_document", pointer)
     return value
 
 

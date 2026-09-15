@@ -1,0 +1,60 @@
+{
+  "red": {
+    "collected_selected": 66,
+    "passed": 58,
+    "failed": 8,
+    "skipped": 0,
+    "failure_ids": [
+      "tests.test_sec_research_catalog::test_primary_url_uses_actual_document_name[xslF345X06/form4.xml-False]",
+      "tests.test_sec_research_catalog::test_primary_url_uses_actual_document_name[xslF345X06/form4.xml-True]",
+      "tests.test_sec_research_catalog::test_primary_url_uses_actual_document_name[a/b.htm-False]",
+      "tests.test_sec_research_catalog::test_primary_url_uses_actual_document_name[a/b.htm-True]",
+      "tests.test_sec_research_catalog::test_primary_url_uses_actual_document_name[a/b/c.htm-False]",
+      "tests.test_sec_research_catalog::test_primary_url_uses_actual_document_name[a/b/c.htm-True]",
+      "tests.test_sec_research_citations::test_native_nullable_filings_preserve_normalized_fields[source-relative-document]",
+      "tests.test_sec_research_service::test_relative_primary_document_does_not_discard_other_filings"
+    ]
+  },
+  "green": {
+    "collected_selected": 381,
+    "passed": 381,
+    "failed": 0,
+    "skipped": 0,
+    "failure_ids": []
+  },
+  "integration": {
+    "collected_selected": 653,
+    "passed": 653,
+    "failed": 0,
+    "skipped": 0,
+    "failure_ids": []
+  },
+  "candidate": {
+    "collected_selected": 1034,
+    "passed": 1034,
+    "failed": 0,
+    "skipped": 0,
+    "failure_ids": []
+  },
+  "paired_case_ids_identical": true,
+  "boundary_mutation": {
+    "collected_selected": 1,
+    "failed": 1,
+    "expected_failure": true
+  },
+  "boundary_current": {
+    "collected_selected": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "boundary_candidate": {
+    "collected_selected": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "aggregate_current_unique_passed": 1035,
+  "aggregate_candidate_unique_passed": 1035,
+  "aggregate_paired_case_ids_identical": true
+}

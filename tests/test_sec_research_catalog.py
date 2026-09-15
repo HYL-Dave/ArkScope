@@ -106,14 +106,22 @@ def test_amendments_remain_distinct_accessions(catalog):
     assert first.filing_id != second.filing_id
 
 
-@pytest.mark.parametrize("name", ["issuer-20260331.htm", "real_document.xml", "exhibit.htm"])
-def test_primary_url_uses_actual_document_name(catalog, name):
-    filing, = catalog.parse_submissions(body(document(arrays(primaryDocument=[name]))), cik=CIK).filings
+@pytest.mark.parametrize("historical", [False, True])
+@pytest.mark.parametrize("name", ["issuer-20260331.htm", "real_document.xml", "exhibit.htm",
+                                "xslF345X06/form4.xml", "a/b.htm", "a/b/c.htm"])
+def test_primary_url_uses_actual_document_name(catalog, name, historical):
+    rows = arrays(primaryDocument=[name])
+    raw = body(rows if historical else document(rows))
+    filing, = catalog.parse_submissions(raw, cik=CIK, historical_name=HISTORY if historical else None).filings
     assert filing.primary_document == name
     assert filing.primary_url == "https://www.sec.gov/Archives/edgar/data/320193/000095017026000001/" + name
 
 
-@pytest.mark.parametrize("name", ["../a.htm", "/a.htm", "a/b.htm", "a\\b.htm", "%2e%2e.htm", "a%252f.htm", "a.htm?x=1", "a.htm#x", "a\n.htm", "a b.htm", "https:a.htm", ".", "..", 1])
+@pytest.mark.parametrize("name", ["../a.htm", "/a.htm", "a/../b.htm", "a/./b.htm",
+                                "a//b.htm", "a/", "//other.example/a.htm", "a/%2e%2e/b.htm",
+                                "a/b.htm?x=1", "a/b.htm#x", "a\\b.htm", "%2e%2e.htm",
+                                "a%252f.htm", "a.htm?x=1", "a.htm#x", "a\n.htm", "a b.htm",
+                                "https:a.htm", ".", "..", 1])
 def test_primary_document_rejects_unsafe_url_components(catalog, name):
     with pytest.raises(catalog.SourceError) as caught:
         catalog.parse_submissions(body(document(arrays(primaryDocument=[name]))), cik=CIK)

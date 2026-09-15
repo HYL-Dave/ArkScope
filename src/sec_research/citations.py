@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 
 from .captures import MAX_OBJECT_BYTES
 from .capture_lock import research_operation
-from .catalog import Filing, _accepted_at, _primary_document
+from .catalog import Filing, _accepted_at, _document_basename, _primary_document
 from .common import accession_value, date_value, normalize_cik, text_value
 from .documents import directory_url, parse_filing_id
 from .facts import FactObservation
@@ -235,7 +235,7 @@ def _document_data(data, coverage):
     for entry in data["documents"]:
         if not isinstance(entry, dict) or set(entry) != {"name", "document_id", "url", "size_bytes", "source"}:
             raise ValueError
-        name = _primary_document(entry["name"], "")
+        name = _document_basename(entry["name"], "")
         source = entry["source"]
         if (name is None or entry["document_id"] != "file:" + name or entry["url"] != root + name
                 or entry["size_bytes"] is not None and (type(entry["size_bytes"]) is not int or entry["size_bytes"] < 0)

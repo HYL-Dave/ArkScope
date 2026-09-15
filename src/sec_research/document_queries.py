@@ -6,7 +6,7 @@ from dataclasses import asdict
 import json
 import re
 
-from .catalog import _primary_document
+from .catalog import _document_basename
 from .capture_lock import research_operation
 from .document_store import DocumentStore
 from .documents import parse_document_directory, parse_filing_id
@@ -52,7 +52,7 @@ def validate_document_query(filing_id, *, document_id="primary", capture_id=None
         parse_filing_id(filing_id)
         if document_id != "primary":
             if (not isinstance(document_id, str) or not document_id.startswith("file:")
-                    or _primary_document(document_id[5:], "") is None):
+                    or _document_basename(document_id[5:], "") is None):
                 raise ValueError
         if (not isinstance(document_id, str)
                 or capture_id is not None and not _capture_id(capture_id)

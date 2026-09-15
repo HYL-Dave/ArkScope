@@ -151,6 +151,7 @@ def test_primary_alias_never_reopens_non_primary_capture(rig):
 
 @pytest.mark.parametrize("changes", [{"max_chars": True}, {"max_chars": 0}, {"max_chars": 20001},
     {"query": ""}, {"query": "\ud800"}, {"document_id": "file:../x"},
+    {"document_id": "file:xslF345X06/form4.xml"},
     {"document_id": "https://evil.example/x"}, {"capture_id": "bad"}, {"cursor": "bad"}])
 def test_pure_validation_rejects_before_storage(changes):
     class Forbidden:
