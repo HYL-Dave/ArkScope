@@ -1,0 +1,65 @@
+{
+  "product_test_revision": "2aeed54a1a3bb55b2182da2512ca14db2cc08e4d",
+  "source_archive_sha256": "316554c4c6e9a4ec77c84a466ecd1c28dbaef8c029c4ee62cb2034e228e20c49",
+  "runs": {
+    "control": {
+      "engine": "3.37.2",
+      "tests": 11257,
+      "passed": 11245,
+      "skipped": 12,
+      "failures": 0,
+      "exit_code": 0,
+      "console_duration_seconds": 1379.96,
+      "junit_duration_seconds": 1379.426,
+      "main_entries": 1,
+      "path_aliases_match": true,
+      "loader_overrides": false,
+      "junit_sha256": "eabadce42cf1a515d59ca5919fe6655b2a1f7f4e4d3a7c7f38c3003c17b434a2"
+    },
+    "candidate": {
+      "engine": "3.53.1",
+      "tests": 11257,
+      "passed": 11245,
+      "skipped": 12,
+      "failures": 0,
+      "exit_code": 0,
+      "console_duration_seconds": 1423.09,
+      "junit_duration_seconds": 1422.557,
+      "main_entries": 1,
+      "path_aliases_match": true,
+      "loader_overrides": false,
+      "junit_sha256": "c6b7f197494a208028015dbe8f162edb0bd205f34e184e86104bb6dea769f678"
+    }
+  },
+  "test_identities_equal": true,
+  "skipped_identities_equal": true,
+  "manual_skips_match_prior": true,
+  "skipped_identities": [
+    "tests.test_detailed_financials.TestLiveTechMetrics::test_nvda_tech_metrics",
+    "tests.test_ibkr_scanner::test_basic_stock_scan",
+    "tests.test_ibkr_scanner::test_connection",
+    "tests.test_ibkr_scanner::test_iv_scan",
+    "tests.test_ibkr_scanner::test_option_filter",
+    "tests.test_ibkr_scanner::test_option_quote",
+    "tests.test_ibkr_scanner::test_option_volume_scan",
+    "tests.test_ibkr_scanner::test_put_call_ratio_scan",
+    "tests.test_ibkr_scanner::test_scanner_parameters",
+    "tests.test_ibkr_scanner::test_unusual_activity",
+    "tests.test_option_chain_tools.TestLiveOptionChain::test_spy_option_chain",
+    "tests.test_peer_comparison.TestLivePeerComparison::test_nvda_peer_comparison"
+  ],
+  "post_run_source_checks": {
+    "control": {
+      "files_checked": 11894,
+      "mismatches": [],
+      "git_diff_exit_code": 0
+    },
+    "candidate": {
+      "files_checked": 11894,
+      "mismatches": [],
+      "git_diff_exit_code": 0
+    }
+  },
+  "production_admitted": false,
+  "production_activated": false
+}

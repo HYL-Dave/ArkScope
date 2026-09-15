@@ -137,11 +137,14 @@ that consistent version. No product code was changed for the runner correction.
 | Authoritative full run | Result |
 | --- | --- |
 | SQLite 3.37.2 control | **11,245 passed / 12 skipped**, 1,379.96s, exit 0 |
-| SQLite 3.53.1 candidate | Running; not yet accepted |
+| SQLite 3.53.1 candidate | **11,245 passed / 12 skipped**, 1,423.09s, exit 0 |
 
-The control has exactly one pytest main entry and an unchanged source diff.
-All 12 skipped identities match the prior manual tests after removing the
-retired source-dependent runtime tests. Node accounting is explicit:
+Both have exactly one pytest main entry, an unchanged source diff, and all
+11,894 archived files still byte-identical after execution. The 11,257 unique
+test identities and all 12 skipped identities match between engines; the skips
+also match the prior manual tests after removing the retired source-dependent
+runtime tests. The paired summary records XML hashes, observed engine/PATH,
+console versus JUnit duration and post-run source checks. Node accounting is explicit:
 11,216 before - 94 removed + 135 added = **11,257**. Removed identities are
 72 self-build cases, 21 obsolete converter cases and one unused query-writer
 case. Added identities and their owners are in `test-node-accounting.json`.
@@ -191,7 +194,8 @@ rows. Until granted and actually executed, keep the table and generic reader.
 
 ## Still Pending
 
-Candidate full-suite completion and paired receipts, plus the user's
-SEC/current-feature hand test and C20 retained-data authorization. C,
+The user's [SEC/current-feature hand test](../../plans/2026-09-15-sec-current-runtime-hand-test.md)
+and C20 retained-data authorization. A+B and C15 code retirement have passed
+paired full acceptance; neither old query contents nor their table were deleted. C,
 Windows/macOS and Python sandbox remain explicitly separate. No merge/push,
 App restart, production schema change or runtime activation occurred.

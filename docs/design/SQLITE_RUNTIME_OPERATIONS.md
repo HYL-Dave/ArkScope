@@ -54,9 +54,10 @@ the chosen platform/Python version has no matching binary.
 6. Run full application acceptance serially against the supplied binary. No
    SQLite archive or compiler is needed for binary acceptance. Report exactly
    which behavioral owners run, move or are removed; no hidden skips to make a
-   replacement appear accepted. The unchanged full backend has now run, with
-   the errors/skips and additional large-ID failures classified below. Full
-   candidate admission, including real entrypoints, has not passed.
+   replacement appear accepted. The pre-change failures below are retained as
+   baseline evidence; the A+B repair has since passed paired full compatibility
+   testing. Full candidate admission, including production entrypoints and TLS,
+   has not passed.
 
 ## Limited Feasibility Probe, September 15
 
@@ -78,7 +79,7 @@ candidate. That initial spike exercised no project dependencies, App tests, real
 entrypoints, WAL/backup tests or production stores. Nothing was deployed. The
 subsequent project evaluation is recorded separately below.
 
-## Project Compatibility Evaluation, September 15
+## Pre-Change Compatibility Evaluation, September 15
 
 At `f42e7909`, the same artifact ran a disposable 89-wheel project environment
 without compilation or dependency version drift. Eight reused database behavior
@@ -108,10 +109,11 @@ source identity, isolated environment, raw results and failure cases:
 [prebuilt project compatibility](../superpowers/evidence/2026-09-15-prebuilt-runtime-compatibility/README.md).
 
 SQLite 3.53.1 still needs review against subsequent fixes; neither the full suite
-nor bounded WAL stress proves all those fixes irrelevant. Desktop/SA/production
-writer entrypoint acceptance, the replacement/removal patch and production
-cutover remain open. No installed interpreter, original dependency environment,
-selector, production store or running App was changed by this evaluation.
+nor bounded WAL stress proves all those fixes irrelevant. At this pre-change
+checkpoint, the replacement/removal patch was also open; its subsequent result
+is below. Production entrypoint admission and cutover remain open. No installed
+interpreter, original dependency environment, selector, production store or
+running App was changed by this evaluation.
 
 ## Replacement And Removal Boundary
 
@@ -134,6 +136,18 @@ five call sites/six SQL statements use bound sets with no application count cap.
 It preserves int64 overflow rejection, exact text (including old-engine NUL
 handling), global sorting/limits and the entire retention exclusion set.
 The earlier candidate failures above remain historical baseline results.
+
+At product/test revision `2aeed54a`, serial full backend runs on control 3.37.2
+and candidate 3.53.1 each passed **11,245 tests / 12 unchanged manual skips**.
+Both runs use the same source bytes and 89 version-matched dependency wheels;
+the corrected test PATH admits the selected interpreter for both Python aliases.
+All test identities match, and post-run source diffs and byte checks are clean.
+Frontend acceptance is 1,835 passed, with typecheck/build also passing. The
+[paired receipt](../superpowers/evidence/2026-09-15-prebuilt-transition-cleanup/README.md)
+preserves the earlier runner mistakes and their corrected results. These checks
+require neither SQLite source nor a compiler. Next is the current-engine hand
+test, not automatic candidate deployment; TLS, required-fix review, production
+admission and the operational window remain separate C work.
 
 The source-dependent September 15 evidence remains valid for the old artifact only.
 Existing preparation commands and test receipts are retained in the
