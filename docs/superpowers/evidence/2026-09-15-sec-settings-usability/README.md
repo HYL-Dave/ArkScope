@@ -136,3 +136,35 @@ period; exact-file replay caught it and produced the separately archived RED.
 This repair does not claim a fresh full-backend run or live-model Research
 acceptance. The revised remaining user checklist is
 `docs/superpowers/plans/2026-09-15-sec-current-runtime-hand-test.md`.
+
+## Isolated Desktop Verification
+
+Running code: `f859e0d67b270fcd71092211e53625ba5f31aada`. The Desktop was rebuilt
+and relaunched with the same private profile, stored SEC objects and contact
+configuration. The scheduler remains disabled; the production filesystem is
+read-only. No runtime selection or merge was performed. The window title is
+`ArkScope - SEC Hand Test A - f859e0d6 - Isolated Data`.
+
+Playwright connected only to that Electron instance and exercised the actual
+stored Apple data. A route guard was configured to reject any non-GET SEC
+request during the exercise; none occurred. Typing the issuer alone did not query filings. After
+local load, `10-Q` and page 2 worked, then rapid filter edits settled into exactly
+one `10-K` request with no cursor and returned to page 1. Its 20 rows retained
+20 official source links. The actual `dei:EntityCommonStockSharesOutstanding`
+filter also returned its matching stored concept, and switching back preserved
+the `10-K` filter. Stored-status and capacity responses were identical before
+and after. There were no page errors.
+
+The 1440x900 and 390x844 layouts have no document-level horizontal overflow;
+wide metadata stays inside the table's own horizontal scroller. Source links
+are visible without horizontal scrolling in both sizes and render with theme
+foreground `rgb(230, 237, 243)`, not default blue. Screenshots were inspected;
+the final App is restored to desktop size with the filter in view. The native
+browser link itself was not opened automatically, to avoid another SEC request.
+That click remains in the user's revised checklist.
+
+See [browser assertions](checks/browser.json), [desktop](checks/desktop.png) and
+[narrow layout](checks/narrow.png). These are Linux Electron renderer checks,
+not Windows/macOS or live model acceptance. The browser-check runner emitted
+the existing Playwright/Node `url.parse()` deprecation warning; App page errors
+remained empty.

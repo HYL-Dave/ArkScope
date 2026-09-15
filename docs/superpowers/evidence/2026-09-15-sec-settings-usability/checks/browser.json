@@ -1,0 +1,37 @@
+{
+  "filter": "10-K",
+  "rows": 20,
+  "links": 20,
+  "facts_filter": "dei:EntityCommonStockSharesOutstanding",
+  "settled_filings_requests": 1,
+  "cursor_reset": true,
+  "sec_non_get_requests": [],
+  "stored_status_and_capacity_unchanged": true,
+  "console_page_errors": [],
+  "layouts": [
+    {
+      "name": "desktop",
+      "panel_width": 915,
+      "panel_left": 490,
+      "viewport": 1440,
+      "document_width": 1440,
+      "table_client_width": 900,
+      "table_scroll_width": 943,
+      "link_visible_without_horizontal_scroll": true,
+      "link_color": "rgb(230, 237, 243)"
+    },
+    {
+      "name": "narrow",
+      "panel_width": 351,
+      "panel_left": 12,
+      "viewport": 390,
+      "document_width": 390,
+      "table_client_width": 336,
+      "table_scroll_width": 943,
+      "link_visible_without_horizontal_scroll": true,
+      "link_color": "rgb(230, 237, 243)"
+    }
+  ],
+  "official_link_opened": false,
+  "launch_commit": "f859e0d67b270fcd71092211e53625ba5f31aada"
+}
