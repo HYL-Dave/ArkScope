@@ -56,6 +56,14 @@ behavior is tested without a compiler or source archive. Replacement artifact
 admission, TLS, selected-engine startup rejection and activation remain C,
 after hand testing. See the [implementation plan](../superpowers/plans/2026-09-15-prebuilt-transition-cleanup.md).
 
+The A+B/C15 source checkpoint `2aeed54a` now has paired full offline acceptance:
+**11,245 passed / 12 unchanged manual skips** on each engine, with identical
+case identities, interpreter-consistent PATH and unchanged source bytes.
+Frontend tests, typecheck and build also pass. This is compatibility evidence,
+not runtime admission or activation. Current-engine hand testing and C20's two
+retained query records remain outstanding; no archive or DROP is authorized by
+these results. See the [final cleanup receipt](../superpowers/evidence/2026-09-15-prebuilt-transition-cleanup/README.md).
+
 Record one admitted artifact identity per environment, not one version for the
 rest of pre-release development. Review newer stable distributions and upstream
 fixes regularly. Validate a separate candidate environment before switching;
