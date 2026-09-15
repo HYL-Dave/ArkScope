@@ -7,6 +7,13 @@
 (function () {
   "use strict";
 
+  var COMMENT_ROW = '[class*="border-t-share-separator-thin"]';
+  var commentExclusions = new Set();
+  var textCache = new WeakMap();
+  var displayCache = new WeakMap();
+  var narrativeCache = new WeakMap();
+  if (document.body) classifyCommentUnits(document.body);
+
   // Prefer provider-owned content containers. Generic <article> nodes can be
   // disclosure cards, and the page may contain more than one content container.
   var container = findLargestContainer([
@@ -88,7 +95,9 @@
     for (var i = 0; i < selectors.length; i++) {
       var nodes = document.querySelectorAll(selectors[i]);
       for (var j = 0; j < nodes.length; j++) {
-        var length = (nodes[j].innerText || "").trim().length;
+        if (hasExcludedAncestor(nodes[j])) continue;
+        if (inCommentOnlyContext(nodes[j])) continue;
+        var length = retainedText(nodes[j]).text.trim().length;
         if (length > 200 && length > bestLength) {
           best = nodes[j];
           bestLength = length;
@@ -101,15 +110,138 @@
   // --- Core extraction ---
 
   function extractMarkdown(root) {
+    if (hasExcludedAncestor(root)) return "";
     var parts = [];
-    var children = root.children;
+    var inline = [];
+    function finishInline() {
+      var text = inline.join("").trim();
+      if (text) parts.push(text);
+      inline = [];
+    }
+    var children = root.childNodes;
     for (var i = 0; i < children.length; i++) {
       var node = children[i];
       if (isExcluded(node)) continue;
+      if (node.nodeType === 3 || /^(A|SPAN|STRONG|EM|B|I|CODE|SMALL|SUB|SUP|BR)$/.test(node.tagName || "")) {
+        inline.push(retainedText(node).text);
+        continue;
+      }
+      finishInline();
       var md = nodeToMarkdown(node);
       if (md) parts.push(md);
     }
+    finishInline();
     return parts.join("\n\n");
+  }
+
+  function hasExcludedAncestor(node) {
+    for (var current = node; current; current = current.parentElement) {
+      if (isExcluded(current)) return true;
+    }
+    return false;
+  }
+
+  function hasRetainedNarrative(root) {
+    if (narrativeCache.has(root)) return narrativeCache.get(root);
+    var nodes = root.querySelectorAll("p, ul, ol, table, blockquote");
+    for (var i = 0; i < nodes.length; i++) {
+      if (!hasExcludedAncestor(nodes[i]) && retainedText(nodes[i]).text.trim()) {
+        narrativeCache.set(root, true);
+        return true;
+      }
+    }
+    narrativeCache.set(root, false);
+    return false;
+  }
+
+  function inCommentOnlyContext(node) {
+    for (var current = node; current; current = current.parentElement) {
+      if (current.querySelector(COMMENT_ROW) && !hasRetainedNarrative(current)) return true;
+    }
+    return false;
+  }
+
+  function displayOf(node) {
+    if (!displayCache.has(node)) displayCache.set(node, getComputedStyle(node).display);
+    return displayCache.get(node);
+  }
+
+  // Preserve rendered text when unchanged; never recover an excluded subtree
+  // through a parent, list item or table cell's unfiltered innerText.
+  function retainedText(node) {
+    if (textCache.has(node)) return textCache.get(node);
+    var result;
+    if (node.nodeType === 3) {
+      result = { text: node.textContent || "", pruned: false };
+    } else if (node.nodeType !== 1) {
+      result = { text: "", pruned: false };
+    } else if (isExcluded(node)) {
+      result = { text: "", pruned: true };
+    } else if (node.tagName === "BR") {
+      result = { text: "\n", pruned: false };
+    } else {
+      var parts = [];
+      var pruned = false;
+      for (var i = 0; i < node.childNodes.length; i++) {
+        var element = node.childNodes[i];
+        var child = retainedText(element);
+        var block = element.nodeType === 1 && /^(block|flow-root|flex|grid|list-item|table|table-row)$/.test(displayOf(element));
+        if (block && parts.length && !parts[parts.length - 1].endsWith("\n")) parts.push("\n");
+        if (child.text) parts.push(child.text);
+        if (block && child.text && !child.text.endsWith("\n")) parts.push("\n");
+        pruned = pruned || child.pruned;
+      }
+      result = { text: pruned ? parts.join("") : (node.innerText || ""), pruned: pruned };
+    }
+    textCache.set(node, result);
+    return result;
+  }
+
+  // Only a known row anchors a comment group. Unknown prose breaks sibling
+  // grouping, and a mixed parent is never excluded as a whole. Do not mutate
+  // the page: the comment scraper runs against this same DOM afterward.
+  function classifyCommentUnits(node) {
+    if (node.nodeType === 3) return node.textContent.trim() ? "content" : "empty";
+    if (node.nodeType !== 1) return "empty";
+    if (isExcluded(node)) {
+      return node.matches(COMMENT_ROW) || node.querySelector(COMMENT_ROW) ? "comment" : "control";
+    }
+    if (/^H[1-6]$/.test(node.tagName) &&
+        /^comments(?:\s*\([0-9,]+\))?$/i.test((node.innerText || "").trim())) return "heading";
+
+    var units = [];
+    var run = [];
+    var anchored = false;
+    var covered = 0;
+    function finishRun() {
+      if (anchored) {
+        for (var r = 0; r < run.length; r++) commentExclusions.add(run[r]);
+        covered += run.length;
+      }
+      run = [];
+      anchored = false;
+    }
+    for (var i = 0; i < node.childNodes.length; i++) {
+      var child = node.childNodes[i];
+      var kind = classifyCommentUnits(child);
+      if (kind === "empty") continue;
+      units.push(kind);
+      if (kind === "content") {
+        finishRun();
+      } else {
+        run.push(child);
+        anchored = anchored || kind === "comment";
+      }
+    }
+    finishRun();
+    if (!units.length) return "empty";
+    if (covered === units.length) {
+      commentExclusions.add(node);
+      return "comment";
+    }
+    if (units.every(function (kind) { return kind === "control"; })) return "control";
+    if (units.every(function (kind) { return kind === "heading" || kind === "control"; })) return "heading";
+    return "content";
   }
 
   function isMarketNewsPage() {
@@ -264,7 +396,7 @@
     if (isExcluded(node)) return null;
 
     var tag = node.tagName ? node.tagName.toLowerCase() : "";
-    var text = node.innerText ? node.innerText.trim() : "";
+    var text = retainedText(node).text.trim();
     if (!text) return null;
 
     if (tag === "h1") return "# " + text;
@@ -278,8 +410,9 @@
       var items = node.querySelectorAll(":scope > li");
       var lines = [];
       for (var j = 0; j < items.length; j++) {
+        if (isExcluded(items[j])) continue;
         var prefix = tag === "ol" ? j + 1 + ". " : "- ";
-        lines.push(prefix + items[j].innerText.trim());
+        lines.push(prefix + retainedText(items[j]).text.trim());
       }
       return lines.join("\n");
     }
@@ -287,20 +420,8 @@
     if (tag === "table") return tableToMarkdown(node);
 
     // Container elements: recurse into children
-    if (tag === "div" || tag === "section" || tag === "figure") {
-      var ch = node.children;
-      if (ch.length > 0) {
-        // Has child elements — recurse (do NOT fallback to text to avoid
-        // leaking excluded descendant content)
-        var subParts = [];
-        for (var k = 0; k < ch.length; k++) {
-          var sub = nodeToMarkdown(ch[k]);
-          if (sub) subParts.push(sub);
-        }
-        return subParts.length > 0 ? subParts.join("\n\n") : null;
-      }
-      // Leaf container (no child elements) — use text
-      return text;
+    if (tag === "div" || tag === "section" || tag === "figure" || tag === "article" || tag === "main") {
+      return extractMarkdown(node) || null;
     }
 
     // p, span, etc. — direct text
@@ -310,6 +431,8 @@
   // --- Exclusion ---
 
   function isExcluded(node) {
+    if (commentExclusions.has(node)) return true;
+    if (node.matches && node.matches(COMMENT_ROW + ', button, input, select, textarea, [role="button"]')) return true;
     // Tag-based exclusion
     var tag = node.tagName ? node.tagName.toLowerCase() : "";
     if (
@@ -321,37 +444,32 @@
     )
       return true;
 
-    // Class-based exclusion (no dot prefix — className is "foo bar", not ".foo")
-    var EXCLUDED_CLASSES = [
-      "ad-",
-      "promo",
-      "related-",
-      "comment",
-      "sidebar",
-      "newsletter",
-      "cta-",
-    ];
+    // Match semantic class tokens, not incidental substrings such as
+    // "no-sidebar" or "commentary-layout" on an article's ancestors.
     var cls = typeof node.className === "string" ? node.className : "";
-    for (var i = 0; i < EXCLUDED_CLASSES.length; i++) {
-      if (cls.indexOf(EXCLUDED_CLASSES[i]) >= 0) return true;
+    var classes = cls.split(/\s+/);
+    for (var i = 0; i < classes.length; i++) {
+      if (/^(?:ad-|related-|cta-|(?:promo|comments?|sidebar|newsletter)(?:[-_]|$))/.test(classes[i])) return true;
     }
-    return false;
+    return node.nodeType === 1 && displayOf(node) === "none";
   }
 
   // --- Table → Markdown ---
 
   function tableToMarkdown(table) {
-    var rows = table.querySelectorAll("tr");
+    var rows = table.rows;
     if (rows.length === 0) return "";
     var lines = [];
     for (var r = 0; r < rows.length; r++) {
-      var cells = rows[r].querySelectorAll("th, td");
+      if (hasExcludedAncestor(rows[r])) continue;
+      var cells = rows[r].cells;
       var line = "| ";
       for (var c = 0; c < cells.length; c++) {
-        line += cells[c].innerText.trim() + " | ";
+        line += retainedText(cells[c]).text.trim() + " | ";
       }
+      var first = lines.length === 0;
       lines.push(line);
-      if (r === 0) {
+      if (first) {
         var sep = "| ";
         for (var s = 0; s < cells.length; s++) sep += "--- | ";
         lines.push(sep);
