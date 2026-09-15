@@ -1,4 +1,4 @@
-"""Local store for research reports, agent memories, and agent queries.
+"""Local store for research reports and agent memories.
 
 Records live in ``profile_state.db``. List-valued fields are stored as JSON text,
 timestamps use second-resolution UTC text, and low-volume search uses a
@@ -62,18 +62,6 @@ CREATE TABLE IF NOT EXISTS agent_memories (
 );
 CREATE INDEX IF NOT EXISTS idx_memories_created ON agent_memories(importance DESC, created_at DESC);
 
-CREATE TABLE IF NOT EXISTS agent_queries (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    question    TEXT NOT NULL,
-    answer      TEXT,
-    provider    TEXT,
-    model       TEXT,
-    tools_used  TEXT,                 -- JSON array
-    duration_ms INTEGER,
-    tokens_in   INTEGER,
-    tokens_out  INTEGER,
-    created_at  TEXT NOT NULL
-);
 """
 
 
@@ -298,26 +286,9 @@ class AppRecordsLocalStore:
         finally:
             conn.close()
 
-    # --- agent_queries --------------------------------------------------------------
-
-    def insert_agent_query(self, question: str, answer: Optional[str] = None,
-                           provider: Optional[str] = None, model: Optional[str] = None,
-                           tools_used: Optional[List[str]] = None, duration_ms: Optional[int] = None,
-                           tokens_in: Optional[int] = None, tokens_out: Optional[int] = None,
-                           *, created_at: Optional[str] = None, id: Optional[int] = None,
-                           conn: Optional[sqlite3.Connection] = None) -> Optional[int]:
-        cols = "question,answer,provider,model,tools_used,duration_ms,tokens_in,tokens_out,created_at"
-        vals: tuple = (question, answer, provider, model, _json_or_none(tools_used), duration_ms,
-                       tokens_in, tokens_out, created_at or _now_iso())
-        if id is not None:  # id-preserving migration (gate #2)
-            cols, vals = "id," + cols, (id,) + vals
-        return self._exec_insert("agent_queries", cols, vals, id, conn)
-
-    def count_agent_queries(self) -> int:
-        return self.count("agent_queries")
-
     # --- migration support (1c) -----------------------------------------------------
 
+    # Existing query archives remain readable pending explicit retained-data disposition.
     MIGRATE_TABLES = ("research_reports", "agent_memories", "agent_queries")
 
     @property
