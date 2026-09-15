@@ -1,0 +1,3 @@
+..................                                                       [100%]
+- generated xml file: /tmp/arkscope-prebuilt-compat.oCmRRHrQ/id-set-affinity-control/junit.xml -
+18 passed in 3.72s

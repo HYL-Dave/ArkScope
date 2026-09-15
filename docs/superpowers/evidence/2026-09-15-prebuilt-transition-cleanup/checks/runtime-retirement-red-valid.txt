@@ -1,0 +1,13 @@
+F........................                                                [100%]
+=================================== FAILURES ===================================
+______________________ test_self_build_runtime_is_removed ______________________
+tests/test_app_entrypoints.py:29: in test_self_build_runtime_is_removed
+    assert not list((ROOT / "src/sqlite_runtime").glob("*.py"))
+E   AssertionError: assert not [PosixPath('/tmp/arkscope-prebuilt-compat.oCmRRHrQ/source/src/sqlite_runtime/contract.py'), PosixPath('/tmp/arkscope-p.../sqlite_runtime/__init__.py'), PosixPath('/tmp/arkscope-prebuilt-compat.oCmRRHrQ/source/src/sqlite_runtime/launch.py')]
+E    +  where [PosixPath('/tmp/arkscope-prebuilt-compat.oCmRRHrQ/source/src/sqlite_runtime/contract.py'), PosixPath('/tmp/arkscope-p.../sqlite_runtime/__init__.py'), PosixPath('/tmp/arkscope-prebuilt-compat.oCmRRHrQ/source/src/sqlite_runtime/launch.py')] = list(<generator object Path.glob at 0x7013055e98c0>)
+E    +    where <generator object Path.glob at 0x7013055e98c0> = glob('*.py')
+E    +      where glob = (PosixPath('/tmp/arkscope-prebuilt-compat.oCmRRHrQ/source') / 'src/sqlite_runtime').glob
+- generated xml file: /tmp/arkscope-prebuilt-compat.oCmRRHrQ/runtime-retirement-red-valid/junit.xml -
+=========================== short test summary info ============================
+FAILED tests/test_app_entrypoints.py::test_self_build_runtime_is_removed - As...
+1 failed, 24 passed in 1.38s

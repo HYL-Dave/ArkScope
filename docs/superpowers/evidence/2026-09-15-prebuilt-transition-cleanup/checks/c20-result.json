@@ -1,0 +1,14 @@
+{
+  "status": "observed",
+  "table": "present",
+  "rows": 2,
+  "sqlite_version": "3.37.2",
+  "column_authorizer": true,
+  "query_only": true,
+  "main_readonly": true,
+  "explicit_checkpoint": false,
+  "contents_read": false,
+  "disposition": "pending_user_approval",
+  "script_sha256": "12f289c7fb6029a0dce08fc4bc7ad96bb1109a86fbdca1e1b1dc3a9d823e3d50",
+  "uncompressed_trace_sha256": "c8a108e1598d4c5a42821c40dde0156b66da60b0022217a011f43d5a579a3726"
+}

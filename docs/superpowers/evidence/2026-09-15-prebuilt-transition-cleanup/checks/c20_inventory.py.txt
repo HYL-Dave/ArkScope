@@ -1,0 +1,120 @@
+"""One-time counts-only C20 inventory; no application imports or data writes."""
+
+import json
+import os
+from pathlib import Path
+import sqlite3
+import stat
+import subprocess
+import sys
+
+
+def authorize(action, first, second, db, trigger):
+    if trigger is not None:
+        return sqlite3.SQLITE_DENY
+    if action == sqlite3.SQLITE_SELECT:
+        return sqlite3.SQLITE_OK
+    if action == sqlite3.SQLITE_READ and db == "main":
+        if first == "sqlite_master" and second in {"name", "type"}:
+            return sqlite3.SQLITE_OK
+    if action == sqlite3.SQLITE_READ and db in {None, "main"} and first == "agent_queries" and second == "":
+        return sqlite3.SQLITE_OK
+    if action == sqlite3.SQLITE_FUNCTION and second == "count":
+        return sqlite3.SQLITE_OK
+    if action == sqlite3.SQLITE_TRANSACTION and first in {"BEGIN", "ROLLBACK"}:
+        return sqlite3.SQLITE_OK
+    return sqlite3.SQLITE_DENY
+
+
+def counts(conn):
+    conn.execute("PRAGMA query_only=ON")
+    conn.set_authorizer(authorize)
+    conn.execute("BEGIN")
+    try:
+        kind = conn.execute("SELECT type FROM sqlite_master WHERE name=?", ("agent_queries",)).fetchone()
+        if kind is None:
+            return {"status": "observed", "table": "absent", "rows": None}
+        if kind != ("table",):
+            raise ValueError("c20_unexpected_schema_object")
+        return {"status": "observed", "table": "present", "rows": conn.execute("SELECT COUNT(*) FROM agent_queries").fetchone()[0]}
+    finally:
+        conn.rollback()
+
+
+def checked(path):
+    if path.resolve() != path or path.is_symlink():
+        raise ValueError("symlink_refused")
+    info = path.stat()
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise ValueError("unsafe_file")
+    return (info.st_dev, info.st_ino)
+
+
+def worker(path):
+    identity = checked(path)
+    if not os.statvfs(path).f_flag & os.ST_RDONLY:
+        raise ValueError("main_file_not_readonly")
+    conn = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=10)
+    try:
+        result = counts(conn)
+    finally:
+        conn.close()
+    if identity != checked(path):
+        raise ValueError("identity_changed")
+    return {**result, "sqlite_version": sqlite3.sqlite_version, "main_readonly": True,
+            "query_only": True, "column_authorizer": True, "explicit_checkpoint": False}
+
+
+def self_test():
+    for present in [False, True]:
+        conn = sqlite3.connect(":memory:")
+        if present:
+            conn.execute("CREATE TABLE agent_queries(question TEXT,answer TEXT)")
+            conn.execute("INSERT INTO agent_queries VALUES ('private question','private answer')")
+            conn.commit()
+        assert counts(conn) == {"status": "observed", "table": "present" if present else "absent", "rows": 1 if present else None}
+        for sql in ["SELECT question FROM agent_queries", "SELECT answer FROM agent_queries",
+                    "DELETE FROM agent_queries", "CREATE TABLE unexpected(x)", "PRAGMA query_only=OFF"]:
+            try:
+                conn.execute(sql)
+            except sqlite3.DatabaseError:
+                pass
+            else:
+                raise AssertionError("authorizer_failed")
+        conn.close()
+    print("counts_and_authorizer_pass")
+
+
+def run(path):
+    before = checked(path)
+    sidecars = {Path(str(path) + suffix) for suffix in ("-shm", "-wal")}
+    for sidecar in sidecars:
+        if sidecar.is_symlink():
+            raise ValueError("symlink_sidecar_refused")
+        if sidecar.exists():
+            checked(sidecar)
+    argv = ["/usr/bin/bwrap", "--ro-bind", "/", "/", "--bind", str(path.parent), str(path.parent)]
+    for entry in sorted(path.parent.iterdir()):
+        if entry not in sidecars:
+            if entry.is_symlink():
+                raise ValueError("symlink_parent_entry_refused")
+            argv += ["--ro-bind", str(entry), str(entry)]
+    argv += ["--unshare-net", "--unshare-pid", "--proc", "/proc", "--die-with-parent", "--cap-drop", "ALL",
+             sys.executable, "-I", "-S", "-B", str(Path(__file__).resolve()), "--worker", str(path)]
+    child = subprocess.run(argv, env={"PATH": "/usr/bin:/bin"}, capture_output=True, text=True, timeout=30)
+    if child.returncode:
+        raise RuntimeError("c20_inventory_unavailable")
+    if before != checked(path):
+        raise ValueError("identity_changed")
+    print(json.dumps(json.loads(child.stdout), sort_keys=True))
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--self-test"]:
+        self_test()
+    elif len(sys.argv) == 3 and sys.argv[1] == "--worker":
+        print(json.dumps(worker(Path(sys.argv[2]))))
+    elif len(sys.argv) == 3 and sys.argv[1] == "--inventory":
+        run(Path(sys.argv[2]).absolute())
+    else:
+        raise SystemExit("explicit_mode_required")

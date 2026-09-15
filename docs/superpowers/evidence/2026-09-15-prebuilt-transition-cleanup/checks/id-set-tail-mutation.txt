@@ -1,0 +1,46 @@
+FFFFF.............                                                       [100%]
+=================================== FAILURES ===================================
+__ test_recovery_large_frozen_target_set[query_sa_market_news_recovery_rows] ___
+tests/test_sqlite_id_sets.py:30: in test_recovery_large_frozen_target_set
+    assert [row["news_id"] for row in result] == ["1", "tail-match"]
+E   AssertionError: assert ['1'] == ['1', 'tail-match']
+E     
+E     Right contains one more item: 'tail-match'
+E     Use -v to get more diff
+__ test_recovery_large_frozen_target_set[query_sa_market_news_body_presence] ___
+tests/test_sqlite_id_sets.py:28: in test_recovery_large_frozen_target_set
+    assert result == {"1": False, "tail-match": False}
+E   AssertionError: assert {'1': False} == {'1': False, ...match': False}
+E     
+E     Omitting 1 identical items, use -vv to show
+E     Right contains 1 more item:
+E     {'tail-match': False}
+E     Use -v to get more diff
+_______________________ test_lineage_filter_large_input ________________________
+tests/test_sqlite_id_sets.py:44: in test_lineage_filter_large_input
+    assert [(row["lineage_id"], row["symbol"]) for row in events] == [(1, "BTSG"), (33000, "TAIL")]
+E   AssertionError: assert [(1, 'BTSG')] == [(1, 'BTSG'), (33000, 'TAIL')]
+E     
+E     Right contains one more item: (33000, 'TAIL')
+E     Use -v to get more diff
+______________ test_article_filter_large_input_keeps_global_limit ______________
+tests/test_sqlite_id_sets.py:59: in test_article_filter_large_input_keeps_global_limit
+    assert [row["article_id"] for row in rows] == sorted(stored_ids, reverse=True)[:20]
+E   AssertionError: assert ['9', '8', '7...'5', '4', ...] == ['zzz-tail-wi...'6', '5', ...]
+E     
+E     At index 0 diff: '9' != 'zzz-tail-winner'
+E     Use -v to get more diff
+______________ test_many_pinned_citations_survive_family_refresh _______________
+tests/test_sqlite_id_sets.py:108: in test_many_pinned_citations_survive_family_refresh
+    kernel.complete_run(
+src/security_lifecycle_fact_kernel.py:2272: in complete_run
+    self.conn.execute(
+E   sqlite3.IntegrityError: FOREIGN KEY constraint failed
+- generated xml file: /tmp/arkscope-prebuilt-compat.oCmRRHrQ/id-set-tail-mutation/junit.xml -
+=========================== short test summary info ============================
+FAILED tests/test_sqlite_id_sets.py::test_recovery_large_frozen_target_set[query_sa_market_news_recovery_rows]
+FAILED tests/test_sqlite_id_sets.py::test_recovery_large_frozen_target_set[query_sa_market_news_body_presence]
+FAILED tests/test_sqlite_id_sets.py::test_lineage_filter_large_input - Assert...
+FAILED tests/test_sqlite_id_sets.py::test_article_filter_large_input_keeps_global_limit
+FAILED tests/test_sqlite_id_sets.py::test_many_pinned_citations_survive_family_refresh
+5 failed, 13 passed in 3.12s

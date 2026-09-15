@@ -1,0 +1,20 @@
+........FF............                                                   [100%]
+=================================== FAILURES ===================================
+____________ test_fresh_store_does_not_create_obsolete_query_table _____________
+tests/test_app_records_store.py:122: in test_fresh_store_does_not_create_obsolete_query_table
+    assert conn.execute("SELECT 1 FROM sqlite_schema WHERE name='agent_queries'").fetchone() is None
+E   assert (1,) is None
+E    +  where (1,) = <built-in method fetchone of sqlite3.Cursor object at 0x75b81e9e8a40>()
+E    +    where <built-in method fetchone of sqlite3.Cursor object at 0x75b81e9e8a40> = <sqlite3.Cursor object at 0x75b81e9e8a40>.fetchone
+E    +      where <sqlite3.Cursor object at 0x75b81e9e8a40> = <built-in method execute of sqlite3.Connection object at 0x75b8175a7040>("SELECT 1 FROM sqlite_schema WHERE name='agent_queries'")
+E    +        where <built-in method execute of sqlite3.Connection object at 0x75b8175a7040> = <sqlite3.Connection object at 0x75b8175a7040>.execute
+___________________ test_obsolete_query_writers_are_removed ____________________
+tests/test_app_records_store.py:128: in test_obsolete_query_writers_are_removed
+    assert not hasattr(store, "insert_agent_query")
+E   AssertionError: assert not True
+E    +  where True = hasattr(<src.app_records_store.AppRecordsLocalStore object at 0x75b8121827a0>, 'insert_agent_query')
+- generated xml file: /tmp/arkscope-prebuilt-compat.oCmRRHrQ/c20-code-red/junit.xml -
+=========================== short test summary info ============================
+FAILED tests/test_app_records_store.py::test_fresh_store_does_not_create_obsolete_query_table
+FAILED tests/test_app_records_store.py::test_obsolete_query_writers_are_removed
+2 failed, 20 passed in 0.79s
