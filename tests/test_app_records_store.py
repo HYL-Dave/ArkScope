@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from src.app_records_store import AppRecordsLocalStore
@@ -115,13 +117,37 @@ def test_memory_meta_excludes_content_and_delete(store):
 
 # --- agent_queries -----------------------------------------------------------------
 
-def test_agent_query_insert(store):
-    qid = store.insert_agent_query(question="what is AFRM?", answer="a fintech",
-                                   provider="openai", model="gpt-5.4", tools_used=["get_ticker_news"],
-                                   duration_ms=1200, tokens_in=50, tokens_out=80,
-                                   created_at="2026-06-20T10:00:00")
-    assert isinstance(qid, int)
-    assert store.count_agent_queries() == 1
+def test_fresh_store_does_not_create_obsolete_query_table(store):
+    with sqlite3.connect(store.db_path) as conn:
+        assert conn.execute("SELECT 1 FROM sqlite_schema WHERE name='agent_queries'").fetchone() is None
+    assert store.count("agent_queries") == 0
+    assert store.raw_rows("agent_queries") == []
+
+
+def test_obsolete_query_writers_are_removed(store):
+    assert not hasattr(store, "insert_agent_query")
+    assert not hasattr(store, "count_agent_queries")
+
+
+def test_existing_query_archive_is_preserved_and_readable(tmp_path):
+    path = tmp_path / "profile_state.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE agent_queries (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                     "question TEXT NOT NULL, answer TEXT, provider TEXT, model TEXT, "
+                     "tools_used TEXT, duration_ms INTEGER, tokens_in INTEGER, tokens_out INTEGER, "
+                     "created_at TEXT NOT NULL)")
+        conn.execute("INSERT INTO agent_queries VALUES (?,?,?,?,?,?,?,?,?,?)",
+                     (4, "retained question", "retained answer", "provider", "model", "[]", 15, 50, 80,
+                      "2026-06-20T10:00:00"))
+        schema_before = conn.execute("SELECT sql FROM sqlite_schema WHERE name='agent_queries'").fetchone()
+        rows_before = conn.execute("SELECT * FROM agent_queries").fetchall()
+    store = AppRecordsLocalStore(path)
+    store.ensure_schema()
+    assert store.count("agent_queries") == 1
+    assert store.raw_rows("agent_queries")[0]["answer"] == "retained answer"
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("SELECT sql FROM sqlite_schema WHERE name='agent_queries'").fetchone() == schema_before
+        assert conn.execute("SELECT * FROM agent_queries").fetchall() == rows_before
 
 
 # --- hermetic local behavior -------------------------------------------------------
