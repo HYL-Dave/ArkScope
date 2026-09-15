@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="0" skipped="0" tests="1" time="21.290" timestamp="2026-09-15T03:06:36.561517+00:00" hostname="ais"><testcase classname="" name="tests.test_lifecycle_provider_census_runner" time="0.000"><error message="collection failure">tests/test_lifecycle_provider_census_runner.py:44: in &lt;module&gt;
+    runner = _load_runner()
+tests/test_lifecycle_provider_census_runner.py:40: in _load_runner
+    spec.loader.exec_module(module)
+&lt;frozen importlib._bootstrap_external&gt;:879: in exec_module
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1016: in get_code
+    ???
+&lt;frozen importlib._bootstrap_external&gt;:1073: in get_data
+    ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/arkscope-c15-evaluation.G7sxyGBc/source/docs/superpowers/evidence/2026-09-04-lifecycle-provider-authority-shadow-census/run_census.py'</error></testcase></testsuite></testsuites>

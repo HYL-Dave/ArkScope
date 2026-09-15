@@ -13,7 +13,7 @@ import sqlite3
 
 from src.lifecycle_investigation.schema import verify_journal
 from src.lifecycle_journal_codec import canonical_json, digest_json
-from src.security_lifecycle_listing_migration import _quote_identifier as q, _sha_file
+from src.lifecycle_investigation.sqlite_helpers import _quote_identifier as q, _sha_file
 from src.security_lifecycle_schema import PROFILE_TABLE_SQL, verify_profile_connection, verify_market_connection, _normalize_sql
 from src.sqlite_backup import backup_connection
 

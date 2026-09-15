@@ -1,0 +1,48 @@
+
+==================================== ERRORS ====================================
+_______ ERROR collecting tests/test_lifecycle_investigation_migration.py _______
+ImportError while importing test module '/tmp/arkscope-c15-evaluation.G7sxyGBc/source/tests/test_lifecycle_investigation_migration.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/tmp/arkscope-prebuilt-compat.oCmRRHrQ/python/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_lifecycle_investigation_migration.py:6: in <module>
+    from tests.test_security_lifecycle_population import stores
+tests/test_security_lifecycle_population.py:16: in <module>
+    from src.security_lifecycle_listing_evidence import _evidence
+src/security_lifecycle_listing_evidence.py:13: in <module>
+    from data_sources.listing_authority_transport import (
+E   ModuleNotFoundError: No module named 'data_sources'
+______ ERROR collecting tests/test_lifecycle_investigation_retirement.py _______
+ImportError while importing test module '/tmp/arkscope-c15-evaluation.G7sxyGBc/source/tests/test_lifecycle_investigation_retirement.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/tmp/arkscope-prebuilt-compat.oCmRRHrQ/python/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_lifecycle_investigation_retirement.py:7: in <module>
+    from tests.test_security_lifecycle_population import stores, sec as observe, persist
+tests/test_security_lifecycle_population.py:16: in <module>
+    from src.security_lifecycle_listing_evidence import _evidence
+src/security_lifecycle_listing_evidence.py:13: in <module>
+    from data_sources.listing_authority_transport import (
+E   ModuleNotFoundError: No module named 'data_sources'
+__________ ERROR collecting tests/test_lifecycle_investigation_cli.py __________
+ImportError while importing test module '/tmp/arkscope-c15-evaluation.G7sxyGBc/source/tests/test_lifecycle_investigation_cli.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/tmp/arkscope-prebuilt-compat.oCmRRHrQ/python/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_lifecycle_investigation_cli.py:7: in <module>
+    from tests.test_security_lifecycle_population import stores, sec, persist
+tests/test_security_lifecycle_population.py:16: in <module>
+    from src.security_lifecycle_listing_evidence import _evidence
+src/security_lifecycle_listing_evidence.py:13: in <module>
+    from data_sources.listing_authority_transport import (
+E   ModuleNotFoundError: No module named 'data_sources'
+- generated xml file: /tmp/arkscope-c15-evaluation.G7sxyGBc/baseline/pytest.xml -
+=========================== short test summary info ============================
+ERROR tests/test_lifecycle_investigation_migration.py
+ERROR tests/test_lifecycle_investigation_retirement.py
+ERROR tests/test_lifecycle_investigation_cli.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!!
+3 errors in 0.63s

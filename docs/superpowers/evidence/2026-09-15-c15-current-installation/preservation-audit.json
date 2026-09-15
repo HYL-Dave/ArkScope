@@ -1,0 +1,58 @@
+{
+  "baseline": "9bb80725238947c351e0257765c9b53280e67569",
+  "ast_equivalent_after_owner_renames_and_docstrings": [
+    "src/security_lifecycle_listing_migration.py:_sha_file -> src/lifecycle_investigation/sqlite_helpers.py:_sha_file",
+    "src/security_lifecycle_listing_migration.py:_quote_identifier -> src/lifecycle_investigation/sqlite_helpers.py:_quote_identifier",
+    "src/security_lifecycle_listing_migration.py:_encode_cell -> src/lifecycle_investigation/sqlite_helpers.py:_encode_cell",
+    "src/security_lifecycle_provider_migration.py:_automation_settings -> src/sa_tracking_installation.py:_automation_settings",
+    "src/security_lifecycle_provider_migration.py:_digest -> src/sa_tracking_installation.py:_digest",
+    "src/security_lifecycle_provider_migration.py:_cutover_preview -> src/sa_tracking_installation.py:_installation_preview",
+    "src/security_lifecycle_provider_migration.py:preview_provider_cutover -> src/sa_tracking_installation.py:preview_installation",
+    "src/security_lifecycle_provider_migration.py:apply_provider_cutover -> src/sa_tracking_installation.py:apply_installation",
+    "src/lifecycle_investigation/migration.py: whole module, helper import change only",
+    "src/lifecycle_investigation/disposal.py: whole module, helper import change only"
+  ],
+  "byte_identical_sha256": {
+    "src/security_lifecycle_schema.py": "728f18cf695b929848d0edcaa707e9aa70092dbe64a253e1ee838f78f47a76c8",
+    "src/ticker_identity_schema.py": "008f0f7d7043be3ed73f7c7a4ea60d93156e16e79f54a54e278da13211aed7b7",
+    "src/sa_tracking_memberships.py": "e81bc5bec77cc06c4b4cc38773669c70eac3db380cc41c1baed7152db4a5b8a4",
+    "src/lifecycle_investigation/__main__.py": "fd01897b352b69caeb4ee49a2bd903fc59e0917cd328588d9a98dcc76532f7f9",
+    "tests/test_lifecycle_investigation_migration.py": "cc5c7ef9d1e9717cf4e4a99ce42431fb9186f8cb17e486e8e1a93ec08dee05b2",
+    "tests/test_lifecycle_investigation_retirement.py": "6a6d281e5ba1e741143a09f4c05d295c6676ee33a7af651486468300c2167418",
+    "tests/test_lifecycle_investigation_cli.py": "fc2ca1122c65e95834cf54fcb813c446221ce9564da71a201ae952ff40ce6a1a",
+    "tests/test_sqlite_backup.py": "6d3d1b724e1a493cdeef326339ddfa917cd26b65f9e79f5cb5ca84a6cad5f985",
+    "docs/superpowers/evidence/2026-08-28-lifecycle-listing-authority/run_mutations.py": "ba0a4879fa45823bd3992db4db67e65efab8f21dc87860cfcfc753f892b23b68",
+    "docs/superpowers/evidence/2026-08-28-lifecycle-listing-authority/capture_offline_authority.py": "deee5dc61decd723e7c3d7180be5a7c58a376a7a36aa1fac914ce8e4ab74b843",
+    "docs/superpowers/evidence/2026-09-05-lifecycle-terminal-cutover/scripts/fresh_check_v2.py": "f49a233dbfbecbb3c8325067cf0f8ae3bbc41d09100275b831fa30855153ca9f",
+    "docs/superpowers/evidence/2026-09-05-lifecycle-terminal-cutover/scripts/fresh_check_v1.py": "98b8eb7eb2d4b1e329e8b44160ae6b345b586dfca1b3c8b95fabf2879d420752",
+    "docs/superpowers/evidence/2026-09-05-lifecycle-terminal-cutover/scripts/install.py": "b4b76018c4d7cdd01518bf2ec777251e6866e6400cbbb6d7bed03edd3c2fdaca",
+    "docs/superpowers/evidence/2026-09-08-lifecycle-investigation/completion-r1/source/src/lifecycle_investigation/migration.py": "aac0fdd4cc823a6cf49b210c7a8d804b17909f84f676db697d0c2e8a855f3dbd",
+    "docs/superpowers/evidence/2026-09-08-lifecycle-investigation/completion-r1/source/src/lifecycle_investigation/disposal.py": "1505a63f934d2ac8530f0619397b8617b2fdc855b3938629bcdc67da3e6aff4d"
+  },
+  "sealed_scripts_replay_revision": "9bb80725238947c351e0257765c9b53280e67569",
+  "historical_scripts_executed": false,
+  "current_retired_imports": [],
+  "non_test_membership_install_callers": [
+    "src/sa_tracking_installation.py"
+  ],
+  "current_operator_entrypoint": "python -m src.sa_tracking_installation",
+  "current_operator_commands": [
+    "inspect",
+    "install-preview",
+    "install"
+  ],
+  "retired_runtime_modules": [
+    "src/security_lifecycle_listing_migration.py",
+    "src/security_lifecycle_provider_migration.py"
+  ],
+  "retired_converter_test_consumers": [
+    "tests/test_security_lifecycle_listing_migration.py",
+    "tests/test_security_lifecycle_provider_migration.py"
+  ],
+  "retained_current_consumer_paths": [
+    "src/lifecycle_investigation/migration.py",
+    "src/lifecycle_investigation/disposal.py",
+    "src/lifecycle_investigation/__main__.py",
+    "src/sa_tracking_installation.py"
+  ]
+}

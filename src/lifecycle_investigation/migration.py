@@ -7,7 +7,7 @@ import sqlite3
 
 from src.lifecycle_investigation.schema import installed, schema_digest, verify_journal, _install_on_connection
 from src.lifecycle_journal_codec import digest_json
-from src.security_lifecycle_listing_migration import _encode_cell, _quote_identifier as q, _sha_file
+from src.lifecycle_investigation.sqlite_helpers import _encode_cell, _quote_identifier as q, _sha_file
 from src.security_lifecycle_provider_snapshot import instant
 from src.security_lifecycle_schema import verify_profile_connection, assert_lifecycle_writes_available
 from src.sqlite_backup import backup_connection

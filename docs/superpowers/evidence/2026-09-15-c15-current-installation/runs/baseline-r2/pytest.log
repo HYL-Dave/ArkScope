@@ -1,0 +1,32 @@
+......................................F.........................         [100%]
+=================================== FAILURES ===================================
+_ test_disposal_preserves_approved_current_investigation_and_idempotent_confirmation _
+tests/test_lifecycle_investigation_retirement.py:122: in test_disposal_preserves_approved_current_investigation_and_idempotent_confirmation
+    from tests.test_lifecycle_investigation_review import context, prepare, confirm
+<frozen importlib._bootstrap>:1027: in _find_and_load
+    ???
+<frozen importlib._bootstrap>:1006: in _find_and_load_unlocked
+    ???
+<frozen importlib._bootstrap>:688: in _load_unlocked
+    ???
+/tmp/arkscope-prebuilt-compat.oCmRRHrQ/venv/lib/python3.10/site-packages/_pytest/assertion/rewrite.py:186: in exec_module
+    exec(co, module.__dict__)
+tests/test_lifecycle_investigation_review.py:7: in <module>
+    from src.auth_drivers.lifecycle_web_models import WebCredential
+src/auth_drivers/__init__.py:5: in <module>
+    from .protocol import (
+src/auth_drivers/protocol.py:21: in <module>
+    from src.agents.shared.events import AgentEvent  # the stream event vocabulary — reused
+src/agents/shared/__init__.py:16: in <module>
+    from .skills import SKILL_REGISTRY, SkillDefinition, expand_skill, list_skills
+src/agents/shared/skills.py:393: in <module>
+    rebuild_skill_registry()
+src/agents/shared/skills.py:376: in rebuild_skill_registry
+    tier1 = _scan_builtin(_RESOURCES_DIR / "builtin")
+src/agents/shared/skills.py:203: in _scan_builtin
+    raise RuntimeError(
+E   RuntimeError: Builtin skills directory missing: /tmp/arkscope-c15-evaluation.G7sxyGBc/source/resources/skills/builtin
+- generated xml file: /tmp/arkscope-c15-evaluation.G7sxyGBc/baseline-r2/pytest.xml -
+=========================== short test summary info ============================
+FAILED tests/test_lifecycle_investigation_retirement.py::test_disposal_preserves_approved_current_investigation_and_idempotent_confirmation
+1 failed, 63 passed in 7.26s
