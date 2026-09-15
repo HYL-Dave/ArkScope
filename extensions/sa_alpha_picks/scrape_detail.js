@@ -16,14 +16,16 @@
 
   // Prefer provider-owned content containers. Generic <article> nodes can be
   // disclosure cards, and the page may contain more than one content container.
-  var container = findLargestContainer([
+  var providerSelectors = [
     '[data-test-id="content-container"]',
     '[data-testid="content-container"]',
     '[data-test-id="article-body"]',
     '[data-testid="article-body"]',
     ".paywall-full-content",
     "#content-body",
-  ]);
+  ];
+  var extractionSelector = providerSelectors.concat(["article", "main"]).join(",");
+  var container = findLargestContainer(providerSelectors);
   if (!container) {
     container = findLargestContainer(["article", "main"]);
   }
@@ -121,8 +123,9 @@
     var children = root.childNodes;
     for (var i = 0; i < children.length; i++) {
       var node = children[i];
+      if (node.nodeType !== 1 && node.nodeType !== 3) continue;
       if (isExcluded(node)) continue;
-      if (node.nodeType === 3 || /^(A|SPAN|STRONG|EM|B|I|CODE|SMALL|SUB|SUP|BR)$/.test(node.tagName || "")) {
+      if (node.nodeType === 3 || (!isBlock(node) && /^(A|SPAN|STRONG|EM|B|I|CODE|SMALL|SUB|SUP|BR)$/.test(node.tagName || ""))) {
         inline.push(retainedText(node).text);
         continue;
       }
@@ -156,7 +159,8 @@
 
   function inCommentOnlyContext(node) {
     for (var current = node; current; current = current.parentElement) {
-      if (current.querySelector(COMMENT_ROW) && !hasRetainedNarrative(current)) return true;
+      if (current.matches(extractionSelector) && current.querySelector(COMMENT_ROW) &&
+          !hasRetainedNarrative(current)) return true;
     }
     return false;
   }
@@ -164,6 +168,10 @@
   function displayOf(node) {
     if (!displayCache.has(node)) displayCache.set(node, getComputedStyle(node).display);
     return displayCache.get(node);
+  }
+
+  function isBlock(node) {
+    return node.nodeType === 1 && /^(block|flow-root|flex|grid|list-item|table|table-row)$/.test(displayOf(node));
   }
 
   // Preserve rendered text when unchanged; never recover an excluded subtree
@@ -185,7 +193,7 @@
       for (var i = 0; i < node.childNodes.length; i++) {
         var element = node.childNodes[i];
         var child = retainedText(element);
-        var block = element.nodeType === 1 && /^(block|flow-root|flex|grid|list-item|table|table-row)$/.test(displayOf(element));
+        var block = isBlock(element);
         if (block && parts.length && !parts[parts.length - 1].endsWith("\n")) parts.push("\n");
         if (child.text) parts.push(child.text);
         if (block && child.text && !child.text.endsWith("\n")) parts.push("\n");

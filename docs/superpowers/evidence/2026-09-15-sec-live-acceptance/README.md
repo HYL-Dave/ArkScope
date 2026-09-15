@@ -325,7 +325,7 @@ these test writes. The private `stop.sh` still targets only this fixture.
 
 The user approved repairing article-body selection and retesting the same
 article in the disposable copy, without shipping the no-focus experiment.
-The product change is confined to `scrape_detail.js`, with 45 new regression
+The product change is confined to `scrape_detail.js`, with 50 new regression
 cases in `tests/test_sa_extension_article_body.py`.
 
 Known comment rows anchor bottom-up sibling groups. Recognized heading/control
@@ -367,8 +367,22 @@ Reproducible local evidence under `/tmp/arkscope-sa-body-repair.CGUODf5P`:
   once, and unchanged DOM. These are synthetic rendering checks, not live-site
   or background-tab stability acceptance.
 
-Parser SHA-256 verified by the final native-browser run:
-`5f46c807fc8c4c3b45f58dd0751f1e719722c776024e0cb3a894621a3a6fe8bc`.
+The last bounded review caught three additional paths: inherited rejection
+through shared page ancestors, HTML-comment nodes flushing a direct-text group,
+and block-styled spans being joined as inline text. `red-final-review.xml`
+reproduces all five added regression cases. Rejection now follows recognized
+extraction containers, not arbitrary shared page ancestors; non-rendering nodes
+are skipped before flushing; computed block display overrides inline tag names.
+The reviewer statically confirmed those three corrections, with no remaining
+blocker from those findings. This is not an exhaustive guarantee about unseen
+site DOM variants.
+
+Final same-revision verification: `related-reviewed.xml`, **271 passed, zero
+failures/skips**, 58.35 seconds, one serial related-suite run. Two further native
+Chrome rendering cases were first observed failing in `native-followup-red.json`;
+all seven cases pass in `native-reviewed.json`, including unchanged DOM and all
+article paragraphs. Parser SHA-256 verified by that final native-browser run:
+`ebf8fa9a83ffad51662a2c4feefc5e151f9792e9cbbdcfe99e50fe69baa18367`.
 The earlier 11,360-test full-suite result belongs to `13248718`; no new full
 backend run or same-article logged-in pass is claimed for this parser repair.
 

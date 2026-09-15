@@ -194,6 +194,33 @@ def test_nested_candidate_cannot_escape_comment_only_context(tmp_path):
     assert not payload.get("body_markdown")
 
 
+@pytest.mark.parametrize("tag", ["main", "article", 'div data-test-id="content-container"'])
+def test_unrelated_comment_section_does_not_disqualify_clean_div_only_body(tmp_path, tag):
+    prose = "Independently bounded article prose. " * 20
+    html = (
+        '<div class="page-layout"><' + tag + "><div>" + prose
+        + "</div></" + tag.split()[0] + ">" + COMMENTS + "</div>"
+    )
+    payload = _scrape(tmp_path, html)
+    assert "error" not in payload, payload
+    assert payload["body_markdown"] == prose.strip()
+
+
+def test_html_comment_does_not_split_direct_prose(tmp_path):
+    payload = _scrape(
+        tmp_path, '<main>' + BODY + '<div>Opening<!-- marker --> continued.</div></main>'
+    )
+    assert "Opening continued." in payload["body_markdown"]
+
+
+def test_block_styled_spans_keep_a_markdown_boundary(tmp_path):
+    payload = _scrape(
+        tmp_path, '<main>' + BODY + '<div><span style="display:block">First styled block</span>'
+        '<span style="display:block">Second styled block</span></div></main>'
+    )
+    assert "First styled block\n\nSecond styled block" in payload["body_markdown"]
+
+
 @pytest.mark.parametrize("css_class", ["no-sidebar", "commentary-layout"])
 def test_incidental_class_substring_does_not_hide_clean_provider_body(tmp_path, css_class):
     html = (
