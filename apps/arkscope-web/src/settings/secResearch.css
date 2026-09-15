@@ -24,14 +24,18 @@
 .sec-form-trigger svg, .sec-form-menu svg { flex-shrink: 0; }
 .sec-form-value { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
 .sec-form-menu {
-  position: absolute; z-index: 20; top: 100%; left: 0; width: max-content; min-width: 100%;
-  max-width: min(320px, calc(100vw - 48px)); max-height: 260px; overflow-y: auto;
+  position: absolute; z-index: 20; top: 100%; left: 0; width: 360px; min-width: 100%;
+  max-width: calc(100vw - 48px); max-height: 260px; overflow-y: auto;
   padding: 4px; border: 1px solid var(--border); border-radius: 4px;
   background: var(--panel); color: var(--fg); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 .sec-form-menu button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 6px 8px; border: 0; border-radius: 2px; background: transparent; color: var(--fg); font: inherit; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
 .sec-form-menu button:hover, .sec-form-menu button:focus-visible { background: var(--panel2); outline: none; }
 .sec-form-menu [aria-checked="false"] svg { visibility: hidden; }
+.sec-form-group-label { padding: 7px 8px; color: var(--muted); font-size: 12px; font-weight: 600; border-top: 1px solid var(--border); }
+.sec-form-option-text { min-width: 0; line-height: 1.45; white-space: normal; }
+.sec-form-option-text strong { font-weight: 600; }
+.sec-form-option-text > span { color: var(--muted); }
 .sec-form-menu [role="status"], .sec-form-menu code { display: block; padding: 4px 8px; font-size: 12px; overflow-wrap: anywhere; }
 .sec-capacity { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 5px 12px; max-width: 560px; }
 .sec-capacity-pair { display: contents; }

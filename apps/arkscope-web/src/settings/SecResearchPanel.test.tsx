@@ -102,15 +102,16 @@ async function openForms(name = "Forms") {
   return host.querySelector<HTMLElement>('[role="menu"]')!;
 }
 function formOption(name: string) {
-  const option = [...host.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].find((el) => el.textContent === name);
+  const option = [...host.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].find((el) => formCode(el) === name);
   expect(option, `form option ${name}`).toBeDefined();
   return option!;
 }
+function formCode(element: Element) { return element.getAttribute("value") ?? element.textContent; }
 async function chooseForms(...values: string[]) {
   const menu = await openForms();
   const options = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')];
   for (const option of options.slice(1)) {
-    if ((option.getAttribute("aria-checked") === "true") !== values.includes(option.textContent!)) {
+    if ((option.getAttribute("aria-checked") === "true") !== values.includes(option.value)) {
       await act(async () => option.click());
     }
   }
@@ -149,6 +150,92 @@ function deferred<T>() {
 }
 
 describe("SEC filing form selection", () => {
+  it.each(["en", "zh-Hant"])("describes and groups the complete %s filing choices without changing query codes", async (locale) => {
+    vi.useFakeTimers();
+    const codes = ["144", "25", "3", "10-Q/A", "10-K", "10-Q", "DEF 14A", "SC 13G", "SCHEDULE 13G", "NEW-FORM"];
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("ok", codes) : fallback(url);
+    await render(locale); await change("CIK", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
+    const menu = await openForms(locale === "en" ? "Forms" : "申報類型");
+    const groups = [...menu.querySelectorAll('[role="group"]')];
+    expect(groups.map((el) => el.getAttribute("aria-label"))).toEqual(locale === "en"
+      ? ["Financial and periodic reports", "Events and proxy materials", "Ownership and transactions", "Offerings and listing", "Other filings"]
+      : ["財務與定期報告", "重大事件與委託書", "持股與交易", "發行與上市", "其他申報"]);
+    const choices = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].slice(1);
+    expect(choices.map((el) => el.value).sort()).toEqual([...codes].sort());
+    expect(choices.slice(0, 3).map((el) => el.value)).toEqual(["10-K", "10-Q", "10-Q/A"]);
+    const expected = locale === "en" ? {
+      "144": "Proposed sale of securities", "25": "Removal from listing and/or registration",
+      "3": "Initial ownership statement", "10-Q/A": "Quarterly report (amendment)", "NEW-FORM": "Unclassified filing",
+    } : {
+      "144": "擬出售證券通知", "25": "撤銷證券上市及／或註冊通知",
+      "3": "初始持股申報", "10-Q/A": "季報（修訂）", "NEW-FORM": "未分類申報",
+    };
+    for (const [code, label] of Object.entries(expected)) {
+      const option = choices.find((el) => el.value === code)!;
+      expect(option.textContent).toBe(`${code} ${label}`);
+      expect(option.getAttribute("aria-label")).toBeNull(); // Both code and meaning are accessible.
+      await act(async () => option.click());
+    }
+    await settleFilters();
+    expect(recordRequests().at(-1)?.url.searchParams.getAll("forms").sort()).toEqual(Object.keys(expected).sort());
+    expect(formRequests()).toHaveLength(1);
+    expect(requests.every(({ init }) => (init.method ?? "GET") === "GET")).toBe(true);
+  });
+
+  it("does not invent absent types or groups when a partial catalog only contains unfamiliar codes", async () => {
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("partial", ["NEW-FORM/A", "__proto__"]) : fallback(url);
+    await render(); await load(); const menu = await openForms();
+    expect([...menu.querySelectorAll('[role="group"]')].map((el) => el.getAttribute("aria-label"))).toEqual(["Other filings"]);
+    expect([...menu.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].slice(1).map((el) => el.textContent)).toEqual([
+      "NEW-FORM/A Unclassified filing", "__proto__ Unclassified filing",
+    ]);
+    expect(menu.querySelector('[role="status"]')?.textContent).toBe("Partial");
+    expect(menu.textContent).toContain("history_pending");
+  });
+
+  it.each(["en", "zh-Hant"])("names all 52 observed filing codes in %s, retaining historical forms and aliases", async (locale) => {
+    const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname,
+      "../../../../docs/superpowers/evidence/2026-09-15-sec-form-selector/checks/browser.json"), "utf8"));
+    const codes: string[] = fixture.options;
+    expect(codes).toHaveLength(52);
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("ok", codes) : fallback(url);
+    await render(locale); await change("CIK", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
+    const menu = await openForms(locale === "en" ? "Forms" : "申報類型");
+    const options = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].slice(1);
+    expect(options.map((el) => el.value).sort()).toEqual([...codes].sort());
+    for (const option of options) {
+      expect(option.textContent).not.toMatch(/Unclassified|未分類|secResearch\./);
+      expect(option.querySelector(".sec-form-option-text > span")?.textContent).toMatch(locale === "en" ? /[A-Za-z]/ : /[\u4e00-\u9fff]/);
+    }
+    expect(options.slice(0, 4).map((el) => el.value)).toEqual(["10-K", "10-K/A", "10-Q", "10-Q/A"]);
+    expect(formOption("10-K405").textContent).toContain(locale === "en" ? "historical" : "歷史");
+    expect(formOption("144/A").textContent).toContain(locale === "en" ? "amendment" : "修訂");
+  });
+
+  it("keeps language changes and grouped keyboard focus independent of exact amendment and alias selections", async () => {
+    vi.useFakeTimers();
+    handler = (url) => url.pathname.endsWith("/filing-forms")
+      ? envelope("ok", ["144", "144/A", "SC 13G", "SCHEDULE 13G"]) : fallback(url);
+    await render(); await load(); await openForms();
+    await act(async () => formOption("144/A").click());
+    await act(async () => formOption("SCHEDULE 13G").click());
+    formOption("SCHEDULE 13G").focus();
+    await act(async () => i18n.changeLanguage("zh-Hant"));
+    expect(document.activeElement).toBe(formOption("SCHEDULE 13G"));
+    expect(formOption("SC 13G").getAttribute("aria-checked")).toBe("false");
+    expect(formOption("144").getAttribute("aria-checked")).toBe("false");
+    expect(formOption("144/A").textContent).toBe("144/A 擬出售證券通知（修訂）");
+    await settleFilters();
+    expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual(["144/A", "SCHEDULE 13G"]);
+    expect(formRequests()).toHaveLength(1);
+    await key(document.activeElement!, "Home");
+    expect(document.activeElement).toBe(formOption("全部"));
+    await key(document.activeElement!, "ArrowDown");
+    expect(document.activeElement).toBe(formOption("144"));
+    await key(document.activeElement!, "Escape");
+    expect(document.activeElement).toBe(button("申報類型"));
+  });
+
   it("loads off-page choices from the issuer catalog instead of the current result page", async () => {
     await render();
     expect(formRequests()).toHaveLength(0);
@@ -157,7 +244,7 @@ describe("SEC filing form selection", () => {
     expect(formRequests()).toHaveLength(0);
     await click("Load local");
     const menu = await openForms();
-    expect([...menu.querySelectorAll('[role="menuitemcheckbox"]')].map((el) => el.textContent)).toEqual([
+    expect([...menu.querySelectorAll('[role="menuitemcheckbox"]')].map(formCode)).toEqual([
       "All", "10-K", "10-Q", "10-Q/A", "8-K", "DEF 14A", "SC 13G/A",
     ]);
     expect(host.querySelector(".sec-record-scroll")?.textContent).not.toContain("DEF 14A");
@@ -239,7 +326,7 @@ describe("SEC filing form selection", () => {
     await render(); await load();
     const menu = await openForms();
     expect(menu.querySelector('[role="status"]')?.textContent).toContain(label);
-    expect([...menu.querySelectorAll('[role="menuitemcheckbox"]')].map((el) => el.textContent)).toEqual(options);
+    expect([...menu.querySelectorAll('[role="menuitemcheckbox"]')].map(formCode)).toEqual(options);
     if (state !== "empty") expect(menu.textContent).not.toContain("Observed empty");
     if (state === "partial") expect(menu.textContent).toContain("history_pending");
     expect(host.querySelector(".sec-record-scroll")?.textContent).toContain("10-K");
@@ -306,7 +393,7 @@ describe("SEC filing form selection", () => {
     await click("Load local");
     const menu = await openForms();
     await act(async () => old.resolve(envelope("ok", ["STALE"])));
-    expect([...menu.querySelectorAll('[role="menuitemcheckbox"]')].map((el) => el.textContent)).toEqual(["All", "S-3"]);
+    expect([...menu.querySelectorAll('[role="menuitemcheckbox"]')].map(formCode)).toEqual(["All", "S-3"]);
     expect(recordRequests().at(-1)?.url.pathname).toBe("/sec-research/0000000456/filings");
     expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual([]);
   });
@@ -452,7 +539,7 @@ describe("SEC filing form selection", () => {
     expect.soft(style.textOverflow).toBe("ellipsis");
     expect.soft(getComputedStyle(trigger.querySelector("svg")!).flexShrink).toBe("0");
     const menu = await openForms();
-    expect([...menu.querySelectorAll('[aria-checked="true"]')].map((el) => el.textContent)).toEqual([
+    expect([...menu.querySelectorAll('[aria-checked="true"]')].map(formCode)).toEqual([
       "10-K", "10-Q", "10-Q/A", "8-K", "DEF 14A", "SC 13G/A",
     ]);
   });
@@ -466,6 +553,14 @@ describe("SEC filing form selection", () => {
     expect(getComputedStyle(menu).maxHeight).toBe("260px");
     expect(getComputedStyle(menu).overflowY).toBe("auto");
     expect(getComputedStyle(menu.parentElement!).minWidth).toBe("0px");
+  });
+
+  it("keeps group headings in flow so they cannot cover keyboard-focused choices", async () => {
+    applyPanelStyles();
+    await render(); await load(); const menu = await openForms();
+    for (const heading of menu.querySelectorAll(".sec-form-group-label")) {
+      expect(getComputedStyle(heading).position).not.toMatch(/sticky|absolute|fixed/);
+    }
   });
 
   it("retains text-input debounce for concepts", async () => {

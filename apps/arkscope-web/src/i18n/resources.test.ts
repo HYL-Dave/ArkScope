@@ -11,6 +11,15 @@ const secScheduleKeys = [
   "succeeded", "failed", "running", "universe", "attempted", "confirmed", "failedIssuers", "deferred",
   "filings", "facts", "requests", "unresolved", "stop", "unavailable",
 ];
+const secFormGroupKeys = ["reports", "events", "ownership", "offering", "other"];
+const secFormNameKeys = [
+  "annual", "quarterly", "foreignAnnual", "canadianAnnual", "historicalAnnual", "lateAnnual", "lateQuarterly",
+  "current", "foreignCurrent", "proxy", "preliminaryProxy", "additionalProxy", "revisedProxy", "nonManagementProxy",
+  "exemptProxy", "rollupProxy", "specialized", "iran", "initialOwnership", "ownershipChanges", "annualOwnership",
+  "proposedSale", "beneficialOwnership", "shortOwnership", "registration", "shelf", "businessCombination", "employeePlan",
+  "employeePlanAmendment", "prospectus", "freeWritingProspectus", "issuerTender", "listedRegistration", "delisting",
+  "exchangeDelisting", "listingCertification", "nyseCertification", "correspondence", "secLetter", "noAction",
+];
 const secResearchKeys = [
   "title", "cik", "load", "refresh", "resume", "reread", "budget", "unit", "bytes", "gib",
   "save", "saved", "reloadConfig", "invalidBudget", "configError", "saveError", "readError", "confirmationMismatch",
@@ -21,6 +30,7 @@ const secResearchKeys = [
   "concepts", "asOf", "revisions", "latest", "all", "previous", "next", "page", "filingId",
   "factId", "accession", "form", "filedDate", "reportDate", "acceptedAt", "document",
   "catalogUrl", "namespace", "concept", "value", "factUnit", "start", "end",
+  "unclassifiedForm", "amendedForm",
 ] as const;
 
 interface PortfolioSourceClaim {
@@ -751,7 +761,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1006,
+      settings: 1053,
       research: 236,
       explore: 1178,
       portfolio: 374,
@@ -837,9 +847,11 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2937);
-      expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys, "schedule"].sort());
+      expect(total, `${locale}.total`).toBe(2984);
+      expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys, "schedule", "formGroups", "formNames"].sort());
       expect(Object.keys(resources[locale].settings.secResearch.schedule).sort()).toEqual([...secScheduleKeys].sort());
+      expect(Object.keys(resources[locale].settings.secResearch.formGroups).sort()).toEqual([...secFormGroupKeys].sort());
+      expect(Object.keys(resources[locale].settings.secResearch.formNames).sort()).toEqual([...secFormNameKeys].sort());
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1214,6 +1226,8 @@ describe("bundled i18n resources", () => {
     ] as const;
     const postSliceSettingsPaths = [
       ...secScheduleKeys.map((key) => `secResearch.schedule.${key}`),
+      ...secFormGroupKeys.map((key) => `secResearch.formGroups.${key}`),
+      ...secFormNameKeys.map((key) => `secResearch.formNames.${key}`),
       "dataSources.schedule.sources.secResearch.label",
       "dataSources.schedule.sources.secResearch.description",
       ...secResearchKeys.map((key) => `secResearch.${key}`),

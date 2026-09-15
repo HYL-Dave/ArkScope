@@ -13,6 +13,7 @@ import { formatSystemTimestamp } from "../timeDisplay";
 import { Button, IconButton } from "../ui/Button";
 import { Tabs } from "../ui/Tabs";
 import type { SettingsT } from "./settingsCopy";
+import { groupSecFilingForms } from "./secFilingForms";
 import { useSharedDataScheduleControls, terminalRevision } from "./dataScheduleControls";
 import "./secResearch.css";
 
@@ -142,10 +143,13 @@ function FilingFormsFilter({ value, options, loading, error, disabled, onChange,
       <button type="button" role="menuitemcheckbox" tabIndex={-1} aria-checked={value.length === 0} onClick={() => onChange([])}>
         <Check size={14} aria-hidden="true" />{t(($) => $.secResearch.all)}
       </button>
-      {choices.map((form) => <button key={form} type="button" role="menuitemcheckbox" tabIndex={-1} aria-checked={value.includes(form)}
-        onClick={() => onChange(value.includes(form) ? value.filter((item) => item !== form) : [...value, form])}>
-        <Check size={14} aria-hidden="true" />{form}
-      </button>)}
+      {groupSecFilingForms(choices, t).map((group) => <div key={group.id} role="group" aria-label={group.label}>
+        <div className="sec-form-group-label" aria-hidden="true">{group.label}</div>
+        {group.choices.map(({ form, description }) => <button key={form} type="button" value={form} role="menuitemcheckbox" tabIndex={-1} aria-checked={value.includes(form)}
+          onClick={() => onChange(value.includes(form) ? value.filter((item) => item !== form) : [...value, form])}>
+          <Check size={14} aria-hidden="true" /><span className="sec-form-option-text"><strong>{form}</strong>{" "}<span>{description}</span></span>
+        </button>)}
+      </div>)}
     </div>}
   </div>;
 }
