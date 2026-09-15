@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import sqlite3
 
+from src.operator_preview import write_operator_preview
 from src.sa_tracking_memberships import SaTrackingMembershipStore, read_sa_tracking_observations, tracking_identity_context
 from src.security_lifecycle_schema import verify_profile_connection
 from src.service.security_lifecycle_automation_config import (
@@ -167,9 +168,9 @@ def main(argv=None):
             cutover_sha256=args.cutover_sha256, at=datetime.now(timezone.utc).isoformat(),
             app_stopped=args.app_stopped)
     else:
-        with args.output.open("x", encoding="utf-8") as output:
-            value = inspect_installation(args.profile) if args.command == "inspect" else preview_installation(args.profile, args.sa)
-            output.write(json.dumps(value, ensure_ascii=True, indent=2) + "\n")
+        inputs = [args.profile] if args.command == "inspect" else [args.profile, args.sa]
+        value = write_operator_preview(args.output, inputs=inputs,
+            build=lambda: inspect_installation(args.profile) if args.command == "inspect" else preview_installation(args.profile, args.sa))
     print(json.dumps(value, ensure_ascii=True, sort_keys=True))
     return value
 

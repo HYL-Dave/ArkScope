@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 
+from src.operator_preview import write_operator_preview
 from src.lifecycle_investigation.disposal import preview_disposal, apply_disposal_stage
 from src.lifecycle_investigation.migration import preview_installation, apply_installation
 
@@ -28,10 +29,9 @@ def main(argv=None):
             item.add_argument("--stage", choices=("profile", "market"), required=True)
     args = parser.parse_args(argv)
     if args.command.endswith("preview"):
-        # Refuse overwriting a prior authorization artifact before reading stores.
-        with args.output.open("x", encoding="utf-8") as output:
-            value = preview_installation(args.profile) if args.command == "install-preview" else preview_disposal(args.market, args.profile)
-            output.write(json.dumps(value, ensure_ascii=True, indent=2) + "\n")
+        inputs = [args.profile] if args.command == "install-preview" else [args.profile, args.market]
+        value = write_operator_preview(args.output, inputs=inputs,
+            build=lambda: preview_installation(args.profile) if args.command == "install-preview" else preview_disposal(args.market, args.profile))
     elif args.command == "install":
         value = apply_installation(args.profile, backup_path=args.backup, approval_sha256=args.approval_sha256,
             at=datetime.now(timezone.utc).isoformat(), app_stopped=args.app_stopped)
