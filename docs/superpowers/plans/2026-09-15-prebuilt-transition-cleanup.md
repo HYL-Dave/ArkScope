@@ -4,7 +4,9 @@ Authority: September 15 user approval of A+B before hand testing, then a
 separate interpreter decision/activation. The retained-data and current-feature
 constraints in `docs/design/RUNTIME_AND_RECENT_COLLECTION_POLICY.md` still apply;
 its old ordering (admit a candidate before removing the unused builder) is
-superseded. No production writes, activation, dependency upgrades or merge.
+superseded. No production row/schema/settings writes, activation, dependency
+upgrades or merge. Counts-only inventory may use the separately authorized
+WAL/SHM coordination, with its actual file effects recorded.
 
 ## A: Exact ID Sets
 
@@ -43,6 +45,12 @@ superseded. No production writes, activation, dependency upgrades or merge.
   absence guards and helper contracts, see RED, then run focused tests.
 - Sealed historical scripts stay byte-identical and replay against their pinned
   historical revision; document this instead of leaving forwarding modules.
+- Review found the new CLI and existing investigation CLI both created preview
+  output before reading inputs. Fix this independently of the extraction: reject
+  input/output aliases, preserve existing outputs, finish reading/serialization
+  before exclusive creation, and clean only this invocation's partial file on
+  handled failure. Share the small writer across these two real consumers;
+  retain installation/disposal engine semantics and test real failure/retry.
 
 ## C20: Separate Code Retirement From Retained Data
 
