@@ -115,23 +115,27 @@ selector, production store or running App was changed by this evaluation.
 
 ## Replacement And Removal Boundary
 
-Current source at `8ef04a60` still contains `src/sqlite_runtime/build.py`,
-`contract.py`, `launch.py`, package initialization and the early check in
-`src/__init__.py`. The corresponding tests are `test_sqlite_runtime_build.py`,
-`test_sqlite_runtime_contract.py`, `test_sqlite_runtime_launch.py` and
-`test_sqlite_runtime_startup.py`. This policy revision changes none of them.
+The user approved removing the never-activated custom runtime before hand
+testing, separately from C admission. Its four product modules, four test
+modules and the optional `src`/native-host hooks are now removed. Neither the
+source-archive environment variable nor an alternate builder remains live.
+No installed selector, interpreter, dependency or production database is changed.
 
-Once the candidate passes, the replacement patch owns removing superseded
-self-build/custom-loader code and build-only tests, together with their obsolete
-archive environment variable and source-only acceptance gate. Do not retain a
-permanent fallback builder or forwarding aliases. Replace early engine checks
-and preserve real startup, corruption/mismatch, descendant and native-host
-behavioral tests in the same change; do not just delete their coverage.
+Current startup/descendant/IO/signal behavior is owned by source-free
+`tests/test_app_entrypoints.py`, existing scheduler/worker tests and the
+strengthened native-host import-purity test. Build, exact custom manifest,
+hash/mapped-library and loader-tamper tests retire with their implementation.
+They are not silently skipped or represented as replacement-runtime safety
+acceptance. The replacement's actual engine admission and no-fallback startup
+guard remain required C work after the current-engine hand test.
 
-The current launch-test fixture rebuilds its own disposable package and still
-requires `ARKSCOPE_TEST_SQLITE_ARCHIVE` when a custom runtime is selected. That
-is an existing self-build-test dependency, not a general requirement to execute
-SQLite. Its September 15 evidence remains valid for the old artifact only.
+The SQL compatibility repair also runs on both current and candidate engines:
+five call sites/six SQL statements use bound sets with no application count cap.
+It preserves int64 overflow rejection, exact text (including old-engine NUL
+handling), global sorting/limits and the entire retention exclusion set.
+The earlier candidate failures above remain historical baseline results.
+
+The source-dependent September 15 evidence remains valid for the old artifact only.
 Existing preparation commands and test receipts are retained in the
 [historical preparation evidence](../superpowers/evidence/2026-09-14-private-sqlite-runtime/README.md)
 and [acceptance evidence](../superpowers/evidence/2026-09-15-runtime-acceptance-cleanup/README.md),

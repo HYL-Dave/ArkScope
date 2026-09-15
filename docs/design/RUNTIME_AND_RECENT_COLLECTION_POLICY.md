@@ -48,9 +48,13 @@ large-ID cases fail against the candidate's 32,766 parameter limit and pass on
 the system-engine control. Their three product owners and proposed JSON-parameter
 repair are recorded, pending confirmation. See the
 [compatibility receipt](../superpowers/evidence/2026-09-15-prebuilt-runtime-compatibility/README.md).
-The lag behind SQLite 3.53.4, replacement safety owners and real App launch paths
-remain open. No replacement is admitted or deployed; superseded tests must be
-replaced with useful safety coverage, not silently skipped or kept build-dependent.
+That is the pre-change baseline, not the current source status. The user has
+since approved A+B before hand testing: exact bound-ID sets and removal of the
+unused self-build machinery. The SQL repair is implemented without an ID-count
+cap; existing int64 rejection and text identity are preserved. Current launch
+behavior is tested without a compiler or source archive. Replacement artifact
+admission, TLS, selected-engine startup rejection and activation remain C,
+after hand testing. See the [implementation plan](../superpowers/plans/2026-09-15-prebuilt-transition-cleanup.md).
 
 Record one admitted artifact identity per environment, not one version for the
 rest of pre-release development. Review newer stable distributions and upstream
@@ -65,7 +69,7 @@ Admission requirements:
   application behavior. Record source ID and compile options; do not require
   equality with the old distribution's entire flag list. Requirements such as
   parameter capacity and SQL grammar need actual consumer/test owners, not just
-  inheritance from `src/sqlite_runtime/contract.py`. Missing required behavior
+   inheritance from the deleted custom runtime verifier. Missing required behavior
   or an unexpected engine fails visibly, never silently falls back. Do not use
   the standalone SQLite CLI's identity as Python's identity.
 - Desktop, the SA native host, supported operator/development/test entrypoints
@@ -121,18 +125,19 @@ rejects missing source archives in selected-runtime artifact acceptance.
 Its single full backend passed 11,204 cases with twelve unchanged skips; all
 31 artifact cases executed. That fixture rebuilds a disposable package: the
 source requirement is a property of that test design, not SQLite execution or
-acceptance of a prebuilt artifact. The gate still exists in product/test source
-at this policy revision; do not claim this documentation change removed it.
+acceptance of a prebuilt artifact. This gate and the four self-build test modules
+are now removed with the unused builder, manifest verifier, custom launcher and
+optional import/native-host hooks. No fallback builder or compatibility alias
+is retained. The historical checks remain evidence of the old artifact only.
 
-The replacement patch owns removing the self-build recipe, custom bootstrap and
-obsolete build-only tests once a prebuilt candidate is admitted. It must replace
-the early `src/__init__.py` check and transfer real engine/child/startup safety
-tests together, not remove the guard in isolation or retain the old builder as
-a permanent fallback. Separate testing a supplied binary from building one;
-ordinary selected-runtime acceptance must not depend on a source archive.
-Before activation, prove that supported production startup cannot silently use
-an unadmitted system engine. The exact replacement mechanism belongs to candidate
-integration, not another extension of the superseded loader architecture.
+`tests/test_app_entrypoints.py` owns source-free current launch behavior: native
+IO/cwd/exit/signals, configured-interpreter/descendant identity, real Desktop
+spawn, worker help, dependency features and OAuth loader isolation. Native import
+purity remains in `test_sa_native_host_telemetry.py`. The exact old package's
+manifest/hash/loader defenses are retired contracts, not checks that a different
+runtime has passed. Before C activation, prove that supported production startup
+cannot silently use an unadmitted engine. No new guard or environment selector
+is invented for B; current development and hand testing use the existing engine.
 
 ### Internal Analysis Library And Sandbox Ownership
 

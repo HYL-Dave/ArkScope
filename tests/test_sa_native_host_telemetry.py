@@ -43,8 +43,11 @@ def test_import_has_no_script_side_effects(tmp_path):
     """
     repo_root = Path(__file__).resolve().parents[1]
     code = (
-        "import os, logging\n"
+        "import os, logging, sys\n"
         "start_cwd = os.getcwd()\n"
+        "def guard(event, args):\n"
+        "    if event in {'os.chdir', 'os.mkdir'}: raise AssertionError(event)\n"
+        "sys.addaudithook(guard)\n"
         "import src.sa_native_host\n"
         "assert os.getcwd() == start_cwd, 'import changed cwd'\n"
         "assert not logging.getLogger().handlers, 'import configured root logging'\n"
@@ -59,7 +62,7 @@ def test_import_has_no_script_side_effects(tmp_path):
         timeout=30,
     )
     assert proc.returncode == 0, proc.stderr
-    assert "IMPORT_PURE" in proc.stdout
+    assert proc.stdout == "IMPORT_PURE\n"
 
 
 _API_ENV_KEYS = [
