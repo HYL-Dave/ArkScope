@@ -54,6 +54,14 @@ WAL/SHM coordination, with its actual file effects recorded.
 
 ## C20: Separate Code Retirement From Retained Data
 
+Subsequent user ruling: delete the two old rows and table directly, with no
+archive or content inspection. Remove the final old-table allowlist entry.
+The running old-master App can still recreate the table; perform the scoped
+transaction after normal App shutdown, then hand test the updated branch.
+Execution status: `../evidence/2026-09-15-c20-disposal/README.md`.
+The earlier inventory-first/archive proposal below is historical, not an
+additional approval requirement after this ruling.
+
 - Remove fresh `agent_queries` DDL and unused insert/count wrappers. Keep generic
   archive reading of existing tables, reports, memories and current Research.
 - RED fresh-schema absence plus existing-row preservation; keep no-create tests.

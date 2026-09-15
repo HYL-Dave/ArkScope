@@ -288,8 +288,7 @@ class AppRecordsLocalStore:
 
     # --- migration support (1c) -----------------------------------------------------
 
-    # Existing query archives remain readable pending explicit retained-data disposition.
-    MIGRATE_TABLES = ("research_reports", "agent_memories", "agent_queries")
+    MIGRATE_TABLES = ("research_reports", "agent_memories")
 
     @property
     def db_path(self) -> str:

@@ -192,6 +192,12 @@ schema or settings were changed.
 User approval has been requested for verified archive-then-dispose of the two
 rows. Until granted and actually executed, keep the table and generic reader.
 
+Subsequent ruling: the user instead approved direct deletion without an archive.
+The final allowlist entry is removed in the follow-up; the production operation
+awaits shutdown of the old-master App that would recreate the table. See
+[C20 direct disposal](../2026-09-15-c20-disposal/README.md) for current status;
+the paragraph above records this checkpoint's earlier proposal.
+
 ## Still Pending
 
 The user's [SEC/current-feature hand test](../../plans/2026-09-15-sec-current-runtime-hand-test.md)
