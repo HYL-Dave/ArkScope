@@ -194,14 +194,16 @@ rows. Until granted and actually executed, keep the table and generic reader.
 
 Subsequent ruling: the user instead approved direct deletion without an archive.
 The final allowlist entry is removed in the follow-up; the production operation
-awaits shutdown of the old-master App that would recreate the table. See
+then completed after the user closed the old-master App: exactly two rows and
+the table were removed, with fresh read-only absence verification. See
 [C20 direct disposal](../2026-09-15-c20-disposal/README.md) for current status;
 the paragraph above records this checkpoint's earlier proposal.
 
 ## Still Pending
 
 The user's [SEC/current-feature hand test](../../plans/2026-09-15-sec-current-runtime-hand-test.md)
-and C20 retained-data authorization. A+B and C15 code retirement have passed
-paired full acceptance; neither old query contents nor their table were deleted. C,
+remains. A+B and C15 code retirement passed paired full acceptance; C20 code and
+the separately authorized direct disposal are now closed in the follow-up. C,
 Windows/macOS and Python sandbox remain explicitly separate. No merge/push,
-App restart, production schema change or runtime activation occurred.
+App restart or runtime activation occurred. The only follow-up production schema
+change was the approved C20 DROP, not part of this checkpoint's offline tests.

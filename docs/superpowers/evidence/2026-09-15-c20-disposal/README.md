@@ -7,21 +7,29 @@ for other stored data, runtime activation, application shutdown, merge or push.
 
 ## Current Status
 
-**Code retirement complete; production DROP not executed.**
+**C20 CLOSED: code retirement and the approved production DROP are complete.**
 
-The running Desktop sidecar was observed at PID 357943, working directory
+Before the user closed the App, its sidecar was observed at PID 357943, working directory
 `/mnt/md0/PycharmProjects/ArkScope`, whose master is still `30bb31c7`.
 That source's `AppRecordsLocalStore._ensure_schema()` still includes
 `CREATE TABLE IF NOT EXISTS agent_queries`; report and memory tools construct
 that store. Therefore the old App can recreate the table after a DROP. This is
 a deployment-state issue, not a need to archive the old questions.
 
-The user has been asked to close the App normally. No process was terminated,
-no production DB was opened by this batch, and no question/answer content was
-read, printed, dumped or archived. The earlier counts-only observation of two
-rows remains historical until the transaction rechecks it. Do not mark C20's
-stored-data disposition closed yet, or re-seek the already granted no-archive
-authorization merely because the operation was deferred.
+The user then confirmed normal App shutdown. A fresh process check found no
+matching App/native-host/collector writer and `fuser` observed no open profile
+handle. The unchanged `f0dd6feb` operation executed on September 15 at
+06:49:29 UTC, rechecked exactly two rows, and committed the target DROP.
+Its non-target schema, six protected table counts and non-target sequence
+entries were unchanged. A fresh mode=ro/query_only connection, with the main
+file mounted read-only and a column authorizer, returned `table: absent`.
+The metadata-only receipt is `checks/execution.json`.
+
+No question/answer content was read, printed, dumped or archived. No process
+was terminated or restarted, no backup was made, and the engine remains 3.37.2.
+This confirms the scoped deletion, not a new whole-database integrity baseline
+or a runtime switch. The main-master source is still old; restarting it can
+recreate an empty legacy table. Hand testing must use the updated branch.
 
 ## Source Change
 
@@ -57,12 +65,12 @@ callback, which the current Python build rejected on the next query. An isolated
 three-query probe reproduced that difference; resetting with an explicit OK
 callback fixes it. This affected only disposable verification, never production.
 
-## Authorized Remaining Operation
+## Executed Operation
 
-After the App is closed, recheck that no old writer is active, then run the
-fixed one-time operation in `checks/dispose.py` against only the approved main
-profile. It is evidence/operator code, not an application migration, installed
-tool or automatic startup action.
+The one-time operation in `checks/dispose.py` ran against only the approved
+main profile after the shutdown checks. It remains historical evidence/operator
+code, not an application migration, installed tool or automatic startup action.
+Do not repeat the completed production operation.
 
 Within `BEGIN IMMEDIATE`, it verifies the exact old columns, two-row count and
 absence of dependent schema objects; takes only schema/sequence metadata and
@@ -73,7 +81,10 @@ writes to current data tables. Any failed check rolls back. No backup, JSON
 dump, content hash, REINDEX, VACUUM, manual checkpoint or SQLite update is part
 of this operation. SQLite's shared `sqlite_sequence` must remain for live tables.
 
-After execution, verify absence using a fresh read-only connection and save
-only the metadata result, never the deleted contents. Start the tested branch
-for hand testing; restarting old master can still recreate an empty legacy table
-and is not deployment of this fix.
+Execution was network-isolated, with the rest of the filesystem read-only and
+existing non-target entries in the data directory remounted read-only. The
+writable parent permits SQLite coordination names; this is not a kernel filename
+allowlist. No immutable connection or manual checkpoint was used. Postcheck used
+the already tested counts-only inventory from the previous receipt. Only the
+metadata results were saved, never the deleted contents. App restart, merge,
+push and interpreter replacement were not performed.

@@ -1,0 +1,37 @@
+{
+  "operation_revision": "f0dd6feb",
+  "started_at_utc": "2026-09-15T06:49:29Z",
+  "recorded_at_utc": "2026-09-15T06:50:24Z",
+  "database": "/mnt/md0/PycharmProjects/ArkScope/data/profile_state.db",
+  "user_closed_desktop": true,
+  "matched_app_writer_processes_before": 0,
+  "matched_app_writer_processes_after": 0,
+  "open_profile_handles_observed_before": false,
+  "network_isolated": true,
+  "existing_non_target_data_entries_readonly": true,
+  "apply_exit_code": 0,
+  "apply_result": {
+    "archive_created": false,
+    "other_schema_unchanged": true,
+    "other_sequences_unchanged": true,
+    "protected_counts_unchanged": true,
+    "removed_rows": 2,
+    "row_contents_read": false,
+    "sqlite_version": "3.37.2",
+    "status": "removed",
+    "table": "agent_queries"
+  },
+  "fresh_connection_postcheck_exit_code": 0,
+  "fresh_connection_postcheck": {
+    "column_authorizer": true,
+    "explicit_checkpoint": false,
+    "main_readonly": true,
+    "query_only": true,
+    "rows": null,
+    "sqlite_version": "3.37.2",
+    "status": "observed",
+    "table": "absent"
+  },
+  "app_restarted": false,
+  "runtime_switched": false
+}
