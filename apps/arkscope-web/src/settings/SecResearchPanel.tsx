@@ -85,8 +85,8 @@ function Records({ page, view, t }: { page: Page | null; view: View; t: Settings
   const rows = page?.data ?? [];
   const columns: [string, string][] = view === "filings" ? [
     ["form", t(($) => $.secResearch.form)], ["filed_date", t(($) => $.secResearch.filedDate)],
-    ["report_date", t(($) => $.secResearch.reportDate)], ["accepted_at", t(($) => $.secResearch.acceptedAt)],
-    ["primary_document", t(($) => $.secResearch.document)], ["primary_url", t(($) => $.secResearch.catalogUrl)],
+    ["primary_url", t(($) => $.secResearch.catalogUrl)], ["report_date", t(($) => $.secResearch.reportDate)],
+    ["accepted_at", t(($) => $.secResearch.acceptedAt)], ["primary_document", t(($) => $.secResearch.document)],
     ["accession", t(($) => $.secResearch.accession)], ["filing_id", t(($) => $.secResearch.filingId)],
   ] : [
     ["concept", t(($) => $.secResearch.concept)], ["value", t(($) => $.secResearch.value)],

@@ -145,3 +145,49 @@ node ../../node_modules/vitest/vitest.mjs run src/settings/SecResearchPanel.test
 - Scoped `git --no-optional-locks diff --check`: exit 0.
 - No full frontend suite, typecheck rerun, build, live app, backend, staging or
   commit activity in this follow-up. Parent owns full frontend integration run.
+
+## Source-Link Visibility Polish at 90c8e04c
+
+Started clean on codex/sec-research-integration at
+90c8e04c16403d5424bc5d3afc800a8c5630163b. Prior work was already committed by
+parent. This follow-up changes only these three frontend files:
+
+- apps/arkscope-web/src/settings/SecResearchPanel.tsx
+- apps/arkscope-web/src/settings/SecResearchPanel.test.tsx
+- apps/arkscope-web/src/settings/secResearch.css
+
+Filing column order is now form, filed_date, primary_url, report_date,
+accepted_at, primary_document, accession, filing_id. Fact columns, labels,
+filtering, pagination and acquisition controls are unchanged.
+
+Source anchors now use var(--fg), with the existing var(--panel2) hover
+background and 2px var(--accent) keyboard focus outline at a 2px offset.
+The 28px minimum hit area is unchanged; the hover area has a 4px radius.
+
+RED-first tests updated both-locale source header positions, the complete
+filing header/cell ordering, and cached page expectations. A new regression
+checks parsed stylesheet color/hover/focus declarations and real anchor focus.
+jsdom cannot reliably resolve custom-property colors or :focus-visible, so
+the styling test uses CSSOM declarations, consistent with repo CSS contracts;
+it is not a screenshot or measured Electron pixel-contrast test.
+
+Commands (same Node PATH, apps/arkscope-web cwd, pipefail + external tee logs):
+
+```sh
+# RED then GREEN; each process finished before the next started.
+node ../../node_modules/vitest/vitest.mjs run src/settings/SecResearchPanel.test.tsx --no-file-parallelism --maxWorkers=1
+
+# Only after GREEN completed:
+node ../../node_modules/typescript/bin/tsc --noEmit
+```
+
+- red-source-visibility.log: exit 1, 5 expected failed tests / 56 passed.
+  Failures identify the old sixth-column source link and missing theme,
+  hover and focus styling. No product files were edited before RED.
+- green-source-visibility.log: exit 0, all 61 panel tests passed.
+- typecheck-source-visibility.log: exit 0, no diagnostics.
+- Scoped git diff --check: exit 0.
+- Final git status shows only the three approved files modified, unstaged.
+- No full suite, Python, backend/docs changes, index writes, commits, build,
+  live-app access, or process changes. Parent owns the isolated app rebuild;
+  this work does not change its running 90c8e04c version.

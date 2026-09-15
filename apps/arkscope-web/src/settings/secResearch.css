@@ -35,7 +35,9 @@
 .sec-record-scroll table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 12px; }
 .sec-record-scroll th, .sec-record-scroll td { padding: 7px 9px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .sec-record-scroll td { font-variant-numeric: tabular-nums; }
-.sec-record-scroll a { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
+.sec-record-scroll a { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; color: var(--fg); border-radius: 4px; }
+.sec-record-scroll a:hover { background: var(--panel2); }
+.sec-record-scroll a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sec-pagination { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
 .sec-pagination > span { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
 @media (max-width: 480px) {

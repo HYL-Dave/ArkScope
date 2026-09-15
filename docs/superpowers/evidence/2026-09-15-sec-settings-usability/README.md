@@ -106,8 +106,17 @@ refinements; it is not claimed as a final full candidate-runtime run.
 The final current-runtime SEC/API run passes **2,217 cases**, with no failures,
 errors or skips. Candidate aggregate case identities (checkpoint plus the
 final document run) equal that set; the final 282-case document sets also agree.
-The full frontend suite passes 1,817 cases in 124 files, plus typecheck and
+The full frontend suite passes 1,818 cases in 124 files, plus typecheck and
 production build. The build still reports the existing >500 kB chunk warning.
+
+Actual Electron inspection then identified the source link's pre-existing
+default dark-blue color and inconvenient position in narrow layouts. The final
+frontend polish puts SEC original immediately after Filed date, uses theme
+foreground and supplies hover/focus states. Five targeted assertions failed
+before this polish and 61 panel cases pass afterward. An actual-browser color
+assertion also failed on the default `rgb(0, 0, 238)` before the new bundle.
+The final frontend total includes one additional contrast/focus regression;
+the earlier full run had 1,817 cases. Backend code is unchanged by this polish.
 
 The final reviewer found no remaining defect after both guard refinements.
 Review was read-only and did not substitute for executing the tests. The source

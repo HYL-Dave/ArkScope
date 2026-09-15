@@ -66,8 +66,8 @@
   },
   "frontend": {
     "success": true,
-    "numTotalTests": 1817,
-    "numPassedTests": 1817,
+    "numTotalTests": 1818,
+    "numPassedTests": 1818,
     "numFailedTests": 0,
     "numPendingTests": 0
   },
