@@ -69,4 +69,30 @@ config-loader deprecation and existing >500 kB bundle warning are nonfatal.
 Tests ran serially with network access disabled, a read-only host and private
 caches. No full-backend or cross-platform acceptance is implied.
 
-Actual Desktop viewport verification is pending the rebuilt hand-test launch.
+## Actual Desktop
+
+The isolated hand-test Desktop is running product `f4925da9`, with its existing
+private profile, contact identity and captures retained. No production DB was
+opened, no runtime was changed, and no merge or push was performed.
+
+`check_browser.py` confirms all 52 local codes have names, the five groups are
+present, and 10-K / 10-K/A / 10-Q / 10-Q/A lead the list. It checks the actual
+accessible names of 144, 25 and 3. Traversing all 53 controls upward checks the
+focused row against `elementFromPoint`, not merely focus identity. Space,
+Home/End, ArrowUp/Down and Escape work; All clears the exact filter. A mixed
+selection sends precisely 10-K, 144, 25, 3 and DEF 14A, with no cursor retained.
+The option list is fetched once during the exercise.
+
+Inspected screenshots at 1440x900, 840x900 and 390x844 show readable labels and
+no menu/page horizontal overflow. The trigger remains 32px tall. Non-GET SEC
+requests are guarded and none occurred; there are no page errors, and the
+stored-status/capacity responses are identical before and after the check.
+The App is left at desktop size with the 10-K filter for the user's next check.
+
+The runner's initial assertion incorrectly assumed JavaScript object-key order
+would preserve DOM order for numeric codes. It now transfers an array of pairs
+before constructing the Python dictionary. This was a harness error, not a
+change to product ordering. The successful rerun and screenshots are retained
+in `checks/browser.json` and the six viewport images. Playwright's Node
+`url.parse()` deprecation diagnostic remains nonfatal. This run does not repeat
+the earlier external-browser handoff check; navigation code is unchanged.

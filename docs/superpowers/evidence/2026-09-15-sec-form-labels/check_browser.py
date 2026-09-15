@@ -81,7 +81,7 @@ async def check(root, out):
 
                 popup = await menu()
                 items = popup.get_by_role("menuitemcheckbox").filter(has=page.locator(".sec-form-option-text"))
-                names = await items.evaluate_all("els => Object.fromEntries(els.map(el => [el.value, el.textContent]))")
+                names = dict(await items.evaluate_all("els => els.map(el => [el.value, el.textContent])"))
                 assert set(names) == set(codes)
                 assert all("未分類" not in name and "secResearch." not in name for name in names.values())
                 for code, meaning in [("144", "擬出售證券通知"), ("25", "撤銷證券上市及／或註冊通知"), ("3", "初始持股申報")]:
