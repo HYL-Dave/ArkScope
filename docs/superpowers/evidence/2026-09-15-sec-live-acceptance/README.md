@@ -1,8 +1,9 @@
 # SEC Live Research Acceptance
 
-Status: backend and live SEC checks passed; real logged-in SA hand tests exposed
-an article-body capture defect. Integration acceptance is blocked on its repair
-and live revalidation. The optional background-tab experiment is not accepted.
+Status: live SEC checks passed. Real logged-in SA hand tests exposed an
+article-body capture defect; the repaired parser now passes the same-article
+foreground retest. Final-revision integration acceptance remains pending. The
+optional background-tab experiment is not accepted.
 
 Base revision: `4d4a5e2c997576acb3f2d98141b641612e029c95`.
 Last fully tested product: `13248718b0a91fede0219c8b6ca742d74eb12627`.
@@ -384,12 +385,70 @@ all seven cases pass in `native-reviewed.json`, including unchanged DOM and all
 article paragraphs. Parser SHA-256 verified by that final native-browser run:
 `ebf8fa9a83ffad51662a2c4feefc5e151f9792e9cbbdcfe99e50fe69baa18367`.
 The earlier 11,360-test full-suite result belongs to `13248718`; no new full
-backend run or same-article logged-in pass is claimed for this parser repair.
+backend run is claimed for this parser repair. Its subsequent logged-in retest
+is recorded below.
+
+### Same-Article Repair Retest, September 16
+
+The user reloaded the disposable extension and completed one foreground Quick
+Update with parser commit `0a60b73410a97879c7fd2c93229c52a1fc2934f3`.
+Post-run verification checks all 27 extension files against the prepared overlay
+inventory and all 412 readonly base files against `13248718`. Only the parser
+was overlaid; API, collector flow and foreground instrumentation stayed on the
+previously recorded base. This is a hybrid component test, not whole-revision
+App acceptance or acceptance of background collection.
+
+The same seeded article, whose body and detail checkpoint were NULL before the
+run, now contains **3,684 characters, byte-for-byte equal to the original
+article**. Its SHA-256 is
+`a5c4bf3c0c2d5526f41f6e4ab32691e7f0fec9882a47edb57e6ce72b9e16bd40`.
+All ten original long paragraphs are present exactly once. There is no
+`COMMENTS (n)` heading or full-comment match of at least 50 non-whitespace
+characters; it is not the previously rejected 5,660-character comment body.
+Actual authenticated API readback returns the identical article body. This
+establishes a passing same-article content retest, not just a nonempty-body or
+successful-job check.
+
+Its comment scan advanced, retaining all 61 prior comments and adding one.
+The two earlier failed-comment targets also advanced their scan timestamps,
+retaining 646 and 479 comments (the latter adds four). All three targets' full
+comment collections match actual API readback; no prior comment IDs were lost.
+
+Job 5 reports `succeeded / complete`, all four phases complete, with zero
+recorded or omitted diagnostics. Duration: 94,901 ms (collector: 94,847 ms).
+The Chrome receipt records foreground mode, one activation, zero suppressions,
+111 samples, 97 active-tab samples, 89 visible and 11 hidden document samples,
+with no navigation/script/observation errors, truncation or removal failure.
+These samples do not prove continuous visibility or repeated-run reliability.
+
+Across this Quick run, 59 existing article rows changed and one new article was
+added. Two bodies were acquired: the deliberately missing body and the new
+article. Only the former has the original-body comparison described above;
+do not infer independent semantic validation of the second from its length.
+Thirty-eight comments were added; all previous comment rows are unchanged.
+All previous article/news IDs are preserved, and no pre-existing nonempty body
+changed. News rows and other retained SA tables are unchanged except pick and
+refresh metadata. Profile changes are limited to the new job. Both copied DB
+integrity checks return `ok`; private market main/WAL hashes remain identical.
+These writes stayed in the disposable fixture, not production stores.
+
+Private evidence under `/tmp/arkscope-sa-manual.CYHtVYUy`:
+
+- Baseline: `data/evidence/before-body-repair-quick-f5q__vwz`.
+- Result: `data/evidence/after-body-repair-quick-hk1hs4oa`, containing the
+  checkpoint receipt, row comparison, `api-body-repair-readback.json` and the
+  verified `probe-artifact.json`.
+- Chrome receipt: `data/evidence/focus-probe/5e68601f-22d1-4891-8618-3479d3bc3a6a.json`.
+- `body_repair_readback.py` checks session/controller/listener identity, uses
+  only authenticated loopback GETs without proxies or redirects, and reads
+  query-only checkpoint copies. Its write sandbox permits only the new evidence
+  directory and scratch; private article/comment text is not printed or committed.
 
 ## Pending
 
-- Live-retest fresh SA article-body capture with the reviewed repair, then run
-  final-revision integration acceptance before merging.
+- Run final-revision integration acceptance before merging. The repaired
+  same-article foreground live retest above is complete; the previous full
+  backend result is not reattributed to this new parser revision.
 - The optional no-focus experiment remains failed; no background News run or
   repeated/matched-input stability claim has been made.
 - Integration decision after acceptance.
