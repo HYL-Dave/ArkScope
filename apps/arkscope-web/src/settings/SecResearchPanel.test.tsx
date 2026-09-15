@@ -72,6 +72,7 @@ afterEach(async () => {
   host?.remove();
   stylesheet?.remove();
   stylesheet = undefined;
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 async function render(language = "en", withControls = false) {
@@ -108,6 +109,12 @@ async function select(name: string, value: string) {
   });
 }
 async function load(cik = "123") { await change("CIK", cik); await click("Load local"); }
+async function settleFilters(milliseconds = 300) {
+  await act(async () => { await vi.advanceTimersByTimeAsync(milliseconds); });
+}
+function recordRequests() {
+  return requests.filter(({ url }) => /\/(filings|facts)$/.test(url.pathname));
+}
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
@@ -116,6 +123,222 @@ function deferred<T>() {
 }
 
 describe("SEC structured storage", () => {
+  it("debounces typing beside the results and queries only the latest local filters", async () => {
+    vi.useFakeTimers();
+    handler = (url) => url.searchParams.has("forms") ? envelope("ok", [filing("filtered")]) : fallback(url);
+    await render(); await load();
+    expect(host.querySelector('[role="tabpanel"]')?.contains(input("Forms"))).toBe(true);
+    await change("Forms", "10");
+    await settleFilters(200);
+    await change("Forms", "10-Q, 8-K");
+    await settleFilters(299);
+    expect(recordRequests()).toHaveLength(1);
+    expect(host.textContent).not.toContain("first.htm");
+    await settleFilters(1);
+    expect(recordRequests()).toHaveLength(2);
+    expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual(["10-Q", "8-K"]);
+    expect(host.textContent).toContain("filtered.htm");
+    expect(requests.every(({ init }) => (init.method ?? "GET") === "GET" && init.body === undefined)).toBe(true);
+    await settleFilters(1000);
+    expect(recordRequests()).toHaveLength(2);
+  });
+
+  it("automatically applies filing dates and amendment selection to stored results", async () => {
+    vi.useFakeTimers();
+    handler = (url) => url.searchParams.get("include_amendments") === "false"
+      ? envelope("ok", [filing("dated")]) : fallback(url);
+    await render(); await load();
+    await change("Filed from", "2025-01-01");
+    await change("Filed to", "2026-03-01");
+    await act(async () => host.querySelector<HTMLInputElement>('.sec-checkbox input')!.click());
+    await settleFilters();
+    expect([...recordRequests().at(-1)!.url.searchParams]).toEqual([
+      ["filed_from", "2025-01-01"], ["filed_to", "2026-03-01"],
+      ["include_amendments", "false"], ["limit", "20"],
+    ]);
+    expect(host.textContent).toContain("dated.htm");
+    expect(recordRequests()).toHaveLength(2);
+    expect(requests.some(({ init }) => init.method === "POST")).toBe(false);
+  });
+
+  it("automatically applies concepts, as-of date and revisions without acquiring SEC data", async () => {
+    vi.useFakeTimers();
+    handler = (url) => url.searchParams.get("revisions") === "all" ? envelope("ok", [{
+      fact_id: "revised", namespace: "us-gaap", concept: "Revenues", value: "999.00100",
+      unit: "USD", end: "2025-12-31", filed_date: "2026-02-01", accession: "000-1",
+    }]) : fallback(url);
+    await render(); await load(); await click("Facts");
+    expect(host.querySelector('[role="tabpanel"]')?.contains(input("Concepts"))).toBe(true);
+    await change("Concepts", "us-gaap:Revenues Assets");
+    await change("Available as of", "2026-03-01");
+    await select("Revisions", "all");
+    await settleFilters();
+    expect([...recordRequests().at(-1)!.url.searchParams]).toEqual([
+      ["concepts", "us-gaap:Revenues"], ["concepts", "Assets"], ["as_of", "2026-03-01"],
+      ["revisions", "all"], ["limit", "40"],
+    ]);
+    expect(host.textContent).toContain("999.00100");
+    expect(recordRequests()).toHaveLength(3);
+    expect(requests.some(({ init }) => init.method === "POST")).toBe(false);
+  });
+
+  it.each(["success", "failure"])("ignores a late %s from an older automatic filter read", async (outcome) => {
+    vi.useFakeTimers();
+    const oldPage = deferred<unknown>();
+    const oldStatus = deferred<unknown>();
+    let delayStatus = false;
+    handler = (url) => {
+      if (delayStatus && /\/sec-research\/\d+$/.test(url.pathname)) return oldStatus.promise;
+      if (url.searchParams.get("forms") === "10-K") return oldPage.promise;
+      if (url.searchParams.get("forms") === "10-Q") return envelope("ok", [filing("latest-filter")]);
+      return fallback(url);
+    };
+    await render(); await load();
+    delayStatus = true;
+    await change("Forms", "10-K"); await settleFilters();
+    expect(recordRequests()).toHaveLength(2);
+    delayStatus = false;
+    await change("Forms", "10-Q"); await settleFilters();
+    expect(host.textContent).toContain("latest-filter.htm");
+    await act(async () => {
+      oldPage.resolve(outcome === "success" ? envelope("ok", [filing("stale-filter")], "stale-cursor")
+        : new Response(JSON.stringify({ detail: { code: "stale_filter_error" } }), { status: 422 }));
+      oldStatus.resolve({ ...envelope("partial"), gaps: [{ code: "stale_status" }] });
+    });
+    expect(host.textContent).toContain("latest-filter.htm");
+    expect(host.textContent).not.toContain("stale");
+    expect(button("Next page").disabled).toBe(true);
+    expect(button("Load local").disabled).toBe(false);
+  });
+
+  it("invalidates an in-flight cursor page immediately, before the new debounce fires", async () => {
+    vi.useFakeTimers();
+    const old = deferred<unknown>();
+    handler = (url) => url.searchParams.has("cursor") ? old.promise : fallback(url);
+    await render(); await load(); await click("Next page");
+    await change("Forms", "10-Q");
+    await act(async () => old.resolve(envelope("ok", [filing("stale-page")], "stale-cursor")));
+    expect(host.textContent).not.toContain("stale-page");
+    expect(button("Next page").disabled).toBe(true);
+    expect(host.querySelector(".sec-pagination > span")?.textContent).toBe("Page 1");
+    await settleFilters();
+    expect(recordRequests()).toHaveLength(3);
+    expect(recordRequests().at(-1)?.url.searchParams.has("cursor")).toBe(false);
+    expect(host.textContent).toContain("first.htm");
+  });
+
+  it("cancels pending filter reads on tab navigation and reads the selected view once", async () => {
+    vi.useFakeTimers();
+    await render(); await load(); await change("Forms", "10-Q");
+    await click("Facts");
+    expect(host.textContent).toContain("1234567890123456789.123");
+    await settleFilters(1000);
+    expect(recordRequests().map(({ url }) => url.pathname)).toEqual([
+      "/sec-research/0000000123/filings", "/sec-research/0000000123/facts",
+    ]);
+    await change("Concepts", "Assets"); await click("Catalog");
+    await settleFilters(1000);
+    expect(recordRequests()).toHaveLength(3);
+    expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual(["10-Q"]);
+    expect(host.textContent).toContain("first.htm");
+  });
+
+  it("ignores an automatic filter response after navigating to another view", async () => {
+    vi.useFakeTimers();
+    const old = deferred<unknown>();
+    handler = (url) => url.searchParams.has("forms") ? old.promise : fallback(url);
+    await render(); await load(); await change("Forms", "10-Q"); await settleFilters();
+    expect(recordRequests()).toHaveLength(2);
+    await click("Facts");
+    await act(async () => old.resolve(envelope("ok", [filing("stale-catalog")])));
+    expect(host.textContent).toContain("1234567890123456789.123");
+    expect(host.textContent).not.toContain("stale-catalog");
+  });
+
+  it("cancels a pending debounce on unmount without issuing another local read", async () => {
+    vi.useFakeTimers();
+    await render(); await load(); await change("Forms", "10-Q");
+    const before = requests.length;
+    await act(async () => root!.unmount()); root = undefined;
+    await settleFilters(1000);
+    expect(requests).toHaveLength(before);
+    expect(host.textContent).toBe("");
+  });
+
+  it("ignores automatic filter completion after unmount", async () => {
+    vi.useFakeTimers();
+    const old = deferred<unknown>();
+    handler = (url) => url.searchParams.has("forms") ? old.promise : fallback(url);
+    await render(); await load(); await change("Forms", "10-Q"); await settleFilters();
+    expect(recordRequests()).toHaveLength(2);
+    const before = requests.length;
+    await act(async () => root!.unmount()); root = undefined;
+    await act(async () => old.resolve(envelope("ok", [filing("unmounted")])));
+    await settleFilters(1000);
+    expect(requests).toHaveLength(before);
+    expect(host.textContent).toBe("");
+  });
+
+  it.each(["456", "invalid", ""])("cancels pending filtering when CIK changes to %s and waits for local load", async (cik) => {
+    vi.useFakeTimers();
+    await render(); await load(); await change("Forms", "10-Q");
+    await change("CIK", cik); await settleFilters(1000);
+    await change("Forms", "8-K"); await settleFilters(1000);
+    expect(recordRequests()).toHaveLength(1);
+    expect(host.textContent).not.toContain("first.htm");
+    expect(button("Load local").disabled).toBe(cik !== "456");
+    if (cik === "456") {
+      await click("Load local");
+      expect(recordRequests().at(-1)?.url.pathname).toBe("/sec-research/0000000456/filings");
+      expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual(["8-K"]);
+      expect(host.textContent).toContain("first.htm");
+    }
+    expect(requests.some(({ init }) => init.method === "POST")).toBe(false);
+  });
+
+  it("ignores an automatic filter response after a different CIK is loaded", async () => {
+    vi.useFakeTimers();
+    const old = deferred<unknown>();
+    handler = (url) => url.pathname === "/sec-research/0000000123/filings" && url.searchParams.has("forms")
+      ? old.promise : fallback(url);
+    await render(); await load(); await change("Forms", "10-Q"); await settleFilters();
+    expect(recordRequests()).toHaveLength(2);
+    await load("456");
+    await act(async () => old.resolve(envelope("ok", [filing("stale-issuer-filter")])));
+    expect(host.textContent).toContain("first.htm");
+    expect(host.textContent).not.toContain("stale-issuer-filter");
+    expect(recordRequests().at(-1)?.url.pathname).toBe("/sec-research/0000000456/filings");
+  });
+
+  it("an explicit local load consumes the pending debounce without a duplicate read", async () => {
+    vi.useFakeTimers();
+    await render(); await load(); await change("Forms", "10-Q"); await click("Load local");
+    await settleFilters(1000);
+    expect(recordRequests()).toHaveLength(2);
+    expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual(["10-Q"]);
+    expect(host.textContent).toContain("first.htm");
+  });
+
+  it.each(["en", "zh-Hant"])("offers only the official browser source link for filing documents in %s", async (locale) => {
+    await render(locale);
+    await change("CIK", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
+    const row = host.querySelector(".sec-record-scroll tbody tr")!;
+    const link = row.querySelector<HTMLAnchorElement>("a")!;
+    expect(row.textContent).toContain("first.htm");
+    expect(link.href).toBe("https://www.sec.gov/Archives/edgar/data/123/report.htm");
+    expect(link.target).toBe("_blank");
+    expect(link.rel).toBe("noopener noreferrer");
+    expect(link.getAttribute("aria-label")).toBe(locale === "en" ? "SEC original" : "SEC 原文");
+    expect(link.title).toBe(locale === "en" ? "SEC original" : "SEC 原文");
+    expect(host.querySelectorAll(".sec-record-scroll th")[5]?.textContent).toBe(locale === "en" ? "SEC original" : "SEC 原文");
+    expect(row.querySelectorAll("button")).toHaveLength(0);
+    const before = requests.length;
+    link.addEventListener("click", (event) => event.preventDefault());
+    await act(async () => link.click());
+    expect(requests).toHaveLength(before);
+    expect(host.querySelector('[aria-label="Filing reader"], [aria-label="申報文件閱讀器"]')).toBeNull();
+  });
+
   it("ignores unrelated source completion", async () => {
     let news = { ...scheduled, running: true };
     handler = (url) => url.pathname === "/schedule"
@@ -197,7 +420,7 @@ describe("SEC structured storage", () => {
     }]) : fallback(url);
     await render(); await load();
     expect([...host.querySelectorAll(".sec-record-scroll th")].map((cell) => cell.textContent)).toEqual([
-      "Form", "Filed date", "Report date", "Accepted at", "Primary document", "Catalog URL", "Accession", "Filing ID",
+      "Form", "Filed date", "Report date", "Accepted at", "Primary document", "SEC original", "Accession", "Filing ID",
     ]);
     const cells = [...host.querySelectorAll(".sec-record-scroll tbody td")];
     expect(cells.map((cell) => cell.textContent)).toEqual([
@@ -349,18 +572,28 @@ describe("SEC structured storage", () => {
   });
 
   it("passes opaque cursors unchanged, reopens previous pages and resets on filter change", async () => {
-    handler = (url) => url.searchParams.has("cursor") ? envelope("ok", [filing("second")]) : fallback(url);
+    vi.useFakeTimers();
+    handler = (url) => url.searchParams.has("forms")
+      ? envelope("ok", [filing(url.searchParams.has("cursor") ? "filtered-next" : "filtered-first")],
+        url.searchParams.has("cursor") ? null : "filtered+/= &cursor")
+      : url.searchParams.has("cursor") ? envelope("ok", [filing("second")]) : fallback(url);
     await render(); await load(); await click("Next page");
     expect(requests.at(-1)?.url.searchParams.get("cursor")).toBe("opaque+/= &token");
     expect(host.textContent).toContain("second.htm");
     await click("Previous page"); expect(host.textContent).toContain("first.htm");
     await click("Next page"); await change("Forms", "10-Q");
     expect(host.textContent).not.toContain("second.htm");
-    await click("Load local");
+    await settleFilters();
     const last = requests.filter(({ url }) => url.pathname.endsWith("/filings")).at(-1)!.url;
     expect(last.searchParams.has("cursor")).toBe(false);
     expect(last.searchParams.getAll("forms")).toEqual(["10-Q"]);
     expect(button("Previous page").disabled).toBe(true);
+    expect(host.querySelector(".sec-pagination > span")?.textContent).toBe("Page 1");
+    expect(host.textContent).toContain("filtered-first.htm");
+    await click("Next page");
+    expect(recordRequests().at(-1)?.url.searchParams.get("cursor")).toBe("filtered+/= &cursor");
+    expect(host.textContent).toContain("filtered-next.htm");
+    expect(host.textContent).not.toContain("second.htm");
   });
 
   it("preserves conflicting catalog variants across cached forward and back pages without key warnings", async () => {
@@ -478,6 +711,7 @@ describe("SEC structured storage", () => {
   });
 
   it("refresh completion reloads the current filters rather than the command-time filters", async () => {
+    vi.useFakeTimers();
     const pending = deferred<unknown>();
     handler = (url) => url.pathname.endsWith("/refresh") ? pending.promise : fallback(url);
     await render(); await load(); await click("Refresh structured data");
@@ -487,6 +721,9 @@ describe("SEC structured storage", () => {
     expect(latest.searchParams.getAll("forms")).toEqual(["10-Q"]);
     expect(latest.searchParams.has("cursor")).toBe(false);
     expect(host.textContent).toContain("Refresh receipt");
+    await settleFilters(1000);
+    expect(recordRequests()).toHaveLength(2);
+    expect(requests.filter(({ init }) => init.method === "POST")).toHaveLength(1);
   });
 
   it("keeps budget confirmation owned by the save when refresh completes during PUT", async () => {

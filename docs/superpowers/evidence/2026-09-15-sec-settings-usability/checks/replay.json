@@ -1,0 +1,305 @@
+{
+  "base": "f36a7b336aad35d49c043547815e0f28dee463ff",
+  "original_sha256": "548ae59778cf08ee0f2ee088e7ece20d947076c3c01f74d2d65db4c2777e436a",
+  "original_bytes": 1520208,
+  "before": {
+    "extraction_version": "sec-document-text-v4",
+    "mime": "text/html",
+    "text_bytes": 207845,
+    "text_sha256": "6c6372dc63236ef8831c6cfb3ff8d3180f5ecd0a47b52282ff365b0bd81f758a",
+    "toc_ranges": [],
+    "structure_gaps": [],
+    "sections": [],
+    "section_gaps": [
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_1"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_10"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_11"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_12"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_13"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_14"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_15"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_16"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_1a"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_1b"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_1c"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_2"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_3"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_4"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_5"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_6"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_7"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_7a"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_8"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_9"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_9a"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_9b"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "item_9c"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "part_i"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "part_ii"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "part_iii"
+      },
+      {
+        "code": "section_ambiguous",
+        "section_id": "part_iv"
+      }
+    ]
+  },
+  "after": {
+    "extraction_version": "sec-document-text-v5",
+    "mime": "text/html",
+    "text_bytes": 207845,
+    "text_sha256": "6c6372dc63236ef8831c6cfb3ff8d3180f5ecd0a47b52282ff365b0bd81f758a",
+    "toc_ranges": [
+      {
+        "start_byte": 5288,
+        "end_byte": 6576
+      }
+    ],
+    "structure_gaps": [],
+    "sections": [
+      {
+        "section_id": "part_i",
+        "label": "PART I",
+        "start_byte": 8678,
+        "end_byte": 102218
+      },
+      {
+        "section_id": "item_1",
+        "label": "Item 1. Business",
+        "start_byte": 8685,
+        "end_byte": 24815
+      },
+      {
+        "section_id": "item_1a",
+        "label": "Item 1A. Risk Factors",
+        "start_byte": 24815,
+        "end_byte": 93387
+      },
+      {
+        "section_id": "item_1b",
+        "label": "Item 1B. Unresolved Staff Comments",
+        "start_byte": 93387,
+        "end_byte": 93428
+      },
+      {
+        "section_id": "item_1c",
+        "label": "Item 1C. Cybersecurity",
+        "start_byte": 93428,
+        "end_byte": 96157
+      },
+      {
+        "section_id": "item_2",
+        "label": "Item 2. Properties",
+        "start_byte": 96157,
+        "end_byte": 96676
+      },
+      {
+        "section_id": "item_3",
+        "label": "Item 3. Legal Proceedings",
+        "start_byte": 96676,
+        "end_byte": 102137
+      },
+      {
+        "section_id": "item_4",
+        "label": "Item 4. Mine Safety Disclosures",
+        "start_byte": 102137,
+        "end_byte": 102218
+      },
+      {
+        "section_id": "part_ii",
+        "label": "PART II",
+        "start_byte": 102218,
+        "end_byte": 192712
+      },
+      {
+        "section_id": "item_5",
+        "label": "Item 5. Market for Registrant\u2019s Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities",
+        "start_byte": 102226,
+        "end_byte": 104893
+      },
+      {
+        "section_id": "item_6",
+        "label": "Item 6. [Reserved]",
+        "start_byte": 104893,
+        "end_byte": 104945
+      },
+      {
+        "section_id": "item_7",
+        "label": "Item 7. Management\u2019s Discussion and Analysis of Financial Condition and Results of Operations",
+        "start_byte": 104945,
+        "end_byte": 123096
+      },
+      {
+        "section_id": "item_7a",
+        "label": "Item 7A. Quantitative and Qualitative Disclosures About Market Risk",
+        "start_byte": 123096,
+        "end_byte": 126145
+      },
+      {
+        "section_id": "item_8",
+        "label": "Item 8. Financial Statements and Supplementary Data",
+        "start_byte": 126145,
+        "end_byte": 187405
+      },
+      {
+        "section_id": "item_9",
+        "label": "Item 9. Changes in and Disagreements with Accountants on Accounting and Financial Disclosure",
+        "start_byte": 187405,
+        "end_byte": 187504
+      },
+      {
+        "section_id": "item_9a",
+        "label": "Item 9A. Controls and Procedures",
+        "start_byte": 187504,
+        "end_byte": 192045
+      },
+      {
+        "section_id": "item_9b",
+        "label": "Item 9B. Other Information",
+        "start_byte": 192045,
+        "end_byte": 192619
+      },
+      {
+        "section_id": "item_9c",
+        "label": "Item 9C. Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
+        "start_byte": 192619,
+        "end_byte": 192712
+      },
+      {
+        "section_id": "part_iii",
+        "label": "PART III",
+        "start_byte": 192712,
+        "end_byte": 193927
+      },
+      {
+        "section_id": "item_10",
+        "label": "Item 10. Directors, Executive Officers and Corporate Governance",
+        "start_byte": 192721,
+        "end_byte": 193127
+      },
+      {
+        "section_id": "item_11",
+        "label": "Item 11. Executive Compensation",
+        "start_byte": 193127,
+        "end_byte": 193284
+      },
+      {
+        "section_id": "item_12",
+        "label": "Item 12. Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
+        "start_byte": 193284,
+        "end_byte": 193513
+      },
+      {
+        "section_id": "item_13",
+        "label": "Item 13. Certain Relationships and Related Transactions, and Director Independence",
+        "start_byte": 193513,
+        "end_byte": 193721
+      },
+      {
+        "section_id": "item_14",
+        "label": "Item 14. Principal Accountant Fees and Services",
+        "start_byte": 193721,
+        "end_byte": 193927
+      },
+      {
+        "section_id": "part_iv",
+        "label": "PART IV",
+        "start_byte": 193927,
+        "end_byte": 207845
+      },
+      {
+        "section_id": "item_15",
+        "label": "Item 15. Exhibit and Financial Statement Schedules",
+        "start_byte": 193935,
+        "end_byte": 205756
+      },
+      {
+        "section_id": "item_16",
+        "label": "Item 16. Form 10-K Summary",
+        "start_byte": 205756,
+        "end_byte": 207845
+      }
+    ],
+    "section_gaps": []
+  },
+  "database_access": false,
+  "provider_calls": false,
+  "retained_capture_rewritten": false
+}

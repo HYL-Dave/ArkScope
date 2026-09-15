@@ -1,5 +1,11 @@
 # SEC Document Reading And Pinned Citations Implementation Plan
 
+Historical implementation record. The Settings reader and its GET/POST document
+adapters below were superseded by the user-approved 2026-09-15 hand-test decision:
+human full-document reading uses official browser links; model document tools
+and the independent Research citation viewer remain. See the current
+[hand-test checklist](2026-09-15-sec-current-runtime-hand-test.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:subagent-driven-development. Execute RED-first, independently
 > review each task and the complete integrated change.

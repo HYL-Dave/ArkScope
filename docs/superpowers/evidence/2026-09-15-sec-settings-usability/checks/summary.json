@@ -1,0 +1,78 @@
+{
+  "backend": {
+    "backend-candidate.xml.gz": {
+      "tests": 2160,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "case_ids_sha256": "20bf377816ba9079780548bb037dcee9579eb4f42f4b1674c063092cbb3d2258"
+    },
+    "backend-current-complete.xml.gz": {
+      "tests": 2217,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "case_ids_sha256": "d2e01a3228513887cb01c94cf828c7e01599e5d39d50eecc9055bc122a71b2e5"
+    },
+    "guard-final-candidate.xml.gz": {
+      "tests": 282,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "case_ids_sha256": "e8ae8e8c1faa905372f56e5c16ffbbe7ed541ffd2dae80a4144902f98440777f"
+    },
+    "guard-final-current.xml.gz": {
+      "tests": 282,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "case_ids_sha256": "e8ae8e8c1faa905372f56e5c16ffbbe7ed541ffd2dae80a4144902f98440777f"
+    },
+    "inline-guard-red.xml.gz": {
+      "tests": 29,
+      "failed": 16,
+      "errors": 0,
+      "skipped": 0,
+      "case_ids_sha256": "65365da3324ab75dab6efe2789c50acc344d8c09c8573c5c79debc0fbf560a58"
+    },
+    "punctuation-red.xml.gz": {
+      "tests": 2,
+      "failed": 1,
+      "errors": 0,
+      "skipped": 0,
+      "case_ids_sha256": "36e1e3f02b72136237a2e86efb0b4946bd7c8fbf942b5bdf806e11d06ee71b61"
+    },
+    "reader-removal-red.xml.gz": {
+      "tests": 9,
+      "failed": 2,
+      "errors": 0,
+      "skipped": 0,
+      "case_ids_sha256": "b46db3e3661548a39a2f4a592f00620ec101627b920d30896669df0d9bbe8a76"
+    },
+    "red.xml.gz": {
+      "tests": 20,
+      "failed": 11,
+      "errors": 0,
+      "skipped": 0,
+      "case_ids_sha256": "f3a1055a4f2b01661ada2b28d57f179b92c51fd64792f2e188e78aa45c9667e0"
+    },
+    "void-guard-red.xml.gz": {
+      "tests": 28,
+      "failed": 28,
+      "errors": 0,
+      "skipped": 0,
+      "case_ids_sha256": "912d573f845e80ab716ad0bb9d93b223cf5d9b1cbc4da2b50dee36a9f5b1324a"
+    }
+  },
+  "frontend": {
+    "success": true,
+    "numTotalTests": 1817,
+    "numPassedTests": 1817,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "frontend_files": 124,
+  "final_document_case_ids_equal": true,
+  "candidate_coverage_is_aggregated_not_one_final_run": true,
+  "candidate_aggregate_matches_final_current": true
+}

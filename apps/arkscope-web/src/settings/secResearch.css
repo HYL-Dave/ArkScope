@@ -38,25 +38,6 @@
 .sec-record-scroll a { display: inline-flex; min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
 .sec-pagination { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
 .sec-pagination > span { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
-.sec-record-scroll td .ui-icon-button { margin-left: 8px; vertical-align: middle; }
-.sec-document-reader { min-width: 0; max-width: 100%; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
-.sec-document-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.sec-document-heading h4 { margin: 0; scroll-margin-top: 16px; }
-.sec-document-identity { display: grid; grid-template-columns: minmax(80px, 120px) minmax(0, 1fr); gap: 4px 12px; }
-.sec-document-identity dt { color: var(--muted); }
-.sec-document-identity dd { margin: 0; overflow-wrap: anywhere; }
-.sec-document-capture { display: grid; gap: 4px; }
-.sec-document-attempt { margin: 8px 0; overflow-wrap: anywhere; }
-.sec-document-capture code, .sec-document-index code { overflow-wrap: anywhere; }
-.sec-document-index { border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-.sec-document-index p { margin: 8px 0; }
-.sec-document-passages { max-height: 480px; min-width: 0; overflow: auto; }
-.sec-document-reader .sec-document-text { font-family: inherit; font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 12px; }
-.sec-document-passage { padding: 8px 0; border-bottom: 1px solid var(--border); }
-.sec-document-citation { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; font-size: 12px; }
-.sec-document-citation a { display: inline-flex; gap: 6px; align-items: center; min-height: 28px; }
-.sec-document-citation details { flex: 1 1 180px; }
-.sec-document-citation pre { max-height: 200px; overflow: auto; }
 @media (max-width: 480px) {
   .sec-fields label { flex-basis: 100%; }
 }
