@@ -634,3 +634,78 @@ production DB, source parser, browser mode or production configuration changed.
 Next: foreground `Sync Latest News`, then background Quick/News on the untouched
 case. Background equivalence and repeated-run stability remain unaccepted; no
 merge or interpreter switch has occurred.
+
+## Matched Foreground News Readback, September 16
+
+The user completed one bounded foreground `Sync Latest News`. Private readback
+`data/matched-ab/foreground/evidence/after-news-5h44qmoq/readback.json` compares
+six WAL-safe, integrity-checked SA/profile snapshots with the accepted Quick
+checkpoint. The 412-file runtime base, 27-file extension overlay and native
+control still match their inventories before mode switching. No product code,
+production DB, normal browser profile or interpreter was changed.
+
+Job 7 is `sa_market_news_refresh`, `quick`, `succeeded / complete`, 145,804 ms.
+All five phases complete, no recorded/omitted diagnostics. The single native
+completed-event receipt is persisted and matches the stored client event ID.
+The native list save records 50 items saved, current detail limit 18, backfill
+limit zero, 18 bodies requested. All 18 successful detail saves match newly
+stored bodies in identity and character count; all 18 authenticated API bodies
+are byte-identical to their DB values and have detail checkpoints. No acquired
+body contains a comments heading. This is save/readback evidence, not an
+independent semantic audit of every source article.
+
+Exactly 50 news rows and 50 news-ticker links are added. No prior news/article
+ID or nonempty body is lost or changed; other foreground SA tables are
+unchanged. Its profile adds only job 7. Background and original-fixture SA/profile
+schemas and retained rows remain unchanged, as do all three market main/WAL
+hashes. The background SA/profile snapshot hashes still equal their original
+matched preflight hashes.
+
+The focus receipt `cc235877-2f6a-4707-8505-8d5ceeb02e49` binds to this job's
+interval: one collector activation, zero suppressions, 86 observations (82
+active, 61 visible, three hidden), no observation/navigation/script errors,
+truncation or removal failure. Sampling does not prove continuous visibility.
+
+This is a **passing bounded foreground News control**, not a claim that every
+missing body was fetched. The older seeded news item remains body/checkpoint
+NULL; it is visible among the latest 100 API items but was not selected by this
+run. It therefore does not pass the originally desired same-seeded-news-body
+reacquisition check. Keep that limit explicit, alongside the successful 18 fresh
+bodies. The foreground Quick and News runs occurred hours apart; remote source
+time and browser cache are not pinned. Compare common identities/content and
+explicit coverage observations across modes, not raw counts alone.
+
+`ab_news_readback.py` uses authenticated loopback GETs, query-only SQLite sources,
+WAL-safe snapshots and a readonly filesystem outside the disposable data root.
+All 17 checks passed. The receipt includes body identity/content hashes only,
+not raw article prose, credentials or browsing history. Earlier failed background
+and original-parser runs remain retained. Background equivalence, repeated-run
+stability, merge and interpreter replacement remain pending.
+
+### Background Case Selected, Awaiting Reload and Live Run
+
+Only the disposable extension's `probe_mode.js` changes from foreground to
+background; its parser and other 26 files remain identical. Selection was paused
+first, with the foreground selector archived. The mode file was readonly; the
+initial edit failed without changing it, then only that file's owner-write bit
+was enabled for apply_patch and restored to 0444. No product source changed.
+
+`select_background_case.py` verifies both owned APIs, native control/config,
+all three runtime copies, the overlay and all six SA/profile stores against the
+accepted News checkpoint. The background seeded article body remains missing,
+ready for actual acquisition. After selection, the actual product shell launcher
+passes framed `ping` and recent-news-ID reads against the background case, even
+with synthetic inherited API/DB canaries. A second full guard passes afterward.
+Job counts remain foreground 7, background 5, original 5; market hashes and all
+retained records are unchanged by the switch.
+
+Private receipts: `background-switch-preflight.json`,
+`foreground-selection-ended.json`, `background-selection.json`. The latter is
+the new 27-file overlay inventory; earlier inventories and `activation.json`
+remain intact. A failed post-selection check removes/archives admission instead
+of restoring original-store routing. This smoke is not a browser collector run.
+
+Next manual action: reload the same disposable extension, keep an unrelated tab
+selected and run one background Quick Update. Read back before background News.
+Background equivalence and repeated stability remain pending; no merge, push,
+production-data write or interpreter switch has occurred.
