@@ -1,6 +1,8 @@
 # SEC Live Research Acceptance
 
-Status: backend and live SEC checks passed; real logged-in SA hand test pending.
+Status: backend and live SEC checks passed; real logged-in SA hand tests exposed
+an article-body capture defect. Integration acceptance is blocked on its repair
+and live revalidation. The optional background-tab experiment is not accepted.
 
 Base revision: `4d4a5e2c997576acb3f2d98141b641612e029c95`.
 Final tested product: `13248718b0a91fede0219c8b6ca742d74eb12627`.
@@ -231,7 +233,6 @@ the backend count in this session.
 
 ### SA Manual Fixture
 
-The user confirmed the real logged-in extension sync has not been tested.
 A separate fixture at `/tmp/arkscope-sa-manual.CYHtVYUy` uses a read-only
 412-file runtime subset verified against the tested commit, disposable copies
 of the market/SA backups, a fresh profile DB and a fresh browser HOME. It has
@@ -245,17 +246,85 @@ needed. The new private Chrome window is visually nonblank. Desktop-bus/udev
 and machine-ID warnings in this restricted environment were not mistaken for
 successful extension registration. No `--no-sandbox` workaround was added.
 
-The fixture is left open for manual loading. Native-host registration is still
-absent; user login, browser-originated native ping and incremental article/news
-body readback remain unverified. Only load the extension from the sandbox-visible
-`/fixture/source/extensions/sa_alpha_picks`, then register the actual displayed
-extension ID in that fixture. Do not redirect the existing normal browser's
-native host, copy login cookies or count the earlier synthetic replay as a
-passing login/sync check. The private `stop.sh` targets only this fixture.
+The user loaded and logged into the original extension in this private Chrome;
+its actual native-host registration and browser-originated sync succeeded.
+Quick Update completed four phases in 66,860 ms, refreshing 60 article metadata
+rows, adding one comment and one article link. The comment and a retained
+5,704-character body matched the actual API. All article bodies were already
+cached, so this did NOT exercise a fresh article-body download.
+
+Sync Latest News completed five phases in 150,198 ms, adding 49 metadata rows
+and 18 bodies totaling 24,655 characters. All 18 bodies matched actual API
+readback. Existing article/news IDs and bodies were preserved; market main/WAL
+hashes were unchanged. Checkpoints are `data/evidence/after-quick-4sk875d2` and
+`data/evidence/after-news-da9bqf8y` under the private fixture.
+
+### Background Experiment And Fresh-Body Finding
+
+The user separately approved a disposable background-tab experiment. A private
+copy adds an observation wrapper and suppresses only collector-owned activation
+requests. It changes no collector/parser/scroll logic, Chrome permissions or
+throttling flags. The original source inventory remains pinned and unchanged;
+this instrumentation is not a product patch or a release build. All browser
+login and native-host changes are confined to the private HOME.
+
+Exactly one previously cached, current-pick-linked article was made missing in
+the disposable DB, preserving its metadata, comments and links. This prevents
+a warm-cache no-op from being counted as successful body acquisition. Before
+the subsequent foreground control, only that same body was reseeded. Other
+updated inputs were retained, so this is not a whole-DB matched-input A/B test.
+
+The background Quick run lasted 51,943 ms. The user reported no focus stealing;
+the actual Chrome receipt records zero collector activations, four suppressed
+activation requests, 72 inactive-tab samples and 64 hidden/unfocused document
+samples, with no observation errors or truncation. These are sampled states,
+not proof of continuous visibility or indefinite reliability. The missing
+3,684-character article body matched its original hash and actual API. However,
+the job was `failed / degraded`, with two durable `comment_scan_failed`
+diagnostics, and only 20 article metadata rows updated. The seeded article's
+retained comments remained readable but its scan timestamp did not advance.
+The aggregate `detail_save_failed` phase reason is a fallback label, not proof
+of a database write error. **Background collection is not accepted.**
+
+The same-extension foreground control lasted 82,417 ms. Its receipt confirms
+foreground mode and one collector activation. All four job phases report
+complete; 60 article metadata rows updated, five new comments were saved and
+all old comments were preserved. Both previously failed comment targets now
+advanced their scan timestamps; their retained 646 and 475 comments matched the
+API exactly. The seeded article's comment scan also advanced.
+
+**Despite the successful job label, its newly captured article body is wrong:**
+5,660 characters of comments/replies, starting with `COMMENTS (68)` after the
+article title, replaced the original 3,684-character body. The API serves that
+wrong text unchanged. API/DB equality and a nonempty body therefore do not
+establish content acceptance. Original/background SHA-256:
+`a5c4bf3c0c2d5526f41f6e4ab32691e7f0fec9882a47edb57e6ce72b9e16bd40`;
+foreground SHA-256:
+`ceecba36c451353a5c4e9b00f7bba3534ed772858d978cacfe0b1d4d18b53b8a`.
+
+Code inspection found unfiltered text-length ranking among provider containers,
+no selected-root exclusion, and comment rows not recognized by the body
+scraper's exclusion rules. Nested `article` / `main` fallback also bypasses
+recursive filtering. No live DOM snapshot was captured: the exact winning
+selector/ancestry is not established. Existing identity/scraper tests still
+pass (10 cases in an isolated baseline), demonstrating missing coverage rather
+than remediation. A bounded structure-aware fix and same-article live retest
+have been proposed; product code has not changed for this defect yet.
+
+Private evidence: `FOCUS-PROBE.md`; checkpoints
+`data/evidence/after-focus-background-quick-cz4dt24g` and
+`data/evidence/after-focus-foreground-quick-1q8la3oa`, each retaining its own
+`comparison.json`, `api-focus-readback.json` and `probe-artifact.json`; Chrome
+receipts under `data/evidence/focus-probe/`. No private article/comment text,
+databases or credentials are committed. Both working DB integrity checks are
+`ok`; market main/WAL hashes are unchanged. Production data did not receive
+these test writes. The private `stop.sh` still targets only this fixture.
 
 ## Pending
 
-- A real logged-in SA extension synchronization remains a separate hand test.
+- Repair and live-retest fresh SA article-body capture before acceptance.
+- The optional no-focus experiment remains failed; no background News run or
+  repeated/matched-input stability claim has been made.
 - Integration decision after acceptance.
 
 No merge, push, production App restart or interpreter switch was performed.
