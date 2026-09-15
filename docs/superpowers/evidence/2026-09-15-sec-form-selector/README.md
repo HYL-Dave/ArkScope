@@ -92,4 +92,36 @@ has exited, with file parallelism disabled and private Vite caches. Typecheck
 and production build also pass; the existing >500 kB bundle warning remains.
 No full backend, replacement-runtime or cross-platform claim is made here.
 
-Final actual-browser selector verification is pending the isolated relaunch.
+## Actual Desktop Check
+
+The isolated Desktop was rebuilt and relaunched at `087e61e9`, retaining its
+private profile, SEC identity and downloaded data. The current interpreter and
+disabled scheduler are unchanged. The hand-test launcher now checks the private
+browser handler before starting, so this fixture cannot silently regress to
+the failing Firefox handler.
+
+`check_browser.py` connected to that Electron instance and tested its actual
+local Apple catalog: 52 distinct types across 2,247 rows and two receipt-bound
+catalog sources. Options were requested once; filter/page changes reused that
+observation. Multi-select, exact `DEF 14A`, All, page-2-to-page-1 reset, native
+Enter/Space activation, arrow/Home/Escape and Tab focus all passed.
+
+Selecting eight types kept the trigger exactly 32px tall. Inspected 1440x900
+and 390x844 screenshots show the dropdown inside the viewport, with no page
+horizontal overflow. The final click opened the exact 2025 Apple 10-K URL in
+the private Chrome profile; its title, 211,709 body-text characters and rendered
+cover page were verified. The application retained its own renderer page.
+
+A route guard rejected non-GET SEC calls during the exercise; none occurred.
+There were no App page errors, and stored-status/capacity responses were equal
+before and after. The external browser navigation was deliberate, not
+application acquisition; its normal page-resource requests are not counted as
+application SEC transport calls. The existing Playwright/Node
+`url.parse()` deprecation warning remains a runner diagnostic.
+
+See [browser results](checks/browser.json), [desktop](checks/desktop.png),
+[narrow](checks/narrow.png) and [official document](checks/official-document.png).
+The retained runner requires the explicitly supplied private hand-test root and
+an already-running isolated Desktop; it must not be pointed at production.
+Both the Desktop and its original-document browser are left available for the
+user's next manual check. No merge or push was performed.
