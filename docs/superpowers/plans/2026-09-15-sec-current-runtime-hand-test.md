@@ -57,15 +57,27 @@ revised workflow below; do not restore the discarded reader to follow the old pl
 
 ## Research And Existing Workflows
 
-1. Use one selected inexpensive task model; no need to rerun every model. Ask for
+1. Use at least one API-key and one OAuth route, with a selected inexpensive task
+   model on each; no need to rerun every model. Reuse existing credentials only
+   with the user's approval, without changing the production selection. Ask for
    the issuer's latest annual filing and one reported financial value with a
    filing passage as evidence. Confirm the selected route and SEC tool results,
-   then revisit the conversation and reopen its saved SEC citation.
+   then revisit the conversation and reopen its saved SEC citation. Record the
+   original citation identity and returned passage, close and restart the actual
+   isolated Desktop/sidecar, and reopen the retained citation. Compare exact text
+   and identity across restart, not just a page reload. Keep private content out
+   of committed evidence; equality assertions and public SEC passages suffice.
    Section extraction v5 applies to new captures. Old pinned captures retain
    their original index and exact bytes; they may still require literal search
    or the whole-text cursor when their historical section index is unavailable.
    Any new acquisition must be a deliberate user/model task, not an automatic
    side effect of opening a stored citation or changing a Settings filter.
+   In a separate run, cancel after at least one SEC tool has completed while
+   subsequent work is pending. Verify responsiveness, terminal cancellation,
+   retained completed citations and no new requests after cancellation settles.
+   Distinguish UI state/event observations from transport-level observation.
+   Exercise OpenAI-parent/Anthropic-child cancellation when that actual route can
+   be selected; do not label another route as coverage of that path.
 2. In the SA extension, run the usual incremental synchronization once. Confirm
    native-host communication, article/market-news views and body status still
    work. The 33,000-ID and integer-boundary stress cases are automated tests,
@@ -80,6 +92,19 @@ revised workflow below; do not restore the discarded reader to follow the old pl
 Record the active branch revision, selected provider/auth/model/effort, action,
 expected versus actual result, and any visible error code. Do not include tokens,
 API keys or private filing/research content in diagnostic screenshots/logs.
+
+Before testing retained real data, create a private WAL-safe profile backup.
+Prefer disposable copies of market/SA stores as well; only copies may receive
+test writes. Check their integrity and preserve the originals and backup copies.
+Do not copy a browser's logged-in profile or redirect the normal SA native host
+implicitly. If real extension synchronization cannot be isolated with an
+authorized session, report that live check separately from captured-input replay.
+
+Final acceptance uses one fixed revision and one complete backend session in
+default test order, without concurrent pytest sessions in that source tree.
+Report the exact revision for independent comparison. After separately approved
+local merge, repeat a short Desktop smoke test from master with the same isolated
+data/engine; leave unrelated untracked files intact and do not switch runtimes.
 
 Export/restore, orphan cleanup and schema reset have automated disposable-store
 coverage. Never test destructive maintenance or restore over production data;
