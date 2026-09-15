@@ -201,3 +201,29 @@ def test_json_set_transport_preserves_binding_types_and_readonly_connection():
         assert conn.execute("SELECT name FROM sqlite_temp_schema").fetchall() == []
     finally:
         conn.close()
+
+
+@pytest.mark.parametrize("nul", [False, True])
+def test_text_set_matches_direct_binding_and_uses_the_identifier_index(nul):
+    from src.sqlite_id_sets import text_ids_query
+
+    values = ["1", "01", "1e3", str(2**64 + 1), "", "quote'\"id", "\\u0000", "\u4e2d\u6587"]
+    if nul:
+        values += ["prefix", "prefix\0suffix", "\0"]
+    conn = sqlite3.connect(":memory:")
+    try:
+        conn.execute("CREATE TABLE items(id TEXT PRIMARY KEY)")
+        conn.executemany("INSERT INTO items VALUES (?)", [(value,) for value in values])
+        conn.commit()
+        conn.execute("PRAGMA query_only=ON")
+        wanted = values[::2] + ["missing", values[0]]
+        reference = conn.execute(
+            f"SELECT id FROM items WHERE id IN ({','.join('?' for _ in wanted)}) ORDER BY id", wanted,
+        ).fetchall()
+        query, params = text_ids_query(conn, wanted)
+        sql = f"SELECT id FROM items WHERE id IN ({query}) ORDER BY id"
+        assert conn.execute(sql, params).fetchall() == reference
+        plan = conn.execute("EXPLAIN QUERY PLAN " + sql, params).fetchall()
+        assert any("SEARCH items USING" in row[3] for row in plan)
+    finally:
+        conn.close()
