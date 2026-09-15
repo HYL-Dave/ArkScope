@@ -87,6 +87,122 @@ def test_catalog_filters_before_limit_and_normalizes_forms(store):
                                  filed_to="2026-04-01")) == [3, 4, 5]
 
 
+@pytest.mark.parametrize("recent_count", [25, 127], ids=["28-options", "130-options"])
+def test_filing_forms_use_every_receipt_bound_catalog_source_without_page_cap(store, recent_count):
+    query = queries(store)
+    recent_forms = [f"CURRENT {index:03d}" for index in range(recent_count)]
+    recent = publish(store, [
+        (index + 1, "2026-06-01", form) for index, form in enumerate(recent_forms)
+    ] + [(recent_count + 1, "2026-05-01", "DEF 14A"),
+         (recent_count + 2, "2026-04-01", "DEF 14A")],
+        files=[HISTORY])
+    historical = publish(store, [
+        (recent_count + 3, "2020-03-01", "S-1/A"),
+        (recent_count + 4, "2019-03-01", "10-K"),
+        (recent_count + 5, "2018-03-01", "DEF 14A"),
+    ], history=HISTORY)
+    saved = receipt(store, {"submissions": recent, HISTORY: historical})
+
+    assert len(query.filings(CIK)["data"]) == 20
+    result = query.filing_forms(CIK)
+
+    expected = sorted({*recent_forms, "DEF 14A", "S-1/A", "10-K"})
+    assert len(expected) == recent_count + 3
+    assert result["status"] == "ok"
+    assert result["data"] == expected
+    assert result["data"].count("DEF 14A") == 1
+    assert result["coverage"]["receipt_id"] == saved["receipt_id"]
+    assert result["coverage"]["complete"] is True
+    assert result["next_cursor"] is None
+
+
+def test_filing_forms_latest_failed_receipt_never_blesses_retained_catalog(store):
+    old = publish(store, [(1, "2026-01-01", "10-K")])
+    receipt(store, {"submissions": old})
+    failed = receipt(store, {}, pending=["submissions"],
+                     gaps=[{"source": "submissions", "code": "sec_transport_unavailable"}])
+
+    result = queries(store).filing_forms(CIK)
+
+    assert result["status"] == "unavailable"
+    assert result["data"] == []
+    assert result["coverage"]["receipt_id"] == failed["receipt_id"]
+    assert result["coverage"]["complete"] is False
+    assert result["gaps"]
+
+
+def test_filing_forms_latest_successful_unbound_receipt_never_blesses_retained_catalog(store):
+    old = publish(store, [(1, "2026-01-01", "10-K")])
+    receipt(store, {"submissions": old})
+    unbound = store.record_receipt(
+        CIK, status="ok", completed=["submissions"], pending=[], gaps=[], observed_at=WHEN,
+    )
+
+    result = queries(store).filing_forms(CIK)
+
+    assert result["status"] == "unavailable"
+    assert result["data"] == []
+    assert result["coverage"]["receipt_id"] == unbound["receipt_id"]
+    assert result["coverage"]["complete"] is False
+    assert {gap["code"] for gap in result["gaps"]} == {"submissions_unavailable"}
+
+
+def test_filing_forms_distinguish_observed_empty_from_unobserved_history(store):
+    query = queries(store)
+    assert query.filing_forms(CIK)["status"] == "unavailable"
+
+    complete = publish(store, [])
+    receipt(store, {"submissions": complete})
+    observed = query.filing_forms(CIK)
+    assert observed["status"] == "empty"
+    assert observed["data"] == []
+    assert observed["gaps"] == []
+
+    unobserved = publish(store, [], observed=False)
+    receipt(store, {"submissions": unobserved})
+    partial = query.filing_forms(CIK)
+    assert partial["status"] == "partial"
+    assert partial["data"] == []
+    assert {gap["code"] for gap in partial["gaps"]} == {"historical_files_unobserved"}
+
+
+@pytest.mark.parametrize("bound", ["rows", "bytes", "sources"])
+def test_filing_forms_query_budgets_are_explicit_partial(store, monkeypatch, bound):
+    module = importlib.import_module("src.sec_research.queries")
+    names = [f"CIK{CIK}-submissions-{index:03d}.json" for index in range(3)]
+    recent = publish(store, [], files=names)
+    bindings = {"submissions": recent}
+    for index, name in enumerate(names):
+        bindings[name] = publish(store, [(index + 1, "2026-01-01", f"FORM {index}")], history=name)
+    receipt(store, bindings)
+    if bound == "rows":
+        monkeypatch.setattr(module, "MAX_QUERY_ROWS", 2)
+    elif bound == "bytes":
+        monkeypatch.setattr(module, "MAX_QUERY_BYTES", 4000)
+    else:
+        monkeypatch.setattr(module, "MAX_QUERY_SOURCES", 2)
+
+    result = queries(store).filing_forms(CIK)
+
+    assert result["status"] == "partial"
+    assert len(result["data"]) < 3
+    assert {gap["code"] for gap in result["gaps"]} >= {"query_budget_exceeded"}
+    assert result["coverage"]["complete"] is False
+
+
+def test_filing_forms_envelope_bound_fails_closed_without_truncation(store, monkeypatch):
+    module = importlib.import_module("src.sec_research.queries")
+    sid = publish(store, [(1, "2026-03-01", "FORM ONE"),
+                          (2, "2026-02-01", "FORM TWO"),
+                          (3, "2026-01-01", "FORM THREE")])
+    receipt(store, {"submissions": sid})
+    monkeypatch.setattr(module, "MAX_ENVELOPE_BYTES", 100)
+    oversized = queries(store).filing_forms(CIK)
+    assert oversized["status"] == "unavailable"
+    assert oversized["data"] == []
+    assert oversized["gaps"] == [{"code": "sec_result_too_large"}]
+
+
 def test_cursor_continuation_reopens_pinned_receipt_after_refresh_restart_and_relocation(store, tmp_path):
     query = queries(store)
     seed(store)
@@ -241,6 +357,7 @@ def test_query_is_readonly_without_install_capture_access_or_unpaged_latest_read
     for name in ("install", "publish", "record_receipt", "catalog", "facts", "snapshots"):
         monkeypatch.setattr(store, name, forbidden)
     assert numbers(query.filings(CIK, limit=1)) == [1]
+    assert query.filing_forms(CIK)["data"] == ["10-K", "10-K/A", "10-Q", "8-K"]
     assert store.paths.market_db_path.read_bytes() == before
     assert not store.paths.capture_root.exists()
 
@@ -269,6 +386,9 @@ def test_catalog_receipt_gap_cannot_become_observed_empty(store):
     page = query.filings(CIK)
     assert page["status"] == "partial"
     assert page["gaps"]
+    forms = query.filing_forms(CIK)
+    assert forms["status"] == "partial"
+    assert forms["gaps"]
 
 
 def test_corrupt_receipt_json_is_closed_storage_unavailability(store):

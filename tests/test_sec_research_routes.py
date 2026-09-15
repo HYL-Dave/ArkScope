@@ -336,7 +336,7 @@ def test_config_accounting_failure_does_not_become_zero_capacity(route, profile,
     assert response.json() == {"detail": {"code": "sec_research_store_unavailable"}}
 
 
-@pytest.mark.parametrize("suffix", ["", "/filings", "/facts"])
+@pytest.mark.parametrize("suffix", ["", "/filings", "/filing-forms", "/facts"])
 def test_stored_routes_do_not_construct_acquisition_profile_or_capture_owners(route, monkeypatch, suffix):
     module, paths, client = route
     forbid_acquisition(module, monkeypatch)
@@ -350,7 +350,7 @@ def test_stored_routes_do_not_construct_acquisition_profile_or_capture_owners(ro
     assert not paths.capture_root.exists()
 
 
-@pytest.mark.parametrize("suffix", ["", "/filings", "/facts"])
+@pytest.mark.parametrize("suffix", ["", "/filings", "/filing-forms", "/facts"])
 def test_stored_routes_verify_canonical_schema_without_repair(route, stored, suffix):
     with stored.connect() as conn:
         conn.execute("ALTER TABLE sec_research_facts ADD COLUMN private_column TEXT")
@@ -401,6 +401,47 @@ def test_catalog_http_filters_before_pages_and_pins_receipt(route, stored, monke
     assert second["next_cursor"] is None
     assert set(second["data"][0]["sources"][0]["source"]) == {"sha256", "pointer"}
     assert paths.market_db_path.read_bytes() == before
+
+
+def test_filing_forms_http_returns_all_exact_options_readonly(route, stored, monkeypatch):
+    module, paths, client = route
+    forms = [f"FORM {index:02d}" for index in range(25)] + ["DEF 14A", "DEF 14A", "10-K/A"]
+    publish_catalog(stored, [
+        (index + 1, "2026-06-01", form) for index, form in enumerate(forms)
+    ])
+    before = paths.market_db_path.read_bytes()
+    capture_before = {
+        str(path.relative_to(paths.capture_root)): path.read_bytes()
+        for path in paths.capture_root.rglob("*") if path.is_file()
+    }
+    forbid_acquisition(module, monkeypatch)
+    monkeypatch.setattr(module, "get_profile_store", lambda: pytest.fail("query opened profile"))
+    monkeypatch.setattr(module, "CaptureStore", lambda *a, **kw: pytest.fail("query opened captures"))
+
+    response = client.get("/sec-research/CIK:320193/filing-forms")
+
+    assert response.status_code == 200
+    result = response.json()
+    assert set(result) == {"status", "data", "gaps", "observed_at", "coverage", "next_cursor"}
+    assert result["status"] == "ok"
+    assert result["data"] == sorted(set(forms))
+    assert result["next_cursor"] is None
+    assert paths.market_db_path.read_bytes() == before
+    assert {
+        str(path.relative_to(paths.capture_root)): path.read_bytes()
+        for path in paths.capture_root.rglob("*") if path.is_file()
+    } == capture_before
+
+
+def test_filing_forms_rejects_every_query_parameter_before_storage(route, monkeypatch):
+    module, paths, client = route
+    monkeypatch.setattr(module.SecResearchPaths, "resolve", lambda: pytest.fail("invalid query opened storage"))
+
+    response = client.get("/sec-research/320193/filing-forms", params={"limit": "20"})
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": {"code": "sec_research_query_invalid"}}
+    assert not paths.market_db_path.exists()
 
 
 @pytest.mark.parametrize("cursor", ["", "!", "e30", "a" * 4097])

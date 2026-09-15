@@ -282,6 +282,32 @@ def unavailable_envelope():
             "observed_at": None, "coverage": {"receipt_id": None, "complete": False}, "next_cursor": None}
 
 
+def _whole_envelope(context, data, *, gaps, available, coverage=None):
+    receipt = context.receipt
+    complete = available and not gaps
+    status = ("unavailable" if not available else "partial" if gaps
+              else "ok" if data else "empty")
+    result = {
+        "status": status,
+        "data": data,
+        "gaps": gaps,
+        "observed_at": receipt["observed_at"] if receipt else context.observed_at,
+        "coverage": {
+            **(coverage or {}),
+            "receipt_id": receipt["receipt_id"] if receipt else None,
+            "scope": receipt["scope"] if receipt else None,
+            "bindings_digest": context.bindings_digest,
+            "selection_total": len(data),
+            "complete": complete,
+        },
+        "next_cursor": None,
+    }
+    if len(json.dumps(result, ensure_ascii=True, allow_nan=False).encode("ascii")) > MAX_ENVELOPE_BYTES:
+        from .tool_results import unavailable
+        return unavailable("sec_result_too_large")
+    return result
+
+
 def page_envelope(context, rows, *, limit, gaps, available, coverage=None, result_fits=None):
     """Page already filtered/sorted whole rows within count and encoded byte bounds.
 
@@ -333,6 +359,28 @@ def page_envelope(context, rows, *, limit, gaps, available, coverage=None, resul
     return result
 
 
+def _catalog_gaps(context, bound):
+    sources, gaps = bound.sources, list(bound.gaps)
+    recent = sources.get("submissions")
+    if recent is None:
+        gaps.append({"code": "submissions_unavailable"})
+    elif not recent[0]["historical_files_observed"]:
+        gaps.append({"code": "historical_files_unobserved"})
+    required = {item["name"] for item in recent[0]["historical_files"]} if recent else set()
+    if context.receipt:
+        required.update(source for source in context.receipt["pending"] if source != "companyfacts")
+        source_gaps = sum(gap.get("source") != "companyfacts" for gap in context.receipt["gaps"])
+        if source_gaps:
+            gaps.append({"code": "catalog_source_gaps", "count": source_gaps})
+    missing = required - sources.keys()
+    if context.receipt and context.receipt["scope"] == "recent":
+        gaps = [gap for gap in gaps if gap["code"] != "historical_files_unobserved"]
+        gaps.append({"code": "historical_not_requested"})
+    elif missing:
+        gaps.append({"code": "catalog_sources_pending", "count": len(missing)})
+    return gaps
+
+
 class StoredQueries:
     def __init__(self, store):
         self.store = store
@@ -345,6 +393,27 @@ class StoredQueries:
         return query_facts(self.store, cik, metrics=metrics, concepts=concepts, fact_ids=fact_ids,
                            accession=accession, as_of=as_of, period=period, start=start, end=end,
                            revisions=revisions, cursor=cursor, limit=limit, result_fits=result_fits)
+
+    @store_operation
+    def filing_forms(self, cik):
+        cik = normalize_cik(cik)
+        filters = _filings_filters(limit=100)
+        try:
+            context = open_query(self.store, cik, kind="filings", filters=filters)
+            bound = read_bound_sources(self.store, context, kind="catalog")
+        except (sqlite3.Error, OSError, json.JSONDecodeError):
+            return unavailable_envelope()
+        except ValueError as exc:
+            if str(exc) in {"sec_research_schema_mismatch", "sec_research_receipt_binding_invalid"}:
+                return unavailable_envelope()
+            raise
+        sources = bound.sources
+        forms = sorted({row["form"] for _, rows in sources.values() for row in rows})
+        return _whole_envelope(
+            context, forms, gaps=_catalog_gaps(context, bound), available=bool(sources),
+            coverage={"catalog_sources": len(sources), "admitted_rows": bound.row_count,
+                      "admitted_bytes": bound.encoded_bytes},
+        )
 
     @store_operation
     def filings(self, cik, *, forms=None, filed_from=None, filed_to=None,
@@ -372,24 +441,8 @@ class StoredQueries:
             if str(exc) in {"sec_research_schema_mismatch", "sec_research_receipt_binding_invalid"}:
                 return unavailable_envelope()
             raise
-        sources, gaps = bound.sources, list(bound.gaps)
-        recent = sources.get("submissions")
-        if recent is None:
-            gaps.append({"code": "submissions_unavailable"})
-        elif not recent[0]["historical_files_observed"]:
-            gaps.append({"code": "historical_files_unobserved"})
-        required = {item["name"] for item in recent[0]["historical_files"]} if recent else set()
-        if context.receipt:
-            required.update(source for source in context.receipt["pending"] if source != "companyfacts")
-            source_gaps = sum(gap.get("source") != "companyfacts" for gap in context.receipt["gaps"])
-            if source_gaps:
-                gaps.append({"code": "catalog_source_gaps", "count": source_gaps})
-        missing = required - sources.keys()
-        if context.receipt and context.receipt["scope"] == "recent":
-            gaps = [gap for gap in gaps if gap["code"] != "historical_files_unobserved"]
-            gaps.append({"code": "historical_not_requested"})
-        elif missing:
-            gaps.append({"code": "catalog_sources_pending", "count": len(missing)})
+        sources = bound.sources
+        gaps = _catalog_gaps(context, bound)
 
         # Compare filing metadata independently of provenance; retain all sources
         # for identical observations and all variants for conflicting metadata.

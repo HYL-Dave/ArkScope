@@ -165,7 +165,11 @@ QueryDate = Annotated[str | None, BeforeValidator(_query_date), Query()]
 def _stored_query(cik, kind, **params):
     cik = _cik(cik)
     try:
-        validate_query(cik, kind, **params)
+        if kind == "filing_forms":
+            if params:
+                raise ValueError("sec_research_query_invalid")
+        else:
+            validate_query(cik, kind, **params)
         store = Store(SecResearchPaths.resolve())
         if not _installed(store):
             return _unavailable("sec_research_not_installed")
@@ -177,6 +181,13 @@ def _stored_query(cik, kind, **params):
         return _unavailable("sec_research_store_unavailable")
     except (sqlite3.Error, OSError):
         return _unavailable("sec_research_store_unavailable")
+
+
+@router.get("/sec-research/{cik}/filing-forms")
+def stored_filing_forms(cik: str, request: Request):
+    if request.query_params:
+        raise HTTPException(422, detail={"code": "sec_research_query_invalid"})
+    return _stored_query(cik, "filing_forms")
 
 
 @router.get("/sec-research/{cik}/filings")

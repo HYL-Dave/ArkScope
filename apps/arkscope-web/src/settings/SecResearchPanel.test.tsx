@@ -34,7 +34,8 @@ function ScheduleOwner() {
 
 function applyPanelStyles() {
   stylesheet = document.createElement("style");
-  stylesheet.textContent = readFileSync(resolve(import.meta.dirname, "secResearch.css"), "utf8");
+  stylesheet.textContent = ["../ui/primitives.css", "secResearch.css"]
+    .map((path) => readFileSync(resolve(import.meta.dirname, path), "utf8")).join("\n");
   document.head.append(stylesheet);
 }
 
@@ -44,6 +45,7 @@ function fallback(url: URL) {
     gaps: (batchStatus as { last_attempt: { gaps: unknown[] } | null }).last_attempt?.gaps ?? [] };
   if (url.pathname === "/sec-research/config") return { capture_budget_bytes: budget, capacity };
   if (url.pathname.endsWith("/refresh")) return receipt;
+  if (url.pathname.endsWith("/filing-forms")) return envelope("ok", ["10-K", "10-Q", "10-Q/A", "8-K", "DEF 14A", "SC 13G/A"]);
   if (url.pathname.endsWith("/filings")) return envelope("ok", [filing("first")], "opaque+/= &token");
   if (url.pathname.endsWith("/facts")) return envelope("ok", [{ fact_id: "fact-1", namespace: "us-gaap", concept: "Assets", value: "1234567890123456789.123", unit: "EUR", start: null, end: "2025-12-31", filed_date: "2026-02-01", accession: "000-1", source: { snapshot_id: 2 } }]);
   if (/\/sec-research\/\d+$/.test(url.pathname)) return { ...envelope(), data: { cik: url.pathname.split("/").pop(), snapshots: { recent: 1, facts: 1 } }, coverage: { completed: ["recent"], pending: ["history.json"] } };
@@ -92,6 +94,30 @@ function button(name: string) {
   return result!;
 }
 async function click(name: string) { await act(async () => button(name).click()); }
+async function key(element: Element, value: string) {
+  await act(async () => element.dispatchEvent(new KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true })));
+}
+async function openForms(name = "Forms") {
+  if (button(name).getAttribute("aria-expanded") !== "true") await click(name);
+  return host.querySelector<HTMLElement>('[role="menu"]')!;
+}
+function formOption(name: string) {
+  const option = [...host.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].find((el) => el.textContent === name);
+  expect(option, `form option ${name}`).toBeDefined();
+  return option!;
+}
+async function chooseForms(...values: string[]) {
+  const menu = await openForms();
+  const options = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')];
+  for (const option of options.slice(1)) {
+    if ((option.getAttribute("aria-checked") === "true") !== values.includes(option.textContent!)) {
+      await act(async () => option.click());
+    }
+  }
+  for (const value of values) expect(formOption(value).getAttribute("aria-checked")).toBe("true");
+  await key(menu, "Escape");
+}
+function formRequests() { return requests.filter(({ url }) => url.pathname.endsWith("/filing-forms")); }
 function input(name: string) { return host.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`)!; }
 async function change(name: string, value: string) {
   await act(async () => {
@@ -122,20 +148,354 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+describe("SEC filing form selection", () => {
+  it("loads off-page choices from the issuer catalog instead of the current result page", async () => {
+    await render();
+    expect(formRequests()).toHaveLength(0);
+    expect(button("Forms").disabled).toBe(true);
+    await change("CIK", "123");
+    expect(formRequests()).toHaveLength(0);
+    await click("Load local");
+    const menu = await openForms();
+    expect([...menu.querySelectorAll('[role="menuitemcheckbox"]')].map((el) => el.textContent)).toEqual([
+      "All", "10-K", "10-Q", "10-Q/A", "8-K", "DEF 14A", "SC 13G/A",
+    ]);
+    expect(host.querySelector(".sec-record-scroll")?.textContent).not.toContain("DEF 14A");
+    expect(input("Forms")).toBeNull();
+    expect(host.querySelector("select[multiple]")).toBeNull();
+    expect(formRequests()).toHaveLength(1);
+    expect(formRequests()[0].url.pathname).toBe("/sec-research/0000000123/filing-forms");
+    expect(formRequests()[0].url.search).toBe("");
+    expect(requests.every(({ init }) => (init.method ?? "GET") === "GET" && init.body === undefined)).toBe(true);
+  });
+
+  it("preserves whole form strings and resets the cursor chain when selecting multiple types", async () => {
+    vi.useFakeTimers();
+    handler = (url) => url.pathname.endsWith("/filings") && url.searchParams.has("forms")
+      ? envelope("ok", [filing("selected")], "selected-cursor") : fallback(url);
+    await render(); await load(); await click("Next page");
+    await chooseForms("10-Q/A", "DEF 14A");
+    expect(button("Previous page").disabled).toBe(true);
+    expect(host.querySelector(".sec-pagination > span")?.textContent).toBe("Page 1");
+    await settleFilters(299);
+    expect(recordRequests()).toHaveLength(2);
+    await settleFilters(1);
+    expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual(["10-Q/A", "DEF 14A"]);
+    expect(recordRequests().at(-1)?.url.searchParams.has("cursor")).toBe(false);
+    expect(host.textContent).toContain("selected.htm");
+    await click("Next page");
+    expect(recordRequests().at(-1)?.url.searchParams.get("cursor")).toBe("selected-cursor");
+    expect(formRequests()).toHaveLength(1);
+    expect(requests.some(({ init }) => init.method === "POST")).toBe(false);
+  });
+
+  it("All clears every selected form and automatically returns to an unfiltered first page", async () => {
+    vi.useFakeTimers();
+    await render(); await load(); await chooseForms("DEF 14A", "SC 13G/A"); await settleFilters();
+    await click("Next page");
+    await openForms();
+    await act(async () => formOption("All").click());
+    expect(formOption("All").getAttribute("aria-checked")).toBe("true");
+    expect(formOption("DEF 14A").getAttribute("aria-checked")).toBe("false");
+    expect(formOption("SC 13G/A").getAttribute("aria-checked")).toBe("false");
+    expect(button("Forms").textContent).toBe("All");
+    await settleFilters();
+    expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual([]);
+    expect(recordRequests().at(-1)?.url.searchParams.has("cursor")).toBe(false);
+    expect(button("Previous page").disabled).toBe(true);
+    expect(host.textContent).toContain("first.htm");
+    expect(formRequests()).toHaveLength(1);
+  });
+
+  it("reloads choices only for explicit local reads and completed refreshes, not filter or page edits", async () => {
+    vi.useFakeTimers();
+    await render(); await load(); await chooseForms("10-Q"); await settleFilters();
+    await change("Filed from", "2025-01-01"); await settleFilters();
+    await click("Next page"); await click("Previous page");
+    await click("Facts"); await click("Catalog"); await openForms();
+    expect(formRequests()).toHaveLength(1);
+    await click("Load local");
+    expect(formRequests()).toHaveLength(2);
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("ok", ["10-Q", "S-3"]) : fallback(url);
+    await click("Refresh structured data");
+    await openForms();
+    expect(formRequests()).toHaveLength(3);
+    expect(formOption("S-3")).toBeDefined();
+    expect(formOption("10-Q").getAttribute("aria-checked")).toBe("true");
+    await click("Resume refresh");
+    expect(formRequests()).toHaveLength(4);
+    expect(requests.filter(({ init }) => init.method === "POST").map(({ init }) => init.body)).toEqual([
+      '{"resume":false}', '{"resume":true}',
+    ]);
+  });
+
+  it.each([
+    { state: "partial", data: ["DEF 14A"], label: "Partial", options: ["All", "DEF 14A"] },
+    { state: "partial", data: null, label: "Partial", options: ["All"] },
+    { state: "empty", data: [], label: "Observed empty", options: ["All"] },
+    { state: "unavailable", data: null, label: "Unavailable", options: ["All"] },
+  ])("reports $state choices honestly without inferring types from rows", async ({ state, data, label, options }) => {
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope(state, data) : fallback(url);
+    await render(); await load();
+    const menu = await openForms();
+    expect(menu.querySelector('[role="status"]')?.textContent).toContain(label);
+    expect([...menu.querySelectorAll('[role="menuitemcheckbox"]')].map((el) => el.textContent)).toEqual(options);
+    if (state !== "empty") expect(menu.textContent).not.toContain("Observed empty");
+    if (state === "partial") expect(menu.textContent).toContain("history_pending");
+    expect(host.querySelector(".sec-record-scroll")?.textContent).toContain("10-K");
+  });
+
+  it("shows loading without invented choices and accepts the lookup despite intervening date reads", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<unknown>();
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? pending.promise : fallback(url);
+    await render(); await load();
+    const menu = await openForms();
+    expect(menu.textContent).toContain("Loading");
+    expect(menu.querySelectorAll('[role="menuitemcheckbox"]')).toHaveLength(1);
+    await change("Filed from", "2025-01-01"); await settleFilters();
+    expect(formRequests()).toHaveLength(1);
+    await act(async () => pending.resolve(envelope("ok", ["DEF 14A"])));
+    expect(menu.textContent).not.toContain("Loading");
+    expect(formOption("DEF 14A")).toBeDefined();
+  });
+
+  it("retries failed choices through Load local without a source request", async () => {
+    handler = (url) => url.pathname.endsWith("/filing-forms")
+      ? new Response(JSON.stringify({ detail: { code: "sec_forms_unavailable" } }), { status: 503 }) : fallback(url);
+    await render(); await load();
+    const menu = await openForms();
+    expect(menu.textContent).toContain("Unavailable");
+    expect(menu.textContent).toContain("sec_forms_unavailable");
+    expect(menu.querySelectorAll('[role="menuitemcheckbox"]')).toHaveLength(1);
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("ok", ["DEF 14A"]) : fallback(url);
+    await click("Load local");
+    await openForms();
+    expect(formOption("DEF 14A")).toBeDefined();
+    expect(menu.textContent).not.toContain("sec_forms_unavailable");
+    expect(formRequests()).toHaveLength(2);
+    expect(requests.some(({ init }) => init.method === "POST")).toBe(false);
+  });
+
+  it.each(["success", "failure"])("rejects a stale same-issuer option %s after an explicit reread", async (outcome) => {
+    const old = deferred<unknown>();
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? old.promise : fallback(url);
+    await render(); await load();
+    expect(formRequests()).toHaveLength(1);
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("ok", ["S-3"]) : fallback(url);
+    await click("Load local");
+    const menu = await openForms();
+    await act(async () => old.resolve(outcome === "success" ? envelope("partial", ["STALE"])
+      : new Response(JSON.stringify({ detail: { code: "stale_forms_error" } }), { status: 503 })));
+    expect(formOption("S-3")).toBeDefined();
+    expect(menu.textContent).not.toMatch(/STALE|stale_forms_error|Partial/);
+    expect(formRequests()).toHaveLength(2);
+  });
+
+  it("clears the old issuer selection and rejects its late options when CIK changes", async () => {
+    vi.useFakeTimers();
+    const old = deferred<unknown>();
+    await render(); await load(); await chooseForms("DEF 14A"); await settleFilters();
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? old.promise : fallback(url);
+    await click("Load local"); await openForms();
+    await change("CIK", "456");
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    expect(button("Forms").disabled).toBe(true);
+    expect(button("Forms").textContent).toBe("All");
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("ok", ["S-3"]) : fallback(url);
+    await click("Load local");
+    const menu = await openForms();
+    await act(async () => old.resolve(envelope("ok", ["STALE"])));
+    expect([...menu.querySelectorAll('[role="menuitemcheckbox"]')].map((el) => el.textContent)).toEqual(["All", "S-3"]);
+    expect(recordRequests().at(-1)?.url.pathname).toBe("/sec-research/0000000456/filings");
+    expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual([]);
+  });
+
+  it("does not apply an option response or retain an open menu after unmount", async () => {
+    const old = deferred<unknown>();
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? old.promise : fallback(url);
+    await render(); await load(); await openForms();
+    expect(formRequests()).toHaveLength(1);
+    const before = requests.length;
+    await act(async () => root!.unmount()); root = undefined;
+    await act(async () => old.resolve(envelope("ok", ["STALE"])));
+    expect(host.textContent).toBe("");
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(requests).toHaveLength(before);
+  });
+
+  it("keeps option loading issuer-scoped when navigating away from the filing view", async () => {
+    const pending = deferred<unknown>();
+    handler = (url) => url.pathname.endsWith("/filing-forms") ? pending.promise : fallback(url);
+    await render(); await load(); await openForms(); await click("Facts");
+    await act(async () => pending.resolve(envelope("ok", ["DEF 14A"])));
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    await click("Catalog"); await openForms();
+    expect(formOption("DEF 14A")).toBeDefined();
+    expect(formRequests()).toHaveLength(1);
+  });
+
+  it.each(["DEF 14A", "All"])("preserves menu focus from %s when a delayed refresh replaces choices", async (focused) => {
+    vi.useFakeTimers();
+    const refresh = deferred<unknown>();
+    const forms = deferred<unknown>();
+    await render(); await load(); await openForms();
+    await key(formOption("All"), "Escape");
+    handler = (url) => url.pathname.endsWith("/refresh") ? refresh.promise
+      : url.pathname.endsWith("/filing-forms") ? forms.promise : fallback(url);
+    await click("Refresh structured data");
+    await key(button("Forms"), "ArrowUp");
+    formOption(focused).focus();
+    await act(async () => refresh.resolve(receipt));
+    expect(button("Forms").getAttribute("aria-expanded")).toBe("true");
+    expect(host.querySelector('[role="menu"]')?.textContent).toContain("Loading");
+    expect(document.activeElement).toBe(formOption("All"));
+    await key(document.activeElement!, "ArrowDown");
+    expect(document.activeElement).toBe(formOption("All"));
+    await act(async () => forms.resolve(envelope("ok", ["DEF 14A", "S-3"])));
+    expect(document.activeElement).toBe(formOption("All"));
+    await key(document.activeElement!, "ArrowDown");
+    const option = formOption("DEF 14A");
+    expect(document.activeElement).toBe(option);
+    await act(async () => option.click());
+    await settleFilters();
+    expect(option.getAttribute("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(option);
+    expect(formRequests()).toHaveLength(2);
+    expect(requests.filter(({ init }) => init.method === "POST")).toHaveLength(1);
+    await key(document.activeElement!, "Escape");
+    expect(button("Forms").getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(button("Forms"));
+  });
+
+  it("supports arrow, Home/End, Escape and Tab navigation while choices stay independently checked", async () => {
+    await render(); await load();
+    const trigger = button("Forms");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+    await key(trigger, "ArrowDown");
+    const menu = host.querySelector<HTMLElement>('[role="menu"]')!;
+    expect(trigger.getAttribute("aria-controls")).toBe(menu.id);
+    expect(document.activeElement).toBe(formOption("All"));
+    await key(menu, "ArrowDown");
+    expect(document.activeElement).toBe(formOption("10-K"));
+    await act(async () => formOption("10-K").click());
+    await key(menu, "End");
+    expect(document.activeElement).toBe(formOption("SC 13G/A"));
+    await act(async () => formOption("SC 13G/A").click());
+    expect(formOption("10-K").getAttribute("aria-checked")).toBe("true");
+    expect(formOption("SC 13G/A").getAttribute("aria-checked")).toBe("true");
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    await key(menu, "Home");
+    expect(document.activeElement).toBe(formOption("All"));
+    await key(menu, "Escape");
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    await key(trigger, "ArrowUp");
+    expect(document.activeElement).toBe(formOption("SC 13G/A"));
+    await key(document.activeElement!, "Tab");
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+    await openForms();
+    await act(async () => document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })));
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+  });
+
+  it.each(["Enter", " "])("leaves %j activation to native trigger and option buttons", async (value) => {
+    await render(); await load();
+    async function activate(element: HTMLButtonElement) {
+      expect(element).toBeInstanceOf(HTMLButtonElement);
+      expect(element.type).toBe("button");
+      expect(element.disabled).toBe(false);
+      for (const type of ["keydown", "keyup"]) {
+        const event = new KeyboardEvent(type, { key: value, bubbles: true, cancelable: true });
+        await act(async () => element.dispatchEvent(event));
+        expect(event.defaultPrevented).toBe(false);
+      }
+      // jsdom does not generate native keyboard clicks; exercise that click separately.
+      await act(async () => element.click());
+    }
+    await activate(button("Forms"));
+    expect(button("Forms").getAttribute("aria-expanded")).toBe("true");
+    const option = formOption("DEF 14A");
+    option.focus();
+    await activate(option);
+    expect(option.getAttribute("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(option);
+    expect(button("Forms").getAttribute("aria-expanded")).toBe("true");
+    await activate(option);
+    expect(option.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("keeps many selected forms in a fixed single-line trigger with the full value inspectable", async () => {
+    vi.useFakeTimers();
+    applyPanelStyles();
+    await render(); await load();
+    await chooseForms("10-K", "10-Q", "10-Q/A", "8-K", "DEF 14A", "SC 13G/A");
+    const trigger = button("Forms");
+    const value = trigger.querySelector<HTMLElement>(".sec-form-value")!;
+    const summary = "10-K, 10-Q, 10-Q/A, 8-K, DEF 14A, SC 13G/A";
+    expect(value.textContent).toBe(summary);
+    expect(value.title).toBe(summary);
+    expect(trigger.getAttribute("aria-describedby")).toBe(value.id);
+    expect.soft(getComputedStyle(trigger).height).toBe("32px");
+    expect.soft(getComputedStyle(trigger).minHeight).toBe("32px");
+    expect.soft(getComputedStyle(trigger).boxSizing).toBe("border-box");
+    expect.soft(getComputedStyle(trigger).whiteSpace).toBe("nowrap");
+    const content = getComputedStyle(value.parentElement!);
+    expect.soft(content.display).toMatch(/^(inline-)?flex$/);
+    expect.soft(content.minWidth).toBe("0px");
+    expect.soft(content.width).toBe("100%");
+    const style = getComputedStyle(value);
+    expect.soft(style.minWidth).toBe("0px");
+    expect.soft(style.flexShrink).toBe("1");
+    expect.soft(style.whiteSpace).toBe("nowrap");
+    expect.soft(style.overflow).toBe("hidden");
+    expect.soft(style.textOverflow).toBe("ellipsis");
+    expect.soft(getComputedStyle(trigger.querySelector("svg")!).flexShrink).toBe("0");
+    const menu = await openForms();
+    expect([...menu.querySelectorAll('[aria-checked="true"]')].map((el) => el.textContent)).toEqual([
+      "10-K", "10-Q", "10-Q/A", "8-K", "DEF 14A", "SC 13G/A",
+    ]);
+  });
+
+  it.each(["en", "zh-Hant"])("keeps the %s dropdown bounded with localized All and status", async (locale) => {
+    applyPanelStyles();
+    await render(locale); await change("CIK", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
+    const menu = await openForms(locale === "en" ? "Forms" : "申報類型");
+    expect(formOption(locale === "en" ? "All" : "全部").getAttribute("aria-checked")).toBe("true");
+    expect(menu.querySelector('[role="status"]')?.textContent).toBe(locale === "en" ? "Available" : "可用");
+    expect(getComputedStyle(menu).maxHeight).toBe("260px");
+    expect(getComputedStyle(menu).overflowY).toBe("auto");
+    expect(getComputedStyle(menu.parentElement!).minWidth).toBe("0px");
+  });
+
+  it("retains text-input debounce for concepts", async () => {
+    vi.useFakeTimers();
+    await render(); await load(); await click("Facts");
+    await change("Concepts", "Asset"); await settleFilters(200);
+    await change("Concepts", "Assets"); await settleFilters(299);
+    expect(recordRequests()).toHaveLength(2);
+    await settleFilters(1);
+    expect(recordRequests()).toHaveLength(3);
+    expect(recordRequests().at(-1)?.url.searchParams.getAll("concepts")).toEqual(["Assets"]);
+    expect(formRequests()).toHaveLength(1);
+  });
+});
+
 describe("SEC structured storage", () => {
-  it("debounces typing beside the results and queries only the latest local filters", async () => {
+  it("debounces multiple form selections beside the results and queries only the latest local filters", async () => {
     vi.useFakeTimers();
     handler = (url) => url.searchParams.has("forms") ? envelope("ok", [filing("filtered")]) : fallback(url);
     await render(); await load();
-    expect(host.querySelector('[role="tabpanel"]')?.contains(input("Forms"))).toBe(true);
-    await change("Forms", "10");
+    expect(host.querySelector('[role="tabpanel"]')?.contains(button("Forms"))).toBe(true);
+    await chooseForms("10-Q");
     await settleFilters(200);
-    await change("Forms", "10-Q, 8-K");
+    await chooseForms("10-Q", "8-K");
     await settleFilters(299);
     expect(recordRequests()).toHaveLength(1);
     expect(host.textContent).not.toContain("first.htm");
     await settleFilters(1);
     expect(recordRequests()).toHaveLength(2);
+    expect(formRequests()).toHaveLength(1);
     expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual(["10-Q", "8-K"]);
     expect(host.textContent).toContain("filtered.htm");
     expect(requests.every(({ init }) => (init.method ?? "GET") === "GET" && init.body === undefined)).toBe(true);
@@ -195,10 +555,10 @@ describe("SEC structured storage", () => {
     };
     await render(); await load();
     delayStatus = true;
-    await change("Forms", "10-K"); await settleFilters();
+    await chooseForms("10-K"); await settleFilters();
     expect(recordRequests()).toHaveLength(2);
     delayStatus = false;
-    await change("Forms", "10-Q"); await settleFilters();
+    await chooseForms("10-Q"); await settleFilters();
     expect(host.textContent).toContain("latest-filter.htm");
     await act(async () => {
       oldPage.resolve(outcome === "success" ? envelope("ok", [filing("stale-filter")], "stale-cursor")
@@ -216,7 +576,7 @@ describe("SEC structured storage", () => {
     const old = deferred<unknown>();
     handler = (url) => url.searchParams.has("cursor") ? old.promise : fallback(url);
     await render(); await load(); await click("Next page");
-    await change("Forms", "10-Q");
+    await chooseForms("10-Q");
     await act(async () => old.resolve(envelope("ok", [filing("stale-page")], "stale-cursor")));
     expect(host.textContent).not.toContain("stale-page");
     expect(button("Next page").disabled).toBe(true);
@@ -229,7 +589,7 @@ describe("SEC structured storage", () => {
 
   it("cancels pending filter reads on tab navigation and reads the selected view once", async () => {
     vi.useFakeTimers();
-    await render(); await load(); await change("Forms", "10-Q");
+    await render(); await load(); await chooseForms("10-Q");
     await click("Facts");
     expect(host.textContent).toContain("1234567890123456789.123");
     await settleFilters(1000);
@@ -247,7 +607,7 @@ describe("SEC structured storage", () => {
     vi.useFakeTimers();
     const old = deferred<unknown>();
     handler = (url) => url.searchParams.has("forms") ? old.promise : fallback(url);
-    await render(); await load(); await change("Forms", "10-Q"); await settleFilters();
+    await render(); await load(); await chooseForms("10-Q"); await settleFilters();
     expect(recordRequests()).toHaveLength(2);
     await click("Facts");
     await act(async () => old.resolve(envelope("ok", [filing("stale-catalog")])));
@@ -257,7 +617,7 @@ describe("SEC structured storage", () => {
 
   it("cancels a pending debounce on unmount without issuing another local read", async () => {
     vi.useFakeTimers();
-    await render(); await load(); await change("Forms", "10-Q");
+    await render(); await load(); await chooseForms("10-Q");
     const before = requests.length;
     await act(async () => root!.unmount()); root = undefined;
     await settleFilters(1000);
@@ -269,7 +629,7 @@ describe("SEC structured storage", () => {
     vi.useFakeTimers();
     const old = deferred<unknown>();
     handler = (url) => url.searchParams.has("forms") ? old.promise : fallback(url);
-    await render(); await load(); await change("Forms", "10-Q"); await settleFilters();
+    await render(); await load(); await chooseForms("10-Q"); await settleFilters();
     expect(recordRequests()).toHaveLength(2);
     const before = requests.length;
     await act(async () => root!.unmount()); root = undefined;
@@ -281,14 +641,15 @@ describe("SEC structured storage", () => {
 
   it.each(["456", "invalid", ""])("cancels pending filtering when CIK changes to %s and waits for local load", async (cik) => {
     vi.useFakeTimers();
-    await render(); await load(); await change("Forms", "10-Q");
+    await render(); await load(); await chooseForms("10-Q");
     await change("CIK", cik); await settleFilters(1000);
-    await change("Forms", "8-K"); await settleFilters(1000);
+    expect(button("Forms").disabled).toBe(true);
     expect(recordRequests()).toHaveLength(1);
     expect(host.textContent).not.toContain("first.htm");
     expect(button("Load local").disabled).toBe(cik !== "456");
     if (cik === "456") {
       await click("Load local");
+      await chooseForms("8-K"); await settleFilters();
       expect(recordRequests().at(-1)?.url.pathname).toBe("/sec-research/0000000456/filings");
       expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual(["8-K"]);
       expect(host.textContent).toContain("first.htm");
@@ -301,7 +662,7 @@ describe("SEC structured storage", () => {
     const old = deferred<unknown>();
     handler = (url) => url.pathname === "/sec-research/0000000123/filings" && url.searchParams.has("forms")
       ? old.promise : fallback(url);
-    await render(); await load(); await change("Forms", "10-Q"); await settleFilters();
+    await render(); await load(); await chooseForms("10-Q"); await settleFilters();
     expect(recordRequests()).toHaveLength(2);
     await load("456");
     await act(async () => old.resolve(envelope("ok", [filing("stale-issuer-filter")])));
@@ -312,7 +673,7 @@ describe("SEC structured storage", () => {
 
   it("an explicit local load consumes the pending debounce without a duplicate read", async () => {
     vi.useFakeTimers();
-    await render(); await load(); await change("Forms", "10-Q"); await click("Load local");
+    await render(); await load(); await chooseForms("10-Q"); await click("Load local");
     await settleFilters(1000);
     expect(recordRequests()).toHaveLength(2);
     expect(recordRequests().at(-1)?.url.searchParams.getAll("forms")).toEqual(["10-Q"]);
@@ -597,7 +958,7 @@ describe("SEC structured storage", () => {
     expect(requests.at(-1)?.url.searchParams.get("cursor")).toBe("opaque+/= &token");
     expect(host.textContent).toContain("second.htm");
     await click("Previous page"); expect(host.textContent).toContain("first.htm");
-    await click("Next page"); await change("Forms", "10-Q");
+    await click("Next page"); await chooseForms("10-Q");
     expect(host.textContent).not.toContain("second.htm");
     await settleFilters();
     const last = requests.filter(({ url }) => url.pathname.endsWith("/filings")).at(-1)!.url;
@@ -731,7 +1092,7 @@ describe("SEC structured storage", () => {
     const pending = deferred<unknown>();
     handler = (url) => url.pathname.endsWith("/refresh") ? pending.promise : fallback(url);
     await render(); await load(); await click("Refresh structured data");
-    await change("Forms", "10-Q");
+    await chooseForms("10-Q");
     await act(async () => pending.resolve(receipt));
     const latest = requests.filter(({ url }) => url.pathname.endsWith("/filings")).at(-1)!.url;
     expect(latest.searchParams.getAll("forms")).toEqual(["10-Q"]);
@@ -803,7 +1164,7 @@ describe("SEC structured storage", () => {
   it("rejects delayed old filter pages and allows the new selection to read immediately", async () => {
     const old = deferred<unknown>();
     handler = (url) => url.searchParams.has("cursor") ? old.promise : fallback(url);
-    await render(); await load(); await click("Next page"); await change("Forms", "10-Q");
+    await render(); await load(); await click("Next page"); await chooseForms("10-Q");
     expect(button("Load local").disabled).toBe(false);
     await click("Load local");
     await act(async () => old.resolve(envelope("ok", [filing("old-filter")])));
