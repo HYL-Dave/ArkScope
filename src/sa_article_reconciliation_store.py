@@ -8,6 +8,7 @@ from collections.abc import Collection, Sequence
 from typing import Any
 
 from . import sa_capture_store as capture_store
+from .sqlite_id_sets import integer_ids_json, text_ids_query
 from .sa_article_reconciliation import (
     ArticleEvidence,
     CandidateEvaluation,
@@ -41,13 +42,13 @@ def resolve_lineage(conn: sqlite3.Connection, *, symbol: str, picked_date: str) 
     return int(row[0])
 
 
-def _lineage_ids_clause(lineage_ids: Collection[int] | None) -> tuple[str, list[int]]:
+def _lineage_ids_clause(lineage_ids: Collection[int] | None) -> tuple[str, list[str]]:
     if lineage_ids is None:
         return "", []
     normalized = sorted({int(value) for value in lineage_ids if int(value) > 0})
     if not normalized:
         return " AND 0", []
-    return f" AND l.lineage_id IN ({','.join('?' for _ in normalized)})", normalized
+    return " AND l.lineage_id IN (SELECT value FROM json_each(?))", [integer_ids_json(normalized)]
 
 
 def list_events(
@@ -176,8 +177,9 @@ def _candidate_rows(
         normalized_ids = sorted({str(value) for value in article_ids if str(value)})
         if not normalized_ids:
             return []
-        predicates.append(f"a.article_id IN ({','.join('?' for _ in normalized_ids)})")
-        params.extend(normalized_ids)
+        ids_query, ids_params = text_ids_query(conn, normalized_ids)
+        predicates.append(f"a.article_id IN ({ids_query})")
+        params.extend(ids_params)
     predicates.append(
         "(ABS(julianday(a.published_date) - julianday(?)) <= 3 "
         " OR a.article_id IN (SELECT canonical_article_id FROM sa_alpha_picks "

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
+from src.sqlite_id_sets import text_ids_query
 from src.security_lifecycle_investigation import (
     SecurityLifecycleInvestigationStore,
     evidence_rows_sha256,
@@ -2261,18 +2262,17 @@ class SecurityLifecycleFactKernel:
             if refreshed_families is None:
                 pass
             elif physical_keep_ids:
-                placeholders = ",".join("?" for _ in physical_keep_ids)
-                retained_parameters = tuple(sorted(physical_keep_ids))
+                ids_query, retained_parameters = text_ids_query(self.conn, sorted(physical_keep_ids))
                 self.conn.execute(
                     "DELETE FROM security_lifecycle_automation_facts "
                     "WHERE automation_run_id=? AND evidence_id NOT IN "
-                    f"({placeholders})",
+                    f"({ids_query})",
                     (run_id, *retained_parameters),
                 )
                 self.conn.execute(
                     "DELETE FROM security_lifecycle_evidence "
                     "WHERE automation_run_id=? AND evidence_id NOT IN "
-                    f"({placeholders})",
+                    f"({ids_query})",
                     (run_id, *retained_parameters),
                 )
             else:

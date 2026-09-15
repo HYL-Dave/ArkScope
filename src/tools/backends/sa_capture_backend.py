@@ -18,6 +18,7 @@ from urllib.parse import unquote, urlsplit
 
 from ... import sa_capture_store as store
 from ... import sa_article_reconciliation_store as reconciliation_store
+from ...sqlite_id_sets import text_ids_query
 from .local_market_backend import LocalMarketBackend
 from .sqlite_backend import SqliteBackend
 
@@ -909,10 +910,10 @@ class SACaptureBackend(LocalMarketBackend):
         ordered_ids = list(dict.fromkeys(str(value) for value in news_ids if str(value)))
         if not ordered_ids:
             return []
-        placeholders = ",".join("?" for _ in ordered_ids)
         try:
             conn = self._sa_recovery_read()
             try:
+                ids_query, ids_params = text_ids_query(conn, ordered_ids)
                 rows = conn.execute(
                     f"""
                     SELECT news_id, url, COALESCE(published_at, fetched_at) AS published_at,
@@ -920,9 +921,9 @@ class SACaptureBackend(LocalMarketBackend):
                                       AND trim(body_markdown) <> '' THEN 1 ELSE 0 END
                                AS body_present
                     FROM sa_market_news
-                    WHERE news_id IN ({placeholders})
+                    WHERE news_id IN ({ids_query})
                     """,
-                    tuple(ordered_ids),
+                    ids_params,
                 ).fetchall()
             finally:
                 conn.close()
@@ -947,10 +948,10 @@ class SACaptureBackend(LocalMarketBackend):
         ordered_ids = list(dict.fromkeys(str(value) for value in news_ids if str(value)))
         if not ordered_ids:
             return {}
-        placeholders = ",".join("?" for _ in ordered_ids)
         try:
             conn = self._sa_recovery_read()
             try:
+                ids_query, ids_params = text_ids_query(conn, ordered_ids)
                 rows = conn.execute(
                     f"""
                     SELECT news_id,
@@ -958,9 +959,9 @@ class SACaptureBackend(LocalMarketBackend):
                                       AND trim(body_markdown) <> '' THEN 1 ELSE 0 END
                                AS body_present
                     FROM sa_market_news
-                    WHERE news_id IN ({placeholders})
+                    WHERE news_id IN ({ids_query})
                     """,
-                    tuple(ordered_ids),
+                    ids_params,
                 ).fetchall()
             finally:
                 conn.close()
