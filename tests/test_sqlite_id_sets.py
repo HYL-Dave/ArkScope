@@ -20,38 +20,43 @@ def backend(tmp_path):
 ])
 def test_recovery_large_frozen_target_set(backend, method):
     assert backend.upsert_sa_market_news([
-        {"news_id": "1", "url": "https://seekingalpha.com/news/1", "title": "fixture"},
-    ]) == 1
-    result = getattr(backend, method)([str(value) for value in range(33000)])
+        {"news_id": value, "url": "https://seekingalpha.com/news/1", "title": "fixture"}
+        for value in ["1", "tail-match"]
+    ]) == 2
+    result = getattr(backend, method)([str(value) for value in range(33000)] + ["tail-match"])
     if isinstance(result, dict):
-        assert result == {"1": False}
+        assert result == {"1": False, "tail-match": False}
     else:
-        assert [row["news_id"] for row in result] == ["1"]
+        assert [row["news_id"] for row in result] == ["1", "tail-match"]
 
 
 def test_lineage_filter_large_input(backend):
     sa._refresh(backend, "current", [sa._pick()])
     conn = sa._conn(backend)
     try:
+        conn.execute(
+            "INSERT INTO sa_pick_lineages(lineage_id,symbol_key,picked_date,created_at) VALUES (?,?,?,?)",
+            (33000, "TAIL", "2026-07-16", sa.NOW),
+        )
+        conn.commit()
+        sa._refresh(backend, "current", [sa._pick(), sa._pick(symbol="TAIL", picked="2026-07-16")])
         events = sa.reconciliation_store.list_events(conn, lineage_ids=range(1, 33001))
-        assert len(events) == 1
-        assert events[0]["symbol"] == "BTSG"
+        assert [(row["lineage_id"], row["symbol"]) for row in events] == [(1, "BTSG"), (33000, "TAIL")]
     finally:
         conn.close()
 
 
 def test_article_filter_large_input_keeps_global_limit(backend):
     sa._refresh(backend, "current", [sa._pick()])
-    backend.upsert_sa_articles_meta([sa._article(str(value)) for value in range(1, 26)])
+    stored_ids = [str(value) for value in range(1, 26)] + ["zzz-tail-winner"]
+    backend.upsert_sa_articles_meta([sa._article(value) for value in stored_ids])
     conn = sa._conn(backend)
     try:
         event = sa.reconciliation_store.list_events(conn)[0]
         rows = sa.reconciliation_store._candidate_rows(
-            conn, event, article_ids=[str(value) for value in range(33000)],
+            conn, event, article_ids=[str(value) for value in range(33000)] + ["zzz-tail-winner"],
         )
-        assert [row["article_id"] for row in rows] == sorted(
-            [str(value) for value in range(1, 26)], reverse=True,
-        )[:20]
+        assert [row["article_id"] for row in rows] == sorted(stored_ids, reverse=True)[:20]
     finally:
         conn.close()
 
