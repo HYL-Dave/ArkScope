@@ -1,0 +1,11 @@
+{
+  "revision": "2aeed54a",
+  "files_checked": 11894,
+  "excluded": [
+    "data_sources/DATA_SOURCES_EVALUATION.md",
+    "data_sources/IBKR_INVESTOR_DATA_VALUE.md",
+    "data_sources/PAID_SUBSCRIPTION_EVALUATION.md"
+  ],
+  "byte_mismatches": [],
+  "content_manifest_sha256": "5c55e59f21d30cb8987040d9aeb3c19d6331cd4761913e2b5e1be1cbc611742e"
+}

@@ -21,6 +21,24 @@ completed here. No source archive/compiler is needed for these checks.
 - `6be6f743`: remove fresh `agent_queries` DDL and test-only write/count wrappers.
   Existing query tables/rows and generic archive reads remain. Report/memory and
   current Research owners are unchanged. Retained-data disposition is NOT closed.
+- `34a112ba` integrates reviewed C15 extraction `3132d56e`: physically remove
+  the remaining listing/provider converters, extract unchanged SQLite byte
+  helpers, and keep current investigation installation/disposal. Current V4 SA
+  membership provisioning has an executable `src.sa_tracking_installation`
+  operator with its observation, stopped-App, automation, digest, exclusive
+  backup, transaction and no-op guards. Reject old V2/V3 shapes, do not convert.
+- `2aeed54a`: independently fix the preview-output defect found in C15 review
+  and confirmed in the pre-existing investigation CLI. Both consumers use
+  `operator_preview`: alias rejection, prior-output preservation, build/serialize
+  before creation, and owned-inode cleanup on handled write failure. No
+  installation/disposal-engine or SQL behavior changed in this follow-up.
+
+The C15 extraction proof is pinned to `3132d56e`, not a claim that the later
+CLI output fix is byte-identical to the old CLI. Seven sealed historical
+consumers remain unchanged and replay against `9bb80725`. The live module named
+`lifecycle_investigation/migration.py` is deliberately retained: it installs
+the current investigation system, not an obsolete converter. C15 code retirement
+is closed; that filename alone is not deletion authority.
 
 ## Focused Verification
 
@@ -44,6 +62,11 @@ or credentials are mounted into test runs. Each run is serial in that snapshot.
 | Affinity/index and tail-strengthened A, candidate/control | 18 passed each |
 | Disposable cap mutation, candidate | 5 failed / 13 passed |
 | Restored A, candidate/control | 18 passed each |
+| C15 integrated focus, candidate/control | 166 passed each |
+| New SA preview-output RED | 13 failed / 11 passed |
+| Existing investigation preview-output RED | 5 failed / 2 passed |
+| Shared preview-output GREEN, candidate/control | 134 passed each |
+| Interpreter-path preflight, candidate/control | 11 passed each |
 
 Independent parent review accepted A/B/C20 implementation and closed its P3
 finding after the tail-test follow-up. Its original coverage
@@ -53,6 +76,14 @@ copy only, truncating both set encoders at 32,766 breaks all five large-set case
 The copy was restored byte-for-byte before the last two passing runs. Raw
 mutation output is gzip-preserved because pytest includes trailing whitespace;
 the contents are not reformatted to satisfy a whitespace check.
+
+C15 independent review found the preview-output P2 above. Its follow-up review
+accepted `2aeed54a`, including the shared existing-CLI fix, with no further
+blocking findings. This is handled-failure cleanup, not a claim of crash-atomic
+publication or adversarial filesystem isolation. Serialization failure,
+close-time flush failure and destination creation between precheck and open
+are not separately injected; the tests do exercise partial-write failure and
+preservation of a replacement output.
 
 The first A invocation had an incorrect test-module import and did not collect;
 the valid RED run above followed its correction. The first B run additionally
@@ -75,6 +106,67 @@ refactor was mixed into this backend cleanup.
 The 33,000 historical citation test is structural retention stress, not a claim
 to generate that many independently authenticated assessment digests. It checks
 both surviving facts and evidence, deletion of an uncited row, FK and integrity.
+
+## Full Acceptance
+
+The tested product/test revision is `2aeed54a`. Each full run uses a fresh copy
+of the same ArkScope git archive, not SQLite source. Archive SHA-256:
+`316554c4c6e9a4ec77c84a466ecd1c28dbaef8c029c4ee62cb2034e228e20c49`.
+The byte check covered 11,894 files without mismatches. Only the same three
+encrypted non-runtime evaluation documents were excluded; no key was loaded.
+The first archive attempt failed at git-crypt smudging and was never tested;
+the complete archive used an explicit cat filter without decrypting those
+excluded documents. A tar metadata comparison reported owner differences;
+the subsequent check compared file bytes instead. One initial integrated
+focused invocation named a nonexistent disposal test and ran zero tests;
+the correct existing owner is `test_lifecycle_investigation_retirement.py`.
+
+The first full control invocation passed **11,245 / 12 skipped** in 1,393.94s,
+but its wrapper still put the candidate venv on PATH. Its main interpreter was
+3.37.2; bare-command descendants were ambiguous. Preserve this result as
+`full-cleanup-control`, not as authoritative engine-consistent acceptance.
+
+The corrected wrapper derives PATH from the chosen interpreter and the runner
+asserts that both `python` and `python3` resolve to that interpreter before
+collection. Actual engine, PATH and resolved commands are recorded. The
+source-independent `run_tests-consistent.sh` / `offline_pytest-consistent.py`
+are the final runner versions; the original focused-run files are preserved.
+The scratch launcher invokes its top-level `offline_pytest.py`, populated from
+that consistent version. No product code was changed for the runner correction.
+
+| Authoritative full run | Result |
+| --- | --- |
+| SQLite 3.37.2 control | **11,245 passed / 12 skipped**, 1,379.96s, exit 0 |
+| SQLite 3.53.1 candidate | Running; not yet accepted |
+
+The control has exactly one pytest main entry and an unchanged source diff.
+All 12 skipped identities match the prior manual tests after removing the
+retired source-dependent runtime tests. Node accounting is explicit:
+11,216 before - 94 removed + 135 added = **11,257**. Removed identities are
+72 self-build cases, 21 obsolete converter cases and one unused query-writer
+case. Added identities and their owners are in `test-node-accounting.json`.
+Full runs are serial; no parallel pytest, scanner or source edits occur in the
+tested copy. Documentation and immutable-revision census run in the separate
+parent checkout, never in that copy. These are offline compatibility results,
+not production integrity checks, TLS acceptance or runtime deployment.
+
+## Census
+
+Same scanner, `9bb80725` versus immutable `2aeed54a`: 4,317 to 4,302 candidates,
+3,231 to 3,201 uncertainties, and 1,179 to 1,178 read files. The comparison has
+one new candidate, 63 new uncertainty identities, 12 exact deleted-file
+reductions, and zero dependency-metadata or untracked-name drift. Exit 2 and
+`review_required` remain explicit.
+
+The one candidate is the tested current operator `src.sa_tracking_installation`,
+not an abandoned module. The 63 uncertainty identities cover one dynamic-import
+absence guard and 62 SQL statements/expressions in the changed stores/helpers
+and relocated current installer. File/line relocation changes their identity;
+they are not 63 demonstrated regressions or DROP authorizations. Full snapshots
+and per-path/kind counts are preserved. Broader static uncertainties remain
+review inputs, not a claim that every unreachable symbol is gone. C21 remains
+an explicitly deferred capability. Three generated obsolete runtime pycs and
+their now-empty parent directory were removed; unrelated private files were not.
 
 ## C20 Protected Inventory
 
@@ -99,7 +191,7 @@ rows. Until granted and actually executed, keep the table and generic reader.
 
 ## Still Pending
 
-C15 current-installation cleanup/integration and independent review, final
-serial full-suite receipts and the user's SEC/current-feature hand test. C,
+Candidate full-suite completion and paired receipts, plus the user's
+SEC/current-feature hand test and C20 retained-data authorization. C,
 Windows/macOS and Python sandbox remain explicitly separate. No merge/push,
 App restart, production schema change or runtime activation occurred.

@@ -1,0 +1,76 @@
+"""Throwaway prebuilt compatibility runner. Not a product entrypoint."""
+
+import json
+import os
+from pathlib import Path
+import shutil
+import sqlite3
+import sys
+
+ROOT = Path('/tmp/arkscope-prebuilt-compat.oCmRRHrQ/source')
+WORK = Path(os.environ['ARKSCOPE_OFFLINE_TEST_WORKSPACE'])
+FIXTURES = WORK / 'pytest'
+
+
+def audit(event, args):
+    if event in {'socket.connect', 'socket.sendto', 'socket.getaddrinfo',
+                 'socket.gethostbyname', 'socket.gethostbyaddr'}:
+        address = args[1] if event in {'socket.connect', 'socket.sendto'} else args[0]
+        host = address[0] if isinstance(address, tuple) else address
+        if host not in {'127.0.0.1', '::1', 'localhost', None}:
+            raise PermissionError('offline test rejected provider network')
+    if event == 'subprocess.Popen':
+        executable, argv = args[:2]
+        path = Path(os.fsdecode(executable))
+        fixture = path.is_absolute() and path.resolve().is_relative_to(FIXTURES)
+        if path.name in {'codex', 'claude'} and not fixture and '--version' not in argv:
+            raise PermissionError('offline test rejected real provider CLI session')
+
+
+sys.addaudithook(audit)
+
+
+def main():
+    with (WORK / 'main-entries.jsonl').open('a') as stream:
+        stream.write(json.dumps({'pid': os.getpid(), 'name': __name__}) + '\n')
+    os.chdir(ROOT)
+    sys.path.insert(0, str(ROOT))
+    for key, leaf in {
+        'HOME': 'home', 'XDG_CONFIG_HOME': 'home/config', 'XDG_CACHE_HOME': 'home/cache',
+        'ARKSCOPE_LOCK_DIR': 'state/locks',
+    }.items():
+        path = WORK / leaf
+        path.mkdir(parents=True, exist_ok=True)
+        os.environ[key] = str(path)
+    for key, leaf in {
+        'ARKSCOPE_PROFILE_DB': 'profile.db', 'ARKSCOPE_MARKET_DB': 'market.db',
+        'ARKSCOPE_SA_DB': 'sa.db', 'ARKSCOPE_MACRO_CALENDAR_DB': 'macro.db',
+        'ARKSCOPE_TOKEN_STORE_PATH': 'tokens.json',
+    }.items():
+        os.environ[key] = str(WORK / 'state' / leaf)
+    with sqlite3.connect(':memory:') as conn:
+        identity = {
+            'python': sys.executable, 'python_version': sys.version,
+            'path': os.environ['PATH'],
+            'path_interpreters': {name: shutil.which(name) for name in ('python', 'python3')},
+            'engine': conn.execute('SELECT sqlite_version(),sqlite_source_id()').fetchone(),
+            'compile_options': sorted(row[0] for row in conn.execute('PRAGMA compile_options')),
+            'ld_library_path': os.environ.get('LD_LIBRARY_PATH'),
+            'ld_preload': os.environ.get('LD_PRELOAD'),
+        }
+    assert identity['engine'][0] == os.environ.get('PROBE_EXPECT_SQLITE', '3.53.1')
+    assert identity['ld_library_path'] is identity['ld_preload'] is None
+    assert all(path and Path(path).resolve() == Path(sys.executable).resolve()
+               for path in identity['path_interpreters'].values())
+    (WORK / 'runtime.json').write_text(json.dumps(identity, indent=2) + '\n')
+    from src import env_keys
+    env_keys._loaded = True
+    import pytest
+    return pytest.main([
+        '-p', 'no:cacheprovider', '-p', 'anyio.pytest_plugin', '--tb=short',
+        f'--basetemp={FIXTURES}', *sys.argv[1:],
+    ])
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
