@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, ArrowRight, BookOpen, Database, ExternalLink, Play, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, Database, ExternalLink, Play, RefreshCw, Save } from "lucide-react";
 import {
   ApiError, getSecResearchConfig, getSecResearchFacts, getSecResearchFilings,
   getSecResearchStatus, getSecResearchScheduleStatus, refreshSecResearch, setSecResearchBudget,
@@ -13,7 +13,6 @@ import { formatSystemTimestamp } from "../timeDisplay";
 import { Button, IconButton } from "../ui/Button";
 import { Tabs } from "../ui/Tabs";
 import type { SettingsT } from "./settingsCopy";
-import { SecDocumentReader, type SecDocumentLocator } from "./SecDocumentReader";
 import { useSharedDataScheduleControls, terminalRevision } from "./dataScheduleControls";
 import "./secResearch.css";
 
@@ -82,7 +81,7 @@ function safeCatalogUrl(value: unknown): string | null {
   } catch { return null; }
 }
 
-function Records({ page, view, t, onOpen }: { page: Page | null; view: View; t: SettingsT; onOpen: (filing: SecResearchFiling, opener: HTMLButtonElement) => void }) {
+function Records({ page, view, t }: { page: Page | null; view: View; t: SettingsT }) {
   const rows = page?.data ?? [];
   const columns: [string, string][] = view === "filings" ? [
     ["form", t(($) => $.secResearch.form)], ["filed_date", t(($) => $.secResearch.filedDate)],
@@ -96,7 +95,7 @@ function Records({ page, view, t, onOpen }: { page: Page | null; view: View; t: 
     ["filed_date", t(($) => $.secResearch.filedDate)], ["accession", t(($) => $.secResearch.accession)],
     ["fact_id", t(($) => $.secResearch.factId)],
   ];
-  const present = columns.filter(([key]) => (view === "filings" && key === "primary_document") || rows.some((row) => row[key] != null && row[key] !== ""));
+  const present = columns.filter(([key]) => rows.some((row) => row[key] != null && row[key] !== ""));
   return <>
     <Observation value={page} t={t} />
     {rows.length > 0 && <div className="sec-record-scroll" tabIndex={0} role="region" aria-label={t(($) => $.secResearch.views)}>
@@ -106,7 +105,7 @@ function Records({ page, view, t, onOpen }: { page: Page | null; view: View; t: 
           const url = key === "primary_url" ? safeCatalogUrl(row[key]) : null;
           return <td key={key}>{key === "primary_url"
             ? url && <a href={url} target="_blank" rel="noopener noreferrer" title={t(($) => $.secResearch.catalogUrl)} aria-label={t(($) => $.secResearch.catalogUrl)}><ExternalLink size={16} aria-hidden="true" /></a>
-            : row[key] == null ? null : String(row[key])}{view === "filings" && key === "primary_document" && <IconButton size="compact" label={t(($) => $.secDocument.open)} icon={<BookOpen size={16} />} onClick={(event) => onOpen(row as SecResearchFiling, event.currentTarget)} />}</td>;
+            : row[key] == null ? null : String(row[key])}</td>;
         })}</tr>)}</tbody>
       </table>
     </div>}
@@ -173,6 +172,7 @@ export function SecResearchPanel() {
   const acquisition = useRef(false);
   const budgetSaving = useRef(false);
   const latestRead = useRef<() => Promise<void>>(async () => {});
+  const filterTimer = useRef<number | null>(null);
   const [config, setConfig] = useState<SecResearchConfig | null>(null);
   const [configError, setConfigError] = useState<unknown>(null);
   const [configBusy, setConfigBusy] = useState(false);
@@ -201,10 +201,6 @@ export function SecResearchPanel() {
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [refreshError, setRefreshError] = useState<unknown>(null);
   const [unconfirmed, setUnconfirmed] = useState(false);
-  const rememberedDocuments = useRef(new Map<string, SecDocumentLocator>());
-  const [uncertainDocuments, setUncertainDocuments] = useState(new Set<string>());
-  const readerSequence = useRef(0);
-  const [reader, setReader] = useState<{ filing: SecResearchFiling; key: number; opener: HTMLButtonElement; initial?: SecDocumentLocator } | null>(null);
   const bytes = wholeBytes(draft, unit);
   const page = pages[pageIndex] ?? null;
 
@@ -246,7 +242,7 @@ export function SecResearchPanel() {
     mounted.current = true;
     void loadConfig();
     void loadScheduleStatus();
-    return () => { mounted.current = false; generation.current++; issuerGeneration.current++; configGeneration.current++; scheduleGeneration.current++; };
+    return () => { mounted.current = false; clearFilterTimer(); generation.current++; issuerGeneration.current++; configGeneration.current++; scheduleGeneration.current++; };
   }, []);
 
   useEffect(() => {
@@ -284,10 +280,26 @@ export function SecResearchPanel() {
     }
   }
 
+  function clearFilterTimer() {
+    if (filterTimer.current !== null) window.clearTimeout(filterTimer.current);
+    filterTimer.current = null;
+  }
+
   function invalidate(issuer = false) {
+    clearFilterTimer();
     generation.current++;
-    setPages([]); setPageIndex(0); setLoaded(false); setReading(false); setReadError(null);
-    if (issuer) { issuerGeneration.current++; setStored(null); setReceipt(null); setRefreshError(null); setUnconfirmed(false); setReader(null); }
+    setPages([]); setPageIndex(0); setReading(false); setReadError(null);
+    if (issuer) { issuerGeneration.current++; setLoaded(false); setStored(null); setReceipt(null); setRefreshError(null); setUnconfirmed(false); }
+  }
+
+  function filterChanged() {
+    invalidate();
+    if (!cik || !loaded) return;
+    // Invalidate immediately; the settled read uses the latest filters and view.
+    filterTimer.current = window.setTimeout(() => {
+      filterTimer.current = null;
+      void latestRead.current();
+    }, 300);
   }
 
   function query(issuer: string, kind: View, cursor?: string): Promise<Page> {
@@ -301,7 +313,8 @@ export function SecResearchPanel() {
   }
 
   async function readLocal(kind = view) {
-    if (!cik) return;
+    clearFilterTimer();
+    if (!cik || !mounted.current) return;
     const request = ++generation.current;
     const current = () => mounted.current && request === generation.current;
     setReading(true); setReadError(null); setPages([]); setPageIndex(0); setLoaded(true);
@@ -353,17 +366,17 @@ export function SecResearchPanel() {
 
   const message = (label: string, error: unknown) => t(($) => $.secResearch.errorDetail, { message: label, detail: errorDetail(error) });
   const field = (label: string, value: string, update: (value: string) => void, type = "text") => <label>
-    <span>{label}</span><input aria-label={label} type={type} value={value} onChange={(event) => { update(event.target.value); invalidate(); }} />
+    <span>{label}</span><input aria-label={label} type={type} value={value} onChange={(event) => { update(event.target.value); filterChanged(); }} />
   </label>;
   const filters = view === "filings" ? <>
     {field(t(($) => $.secResearch.forms), forms, setForms)}
     {field(t(($) => $.secResearch.filedFrom), filedFrom, setFiledFrom, "date")}
     {field(t(($) => $.secResearch.filedTo), filedTo, setFiledTo, "date")}
-    <label className="sec-checkbox"><input type="checkbox" checked={amendments} onChange={(event) => { setAmendments(event.target.checked); invalidate(); }} />{t(($) => $.secResearch.amendments)}</label>
+    <label className="sec-checkbox"><input type="checkbox" checked={amendments} onChange={(event) => { setAmendments(event.target.checked); filterChanged(); }} />{t(($) => $.secResearch.amendments)}</label>
   </> : <>
     {field(t(($) => $.secResearch.concepts), concepts, setConcepts)}
     {field(t(($) => $.secResearch.asOf), asOf, setAsOf, "date")}
-    <label><span>{t(($) => $.secResearch.revisions)}</span><select aria-label={t(($) => $.secResearch.revisions)} value={revisions} onChange={(event) => { setRevisions(event.target.value as "latest" | "all"); invalidate(); }}>
+    <label><span>{t(($) => $.secResearch.revisions)}</span><select aria-label={t(($) => $.secResearch.revisions)} value={revisions} onChange={(event) => { setRevisions(event.target.value as "latest" | "all"); filterChanged(); }}>
       <option value="latest">{t(($) => $.secResearch.latest)}</option><option value="all">{t(($) => $.secResearch.all)}</option>
     </select></label>
   </>;
@@ -371,7 +384,7 @@ export function SecResearchPanel() {
     <div className="sec-fields">{filters}</div>
     {reading && <p role="status">{t(($) => $.secResearch.loading)}</p>}
     {readError != null && <p role="alert">{message(t(($) => $.secResearch.readError), readError)}</p>}
-    <Records page={page} view={view} t={t} onOpen={(filing, opener) => setReader({ filing, opener, key: ++readerSequence.current, initial: rememberedDocuments.current.get(JSON.stringify(filing)) })} />
+    <Records page={page} view={view} t={t} />
     <div className="sec-pagination">
       <IconButton size="compact" label={t(($) => $.secResearch.previous)} icon={<ArrowLeft size={16} />} disabled={reading || pageIndex === 0} onClick={() => { setPageIndex(pageIndex - 1); setReadError(null); }} />
       <span>{t(($) => $.secResearch.page, { page: pageIndex + 1 })}</span>
@@ -428,14 +441,5 @@ export function SecResearchPanel() {
       { value: "filings", label: t(($) => $.secResearch.catalog), panel: table },
       { value: "facts", label: t(($) => $.secResearch.facts), panel: table },
     ]} />
-    {reader && <SecDocumentReader key={reader.key} filing={reader.filing} initial={reader.initial}
-      uncertain={uncertainDocuments.has(reader.filing.filing_id)}
-      onUncertain={(value) => setUncertainDocuments((previous) => {
-        const next = new Set(previous);
-        if (value) next.add(reader.filing.filing_id); else next.delete(reader.filing.filing_id);
-        return next;
-      })}
-      onClose={() => { setReader(null); if (reader.opener.isConnected) reader.opener.focus(); }}
-      onCapture={(locator) => rememberedDocuments.current.set(JSON.stringify(reader.filing), locator)} />}
   </section>;
 }

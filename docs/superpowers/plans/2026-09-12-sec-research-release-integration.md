@@ -1,5 +1,11 @@
 # SEC Research Release Integration Implementation Plan
 
+2026-09-15 hand-test follow-up supersedes the embedded Settings reader and the
+v4-only TOC discussion in this historical plan. Settings now exposes local
+automatic filters and official browser links. Model/citation paths remain;
+new plain-label linked-table observations use extraction v5 without modifying
+retained captures. See the [current hand-test checklist](2026-09-15-sec-current-runtime-hand-test.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:subagent-driven-development to implement this plan task-by-task.
 

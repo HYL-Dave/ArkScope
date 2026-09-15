@@ -18,7 +18,7 @@ MAX_NESTING = 512
 MAX_PARSER_EVENTS = 2_000_000
 MAX_TEXT_BYTES = 128 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 128 * 1024 * 1024
-EXTRACTION_VERSION = "sec-document-text-v4"
+EXTRACTION_VERSION = "sec-document-text-v5"
 _CHUNK = 65536
 
 
@@ -120,6 +120,10 @@ class _TextParts:
 class _TOCStructure:
     """Observe display events without changing text or inferring missing end tags."""
 
+    _PLAIN_LABEL_INLINE = frozenset({
+        "a", "b", "em", "font", "i", "mark", "s", "small", "span", "strong", "sub", "sup", "u",
+    })
+
     def __init__(self, budget, output):
         self.budget, self.output = budget, output
         self.stack, self.closed, self.gaps = [], [], []
@@ -130,6 +134,13 @@ class _TOCStructure:
         if gap not in self.gaps:
             self.gaps.append(gap)
 
+    def child(self, local, *, html):
+        self.budget.tick()
+        if not html or local not in self._PLAIN_LABEL_INLINE:
+            for parent in self.stack:
+                self.budget.tick()
+                parent["non_inline_child"] = True
+
     def start(self, tag, local, attrs, *, hidden, html):
         self.budget.tick()
         attributes = dict(attrs)
@@ -138,12 +149,20 @@ class _TOCStructure:
         candidate = html and not hidden and (role or local in {"nav", "table"})
         title = self.previous_title
         adjacent = (candidate and local == "table" and title is not None
-                    and title[2] == len(self.stack) and title[1] == self.output.size_bytes)
+                    and title[2] <= len(self.stack) and title[1] == self.output.size_bytes)
+        if adjacent:
+            # SEC filings often wrap a title's following table in an empty div.
+            for parent in self.stack[title[2]:]:
+                self.budget.tick()
+                if (parent["local"] != "div" or parent["start"] is not None
+                        or not parent["html"] or parent["hidden"] or parent["invalid"]):
+                    adjacent = False
+                    break
         frame = {"tag": tag, "local": local, "candidate": candidate, "role": role,
                  "title": labelled if local == "nav" else adjacent, "links": set(),
                  "start": title[0] if adjacent else None, "text": "", "hidden": hidden,
                  "html": html, "href": attributes.get("href") or "", "linked": None,
-                 "pending_heading": None,
+                 "pending_heading": None, "non_inline_child": False,
                  "invalid": len(attributes) != len(attrs) or local in {"html", "body"}}
         self.stack.append(frame)
 
@@ -157,7 +176,7 @@ class _TOCStructure:
                 continue
             if frame["start"] is None:
                 frame["start"] = self.output.content_start
-            if frame["local"] in {"h1", "h2", "h3", "h4", "h5", "h6", "caption", "a"}:
+            if frame["local"] in {"h1", "h2", "h3", "h4", "h5", "h6", "caption", "a", "div", "p"}:
                 if frame["text"] is not None:
                     frame["text"] = frame["text"] + data if len(frame["text"]) + len(data) <= 240 else None
 
@@ -172,7 +191,8 @@ class _TOCStructure:
             frame = self.stack.pop()
             self.budget.tick()
             label = " ".join((frame["text"] or "").split())
-            heading = frame["html"] and frame["local"] in {"h1", "h2", "h3", "h4", "h5", "h6", "caption"}
+            heading = frame["html"] and (frame["local"] in {"h1", "h2", "h3", "h4", "h5", "h6", "caption"}
+                or frame["local"] in {"div", "p"} and not frame["non_inline_child"])
             title = heading and label.lower() == "table of contents"
             match = _HEADING.fullmatch(label)
             heading_link = (exact and not frame["invalid"] and frame["html"]
@@ -183,7 +203,11 @@ class _TOCStructure:
                 frame["invalid"] = True
             item_link = heading_link and match.group(1).upper() == "ITEM"
             if not frame["hidden"]:
-                if heading and match and frame["linked"] != label:
+                linked = frame["linked"] == label
+                if frame["local"] in {"div", "p"}:
+                    # Some item labels put only the terminal period outside <a>.
+                    linked = linked or frame["linked"] == label.removesuffix(".")
+                if heading and match and not linked:
                     # An enclosing anchor is evidence only after its complete close.
                     anchor = None
                     for ancestor in reversed(self.stack):
@@ -289,6 +313,10 @@ class _DocumentHTMLParser(_SourceTextParser):
         undeclared_ix = prefix == "ix" and prefix not in self.namespaces
         if (namespace in self._INLINE_NAMESPACES or undeclared_ix) and local in self._INLINE_HIDDEN:
             attrs = [*attrs, ("hidden", None)]
+        html = namespace == "http://www.w3.org/1999/xhtml" or not separator and namespace in {None, ""}
+        if self.structure is not None:
+            # Void elements still invalidate a containing plain-label shape.
+            self.structure.child(local.lower(), html=html)
         super().handle_starttag(tag, attrs)
         if tag in self._VOID:
             self._restore_namespaces(previous)
@@ -296,7 +324,7 @@ class _DocumentHTMLParser(_SourceTextParser):
             self.namespace_scopes.append(previous)
             if self.structure is not None:
                 self.structure.start(tag, local.lower(), attrs, hidden=self.stack[-1][1],
-                    html=namespace == "http://www.w3.org/1999/xhtml" or not separator and namespace in {None, ""})
+                    html=html)
 
     def handle_endtag(self, tag):
         super().handle_endtag(tag)

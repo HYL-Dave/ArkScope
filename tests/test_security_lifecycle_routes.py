@@ -462,7 +462,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 224
+    assert len(rows) == 222
     assert ("PUT", "/news/settings") not in rows
     assert {row for row in rows if row[1].startswith("/news/")} == {
         ("GET", "/news/status"), ("PUT", "/news/settings/normalized-writes"),
@@ -478,8 +478,6 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ("PUT", "/sec-research/config"),
         ("GET", "/sec-research/{cik}/filings"),
         ("GET", "/sec-research/{cik}/facts"),
-        ("GET", "/sec-research/filings/{filing_id}/document"),
-        ("POST", "/sec-research/filings/{filing_id}/document"),
     }
     assert {row for row in rows if row[1].startswith("/security-lifecycle/investigations/")} == {
         ("GET", "/security-lifecycle/investigations/{run_id}"),  # Retained historical audit read.

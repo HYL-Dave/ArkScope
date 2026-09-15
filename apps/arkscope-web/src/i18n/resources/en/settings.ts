@@ -1,21 +1,5 @@
 // Translation authority: docs/design/ARKSCOPE_TERMINOLOGY.md
 const settings = {
-  secDocument: {
-    title: "Filing reader", open: "Read filing", close: "Close reader",
-    document: "Document", section: "Section", search: "Literal search (case-sensitive)",
-    searchAction: "Search passages", whole: "Whole document",
-    acquire: "Acquire primary document", reread: "Reread stored document",
-    currentAction: "Read current capture", current: "Current at read", pinned: "Pinned capture",
-    captureId: "Capture ID", pinAction: "Open pinned capture", observed: "Capture observed",
-    directoryCapture: "Directory observed with capture", indexPage: "Index page {{page}}",
-    indexPrevious: "Previous index page", indexNext: "Next index page",
-    previous: "Previous passage page", next: "Next passage page",
-    source: "Source citation", citation: "Citation metadata", attempt: "Acquisition attempt",
-    unknownOutcome: "Acquisition outcome unknown. The server may still be running.",
-    noCapture: "No stored document capture", sectionUnavailable: "Section unavailable",
-    sectionAmbiguous: "Section ambiguous", indexEntryTooLarge: "Index entry exceeds the response limit",
-    pageInsufficient: "Page size insufficient for this passage",
-  },
   secResearch: {
     schedule: {
       title: "Daily structured acquisition", lastAttempt: "Last attempt",
@@ -49,7 +33,7 @@ const settings = {
     previous: "Previous page", next: "Next page", page: "Page {{page}}",
     filingId: "Filing ID", factId: "Fact ID", accession: "Accession", form: "Form",
     filedDate: "Filed date", reportDate: "Report date", acceptedAt: "Accepted at",
-    document: "Primary document", catalogUrl: "Catalog URL", namespace: "Namespace",
+    document: "Primary document", catalogUrl: "SEC original", namespace: "Namespace",
     concept: "Concept", value: "Reported value", factUnit: "Unit", start: "Start", end: "End",
   },
   locale: {

@@ -1252,14 +1252,6 @@ export function refreshSecResearch(cik: string, resume = false): Promise<SecRese
   return sendJSON(`/sec-research/${encodeURIComponent(cik)}/refresh`, "POST", { resume }, 600_000);
 }
 
-export interface SecDocumentQuery {
-  document_id?: string;
-  capture_id?: string;
-  section_id?: string;
-  query?: string;
-  cursor?: string;
-  max_chars?: number;
-}
 export interface SecDocumentCitation {
   filing_id: string;
   document_id: string;
@@ -1349,58 +1341,6 @@ export interface SecDocumentMetadata {
   text_sha256: string;
   extraction_version: string;
   [key: string]: unknown;
-}
-export interface SecDocumentEntry {
-  document_id: string;
-  name: string;
-  url: string;
-  size_bytes: number | null;
-  source: { sha256: string; pointer: string };
-}
-export interface SecDocumentSection {
-  section_id: string;
-  label: string;
-  start_byte: number;
-  end_byte: number;
-}
-export type SecDocumentPage = SecResearchEnvelope<{
-  document: SecDocumentMetadata | null;
-  documents: SecDocumentEntry[];
-  sections: SecDocumentSection[];
-  passages: { text: string; citation: SecDocumentCitation }[];
-  text_start_cursor: string | null;
-} | null>;
-export interface SecDocumentAttempt {
-  attempt_id: number | null;
-  filing_id: string;
-  document_id: string;
-  resolved_document_id: string | null;
-  primary_document: string | null;
-  invalidation_primary_document: string | null;
-  acquisition_id: string;
-  status: SecResearchState;
-  capture_id: string | null;
-  observed_at: string;
-  outcome: string;
-  gaps: SecResearchGap[];
-  requests: {
-    operation: string;
-    url: string;
-    request_count: number | null;
-    dispatch_state: "dispatched" | "not_dispatched" | "unknown";
-    report: Record<string, unknown> | null;
-    gaps: SecResearchGap[];
-  }[];
-}
-export function getSecResearchDocument(filingId: string, query: SecDocumentQuery = {}): Promise<SecDocumentPage> {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined) params.set(key, String(value));
-  }
-  return getJSON(`/sec-research/filings/${encodeURIComponent(filingId)}/document${params.size ? `?${params}` : ""}`);
-}
-export function acquireSecResearchDocument(filingId: string): Promise<SecDocumentAttempt> {
-  return sendJSON(`/sec-research/filings/${encodeURIComponent(filingId)}/document`, "POST", { document_id: "primary" }, 600_000);
 }
 
 export async function getHealthz(): Promise<boolean> {

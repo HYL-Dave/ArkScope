@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SecCitationView } from "./SecCitationView";
-import { citationRead, documentCitation, factCitation } from "./secCitationTestUtils";
+import { citationRead, documentCitation, factCitation, filingCitation } from "./secCitationTestUtils";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let host: HTMLDivElement;
@@ -30,6 +30,27 @@ async function render(citation = documentCitation) {
 function response(value: unknown, status = 200) { return new Response(JSON.stringify(value), { status }); }
 
 describe("SEC citation view response boundary", () => {
+  it.each([
+    [documentCitation, "Retained passage"],
+    [factCitation, "12345678901234567890.00100"],
+    [filingCitation, "annual.htm"],
+  ] as const)("reopens retained $0.kind evidence independently of the settings document reader", async (citation, expected) => {
+    const requests: { url: URL; init: RequestInit }[] = [];
+    vi.stubGlobal("fetch", async (input: string, init: RequestInit = {}) => {
+      requests.push({ url: new URL(input), init });
+      return response(citationRead(citation));
+    });
+    await render(citation);
+    expect(host.textContent).toContain(expected);
+    expect(host.querySelector('[aria-label="Retry SEC source"]')).toBeNull();
+    expect(requests).toHaveLength(1);
+    const { url, init } = requests[0];
+    expect(url.pathname).toBe("/sec-research/citation");
+    expect(init.method ?? "GET").toBe("GET");
+    expect(init.body).toBeUndefined();
+    expect(JSON.parse(atob(url.searchParams.get("ref")!.replace(/-/g, "+").replace(/_/g, "/")))).toEqual(citation);
+  });
+
   it.each([
     { ...citationRead(documentCitation), data: null },
     citationRead(factCitation),

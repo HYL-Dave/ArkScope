@@ -410,6 +410,16 @@ Also expose capture budget, stored bytes, in-flight reservations and a distinct
 capacity/disk-space block. Changing the budget does not enable the schedule or
 start a download. Do not call the 100 GiB budget a token or memory limit.
 
+Hand-test decision approved on 2026-09-15: Settings is an operational and
+stored-data inspection surface, not a full-filing reader. After an issuer is
+loaded, settled filter edits query local records automatically and restart the
+page/cursor chain. Source acquisition remains an explicit command. Official
+filing links open in the browser. Remove the Settings embedded document reader
+and its dedicated HTTP adapters; retain the three model tools and the separate
+Research citation viewer/API. Document extraction, exact cited passages and
+unambiguous section indexing remain backend capabilities. Extraction revisions
+publish new captures; they never rewrite an already retained capture or citation.
+
 ### Remove Abandoned Company-Event Intake
 
 Supersedes the earlier permanent-`retired` wrapper proposal. Delete
@@ -587,7 +597,8 @@ before executing the tests. Required offline owners:
 8. New schedule off by default, old-enabled flags not inherited, physical absence
    of old intake/registrations in journal-present and journal-absent fixtures,
    empty clean refresh success and truthful partial/failure status.
-9. Settings desktop/mobile en/zh-Hant, counters and on-demand document views.
+9. Settings desktop/mobile en/zh-Hant, counters, local automatic filters and
+   official browser links; Research citation reopening remains independently tested.
 10. Capture quota default/conversion/profile persistence, increases/decreases,
     existing-object deduplication, concurrent reservations, restart recovery,
     quota/full-disk rejection and preserved cited/local reads. Use small fixtures

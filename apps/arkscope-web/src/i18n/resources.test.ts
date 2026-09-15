@@ -6,13 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import { initializeI18n, resourceNamespaces, resources } from "./resources";
 type ResourceTree = Record<string, unknown>;
-const secDocumentKeys = [
-  "title", "open", "close", "document", "section", "search", "searchAction", "whole",
-  "acquire", "reread", "currentAction", "current", "pinned", "captureId", "pinAction",
-  "observed", "directoryCapture", "indexPage", "indexPrevious", "indexNext", "previous",
-  "next", "source", "citation", "attempt", "unknownOutcome", "noCapture",
-  "sectionUnavailable", "sectionAmbiguous", "indexEntryTooLarge", "pageInsufficient",
-] as const;
 const secScheduleKeys = [
   "title", "lastAttempt", "lastAcquisition", "lastCompleted", "nextEligible", "eligible", "disabled",
   "succeeded", "failed", "running", "universe", "attempted", "confirmed", "failedIssuers", "deferred",
@@ -758,7 +751,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1037,
+      settings: 1006,
       research: 236,
       explore: 1178,
       portfolio: 374,
@@ -844,10 +837,9 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2968);
+      expect(total, `${locale}.total`).toBe(2937);
       expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys, "schedule"].sort());
       expect(Object.keys(resources[locale].settings.secResearch.schedule).sort()).toEqual([...secScheduleKeys].sort());
-      expect(Object.keys(resources[locale].settings.secDocument).sort()).toEqual([...secDocumentKeys].sort());
 
       const settings = flattenResource(localeResources.settings as ResourceTree);
       expect(
@@ -1225,7 +1217,6 @@ describe("bundled i18n resources", () => {
       "dataSources.schedule.sources.secResearch.label",
       "dataSources.schedule.sources.secResearch.description",
       ...secResearchKeys.map((key) => `secResearch.${key}`),
-      ...secDocumentKeys.map((key) => `secDocument.${key}`),
       "workspace.routes.savedRefreshFailed",
       "workspace.routes.saveUnknown",
       "workspace.routes.saveSuperseded",

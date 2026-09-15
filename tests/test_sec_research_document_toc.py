@@ -84,7 +84,7 @@ def test_toc_keeps_full_text_and_exact_utf8_ranges(rig, mime):
     canonical = rig.captures.read(record["text_sha256"])
     assert canonical == expected.encode()
     assert rig.captures.read(record["original_sha256"]) == body
-    assert record["metadata"]["extraction_version"] == "sec-document-text-v4"
+    assert record["metadata"]["extraction_version"] == "sec-document-text-v5"
     ranges = record["metadata"]["toc_ranges"]
     assert len(ranges) == 1
     start, end = ranges[0]["start_byte"], ranges[0]["end_byte"]
