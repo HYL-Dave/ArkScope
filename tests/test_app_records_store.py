@@ -120,8 +120,7 @@ def test_memory_meta_excludes_content_and_delete(store):
 def test_fresh_store_does_not_create_obsolete_query_table(store):
     with sqlite3.connect(store.db_path) as conn:
         assert conn.execute("SELECT 1 FROM sqlite_schema WHERE name='agent_queries'").fetchone() is None
-    assert store.count("agent_queries") == 0
-    assert store.raw_rows("agent_queries") == []
+    assert store.MIGRATE_TABLES == ("research_reports", "agent_memories")
 
 
 def test_obsolete_query_writers_are_removed(store):
@@ -129,7 +128,8 @@ def test_obsolete_query_writers_are_removed(store):
     assert not hasattr(store, "count_agent_queries")
 
 
-def test_existing_query_archive_is_preserved_and_readable(tmp_path):
+@pytest.mark.parametrize("method", ["count", "raw_rows"])
+def test_obsolete_query_access_is_rejected_without_automatic_disposal(tmp_path, method):
     path = tmp_path / "profile_state.db"
     with sqlite3.connect(path) as conn:
         conn.execute("CREATE TABLE agent_queries (id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -143,11 +143,27 @@ def test_existing_query_archive_is_preserved_and_readable(tmp_path):
         rows_before = conn.execute("SELECT * FROM agent_queries").fetchall()
     store = AppRecordsLocalStore(path)
     store.ensure_schema()
-    assert store.count("agent_queries") == 1
-    assert store.raw_rows("agent_queries")[0]["answer"] == "retained answer"
+    with pytest.raises(ValueError, match="unknown table: agent_queries"):
+        getattr(store, method)("agent_queries")
     with sqlite3.connect(path) as conn:
         assert conn.execute("SELECT sql FROM sqlite_schema WHERE name='agent_queries'").fetchone() == schema_before
         assert conn.execute("SELECT * FROM agent_queries").fetchall() == rows_before
+
+
+def test_dropped_query_table_stays_absent_on_repeated_store_initialization(store):
+    report = store.insert_report(title="current report", summary="keep", tickers=[], report_type="note")
+    memory = store.insert_memory(title="current memory", content="keep", category="note")
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute("CREATE TABLE agent_queries (id INTEGER PRIMARY KEY, question TEXT)")
+        conn.execute("INSERT INTO agent_queries VALUES (1, 'obsolete fixture')")
+        conn.execute("DROP TABLE agent_queries")
+    for _ in range(2):
+        current = AppRecordsLocalStore(store.db_path)
+        current.ensure_schema()
+        assert current.get_report_metadata(report)["title"] == "current report"
+        assert current.query_memories().iloc[0]["id"] == memory
+    with sqlite3.connect(store.db_path) as conn:
+        assert conn.execute("SELECT 1 FROM sqlite_schema WHERE name='agent_queries'").fetchone() is None
 
 
 # --- hermetic local behavior -------------------------------------------------------
