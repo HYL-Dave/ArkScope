@@ -1,8 +1,9 @@
 # SEC Live Research Acceptance
 
-Status: in progress; do not merge on this partial record.
+Status: backend and live SEC checks passed; real logged-in SA hand test pending.
 
 Base revision: `4d4a5e2c997576acb3f2d98141b641612e029c95`.
+Final tested product: `13248718b0a91fede0219c8b6ca742d74eb12627`.
 Current interpreter: Python 3.10.12, linked SQLite 3.37.2. No runtime replacement.
 The user explicitly approved reuse of existing API credentials and App OAuth.
 
@@ -123,6 +124,17 @@ identical after an actual Electron/sidecar restart from process 1678670 to
 1696773, loading the final identity/EOF corrections. All three citation views
 were reopened through Desktop history/evidence controls, not just an API call.
 
+The committed revision was then launched separately and exercised by live run
+`6d4b8f75-6f06-4845-923b-ba13b916c935`. All three tools completed. There were
+four distinct call IDs: the model first queried facts without an accession,
+then made a second, accession-bound facts query. This is not a duplicated
+invocation of the same call. Six retained citation references, including the
+repeated fact references from those two queries, reopened successfully through
+the API and Desktop before and after another actual restart (1707689 to
+1710293), both running the final committed product. The complete read result
+remained identical: SHA-256
+`3aef0b0a8b0762100bb1bc5ad4c3a56e3a3c60375c9617975ddb46d024a373ad`.
+
 ### Cancellation
 
 Live OpenAI API run `67bfa6f8-0b22-436c-b879-aa872cf5a08c` was stopped through
@@ -187,11 +199,62 @@ failures/errors/skips**, 27.98 seconds. Its complete locked Node dependencies,
 writable disposable source/data mount and correct project root resolved all
 three categories. All 12,003 tracked files and failed-baseline receipts remained
 unchanged. No skip, assertion or product change accommodated that harness
-mistake. This targeted rerun is not the pending final complete-suite run.
+mistake. This targeted rerun is separate from the final complete-suite run.
+
+### Final Backend Acceptance
+
+One complete, default-order session on immutable
+`13248718b0a91fede0219c8b6ca742d74eb12627` completed with **11,360 passed,
+12 skipped, zero failures/errors, exit 0**. All 11,372 collected identities
+agree between log and JUnit, without duplicates or partition aggregation. The
+12 skips are the existing manual SEC/IBKR cases, not newly skipped failures.
+Pytest reported 1,421.61 seconds. No other tests or scans ran in that fixture
+during the full session; all finite test/supervisor processes finished.
+
+All 12,004 tracked source files were verified unchanged before/after; installed
+dependency locks and the failed-baseline receipts were preserved. Source
+manifest SHA-256:
+`bfbaefbc1e8cf9cce0afd6d719f867e2df05fdecde3f4eafb9b787e4577485c1`.
+Runtime stayed Python 3.10.12 / SQLite 3.37.2 / Node 22.14.0.
+
+Private reproducibility artifacts remain under
+`/tmp/arkscope-current-corrected.DRLG4b3f/final-13248718b0a91fede0219c8b6ca742d74eb12627/`:
+`results/pytest.log`, `results/pytest.xml`, `results/summary.json`,
+`results/completion.json`, `results/runtime.json`, `results/test-outcomes.json`,
+`results/evidence-manifest.json` and `containment.sh`. No private databases,
+credentials or research contents are copied into this repository.
+
+There is no `apps/` or `extensions/` product delta from `f4925da9`. The prior
+1,853 frontend tests in 124 files, typecheck and production build therefore
+remain evidence for unchanged frontend inputs; they were not rerun or added to
+the backend count in this session.
+
+### SA Manual Fixture
+
+The user confirmed the real logged-in extension sync has not been tested.
+A separate fixture at `/tmp/arkscope-sa-manual.CYHtVYUy` uses a read-only
+412-file runtime subset verified against the tested commit, disposable copies
+of the market/SA backups, a fresh profile DB and a fresh browser HOME. It has
+no production keyring/browser profile/config mount and no inherited provider
+keys. A private environment-pinned sidecar URL prevents fallback to production.
+
+The actual API startup, nonempty retained article/news reader gate, graphical
+Chrome startup, owned-process stop and subsequent restart were exercised.
+Chrome exited 0, the API shut down on SIGTERM, and no forced sandbox kill was
+needed. The new private Chrome window is visually nonblank. Desktop-bus/udev
+and machine-ID warnings in this restricted environment were not mistaken for
+successful extension registration. No `--no-sandbox` workaround was added.
+
+The fixture is left open for manual loading. Native-host registration is still
+absent; user login, browser-originated native ping and incremental article/news
+body readback remain unverified. Only load the extension from the sandbox-visible
+`/fixture/source/extensions/sa_alpha_picks`, then register the actual displayed
+extension ID in that fixture. Do not redirect the existing normal browser's
+native host, copy login cookies or count the earlier synthetic replay as a
+passing login/sync check. The private `stop.sh` targets only this fixture.
 
 ## Pending
 
-- Final committed-revision live rerun and complete backend session.
 - A real logged-in SA extension synchronization remains a separate hand test.
 - Integration decision after acceptance.
 
