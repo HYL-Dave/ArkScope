@@ -330,7 +330,7 @@ describe("SEC structured storage", () => {
     expect(link.rel).toBe("noopener noreferrer");
     expect(link.getAttribute("aria-label")).toBe(locale === "en" ? "SEC original" : "SEC 原文");
     expect(link.title).toBe(locale === "en" ? "SEC original" : "SEC 原文");
-    expect(host.querySelectorAll(".sec-record-scroll th")[5]?.textContent).toBe(locale === "en" ? "SEC original" : "SEC 原文");
+    expect(host.querySelectorAll(".sec-record-scroll th")[2]?.textContent).toBe(locale === "en" ? "SEC original" : "SEC 原文");
     expect(row.querySelectorAll("button")).toHaveLength(0);
     const before = requests.length;
     link.addEventListener("click", (event) => event.preventDefault());
@@ -413,20 +413,36 @@ describe("SEC structured storage", () => {
     for (const icon of icons) expect(getComputedStyle(icon).minWidth).not.toBe("64px");
   });
 
-  it("puts readable catalog fields before complete opaque filing IDs", async () => {
+  it("puts the original-source link third, before the remaining filing metadata", async () => {
     const id = "secfiling_" + "a".repeat(64);
     handler = (url) => url.pathname.endsWith("/filings") ? envelope("ok", [{
       ...filing(id), accession: "0000000123-26-000001", primary_document: "annual-report.htm",
     }]) : fallback(url);
     await render(); await load();
     expect([...host.querySelectorAll(".sec-record-scroll th")].map((cell) => cell.textContent)).toEqual([
-      "Form", "Filed date", "Report date", "Accepted at", "Primary document", "SEC original", "Accession", "Filing ID",
+      "Form", "Filed date", "SEC original", "Report date", "Accepted at", "Primary document", "Accession", "Filing ID",
     ]);
     const cells = [...host.querySelectorAll(".sec-record-scroll tbody td")];
     expect(cells.map((cell) => cell.textContent)).toEqual([
-      "10-K", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", "annual-report.htm", "", "0000000123-26-000001", id,
+      "10-K", "2026-02-01", "", "2025-12-31", "2026-02-01T10:00:00Z", "annual-report.htm", "0000000123-26-000001", id,
     ]);
-    expect(cells[5].querySelector("a")?.href).toBe("https://www.sec.gov/Archives/edgar/data/123/report.htm");
+    expect(cells[2].querySelector("a")?.href).toBe("https://www.sec.gov/Archives/edgar/data/123/report.htm");
+  });
+
+  it("gives original-source links theme foreground contrast, hover feedback and a keyboard focus ring", async () => {
+    applyPanelStyles();
+    await render(); await load();
+    const link = host.querySelector<HTMLAnchorElement>(".sec-record-scroll a")!;
+    // jsdom does not resolve CSS variables or simulate :focus-visible reliably.
+    const rules = [...stylesheet!.sheet!.cssRules] as CSSStyleRule[];
+    const style = (selector: string) => rules.find((rule) => rule.selectorText === selector)?.style;
+    expect(link.matches(".sec-record-scroll a")).toBe(true);
+    expect.soft(style(".sec-record-scroll a")?.color).toBe("var(--fg)");
+    expect.soft(style(".sec-record-scroll a:hover")?.background).toBe("var(--panel2)");
+    expect.soft(style(".sec-record-scroll a:focus-visible")?.outline).toBe("2px solid var(--accent)");
+    expect.soft(style(".sec-record-scroll a:focus-visible")?.outlineOffset).toBe("2px");
+    link.focus();
+    expect(document.activeElement).toBe(link);
   });
 
   it("leads facts with concept value unit and end while retaining every field and full ID", async () => {
@@ -602,13 +618,13 @@ describe("SEC structured storage", () => {
       ...Array.from({ length: 18 }, (_, index) => filing(`first-${index}`)),
     ];
     const expectedFirst = [
-      ["10-K", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", "conflict.htm", "", "accession-conflict", "conflict"],
-      ["10-Q", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", "conflict.htm", "", "accession-conflict", "conflict"],
+      ["10-K", "2026-02-01", "", "2025-12-31", "2026-02-01T10:00:00Z", "conflict.htm", "accession-conflict", "conflict"],
+      ["10-Q", "2026-02-01", "", "2025-12-31", "2026-02-01T10:00:00Z", "conflict.htm", "accession-conflict", "conflict"],
       ...Array.from({ length: 18 }, (_, index) => [
-        "10-K", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", `first-${index}.htm`, "", `accession-first-${index}`, `first-${index}`,
+        "10-K", "2026-02-01", "", "2025-12-31", "2026-02-01T10:00:00Z", `first-${index}.htm`, `accession-first-${index}`, `first-${index}`,
       ]),
     ];
-    const expectedNext = [["10-K", "2026-02-01", "2025-12-31", "2026-02-01T10:00:00Z", "next-page.htm", "", "accession-next-page", "next-page"]];
+    const expectedNext = [["10-K", "2026-02-01", "", "2025-12-31", "2026-02-01T10:00:00Z", "next-page.htm", "accession-next-page", "next-page"]];
     handler = (url) => url.pathname.endsWith("/filings") ? {
       ...envelope("partial", url.searchParams.has("cursor") ? [filing("next-page")] : first,
         url.searchParams.has("cursor") ? null : "conflict+/= &cursor"),
