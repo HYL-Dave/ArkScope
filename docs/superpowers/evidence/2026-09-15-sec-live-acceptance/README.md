@@ -2,11 +2,12 @@
 
 Status: live SEC checks passed. Real logged-in SA hand tests exposed an
 article-body capture defect; the repaired parser now passes the same-article
-foreground retest. Final-revision integration acceptance remains pending. The
-optional background-tab experiment is not accepted.
+foreground retest. Fixed-revision backend/frontend acceptance now passes at
+`bf730ea2`. The user also requires foreground/background comparison before the
+integration decision; background collection is not yet accepted.
 
 Base revision: `4d4a5e2c997576acb3f2d98141b641612e029c95`.
-Last fully tested product: `13248718b0a91fede0219c8b6ca742d74eb12627`.
+Last fully tested product: `bf730ea2a133ba6c4f7405d7be23d129a305df9a`.
 Current interpreter: Python 3.10.12, linked SQLite 3.37.2. No runtime replacement.
 The user explicitly approved reuse of existing API credentials and App OAuth.
 
@@ -384,9 +385,9 @@ Chrome rendering cases were first observed failing in `native-followup-red.json`
 all seven cases pass in `native-reviewed.json`, including unchanged DOM and all
 article paragraphs. Parser SHA-256 verified by that final native-browser run:
 `ebf8fa9a83ffad51662a2c4feefc5e151f9792e9cbbdcfe99e50fe69baa18367`.
-The earlier 11,360-test full-suite result belongs to `13248718`; no new full
-backend run is claimed for this parser repair. Its subsequent logged-in retest
-is recorded below.
+The earlier 11,360-test full-suite result belongs to `13248718`. At this repair
+checkpoint only the related suite had been rerun; the subsequent logged-in
+retest and new fixed-revision full acceptance are recorded below.
 
 ### Same-Article Repair Retest, September 16
 
@@ -446,11 +447,119 @@ Private evidence under `/tmp/arkscope-sa-manual.CYHtVYUy`:
 
 ## Pending
 
-- Run final-revision integration acceptance before merging. The repaired
-  same-article foreground live retest above is complete; the previous full
-  backend result is not reattributed to this new parser revision.
-- The optional no-focus experiment remains failed; no background News run or
-  repeated/matched-input stability claim has been made.
+- Complete the newly requested matched-local-input foreground/background
+  comparison. The prior background Quick failure remains a failure; no
+  background News run or repeated-run stability claim has been made.
 - Integration decision after acceptance.
 
 No merge, push, production App restart or interpreter switch was performed.
+
+## Fixed-Revision Acceptance, September 16
+
+Tested revision: `bf730ea2a133ba6c4f7405d7be23d129a305df9a` (including the repaired
+parser). One complete backend invocation, default pytest order, no concurrent
+tests or scans in that fixture: **11,410 passed / 12 skipped, zero failures or
+errors**, exit 0. Pytest reported 1,455.47 seconds. All 11,422 collected case
+identities and outcomes agree between the full log and JUnit; no duplicates,
+partition sums, new deselections or added skips. The skips are the existing
+two live SEC cases and ten manual IBKR cases.
+
+All 12,005 tracked files were verified against raw Git blobs before and after,
+with no source drift. Installed dependency locks and older failed-baseline
+evidence remain unchanged. Source manifest SHA-256:
+`a69ec21d564da85b47669159d9a6ab4bfe9416ff9cb173031956bf76a37d85c6`.
+The runtime stayed Python 3.10.12 / SQLite 3.37.2 / Node 22.14.0. There were no
+production databases, provider credentials or browser profiles mounted in the
+backend acceptance sandbox; external networking was unavailable.
+
+Artifacts:
+`/tmp/arkscope-current-corrected.DRLG4b3f/final-bf730ea2a133ba6c4f7405d7be23d129a305df9a/`,
+including `results/summary.json`, `pytest.log`, `pytest.xml`, `test-outcomes.json`,
+`evidence-manifest.json`, the exact invocation, and the unchanged containment
+and source-verification helpers reused from the earlier final run.
+
+After the backend finished, a separate frontend sandbox tested the same
+revision: **1,853 passed in 124 files, zero failures/errors/skips**; TypeScript
+`--noEmit` and Vite production build both exit 0. The 296 tracked web files are
+unchanged after every stage. Installed dependencies were readonly; copied App
+files, Vite caches and build outputs were disposable, not master write targets.
+Vite reports a chunk-size warning for the 1,193.62 kB JavaScript bundle; that
+warning is not hidden or counted as a test failure. Frontend artifacts:
+`/tmp/arkscope-final-web.tqyxgd63/results/` and its `run.py` wrapper.
+
+These results close the repaired revision's automated acceptance. They do not
+establish foreground/background live equivalence. The latter is a separate
+explicit user request with matched private starting stores and actual browser
+acquisition; no merge is authorized by claiming those two results interchangeable.
+
+## Matched Foreground/Background Preparation, September 16
+
+The user explicitly requires both modes to be accepted before choosing the less
+disruptive behavior. The earlier background Quick failure is not overwritten by
+the repaired foreground pass. Universal equivalence, reliability when minimized,
+and other-platform behavior are not established by this comparison.
+
+`/tmp/arkscope-sa-manual.CYHtVYUy/data/matched-ab` contains an immutable common
+baseline and two independent disposable cases. SA/profile inputs come from the
+passing repaired foreground checkpoint; market input is the existing immutable
+fixture input. All three databases initially match byte-for-byte between cases,
+without hard links. Each case has its own identical 412-file runtime copy,
+source/data fallback root, HOME, locks, token and scheduler-disabled API. The
+27-file extension overlay remains unchanged, including the repaired parser.
+
+Both copies deliberately need the same known article body, three comment scans,
+and one recent retained news body. Existing IDs, article/news/comment rows and
+other bodies are preserved. The three comment targets have NULL
+`provider_comments_count_at_last_scan`, not only NULL timestamps: Quick uses the
+provider-count checkpoint rather than the full/backfill timestamp TTL. No fake
+provider counts or full-history request is introduced.
+
+Post-start checkpoints verify equal SA capture inputs and retained records. The
+only permitted startup difference is
+`scheduler_state[source='security_lifecycle.automation'].updated_at`: that one
+timestamp advances during the existing startup reconciliation. Every other
+column in that row and all other retained rows are compared exactly. Both copied
+database integrity checks return `ok`. Successful checkpoints are listed in
+`preflight.json`, under `preflight-attempt-2alcdfl6`; their SA SHA-256 is identical:
+`a8bbe4ce7fe6bb8d8d9c899241f2a4dc9104f8dd262f6b01c6977234deb56805`.
+
+The private native config now changes only `host_script` to the acceptance
+wrapper. The unchanged product shell launcher and native host were actually run
+with framed `ping` and `get_market_news_recent_ids` messages. Both pass, and
+synthetic inherited API/DB targets are replaced by the selected case environment.
+The selected authenticated API must be available before native admission;
+readiness and selection are rechecked. API teardown invalidates readiness before
+stopping the child. Failed post-redirect checks remove the active selector rather
+than falling back to the original store. Eight synthetic harness tests pass,
+including stopped/stale/unavailable API rejection, exact-frame replay, and three
+failed-activation stages. These are separate from the full-suite counts above.
+
+The wrapper records content-free hashes/counts of actual submitted comment
+collections, then replays the exact original frame to the unmodified native
+host. Those observations prove fresh submitted input, not successful saving:
+acceptance also requires native save results, exact API/DB readback, advancing
+checkpoints, persisted job receipts and no unexplained omissions. Retained cache
+totals alone cannot pass the comparison. Website data and browser HTTP-cache
+state are not pinned; source-time changes must be separated from capture loss.
+
+The bounded independent source review found and then checked the corrected
+admission/teardown/failed-activation guards. It performed no live operations and
+does not establish mode equivalence. Preparation failures are retained privately:
+the initial readonly-copy permission error, the too-strict startup timestamp
+comparison, Python 3.10's `Z` timestamp parsing mismatch, and a native smoke mount
+ordered after the readonly-root remount. They stopped before browser redirection;
+no product code or original database was changed to make them pass. Two owned,
+uncollected case APIs were explicitly restarted after the guard correction.
+
+Current receipts: `preparation.json`, `comment-work-preparation.json`,
+`environment-check.json`, `restart-before-admission-guard.json`, `preflight.json`,
+`activation.json`, and `launcher-preflight.json`. The original fixture guard
+checkpoint is `data/evidence/before-matched-ab-original-0yaibzr9`; its SA/profile
+integrity checks pass. Original, foreground and background job counts all remain
+five after launcher verification. Production stores are not used by these cases.
+
+Next manual action: reload the same disposable extension and run foreground
+Quick Update once. Verify it before News, then perform background Quick/News on
+the untouched second case. Successful bounded repetitions are still needed for
+a stability claim. No matched live run, merge, push or interpreter switch has
+occurred at this checkpoint.
