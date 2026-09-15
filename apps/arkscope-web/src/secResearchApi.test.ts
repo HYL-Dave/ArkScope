@@ -5,6 +5,31 @@ import * as api from "./api";
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("SEC stored API contracts", () => {
+  it.each([
+    { status: "ok" as const, data: ["10-Q/A", "DEF 14A", "SC 13G/A"] },
+    { status: "partial" as const, data: ["DEF 14A"] },
+    { status: "empty" as const, data: [] },
+    { status: "unavailable" as const, data: null },
+  ])("reads the complete stored $status filing-form envelope without filters or source acquisition", async ({ status, data }) => {
+    const response: api.SecResearchEnvelope<string[] | null> = {
+      status, data, gaps: status === "partial" ? [{ code: "history_pending" }] : [],
+      observed_at: status === "unavailable" ? null : "2026-09-15T00:00:00Z",
+      coverage: { complete: status === "ok" || status === "empty" }, next_cursor: null,
+    };
+    const requests: { url: URL; init: RequestInit }[] = [];
+    vi.stubGlobal("fetch", async (input: string, init: RequestInit = {}) => {
+      requests.push({ url: new URL(input), init });
+      return new Response(JSON.stringify(response));
+    });
+    expect(api.getSecResearchFilingForms).toBeTypeOf("function");
+    expect(await api.getSecResearchFilingForms("CIK:123")).toEqual(response);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].url.pathname).toBe("/sec-research/CIK%3A123/filing-forms");
+    expect(requests[0].url.search).toBe("");
+    expect(requests[0].init.method ?? "GET").toBe("GET");
+    expect(requests[0].init.body).toBeUndefined();
+  });
+
   it("admits and preserves unavailable null-data envelopes for both stored queries", async () => {
     const filings: Awaited<ReturnType<typeof api.getSecResearchFilings>> = {
       status: "unavailable", data: null, gaps: [{ code: "sec_research_not_installed" }],

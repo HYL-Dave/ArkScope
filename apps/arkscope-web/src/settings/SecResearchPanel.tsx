@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, ArrowRight, Database, ExternalLink, Play, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Database, ExternalLink, Play, RefreshCw, Save } from "lucide-react";
 import {
-  ApiError, getSecResearchConfig, getSecResearchFacts, getSecResearchFilings,
+  ApiError, getSecResearchConfig, getSecResearchFacts, getSecResearchFilings, getSecResearchFilingForms,
   getSecResearchStatus, getSecResearchScheduleStatus, refreshSecResearch, setSecResearchBudget,
   type SecResearchConfig, type SecResearchEnvelope, type SecResearchFact,
   type SecResearchFiling, type SecResearchReceipt, type SecResearchState,
@@ -19,6 +19,7 @@ import "./secResearch.css";
 type Unit = "bytes" | "gib";
 type View = "filings" | "facts";
 type Page = SecResearchEnvelope<(SecResearchFiling | SecResearchFact)[] | null>;
+type FilingForms = SecResearchEnvelope<string[] | null>;
 const GIB = 1073741824n;
 
 function wholeBytes(text: string, unit: Unit): number | null {
@@ -70,6 +71,82 @@ function Observation({ value, t }: {
       <details><summary>{t(($) => $.secResearch.coverage)}</summary><pre>{JSON.stringify(value.coverage, null, 2)}</pre></details>
       {value.gaps.length > 0 && <div aria-label={t(($) => $.secResearch.gaps)}>{value.gaps.map((gap, index) => <code key={index}>{gap.code}</code>)}</div>}
     </>}
+  </div>;
+}
+
+function FilingFormsFilter({ value, options, loading, error, disabled, onChange, t }: {
+  value: string[]; options: FilingForms | null; loading: boolean; error: unknown;
+  disabled: boolean; onChange: (value: string[]) => void; t: SettingsT;
+}) {
+  const id = useId();
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const edge = useRef<"first" | "last">("first");
+  const [open, setOpen] = useState(false);
+  const choices = options?.status === "unavailable" ? [] : options?.data ?? [];
+  const summary = value.length ? value.join(", ") : t(($) => $.secResearch.all);
+
+  useEffect(() => {
+    if (!open) return;
+    const items = menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]');
+    items?.[edge.current === "last" ? items.length - 1 : 0]?.focus();
+    const outside = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", outside);
+    return () => document.removeEventListener("mousedown", outside);
+  }, [open]);
+
+  useEffect(() => {
+    // A catalog replacement can remove the focused option; preserve any surviving focus.
+    if (open && document.activeElement === document.body) {
+      menu.current?.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]')?.focus();
+    }
+  }, [open, loading, options]);
+
+  function navigate(event: KeyboardEvent<HTMLDivElement>) {
+    if (open && (event.key === "Escape" || event.key === "Tab")) {
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); }
+      setOpen(false); trigger.current?.focus();
+      return;
+    }
+    if (event.target === trigger.current && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+      event.preventDefault();
+      edge.current = event.key === "ArrowUp" ? "last" : "first";
+      setOpen(true);
+      return;
+    }
+    if (!open || !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const items = [...menu.current!.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')];
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1
+      : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    event.preventDefault(); event.stopPropagation(); items[next]?.focus();
+  }
+
+  return <div className="sec-form-filter" ref={root} onKeyDown={navigate}>
+    <span>{t(($) => $.secResearch.forms)}</span>
+    <Button ref={trigger} size="compact" className="sec-form-trigger" disabled={disabled}
+      aria-label={t(($) => $.secResearch.forms)} aria-describedby={`${id}-value`}
+      aria-haspopup="menu" aria-expanded={open} aria-controls={`${id}-menu`}
+      onClick={() => { edge.current = "first"; setOpen(!open); }}>
+      <span id={`${id}-value`} className="sec-form-value" title={summary}>{summary}</span><ChevronDown size={16} aria-hidden="true" />
+    </Button>
+    {open && <div id={`${id}-menu`} ref={menu} className="sec-form-menu" role="menu" aria-label={t(($) => $.secResearch.forms)} aria-busy={loading}>
+      <div role="status" data-state={error != null ? "unavailable" : options?.status ?? "unknown"}>
+        {loading ? t(($) => $.secResearch.loading) : stateLabel(error != null ? "unavailable" : options?.status, t)}
+      </div>
+      {error != null && <code role="alert">{errorDetail(error)}</code>}
+      {options?.gaps.map((gap, index) => <code key={index}>{gap.code}</code>)}
+      <button type="button" role="menuitemcheckbox" tabIndex={-1} aria-checked={value.length === 0} onClick={() => onChange([])}>
+        <Check size={14} aria-hidden="true" />{t(($) => $.secResearch.all)}
+      </button>
+      {choices.map((form) => <button key={form} type="button" role="menuitemcheckbox" tabIndex={-1} aria-checked={value.includes(form)}
+        onClick={() => onChange(value.includes(form) ? value.filter((item) => item !== form) : [...value, form])}>
+        <Check size={14} aria-hidden="true" />{form}
+      </button>)}
+    </div>}
   </div>;
 }
 
@@ -167,11 +244,13 @@ export function SecResearchPanel() {
   const mounted = useRef(false);
   const generation = useRef(0);
   const issuerGeneration = useRef(0);
+  const formsGeneration = useRef(0);
+  const formsRequested = useRef(false);
   const configGeneration = useRef(0);
   const dirty = useRef(false);
   const acquisition = useRef(false);
   const budgetSaving = useRef(false);
-  const latestRead = useRef<() => Promise<void>>(async () => {});
+  const latestRead = useRef<(reloadForms?: boolean) => Promise<void>>(async () => {});
   const filterTimer = useRef<number | null>(null);
   const [config, setConfig] = useState<SecResearchConfig | null>(null);
   const [configError, setConfigError] = useState<unknown>(null);
@@ -184,7 +263,10 @@ export function SecResearchPanel() {
   const [cikInput, setCikInput] = useState("");
   const cik = normalizeCik(cikInput);
   const [view, setView] = useState<View>("filings");
-  const [forms, setForms] = useState("");
+  const [forms, setForms] = useState<string[]>([]);
+  const [formOptions, setFormOptions] = useState<FilingForms | null>(null);
+  const [formsLoading, setFormsLoading] = useState(false);
+  const [formsError, setFormsError] = useState<unknown>(null);
   const [filedFrom, setFiledFrom] = useState("");
   const [filedTo, setFiledTo] = useState("");
   const [amendments, setAmendments] = useState(true);
@@ -238,11 +320,24 @@ export function SecResearchPanel() {
     }
   }
 
+  async function readFilingForms() {
+    if (!cik || !mounted.current) return;
+    const request = ++formsGeneration.current;
+    const current = () => mounted.current && request === formsGeneration.current;
+    formsRequested.current = true;
+    setFormsLoading(true); setFormsError(null); setFormOptions(null);
+    try {
+      const result = await getSecResearchFilingForms(cik);
+      if (current()) setFormOptions(result);
+    } catch (error) { if (current()) setFormsError(error); }
+    finally { if (current()) setFormsLoading(false); }
+  }
+
   useEffect(() => {
     mounted.current = true;
     void loadConfig();
     void loadScheduleStatus();
-    return () => { mounted.current = false; clearFilterTimer(); generation.current++; issuerGeneration.current++; configGeneration.current++; scheduleGeneration.current++; };
+    return () => { mounted.current = false; clearFilterTimer(); generation.current++; issuerGeneration.current++; formsGeneration.current++; configGeneration.current++; scheduleGeneration.current++; };
   }, []);
 
   useEffect(() => {
@@ -289,7 +384,11 @@ export function SecResearchPanel() {
     clearFilterTimer();
     generation.current++;
     setPages([]); setPageIndex(0); setReading(false); setReadError(null);
-    if (issuer) { issuerGeneration.current++; setLoaded(false); setStored(null); setReceipt(null); setRefreshError(null); setUnconfirmed(false); }
+    if (issuer) {
+      issuerGeneration.current++; formsGeneration.current++; formsRequested.current = false;
+      setForms([]); setFormOptions(null); setFormsLoading(false); setFormsError(null);
+      setLoaded(false); setStored(null); setReceipt(null); setRefreshError(null); setUnconfirmed(false);
+    }
   }
 
   function filterChanged() {
@@ -304,7 +403,7 @@ export function SecResearchPanel() {
 
   function query(issuer: string, kind: View, cursor?: string): Promise<Page> {
     return kind === "filings" ? getSecResearchFilings(issuer, {
-      forms: forms.split(/[\s,]+/).filter(Boolean), filed_from: filedFrom || undefined,
+      forms, filed_from: filedFrom || undefined,
       filed_to: filedTo || undefined, include_amendments: amendments, limit: 20, cursor,
     }) : getSecResearchFacts(issuer, {
       concepts: concepts.split(/[\s,]+/).filter(Boolean), as_of: asOf || undefined,
@@ -312,9 +411,10 @@ export function SecResearchPanel() {
     });
   }
 
-  async function readLocal(kind = view) {
+  async function readLocal(kind = view, reloadForms = true) {
     clearFilterTimer();
     if (!cik || !mounted.current) return;
+    if (reloadForms || !formsRequested.current) void readFilingForms();
     const request = ++generation.current;
     const current = () => mounted.current && request === generation.current;
     setReading(true); setReadError(null); setPages([]); setPageIndex(0); setLoaded(true);
@@ -327,7 +427,7 @@ export function SecResearchPanel() {
     await statusRead;
     if (current()) setReading(false);
   }
-  latestRead.current = readLocal;
+  latestRead.current = (reloadForms = false) => readLocal(view, reloadForms);
 
   async function nextPage() {
     if (!cik || !page?.next_cursor || reading) return;
@@ -353,7 +453,7 @@ export function SecResearchPanel() {
       if (!mounted.current || request !== issuerGeneration.current) return;
       setReceipt(result);
       void loadConfig();
-      void latestRead.current();
+      void latestRead.current(true);
     } catch (error) {
       if (!mounted.current || request !== issuerGeneration.current) return;
       if (error instanceof ApiError && error.status < 500) setRefreshError(error);
@@ -369,7 +469,8 @@ export function SecResearchPanel() {
     <span>{label}</span><input aria-label={label} type={type} value={value} onChange={(event) => { update(event.target.value); filterChanged(); }} />
   </label>;
   const filters = view === "filings" ? <>
-    {field(t(($) => $.secResearch.forms), forms, setForms)}
+    <FilingFormsFilter key={cikInput} value={forms} options={formOptions} loading={formsLoading} error={formsError}
+      disabled={!cik || !loaded} t={t} onChange={(next) => { setForms(next); filterChanged(); }} />
     {field(t(($) => $.secResearch.filedFrom), filedFrom, setFiledFrom, "date")}
     {field(t(($) => $.secResearch.filedTo), filedTo, setFiledTo, "date")}
     <label className="sec-checkbox"><input type="checkbox" checked={amendments} onChange={(event) => { setAmendments(event.target.checked); filterChanged(); }} />{t(($) => $.secResearch.amendments)}</label>
@@ -436,7 +537,7 @@ export function SecResearchPanel() {
       if (next === view) return;
       const wasLoaded = loaded;
       setView(next); invalidate();
-      if (wasLoaded) void readLocal(next);
+      if (wasLoaded) void readLocal(next, false);
     }} items={[
       { value: "filings", label: t(($) => $.secResearch.catalog), panel: table },
       { value: "facts", label: t(($) => $.secResearch.facts), panel: table },

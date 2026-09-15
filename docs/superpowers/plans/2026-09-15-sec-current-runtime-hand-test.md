@@ -43,9 +43,17 @@ revised workflow below; do not restore the discarded reader to follow the old pl
    available. IDs, accessions, URLs and precise values remain intact. Changing a
    filter starts page 1 with a fresh cursor chain; stale responses cannot restore
    a previous selection. Merely typing a different CIK does not start acquisition.
+   The revised form control is a multi-select dropdown: options come from the
+   full locally observed catalog, not just the visible page. Select two types,
+   then All, and verify both queries. Incomplete options retain an explicit
+   partial/unavailable state rather than claiming complete source coverage.
 4. Use the SEC original link to open the official filing in the browser. No
    full-document reader remains in Settings. Verify retained passages through
    the Research citation flow below, not by restoring a retired Settings route.
+   In an isolated HOME, verify its browser handler independently of the normal
+   desktop default. A successful opener exit does not prove the child browser
+   loaded the document. The current hand-test profile uses a separate Chrome
+   profile; do not loosen production filesystem access to run Snap Firefox.
 
 ## Research And Existing Workflows
 
