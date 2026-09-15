@@ -186,6 +186,8 @@ def _tool_schema(name: str, tool_def: Any) -> dict:
         "type": "function",
         "name": name,
         "description": getattr(tool_def, "description", name) or name,
+        # Responses otherwise normalizes optional registry parameters to required.
+        "strict": False,
         "parameters": _ark_input_schema(tool_def),
     }
 
@@ -235,23 +237,71 @@ def _text_from_output_items(items: list[dict]) -> str:
     return "".join(parts)
 
 
+class _ToolCallIdentityError(ValueError):
+    pass
+
+
+def _resolve_call_item(
+    item: dict,
+    output_index: Any,
+    call_items: dict[int, dict],
+    call_keys: dict[tuple[str, str | int], int],
+    *,
+    allow_new: bool = False,
+) -> dict:
+    identities = {name: item[name] for name in ("call_id", "id") if item.get(name) is not None}
+    if any(not isinstance(value, str) or not value for value in identities.values()):
+        raise _ToolCallIdentityError
+    if output_index is not None:
+        if type(output_index) is not int or output_index < 0:
+            raise _ToolCallIdentityError
+        identities["output_index"] = output_index
+    if not identities:
+        if not allow_new and len(call_items) == 1:
+            return next(iter(call_items.values()))
+        raise _ToolCallIdentityError
+
+    # Every supplied identity must resolve to the same call, without rebinding.
+    matches = {call_keys[identity] for identity in identities.items() if identity in call_keys}
+    if len(matches) > 1:
+        raise _ToolCallIdentityError
+    if matches:
+        key = next(iter(matches))
+    elif allow_new and ("call_id" in identities or "id" in identities):
+        key = len(call_items)
+    else:
+        raise _ToolCallIdentityError
+    call = call_items.get(key, {})
+    if any(call.get(name) is not None and call[name] != value for name, value in identities.items()):
+        raise _ToolCallIdentityError
+    call.update(identities)
+    call_items[key] = call
+    call_keys.update((identity, key) for identity in identities.items())
+    return call
+
+
 def _call_from_item(item: dict, arg_fallback: dict[str, str]) -> Optional[dict]:
-    if item.get("type") != "function_call":
+    if item.get("type") != "function_call" or item.get("status") not in (None, "completed"):
         return None
     name = item.get("name")
     call_id = item.get("call_id") or item.get("id")
-    if not isinstance(name, str) or not isinstance(call_id, str):
+    if not isinstance(name, str) or not name or not isinstance(call_id, str) or not call_id:
         return None
     arguments = item.get("arguments")
-    if not isinstance(arguments, str):
-        arguments = arg_fallback.get(call_id) or ""
+    if not isinstance(arguments, str) or not arguments.strip():
+        arguments = arg_fallback.get(call_id)
+        item_id = item.get("id")
+        if not arguments and isinstance(item_id, str):
+            arguments = arg_fallback.get(item_id)
+    if not isinstance(arguments, str) or not arguments.strip():
+        raise ValueError("invalid_tool_arguments")
     try:
-        args = json.loads(arguments) if arguments else {}
+        args = json.loads(arguments)
     except (TypeError, ValueError):
-        args = {}
+        raise ValueError("invalid_tool_arguments") from None
     if not isinstance(args, dict):
-        args = {}
-    return {"name": name, "call_id": call_id, "arguments": arguments or "{}", "args": args}
+        raise ValueError("invalid_tool_arguments")
+    return {"name": name, "call_id": call_id, "arguments": arguments, "args": args}
 
 
 async def _maybe_await(value: Any) -> Any:
@@ -622,10 +672,12 @@ class OpenAIChatGPTOAuthDriver:
                 kwargs["reasoning"] = reasoning
 
             response_obj = None
+            response_completed = False
             arg_fallback: dict[str, str] = {}
-            call_items: list[dict] = []
+            call_items: dict[int, dict] = {}
+            call_keys: dict[tuple[str, str | int], int] = {}
+            invalid_call_identity = False
             text_parts: list[str] = []
-            current_call_id: Optional[str] = None
             try:
                 stream = await _with_deadline(_maybe_await(client.responses.create(**kwargs)))
                 stream_iter = _aiter_stream(stream).__aiter__()
@@ -642,19 +694,40 @@ class OpenAIChatGPTOAuthDriver:
                             text_parts.append(delta)
                             yield AgentEvent(EventType.text, {"content": delta})
                     elif etype == "response.function_call_arguments.done":
-                        call_id = raw.get("call_id") or raw.get("item_id") or current_call_id
+                        try:
+                            call = _resolve_call_item(
+                                {"call_id": raw.get("call_id"), "id": raw.get("item_id")},
+                                raw.get("output_index"), call_items, call_keys,
+                            )
+                        except _ToolCallIdentityError:
+                            invalid_call_identity = True
+                            continue
                         args = raw.get("arguments")
-                        if isinstance(call_id, str) and isinstance(args, str):
-                            arg_fallback[call_id] = args
+                        if isinstance(args, str):
+                            for name in ("call_id", "id"):
+                                if isinstance(call.get(name), str):
+                                    arg_fallback[call[name]] = args
+                        if call.get("status") == "in_progress":
+                            call.update(arguments=args, status="completed")
                     elif etype in ("response.output_item.added", "response.output_item.done"):
                         item = raw.get("item") or raw.get("output_item")
                         if isinstance(item, dict) and item.get("type") == "function_call":
-                            maybe_id = item.get("call_id") or item.get("id")
-                            if isinstance(maybe_id, str):
-                                current_call_id = maybe_id
-                            call_items.append(item)
+                            try:
+                                call = _resolve_call_item(
+                                    item, raw.get("output_index"), call_items, call_keys, allow_new=True,
+                                )
+                            except _ToolCallIdentityError:
+                                invalid_call_identity = True
+                                continue
+                            if etype == "response.output_item.done":
+                                snapshot = {name: value for name, value in item.items()
+                                            if name not in ("id", "call_id") or value is not None}
+                                call.update(snapshot, status=item.get("status") or "completed")
+                            elif "type" not in call:
+                                call.update(item, status="in_progress")
                     elif etype == "response.completed":
                         response_obj = raw.get("response")
+                        response_completed = True
                     elif etype in ("response.failed", "response.incomplete"):
                         yield AgentEvent(EventType.error, {"error": f"ChatGPT backend stream ended with {etype}", "provider": "openai", "model": request.model})
                         return
@@ -678,12 +751,37 @@ class OpenAIChatGPTOAuthDriver:
                 yield AgentEvent(EventType.error, payload)
                 return
 
-            output_items = _response_output_items(response_obj) or call_items
+            if not response_completed:
+                yield AgentEvent(EventType.error, {
+                    "error": "ChatGPT backend stream ended before response.completed",
+                    "code": "incomplete_response", "provider": "openai", "model": request.model,
+                })
+                return
+
+            # The backend can complete with output=[] despite completed streamed calls.
+            final_output = _response_output_items(response_obj)
+            if invalid_call_identity and not final_output:
+                yield AgentEvent(EventType.error, {
+                    "error": "ChatGPT backend returned ambiguous or conflicting tool call identity",
+                    "code": "invalid_tool_call_identity", "provider": "openai", "model": request.model,
+                })
+                return
+            output_items = final_output or list(call_items.values())
+            # A complete final snapshot may supersede bad provisional identities,
+            # but it must not borrow arguments from that ambiguous fallback.
+            fallback = {} if invalid_call_identity else arg_fallback
             usage = _to_dict(response_obj).get("usage") if response_obj else None
             if isinstance(usage, dict):
                 _accumulate_token_usage(total_usage, usage)
 
-            calls = [c for c in (_call_from_item(item, arg_fallback) for item in output_items) if c]
+            try:
+                calls = [c for c in (_call_from_item(item, fallback) for item in output_items) if c]
+            except ValueError:
+                yield AgentEvent(EventType.error, {
+                    "error": "ChatGPT backend returned invalid tool arguments",
+                    "code": "invalid_tool_arguments", "provider": "openai", "model": request.model,
+                })
+                return
             if calls:
                 for call in calls:
                     name = call["name"]

@@ -725,9 +725,9 @@ def test_stream_llm_overall_timeout_errors(monkeypatch):
     assert "timed out after 0.001s" in events[-1].data["error"]
 
 
-def test_stream_llm_uses_last_call_id_when_arguments_done_omits_id(monkeypatch):
+def test_stream_llm_uses_single_call_when_arguments_done_omits_identity(monkeypatch):
     # Live P2b shape: function_call_arguments.done can omit call_id/item_id while
-    # output_item.added carries the call_id. Use the most recent call item.
+    # output_item.added carries the call_id. Only one call is unambiguous.
     first = [
         {"type": "response.output_item.added",
          "item": {"type": "function_call", "name": "get_price_change", "call_id": "call_1"}},
@@ -746,6 +746,511 @@ def test_stream_llm_uses_last_call_id_when_arguments_done_omits_id(monkeypatch):
     events = _run(_collect(d.stream_llm(_req())))
 
     assert events[1].data == {"tool": "get_price_change", "input": {"ticker": "MSFT"}, "call_id": "call_1"}
+    assert [event.type for event in events if event.type in (EventType.done, EventType.error)] == [EventType.done]
+    assert len(client.responses.calls) == 2
+    assert client.closed is True
+
+
+def _function_item(*, item_id="fc_1", call_id="call_1", arguments="", status="in_progress"):
+    return {
+        "type": "function_call", "id": item_id, "call_id": call_id,
+        "name": "get_price_change", "arguments": arguments, "status": status,
+    }
+
+
+def _completed_event(output=()):
+    return {"type": "response.completed", "response": {"status": "completed", "output": list(output)}}
+
+
+def _function_stream(monkeypatch, first):
+    invocations = []
+    function = _ToolDef.function
+
+    def record(dal, **kwargs):
+        invocations.append(kwargs.copy())
+        return function(dal, **kwargs)
+
+    client = _ExecClient([first, [_completed_event([
+        {"type": "message", "content": [{"type": "output_text", "text": "done"}]},
+    ])]])
+    monkeypatch.setattr(_ToolDef, "function", staticmethod(record))
+    monkeypatch.setattr(mod, "_execution_client", lambda token: client)
+    driver = OpenAIChatGPTOAuthDriver(
+        credential=_Cred(7), token_store=_TokStore(), registry=_Registry(), dal=object(),
+    )
+    return driver, client, invocations
+
+
+def _run_function_stream(monkeypatch, first):
+    driver, client, invocations = _function_stream(monkeypatch, first)
+    events = _run(_collect(driver.stream_llm(_req())))
+    return events, client, invocations
+
+
+def test_stream_llm_completed_empty_output_executes_once_without_duplicate_followup(monkeypatch):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "output_index": 0, "item": _function_item()},
+        {"type": "response.function_call_arguments.done", "output_index": 0,
+         "item_id": "fc_1", "arguments": '{"ticker":"AAPL"}'},
+        {"type": "response.output_item.done", "output_index": 0,
+         "item": _function_item(arguments='{"ticker":"AAPL"}', status="completed")},
+        _completed_event(),
+    ])
+
+    assert invocations == [{"ticker": "AAPL"}]
+    assert [event.type for event in events] == [
+        EventType.thinking, EventType.tool_start, EventType.tool_end, EventType.done,
+    ]
+    assert events[1].data == {"tool": "get_price_change", "call_id": "call_1", "input": {"ticker": "AAPL"}}
+    assert events[-1].data["answer"] == "done"
+    assert len(client.responses.calls) == 2
+    assert client.responses.calls[1]["input"] == [
+        {"role": "user", "content": "hi"},
+        {"type": "function_call", "name": "get_price_change", "call_id": "call_1",
+         "arguments": '{"ticker":"AAPL"}'},
+        {"type": "function_call_output", "call_id": "call_1", "output": events[2].data["summary"]},
+    ]
+    assert client.closed is True
+
+
+def test_stream_llm_interleaved_calls_keep_identity_and_first_seen_order(monkeypatch):
+    first = _function_item(item_id="fc_a", call_id="call_a")
+    second = _function_item(item_id="fc_b", call_id="call_b")
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "output_index": 0, "item": first},
+        {"type": "response.output_item.added", "output_index": 1, "item": second},
+        {"type": "response.function_call_arguments.done", "output_index": 1,
+         "item_id": "fc_b", "arguments": '{"ticker":"MSFT"}'},
+        {"type": "response.output_item.done", "output_index": 1, "item": dict(second, status="completed")},
+        {"type": "response.function_call_arguments.done", "output_index": 0,
+         "item_id": "fc_a", "arguments": '{"ticker":"AAPL"}'},
+        {"type": "response.output_item.done", "output_index": 0, "item": dict(first, status="completed")},
+        _completed_event(),
+    ])
+
+    assert invocations == [{"ticker": "AAPL"}, {"ticker": "MSFT"}]
+    assert [event.data["call_id"] for event in events if event.type == EventType.tool_start] == ["call_a", "call_b"]
+    assert [event.data["call_id"] for event in events if event.type == EventType.tool_end] == ["call_a", "call_b"]
+    assert len(client.responses.calls) == 2
+    assert [(item["type"], item["call_id"]) for item in client.responses.calls[1]["input"][1:]] == [
+        ("function_call", "call_a"), ("function_call_output", "call_a"),
+        ("function_call", "call_b"), ("function_call_output", "call_b"),
+    ]
+
+
+@pytest.mark.parametrize("completion_order", [(0, 1), (1, 0)], ids=["wire-order", "reverse-completion"])
+def test_stream_llm_idless_interleaved_arguments_use_output_index(monkeypatch, completion_order):
+    arguments = ['{"ticker":"AAPL"}', '{"ticker":"MSFT"}']
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "output_index": 0,
+         "item": _function_item(item_id="fc_a", call_id="call_a")},
+        {"type": "response.output_item.added", "output_index": 1,
+         "item": _function_item(item_id="fc_b", call_id="call_b")},
+        *[{"type": "response.function_call_arguments.done", "output_index": index,
+           "arguments": arguments[index]} for index in completion_order],
+        _completed_event(),
+    ])
+
+    assert invocations == [{"ticker": "AAPL"}, {"ticker": "MSFT"}]
+    assert [event.data for event in events if event.type == EventType.tool_start] == [
+        {"tool": "get_price_change", "call_id": "call_a", "input": {"ticker": "AAPL"}},
+        {"tool": "get_price_change", "call_id": "call_b", "input": {"ticker": "MSFT"}},
+    ]
+    assert [event.type for event in events] == [
+        EventType.thinking, EventType.tool_start, EventType.tool_end,
+        EventType.tool_start, EventType.tool_end, EventType.done,
+    ]
+    assert events[-1].data["answer"] == "done"
+    assert len(client.responses.calls) == 2
+    assert [(item["call_id"], item["arguments"]) for item in client.responses.calls[1]["input"]
+            if item.get("type") == "function_call"] == [
+        ("call_a", '{"ticker":"AAPL"}'), ("call_b", '{"ticker":"MSFT"}'),
+    ]
+    assert [item["call_id"] for item in client.responses.calls[1]["input"]
+            if item.get("type") == "function_call_output"] == ["call_a", "call_b"]
+    assert client.closed is True
+
+
+def test_stream_llm_idless_completed_items_resolve_by_output_index(monkeypatch):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "output_index": 0,
+         "item": _function_item(item_id="fc_a", call_id="call_a")},
+        {"type": "response.output_item.added", "output_index": 1,
+         "item": _function_item(item_id="fc_b", call_id="call_b")},
+        {"type": "response.output_item.done", "output_index": 1,
+         "item": {"type": "function_call", "arguments": '{"ticker":"MSFT"}', "status": "completed"}},
+        {"type": "response.output_item.done", "output_index": 0,
+         "item": {"type": "function_call", "arguments": '{"ticker":"AAPL"}', "status": "completed"}},
+        _completed_event(),
+    ])
+
+    assert invocations == [{"ticker": "AAPL"}, {"ticker": "MSFT"}]
+    assert [event.data["call_id"] for event in events if event.type == EventType.tool_start] == ["call_a", "call_b"]
+    assert [event.type for event in events if event.type in (EventType.done, EventType.error)] == [EventType.done]
+    assert len(client.responses.calls) == 2
+    assert client.closed is True
+
+
+@pytest.mark.parametrize("complete_first", [False, True], ids=["both-pending", "one-pending"])
+def test_stream_llm_idless_unindexed_arguments_reject_ambiguous_calls(monkeypatch, complete_first):
+    first = [
+        {"type": "response.output_item.added", "output_index": 0,
+         "item": _function_item(item_id="fc_a", call_id="call_a")},
+        {"type": "response.output_item.added", "output_index": 1,
+         "item": _function_item(item_id="fc_b", call_id="call_b")},
+    ]
+    if complete_first:
+        first.append({"type": "response.function_call_arguments.done", "item_id": "fc_a", "arguments": '{"ticker":"AAPL"}'})
+    first.extend([
+        {"type": "response.function_call_arguments.done", "arguments": '{"ticker":"MSFT"}'},
+        _completed_event(),
+    ])
+    events, client, invocations = _run_function_stream(monkeypatch, first)
+
+    assert [event.type for event in events] == [EventType.thinking, EventType.error]
+    assert events[-1].data["code"] == "invalid_tool_call_identity"
+    assert invocations == []
+    assert len(client.responses.calls) == 1
+    assert client.closed is True
+
+
+@pytest.mark.parametrize("identity", [
+    {"item_id": "fc_a", "output_index": 1},
+    {"call_id": "call_a", "output_index": 1},
+    {"item_id": "fc_a", "call_id": "call_b", "output_index": 0},
+    {"item_id": "fc_unknown", "output_index": 0},
+    {"call_id": "call_a", "output_index": 2},
+    {"output_index": 2},
+    {"output_index": False},
+    {"output_index": -1},
+    {"output_index": "0"},
+], ids=["item-index", "call-index", "call-item", "unknown-item", "rebound-index",
+        "unknown-index", "boolean-index", "negative-index", "string-index"])
+def test_stream_llm_arguments_done_rejects_conflicting_identifiers(monkeypatch, identity):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "output_index": 0,
+         "item": _function_item(item_id="fc_a", call_id="call_a")},
+        {"type": "response.output_item.added", "output_index": 1,
+         "item": _function_item(item_id="fc_b", call_id="call_b")},
+        {"type": "response.function_call_arguments.done", **identity, "arguments": '{"ticker":"AAPL"}'},
+        _completed_event(),
+    ])
+
+    assert [event.type for event in events] == [EventType.thinking, EventType.error]
+    assert events[-1].data["code"] == "invalid_tool_call_identity"
+    assert invocations == []
+    assert len(client.responses.calls) == 1
+    assert client.closed is True
+
+
+@pytest.mark.parametrize("event_type", ["response.output_item.added", "response.output_item.done"])
+@pytest.mark.parametrize(("index", "item_id", "call_id"), [
+    (1, "fc_a", "call_a"), (0, "fc_other", "call_other"), (2, "fc_a", "call_a"),
+], ids=["conflicting-index", "conflicting-ids", "rebound-index"])
+def test_stream_llm_output_items_reject_conflicting_identity(monkeypatch, event_type, index, item_id, call_id):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "output_index": 0,
+         "item": _function_item(item_id="fc_a", call_id="call_a")},
+        {"type": "response.output_item.added", "output_index": 1,
+         "item": _function_item(item_id="fc_b", call_id="call_b")},
+        {"type": event_type, "output_index": index,
+         "item": _function_item(item_id=item_id, call_id=call_id, arguments='{"ticker":"AAPL"}', status="completed")},
+        _completed_event(),
+    ])
+
+    assert [event.type for event in events] == [EventType.thinking, EventType.error]
+    assert events[-1].data["code"] == "invalid_tool_call_identity"
+    assert invocations == []
+    assert len(client.responses.calls) == 1
+    assert client.closed is True
+
+
+@pytest.mark.parametrize("identity", [{"item_id": "fc_1"}, {"call_id": "call_1"}, {}], ids=["item-id", "call-id", "implicit-id"])
+@pytest.mark.parametrize("provisional_args", ["", '{"ticker":"STALE"}'], ids=["empty", "provisional-json"])
+def test_stream_llm_arguments_done_fallback_replaces_provisional_arguments(monkeypatch, identity, provisional_args):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "item": _function_item(arguments=provisional_args)},
+        {"type": "response.function_call_arguments.done", **identity, "arguments": '{"ticker":"AAPL"}'},
+        _completed_event(),
+    ])
+
+    assert invocations == [{"ticker": "AAPL"}]
+    assert [event.data["call_id"] for event in events if event.type == EventType.tool_start] == ["call_1"]
+    assert len(client.responses.calls) == 2
+    assert client.responses.calls[1]["input"][1] == {
+        "type": "function_call", "name": "get_price_change", "call_id": "call_1", "arguments": '{"ticker":"AAPL"}',
+    }
+
+
+@pytest.mark.parametrize("identity", [{"id": "fc_1"}, {"call_id": "call_1"}], ids=["item-id", "call-id"])
+def test_stream_llm_completed_snapshot_merges_by_either_identity(monkeypatch, identity):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "item": _function_item()},
+        {"type": "response.output_item.done", "item": {
+            "type": "function_call", **identity, "arguments": '{"ticker":"AAPL"}', "status": "completed",
+        }},
+        _completed_event(),
+    ])
+
+    assert invocations == [{"ticker": "AAPL"}]
+    assert [event.data["call_id"] for event in events if event.type == EventType.tool_start] == ["call_1"]
+    assert len(client.responses.calls[1]["input"]) == 3
+
+
+@pytest.mark.parametrize("final_kind", ["tool", "message"])
+def test_stream_llm_final_output_resolves_ambiguous_provisional_identity(monkeypatch, final_kind):
+    final = (_function_item(arguments='{"ticker":"AAPL"}', status="completed")
+             if final_kind == "tool" else
+             {"type": "message", "content": [{"type": "output_text", "text": "No tool needed."}]})
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "output_index": 0, "item": _function_item()},
+        {"type": "response.output_item.added", "output_index": 1,
+         "item": _function_item(item_id="fc_other", call_id="call_other")},
+        {"type": "response.function_call_arguments.done", "arguments": '{"ticker":"WRONG"}'},
+        _completed_event([final]),
+    ])
+
+    assert invocations == ([{"ticker": "AAPL"}] if final_kind == "tool" else [])
+    assert [event.type for event in events if event.type in (EventType.done, EventType.error)] == [EventType.done]
+    assert len(client.responses.calls) == (2 if final_kind == "tool" else 1)
+    assert client.closed is True
+
+
+def test_stream_llm_ambiguous_fallback_cannot_supply_missing_final_arguments(monkeypatch):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "output_index": 0, "item": _function_item()},
+        {"type": "response.function_call_arguments.done", "item_id": "fc_1", "arguments": '{"ticker":"STALE"}'},
+        {"type": "response.output_item.added", "output_index": 1,
+         "item": _function_item(item_id="fc_other", call_id="call_other")},
+        {"type": "response.function_call_arguments.done", "arguments": '{"ticker":"WRONG"}'},
+        _completed_event([_function_item(arguments="", status="completed")]),
+    ])
+
+    assert invocations == []
+    assert [event.type for event in events] == [EventType.thinking, EventType.error]
+    assert events[-1].data["code"] == "invalid_tool_arguments"
+    assert len(client.responses.calls) == 1
+    assert client.closed is True
+
+
+@pytest.mark.parametrize("null_ids", [{"id": None}, {"call_id": None}, {"id": None, "call_id": None}])
+def test_stream_llm_null_snapshot_ids_preserve_resolved_identity(monkeypatch, null_ids):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "output_index": 0, "item": _function_item()},
+        {"type": "response.output_item.done", "output_index": 0,
+         "item": {"type": "function_call", **null_ids, "arguments": '{"ticker":"AAPL"}', "status": "completed"}},
+        _completed_event(),
+    ])
+
+    assert invocations == [{"ticker": "AAPL"}]
+    assert [event.data["call_id"] for event in events if event.type == EventType.tool_start] == ["call_1"]
+    assert [item["call_id"] for item in client.responses.calls[1]["input"]
+            if item.get("type") == "function_call"] == ["call_1"]
+    assert events[-1].type == EventType.done
+    assert client.closed is True
+
+
+def test_stream_llm_final_output_is_authoritative_over_streamed_calls(monkeypatch):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "item": _function_item()},
+        {"type": "response.function_call_arguments.done", "item_id": "fc_1", "arguments": '{"ticker":"STALE"}'},
+        {"type": "response.output_item.done", "item": _function_item(arguments='{"ticker":"STALE"}', status="completed")},
+        {"type": "response.output_item.done", "item": _function_item(item_id="fc_other", call_id="call_other",
+                                                                      arguments='{"ticker":"MSFT"}', status="completed")},
+        _completed_event([_function_item(arguments='{"ticker":"AAPL"}', status="completed")]),
+    ])
+
+    assert invocations == [{"ticker": "AAPL"}]
+    assert [event.data["call_id"] for event in events if event.type == EventType.tool_start] == ["call_1"]
+    assert len(client.responses.calls) == 2
+    assert len(client.responses.calls[1]["input"]) == 3
+    assert client.responses.calls[1]["input"][1]["arguments"] == '{"ticker":"AAPL"}'
+
+
+def test_stream_llm_final_message_suppresses_streamed_calls(monkeypatch):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.done", "item": _function_item(arguments='{"ticker":"AAPL"}', status="completed")},
+        _completed_event([{"type": "message", "content": [{"type": "output_text", "text": "No tool needed."}]}]),
+    ])
+
+    assert invocations == []
+    assert [event.type for event in events] == [EventType.thinking, EventType.done]
+    assert events[-1].data["answer"] == "No tool needed."
+    assert len(client.responses.calls) == 1
+
+
+@pytest.mark.parametrize("arguments", ["", " ", None, '{"ticker":', "[]", "null", '"AAPL"', {}])
+@pytest.mark.parametrize("source", ["final-output", "item-done", "arguments-done"])
+def test_stream_llm_invalid_arguments_never_execute_as_empty_object(monkeypatch, source, arguments):
+    item = _function_item(arguments=arguments, status="completed")
+    if source == "final-output":
+        first = [_completed_event([item])]
+    elif source == "item-done":
+        first = [{"type": "response.output_item.done", "item": item}, _completed_event()]
+    else:
+        first = [
+            {"type": "response.output_item.added", "item": _function_item()},
+            {"type": "response.function_call_arguments.done", "item_id": "fc_1", "arguments": arguments},
+            _completed_event(),
+        ]
+    events, client, invocations = _run_function_stream(monkeypatch, first)
+
+    assert [event.type for event in events] == [EventType.thinking, EventType.error]
+    assert events[-1].data["code"] == "invalid_tool_arguments"
+    assert invocations == []
+    assert not any(event.type in (EventType.tool_start, EventType.tool_end) for event in events)
+    assert len(client.responses.calls) == 1
+    assert client.responses.calls[0]["input"] == [{"role": "user", "content": "hi"}]
+
+
+def test_stream_llm_malformed_completed_call_aborts_before_valid_sibling_executes(monkeypatch):
+    events, client, invocations = _run_function_stream(monkeypatch, [_completed_event([
+        _function_item(arguments='{"ticker":"AAPL"}', status="completed"),
+        _function_item(item_id="fc_bad", call_id="call_bad", arguments="[]", status="completed"),
+    ])])
+
+    assert [event.type for event in events] == [EventType.thinking, EventType.error]
+    assert events[-1].data["code"] == "invalid_tool_arguments"
+    assert invocations == []
+    assert len(client.responses.calls) == 1
+    assert client.closed is True
+
+
+@pytest.mark.parametrize("ending", ["added-only", "delta-only", "unknown-identity", "incomplete-item", "eof", "failed", "incomplete"])
+def test_stream_llm_unfinished_calls_never_execute(monkeypatch, ending):
+    first = [{"type": "response.output_item.added", "item": _function_item(arguments='{"ticker":"STALE"}')}]
+    if ending == "delta-only":
+        first.append({"type": "response.function_call_arguments.delta", "item_id": "fc_1", "delta": '{"ticker":"AAPL"}'})
+    elif ending == "unknown-identity":
+        first.append({"type": "response.function_call_arguments.done", "item_id": "fc_unknown", "arguments": '{"ticker":"AAPL"}'})
+    elif ending == "incomplete-item":
+        first.append({"type": "response.output_item.done", "item": _function_item(arguments='{"ticker":"AAPL"}', status="incomplete")})
+    elif ending in ("eof", "failed", "incomplete"):
+        first.append({"type": "response.output_item.done", "item": _function_item(arguments='{"ticker":"AAPL"}', status="completed")})
+    if ending in ("failed", "incomplete"):
+        first.append({"type": f"response.{ending}"})
+    elif ending != "eof":
+        first.append(_completed_event())
+    events, client, invocations = _run_function_stream(monkeypatch, first)
+
+    assert invocations == []
+    assert not any(event.type in (EventType.tool_start, EventType.tool_end) for event in events)
+    assert len(client.responses.calls) == 1
+    assert client.closed is True
+    terminal_types = [event.type for event in events if event.type in (EventType.done, EventType.error)]
+    if ending in ("eof", "failed", "incomplete", "unknown-identity"):
+        assert terminal_types == [EventType.error]
+        if ending == "eof":
+            assert events[-1].data["code"] == "incomplete_response"
+    else:
+        assert terminal_types == [EventType.done]
+
+
+@pytest.mark.parametrize("prefix", ["empty", "plain-text", "provisional-call", "arguments-done"])
+def test_stream_llm_eof_without_completed_is_terminal_error(monkeypatch, prefix):
+    first = []
+    if prefix == "plain-text":
+        first.append({"type": "response.output_text.delta", "delta": "Partial answer."})
+    elif prefix in ("provisional-call", "arguments-done"):
+        first.append({"type": "response.output_item.added", "output_index": 0, "item": _function_item()})
+        if prefix == "arguments-done":
+            first.append({"type": "response.function_call_arguments.done", "output_index": 0,
+                          "item_id": "fc_1", "arguments": '{"ticker":"AAPL"}'})
+    events, client, invocations = _run_function_stream(monkeypatch, first)
+
+    assert events[-1].type == EventType.error
+    assert events[-1].data["code"] == "incomplete_response"
+    assert [event.type for event in events if event.type in (EventType.done, EventType.error)] == [EventType.error]
+    assert not any(event.type in (EventType.tool_start, EventType.tool_end) for event in events)
+    assert invocations == []
+    assert len(client.responses.calls) == 1
+    assert client.closed is True
+
+
+def test_call_llm_does_not_succeed_on_text_only_eof(monkeypatch):
+    driver, client, invocations = _function_stream(monkeypatch, [
+        {"type": "response.output_text.delta", "delta": "Partial answer."},
+    ])
+
+    with pytest.raises(RuntimeError, match="before response.completed"):
+        _run(driver.call_llm(_req()))
+
+    assert invocations == []
+    assert len(client.responses.calls) == 1
+    assert client.closed is True
+
+
+def test_stream_llm_followup_eof_does_not_report_success(monkeypatch):
+    driver, client, invocations = _function_stream(monkeypatch, [
+        {"type": "response.output_item.done", "output_index": 0,
+         "item": _function_item(arguments='{"ticker":"AAPL"}', status="completed")},
+        _completed_event(),
+    ])
+    client.responses.streams[1] = [{"type": "response.output_text.delta", "delta": "Partial answer."}]
+
+    events = _run(_collect(driver.stream_llm(_req())))
+
+    assert invocations == [{"ticker": "AAPL"}]
+    assert events[-1].type == EventType.error
+    assert events[-1].data["code"] == "incomplete_response"
+    assert [event.type for event in events if event.type in (EventType.done, EventType.error)] == [EventType.error]
+    assert [event.data["call_id"] for event in events if event.type == EventType.tool_start] == ["call_1"]
+    assert len(client.responses.calls) == 2
+    assert client.closed is True
+
+
+def test_stream_llm_explicit_completed_empty_object_is_valid(monkeypatch):
+    events, client, invocations = _run_function_stream(monkeypatch, [
+        {"type": "response.output_item.done", "item": _function_item(arguments="{}", status="completed")},
+        _completed_event(),
+    ])
+
+    assert invocations == [{}]
+    assert events[1].data["input"] == {}
+    assert len(client.responses.calls) == 2
+    assert client.responses.calls[1]["input"][1]["arguments"] == "{}"
+
+
+def test_stream_llm_completed_fallback_keeps_output_boundary_before_tool_invocation(monkeypatch):
+    from src.agents.shared.output_boundary import OutputBoundaryError
+
+    driver, client, invocations = _function_stream(monkeypatch, [
+        {"type": "response.output_item.added", "item": _function_item()},
+        {"type": "response.function_call_arguments.done", "item_id": "fc_1", "arguments": '{"ticker":"cg-FAKE-TOKEN"}'},
+        _completed_event(),
+    ])
+    events = []
+
+    async def collect_rejected():
+        async for event in driver.stream_llm(_req()):
+            events.append(event)
+
+    with pytest.raises(OutputBoundaryError, match="known_secret"):
+        _run(collect_rejected())
+
+    assert invocations == []
+    assert [event.type for event in events] == [EventType.thinking]
+    assert "cg-FAKE-TOKEN" not in repr([event.data for event in events])
+    assert not any(event.type in (EventType.tool_start, EventType.tool_end) for event in events)
+    assert len(client.responses.calls) == 1
+    assert client.closed is True
+
+
+def test_stream_llm_outgoing_registry_tools_explicitly_keep_optional_parameters(monkeypatch):
+    events, client, invocations = _run_function_stream(monkeypatch, [_completed_event()])
+
+    tools = {tool["name"]: tool for tool in client.responses.calls[0]["tools"]}
+    assert set(tools) == {"get_price_change", "list_sec_filings", "get_sec_financial_facts", "read_sec_filing"}
+    for name in ("list_sec_filings", "get_sec_financial_facts"):
+        parameters = tools[name]["parameters"]
+        assert parameters["required"] == ["issuer"]
+        assert parameters["properties"]["issuer"]["type"] == "string"
+        assert parameters["properties"]["cursor"]["type"] == "string"
+        assert "cursor" not in parameters["required"]
+        assert parameters["additionalProperties"] is False
+    assert all(tool.get("strict") is False for tool in tools.values())
+    assert invocations == []
+    assert events[-1].type == EventType.done
 
 
 def test_stream_llm_off_allowlist_tool_errors_without_calling_registry(monkeypatch):
