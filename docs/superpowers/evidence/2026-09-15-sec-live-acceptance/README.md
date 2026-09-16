@@ -802,3 +802,76 @@ for combined-only failure, genuine zero provider comments, and usable existing
 comments with zero net-new rows. User confirmation is requested separately from
 the background-mode experiment. Keep the private collector unchanged while
 finishing the remaining News comparison; do not hide its failed Quick result.
+
+### Approved Reporting-Only Correction, September 16
+
+The user approved the bounded correction, explicitly retaining the private
+collector unchanged and not adopting background capture. The earlier failed
+Quick receipt remains evidence of failed acquisition; this change fixes reporting,
+not the site's comment loading or background-mode stability.
+
+`background.js` now checks `comment_scan_usable !== true` after successful combined
+body/comment saves in both `doDetailFetch` and `doManualFetch`. Each unusable or
+missing scan result records one retryable
+`content_parse / comment_scan_failed / article_comments` diagnostic and increments
+the existing failure count. Body success is still counted, manual reconciliation
+acceptance still runs, and storage failures keep their separate classification.
+No backend storage, scrolling, focus, protocol schema or runtime policy changes.
+
+The existing protocol deliberately distinguishes the entrypoints: automatic
+Quick/Full/Backfill has a failed `article_details` phase and `degraded` outcome;
+manual capture has a fatal `manual_fetch` phase and `failed` outcome. Both yield
+database status `failed` and are ineligible to advance a healthy sync anchor.
+The correction does not redefine those contracts or rewrite historical receipts.
+
+Regression owner: `tests/test_sa_extension_reconciliation_flow.py`, with 27 added
+cases. Its Node VM executes the real queued job, capture functions, diagnostics
+collector and protocol derivation, while browser/site/native/telemetry transport
+boundaries are synthetic. It verifies the submitted job result and diagnostic,
+all four modes, false/missing/null/string usability flags, usable existing comments
+with zero net-new rows, authoritative zero provider comments, and independent
+storage failures. The existing nested-reconciliation failure fixture now explicitly
+supplies a usable zero-comment observation; its behavior assertions are unchanged.
+
+Private offline receipts and logs are under
+`/tmp/arkscope-sa-combined-reporting.1Agu5NYh/`. Tests ran sequentially through
+`run.py` and the existing `offline_pytest.py`, with a network-isolated bwrap,
+read-only product source/dependencies, synthetic writable data/config/home, and
+no mounted production or browser data. The final broader run imports only
+`config/user_profile.yaml` and `config/sectors.yaml` from git HEAD, not operator
+configuration. Python/SQLite remain on the current engine; no provider is invoked.
+
+| Checkpoint | Result | Interpretation |
+| --- | --- | --- |
+| `baseline-r2` | 19 passed | Existing reconciliation/diagnostics baseline |
+| `red` | 8 failed, 5 passed, 11 deselected | All eight failures are the original missing failure increment, `0 != 1` |
+| `green-first` | 5 failed, 27 passed | Four new manual assertions incorrectly expected `degraded`; one existing fixture omitted scan usability |
+| `green-r2` | 46 passed | Corrected assertions follow the unchanged manual fatal-phase contract; four modes and job submission covered |
+| `sa-regression` | 5 failed, 717 passed | Runner hid the two versioned default YAML files needed by data-access config tests |
+| `sa-regression-r2` | 722 passed | Same full SA/data-access selection, only runner mounts corrected; no skips or failures |
+
+The initial `baseline` attempt failed at bwrap setup, before pytest, because its
+node_modules mount did not resolve the worktree's absolute symlink. Its log is
+retained separately; it is not a product-test result. The five broader failures
+also remain recorded rather than being relabeled as product regressions or
+removed from the selection. Final selection: `tests/test_sa*.py` plus
+`tests/test_data_access.py`, including backend body-preservation and comment
+checkpoint/recovery tests, native diagnostics, telemetry, packaging and parsers.
+
+The final run verifies unchanged product/test SHA-256 hashes across execution:
+
+- `background.js`: `cae63cd0117a50045ae881e36c26991d5397b68aab442d9e2c3be449c28e24b5`
+- `test_sa_extension_reconciliation_flow.py`: `dee9fb416eecf23289dda5eb6bc167d457a18d9a3fec0782fd2d257ed1fe5091`
+
+Independent read-only review found no blocking issues and confirmed the manual
+versus automatic outcome distinction against both JS and server contracts. Its
+residual coverage limits are that the new queued-flow tests mock persistence
+and delivery, and do not combine comment and reconciliation failures in one
+case; existing separate tests cover those failure classifications. The reviewer
+ran no concurrent tests and accessed no private state.
+
+This is scoped automated regression acceptance, not a new full-backend run or
+live-browser acceptance of the correction. The loaded private extension, Chrome,
+and its DBs were not changed. Background News remains separately pending; its
+eventual outcome cannot erase the failed background Quick/comments result.
+No merge, push, production DB write or interpreter switch occurred.
