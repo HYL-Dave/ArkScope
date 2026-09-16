@@ -709,3 +709,96 @@ Next manual action: reload the same disposable extension, keep an unrelated tab
 selected and run one background Quick Update. Read back before background News.
 Background equivalence and repeated stability remain pending; no merge, push,
 production-data write or interpreter switch has occurred.
+
+## Matched Background Quick Failed Acceptance, September 16
+
+The user reloaded and completed background Quick without focus takeover. The
+actual receipt confirms that the running worker used background mode, not merely
+that its on-disk mode file changed. However, this run **fails collector acceptance**
+and does not establish equivalence with foreground behavior.
+
+Private evidence: `data/matched-ab/background/evidence/after-quick-ucbeiy_s/`,
+containing six WAL-safe, integrity-checked snapshots, `readback.json`,
+`fresh-submissions.json` and `comparison.json`. `ab_background_quick_readback.py`
+returns exit 2 for the failed collector, although its 12 data-integrity,
+isolation and evidence-correlation checks pass. The closed-checkpoint comparison
+helper verifies the failure without changing the original receipt.
+
+- Background job 6: `sa_alpha_picks_refresh`, `quick`, `failed / degraded`,
+  87,487 ms, three complete phases and failed `article_details`. Its summary
+  reason is `detail_save_failed`; the five retained, retryable diagnostics are
+  specifically `content_parse / comment_scan_failed / article_comments`.
+  The single native completed event persisted and matches the stored job.
+- The previously missing seeded body is freshly acquired: 3,684 characters,
+  SHA-256 `a5c4bf3c0c2d5526f41f6e4ab32691e7f0fec9882a47edb57e6ce72b9e16bd40`,
+  identical to foreground, all ten long paragraphs once, no comment heading or
+  complete retained comment text. Authenticated API readback is exact.
+- Six actual native submissions contain **zero fresh comments**, including the
+  combined body/comments request. Five comment-only saves report `usable=False`.
+  The four common foreground targets submitted 62/48/124/92 comments, 326 total;
+  all four submit zero here. Two additional targets are selected as provider
+  counts change. Do not equate the pre-existing cached comments with acquisition.
+- All six comment checkpoints/provider checkpoints remain unchanged, as does
+  the entire retained comments table. No prior IDs or nonempty article/news
+  bodies are lost or overwritten. Stored/API comment readbacks are equal, but
+  these are retained records, not successfully refreshed comments.
+- The actual article-metadata save reports 20 rows rather than the foreground
+  control's 60. Existing article IDs remain retained; this is reduced observed
+  acquisition coverage, not deletion of 40 stored articles.
+- All six submitted scroll-stop hashes resolve to the source-enumerated
+  `stable_bottom`, not timeout or maximum-scroll termination. The scraper stops
+  with no loaded comments before native persistence. This localizes the failure
+  upstream of storage; it does not prove why the site failed to populate them.
+
+Focus receipt `2f5b5770-95dc-45d6-8646-88b34d49aa0b`: zero collector activations,
+seven suppressed activation requests, 117 samples with zero active/visible and
+106 hidden observations, no navigation/script/observation errors, truncation or
+removal failure. The interval binds to the persisted job and all six submissions.
+This agrees with the user's observation; it is not continuous-focus proof.
+
+Foreground and original-fixture SA/profile schemas and retained rows are unchanged
+from the accepted foreground News checkpoint. All three market main/WAL hashes
+are unchanged. Background profile adds only job 6; its news tables are unchanged,
+ready for a separately assessed background News control. Source/overlay/control
+inventories still match the background-selection receipt, with the same parser
+as the foreground test. No product change, production write or mode fallback was
+performed to turn the failure into success.
+
+One readback field needs careful interpretation: `body_same_as_foreground=false`
+on two targets means no foreground *capture-check entry* exists, not different
+cached body text. `comparison.json` directly compares the closed DBs and verifies
+all six retained bodies match; only the seeded one was freshly acquired here.
+The original field is retained rather than silently rewritten.
+
+Remote website state and browser cache are not frozen: provider counts differ
+between runs six hours apart. We therefore do not claim exclusive focus-only
+causality, absolute historical coverage, or a universal browser limitation.
+We do have a concrete failed background run using the matched starting DB and
+same parser. Earlier background failures remain retained. Do not ship the
+focus-suppression probe or call it equivalent/stable on this evidence.
+
+Next bounded check is background News, independently assessed against the accepted
+foreground News and this unchanged-news checkpoint. Passing News cannot clear
+the failed Quick/comments result. No merge or interpreter switch has occurred.
+
+### Follow-Up: Combined Capture Failure Reporting
+
+Source review of the actual empty combined submission identifies a separate
+reporting gap in the current product, not only in the focus-suppression probe.
+`sa_capture_backend._capture_comment_scan` returns `comment_scan_usable=False`
+when a nonzero provider count produces no comments; it correctly retains prior
+rows and checkpoints. The body can still be stored successfully. The native
+`_handle_save_article_content` forwards both results, but the combined branch in
+`background.js` checks only body `ok` and reconciliation, unlike its comment-only
+branch. The seeded body's failed comment acquisition therefore has no sixth
+`comment_scan_failed` entry. A combined-only run can consequently overstate
+completion even though this particular run is already degraded by five other
+failures.
+
+This gap was independently source-reviewed; no product fix has yet been made.
+Proposed bounded correction: preserve body success while recording unusable
+comment scans as retryable `article_comments / comment_scan_failed`, with tests
+for combined-only failure, genuine zero provider comments, and usable existing
+comments with zero net-new rows. User confirmation is requested separately from
+the background-mode experiment. Keep the private collector unchanged while
+finishing the remaining News comparison; do not hide its failed Quick result.
