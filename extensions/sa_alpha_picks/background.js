@@ -2496,6 +2496,16 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
       if (saveResult && saveResult.ok) {
         fetched++;
         netNewComments += saveResult.net_new_comments || 0;
+        if (saveResult.comment_scan_usable !== true) {
+          failed += recordExtensionFailure(diagnostics, {
+            stage: "content_parse",
+            reason_code: "comment_scan_failed",
+            target_kind: "article_comments",
+            target_ref: item.article_id,
+            retryable: true,
+            attempt_count: 1,
+          });
+        }
         if (
           saveResult.reconciliation &&
           saveResult.reconciliation.status === "failed"
@@ -2774,6 +2784,16 @@ async function doManualFetch(items, diagnostics) {
         });
         if (saveResult && saveResult.ok) {
           fetched++;
+          if (saveResult.comment_scan_usable !== true) {
+            failed += recordExtensionFailure(diagnostics, {
+              stage: "content_parse",
+              reason_code: "comment_scan_failed",
+              target_kind: "article_comments",
+              target_ref: articleId,
+              retryable: true,
+              attempt_count: 1,
+            });
+          }
           var acceptResult = await sendNativeMessage2({
             action: "accept_reconciliation_link",
             lineage_id: item.lineage_id,

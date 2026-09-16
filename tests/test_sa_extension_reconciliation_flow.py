@@ -5,6 +5,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKGROUND = ROOT / "extensions" / "sa_alpha_picks" / "background.js"
@@ -313,14 +315,17 @@ def test_capture_success_survives_nested_reconciliation_failure():
           if (message.action === "save_articles_meta") {
             return {
               status: "ok", saved: 1,
-              need_content: [{ article_id: "a1", url: "https://seekingalpha.com/alpha-picks/articles/1-a" }],
+              need_content: [{
+                article_id: "a1", url: "https://seekingalpha.com/alpha-picks/articles/1-a",
+                provider_comments_count: 0,
+              }],
               need_comments: [], unresolved_symbols: [],
               reconciliation: { status: "ok", enrichment: [] },
             };
           }
           if (message.action === "save_article_content") {
             return {
-              ok: true,
+              ok: true, comment_scan_usable: true,
               reconciliation: { status: "failed", error_code: "reconciliation_failed" },
             };
           }
@@ -332,6 +337,166 @@ def test_capture_success_survives_nested_reconciliation_failure():
     assert result["fetched"] == 1
     assert result["failed"] == 0
     assert result["reconciliation_failed"] == 1
+
+
+def _combined_capture_result(entry: str, save_result: dict, *, provider_count=70):
+    return _run_background(
+        _DETAIL_FLOW_SETUP
+        + "var entry = " + json.dumps(entry) + ";"
+        + "var saveResult = " + json.dumps(save_result) + ";"
+        + "var providerCount = " + json.dumps(provider_count) + ";"
+        + r"""
+        var articleId = "6316639";
+        var articleUrl = "https://seekingalpha.com/alpha-picks/articles/6316639-fixture";
+        var comments = saveResult.prepared_comments > 0 ? [{
+          comment_id: "c1", commenter: "Reader", comment_text: "Retained comment",
+          comment_date: "2026-07-18T12:00:00Z", parent_comment_id: null, upvotes: 0,
+        }] : [];
+        injectCommentsScraper = async function () { return { comments: comments }; };
+        cleanupCollectorTabs = async function () {};
+        registerCollectorTab = async function () {};
+        unregisterCollectorTab = async function () {};
+        safeRemoveTab = async function () {};
+        chrome.tabs.create = async function () { return { id: 1 }; };
+        sendNativeMessage2 = async function (message) {
+          calls.push(message);
+          if (message.action === "save_articles_meta") return {
+            status: "ok", saved: 1, auto_upgrade: false,
+            need_content: [{article_id: articleId, url: articleUrl,
+                            provider_comments_count: providerCount}],
+            need_comments: [], unresolved_symbols: [],
+            reconciliation: {status: "ok", enrichment: []},
+          };
+          if (message.action === "save_article_content") return saveResult;
+          if (message.action === "accept_reconciliation_link") return {status: "ok"};
+          if (message.action === "audit_unresolved") return {
+            status: "ok", unresolved_symbols: [], review_queue: {total: 0, events: []},
+          };
+          throw new Error("Unexpected native action: " + message.action);
+        };
+        var submissions = [];
+        extensionTelemetryController = {
+          async flush() { return []; },
+          async submit(event) {
+            submissions.push(event);
+            return {delivery: "persisted", run_id: submissions.length};
+          },
+        };
+        var job = await enqueueSaSyncJob({
+          operation: entry === "manual" ? "alpha_picks_manual_fetch" : "alpha_picks_sync",
+          mode: entry,
+        }, async function (diagnostics) {
+          if (entry === "manual") return await doManualFetch([{
+            symbol: "BTSG", role: "entry", event_anchor_date: "2026-07-15",
+            lineage_id: 7, url: articleUrl,
+          }], diagnostics);
+          return {
+            current: {status: "ok"}, closed: {status: "ok"},
+            details: await doDetailFetch(1, [], entry, diagnostics),
+          };
+        });
+        return {summary: entry === "manual" ? job : job.details,
+                diagnostics: submissions[0].extension_diagnostics,
+                protocol: job.extension_run, submissions: submissions, calls: calls};
+        """
+    )
+
+
+@pytest.mark.parametrize("entry", ["quick", "full", "backfill", "manual"])
+@pytest.mark.parametrize(
+    "scan_fields",
+    [
+        pytest.param({"comment_scan_usable": False}, id="unusable"),
+        pytest.param({}, id="missing-usability"),
+        pytest.param({"comment_scan_usable": None}, id="null-usability"),
+        pytest.param({"comment_scan_usable": "true"}, id="non-boolean-usability"),
+    ],
+)
+def test_combined_capture_reports_failed_comment_scan_without_losing_body(
+    entry, scan_fields,
+):
+    result = _combined_capture_result(entry, {
+        "status": "ok", "ok": True, "article_id": "6316639",
+        "prepared_comments": 0, "net_new_comments": 0, "stored_comments_total": 62,
+        "reconciliation": {"status": "ok"}, **scan_fields,
+    })
+
+    assert result["summary"]["fetched"] == 1
+    assert result["summary"]["failed"] == 1
+    expected_outcome = "failed" if entry == "manual" else "degraded"
+    assert result["protocol"]["derived_outcome"] == expected_outcome
+    assert result["protocol"]["db_status"] == "failed"
+    assert result["protocol"]["healthy_anchor_eligible"] is False
+    submission, = result["submissions"]
+    assert submission["result"] == result["protocol"]
+    assert result["protocol"]["phases"]["reconciliation"]["state"] == "complete"
+    phase = "manual_fetch" if entry == "manual" else "article_details"
+    assert result["protocol"]["phases"][phase]["state"] == "failed"
+    diagnostic, = result["diagnostics"]["entries"]
+    assert {key: value for key, value in diagnostic.items() if key != "occurred_at"} == {
+        "stage": "content_parse", "reason_code": "comment_scan_failed",
+        "target_kind": "article_comments", "target_ref": "6316639",
+        "retryable": True, "attempt_count": 1,
+    }
+    assert result["diagnostics"]["omitted_count"] == 0
+    assert len([call for call in result["calls"] if call["action"] == "save_article_content"]) == 1
+    if entry == "manual":
+        assert result["summary"]["accepted"] == 1
+        assert len([call for call in result["calls"] if call["action"] == "accept_reconciliation_link"]) == 1
+    else:
+        assert result["summary"]["net_new_comments"] == 0
+        assert result["summary"]["comments_refreshed"] == 0
+
+
+@pytest.mark.parametrize("entry", ["quick", "full", "backfill", "manual"])
+def test_combined_capture_accepts_usable_comments_with_no_net_new_rows(entry):
+    result = _combined_capture_result(entry, {
+        "status": "ok", "ok": True, "article_id": "6316639",
+        "prepared_comments": 1, "net_new_comments": 0, "stored_comments_total": 1,
+        "comment_scan_usable": True, "reconciliation": {"status": "ok"},
+    })
+
+    assert result["summary"]["fetched"] == 1
+    assert result["summary"]["failed"] == 0
+    assert result["protocol"]["derived_outcome"] == "complete"
+    assert result["protocol"]["db_status"] == "succeeded"
+    assert result["diagnostics"]["entries"] == []
+    if entry == "manual":
+        assert result["summary"]["accepted"] == 1
+    else:
+        assert result["summary"]["net_new_comments"] == 0
+
+
+@pytest.mark.parametrize("entry", ["quick", "full", "backfill"])
+def test_combined_capture_accepts_authoritative_zero_provider_comments(entry):
+    result = _combined_capture_result(entry, {
+        "status": "ok", "ok": True, "article_id": "6316639",
+        "prepared_comments": 0, "net_new_comments": 0, "stored_comments_total": 0,
+        "comment_scan_usable": True, "reconciliation": {"status": "ok"},
+    }, provider_count=0)
+
+    assert result["summary"]["fetched"] == 1
+    assert result["summary"]["failed"] == 0
+    assert result["protocol"]["derived_outcome"] == "complete"
+    assert result["diagnostics"]["entries"] == []
+    save, = [call for call in result["calls"] if call["action"] == "save_article_content"]
+    assert save["provider_comments_count"] == 0
+    assert save["comments"] == []
+
+
+@pytest.mark.parametrize("entry", ["quick", "full", "backfill", "manual"])
+def test_combined_capture_storage_failure_does_not_add_a_comment_scan_failure(entry):
+    result = _combined_capture_result(entry, {
+        "status": "error", "error_code": "database_busy", "retryable": True,
+    })
+
+    assert result["summary"]["fetched"] == 0
+    assert result["summary"]["failed"] == 1
+    diagnostic, = result["diagnostics"]["entries"]
+    assert diagnostic["stage"] == "local_persistence"
+    assert diagnostic["reason_code"] == "database_busy"
+    assert diagnostic["target_kind"] == "article_detail"
+    assert not any(call["action"] == "accept_reconciliation_link" for call in result["calls"])
 
 
 def test_comment_refresh_settles_after_ready_before_scrolling():
