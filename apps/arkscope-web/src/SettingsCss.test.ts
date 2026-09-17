@@ -163,14 +163,10 @@ describe("Settings workspace CSS contract", () => {
     expect(ledeIndex).toBeLessThan(settingsSource.indexOf("<Tabs"));
   });
 
-  it("allocates reviewed schedule columns without overlapping controls", () => {
-    const expectedWidths = ["30%", "11%", "12%", "12%", "35%"];
-    for (const [index, width] of expectedWidths.entries()) {
-      expect(ruleBodyFrom(
-        stylesCss,
-        `.settings-schedule-table th:nth-child(${index + 1})`,
-      )).toMatch(new RegExp(`width:\\s*${width.replace("%", "\\%")}`));
-    }
+  it("does not truncate schedule outcomes when several facts wrap", () => {
+    const summary = ruleBodyFrom(stylesCss, ".ds-last-run-summary");
+    expect(summary).not.toMatch(/max-height\s*:/);
+    expect(summary).not.toMatch(/overflow\s*:\s*hidden/);
   });
 
   it("wraps schedule source copy inside the source column", () => {
