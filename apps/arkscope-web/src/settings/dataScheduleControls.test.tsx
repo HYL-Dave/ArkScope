@@ -8,6 +8,7 @@ import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  IBKR_GATEWAY_UNAVAILABLE,
   getSchedule,
   putSchedule,
   runScheduleNow,
@@ -248,6 +249,86 @@ afterEach(() => {
 });
 
 describe("Data schedule controls", () => {
+  it.each(["zh-Hant", "en"])("shows one live status and prevents duplicate runs in %s", async (language) => {
+    await i18n.changeLanguage(language);
+    controls.schedule = response([["polygon_news", {
+      running: true,
+      progress: { done: 9, total: 183, current: "AMAT" },
+      last_result: { source: "polygon_news", status: "skipped" },
+      durable_state: {
+        last_status: "running",
+        last_error: null,
+        continuation: null,
+        last_attempt: "2026-08-13T01:00:00Z",
+        updated_at: "2026-08-13T01:00:00Z",
+      },
+    }]]);
+    const harness = await renderControls({ scopes: ["non_macro"] });
+    try {
+      act(() => harness.current().replaceJobFacts({
+        "collect.polygon_news": { status: "running" },
+      }));
+      const row = harness.host.querySelector("tbody tr")!;
+      const runningLabel = i18n.t(($) => $.actions.running, { ns: "settings" });
+      expect(row.textContent!.split(runningLabel)).toHaveLength(2);
+      expect(row.querySelectorAll('[data-state="running"]')).toHaveLength(1);
+      expect(row.textContent).toContain(language === "en" ? "New trigger skipped" : "新觸發已略過");
+      expect(row.querySelector("[role='progressbar']")?.getAttribute("aria-valuenow")).toBe("9");
+
+      const run = row.querySelector<HTMLButtonElement>("button[aria-label]")!;
+      expect(run).not.toBeNull();
+      expect(run.disabled).toBe(true);
+      act(() => run.click());
+      expect(runScheduleNow).not.toHaveBeenCalled();
+
+      controls.schedule = response([["polygon_news"]]);
+      await act(async () => {
+        harness.current().replaceJobFacts({
+          "collect.polygon_news": { status: "succeeded", finished_at: "2026-08-13T01:02:00Z" },
+        });
+        await harness.current().pollSchedule();
+      });
+      expect(row.querySelector("[role='progressbar']")).toBeNull();
+      expect(row.textContent).not.toContain(runningLabel);
+      expect(row.textContent).toContain(language === "en" ? "Last run succeeded" : "上次成功");
+      expect(run.disabled).toBe(false);
+      await act(async () => run.click());
+      expect(controls.runCalls).toEqual(["polygon_news"]);
+    } finally {
+      harness.unmount();
+    }
+  });
+
+  it("keeps the previous failure and skipped trigger visible during an indeterminate retry", async () => {
+    controls.schedule = response([["ibkr_prices", {
+      running: true,
+      last_result: { source: "ibkr_prices", status: "skipped" },
+      durable_state: {
+        last_status: "failed",
+        last_error: IBKR_GATEWAY_UNAVAILABLE,
+        continuation: null,
+        last_attempt: "2026-08-13T01:00:00Z",
+        updated_at: "2026-08-13T01:00:00Z",
+      },
+    }]]);
+    const harness = await renderControls({ scopes: ["non_macro"] });
+    try {
+      act(() => harness.current().replaceJobFacts({
+        "collect.ibkr_prices": { status: "failed", finished_at: "2026-08-13T01:02:00Z" },
+      }));
+      const status = harness.host.querySelector(".ds-last-run-cell")!;
+      expect(status.textContent).toContain("執行中");
+      expect(status.textContent).toContain("最近一次");
+      expect(status.textContent).toContain("IBKR Gateway 無法連線");
+      expect(status.textContent).toContain("新觸發已略過");
+      expect(status.textContent).toContain("08-13");
+      expect(status.querySelector("[role='progressbar']")).toBeNull();
+      expect(status.textContent).not.toContain("0%");
+    } finally {
+      harness.unmount();
+    }
+  });
+
   it("shares one schedule read across visible consumers", async () => {
     vi.useFakeTimers();
     const harness = await renderControls({ consumers: 2 });

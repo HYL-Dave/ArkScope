@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { Check, Play, RotateCw } from "lucide-react";
 
 import {
   getSchedule,
@@ -31,7 +32,7 @@ import {
 } from "../marketDataDisplay";
 import { SourceRunProgress } from "../SourceRunProgress";
 import { formatSystemTimestamp } from "../timeDisplay";
-import { StatusBadge } from "../ui";
+import { Button, IconButton, StatusBadge } from "../ui";
 import { shortTs } from "./DataStorageSection";
 import {
   scheduleSourceCopy,
@@ -323,14 +324,16 @@ function jobOutcome(
   return row.status ?? "—";
 }
 
-function LastRun({
+function ScheduleStatus({
   source,
+  sourceLabel,
   state,
   controller,
   externalBusy,
   t,
 }: {
   source: string;
+  sourceLabel: string;
   state: ScheduleSourceState;
   controller: DataScheduleController;
   externalBusy: boolean;
@@ -341,27 +344,47 @@ function LastRun({
   const durableSkipped = state.durable_state?.last_status === "skipped";
   const schedulerState = schedulerStateLabel(state.durable_state ?? null, t);
   const bodyBacklog = schedulerBodyBacklogPresentation(state.durable_state ?? null, t);
+  const job = controller.jobFacts?.[state.job_name];
+  const showJob = job?.status === "running"
+    ? !state.running && historyState !== "running" && historyState !== "stale"
+    : Boolean(job) || (!state.running && historyState === null);
+  const showHistory = historyState !== null
+    && !(state.running && (historyState === "running" || historyState === "empty"));
   return (
     <div className="ds-last-run">
+      <SourceRunProgress
+        sourceLabel={sourceLabel}
+        running={state.running}
+        progress={state.progress}
+      />
       <div className="ds-last-run-summary">
-        <span>{jobOutcome(controller.jobFacts, state.job_name, t)}</span>
-        {skipped ? (
-          <StatusBadge state="blocked" label={t(($) => $.dataSources.schedule.triggerSkipped)} />
+        {state.running && showHistory && historyState !== "stale" ? (
+          <span className="ds-last-run-history-label">{t(($) => $.dataSources.headings.lastRun)}</span>
         ) : null}
-        {historyState !== null ? (
+        {showHistory ? (
           <StatusBadge state={historyState} label={schedulerState.label} />
         ) : durableSkipped && !skipped ? (
           <span className="muted tiny">{schedulerState.label}</span>
         ) : null}
         {schedulerState.needsContinue ? (
-          <button
-            className="btn-ghost"
+          <Button
+            tone="ghost"
+            size="compact"
+            icon={<RotateCw size={14} />}
             disabled={externalBusy || Boolean(controller.busy) || state.running}
             onClick={() => void controller.runNow(source)}
             title={t(($) => $.dataSources.schedule.continue.title)}
           >
             {t(($) => $.dataSources.schedule.continue.label)}
-          </button>
+          </Button>
+        ) : null}
+        {showJob ? (
+          <span className="ds-last-run-time">{jobOutcome(controller.jobFacts, state.job_name, t)}</span>
+        ) : null}
+        {skipped ? (
+          <span className="ds-skipped-trigger">
+            <StatusBadge state="blocked" label={t(($) => $.dataSources.schedule.triggerSkipped)} />
+          </span>
         ) : null}
       </div>
       {bodyBacklog ? (
@@ -403,11 +426,11 @@ export function DataScheduleTable({
         <table className="data-table settings-schedule-table">
           <thead>
             <tr>
-              <th>{t(($) => $.dataSources.headings.source)}</th>
-              <th>{t(($) => $.dataSources.headings.schedule)}</th>
-              <th>{t(($) => $.dataSources.headings.intervalMinutes)}</th>
-              <th>{t(($) => $.dataSources.headings.runNow)}</th>
-              <th>{t(($) => $.dataSources.headings.lastRun)}</th>
+              <th scope="col">{t(($) => $.dataSources.headings.source)}</th>
+              <th scope="col">{t(($) => $.dataSources.headings.schedule)}</th>
+              <th scope="col">{t(($) => $.dataSources.headings.intervalMinutes)}</th>
+              <th scope="col">{t(($) => $.dataSources.headings.status)}</th>
+              <th scope="col">{t(($) => $.dataSources.headings.runNow)}</th>
             </tr>
           </thead>
           <tbody>
@@ -423,6 +446,7 @@ export function DataScheduleTable({
                     <label className="ds-toggle">
                       <input
                         type="checkbox"
+                        aria-label={t(($) => $.dataSources.schedule.controls.schedule, { source: copy.label })}
                         checked={state.enabled}
                         disabled={externalBusy || controller.busy === source}
                         onChange={(event) => void controller.setEnabled(source, event.target.checked)}
@@ -435,52 +459,50 @@ export function DataScheduleTable({
                     </label>
                   </td>
                   <td>
-                    <input
-                      className="ds-interval"
-                      type="number"
-                      min={5}
-                      placeholder={String(state.interval_minutes)}
-                      value={controller.drafts[source] ?? ""}
-                      disabled={externalBusy || controller.busy === source}
-                      onChange={(event) => controller.setIntervalDraft(source, event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") void controller.applyInterval(source);
-                      }}
-                    />
-                    {controller.drafts[source] ? (
-                      <button
-                        className="btn-ghost tiny"
-                        disabled={externalBusy || Boolean(controller.busy)}
-                        onClick={() => void controller.applyInterval(source)}
-                      >
-                        {t(($) => $.actions.apply)}
-                      </button>
-                    ) : null}
-                  </td>
-                  <td>
-                    {state.running ? (
-                      <SourceRunProgress
-                        sourceLabel={copy.label}
-                        running={state.running}
-                        progress={state.progress}
+                    <div className="ds-interval-controls">
+                      <input
+                        className="ds-interval"
+                        type="number"
+                        aria-label={t(($) => $.dataSources.schedule.controls.interval, { source: copy.label })}
+                        min={5}
+                        placeholder={String(state.interval_minutes)}
+                        value={controller.drafts[source] ?? ""}
+                        disabled={externalBusy || controller.busy === source}
+                        onChange={(event) => controller.setIntervalDraft(source, event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") void controller.applyInterval(source);
+                        }}
                       />
-                    ) : (
-                      <button
-                        className="btn-ghost"
-                        disabled={externalBusy || Boolean(controller.busy)}
-                        onClick={() => void controller.runNow(source)}
-                      >
-                        ▶ {t(($) => $.actions.run)}
-                      </button>
-                    )}
+                      {controller.drafts[source] ? (
+                        <IconButton
+                          tone="ghost"
+                          size="compact"
+                          label={t(($) => $.dataSources.schedule.controls.apply, { source: copy.label })}
+                          icon={<Check size={14} />}
+                          disabled={externalBusy || Boolean(controller.busy)}
+                          onClick={() => void controller.applyInterval(source)}
+                        />
+                      ) : null}
+                    </div>
                   </td>
                   <td className="muted tiny ds-last-run-cell settings-wrap-text">
-                    <LastRun
+                    <ScheduleStatus
                       source={source}
+                      sourceLabel={copy.label}
                       state={state}
                       controller={controller}
                       externalBusy={externalBusy}
                       t={t}
+                    />
+                  </td>
+                  <td className="ds-run-action">
+                    <IconButton
+                      tone="ghost"
+                      size="compact"
+                      label={t(($) => $.dataSources.schedule.controls.run, { source: copy.label })}
+                      icon={<Play size={14} />}
+                      disabled={externalBusy || Boolean(controller.busy) || state.running}
+                      onClick={() => void controller.runNow(source)}
                     />
                   </td>
                 </tr>

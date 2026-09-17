@@ -730,6 +730,12 @@ const settings = {
       autoRefreshing: " (Running, auto-refreshing)",
       protection: "A data source or IBKR job runs only once at a time. If work is already in progress, a new trigger is shown as skipped and does not collect duplicate data.",
       triggerSkipped: "New trigger skipped",
+      controls: {
+        schedule: "{{source}}: Schedule",
+        interval: "{{source}}: Interval (min)",
+        apply: "Apply: {{source}}",
+        run: "Run now: {{source}}",
+      },
       skippedPrefix: "Skipped: {{value}}",
       details: {
         skipReason: "Skip reason",
