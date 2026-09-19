@@ -25,6 +25,9 @@ SEC fundamentals replace it, or schedule the current approximation unchanged.
 3. Separate an immediate observed reaction from subsequent session and
    multi-session observations. Delayed or frozen prices cannot be labeled live.
    This is descriptive evidence, not a guaranteed trading signal or causal proof.
+   A small historical average is not an options-implied move or a calibrated
+   forecast; a few beat/up observations must not become a predictive-confidence
+   claim. Expose the sample and coverage instead.
 4. Disclose provider entitlement, per-request cost, available history and
    freshness before selecting cadence. No new subscription purchase or paid
    probe is authorized by this plan; use the provider-capability inventory.
@@ -44,6 +47,8 @@ SEC fundamentals replace it, or schedule the current approximation unchanged.
 - Release-date versus fiscal-period fixtures, before/after market close, weekends,
   early closes, timestamp changes, missing sessions and insufficient windows.
 - Exact source/timestamp/precision provenance and typed entitlement/freshness gaps.
+- Descriptive versus predictive labels, sample size and partial-history refusal;
+  do not inherit the old `surprise_predictive` label from a small sample.
 - Restart, overlapping runs, missed schedules, cancellation, rate-limit and
   delivery tests. No duplicate paid fetch or automatic model/provider fallback.
 - Separately approved live checks for the selected calendar and market sources.
