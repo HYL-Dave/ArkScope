@@ -172,25 +172,6 @@ def test_agent_query_signatures_and_replay_schema_have_no_obsolete_attachment_su
     assert "entrypoint" not in _defaulted_positional_names(methods["__init__"])
 
 
-def test_card_translation_remains_independent_of_conversation_history():
-    route = _function(
-        _tree("src/api/routes/analysis_cards.py"),
-        "translate_card_route",
-    )
-    assert "/analysis/cards/{run_id}/translate" in _route_paths(route)
-    assert any(
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "translate_card"
-        for node in ast.walk(route)
-    )
-
-    translate = _function(_tree("src/card_synthesis.py"), "translate_card")
-    arguments = _argument_names(translate)
-    assert {"card", "lang", "model", "model_timeout_s"} <= arguments
-    assert arguments.isdisjoint({"history", "messages", "conversation"})
-
-
 def test_interactive_cli_modules_and_documented_command_are_absent():
     assert not (_ROOT / "src/agents/__main__.py").exists()
     assert not (_ROOT / "src/agents/cli.py").exists()
@@ -256,7 +237,7 @@ def test_spark_cannot_enter_api_key_or_generic_agent_surfaces():
 
     assert model_execution_admission_detail(
         "gpt-5.3-codex-spark",
-        task="card_translation",
+        task="card_synthesis",
         auth_mode="api_key",
         plan_type="pro",
     ) == {"code": "model_retired", "field": "model"}

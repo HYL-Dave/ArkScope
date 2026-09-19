@@ -12,7 +12,7 @@ from typing import Literal, get_args
 from pydantic import BaseModel, Field
 
 Provider = Literal["anthropic", "openai"]
-TaskId = Literal["card_synthesis", "card_translation", "ai_research", "lifecycle_investigation"]
+TaskId = Literal["card_synthesis", "ai_research", "lifecycle_investigation"]
 TASK_IDS: tuple[TaskId, ...] = get_args(TaskId)
 RouteSource = Literal["env", "db", "profile", "default"]
 EffortId = Literal["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
@@ -103,16 +103,6 @@ TASKS: list[TaskInfo] = [
         description="Generate the structured §2 investment-research card from objective evidence.",
         default_provider="anthropic",
         recommended_model="claude-opus-5",
-    ),
-    TaskInfo(
-        id="card_translation",
-        label="Content translation",
-        description=(
-            "Translate cards and source excerpts while preserving structure, "
-            "citations, identifiers, and numbers."
-        ),
-        default_provider="anthropic",
-        recommended_model="claude-sonnet-5",
     ),
     TaskInfo(
         id="ai_research",

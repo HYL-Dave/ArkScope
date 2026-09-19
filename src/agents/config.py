@@ -52,9 +52,6 @@ class AgentConfig(BaseModel):
     card_synthesis_provider: str = "anthropic"
     card_synthesis_model: str = "claude-opus-5"
     card_synthesis_effort: str = "high"
-    card_translation_provider: str = "anthropic"
-    card_translation_model: str = "claude-sonnet-5"
-    card_translation_effort: str = "medium"
     # AI 研究 (Research) surface route. Empty = use the request provider's
     # default-tier agent model (today's behavior). Honored only when its provider
     # matches the request provider (see resolve_research_route).
@@ -280,12 +277,6 @@ def get_agent_config() -> AgentConfig:
         config.card_synthesis_model = llm_prefs["card_synthesis_model"]
     if "card_synthesis_effort" in llm_prefs:
         config.card_synthesis_effort = llm_prefs["card_synthesis_effort"]
-    if "card_translation_provider" in llm_prefs:
-        config.card_translation_provider = llm_prefs["card_translation_provider"]
-    if "card_translation_model" in llm_prefs:
-        config.card_translation_model = llm_prefs["card_translation_model"]
-    if "card_translation_effort" in llm_prefs:
-        config.card_translation_effort = llm_prefs["card_translation_effort"]
     if "ai_research_provider" in llm_prefs:
         config.ai_research_provider = llm_prefs["ai_research_provider"]
     if "ai_research_model" in llm_prefs:
@@ -394,13 +385,9 @@ def get_agent_config() -> AgentConfig:
     return config
 
 
-# Per-task model routing. Resolution: env override → user_profile → built-in
-# default. Lets card synthesis stay Opus-class while translation (and future
-# chat/deep-research) route to cheaper/faster models, without a full Settings UI.
-_DEFAULT_TRANSLATION_MODEL = "claude-sonnet-5"
+# Per-task model routing. Each task retains its own selected execution authority.
 _BUILTIN_TASK_DEFAULTS = {
     "card_synthesis": ("anthropic", "claude-opus-5", "high"),
-    "card_translation": ("anthropic", "claude-sonnet-5", "medium"),
     "ai_research": ("openai", "gpt-5.6-luna", "xhigh"),
     "lifecycle_investigation": ("anthropic", "claude-sonnet-5", "high"),
 }
@@ -409,11 +396,6 @@ _TASK_ENV = {
         "ARKSCOPE_CARD_SYNTHESIS_PROVIDER",
         "ARKSCOPE_CARD_SYNTHESIS_MODEL",
         "ARKSCOPE_CARD_SYNTHESIS_EFFORT",
-    ),
-    "card_translation": (
-        "ARKSCOPE_CARD_TRANSLATION_PROVIDER",
-        "ARKSCOPE_CARD_TRANSLATION_MODEL",
-        "ARKSCOPE_CARD_TRANSLATION_EFFORT",
     ),
     "ai_research": (
         "ARKSCOPE_AI_RESEARCH_PROVIDER",
@@ -447,12 +429,6 @@ def _configured_task_values(config: AgentConfig, task: TaskId) -> tuple[str, str
             config.card_synthesis_provider,
             config.card_synthesis_model,
             config.card_synthesis_effort,
-        )
-    if task == "card_translation":
-        return (
-            config.card_translation_provider,
-            config.card_translation_model,
-            config.card_translation_effort,
         )
     if task == "ai_research":
         return (
@@ -541,8 +517,6 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
             model = config.anthropic_model_advanced
         elif task == "card_synthesis" and provider == "openai":
             model = config.openai_model_advanced
-        elif task == "card_translation" and provider == "anthropic":
-            model = _DEFAULT_TRANSLATION_MODEL
         elif task == "ai_research" and provider == "anthropic":
             model = config.anthropic_model       # Research default tier (not advanced)
         elif task == "ai_research" and provider == "openai":

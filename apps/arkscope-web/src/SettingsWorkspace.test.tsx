@@ -219,7 +219,7 @@ vi.mock("./settings/ModelRoutingSection", () => ({
   ),
   TASK_LABELS: {
     card_synthesis: "AI 卡片生成",
-    card_translation: "內容翻譯",
+
     ai_research: "AI 研究",
   },
 }));
@@ -392,11 +392,11 @@ beforeEach(() => {
   mocks.importModelRoutes.mockReset();
   mocks.importModelRoutes.mockResolvedValue({
     imported: ["card_synthesis", "ai_research"],
-    skipped: ["card_translation"],
+    skipped: ["card_synthesis"],
   });
   mocks.exportModelRoutes.mockReset();
   mocks.exportModelRoutes.mockResolvedValue({
-    exported: ["card_synthesis", "card_translation"],
+    exported: ["card_synthesis"],
     cleared: ["ai_research"],
   });
   mocks.deleteModelRoute.mockReset();
@@ -524,7 +524,7 @@ describe("Settings workspace", () => {
     );
     await click(transferActions[1]!);
     expect.soft(host!.textContent).toContain(
-      "Exported DB task routes to the profile file. Exported: 2; cleared as stale without DB authority: 1.",
+      "Exported DB task routes to the profile file. Exported: 1; cleared as stale without DB authority: 1.",
     );
     await click(buttonWithText("重設卡片生成路由", models));
     expect.soft(host!.textContent).toContain(

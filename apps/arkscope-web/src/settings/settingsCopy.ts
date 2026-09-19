@@ -152,8 +152,6 @@ export function settingsTaskLabel(task: ModelTask, t: SettingsT): string {
   switch (task) {
     case "card_synthesis":
       return t(($) => $.models.tasks.cardSynthesis.label);
-    case "card_translation":
-      return t(($) => $.models.tasks.cardTranslation.label);
     case "ai_research":
       return t(($) => $.models.tasks.aiResearch.label);
     case "lifecycle_investigation":

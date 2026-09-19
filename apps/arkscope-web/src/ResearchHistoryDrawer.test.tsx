@@ -49,7 +49,7 @@ const RUNTIME: RuntimeConfig = {
     credentials: [],
   },
   card_synthesis: taskRoute("card_synthesis"),
-  card_translation: taskRoute("card_translation"),
+
   ai_research: taskRoute("ai_research"),
   research_runtime: {
     max_tool_calls: 60,
@@ -84,7 +84,7 @@ const CATALOG: ModelCatalog = {
   },
   routes: {
     card_synthesis: taskRoute("card_synthesis"),
-    card_translation: taskRoute("card_translation"),
+
     ai_research: taskRoute("ai_research"),
   },
   credentials: { openai: [], anthropic: [] },

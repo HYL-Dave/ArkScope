@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS ai_card_runs (
     status               TEXT NOT NULL DEFAULT 'generated',
     saved_report_id      INTEGER,
     expires_at           TEXT,
-    translations_json    TEXT,
     personalization_context_snapshot TEXT
 );
 
@@ -53,16 +52,6 @@ CREATE TABLE IF NOT EXISTS ai_card_execution_receipts (
     provider TEXT, model TEXT, effort TEXT, auth_mode TEXT
 );
 
-CREATE TABLE IF NOT EXISTS ai_card_translation_versions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id INTEGER NOT NULL REFERENCES ai_card_runs(id),
-    lang TEXT NOT NULL,
-    card_json TEXT NOT NULL,
-    provider TEXT, model TEXT, effort TEXT, auth_mode TEXT,
-    created_at TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_card_translation_versions
-    ON ai_card_translation_versions(run_id, lang, id);
 """
 
 VALID_STATUS = ("generated", "saved", "archived", "deleted")
@@ -92,10 +81,8 @@ class CardRun:
     status: str
     saved_report_id: Optional[int]
     expires_at: Optional[str]
-    translations: Optional[dict] = None  # {lang: translated result_card dict}
     personalization: Optional[dict] = None  # Track A run trace (profile/stance/skills)
     execution_receipt: ExecutionReceipt = field(default_factory=ExecutionReceipt)
-    translation_receipts: dict[str, ExecutionReceipt] = field(default_factory=dict)
 
 
 class CardRunStore:
@@ -121,9 +108,6 @@ class CardRunStore:
             except sqlite3.OperationalError:
                 pass
             conn.executescript(_SCHEMA)
-            # Migration: add translations_json to a pre-existing table. Tolerant
-            # of the same concurrent-first-construct race the WAL line guards: a
-            # duplicate-column error just means another constructor added it.
             cols = {r[1] for r in conn.execute("PRAGMA table_info(ai_card_runs)").fetchall()}
             for _pcol, _pddl in (
                 ("profile_active", "INTEGER NOT NULL DEFAULT 0"),
@@ -138,11 +122,6 @@ class CardRunStore:
                         conn.execute(f"ALTER TABLE ai_card_runs ADD COLUMN {_pcol} {_pddl}")
                     except sqlite3.OperationalError:
                         pass
-            if "translations_json" not in cols:
-                try:
-                    conn.execute("ALTER TABLE ai_card_runs ADD COLUMN translations_json TEXT")
-                except sqlite3.OperationalError:
-                    pass
             conn.commit()
 
     @staticmethod
@@ -154,16 +133,6 @@ class CardRunStore:
         receipt = ExecutionReceipt(**dict(receipt_row)) if receipt_row else ExecutionReceipt(
             provider=r["provider"], model=r["model"],
         )
-        translation_receipts = {
-            row["lang"]: ExecutionReceipt(
-                provider=row["provider"], model=row["model"], effort=row["effort"], auth_mode=row["auth_mode"],
-            )
-            for row in conn.execute(
-                "SELECT v.* FROM ai_card_translation_versions v JOIN "
-                "(SELECT lang, MAX(id) AS id FROM ai_card_translation_versions WHERE run_id = ? GROUP BY lang) latest "
-                "ON v.id = latest.id", (r["id"],),
-            )
-        }
         return CardRun(
             id=r["id"],
             ticker=r["ticker"],
@@ -180,10 +149,6 @@ class CardRunStore:
             saved_report_id=r["saved_report_id"],
             expires_at=r["expires_at"],
             execution_receipt=receipt,
-            translation_receipts=translation_receipts,
-            translations=json.loads(r["translations_json"])
-            if r["translations_json"]
-            else None,
             personalization={
                 "profile_active": bool(r["profile_active"]),
                 "assistant_stance": r["assistant_stance"],
@@ -332,67 +297,3 @@ class CardRunStore:
                 params,
             ).fetchall()
             return [self._row(conn, r) for r in rows]
-
-    # --- translations (on-demand, cached) --------------------------------
-
-    def set_translation(
-        self, run_id: int, lang: str, card: dict, *,
-        execution_receipt: ExecutionReceipt | None = None,
-    ) -> None:
-        """Append a successful output/receipt and update the legacy cache atomically."""
-        receipt = execution_receipt if execution_receipt is not None else ExecutionReceipt()
-        if not isinstance(receipt, ExecutionReceipt):
-            raise ValueError("execution_receipt_invalid")
-        with self._write_lock, self._connect() as conn:
-            # Serialize read/merge/write across different store instances too.
-            conn.execute("BEGIN IMMEDIATE")
-            row = conn.execute(
-                "SELECT translations_json FROM ai_card_runs WHERE id = ?", (run_id,)
-            ).fetchone()
-            if row is None:
-                return
-            current = json.loads(row["translations_json"]) if row["translations_json"] else {}
-            if lang in current and not conn.execute(
-                "SELECT 1 FROM ai_card_translation_versions WHERE run_id = ? AND lang = ? LIMIT 1",
-                (run_id, lang),
-            ).fetchone():
-                # An old cache has no known route or execution time. Preserve it
-                # before the first refresh, without inventing provenance.
-                conn.execute(
-                    "INSERT INTO ai_card_translation_versions (run_id, lang, card_json) VALUES (?, ?, ?)",
-                    (run_id, lang, json.dumps(current[lang])),
-                )
-            conn.execute(
-                "INSERT INTO ai_card_translation_versions "
-                "(run_id, lang, card_json, provider, model, effort, auth_mode, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (run_id, lang, json.dumps(card), receipt.provider, receipt.model,
-                 receipt.effort, receipt.auth_mode, _now()),
-            )
-            current[lang] = card
-            conn.execute(
-                "UPDATE ai_card_runs SET translations_json = ? WHERE id = ?",
-                (json.dumps(current), run_id),
-            )
-            conn.commit()
-
-    def translation_versions(self, run_id: int, lang: str) -> list[dict]:
-        """Successful versions in oldest-first order; no current Settings lookup."""
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM ai_card_translation_versions WHERE run_id = ? AND lang = ? ORDER BY id",
-                (run_id, lang),
-            ).fetchall()
-        return [{
-            "version_id": row["id"], "card": json.loads(row["card_json"]),
-            "created_at": row["created_at"],
-            "execution_receipt": ExecutionReceipt(
-                provider=row["provider"], model=row["model"], effort=row["effort"], auth_mode=row["auth_mode"],
-            ).model_dump(),
-        } for row in rows]
-
-    def get_translation(self, run_id: int, lang: str) -> Optional[dict]:
-        run = self.get(run_id)
-        if run and run.translations:
-            return run.translations.get(lang)
-        return None

@@ -24,16 +24,10 @@ def store(tmp_path):
 
 
 def test_registry_is_the_exact_fixed_task_membership():
-    assert tuple(FIXED_TASK_RUNTIME_TASKS) == (
-        "card_synthesis",
-        "card_translation",
-    )
-    assert {definition.task for definition in FIXED_TASK_RUNTIME_TASKS.values()} == {
-        "card_synthesis",
-        "card_translation",
-    }
+    assert tuple(FIXED_TASK_RUNTIME_TASKS) == ('card_synthesis',)
+    assert {definition.task for definition in FIXED_TASK_RUNTIME_TASKS.values()} == {'card_synthesis'}
     assert set(FIXED_TASK_RUNTIME_TASKS) <= {task.id for task in TASKS}
-    assert FIXED_TASK_RUNTIME_TASKS["card_translation"].label == "內容翻譯"
+    assert FIXED_TASK_RUNTIME_TASKS["card_synthesis"].label == "AI 卡片生成"
 
 
 def test_defaults_are_900_seconds(store):
@@ -48,22 +42,19 @@ def test_defaults_are_900_seconds(store):
         assert value.warning is None
 
 
-def test_set_many_persists_both_tasks_in_one_db(store):
+def test_set_many_persists_synthesis_across_reopen(store):
     written = store.set_many(
-        {"card_synthesis": 1200.0, "card_translation": 600.0}
+        {"card_synthesis": 1200.0}
     )
 
     assert written["card_synthesis"].model_timeout_s == 1200.0
-    assert written["card_translation"].model_timeout_s == 600.0
     reopened = FixedTaskRuntimeStore(store.db_path)
     rows = reopened.get_all()
     assert rows["card_synthesis"].model_timeout_s == 1200.0
-    assert rows["card_translation"].model_timeout_s == 600.0
 
     resolved = resolve_all_fixed_task_runtime(store=reopened)
     assert resolved["card_synthesis"].source == "db"
     assert resolved["card_synthesis"].db_saved is True
-    assert resolved["card_translation"].source == "db"
 
 
 def test_env_overrides_db_without_rewriting_saved_value(store, monkeypatch):
@@ -93,9 +84,9 @@ def test_invalid_env_keeps_db_value_and_surfaces_warning(store, monkeypatch):
 def test_invalid_env_without_db_keeps_default_and_surfaces_warning(
     store, monkeypatch
 ):
-    monkeypatch.setenv("ARKSCOPE_CARD_TRANSLATION_TIMEOUT_S", "59")
+    monkeypatch.setenv("ARKSCOPE_CARD_SYNTHESIS_TIMEOUT_S", "59")
 
-    got = resolve_fixed_task_runtime("card_translation", store=store)
+    got = resolve_fixed_task_runtime("card_synthesis", store=store)
 
     assert got.model_timeout_s == 900.0
     assert got.source == "default"
@@ -119,7 +110,7 @@ def test_db_read_failure_returns_defaults_with_warning(store, monkeypatch):
 
 
 def test_delete_all_is_idempotent(store):
-    store.set_many({"card_synthesis": 700.0, "card_translation": 800.0})
+    store.set_many({"card_synthesis": 700.0})
 
     assert store.delete_all() is True
     assert store.get_all() == {}
@@ -146,8 +137,8 @@ def test_set_many_validates_every_value_before_writing(store):
     store.set_many({"card_synthesis": 700.0})
 
     with pytest.raises(ValueError):
-        store.set_many({"card_synthesis": 800.0, "card_translation": 59.0})
+        store.set_many({"card_synthesis": 800.0, "ai_research": 900.0})
 
     rows = store.get_all()
     assert rows["card_synthesis"].model_timeout_s == 700.0
-    assert "card_translation" not in rows
+    assert "ai_research" not in rows

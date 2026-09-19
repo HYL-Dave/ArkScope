@@ -33,7 +33,6 @@ export function FixedTaskRuntimeSection({
   onSave: (body: {
     tasks: {
       card_synthesis: { model_timeout_s: number };
-      card_translation: { model_timeout_s: number };
     };
   }) => void | Promise<void>;
   onReset: () => void | Promise<void>;
@@ -43,25 +42,20 @@ export function FixedTaskRuntimeSection({
   const { t } = useTranslation("settings");
   const [draft, setDraft] = useState({
     card_synthesis: String(settings.card_synthesis.model_timeout_s),
-    card_translation: String(settings.card_translation.model_timeout_s),
   });
 
   useEffect(() => {
     setDraft({
       card_synthesis: String(settings.card_synthesis.model_timeout_s),
-      card_translation: String(settings.card_translation.model_timeout_s),
     });
   }, [
     settings.card_synthesis.model_timeout_s,
-    settings.card_translation.model_timeout_s,
   ]);
 
   const synthesis = parseFixedTaskTimeout(draft.card_synthesis);
-  const translation = parseFixedTaskTimeout(draft.card_translation);
-  const disabled = saving || synthesis == null || translation == null;
-  const canReset = settings.card_synthesis.db_saved || settings.card_translation.db_saved;
-  const dirty = draft.card_synthesis !== String(settings.card_synthesis.model_timeout_s)
-    || draft.card_translation !== String(settings.card_translation.model_timeout_s);
+  const disabled = saving || synthesis == null;
+  const canReset = settings.card_synthesis.db_saved;
+  const dirty = draft.card_synthesis !== String(settings.card_synthesis.model_timeout_s);
 
   useEffect(() => {
     onNavigationGuardChange?.(dirty
@@ -73,7 +67,7 @@ export function FixedTaskRuntimeSection({
     onNavigationGuardChange?.(CLEAR_SETTINGS_NAVIGATION_GUARD);
   }, [onNavigationGuardChange]);
   const rows: Array<{
-    key: "card_synthesis" | "card_translation";
+    key: "card_synthesis";
     label: string;
     settings: FixedTaskRuntimeSettings;
   }> = [
@@ -81,11 +75,6 @@ export function FixedTaskRuntimeSection({
       key: "card_synthesis",
       label: t(($) => $.runtime.fixed.fields.cardSynthesis),
       settings: settings.card_synthesis,
-    },
-    {
-      key: "card_translation",
-      label: t(($) => $.runtime.fixed.fields.cardTranslation),
-      settings: settings.card_translation,
     },
   ];
 
@@ -127,7 +116,6 @@ export function FixedTaskRuntimeSection({
         <DeveloperDiagnostics
           diagnostics={[
             settings.card_synthesis.warning,
-            settings.card_translation.warning,
           ]}
           t={t}
         />
@@ -139,11 +127,10 @@ export function FixedTaskRuntimeSection({
           className="btn-ghost small"
           disabled={disabled}
           onClick={() => {
-            if (synthesis == null || translation == null) return;
+            if (synthesis == null) return;
             void onSave({
               tasks: {
                 card_synthesis: { model_timeout_s: synthesis },
-                card_translation: { model_timeout_s: translation },
               },
             });
           }}

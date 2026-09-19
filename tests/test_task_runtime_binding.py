@@ -107,7 +107,6 @@ def anthropic_wire(monkeypatch, isolated):
 
 @pytest.mark.parametrize("task,expected", [
     ("card_synthesis", ("anthropic", "claude-opus-5", "high")),
-    ("card_translation", ("anthropic", "claude-sonnet-5", "medium")),
     ("ai_research", ("openai", "gpt-5.6-luna", "xhigh")),
     ("lifecycle_investigation", ("anthropic", "claude-sonnet-5", "high")),
 ])

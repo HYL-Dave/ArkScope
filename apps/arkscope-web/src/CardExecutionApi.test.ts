@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, expect, it, vi } from "vitest";
-import { ApiError, generateCard, getCard, getCards, translateCard, type RuntimeConfig } from "./api";
+import { ApiError, generateCard, getCard, getCards } from "./api";
 
 const receipt = { provider: "openai", model: "gpt-5.6-sol", effort: "low", auth_mode: "api_key" };
 function respond(body: unknown) {
@@ -14,7 +14,6 @@ const endpoints = [
   { name: "generate", load: () => generateCard("AAPL"), envelope: (value: object) => value, row: (value: any) => value },
   { name: "detail", load: () => getCard(1), envelope: (value: object) => value, row: (value: any) => value },
   { name: "list", load: () => getCards(), envelope: (value: object) => ({ cards: [value] }), row: (value: any) => value.cards[0] },
-  { name: "translate", load: () => translateCard(1), envelope: (value: object) => value, row: (value: any) => value },
 ];
 
 it.each(endpoints)("preserves the closed receipt on $name", async ({ load, envelope, row }) => {
@@ -44,23 +43,11 @@ it.each(endpoints)("rejects malformed present receipts as safe API errors on $na
   }
 });
 
-it("accepts nullable legacy fields and explicit partial-card no-op separately", async () => {
+it("accepts nullable legacy fields without inventing execution facts", async () => {
   respond({ execution_receipt: { ...receipt, effort: null, auth_mode: null } });
   expect((await getCard(1)).execution_receipt).toEqual({ ...receipt, effort: null, auth_mode: null });
-  const noop = { run_id: 1, lang: "zh-Hant", card: { ticker: "AAPL" }, cached: false, no_op: true, execution_receipt: null };
-  respond(noop);
-  expect(await translateCard(1)).toEqual(noop);
-  respond({ ...noop, execution_receipt: receipt });
-  await expect(translateCard(1)).rejects.toMatchObject({ code: "card_payload_invalid" });
 });
 
-it("omits normal refresh and sends explicit refresh without losing the runtime timeout", async () => {
-  const fetch = respond({ execution_receipt: receipt });
-  const timer = vi.spyOn(window, "setTimeout");
-  const runtime = { fixed_task_runtime: { card_translation: { model_timeout_s: 600 } } } as RuntimeConfig;
-  await translateCard(1, "zh-Hant", runtime);
-  await translateCard(1, "zh-Hant", runtime, { refresh: true });
-  expect(fetch.mock.calls.map(call => JSON.parse(String((call as unknown as [string, RequestInit])[1].body))))
-    .toEqual([{ lang: "zh-Hant" }, { lang: "zh-Hant", refresh: true }]);
-  expect(timer.mock.calls.map(call => call[1])).toEqual([660_000, 660_000]);
+it("does not export the retired translation client", async () => {
+  expect(await import("./api")).not.toHaveProperty("translateCard");
 });

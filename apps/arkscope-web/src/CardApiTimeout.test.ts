@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe("card API timeouts", () => {
-  const runtimeWith = (synthesis: number, translation: number) => ({
+  const runtimeWith = (synthesis: number) => ({
     fixed_task_runtime: {
       card_synthesis: {
         task: "card_synthesis",
@@ -18,25 +18,17 @@ describe("card API timeouts", () => {
         db_saved: true,
         warning: null,
       },
-      card_translation: {
-        task: "card_translation",
-        model_timeout_s: translation,
-        source: "db",
-        db_saved: true,
-        warning: null,
-      },
     },
   }) as RuntimeConfig;
 
-  it("derives independent task budgets and uses 900 seconds for old sidecars", async () => {
+  it("derives the synthesis budget and uses 900 seconds for old sidecars", async () => {
     const { fixedTaskRequestTimeoutMs } = await import("./api");
 
     expect(fixedTaskRequestTimeoutMs(null, "card_synthesis")).toBe(960_000);
-    expect(fixedTaskRequestTimeoutMs(runtimeWith(1200, 600), "card_synthesis")).toBe(1_260_000);
-    expect(fixedTaskRequestTimeoutMs(runtimeWith(1200, 600), "card_translation")).toBe(660_000);
+    expect(fixedTaskRequestTimeoutMs(runtimeWith(1200), "card_synthesis")).toBe(1_260_000);
   });
 
-  it("uses each effective task budget for generation and translation", async () => {
+  it("uses the effective task budget for generation", async () => {
     const setTimeoutSpy = vi.spyOn(window, "setTimeout");
     vi.stubGlobal(
       "fetch",
@@ -50,13 +42,11 @@ describe("card API timeouts", () => {
 
     const {
       generateCard,
-      translateCard,
     } = await import("./api");
-    const runtime = runtimeWith(1200, 600);
+    const runtime = runtimeWith(1200);
     await generateCard("MU", { provider: "anthropic" }, runtime);
-    await translateCard(1, "zh-Hant", runtime);
 
     const budgets = setTimeoutSpy.mock.calls.map((call) => call[1]);
-    expect(budgets).toEqual([1_260_000, 660_000]);
+    expect(budgets).toEqual([1_260_000]);
   });
 });

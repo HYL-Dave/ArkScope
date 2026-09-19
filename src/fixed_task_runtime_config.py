@@ -35,11 +35,6 @@ FIXED_TASK_RUNTIME_TASKS: dict[TaskId, FixedTaskRuntimeDefinition] = {
         label="AI 卡片生成",
         env_key="ARKSCOPE_CARD_SYNTHESIS_TIMEOUT_S",
     ),
-    "card_translation": FixedTaskRuntimeDefinition(
-        task="card_translation",
-        label="內容翻譯",
-        env_key="ARKSCOPE_CARD_TRANSLATION_TIMEOUT_S",
-    ),
 }
 
 _MODEL_ROUTE_TASKS = {task.id for task in TASKS}

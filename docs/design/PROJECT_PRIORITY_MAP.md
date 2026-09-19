@@ -652,6 +652,23 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
+- **2026-09-20 (FULL CARD TRANSLATION RETIREMENT; EARNINGS OBSERVATION RETAINED):**
+  The user broadened Spark retirement to the entire card translation feature,
+  authorizing its UI/task/API/cache-code removal while retaining original cards,
+  Research and interface localization. This supersedes the previous entry's
+  other-model-translation preservation, not its shared safety boundaries.
+  Generic auth/output tests remain on synthesis; dead-only tests leave with the
+  removed feature. Report file confinement independently closes the confirmed
+  path escape, including directory/leaf links and listing preview. No provider
+  call or automatic model replacement occurs. Earnings-event market observation
+  is retained as a capability to repair and schedule, not falsely replaced by
+  SEC fundamentals; its timestamp/window/freshness and delivery requirements are
+  in `docs/superpowers/plans/2026-09-20-earnings-observation-followup.md`.
+  Product tests and paused data-disposal scope are recorded in
+  `docs/superpowers/evidence/2026-09-19-card-translation-retirement/README.md`.
+  User controls push. Unaccepted fundamentals work is not silently merged or
+  discarded; production disposal/activation requires the running App to stop.
+
 - **2026-09-19 (SPARK PRODUCT RETIREMENT; TOOL-AUDIT DIFFERENCES RECHECKED):**
   The user authorized removing `gpt-5.3-codex-spark` and its dedicated translation
   path. A history-only registry identity rejects stale/custom requests with

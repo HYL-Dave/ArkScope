@@ -46,8 +46,8 @@ def test_stale_discovery_cannot_reintroduce_a_spark_option(tmp_path, saved_route
             "id": MODEL, "label": "Old subscription model", "source": "provider_api",
         }],
     )
-    routes = {"card_translation": TaskRoute(
-        task="card_translation", provider="openai",
+    routes = {"card_synthesis": TaskRoute(
+        task="card_synthesis", provider="openai",
         model=MODEL if saved_route else "gpt-5.6-luna", effort="high",
     )}
     view = effective_model_view_v2(
@@ -58,14 +58,14 @@ def test_stale_discovery_cannot_reintroduce_a_spark_option(tmp_path, saved_route
     )
     for task, value in view["tasks"].items():
         entries = [row for row in value["providers"]["openai"]["models"] if row["id"] == MODEL]
-        if saved_route and task == "card_translation":
+        if saved_route and task == "card_synthesis":
             assert len(entries) == 1
             assert entries[0]["status"] == "route"
             assert entries[0]["eligible"] is False
             assert entries[0]["reason_code"] == "model_retired"
         else:
             assert entries == []
-    assert routes["card_translation"].model == (MODEL if saved_route else "gpt-5.6-luna")
+    assert routes["card_synthesis"].model == (MODEL if saved_route else "gpt-5.6-luna")
 
 
 def test_subscription_dispatch_refuses_spark_before_token_store_or_transport(monkeypatch):
@@ -78,7 +78,7 @@ def test_subscription_dispatch_refuses_spark_before_token_store_or_transport(mon
         monkeypatch.setattr(output, name, forbidden)
     with pytest.raises(output.SubscriptionStructuredOutputError) as caught:
         output.run_subscription_structured_output(
-            task="card_translation", provider="openai", auth_mode="chatgpt_oauth",
+            task="card_synthesis", provider="openai", auth_mode="chatgpt_oauth",
             credential_id="local:1", model=MODEL, system="Translate", user="Fixture",
             schema={"type": "object"}, output_name="emit_translation",
             output_description="Translation", effort="high", timeout_s=1,
@@ -86,7 +86,7 @@ def test_subscription_dispatch_refuses_spark_before_token_store_or_transport(mon
     assert caught.value.code == "model_retired"
 
 
-@pytest.mark.parametrize("task", ["card_translation", "card_synthesis"])
+@pytest.mark.parametrize("task", ['card_synthesis'])
 def test_card_selection_refuses_spark_before_credential_capture(monkeypatch, task):
     from src import card_execution
 
@@ -108,20 +108,20 @@ def test_route_save_rejects_spark_without_rewriting_existing_selection(tmp_path,
 
     store = CredentialStore(tmp_path / "profile.db")
     routes = ModelRouteStore(store.db_path)
-    previous = routes.set("card_translation", "openai", "gpt-5.6-luna", "high")
+    previous = routes.set("card_synthesis", "openai", "gpt-5.6-luna", "high")
     monkeypatch.setattr(
         config_routes, "resolve_active_credential",
         lambda *args, **kwargs: pytest.fail("retirement requires no credential lookup"),
     )
     with pytest.raises(HTTPException) as caught:
         config_routes.update_model_routes(
-            config_routes.ModelRoutesUpdate(routes={"card_translation": config_routes.RouteUpdate(
+            config_routes.ModelRoutesUpdate(routes={"card_synthesis": config_routes.RouteUpdate(
                 provider="openai", model=MODEL, effort="high",
             )}), store=store,
         )
     assert caught.value.status_code == 400
     assert caught.value.detail["code"] == "model_retired"
-    assert routes.get("card_translation") == previous
+    assert routes.get("card_synthesis") == previous
 
 
 def test_translation_adapter_removed_but_live_web_contract_retained():
@@ -190,7 +190,7 @@ def test_task_canary_refuses_spark_before_credential_resolution(monkeypatch):
         lambda *args, **kwargs: pytest.fail("retired canary reached credential resolution"),
     )
     result = asyncio.run(model_task_canary.dispatch_task_model_test(
-        task="card_translation", provider="openai", model=MODEL, effort="high",
+        task="card_synthesis", provider="openai", model=MODEL, effort="high",
         store=object(), token_store=object(),
     ))
     assert result.status == "unsupported"

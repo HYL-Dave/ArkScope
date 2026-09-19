@@ -116,15 +116,15 @@ function flattenResource(tree: ResourceTree, prefix = ""): Map<string, string> {
 describe("bundled i18n resources", () => {
   it("contains the exact Explore subtree inventory in both locales", () => {
     const expectedSubtreeCounts = {
-      errors: 61,
+      errors: 49,
       home: 23,
       watchlist: 71,
       universe: 38,
-      lifecycle: 621,
+      lifecycle: 618,
       alphaTracking: 34,
       news: 45,
       tickerDetail: 89,
-      aiCard: 70,
+      aiCard: 64,
       tags: 7,
     } as const;
     const expectedCountCopy = {
@@ -291,7 +291,7 @@ describe("bundled i18n resources", () => {
       expect.soft(explore, `${locale}.explore`).toBeDefined();
       if (!explore || typeof explore !== "object" || Array.isArray(explore)) continue;
       const flattened = flattenResource(explore as ResourceTree);
-      expect(flattened.size, `${locale}.explore`).toBe(1178);
+      expect(flattened.size, `${locale}.explore`).toBe(1157);
       for (const path of [
         "errors.operations.watchlistDeleteList",
         "watchlist.emptyListWithArchivedHint",
@@ -759,13 +759,13 @@ describe("bundled i18n resources", () => {
       "../../scripts/i18n/fixtures/portfolio-resource-ownership.json",
     ), "utf8")) as PortfolioOwnershipContract;
     const expectedCounts = {
-      common: 82,
+      common: 81,
       shell: 37,
-      settings: 1052,
+      settings: 1049,
       research: 236,
-      explore: 1178,
+      explore: 1157,
       portfolio: 374,
-      system: 24,
+      system: 23,
     } as const;
 
     const expectedCoveragePaths = [
@@ -847,7 +847,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2983);
+      expect(total, `${locale}.total`).toBe(2957);
       expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys, "schedule", "formGroups", "formNames"].sort());
       expect(Object.keys(resources[locale].settings.secResearch.schedule).sort()).toEqual([...secScheduleKeys].sort());
       expect(Object.keys(resources[locale].settings.secResearch.formGroups).sort()).toEqual([...secFormGroupKeys].sort());
@@ -1391,6 +1391,9 @@ describe("bundled i18n resources", () => {
       "models.catalog.selectEffort",
     ]);
     const retiredSettingsPaths = [
+      "models.tasks.cardTranslation.label",
+      "models.tasks.cardTranslation.description",
+      "runtime.fixed.fields.cardTranslation",
       "newsStorage.routing.directEnvOn",
       "newsStorage.routing.directEnvOff",
       "newsStorage.routing.localCompatibility",
