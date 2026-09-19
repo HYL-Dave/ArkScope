@@ -1169,7 +1169,7 @@ def test_shared_text_translation_has_no_legacy_16000_character_boundary(monkeypa
     assert result["translated_text"] == translated
 
 
-def test_spark_text_translation_reports_codex_app_server_harness(monkeypatch):
+def test_spark_text_translation_rejects_before_dispatch(monkeypatch):
     from src import card_synthesis as cs
     from src.model_routing import TaskRoute
 
@@ -1188,9 +1188,9 @@ def test_spark_text_translation_reports_codex_app_server_harness(monkeypatch):
     monkeypatch.setattr(
         cs,
         "_translate_openai",
-        lambda *_args, **_kwargs: {"translated_text": "譯文"},
+        lambda *_args, **_kwargs: pytest.fail("retired model dispatched"),
     )
 
-    result = cs.translate_text("source", lang="zh-Hant", model_timeout_s=30.0)
-
-    assert result["harness"] == "codex_app_server"
+    with pytest.raises(cs.CardExecutionAdmissionError) as caught:
+        cs.translate_text("source", lang="zh-Hant", model_timeout_s=30.0)
+    assert caught.value.detail == {"code": "model_retired", "field": "model"}

@@ -160,26 +160,6 @@ def _cleanup_budget(deadline: float) -> float:
     return min(1.0, max(remaining, 0.005))
 
 
-async def _await_owned_sync_call(call) -> Any:
-    """Do not let cancellation return while an owned provider child may still run."""
-    loop = asyncio.get_running_loop()
-    pool = concurrent.futures.ThreadPoolExecutor(
-        max_workers=1,
-        thread_name_prefix="ark-codex-translation",
-    )
-    future = loop.run_in_executor(pool, call)
-    try:
-        return await asyncio.shield(future)
-    except asyncio.CancelledError:
-        try:
-            await asyncio.shield(future)
-        finally:
-            pool.shutdown(wait=False, cancel_futures=True)
-        raise
-    finally:
-        pool.shutdown(wait=False, cancel_futures=True)
-
-
 async def _await_with_deadline(value: Any, deadline: float) -> Any:
     if not inspect.isawaitable(value):
         _remaining(deadline)
@@ -362,98 +342,6 @@ async def _openai_structured_output_async(
         await _close_quietly(client, timeout_s=_cleanup_budget(deadline))
 
 
-async def _codex_structured_output_async(
-    *,
-    task: str | None,
-    credential_id: str,
-    model: str,
-    system: str,
-    user: str,
-    schema: dict[str, Any],
-    effort: str,
-    token_store: Any,
-    timeout_s: float,
-) -> dict[str, Any]:
-    from src.auth_drivers.codex_translation_adapter import (
-        CodexTranslationError,
-        run_codex_translation,
-    )
-    from src.model_capabilities import model_execution_admission_detail
-
-    deadline = asyncio.get_running_loop().time() + max(float(timeout_s), 0.001)
-    try:
-        record = await _run_sync_preflight(
-            lambda: _refresh_chatgpt_token(
-                credential_id=credential_id,
-                token_store=token_store,
-            ),
-            deadline=deadline,
-            label="ChatGPT credential",
-        )
-    except ChatGPTOAuthLoginError as exc:
-        code = "reauth_required" if getattr(exc, "reauth_required", False) else "provider_call_failed"
-        raise SubscriptionStructuredOutputError(code, _safe_message(exc)) from exc
-    except SubscriptionStructuredOutputError:
-        raise
-    except Exception as exc:  # noqa: BLE001
-        raise SubscriptionStructuredOutputError(
-            "provider_call_failed", _safe_message(exc)
-        ) from exc
-
-    detail = model_execution_admission_detail(
-        model,
-        task=task,
-        auth_mode="chatgpt_oauth",
-        plan_type=getattr(record, "plan_type", None),
-    )
-    if detail is not None and detail["code"] != "subscription_plan_unverified":
-        raise SubscriptionStructuredOutputError(
-            detail["code"],
-            "The selected subscription route is not executable for this task.",
-        )
-
-    remaining = _remaining(deadline)
-
-    def observe_plan(plan_type: str) -> None:
-        from src.auth_drivers.chatgpt_oauth_login import (
-            persist_chatgpt_plan_observation,
-        )
-
-        try:
-            persist_chatgpt_plan_observation(
-                credential_id=credential_id,
-                token_store=token_store,
-                expected_record=record,
-                plan_type=plan_type,
-                observed_at=datetime.now(timezone.utc),
-            )
-        except ChatGPTOAuthLoginError as exc:
-            if exc.error_code == "plan_observation_store_failed":
-                logger.warning("ChatGPT plan diagnostic could not be stored")
-                return
-            raise CodexTranslationError("provider_call_failed") from None
-
-    try:
-        return await _await_owned_sync_call(
-            lambda: run_codex_translation(
-                credential_id=credential_id,
-                record=record,
-                model=model,
-                effort=effort,
-                system=system,
-                user=user,
-                schema=schema,
-                timeout_s=remaining,
-                plan_observer=observe_plan,
-            )
-        )
-    except CodexTranslationError as exc:
-        raise SubscriptionStructuredOutputError(
-            exc.code,
-            "The Codex translation adapter could not complete the request.",
-        ) from exc
-
-
 async def _claude_structured_output_async(
     *,
     credential_id: str,
@@ -629,6 +517,13 @@ async def run_subscription_structured_output_async(
     timeout_s: float,
 ) -> dict[str, Any]:
     """Execute one deadline-bound subscription result without fallback."""
+    from src.model_capabilities import model_execution_admission_detail
+
+    detail = model_execution_admission_detail(model, task=task, auth_mode=auth_mode)
+    if detail is not None:
+        raise SubscriptionStructuredOutputError(
+            detail["code"], "The selected model cannot execute this task.",
+        )
     openai_oauth = provider == "openai" and auth_mode == "chatgpt_oauth"
     claude_oauth = provider == "anthropic" and auth_mode == "claude_code_oauth"
     if not (openai_oauth or claude_oauth):
@@ -638,24 +533,6 @@ async def run_subscription_structured_output_async(
         )
     token_store = token_store or get_token_store()
     if openai_oauth:
-        from src.model_capabilities import capability_for
-
-        capability = capability_for(model)
-        if (
-            capability is not None
-            and capability.execution_adapter == "codex_app_server"
-        ):
-            return await _codex_structured_output_async(
-                task=task,
-                credential_id=credential_id,
-                model=model,
-                system=system,
-                user=user,
-                schema=schema,
-                effort=effort,
-                token_store=token_store,
-                timeout_s=timeout_s,
-            )
         return await _openai_structured_output_async(
             credential_id=credential_id,
             model=model,

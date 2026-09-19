@@ -108,11 +108,9 @@ def test_picker_visibility_matches_the_ruling():
     for current in ("claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
                     "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra"):
         assert vis[current] == "default", current
-    assert vis["gpt-5.3-codex-spark"] == "advanced"
     for pinned in (set(vis) - {
         "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-5.3-codex-spark",
         "gpt-6-astra",
     }):
         assert vis[pinned] == "pinned_only", pinned
@@ -194,23 +192,25 @@ def test_fable_5_1_client_compaction_is_separate_from_provider_compaction():
     assert client_compaction_admission_detail(retired.id, True) is None
 
 
-def test_spark_is_exact_oauth_content_translation_only():
+def test_spark_is_history_only_without_an_execution_adapter():
     cap = capability_for("gpt-5.3-codex-spark")
 
     assert cap is not None
     assert cap.max_output is None
-    assert cap.allowed_tasks == ("card_translation",)
-    assert cap.allowed_auth_modes == ("chatgpt_oauth",)
+    assert cap.new_execution_allowed is False
+    assert cap.task_route_status == "retired"
+    assert cap.allowed_tasks == ()
+    assert cap.allowed_auth_modes == ()
     assert cap.required_plans == ()
     assert cap.exact_model_id is True
-    assert cap.execution_adapter == "codex_app_server"
+    assert cap.execution_adapter == "provider_native"
     assert capability_for("gpt-5.3-codex-spark-preview") is None
 
 
-def test_spark_execution_requires_the_exact_task_and_auth_tuple():
+def test_spark_execution_is_retired_for_every_former_context():
     assert model_execution_admission_detail("gpt-5.3-codex-spark") == {
-        "code": "model_task_unsupported",
-        "field": "task",
+        "code": "model_retired",
+        "field": "model",
     }
     assert model_execution_admission_detail(
         "gpt-5.3-codex-spark",
@@ -218,8 +218,8 @@ def test_spark_execution_requires_the_exact_task_and_auth_tuple():
         auth_mode="api_key",
         plan_type="pro",
     ) == {
-        "code": "task_auth_mode_unsupported",
-        "field": "credential",
+        "code": "model_retired",
+        "field": "model",
     }
     for diagnostic_plan in ("pro", "prolite", "plus", None):
         assert model_execution_admission_detail(
@@ -227,26 +227,26 @@ def test_spark_execution_requires_the_exact_task_and_auth_tuple():
             task="card_translation",
             auth_mode="chatgpt_oauth",
             plan_type=diagnostic_plan,
-        ) is None
+        ) == {"code": "model_retired", "field": "model"}
 
 
-def test_unknown_plan_does_not_replace_exact_model_entitlement():
+def test_unknown_plan_does_not_override_retirement():
     for plan_type in (None, "", "   ", "not a valid plan value"):
         assert model_execution_admission_detail(
             "gpt-5.3-codex-spark",
             task="card_translation",
             auth_mode="chatgpt_oauth",
             plan_type=plan_type,
-        ) is None
+        ) == {"code": "model_retired", "field": "model"}
 
 
-def test_provider_plan_names_are_diagnostic_not_spark_admission():
+def test_future_provider_plan_does_not_override_retirement():
     assert model_execution_admission_detail(
         "gpt-5.3-codex-spark",
         task="card_translation",
         auth_mode="chatgpt_oauth",
         plan_type="future-provider-plan-name",
-    ) is None
+    ) == {"code": "model_retired", "field": "model"}
 
 
 def test_spark_exact_entitlement_accepts_the_literal_provider_model_id():
@@ -456,9 +456,9 @@ def test_opus5_is_the_current_anthropic_advanced_model_with_official_facts():
 def test_known_retired_models_keep_capabilities_but_leave_new_task_routes():
     current = {"claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
                "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-               "gpt-5.3-codex-spark", "gpt-6-astra"}
+               "gpt-6-astra"}
     retired = {cap.id for cap in all_models()} - current
-    assert len(retired) == 13
+    assert len(retired) == 14
     for model_id in retired:
         capability = capability_for(model_id)
         assert capability is not None, model_id

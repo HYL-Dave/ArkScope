@@ -324,7 +324,13 @@ async def dispatch_task_model_test(
     token_store: Any,
     timeout_s: float = 45.0,
 ) -> TaskModelTestResult:
-    """Run one bounded test using the fixed five-step dispatch precedence."""
+    """Reject product-retired models before the credential-aware dispatch checks."""
+    capability = capability_for(model)
+    if capability is not None and not capability.new_execution_allowed:
+        return _result(
+            task=task, provider=provider, model=model, effort=effort,
+            active=None, status="unsupported", error_code="model_retired",
+        )
     active = resolve_active_credential(
         provider,
         store,
@@ -344,7 +350,6 @@ async def dispatch_task_model_test(
             active=active, status="unsupported", error_code=auth_error,
         )
 
-    capability = capability_for(model)
     if task == "lifecycle_investigation":
         from src.model_routing import task_route_admission_detail
 

@@ -397,33 +397,19 @@ describe("ModelRoutingSection provider-first UX", () => {
     return host!.querySelector('[data-testid="route-card_translation"]')!;
   }
 
-  function sparkCatalog(
-    planType: string,
-    eligible: boolean,
-    usageHint = false,
-    missingReason: "model_entitlement_unverified" | "model_not_visible" = "model_entitlement_unverified",
-  ): ModelCatalog {
+  function retiredSparkCatalog(planType: string, savedRoute = true): ModelCatalog {
     const cat = catalogV2();
     const sparkId = "gpt-5.3-codex-spark";
-    cat.current_model_ids = [...(cat.current_model_ids ?? []), sparkId];
-    cat.models = [
-      ...cat.models,
-      {
-        ...MODELS[0],
-        id: sparkId,
-        label: sparkId,
-        effort_options: ["low", "medium", "high", "xhigh"],
-      },
+    cat.retired_model_ids = [...(cat.retired_model_ids ?? []), sparkId];
+    cat.model_lifecycle = [
+      ...(cat.model_lifecycle ?? []),
+      { id: sparkId, provider: "openai", task_route_status: "retired", aliases: [] },
     ];
     cat.effective!.providers!.openai = {
       ...cat.effective!.providers!.openai!,
       plan_type: planType,
-      entitlement_hints: usageHint ? [{
-        model_id: sparkId,
-        source: "subscription_usage",
-        observed_at: "2026-09-03T01:02:03Z",
-      }] : undefined,
     };
+    if (!savedRoute) return cat;
     const task = cat.effective!.tasks.card_translation!;
     const openai = task.providers!.openai!;
     cat.effective!.tasks.card_translation = {
@@ -437,13 +423,13 @@ describe("ModelRoutingSection provider-first UX", () => {
             {
               ...entry(
                 sparkId,
-                "advanced",
-                eligible,
-                eligible ? null : missingReason,
+                "route",
+                false,
+                "model_retired",
                 "none",
-                eligible ? true : null,
+                true,
               ),
-              effort_options: ["low", "medium", "high", "xhigh"],
+              effort_options: [],
             },
           ],
         },
@@ -537,10 +523,10 @@ describe("ModelRoutingSection provider-first UX", () => {
       .toContain("進階");
   });
 
-  it.each(["model_entitlement_unverified", "model_not_visible"] as const)(
-    "uses Spark usage only to prompt exact model-list revalidation from %s",
-    (reason) => {
-      const cat = sparkCatalog("prolite", false, true, reason);
+  it.each(["pro", "prolite", "plus"])(
+    "keeps an old Spark route blocked regardless of discovered visibility or plan %s",
+    (plan) => {
+      const cat = retiredSparkCatalog(plan);
       render(vi.fn(), cat, undefined, {
         draft: {
           ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
@@ -554,40 +540,29 @@ describe("ModelRoutingSection provider-first UX", () => {
       const spark = Array.from(model.options)
         .find((option) => option.value === "gpt-5.3-codex-spark")!;
       expect(spark.disabled).toBe(true);
-      expect(spark.textContent).toContain(
-        reason === "model_entitlement_unverified"
-          ? "尚未確認此登入可用此模型"
-          : "此登入的探索清單未顯示此模型",
-      );
-      expect(translation.textContent).toContain("方案：prolite");
+      expect(spark.textContent).toContain("此模型已退出新執行");
+      expect(translation.textContent?.toLowerCase()).toContain(`方案：${plan}`);
       expect(translation.textContent)
-        .toContain("已偵測到 Spark 額度；重新驗證模型清單後才能使用");
+        .not.toContain("已偵測到 Spark 額度");
       expect(translation.textContent).toContain("不可選：");
       expect(buttonByText(translation, "重新驗證列表")).toBeTruthy();
     },
   );
 
-  it("enables exactly discovered Spark regardless of diagnostic plan name", () => {
-    const cat = sparkCatalog("prolite", true);
+  it("does not offer Spark in any task without a saved historical route", () => {
+    const cat = retiredSparkCatalog("prolite", false);
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
-        card_translation: { provider: "openai", model: "gpt-5.3-codex-spark", effort: "high", custom: false },
+        card_translation: { provider: "openai", model: "gpt-5.6-luna", effort: "high", custom: false },
         card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
 
     const translation = translationCard();
     const model = labelledControl(translation, "model") as HTMLSelectElement;
-    const effort = labelledControl(translation, "effort") as HTMLSelectElement;
     expect(Array.from(model.options)
-      .find((option) => option.value === "gpt-5.3-codex-spark")?.disabled).toBe(false);
-    expect(Array.from(effort.options).map((option) => option.value)).toEqual([
-      "", "low", "medium", "high", "xhigh",
-    ]);
-    expect(Array.from(model.options)
-      .find((option) => option.value === "gpt-5.3-codex-spark")?.textContent)
-      .not.toContain("進階");
+      .map((option) => option.value)).not.toContain("gpt-5.3-codex-spark");
     expect(translation.textContent).toContain("方案：prolite");
     expect(Array.from((labelledControl(researchCard(), "model") as HTMLSelectElement).options)
       .map((option) => option.value)).not.toContain("gpt-5.3-codex-spark");

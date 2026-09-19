@@ -66,7 +66,6 @@ logger = logging.getLogger(__name__)
 
 # The per-task model routes this surface manages (matches model_routing.TaskId).
 _ROUTE_TASKS = TASK_IDS
-_SPARK_MODEL_ID = "gpt-5.3-codex-spark"
 
 
 def _credential_apply_enabled() -> bool:
@@ -89,36 +88,6 @@ def _oauth_observation_store(store: CredentialStore, candidate):
     from src.auth_drivers.oauth_status import OAuthObservationStore
 
     return OAuthObservationStore(store.db_path)
-
-
-def _subscription_entitlement_hints(observation_store, summary) -> list[dict[str, str]]:
-    """Project closed, non-authoritative model hints from cached usage only."""
-    if summary.get("auth_mode") != "chatgpt_oauth":
-        return []
-    try:
-        snapshot = observation_store.read_account_snapshot(summary["credential_id"])
-    except Exception:  # noqa: BLE001 - an optional hint must not break the catalog
-        return []
-    if (
-        snapshot is None
-        or snapshot.provider != "openai"
-        or snapshot.auth_mode != "chatgpt_oauth"
-        or snapshot.credential_id != summary["credential_id"]
-    ):
-        return []
-    capability = capability_for(_SPARK_MODEL_ID)
-    expected_label = capability.label.casefold() if capability is not None else ""
-    if not any(
-        isinstance(limit.limit_name, str)
-        and limit.limit_name.strip().casefold() == expected_label
-        for limit in snapshot.payload.rate_limits_by_limit_id.values()
-    ):
-        return []
-    return [{
-        "model_id": _SPARK_MODEL_ID,
-        "source": "subscription_usage",
-        "observed_at": snapshot.observed_at,
-    }]
 
 
 def _run_coro(coro):
@@ -152,6 +121,8 @@ def _restricted_task_route_admission_detail(
 ) -> dict[str, str] | None:
     """Apply credential and discovery policy for restricted registry entries."""
     capability = capability_for(model)
+    if capability is not None and not capability.new_execution_allowed:
+        return {"code": "model_retired", "field": "model"}
     credential = None
     if capability is not None and (
         capability.allowed_tasks
@@ -408,7 +379,6 @@ def model_catalog(
             routes=routes,
             credentials=credentials,
         )
-        resolved_observation_store = _oauth_observation_store(store, observation_store)
         for provider, summary in v2["providers"].items():
             if summary is None:
                 continue
@@ -420,13 +390,6 @@ def model_catalog(
                 None,
             )
             summary["label"] = inventory_row.label if inventory_row else summary["credential_id"]
-            if provider == "openai":
-                hints = _subscription_entitlement_hints(
-                    resolved_observation_store,
-                    summary,
-                )
-                if hints:
-                    summary["entitlement_hints"] = hints
         legacy = legacy_effective_alias(v2)
         effective = {
             "providers": v2["providers"],

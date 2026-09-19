@@ -43,8 +43,6 @@ import {
   type SettingsT,
 } from "./settingsCopy";
 
-const SPARK_MODEL_ID = "gpt-5.3-codex-spark";
-
 function taskDescription(task: ModelTask, t: SettingsT): string {
   switch (task) {
     case "card_synthesis":
@@ -73,7 +71,6 @@ function modelEntrySuffix(
   if (entry.compatibility === "legacy_unverified") {
     return t(($) => $.models.compatibility.unverified);
   }
-  if (entry.id === SPARK_MODEL_ID && entry.status === "advanced") return null;
   if (entry.status === "advanced") return t(($) => $.models.compatibility.advanced);
   if (entry.status === "seed" && cacheState === "ok") {
     return t(($) => $.models.compatibility.notInLastModelList);
@@ -198,21 +195,6 @@ export function ModelRoutingSection({
             providerReason,
             commonT,
             providerBlock?.cache_state,
-          );
-          const hasSparkUsageHint = !!(
-            task.id === "card_translation"
-            && row.provider === "openai"
-            && context?.entitlement_hints?.some(
-              (hint) => hint.model_id === "gpt-5.3-codex-spark"
-                && hint.source === "subscription_usage",
-            )
-            && entries.some(
-              (entry) => entry.id === "gpt-5.3-codex-spark"
-                && (
-                  entry.reason_code === "model_entitlement_unverified"
-                  || entry.reason_code === "model_not_visible"
-                ),
-            )
           );
           const selectedEntry = entries.find((entry) => entry.id === row.model) ?? null;
           const selectedReason = selectedModelStatus === "retired"
@@ -373,12 +355,6 @@ export function ModelRoutingSection({
                   </>
                 )}
               </div>
-
-              {hasSparkUsageHint ? (
-                <p className="field-help">
-                  {t(($) => $.models.catalog.sparkUsageHint)}
-                </p>
-              ) : null}
 
               {compatMode ? (
                 <p className="warn-text">

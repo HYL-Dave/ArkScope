@@ -39,7 +39,7 @@ def test_web_model_admission_keeps_eligible_api_and_oauth(provider, auth, model)
 
 
 @pytest.mark.parametrize("provider,auth,model,code", [
-    ("openai", "chatgpt_oauth", "gpt-5.3-codex-spark", "model_task_unsupported"),
+    ("openai", "chatgpt_oauth", "gpt-5.3-codex-spark", "model_retired"),
     ("anthropic", "api_key", "claude-fable-5", "model_retired"),
     ("anthropic", "claude_code_oauth", "claude-fable-5-1", "model_auth_unverified"),
     ("openai", "api_key", "claude-opus-5", "model_provider_mismatch"),

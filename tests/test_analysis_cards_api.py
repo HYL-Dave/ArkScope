@@ -277,7 +277,7 @@ def test_translate_subscription_failure_returns_closed_route_metadata(
         lambda task: SimpleNamespace(
             task=task,
             provider="openai",
-            model="gpt-5.3-codex-spark",
+            model="gpt-5.6-luna",
             effort="xhigh",
         ),
     )
@@ -298,8 +298,8 @@ def test_translate_subscription_failure_returns_closed_route_metadata(
         "code": "translation_route_unavailable",
         "retryable": False,
         "provider": "openai",
-        "model": "gpt-5.3-codex-spark",
-        "harness": "codex_app_server",
+        "model": "gpt-5.6-luna",
+        "harness": "openai_sdk",
     }
     assert "provider-controlled" not in str(exc.value.detail)
     assert store.get(rid).translations is None

@@ -52,7 +52,7 @@ def test_fable_5_1_api_key_is_executable_but_oauth_is_not_live_verified():
         ) is False
 
 
-def test_spark_task_auth_executability_uses_oauth_translation_not_plan_name():
+def test_retired_spark_is_not_executable_for_any_plan_or_auth_mode():
     spark = capability_for("gpt-5.3-codex-spark")
 
     assert spark is not None
@@ -62,7 +62,7 @@ def test_spark_task_auth_executability_uses_oauth_translation_not_plan_name():
         "chatgpt_oauth",
         spark,
         plan_type="pro",
-    ) is True
+    ) is False
     for diagnostic_plan in ("plus", "prolite", None):
         assert task_auth_executable(
             "card_translation",
@@ -70,7 +70,7 @@ def test_spark_task_auth_executability_uses_oauth_translation_not_plan_name():
             "chatgpt_oauth",
             spark,
             plan_type=diagnostic_plan,
-        ) is True
+        ) is False
     assert task_auth_executable(
         "card_translation",
         "openai",
@@ -199,7 +199,7 @@ def test_pinned_only_retired_model_stays_absent_from_the_registry_union(tmp_path
         assert all(entry["id"] != "claude-fable-5" for entry in entries)
 
 
-def test_registry_seed_does_not_claim_advanced_exact_model_entitlement(tmp_path):
+def test_registry_seed_does_not_offer_retired_spark(tmp_path):
     view = effective_model_view_v2(
         cache=_seed_cache(tmp_path),
         routes=_routes_mixed(),
@@ -207,14 +207,10 @@ def test_registry_seed_does_not_claim_advanced_exact_model_entitlement(tmp_path)
     )
 
     entries = view["tasks"]["card_translation"]["providers"]["openai"]["models"]
-    spark = next(entry for entry in entries if entry["id"] == "gpt-5.3-codex-spark")
-    assert spark["status"] == "advanced"
-    assert spark["visible_to_credential"] is False
-    assert spark["eligible"] is False
-    assert spark["reason_code"] == "model_not_visible"
+    assert all(entry["id"] != "gpt-5.3-codex-spark" for entry in entries)
 
 
-def test_exact_model_requires_a_successful_discovery_scope(tmp_path):
+def test_absent_discovery_does_not_offer_retired_spark(tmp_path):
     view = effective_model_view_v2(
         cache=ModelDiscoveryCache(tmp_path / "profile_state.db"),
         routes=_routes_mixed(),
@@ -227,10 +223,7 @@ def test_exact_model_requires_a_successful_discovery_scope(tmp_path):
     )
 
     entries = view["tasks"]["card_translation"]["providers"]["openai"]["models"]
-    spark = next(entry for entry in entries if entry["id"] == "gpt-5.3-codex-spark")
-    assert spark["visible_to_credential"] is None
-    assert spark["eligible"] is False
-    assert spark["reason_code"] == "model_entitlement_unverified"
+    assert all(entry["id"] != "gpt-5.3-codex-spark" for entry in entries)
 
 
 def test_pinned_only_model_appears_only_when_route_pins_it(tmp_path):
@@ -410,7 +403,7 @@ def test_resolver_reads_oauth_plan_from_token_store_not_display_alias(
     assert credential.plan_type == "plus"
 
 
-def test_spark_effective_view_uses_exact_discovery_not_plan_name(tmp_path):
+def test_spark_saved_route_stays_retired_despite_discovery_or_plan(tmp_path):
     cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
     cache.record_run(
         provider="openai",
@@ -464,8 +457,9 @@ def test_spark_effective_view_uses_exact_discovery_not_plan_name(tmp_path):
     for diagnostic_plan in ("pro", "prolite", "plus", None):
         spark = spark_entry(diagnostic_plan)
         assert spark["visible_to_credential"] is True
-        assert spark["eligible"] is True
-        assert spark["reason_code"] is None
+        assert spark["status"] == "route"
+        assert spark["eligible"] is False
+        assert spark["reason_code"] == "model_retired"
 
 
 def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_path):
@@ -485,7 +479,7 @@ def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_pat
     assert block["cache_state"] == "never_discovered"   # fail-closed shape
 
 
-def test_model_catalog_exposes_only_a_closed_spark_usage_hint(monkeypatch, tmp_path):
+def test_model_catalog_does_not_promote_historical_spark_usage(monkeypatch, tmp_path):
     from src.api.routes import config_routes as cr
     from src.auth_drivers import PlaintextTokenStore, StoredTokenRecord
     from src.auth_drivers.oauth_status import (
@@ -548,22 +542,13 @@ def test_model_catalog_exposes_only_a_closed_spark_usage_hint(monkeypatch, tmp_p
         observation_store=observation_store,
     )
 
-    assert out["effective"]["providers"]["openai"]["entitlement_hints"] == [
-        {
-            "model_id": "gpt-5.3-codex-spark",
-            "source": "subscription_usage",
-            "observed_at": "2026-09-03T01:02:03+00:00",
-        }
-    ]
-    spark = next(
-        entry
+    assert "entitlement_hints" not in out["effective"]["providers"]["openai"]
+    assert all(
+        entry["id"] != "gpt-5.3-codex-spark"
         for entry in out["effective"]["tasks"]["card_translation"]["providers"][
             "openai"
         ]["models"]
-        if entry["id"] == "gpt-5.3-codex-spark"
     )
-    assert spark["eligible"] is False
-    assert spark["reason_code"] == "model_entitlement_unverified"
     rendered = json.dumps(out, sort_keys=True)
     assert "fixture-secret-token" not in rendered
     assert "opaque-provider-limit-id" not in rendered

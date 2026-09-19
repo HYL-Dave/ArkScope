@@ -196,11 +196,6 @@ export interface EffectiveProviderSummary {
   // Additive for older sidecars that emitted effective providers before plan
   // admission was projected.
   plan_type?: string | null;
-  entitlement_hints?: Array<{
-    model_id: string;
-    source: "subscription_usage";
-    observed_at: string;
-  }>;
 }
 
 export interface EffectiveTaskModels {

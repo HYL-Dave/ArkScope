@@ -1,4 +1,4 @@
-"""Restricted Codex app-server Web purpose; Spark's no-tool adapter is unchanged."""
+"""Restricted Codex app-server Web purpose with shared event validation."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ import time
 from src.auth_drivers.codex_app_server_runtime import (
     CodexAppServerRuntimeError, run_authenticated_codex_operation,
 )
-from src.auth_drivers.codex_translation_adapter import (
-    CodexTranslationError, _ALLOWED_NOTIFICATIONS, _PASSIVE_ACCOUNT_NOTIFICATIONS,
+from src.auth_drivers.codex_event_contract import (
+    CodexEventError, _ALLOWED_NOTIFICATIONS, _PASSIVE_ACCOUNT_NOTIFICATIONS,
     _REJECTED_NOTIFICATIONS, _validate_event_identity, _validate_thread_response,
     _validate_thread_started, _validate_turn_control, _validate_turn_start,
     _validate_turn_telemetry,
@@ -29,7 +29,7 @@ _STOP_GRACE_SECONDS = 2.0
 def _failure(exc: Exception) -> WebModelError:
     if isinstance(exc, WebModelError):
         return exc
-    if isinstance(exc, (CodexAppServerRuntimeError, CodexTranslationError)):
+    if isinstance(exc, (CodexAppServerRuntimeError, CodexEventError)):
         return WebModelError(exc.code)
     return WebModelError("protocol_incompatible")
 

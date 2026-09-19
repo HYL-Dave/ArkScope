@@ -262,7 +262,6 @@ const settings = {
       neverDiscovered: "Models have not been discovered for this sign-in",
       verifyAgain: "Verify list again",
       viewLastResult: "View last result",
-      sparkUsageHint: "Spark quota was detected. Verify the model list again before use.",
     },
     credentials: {
       openProviders: "Go to Provider Sign-in and Credentials",

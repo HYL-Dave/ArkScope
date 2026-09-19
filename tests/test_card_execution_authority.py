@@ -429,8 +429,8 @@ def test_output_and_receipt_commit_atomically(world, operation):
 
 
 @pytest.mark.parametrize("task,provider,model,effort,mode,code", [
-    ("card_synthesis", "openai", "gpt-5.3-codex-spark", "high", "chatgpt_oauth", "model_task_unsupported"),
-    ("card_translation", "openai", "gpt-5.3-codex-spark", "high", "api_key", "task_auth_mode_unsupported"),
+    ("card_synthesis", "openai", "gpt-5.3-codex-spark", "high", "chatgpt_oauth", "model_retired"),
+    ("card_translation", "openai", "gpt-5.3-codex-spark", "high", "api_key", "model_retired"),
     ("card_synthesis", "anthropic", "claude-opus-4-7", "high", "api_key", "model_retired"),
     ("card_translation", "anthropic", "claude-opus-4-7", "high", "api_key", "model_retired"),
     ("card_synthesis", "anthropic", "claude-fable-5-1", "high", "claude_code_oauth", "model_auth_unverified"),

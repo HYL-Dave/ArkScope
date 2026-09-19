@@ -79,11 +79,11 @@ def test_catalog_exposes_canonical_current_and_retired_model_policy():
     assert set(policy.current_model_ids) == {
         "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-5.3-codex-spark",
         "gpt-6-astra",
     }
-    assert len(policy.retired_model_ids) == 13
+    assert len(policy.retired_model_ids) == 14
     assert "claude-fable-5" in policy.retired_model_ids
+    assert "gpt-5.3-codex-spark" in policy.retired_model_ids
     assert set(policy.current_model_ids).isdisjoint(policy.retired_model_ids)
     lifecycle = {fact.id: fact for fact in policy.model_lifecycle}
     assert lifecycle["gpt-5.6-sol"].task_route_status == "current"
@@ -150,7 +150,7 @@ def test_shared_task_route_admission_is_the_bounded_authority(
     assert task_route_admission_detail(provider, model, effort) == detail
 
 
-def test_spark_task_route_admission_uses_task_and_auth_not_plan_name():
+def test_spark_task_route_admission_rejects_all_former_contexts():
     from src.model_routing import task_route_admission_detail
 
     assert task_route_admission_detail(
@@ -160,7 +160,7 @@ def test_spark_task_route_admission_uses_task_and_auth_not_plan_name():
         task="card_translation",
         auth_mode="chatgpt_oauth",
         plan_type="pro",
-    ) is None
+    ) == {"code": "model_retired", "field": "model"}
     for diagnostic_plan in ("prolite", "plus", None):
         assert task_route_admission_detail(
             "openai",
@@ -169,7 +169,7 @@ def test_spark_task_route_admission_uses_task_and_auth_not_plan_name():
             task="card_translation",
             auth_mode="chatgpt_oauth",
             plan_type=diagnostic_plan,
-        ) is None
+        ) == {"code": "model_retired", "field": "model"}
     assert task_route_admission_detail(
         "openai",
         "gpt-5.3-codex-spark",
@@ -177,7 +177,7 @@ def test_spark_task_route_admission_uses_task_and_auth_not_plan_name():
         task="ai_research",
         auth_mode="chatgpt_oauth",
         plan_type="pro",
-    ) == {"code": "model_task_unsupported", "field": "task"}
+    ) == {"code": "model_retired", "field": "model"}
 
 
 def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
@@ -261,7 +261,7 @@ def _spark_route_stores(tmp_path, *, plan_type="pro", discovered=True):
 
 
 @pytest.mark.parametrize("diagnostic_plan", ["pro", "prolite", "plus", None])
-def test_update_model_routes_accepts_discovered_spark_regardless_of_plan_name(
+def test_update_model_routes_rejects_discovered_spark_regardless_of_plan_name(
     tmp_path, diagnostic_plan,
 ):
     from src.model_route_store import ModelRouteStore
@@ -271,23 +271,23 @@ def test_update_model_routes_accepts_discovered_spark_regardless_of_plan_name(
         plan_type=diagnostic_plan,
         discovered=True,
     )
-    result = update_model_routes(
-        ModelRoutesUpdate(routes={
-            "card_translation": RouteUpdate(
-                provider="openai",
-                model="gpt-5.3-codex-spark",
-                effort="medium",
-            ),
-        }),
-        store=store,
-        token_store=tokens,
-        observation_store=None,
-    )
+    with pytest.raises(HTTPException) as caught:
+        update_model_routes(
+            ModelRoutesUpdate(routes={
+                "card_translation": RouteUpdate(
+                    provider="openai",
+                    model="gpt-5.3-codex-spark",
+                    effort="medium",
+                ),
+            }),
+            store=store,
+            token_store=tokens,
+            observation_store=None,
+        )
 
-    assert result["routes"]["card_translation"]["model"] == "gpt-5.3-codex-spark"
-    saved = ModelRouteStore(store.db_path).get("card_translation")
-    assert saved is not None
-    assert saved.model == "gpt-5.3-codex-spark"
+    assert caught.value.status_code == 400
+    assert caught.value.detail == {"code": "model_retired", "field": "model"}
+    assert ModelRouteStore(store.db_path).get("card_translation") is None
 
 
 @pytest.mark.parametrize(
@@ -295,15 +295,15 @@ def test_update_model_routes_accepts_discovered_spark_regardless_of_plan_name(
     [
         (
             False,
-            {"code": "model_entitlement_unverified", "field": "model"},
+            {"code": "model_retired", "field": "model"},
         ),
         (
             "missing",
-            {"code": "model_not_visible", "field": "model"},
+            {"code": "model_retired", "field": "model"},
         ),
     ],
 )
-def test_update_model_routes_requires_exact_spark_discovery_before_write(
+def test_update_model_routes_rejects_retired_spark_without_discovery(
     tmp_path, discovered, expected_detail,
 ):
     from src.model_route_store import ModelRouteStore

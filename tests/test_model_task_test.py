@@ -6,6 +6,7 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
 
 from src.agents.shared.events import AgentEvent, EventType
@@ -369,8 +370,8 @@ def test_oauth_card_canary_uses_one_subscription_structured_call(
 @pytest.mark.parametrize(
     ("active", "task", "expected"),
     [
-        (_active("api_key", plan_type=None), "card_translation", "task_auth_mode_unsupported"),
-        (_active("chatgpt_oauth", plan_type="pro"), "card_synthesis", "model_task_unsupported"),
+        (_active("api_key", plan_type=None), "card_translation", "model_retired"),
+        (_active("chatgpt_oauth", plan_type="pro"), "card_synthesis", "model_retired"),
     ],
 )
 def test_spark_ineligible_contexts_stop_before_discovery_or_provider(
@@ -392,7 +393,7 @@ def test_spark_ineligible_contexts_stop_before_discovery_or_provider(
     assert cache.calls == []
 
 
-def test_unknown_spark_plan_defers_to_bounded_subscription_dispatch(monkeypatch, tmp_path):
+def test_unknown_spark_plan_does_not_allow_dispatch(monkeypatch, tmp_path):
     scope = DiscoveryScope(
         status="ok",
         discovered_at="2026-09-03T00:00:00Z",
@@ -409,11 +410,12 @@ def test_unknown_spark_plan_defers_to_bounded_subscription_dispatch(monkeypatch,
         cache=_Cache(scope),
     )
 
-    assert result.status == "ok"
-    assert len(calls["subscription"]) == 1
+    assert result.status == "unsupported"
+    assert result.error_code == "model_retired"
+    assert calls == {"api": [], "driver": [], "subscription": []}
 
 
-def test_spark_requires_successful_exact_discovery_before_provider(monkeypatch, tmp_path):
+def test_spark_is_retired_even_without_discovery(monkeypatch, tmp_path):
     result, calls, _ = _run(
         monkeypatch,
         tmp_path,
@@ -426,12 +428,12 @@ def test_spark_requires_successful_exact_discovery_before_provider(monkeypatch, 
     )
 
     assert result.status == "unsupported"
-    assert result.error_code == "model_entitlement_unverified"
+    assert result.error_code == "model_retired"
     assert calls == {"api": [], "driver": [], "subscription": []}
 
 
 @pytest.mark.parametrize("diagnostic_plan", ["pro", "prolite", "plus", None])
-def test_spark_task_test_dispatches_once_after_exact_discovery(
+def test_spark_task_test_never_dispatches_after_exact_discovery(
     monkeypatch, tmp_path, diagnostic_plan,
 ):
     scope = DiscoveryScope(
@@ -451,11 +453,9 @@ def test_spark_task_test_dispatches_once_after_exact_discovery(
         cache=_Cache(scope),
     )
 
-    assert result.status == "ok"
-    assert result.latency_ms is not None
-    assert len(calls["subscription"]) == 1
-    assert calls["subscription"][0]["task"] == "card_translation"
-    assert calls["api"] == [] and calls["driver"] == []
+    assert result.status == "unsupported"
+    assert result.error_code == "model_retired"
+    assert calls == {"api": [], "driver": [], "subscription": []}
 
 
 def test_dispatch_passes_token_store_to_active_credential_resolution(
@@ -476,7 +476,7 @@ def test_dispatch_passes_token_store_to_active_credential_resolution(
         mt.dispatch_task_model_test(
             task="card_translation",
             provider="openai",
-            model="gpt-5.3-codex-spark",
+            model="gpt-5.6-luna",
             effort="medium",
             store=store,
             token_store=token_store,
@@ -686,7 +686,7 @@ def test_task_test_route_dispatches_custom_and_current_explicit_routes(
     }
 
 
-def test_task_test_route_defers_spark_entitlement_to_bounded_dispatch(
+def test_task_test_route_rejects_retired_spark_before_dispatch(
     monkeypatch, tmp_path,
 ):
     from src.api.routes import config_routes as cr
@@ -704,19 +704,18 @@ def test_task_test_route_defers_spark_entitlement_to_bounded_dispatch(
 
     monkeypatch.setattr(cr, "dispatch_task_model_test", fake_dispatch)
 
-    response = cr.run_task_model_test(
-        cr.TaskModelTestRequest(
-            task="card_translation",
-            provider="openai",
-            model="gpt-5.3-codex-spark",
-            effort="medium",
-        ),
-        store=_Store(tmp_path / "profile_state.db"),
-        token_store=object(),
-    )
+    with pytest.raises(HTTPException) as caught:
+        cr.run_task_model_test(
+            cr.TaskModelTestRequest(
+                task="card_translation",
+                provider="openai",
+                model="gpt-5.3-codex-spark",
+                effort="medium",
+            ),
+            store=_Store(tmp_path / "profile_state.db"),
+            token_store=object(),
+        )
 
-    assert response == {
-        "status": "unsupported",
-        "error_code": "model_entitlement_unverified",
-    }
-    assert len(dispatched) == 1
+    assert caught.value.status_code == 400
+    assert caught.value.detail == {"code": "model_retired", "field": "model"}
+    assert dispatched == []

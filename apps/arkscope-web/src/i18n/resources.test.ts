@@ -761,7 +761,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1053,
+      settings: 1052,
       research: 236,
       explore: 1178,
       portfolio: 374,
@@ -847,7 +847,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2984);
+      expect(total, `${locale}.total`).toBe(2983);
       expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys, "schedule", "formGroups", "formNames"].sort());
       expect(Object.keys(resources[locale].settings.secResearch.schedule).sort()).toEqual([...secScheduleKeys].sort());
       expect(Object.keys(resources[locale].settings.secResearch.formGroups).sort()).toEqual([...secFormGroupKeys].sort());
@@ -1267,7 +1267,6 @@ describe("bundled i18n resources", () => {
       "models.route.effortRequired",
       "models.route.modelRetired",
       "models.catalog.selectEffort",
-      "models.catalog.sparkUsageHint",
       "models.catalog.viewLastResult",
       "models.credentials.plan",
       "models.compatibility.notInLastModelList",

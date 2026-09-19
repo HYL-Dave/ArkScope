@@ -240,23 +240,22 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ModelCapability(
         id="gpt-5.3-codex-spark", provider="openai",
         label="GPT-5.3-Codex-Spark",
-        picker_visibility="advanced", thinking_mode="none",
+        picker_visibility="pinned_only", thinking_mode="none",
         effort_options=_OPENAI_CODEX_EFFORTS, supports_compaction=False,
         context_mode="standard", context_limit=128_000, max_output=None,
         supports_tool_calling=False,
-        allowed_tasks=("card_translation",),
-        allowed_auth_modes=("chatgpt_oauth",),
+        runtime_ready=False,
+        new_execution_allowed=False,
         exact_model_id=True,
-        execution_adapter="codex_app_server",
-        task_route_status="current",
+        task_route_status="retired",
         in_routing_seed=False,
         quality="fast", speed="fast", cost_tier="low",
-        recommended_for=("card_translation",),
+        recommended_for=(),
         source_url="https://openai.com/index/introducing-gpt-5-3-codex-spark/",
-        verified_at="2026-09-02",
-        notes="ChatGPT Pro research preview; exact-id Content Translation route "
-              "through the bundled Codex app-server only. Provider maximum "
-              "output is not published.",
+        verified_at="2026-09-19",
+        notes="Product-retired by user decision on 2026-09-19. Retained only "
+              "to identify historical records and reject stale selections; "
+              "no execution adapter or automatic replacement.",
     ),
     ModelCapability(
         id="gpt-6-astra", provider="openai", label="GPT-6 Astra",

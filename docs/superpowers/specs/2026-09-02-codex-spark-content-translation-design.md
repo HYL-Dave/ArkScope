@@ -1,5 +1,10 @@
 # Codex Spark Content Translation Design
 
+> **Retired 2026-09-19:** The user withdrew Spark execution from ArkScope.
+> This design is historical, not current admission authority. Spark options
+> and its translation adapter are removed; saved records remain readable.
+> See [retirement and coverage](../evidence/2026-09-19-spark-retirement/README.md).
+
 **Status:** Offline implementation amended 2026-09-03 after live UI observation
 proved that provider plan labels are not a reliable entitlement contract. Live
 Spark execution remains separately gated on exact same-credential `model/list`

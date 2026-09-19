@@ -151,13 +151,13 @@ describe("effortOptionsForModel", () => {
   });
 
   it("validates a discovered task-only model against its effective effort facts", () => {
-    const sparkId = "gpt-5.3-codex-spark";
+    const modelId = "gpt-task-only-fixture";
     const taskOnlyCatalog = {
       ...catalog,
-      current_model_ids: [...(catalog.current_model_ids ?? []), sparkId],
+      current_model_ids: [...(catalog.current_model_ids ?? []), modelId],
       model_lifecycle: [
         ...(catalog.model_lifecycle ?? []),
-        { id: sparkId, provider: "openai" as const, task_route_status: "current" as const, aliases: [] },
+        { id: modelId, provider: "openai" as const, task_route_status: "current" as const, aliases: [] },
       ],
       effective: {
         providers: {},
@@ -165,7 +165,7 @@ describe("effortOptionsForModel", () => {
           card_translation: {
             providers: {
               openai: {
-                models: [{ id: sparkId, effort_options: ["low", "medium", "high", "xhigh"] }],
+                models: [{ id: modelId, effort_options: ["low", "medium", "high", "xhigh"] }],
               },
             },
           },
@@ -175,12 +175,12 @@ describe("effortOptionsForModel", () => {
 
     expect(taskRouteBlocker(taskOnlyCatalog, {
       provider: "openai",
-      model: sparkId,
+      model: modelId,
       effort: "xhigh",
     }, "card_translation")).toBeNull();
     expect(taskRouteBlocker(taskOnlyCatalog, {
       provider: "openai",
-      model: sparkId,
+      model: modelId,
       effort: "max",
     }, "card_translation")).toBe("effort_required");
   });
