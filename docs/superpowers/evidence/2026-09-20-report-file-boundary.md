@@ -21,8 +21,12 @@ Tests: `tests/test_report_file_boundary.py` has 24 cases. Initial result was
 23 failed / 1 passed; after repair, those and records/API/SDK compatibility
 owners passed together (123 passed). Coverage includes traversals, absolute
 and metadata paths, extension/canonical syntax, both link forms, both directory
-components, no-create reads, legitimate roundtrip, save collision, leaf exchange,
+components, no report-directory creation on reads, legitimate roundtrip, save collision, leaf exchange,
 unsupported secure I/O and a subprocess-bounded FIFO case.
 
 This repairs report file access, not the still-open quote freshness, earnings
 event alignment, financial-ratio or future external authorization findings.
+Existing app-record-store initialization is unchanged; this is not a guarantee
+that the whole tool has no database side effects. Complete regression at
+`033c4515` is recorded in the [retirement packet](2026-09-19-card-translation-retirement/README.md).
+The running production App has not yet been switched to the fixed code.

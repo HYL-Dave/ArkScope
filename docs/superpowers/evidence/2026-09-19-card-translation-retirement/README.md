@@ -59,7 +59,47 @@ model, credential, paid call or fallback is introduced.
   commands still function, no horizontal overflow or external/sidecar request.
   Runner: `browser_check.py`; synthetic screenshots under
   `/tmp/arkscope-card-retirement-browser/`. This is not production App activation.
-- Final full-backend verification is recorded separately after the frozen run.
+- Frozen complete regression at `033c451572b4eb97088f6a088a7d13defba500a6`:
+  **11,266 backend passed / 12 skipped**, 1,807.15 seconds, one plain
+  `pytest tests/` process; **1,830 frontend passed / 124 files**, 13.98 seconds.
+  TypeScript/build, i18n (zero debt signatures) and all eight desktop tests were
+  freshly rerun at that revision. No second application pytest session ran in
+  parallel. Separate disposal rehearsals imported no App code and used only
+  in-memory databases outside the product worktree.
+- The first full attempt at `751b2051` was stopped after a stale test expectation
+  appeared. A first-failure replay reported one failed / 91 passed: the fresh
+  route test expected two different models for synthesis after retiring its
+  translation case. `033c4515` now checks all three active tasks exactly once;
+  its eight-test focused file passed before the complete clean rerun above.
+  Neither interrupted run is counted as acceptance.
+- All 1,162 tracked files under `src`, `data_sources`, `tests` and `apps` kept
+  the same fingerprint before and after complete backend/frontend verification:
+  `791e18c52c7b88dbdaaff6e9416c10ec79895872421c079f542bbefaddbb6485`.
+  Method: `git ls-files -z src data_sources tests apps | sort -z |
+  xargs -0 sha256sum | sha256sum`. Subsequent changes add only this evidence,
+  planning updates and the separately tested operator script below.
+
+## Prepared Disposal, Not Executed
+
+`checks/dispose.py` is an explicit one-time operator program, not a startup
+migration, API or scheduler task. Its **10 standalone in-memory tests pass**:
+unchanged originals/receipts/Research and remaining settings, repeat no-op,
+embedded-only legacy state, changed target/settings shape, unexpected index,
+views/triggers/FK dependencies, settings-cascade refusal and COMMIT rollback.
+The code verifies integrity/FKs before and after one transaction, drops only the
+translation table/index and embedded translation column, and removes only the
+retired task's two settings rows. It preserves other schema, sequence entries,
+protected row counts and the complete remaining route/runtime settings.
+
+The command requires explicit `--apply --writers-stopped` flags and targets only
+the approved main profile path, opened with `mode=rw` so it cannot create a
+missing database. The stop flag is an operator assertion, not a substitute for
+checking the App, native-host/collector writers and open DB handles. No actual
+apply has run. No original-card text, translation text or credentials are dumped;
+the eventual receipt contains counts and structural outcomes only. This operation
+does not delete backups, alter private YAML/environment files or change unrelated
+task selections. Private-file retirement keys, if present, still need a scoped
+check during activation; this is not an automatic global configuration cleanup.
 
 ## Remaining Operations
 
@@ -78,3 +118,12 @@ proof that an arbitrary backup can be deleted.
 Earnings monitoring remains a separate scoped follow-up:
 `docs/superpowers/plans/2026-09-20-earnings-observation-followup.md`.
 The source-workflow branch and pre-existing dirty/unknown worktrees are retained.
+Its previously uncommitted source/tool/research audit is now safely recorded at
+`5c123120`; its inventory validator passed (56/57 tools, 17/18 OAuth tools each,
+28 observed names and 37 valid relative links). That dated audit still describes
+its original revisions, not a claim that its parked product code has this fix.
+The unattached `codex/research-output-boundary` branch at `41682675` was deleted
+only after confirming it is an ancestor of master. Attached worktrees with
+ignored data or unknown edits were not removed. Main remains at `52037620`,
+with its two pre-existing untracked documentation locations untouched. There
+has been no merge, remote push or post-merge production smoke test.
