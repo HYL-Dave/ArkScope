@@ -239,11 +239,11 @@ def test_discover_uses_app_server_catalog_and_keeps_subscription_only_model_meta
     assert spark.effort_options == ["low", "medium", "high", "xhigh"]
     assert spark.default_effort == "medium"
     assert spark.input_modalities == ["text"]
-    assert spark.task_route_tasks == ["card_translation"]
+    assert spark.task_route_tasks == []
 
 
 @pytest.mark.parametrize("plan_type", ["pro", "prolite", "plus", None])
-def test_spark_discovery_advertises_translation_from_exact_model_not_plan_name(
+def test_spark_discovery_never_advertises_a_task_regardless_of_plan(
     monkeypatch,
     plan_type,
 ):
@@ -257,7 +257,7 @@ def test_spark_discovery_advertises_translation_from_exact_model_not_plan_name(
     result = _run(_driver().discover_models())
 
     assert result.status == "ok"
-    assert result.models[0].task_route_tasks == ["card_translation"]
+    assert result.models[0].task_route_tasks == []
 
 
 def test_spark_discovery_does_not_advertise_a_case_variant_as_the_exact_model(
@@ -325,7 +325,7 @@ def test_discovery_persists_live_plan_without_changing_token_material(
     )
 
     assert result.status == "ok"
-    assert result.models[0].task_route_tasks == ["card_translation"]
+    assert result.models[0].task_route_tasks == []
     assert token_store.record.plan_type == "pro"
     assert token_store.record.plan_observed_at is not None
     assert token_store.record.access_token == original.access_token
@@ -357,7 +357,7 @@ def test_discovery_keeps_exact_catalog_when_plan_diagnostic_save_fails(
 
     assert result.status == "ok"
     assert result.models[0].id == "gpt-5.3-codex-spark"
-    assert result.models[0].task_route_tasks == ["card_translation"]
+    assert result.models[0].task_route_tasks == []
 
 
 def test_discovery_rejects_catalog_when_token_generation_changed(monkeypatch):
@@ -400,7 +400,7 @@ def test_discovery_accepts_exact_catalog_when_live_plan_is_absent(
     result = _run(_driver().discover_models())
 
     assert result.status == "ok"
-    assert result.models[0].task_route_tasks == ["card_translation"]
+    assert result.models[0].task_route_tasks == []
 
 
 def test_discover_keeps_reviewed_current_models_available_to_existing_task_routes(monkeypatch):

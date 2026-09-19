@@ -65,6 +65,7 @@ _configure_openai_responses_transport()
 # 值為 registry 事實（src/model_capabilities.py）— P2.7 convergence。
 from src.model_capabilities import all_models as _all_capabilities
 from src.model_capabilities import capability_for as _capability_for
+from src.model_capabilities import model_execution_admission_detail
 
 _OPENAI_MODEL_MAX_OUTPUT = {
     c.id: c.max_output
@@ -338,6 +339,9 @@ def _build_agent(
     from agents import Agent, ModelSettings, OpenAIResponsesModel
     from openai.types.shared import Reasoning
 
+    detail = model_execution_admission_detail(model_name)
+    if detail is not None:
+        raise ValueError(detail)
     from src.auth_drivers.live_resolver import live_openai_async_client
     client = live_openai_async_client()
     register_output_api_key(client)

@@ -52,7 +52,7 @@ def task_capability_ok(task: str, capability: ModelCapability) -> bool:
     if capability.allowed_tasks and task not in capability.allowed_tasks:
         return False
     if capability.execution_adapter != "provider_native":
-        return task == "card_translation" and capability.supports_structured_output
+        return False
     if task in (*_CARD_TASKS, "lifecycle_investigation"):
         return capability.supports_tool_calling and capability.supports_structured_output
     if task == "ai_research":

@@ -596,6 +596,15 @@ class OpenAIChatGPTOAuthDriver:
         # Classified early exits (S3 plan D4) — one machine-readable error event,
         # never a bare exception, never a backend call. Wiring vs token-absent
         # arms are split exactly like discover_models.
+        from src.model_capabilities import model_execution_admission_detail
+
+        detail = model_execution_admission_detail(getattr(request, "model", ""))
+        if detail is not None:
+            yield AgentEvent(EventType.error, {
+                "error": "The selected model cannot execute this request.",
+                "code": detail["code"], "provider": "openai", "model": request.model,
+            })
+            return
         if self._token_store is None or not self._credential_id:
             # getattr: these exits must stay reachable even for a malformed/None
             # request — the classified event IS the fail-closed surface.

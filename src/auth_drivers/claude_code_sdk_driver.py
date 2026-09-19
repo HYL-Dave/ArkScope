@@ -529,6 +529,12 @@ class AnthropicClaudeCodeSdkDriver:
         )
 
     async def _stream(self, request: LLMRequest) -> AsyncIterator[AgentEvent]:
+        from src.model_capabilities import model_execution_admission_detail
+
+        detail = model_execution_admission_detail(request.model)
+        if detail is not None:
+            yield _err(request, "The selected model cannot execute this request.", code=detail["code"])
+            return
         # Pre-flight failures may raise on first iteration (the only sanctioned
         # exceptions, mirroring 7A). Once query() begins, every failure becomes a
         # single in-band terminal `error`.

@@ -75,7 +75,7 @@ def test_memory_insert_query_roundtrip(store):
                               tickers=["AFRM"], tags=["earnings", "entry"], importance=8,
                               source="agent_auto", created_at="2026-06-20T10:00:00")
     assert isinstance(mid, int)
-    df = store.query_memories()
+    df = store.query_memories(today="2026-06-21")
     assert list(df.columns) == _MEM_COLS
     row = df.iloc[0]
     assert row["tickers"] == ["AFRM"] and row["tags"] == ["earnings", "entry"]
@@ -90,10 +90,10 @@ def test_memory_search_category_importance_order(store):
     store.insert_memory(title="gamma", content="unrelated", category="note",
                         importance=5, created_at="2026-06-20T08:00:00")
     # substring search over title+content (local FTS simplification)
-    hits = list(store.query_memories(query="affirm")["title"])
+    hits = list(store.query_memories(query="affirm", today="2026-06-21")["title"])
     assert set(hits) == {"alpha", "beta"} and "gamma" not in hits
     # no query → importance DESC then date
-    ordered = list(store.query_memories(category="insight")["title"])
+    ordered = list(store.query_memories(category="insight", today="2026-06-21")["title"])
     assert ordered == ["beta", "alpha"]
 
 
@@ -102,17 +102,28 @@ def test_memory_ticker_and_tag_overlap_filter(store):
                         tags=["t1"], created_at="2026-06-20T10:00:00")
     store.insert_memory(title="b", content="y", category="note", tickers=["NVDA"],
                         tags=["t2"], created_at="2026-06-20T10:00:00")
-    assert list(store.query_memories(tickers=["AAPL"])["title"]) == ["a"]
-    assert list(store.query_memories(tags=["t2"])["title"]) == ["b"]
+    assert list(store.query_memories(tickers=["AAPL"], today="2026-06-21")["title"]) == ["a"]
+    assert list(store.query_memories(tags=["t2"], today="2026-06-21")["title"]) == ["b"]
 
 
 def test_memory_meta_excludes_content_and_delete(store):
     mid = store.insert_memory(title="m", content="body", category="note",
                               file_path="data/agent_memory/m.md", created_at="2026-06-20T10:00:00")
-    meta = store.list_memories_meta()
+    meta = store.list_memories_meta(today="2026-06-21")
     assert list(meta.columns) == _MEM_META_COLS and "content" not in meta.columns
+    assert list(meta["id"]) == [mid]
     assert store.delete_memory(mid) == "data/agent_memory/m.md"
-    assert store.query_memories().empty
+    assert store.query_memories(today="2026-06-21").empty
+
+
+@pytest.mark.parametrize(("today", "expected"), [
+    ("2026-09-18", ["boundary"]),
+    ("2026-09-19", []),
+])
+def test_memory_window_cutoff_does_not_depend_on_test_execution_date(store, today, expected):
+    store.insert_memory(title="boundary", content="fixture", created_at="2026-06-20T10:00:00")
+    assert list(store.query_memories(today=today)["title"]) == expected
+    assert list(store.list_memories_meta(today=today)["title"]) == expected
 
 
 # --- agent_queries -----------------------------------------------------------------

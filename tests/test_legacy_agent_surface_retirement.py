@@ -259,13 +259,13 @@ def test_spark_cannot_enter_api_key_or_generic_agent_surfaces():
         task="card_translation",
         auth_mode="api_key",
         plan_type="pro",
-    ) == {"code": "task_auth_mode_unsupported", "field": "credential"}
+    ) == {"code": "model_retired", "field": "model"}
     assert model_execution_admission_detail(
         "gpt-5.3-codex-spark",
         task="ai_research",
         auth_mode="chatgpt_oauth",
         plan_type="pro",
-    ) == {"code": "model_task_unsupported", "field": "task"}
+    ) == {"code": "model_retired", "field": "model"}
 
 
 def test_python_executor_is_not_registered_for_agent_use():

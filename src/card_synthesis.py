@@ -679,14 +679,6 @@ class TextTranslationOutputInvalid(ModelStructuredOutputInvalid):
 
 
 def translation_harness(provider: Provider, model: str | None = None) -> str:
-    if model is not None:
-        capability = capability_for(model)
-        if (
-            capability is not None
-            and capability.execution_adapter == "codex_app_server"
-        ):
-            return "codex_app_server"
-
     from src.auth_drivers.live_resolver import resolve_live_auth
 
     resolution = resolve_live_auth(provider)

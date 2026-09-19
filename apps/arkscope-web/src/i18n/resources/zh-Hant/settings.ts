@@ -261,7 +261,6 @@ const settings = {
       neverDiscovered: "尚未探索此登入的模型",
       verifyAgain: "重新驗證列表",
       viewLastResult: "查看上次結果",
-      sparkUsageHint: "已偵測到 Spark 額度；重新驗證模型清單後才能使用。",
     },
     credentials: {
       openProviders: "前往 Provider 登入與憑證",

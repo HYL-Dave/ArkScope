@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 from src.agents.config import get_agent_config
 from src.auth_drivers.runtime_binding import RuntimeAuthBinding, capture_runtime_auth
+from src.model_capabilities import model_execution_admission_detail
 from src.model_routing import TaskRoute, default_model_for
 
 
@@ -69,4 +70,7 @@ def capture_card_execution(
         else:
             model = model or default_model_for(provider, task)
             effort = "medium"
+    detail = model_execution_admission_detail(model, task=task)
+    if detail is not None:
+        raise CardExecutionAdmissionError(detail)
     return CardExecution(task, provider, model, effort, capture_runtime_auth(provider))

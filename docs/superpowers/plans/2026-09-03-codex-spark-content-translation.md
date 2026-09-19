@@ -1,5 +1,10 @@
 # Codex Spark Content Translation Implementation Plan
 
+> **Retired 2026-09-19:** Do not reimplement this plan. Spark execution and
+> options have been withdrawn by the user. The historical implementation
+> record below is superseded by
+> [retirement and coverage](../evidence/2026-09-19-spark-retirement/README.md).
+
 > **Historical plan notice (2026-09-03):** The original Pro-name admission
 > described below is superseded by the current authority in
 > `docs/superpowers/specs/2026-09-02-codex-spark-content-translation-design.md`.

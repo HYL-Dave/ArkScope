@@ -198,7 +198,7 @@ describe("research selection precedence and validation", () => {
   });
 
   it.each([
-    { provider: "openai" as const, modelId: "gpt-5.3-codex-spark", auth: "chatgpt_oauth" as const, reason: "model_task_unsupported" },
+    { provider: "openai" as const, modelId: "gpt-5.3-codex-spark", auth: "chatgpt_oauth" as const, reason: "model_retired" },
     { provider: "openai" as const, modelId: "gpt-5.6-luna", auth: "chatgpt_oauth" as const, reason: "subscription_plan_required" },
     { provider: "anthropic" as const, modelId: "claude-fable-5-1", auth: "claude_code_oauth" as const, reason: "model_auth_unverified" },
   ])("retains the effective $reason gate for Settings and an explicit override", ({ provider, modelId, auth, reason }) => {

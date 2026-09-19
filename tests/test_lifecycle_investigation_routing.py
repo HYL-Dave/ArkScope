@@ -191,7 +191,7 @@ def test_investigation_requires_tools_and_structured_output_without_changing_res
 
 
 @pytest.mark.parametrize(("model", "code"), [
-    ("gpt-5.3-codex-spark", "model_task_unsupported"),
+    ("gpt-5.3-codex-spark", "model_retired"),
     ("claude-fable-5", "model_retired"),
     ("gpt-unknown-custom", "model_not_in_registry"),
 ])

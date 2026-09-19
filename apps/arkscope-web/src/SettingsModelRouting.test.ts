@@ -128,8 +128,8 @@ const catalog: ModelCatalog = {
   },
 };
 
-function catalogWithSparkTranslation(): ModelCatalog {
-  const sparkId = "gpt-5.3-codex-spark";
+function catalogWithOAuthTranslation(): ModelCatalog {
+  const modelId = "gpt-6-astra";
   const credential: ProviderCredential = {
     id: "local:7",
     provider: "openai",
@@ -149,10 +149,10 @@ function catalogWithSparkTranslation(): ModelCatalog {
   const translation = catalog.effective!.tasks.card_translation!;
   return {
     ...catalog,
-    current_model_ids: [...(catalog.current_model_ids ?? []), sparkId],
+    current_model_ids: [...(catalog.current_model_ids ?? []), modelId],
     model_lifecycle: [
       ...(catalog.model_lifecycle ?? []),
-      { id: sparkId, provider: "openai", task_route_status: "current", aliases: [] },
+      { id: modelId, provider: "openai", task_route_status: "current", aliases: [] },
     ],
     credentials: { ...catalog.credentials, openai: [credential] },
     effective: {
@@ -177,14 +177,14 @@ function catalogWithSparkTranslation(): ModelCatalog {
               cache_state: "ok",
               discovered_at: "2026-09-03T12:00:00Z",
               models: [{
-                id: sparkId,
-                label: "GPT-5.3-Codex-Spark",
-                status: "advanced",
+                id: modelId,
+                label: "GPT-6 Astra",
+                status: "visible",
                 visible_to_credential: true,
                 eligible: true,
                 reason_code: null,
                 thinking_mode: "none",
-                effort_options: ["low", "medium", "high", "xhigh"],
+                effort_options: TASK_EFFORT_IDS,
               }],
             },
           },
@@ -316,8 +316,8 @@ async function click(element: HTMLElement) {
 
 describe("Settings model route save gate", () => {
   async function investigationDraft(onRuntimeChanged = vi.fn(async () => undefined)) {
-    const value = structuredClone(catalogWithSparkTranslation());
-    value.routes.card_translation = { ...taskRoute("card_translation", "openai", "gpt-5.3-codex-spark"), effort: "xhigh" };
+    const value = structuredClone(catalogWithOAuthTranslation());
+    value.routes.card_translation = { ...taskRoute("card_translation", "openai", "gpt-6-astra"), effort: "xhigh" };
     value.tasks.push({ id: "lifecycle_investigation", label: "Lifecycle Investigation", description: "", default_provider: "anthropic", recommended_model: "claude-sonnet-5" });
     value.routes.lifecycle_investigation = { ...taskRoute("lifecycle_investigation", "anthropic", "claude-sonnet-5"), effort: "high", source: "default" };
     value.effective!.providers!.anthropic = { credential_id: "local:8", auth_mode: "claude_code_oauth", label: "Claude subscription" };
@@ -446,7 +446,7 @@ describe("Settings model route save gate", () => {
     expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
   });
 
-  it("adopts newer untouched Spark settings without sending them in the next investigation save", async () => {
+  it("adopts newer untouched translation settings without sending them in the next investigation save", async () => {
     const { value, effort, save } = await investigationDraft();
     controls.saveModelRoutes.mockImplementationOnce(async () => {
       const receipt = acknowledgeInvestigation(value);
@@ -454,10 +454,10 @@ describe("Settings model route save gate", () => {
       return receipt;
     });
     await click(save);
-    const sparkEffort = host!.querySelector<HTMLSelectElement>(
+    const translationEffort = host!.querySelector<HTMLSelectElement>(
       '[aria-labelledby="model-route-card_translation-task-label model-route-card_translation-effort-label"]',
     )!;
-    expect(sparkEffort.value).toBe("low");
+    expect(translationEffort.value).toBe("low");
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(effort, "medium");
       effort.dispatchEvent(new Event("change", { bubbles: true }));
@@ -498,8 +498,8 @@ describe("Settings model route save gate", () => {
     expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
   });
 
-  it("saves an exact discovered Spark route using its per-task effort facts", async () => {
-    controls.catalogOverride = catalogWithSparkTranslation();
+  it("saves an exact discovered subscription route using its per-task effort facts", async () => {
+    controls.catalogOverride = catalogWithOAuthTranslation();
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -524,7 +524,7 @@ describe("Settings model route save gate", () => {
     )!;
     const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
     await act(async () => {
-      selectSetter?.call(model, "gpt-5.3-codex-spark");
+      selectSetter?.call(model, "gpt-6-astra");
       model.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await act(async () => {
@@ -541,7 +541,7 @@ describe("Settings model route save gate", () => {
     expect(controls.saveModelRoutes).toHaveBeenCalledWith(expect.objectContaining({
       card_translation: {
         provider: "openai",
-        model: "gpt-5.3-codex-spark",
+        model: "gpt-6-astra",
         effort: "xhigh",
       },
     }));
@@ -1501,15 +1501,15 @@ describe("Settings model route save gate", () => {
   });
 
   it("opens model discovery beside the route action and reopens it without another request", async () => {
-    controls.catalogOverride = catalogWithSparkTranslation();
+    controls.catalogOverride = catalogWithOAuthTranslation();
     controls.discoverModels.mockResolvedValue({
       provider: "openai",
       credential_id: "local:7",
       status: "ok",
       models: [{
-        id: "gpt-5.3-codex-spark",
+        id: "gpt-6-astra",
         provider: "openai",
-        label: "GPT-5.3-Codex-Spark",
+        label: "GPT-6 Astra",
         source: "provider_api",
       }],
       error: null,
@@ -1538,7 +1538,7 @@ describe("Settings model route save gate", () => {
 
     let drawer = document.body.querySelector<HTMLElement>('.ui-drawer[role="dialog"]');
     expect(drawer?.textContent).toContain("模型探索");
-    expect(drawer?.textContent).toContain("gpt-5.3-codex-spark");
+    expect(drawer?.textContent).toContain("gpt-6-astra");
     expect(host.querySelector(".provider-card .discovery-box")).toBeNull();
     const close = drawer!.querySelector<HTMLButtonElement>('[aria-label="關閉"]')!;
     await click(close);
@@ -1549,20 +1549,20 @@ describe("Settings model route save gate", () => {
       .find((button) => button.textContent?.trim() === "查看上次結果")!;
     await click(reopen);
     drawer = document.body.querySelector<HTMLElement>('.ui-drawer[role="dialog"]');
-    expect(drawer?.textContent).toContain("gpt-5.3-codex-spark");
+    expect(drawer?.textContent).toContain("gpt-6-astra");
     expect(controls.discoverModels).toHaveBeenCalledTimes(1);
   });
 
   it("opens the same model discovery drawer from a credential row", async () => {
-    controls.catalogOverride = catalogWithSparkTranslation();
+    controls.catalogOverride = catalogWithOAuthTranslation();
     controls.discoverModels.mockResolvedValue({
       provider: "openai",
       credential_id: "local:7",
       status: "ok",
       models: [{
-        id: "gpt-5.3-codex-spark",
+        id: "gpt-6-astra",
         provider: "openai",
-        label: "GPT-5.3-Codex-Spark",
+        label: "GPT-6 Astra",
         source: "provider_api",
       }],
       error: null,
@@ -1587,7 +1587,7 @@ describe("Settings model route save gate", () => {
     await click(discover);
 
     const drawer = document.body.querySelector<HTMLElement>('.ui-drawer[role="dialog"]');
-    expect(drawer?.textContent).toContain("gpt-5.3-codex-spark");
+    expect(drawer?.textContent).toContain("gpt-6-astra");
     expect(host.querySelector(".provider-card .discovery-box")).toBeNull();
   });
 
