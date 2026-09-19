@@ -25,22 +25,18 @@ from src.agents.config import get_agent_config, task_route
 from src.api.dependencies import get_card_store, get_dal
 from src.api.permissions import require_db_write
 from src.card_runs import CardRun, CardRunStore
-from src.card_execution import CardExecutionAdmissionError, ExecutionReceipt, capture_card_execution
+from src.card_execution import CardExecutionAdmissionError, capture_card_execution
 from src.auth_drivers.runtime_binding import (
-    RuntimeAuthUnavailable, activate_runtime_auth, sanitize_runtime_error,
+    RuntimeAuthUnavailable, sanitize_runtime_error,
 )
 from src.auth_drivers.subscription_structured_output import SubscriptionStructuredOutputError
 from src.model_routing import ModelRouteUnavailable
 from src.card_synthesis import (
     ModelExecutionTimeout,
     confidence_to_score,
-    card_has_translatable_prose,
     render_card_markdown,
     synthesize_card,
-    translate_card,
-    translation_harness,
 )
-from src.content_translation_failures import classify_content_translation_failure
 from src.evidence_packet import gather_evidence
 from src.fixed_task_runtime_config import resolve_fixed_task_runtime
 from src.api.personalization import (
@@ -56,7 +52,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["analysis-cards"])
 
 _VALID_PROVIDERS = {"anthropic", "openai"}
-_ALLOWED_LANGS = {"zh-Hant", "zh-Hans"}
 
 
 class GenerateBody(BaseModel):
@@ -74,11 +69,6 @@ class GenerateBody(BaseModel):
 
 class ArchiveBody(BaseModel):
     archived: bool
-
-
-class TranslateBody(BaseModel):
-    lang: str = "zh-Hant"
-    refresh: bool = False
 
 
 def _utcnow() -> str:
@@ -307,71 +297,6 @@ def save_card(
         "saved_report_id": report_id,
         "report": rep,
     }
-
-
-@router.post("/analysis/cards/{run_id}/translate")
-def translate_card_route(
-    run_id: int,
-    body: TranslateBody,
-    store: CardRunStore = Depends(get_card_store),
-):
-    """Translate a card into ``body.lang`` on demand; cache it on the run + return it.
-
-    Cached per language, so re-toggling EN/繁中 costs no further tokens.
-    """
-    run = store.get(run_id)
-    if not run or run.status == "deleted":
-        raise HTTPException(status_code=404, detail="card run not found")
-    lang = (body.lang or "zh-Hant").strip()
-    if lang not in _ALLOWED_LANGS:
-        raise HTTPException(status_code=400, detail=f"unsupported lang: {lang}")
-    cached = (run.translations or {}).get(lang)
-    if cached and not body.refresh:
-        receipt = run.translation_receipts.get(lang, ExecutionReceipt())
-        return {"run_id": run_id, "lang": lang, "card": cached, "cached": True,
-                "execution_receipt": receipt.model_dump()}
-    if not card_has_translatable_prose(run.result_card):
-        return {"run_id": run_id, "lang": lang, "card": run.result_card, "cached": False,
-                "no_op": True, "execution_receipt": None}
-    execution = _capture_execution("card_translation")
-    provider, model = execution.provider, execution.model
-    with activate_runtime_auth(execution.auth):
-        harness = translation_harness(provider, model)
-    runtime = resolve_fixed_task_runtime("card_translation")
-    # Gate BEFORE spending tokens, so a future permission engine can deny pre-LLM.
-    require_db_write("card_translate", {"run_id": run_id, "lang": lang})
-    try:
-        translated = translate_card(
-            run.result_card,
-            lang=lang,
-            model_timeout_s=runtime.model_timeout_s,
-            execution=execution,
-        )
-    except ModelExecutionTimeout as exc:
-        logger.warning("Card translate timed out for run %s: %s", run_id, sanitize_runtime_error(exc, binding=execution.auth))
-        raise HTTPException(status_code=502, detail=exc.detail("card_translation")) from None
-    except CardExecutionAdmissionError as exc:
-        raise HTTPException(status_code=400, detail=exc.detail) from None
-    except Exception as exc:
-        failure = classify_content_translation_failure(exc)
-        logger.warning(
-            "Card translate failed for run %s (%s)",
-            run_id,
-            failure.code,
-        )
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "code": failure.code,
-                "retryable": failure.retryable,
-                "provider": provider,
-                "model": model,
-                "harness": harness,
-            },
-        ) from None
-    store.set_translation(run_id, lang, translated, execution_receipt=execution.receipt)
-    return {"run_id": run_id, "lang": lang, "card": translated, "cached": False,
-            "execution_receipt": execution.receipt.model_dump()}
 
 
 @router.post("/analysis/cards/{run_id}/archive")

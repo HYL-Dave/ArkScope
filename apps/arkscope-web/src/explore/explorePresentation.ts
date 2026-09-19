@@ -42,7 +42,6 @@ export const EXPLORE_OPERATIONS = [
   "card_load_investor_profile",
   "card_generate",
   "card_save",
-  "card_translate",
 ] as const;
 
 export type ExploreOperation = (typeof EXPLORE_OPERATIONS)[number];
@@ -137,7 +136,6 @@ const OPERATION_PRESENTERS = {
   card_load_investor_profile: (t) => t(($) => $.errors.operations.cardLoadInvestorProfile),
   card_generate: (t) => t(($) => $.errors.operations.cardGenerate),
   card_save: (t) => t(($) => $.errors.operations.cardSave),
-  card_translate: (t) => t(($) => $.errors.operations.cardTranslate),
 } satisfies Record<ExploreOperation, (t: ExploreT) => string>;
 
 type ReviewedRoute = {
@@ -235,10 +233,6 @@ const routes = {
     template: "/analysis/cards/{run_id}/save",
     pattern: /^\/analysis\/cards\/[0-9]+\/save$/,
   },
-  translateCard: {
-    template: "/analysis/cards/{run_id}/translate",
-    pattern: /^\/analysis\/cards\/[0-9]+\/translate$/,
-  },
   priceChange: {
     template: "/prices/{ticker}/change",
     pattern: new RegExp(`^/prices/${TICKER_SEGMENT}/change$`),
@@ -307,7 +301,6 @@ const ROUTES_BY_OPERATION = {
   card_load_investor_profile: [routes.profileInvestor],
   card_generate: [routes.generateCard],
   card_save: [routes.saveCard],
-  card_translate: [routes.translateCard],
 } satisfies Record<ExploreOperation, readonly ReviewedRoute[]>;
 
 const STABLE_ERROR_CODE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
@@ -448,38 +441,6 @@ const RECOVERY_TARGETS = {
     kind: "settings_section",
     section: "providers",
   },
-  translation_auth_rejected: {
-    kind: "settings_section",
-    section: "providers",
-  },
-  translation_context_window_exceeded: {
-    kind: "settings_section",
-    section: "models",
-  },
-  translation_credential_missing: {
-    kind: "settings_section",
-    section: "providers",
-  },
-  translation_model_unavailable: {
-    kind: "settings_section",
-    section: "models",
-  },
-  translation_output_invalid: {
-    kind: "settings_section",
-    section: "models",
-  },
-  translation_protocol_resource_exhausted: {
-    kind: "settings_section",
-    section: "models",
-  },
-  translation_quota_exhausted: {
-    kind: "settings_section",
-    section: "models",
-  },
-  translation_route_unavailable: {
-    kind: "settings_section",
-    section: "models",
-  },
 } as const satisfies Record<string, ExploreSettingsTarget>;
 
 export function recoveryTargetForExploreError(
@@ -500,36 +461,6 @@ function recoveryActionCopy(target: ExploreSettingsTarget, t: ExploreT): string 
   return t(($) => $.errors.recovery.dataSources);
 }
 
-function translationGuidance(code: string | null, t: ExploreT): string | null {
-  switch (code) {
-    case "translation_route_unavailable":
-      return t(($) => $.errors.translationGuidance.routeUnavailable);
-    case "translation_credential_missing":
-      return t(($) => $.errors.translationGuidance.credentialMissing);
-    case "translation_auth_rejected":
-      return t(($) => $.errors.translationGuidance.authRejected);
-    case "translation_rate_limited":
-      return t(($) => $.errors.translationGuidance.rateLimited);
-    case "translation_quota_exhausted":
-      return t(($) => $.errors.translationGuidance.quotaExhausted);
-    case "translation_model_unavailable":
-      return t(($) => $.errors.translationGuidance.modelUnavailable);
-    case "translation_timeout":
-    case "model_timeout":
-      return t(($) => $.errors.translationGuidance.timeout);
-    case "translation_output_invalid":
-      return t(($) => $.errors.translationGuidance.outputInvalid);
-    case "translation_context_window_exceeded":
-      return t(($) => $.errors.translationGuidance.contextWindowExceeded);
-    case "translation_protocol_resource_exhausted":
-      return t(($) => $.errors.translationGuidance.protocolResourceExhausted);
-    case "translation_provider_error":
-      return t(($) => $.errors.translationGuidance.providerError);
-    default:
-      return null;
-  }
-}
-
 export function presentExploreError(
   state: ExploreErrorState,
   t: ExploreT,
@@ -546,8 +477,6 @@ export function presentExploreError(
     || (state.developerDetail !== null && developerDetail === null);
   const guidance = code === "reauth_required"
     ? t(($) => $.errors.reauthRequired)
-    : state.operation === "card_translate"
-    ? translationGuidance(code, t)
     : null;
   const recoveryTarget = recoveryTargetForExploreError(state);
   const recovery = recoveryTarget

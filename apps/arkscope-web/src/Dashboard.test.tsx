@@ -96,7 +96,7 @@ describe("Dashboard stored data-source presentation", () => {
     }
   });
 
-  it("uses the canonical Content translation label in Developer Mode", async () => {
+  it("shows the remaining card model without retired translation settings", async () => {
     const runtime = {
       anthropic: {
         model: "claude-opus-5", model_advanced: "claude-opus-4-8",
@@ -110,10 +110,7 @@ describe("Dashboard stored data-source presentation", () => {
         task: "card_synthesis", provider: "anthropic", model: "claude-opus-5",
         effort: "high", source: "default", custom: false, warning: null,
       },
-      card_translation: {
-        task: "card_translation", provider: "anthropic", model: "claude-sonnet-5",
-        effort: "medium", source: "default", custom: false, warning: null,
-      },
+
       ai_research: {
         task: "ai_research", provider: "openai", model: "gpt-5.6-luna",
         effort: "xhigh", source: "default", custom: false, warning: null,
@@ -126,12 +123,14 @@ describe("Dashboard stored data-source presentation", () => {
     } satisfies RuntimeConfig;
 
     const zh = await renderDashboard("zh-Hant", runtime);
-    expect(zh.textContent).toContain("內容翻譯");
+    expect(zh.textContent).toContain("claude-opus-5");
+    expect(zh.textContent).not.toContain("內容翻譯");
     expect(zh.textContent).not.toContain("card translation");
 
     await unmountDashboard();
     const en = await renderDashboard("en", runtime);
-    expect(en.textContent).toContain("Content translation");
+    expect(en.textContent).toContain("claude-opus-5");
+    expect(en.textContent).not.toContain("Content translation");
     expect(en.textContent).not.toContain("card translation");
   });
 });

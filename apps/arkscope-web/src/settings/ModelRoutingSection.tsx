@@ -47,8 +47,6 @@ function taskDescription(task: ModelTask, t: SettingsT): string {
   switch (task) {
     case "card_synthesis":
       return t(($) => $.models.tasks.cardSynthesis.description);
-    case "card_translation":
-      return t(($) => $.models.tasks.cardTranslation.description);
     case "ai_research":
       return t(($) => $.models.tasks.aiResearch.description);
     case "lifecycle_investigation":

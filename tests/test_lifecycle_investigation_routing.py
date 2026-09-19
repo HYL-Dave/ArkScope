@@ -18,7 +18,7 @@ from src.model_routing import TaskId, catalog, task_route_admission_detail
 
 
 TASK = "lifecycle_investigation"
-OTHERS = ("card_synthesis", "card_translation", "ai_research")
+OTHERS = ('card_synthesis', 'ai_research')
 
 
 @pytest.fixture
@@ -95,7 +95,7 @@ def test_investigation_route_save_reset_and_other_tasks_are_independent(stores):
 @pytest.mark.parametrize("auth_mode", ["api_key", "claude_code_oauth"])
 def test_investigation_xhigh_save_reads_back_without_revalidating_unchanged_spark(stores, monkeypatch, auth_mode):
     credentials, routes = stores
-    spark = routes.set("card_translation", "openai", "gpt-5.3-codex-spark", "xhigh")
+    spark = routes.set("card_synthesis", "openai", "gpt-5.3-codex-spark", "xhigh")
     monkeypatch.setattr(config_routes, "_active_auth_mode", lambda *args: auth_mode)
     monkeypatch.setattr(config_routes, "resolve_active_credential", lambda *args, **kwargs: pytest.fail("unchanged Spark must not require entitlement lookup"))
     request = config_routes.ModelRoutesUpdate.model_validate({"routes": {
@@ -104,7 +104,7 @@ def test_investigation_xhigh_save_reads_back_without_revalidating_unchanged_spar
     saved = config_routes.update_model_routes(request, store=credentials)
     assert saved["routes"][TASK]["effort"] == "xhigh"
     assert config.task_route(TASK, route_store=routes).effort == "xhigh"
-    assert routes.get("card_translation") == spark
+    assert routes.get("card_synthesis") == spark
 
 
 def test_multi_task_route_save_api_rolls_back_on_late_sql_failure(stores):

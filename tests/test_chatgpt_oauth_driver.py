@@ -409,12 +409,7 @@ def test_discover_keeps_reviewed_current_models_available_to_existing_task_route
     result = _run(_driver().discover_models())
 
     assert result.status == "ok"
-    assert result.models[0].task_route_tasks == [
-        "card_synthesis",
-        "card_translation",
-        "ai_research",
-        "lifecycle_investigation",
-    ]
+    assert result.models[0].task_route_tasks == ['card_synthesis', 'ai_research', 'lifecycle_investigation']
 
 
 def test_discover_returns_live_ids_as_provider_api(monkeypatch):

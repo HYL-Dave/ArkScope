@@ -47,7 +47,6 @@ const OPERATIONS = [
   "card_load_investor_profile",
   "card_generate",
   "card_save",
-  "card_translate",
 ] as const;
 
 type Operation = (typeof OPERATIONS)[number];
@@ -303,10 +302,6 @@ const EXPECTED_TITLES: Record<Operation, Record<Locale, string>> = {
     "zh-Hant": "無法將卡片存成報告。",
     en: "Could not save the Card as a report.",
   },
-  card_translate: {
-    "zh-Hant": "無法翻譯卡片。",
-    en: "Could not translate the Card.",
-  },
 };
 
 const ROUTE_CASES: ReadonlyArray<{
@@ -369,7 +364,6 @@ const ROUTE_CASES: ReadonlyArray<{
   { path: "/analysis/cards/72", expected: "/analysis/cards/{run_id}", allowedOperations: ["home_open_card", "card_open"] },
   { path: "/analysis/card/AAPL", expected: "/analysis/card/{ticker}", allowedOperations: ["card_generate"] },
   { path: "/analysis/cards/72/save", expected: "/analysis/cards/{run_id}/save", allowedOperations: ["home_save_card", "card_save"] },
-  { path: "/analysis/cards/72/translate", expected: "/analysis/cards/{run_id}/translate", allowedOperations: ["card_translate"] },
   { path: "/prices/AAPL/change?days=30", expected: "/prices/{ticker}/change", allowedOperations: ["ticker_load_price"] },
   { path: "/fundamentals/AAPL?stored=true", expected: "/fundamentals/{ticker}", allowedOperations: ["ticker_load_fundamentals"] },
   { path: "/market-data/status", expected: "/market-data/status", allowedOperations: ["ticker_load_market_status"] },
@@ -430,7 +424,7 @@ describe("Explore presentation boundary", () => {
     const presentation = await loadPresentation();
 
     expect(presentation.EXPLORE_OPERATIONS).toEqual(OPERATIONS);
-    expect(new Set(presentation.EXPLORE_OPERATIONS)).toHaveProperty("size", 38);
+    expect(new Set(presentation.EXPLORE_OPERATIONS)).toHaveProperty("size", 37);
     for (const locale of ["zh-Hant", "en"] as const) {
       const t = exploreT(locale);
       for (const operation of OPERATIONS) {
@@ -758,44 +752,6 @@ describe("Explore presentation boundary", () => {
         ...emptyState("universe_load"),
         code,
       })).toBeNull();
-    }
-  });
-
-  it("explains translation failures and routes recovery without exposing diagnostics", async () => {
-    const { presentExploreError } = await loadPresentation();
-    const cases = [
-      {
-        locale: "zh-Hant" as const,
-        code: "translation_route_unavailable",
-        guidance: "目前無法使用所選的內容翻譯路徑。請改選其他模型，或重新驗證模型清單後再試。",
-        label: "前往任務模型",
-        section: "models" as const,
-      },
-      {
-        locale: "en" as const,
-        code: "translation_auth_rejected",
-        guidance: "The Provider sign-in for Content Translation is no longer valid. Sign in again, then retry.",
-        label: "Go to Provider Sign-in and Credentials",
-        section: "providers" as const,
-      },
-    ];
-
-    for (const item of cases) {
-      const result = presentExploreError({
-        ...emptyState("card_translate"),
-        status: 502,
-        code: item.code,
-        developerDetail: "provider-controlled secret",
-        detailOmitted: true,
-      }, exploreT(item.locale));
-
-      expect(result.guidance).toBe(item.guidance);
-      expect(result.recovery).toEqual({
-        prompt: item.guidance,
-        label: item.label,
-        target: { kind: "settings_section", section: item.section },
-      });
-      expect(result.guidance).not.toContain("provider-controlled");
     }
   });
 

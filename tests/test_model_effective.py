@@ -27,9 +27,9 @@ def test_task_auth_executable_matrix():
     assert task_auth_executable("card_synthesis", "anthropic", "api_key", opus) is True
     assert task_auth_executable("card_synthesis", "anthropic", "api_key_pool", opus) is False
     assert task_auth_executable("card_synthesis", "anthropic", "claude_code_oauth", opus) is True
-    assert task_auth_executable("card_translation", "openai", "chatgpt_oauth", gpt) is True
+    assert task_auth_executable("card_synthesis", "openai", "chatgpt_oauth", gpt) is True
     assert task_auth_executable("card_synthesis", "openai", "claude_code_oauth", gpt) is False
-    assert task_auth_executable("card_translation", "anthropic", "chatgpt_oauth", opus) is False
+    assert task_auth_executable("card_synthesis", "anthropic", "chatgpt_oauth", opus) is False
     # ai_research: oauth on own provider OK; pool still False (unwired)
     assert task_auth_executable("ai_research", "anthropic", "claude_code_oauth", opus) is True
     assert task_auth_executable("ai_research", "openai", "chatgpt_oauth", gpt) is True
@@ -45,7 +45,7 @@ def test_fable_5_1_api_key_is_executable_but_oauth_is_not_live_verified():
     fable = capability_for("claude-fable-5-1")
 
     assert fable is not None
-    for task in ("card_synthesis", "card_translation", "ai_research"):
+    for task in ('card_synthesis', 'ai_research'):
         assert task_auth_executable(task, "anthropic", "api_key", fable) is True
         assert task_auth_executable(
             task, "anthropic", "claude_code_oauth", fable
@@ -57,7 +57,7 @@ def test_retired_spark_is_not_executable_for_any_plan_or_auth_mode():
 
     assert spark is not None
     assert task_auth_executable(
-        "card_translation",
+        "card_synthesis",
         "openai",
         "chatgpt_oauth",
         spark,
@@ -65,14 +65,14 @@ def test_retired_spark_is_not_executable_for_any_plan_or_auth_mode():
     ) is False
     for diagnostic_plan in ("plus", "prolite", None):
         assert task_auth_executable(
-            "card_translation",
+            "card_synthesis",
             "openai",
             "chatgpt_oauth",
             spark,
             plan_type=diagnostic_plan,
         ) is False
     assert task_auth_executable(
-        "card_translation",
+        "card_synthesis",
         "openai",
         "api_key",
         spark,
@@ -92,8 +92,9 @@ def _routes_mixed() -> dict:
     return {
         "card_synthesis": TaskRoute(task="card_synthesis", provider="anthropic",
                                     model="claude-opus-5", effort="high"),
-        "card_translation": TaskRoute(task="card_translation", provider="anthropic",
-                                      model="claude-sonnet-5", effort="medium"),
+        "lifecycle_investigation": TaskRoute(task="lifecycle_investigation", provider="anthropic",
+                                             model="claude-sonnet-5", effort="high"),
+
         "ai_research": TaskRoute(task="ai_research", provider="openai",
                                  model="mystery-model", effort="default"),
     }
@@ -129,9 +130,9 @@ def test_effective_view_handles_mixed_providers_per_task(tmp_path):
     assert [m["id"] for m in synth["verified"]] == ["claude-opus-5"]
     assert synth["cache_state"] == "ok" and synth["discovered_at"]
     # A selected but undiscovered current route remains visible as its route pin.
-    trans = view["tasks"]["card_translation"]
+    investigation = view["tasks"]["lifecycle_investigation"]
     assert any(m["id"] == "claude-sonnet-5" and m["badge"] == "route"
-               for m in trans["advanced"])
+               for m in investigation["advanced"])
     # OpenAI research keeps its unknown route pin while verified uses Luna.
     research = view["tasks"]["ai_research"]
     assert [m["id"] for m in research["verified"]] == ["gpt-5.6-luna"]
@@ -194,7 +195,7 @@ def test_pinned_only_retired_model_stays_absent_from_the_registry_union(tmp_path
         credentials=_credentials(),
     )
 
-    for task in ("card_synthesis", "card_translation", "ai_research"):
+    for task in ('card_synthesis', 'ai_research'):
         entries = view["tasks"][task]["providers"]["anthropic"]["models"]
         assert all(entry["id"] != "claude-fable-5" for entry in entries)
 
@@ -206,7 +207,7 @@ def test_registry_seed_does_not_offer_retired_spark(tmp_path):
         credentials=_credentials(),
     )
 
-    entries = view["tasks"]["card_translation"]["providers"]["openai"]["models"]
+    entries = view["tasks"]["card_synthesis"]["providers"]["openai"]["models"]
     assert all(entry["id"] != "gpt-5.3-codex-spark" for entry in entries)
 
 
@@ -222,7 +223,7 @@ def test_absent_discovery_does_not_offer_retired_spark(tmp_path):
         },
     )
 
-    entries = view["tasks"]["card_translation"]["providers"]["openai"]["models"]
+    entries = view["tasks"]["card_synthesis"]["providers"]["openai"]["models"]
     assert all(entry["id"] != "gpt-5.3-codex-spark" for entry in entries)
 
 
@@ -252,7 +253,7 @@ def test_retired_discovery_stays_out_of_verified_and_route_pin_is_ineligible(tmp
     route = TaskRoute(task="ai_research", provider="openai", model="gpt-5.4-mini-snapshot")
     view = effective_model_view_v2(
         cache=cache,
-        routes={"card_synthesis": route, "card_translation": route, "ai_research": route},
+        routes={"card_synthesis": route,  "ai_research": route},
         credentials=credentials,
     )
     models = view["tasks"]["ai_research"]["providers"]["openai"]["models"]
@@ -270,8 +271,7 @@ def test_effective_view_anthropic_oauth_research_is_executable_but_seed_only(tmp
     routes = {
         "card_synthesis": TaskRoute(task="card_synthesis", provider="anthropic",
                                     model="claude-opus-4-8", effort="default"),
-        "card_translation": TaskRoute(task="card_translation", provider="anthropic",
-                                      model="claude-sonnet-4-6", effort="default"),
+
         "ai_research": TaskRoute(task="ai_research", provider="anthropic",
                                  model="claude-opus-4-8", effort="default"),
     }
@@ -309,7 +309,7 @@ def test_effective_view_marks_fable_5_1_oauth_seed_ineligible(tmp_path):
             model="claude-fable-5-1",
             effort="high",
         )
-        for task in ("card_synthesis", "card_translation", "ai_research")
+        for task in ('card_synthesis', 'ai_research')
     }
     credentials = {
         "anthropic": ActiveCredential(
@@ -423,12 +423,12 @@ def test_spark_saved_route_stays_retired_despite_discovery_or_plan(tmp_path):
             provider="openai",
             model=(
                 "gpt-5.3-codex-spark"
-                if task == "card_translation"
+                if task == "card_synthesis"
                 else "gpt-5.6-luna"
             ),
             effort="medium",
         )
-        for task in ("card_synthesis", "card_translation", "ai_research")
+        for task in ('card_synthesis', 'ai_research')
     }
 
     def spark_entry(plan_type):
@@ -443,14 +443,14 @@ def test_spark_saved_route_stays_retired_despite_discovery_or_plan(tmp_path):
             },
         )
         assert view["providers"]["openai"]["plan_type"] == plan_type
-        for task in ("card_synthesis", "ai_research"):
+        for task in ("lifecycle_investigation", "ai_research"):
             assert all(
                 entry["id"] != "gpt-5.3-codex-spark"
                 for entry in view["tasks"][task]["providers"]["openai"]["models"]
             )
         return next(
             entry
-            for entry in view["tasks"]["card_translation"]["providers"]["openai"]["models"]
+            for entry in view["tasks"]["card_synthesis"]["providers"]["openai"]["models"]
             if entry["id"] == "gpt-5.3-codex-spark"
         )
 
@@ -471,9 +471,7 @@ def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_pat
     out = cr.model_catalog(store=CredentialStore(tmp_path / "profile_state.db"))
     for key in ("providers", "tasks", "models", "effort_options", "routes"):
         assert key in out
-    assert set(out["effective"]["tasks"]) == {
-        "card_synthesis", "card_translation", "ai_research", "lifecycle_investigation",
-    }
+    assert set(out["effective"]["tasks"]) == {'card_synthesis', 'ai_research', 'lifecycle_investigation'}
     block = out["effective"]["tasks"]["ai_research"]
     assert {"verified", "advanced", "cache_state", "discovered_at"} <= set(block)
     assert block["cache_state"] == "never_discovered"   # fail-closed shape
@@ -545,7 +543,7 @@ def test_model_catalog_does_not_promote_historical_spark_usage(monkeypatch, tmp_
     assert "entitlement_hints" not in out["effective"]["providers"]["openai"]
     assert all(
         entry["id"] != "gpt-5.3-codex-spark"
-        for entry in out["effective"]["tasks"]["card_translation"]["providers"][
+        for entry in out["effective"]["tasks"]["card_synthesis"]["providers"][
             "openai"
         ]["models"]
     )
@@ -645,7 +643,7 @@ def test_unknown_discovery_ids_do_not_flood_advanced(tmp_path):
 def test_v2_both_providers_present_regardless_of_route(tmp_path):
     routes = {
         task: TaskRoute(task=task, provider="openai", model="gpt-5.6-luna", effort="xhigh")
-        for task in ("card_synthesis", "card_translation", "ai_research")
+        for task in ('card_synthesis', 'ai_research')
     }
     view = effective_model_view_v2(
         cache=_seed_cache(tmp_path),
@@ -723,7 +721,7 @@ def test_v2_eligibility_split_provider_vs_model(tmp_path, monkeypatch):
     }
     routes = {
         "card_synthesis": TaskRoute(task="card_synthesis", provider="openai", model=no_structured.id),
-        "card_translation": TaskRoute(task="card_translation", provider="anthropic", model="claude-sonnet-5"),
+
         "ai_research": TaskRoute(task="ai_research", provider="openai", model="gpt-5.6-luna"),
     }
     view = effective_model_view_v2(cache=cache, routes=routes, credentials=creds)
@@ -734,7 +732,7 @@ def test_v2_eligibility_split_provider_vs_model(tmp_path, monkeypatch):
     assert missing_cap["eligible"] is False
     assert missing_cap["reason_code"] == "task_capability_missing"
 
-    anthropic_card = view["tasks"]["card_translation"]["providers"]["anthropic"]
+    anthropic_card = view["tasks"]["card_synthesis"]["providers"]["anthropic"]
     assert anthropic_card["executable"] is True
     assert anthropic_card["reason_code"] is None
     assert anthropic_card["models"]
@@ -885,7 +883,7 @@ def test_v2_discovered_ineligible_default_stays_out_of_alias(tmp_path, monkeypat
     }
     routes = {
         "card_synthesis": TaskRoute(task="card_synthesis", provider="openai", model="gpt-5.6-luna"),
-        "card_translation": TaskRoute(task="card_translation", provider="openai", model="gpt-5.6-luna"),
+
         "ai_research": TaskRoute(task="ai_research", provider="openai", model="gpt-5.6-luna"),
     }
     v2 = effective_model_view_v2(cache=cache, routes=routes, credentials=creds)

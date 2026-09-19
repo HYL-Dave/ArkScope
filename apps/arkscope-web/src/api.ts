@@ -25,7 +25,7 @@ export interface ApiStatus {
   data_sources: Record<string, number>;
 }
 
-export type FixedTaskRuntimeTask = "card_synthesis" | "card_translation";
+export type FixedTaskRuntimeTask = "card_synthesis";
 
 export interface FixedTaskRuntimeSettings {
   task: FixedTaskRuntimeTask;
@@ -57,7 +57,6 @@ export interface RuntimeConfig {
     credentials: ProviderCredential[];
   };
   card_synthesis: TaskRoute;
-  card_translation: TaskRoute;
   ai_research: TaskRoute;
   // An older sidecar does not advertise the independent investigation task.
   lifecycle_investigation?: TaskRoute;
@@ -77,7 +76,7 @@ export interface ResearchRuntimeSettings {
 }
 
 export type ModelProvider = "anthropic" | "openai";
-export type ModelTask = "card_synthesis" | "card_translation" | "ai_research" | "lifecycle_investigation";
+export type ModelTask = "card_synthesis" | "ai_research" | "lifecycle_investigation";
 
 export interface TaskRoute {
   task: ModelTask;
@@ -958,27 +957,6 @@ async function fetchWithTimeout(
   }
 }
 
-export interface TranslationFailureMetadata {
-  provider: string | null;
-  model: string | null;
-  harness: string | null;
-  retryable: boolean;
-}
-
-export type TranslationFailureCode =
-  | "translation_route_unavailable"
-  | "translation_credential_missing"
-  | "translation_auth_rejected"
-  | "translation_rate_limited"
-  | "translation_quota_exhausted"
-  | "translation_model_unavailable"
-  | "translation_timeout"
-  | "translation_output_invalid"
-  | "translation_context_window_exceeded"
-  | "translation_protocol_resource_exhausted"
-  | "translation_provider_error"
-  | "evidence_changed";
-
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -986,7 +964,6 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string | null,
     readonly diagnostic: string | null,
-    readonly metadata: TranslationFailureMetadata | null = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -997,43 +974,21 @@ interface ParsedResponseError {
   code: string | null;
   diagnostic: string | null;
   legacySuffix: string | null;
-  metadata: TranslationFailureMetadata | null;
-}
-
-function boundedNullableString(value: unknown, maxLength: number): string | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!normalized || normalized.length > maxLength || normalized.includes("\0")) {
-    return null;
-  }
-  return normalized;
-}
-
-function translationFailureMetadata(
-  value: Record<string, unknown>,
-): TranslationFailureMetadata | null {
-  if (typeof value.retryable !== "boolean") return null;
-  return {
-    provider: boundedNullableString(value.provider, 64),
-    model: boundedNullableString(value.model, 160),
-    harness: boundedNullableString(value.harness, 160),
-    retryable: value.retryable,
-  };
 }
 
 async function parseResponseError(r: Response): Promise<ParsedResponseError> {
   try {
     const body = (await r.json()) as unknown;
     if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return { code: null, diagnostic: null, legacySuffix: null, metadata: null };
+      return { code: null, diagnostic: null, legacySuffix: null };
     }
     const detail = (body as { detail?: unknown }).detail;
     if (typeof detail === "string") {
       const diagnostic = detail.trim() || null;
-      return { code: null, diagnostic, legacySuffix: diagnostic, metadata: null };
+      return { code: null, diagnostic, legacySuffix: diagnostic };
     }
     if (!detail || typeof detail !== "object" || Array.isArray(detail)) {
-      return { code: null, diagnostic: null, legacySuffix: null, metadata: null };
+      return { code: null, diagnostic: null, legacySuffix: null };
     }
     const value = detail as Record<string, unknown>;
     const code = typeof value.code === "string" ? value.code.trim() || null : null;
@@ -1044,18 +999,16 @@ async function parseResponseError(r: Response): Promise<ParsedResponseError> {
     const explicitDiagnostic = typeof rawDiagnostic === "string"
       ? rawDiagnostic.trim() || null
       : null;
-    const metadata = translationFailureMetadata(value);
     if (explicitDiagnostic) {
       return {
         code,
         diagnostic: explicitDiagnostic,
         legacySuffix: diagnostic ?? code,
-        metadata,
       };
     }
-    return { code, diagnostic, legacySuffix: diagnostic ?? code, metadata };
+    return { code, diagnostic, legacySuffix: diagnostic ?? code };
   } catch {
-    return { code: null, diagnostic: null, legacySuffix: null, metadata: null };
+    return { code: null, diagnostic: null, legacySuffix: null };
   }
 }
 
@@ -1069,7 +1022,6 @@ async function getJSON<T>(path: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise
       r.status,
       parsed.code,
       parsed.diagnostic,
-      parsed.metadata,
     );
   }
   return (await r.json()) as T;
@@ -1095,7 +1047,6 @@ async function sendJSON<T>(
       r.status,
       parsed.code,
       parsed.diagnostic,
-      parsed.metadata,
     );
   }
   if (r.status === 204) return undefined as T;
@@ -2678,38 +2629,6 @@ export function saveCard(
   runId: number,
 ): Promise<{ run_id: number; status: string; saved_report_id: number | null }> {
   return sendJSON(`/analysis/cards/${runId}/save`, "POST");
-}
-
-// On-demand translation is cached server-side per language and uses its own
-// effective fixed-task budget.
-export type CardTranslationResult = {
-  run_id: number;
-  lang: string;
-  cached: boolean;
-} & (
-  | { no_op: true; card: Partial<ResultCard>; execution_receipt: null }
-  | { no_op?: never; card: ResultCard; execution_receipt: ExecutionReceipt }
-);
-
-export async function translateCard(
-  runId: number,
-  lang = "zh-Hant",
-  runtime?: RuntimeConfig | null,
-  options?: { refresh?: boolean },
-): Promise<CardTranslationResult> {
-  const path = `/analysis/cards/${runId}/translate`;
-  const response = cardResponseObject(await sendJSON<unknown>(
-    path,
-    "POST",
-    options?.refresh === true ? { lang, refresh: true } : { lang },
-    fixedTaskRequestTimeoutMs(runtime, "card_translation"),
-  ), path);
-  if (Object.hasOwn(response, "no_op")) {
-    if (response.no_op !== true || response.execution_receipt !== null || response.cached !== false) return invalidCardPayload(path);
-    cardResponseObject(response.card, path);
-    return response as CardTranslationResult;
-  }
-  return { ...response, execution_receipt: cardExecutionReceipt(response, path) } as CardTranslationResult;
 }
 
 // --- market-data local-DB lifecycle (3a prices + 3b news + 3c-A iv/fundamentals) ---

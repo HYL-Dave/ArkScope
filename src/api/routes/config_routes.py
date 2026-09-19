@@ -319,7 +319,6 @@ def runtime_config(
         },
         # Per-task model routing (so the UI can show what each operation uses).
         "card_synthesis": task_route("card_synthesis", route_store=route_store).model_dump(),
-        "card_translation": task_route("card_translation", route_store=route_store).model_dump(),
         "ai_research": task_route("ai_research", route_store=route_store).model_dump(),
         "lifecycle_investigation": task_route("lifecycle_investigation", route_store=route_store).model_dump(),
         "research_runtime": resolve_research_runtime(store=runtime_store).model_dump(),

@@ -21,7 +21,6 @@ const apiMocks = vi.hoisted(() => ({
   getCards: vi.fn(),
   getCard: vi.fn(),
   saveCard: vi.fn(),
-  translateCard: vi.fn(),
 }));
 
 vi.mock("./api", async (importOriginal) => {
@@ -33,7 +32,6 @@ vi.mock("./api", async (importOriginal) => {
     getCards: apiMocks.getCards,
     getCard: apiMocks.getCard,
     saveCard: apiMocks.saveCard,
-    translateCard: apiMocks.translateCard,
   };
 });
 
@@ -50,7 +48,6 @@ const UNKNOWN_CONFIDENCE = "future_confidence_v9";
 const SOURCE_AS_OF = "SOURCE_WATCHLIST_AS_OF_NOT_A_DATE";
 const UNSAFE_MESSAGE = "RAW backend workspace failure: token=secret private";
 const UNSAFE_DIAGNOSTIC = "Authorization: Bearer sk-live-secret\nTraceback /srv/private.py:42";
-const TRANSLATED_CONCLUSION = "PLANTED TRANSLATED RESULT 仍保持";
 
 const API_STATUS: ApiStatus = {
   status: "ok",
@@ -229,7 +226,6 @@ const SOURCE_DETAIL_CARD = resultCard(
   "SOURCE DETAIL CONCLUSION <keep>",
   "SOURCE DETAIL",
 );
-const TRANSLATED_CARD = resultCard(TRANSLATED_CONCLUSION, "TRANSLATED PROSE");
 
 const CARD_DETAIL: CardDetail = {
   run_id: 701,
@@ -364,7 +360,6 @@ function requestCounts(): Record<RequestName, number> {
     getCards: apiMocks.getCards.mock.calls.length,
     getCard: apiMocks.getCard.mock.calls.length,
     saveCard: apiMocks.saveCard.mock.calls.length,
-    translateCard: apiMocks.translateCard.mock.calls.length,
   };
 }
 
@@ -375,7 +370,6 @@ function expectRequestCounts(expected: Partial<Record<RequestName, number>>) {
     getCards: 0,
     getCard: 0,
     saveCard: 0,
-    translateCard: 0,
     ...expected,
   });
 }
@@ -403,12 +397,6 @@ beforeEach(async () => {
     run_id: 701,
     status: "saved",
     saved_report_id: 1701,
-  });
-  apiMocks.translateCard.mockReset().mockResolvedValue({
-    run_id: 701,
-    lang: "zh-Hant",
-    card: TRANSLATED_CARD,
-    cached: false,
   });
 });
 
@@ -655,10 +643,9 @@ describe("Home localization", () => {
     const cardView = dialog!.querySelector<HTMLElement>(".cardview");
     expect(dialog?.getAttribute("aria-label")).toBe(`${SOURCE_TICKER} AI 卡片`);
     expect(cardView).not.toBeNull();
-    await click(buttonByText("繁中", dialog!));
-    await waitForText(TRANSLATED_CONCLUSION);
-    expect(dialog!.querySelector(".cardview-concl")?.textContent).toBe(TRANSLATED_CONCLUSION);
-    const modalControl = buttonByText("EN", dialog!);
+    expect(dialog!.querySelector(".lang-toggle")).toBeNull();
+    expect(dialog!.querySelector(".cardview-concl")?.textContent).toBe(CARD_DETAIL.card.conclusion);
+    const modalControl = buttonByText("存成報告", dialog!);
     modalControl.focus();
     expect(document.activeElement).toBe(modalControl);
     const before = requestCounts();
@@ -668,14 +655,13 @@ describe("Home localization", () => {
     expect(host!.textContent).toContain("Watchlist activity");
     expect(host!.querySelector('[role="dialog"]')).toBe(dialog);
     expect(dialog!.querySelector(".cardview")).toBe(cardView);
-    expect(buttonByText("EN", dialog!)).toBe(modalControl);
+    expect(buttonByText("Save as report", dialog!)).toBe(modalControl);
     expect(document.activeElement).toBe(modalControl);
-    expect(dialog!.querySelector(".cardview-concl")?.textContent).toBe(TRANSLATED_CONCLUSION);
+    expect(dialog!.querySelector(".cardview-concl")?.textContent).toBe(CARD_DETAIL.card.conclusion);
     expect(dialog!.getAttribute("aria-label")).toBe(`${SOURCE_TICKER} AI Card`);
     expect(host!.querySelector(".card-row")).toBe(cardRow);
     expect(cardRow!.textContent).toContain(SOURCE_CARD_CONCLUSION);
     expect(apiMocks.getCard).toHaveBeenCalledWith(701);
-    expect(apiMocks.translateCard).toHaveBeenCalledWith(701, "zh-Hant", undefined);
     expect(requestCounts()).toEqual(before);
     expectWorkspaceRequestShape(1);
     expectRequestCounts({
@@ -683,7 +669,6 @@ describe("Home localization", () => {
       getProfileLists: 1,
       getCards: 1,
       getCard: 2,
-      translateCard: 1,
     });
   });
 });

@@ -48,7 +48,7 @@ const RUNTIME: RuntimeConfig = {
     reasoning_effort: "xhigh", key_set: true, credentials: [],
   },
   card_synthesis: route("card_synthesis"),
-  card_translation: route("card_translation"),
+
   ai_research: route("ai_research"),
   research_runtime: {
     max_tool_calls: 60, session_timeout_s: 900, per_tool_timeout_s: 45,
@@ -111,7 +111,7 @@ function catalog(
     },
     routes: {
       card_synthesis: route("card_synthesis"),
-      card_translation: route("card_translation"),
+
       ai_research: route("ai_research"),
     },
     credentials: { openai: [], anthropic: [] },

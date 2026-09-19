@@ -46,11 +46,6 @@ class TestAgentConfig:
             config.card_synthesis_effort,
         ) == ("anthropic", "claude-opus-5", "high")
         assert (
-            config.card_translation_provider,
-            config.card_translation_model,
-            config.card_translation_effort,
-        ) == ("anthropic", "claude-sonnet-5", "medium")
-        assert (
             config.ai_research_provider,
             config.ai_research_model,
             config.ai_research_effort,

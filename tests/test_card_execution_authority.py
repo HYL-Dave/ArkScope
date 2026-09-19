@@ -87,12 +87,10 @@ def wire(monkeypatch, world):
     state = SimpleNamespace(calls=[], fail=False, result="first", clients=[])
 
     def payload(name, schema):
-        if "translated_text" in schema["properties"]:
-            return {"translated_text": state.result}
-        if name == "emit_result_card":
-            return {"conclusion": state.result, "counter_thesis": ["risk"],
-                    "confidence_level": "low", "claims": []}
-        return {"conclusion": state.result, "counter_thesis": ["risk"]}
+        assert name == "emit_result_card"
+        assert "claims" in schema["properties"]
+        return {"conclusion": state.result, "counter_thesis": ["risk"],
+                "confidence_level": "low", "claims": []}
 
     def handler(request):
         body = json.loads(request.content)
@@ -148,7 +146,7 @@ def wire(monkeypatch, world):
         if state.fail:
             raise RuntimeError("Bearer synthetic-token")
         yield SystemMessage(subtype="init", data={"apiKeySource": "none"})
-        name = "emit_result_card" if "claims" in options.output_format["schema"]["properties"] else "emit_translation"
+        name = "emit_result_card"
         yield ResultMessage(subtype="success", duration_ms=1, duration_api_ms=1,
                             is_error=False, num_turns=2, session_id="synthetic",
                             structured_output=payload(name, options.output_format["schema"]))
@@ -186,7 +184,7 @@ def change_settings(world, task, provider, cred, monkeypatch):
 
 
 @pytest.mark.parametrize("same_provider", [False, True])
-@pytest.mark.parametrize("task", ["card_synthesis", "card_translation"])
+@pytest.mark.parametrize("task", ["card_synthesis"])
 @pytest.mark.parametrize("provider,model,effort,mode", CASES)
 def test_api_fixed_dispatch_pins_complete_selection(world, wire, monkeypatch, same_provider, task, provider, model, effort, mode):
     cred = select(world, task, provider, model, effort, mode)
@@ -202,21 +200,12 @@ def test_api_fixed_dispatch_pins_complete_selection(world, wire, monkeypatch, sa
         change_settings(world, task, provider, cred, monkeypatch)
         if same_provider:
             world.routes.set(task, provider, "gpt-5.6-sol" if provider == "openai" else "claude-opus-5", "low")
-    if task == "card_synthesis":
-        gather = api.gather_evidence
-        def changed_gather(*args, **kwargs):
-            mutate()
-            return gather(*args, **kwargs)
-        monkeypatch.setattr(api, "gather_evidence", changed_gather)
-        response = world.client.post("/analysis/card/AAPL", json={"include_sa": False})
-    else:
-        runtime = api.resolve_fixed_task_runtime
-        def changed_runtime(task):
-            mutate()
-            return runtime(task)
-        monkeypatch.setattr(api, "resolve_fixed_task_runtime", changed_runtime)
-        run = world.cards.record(ticker="AAPL", result_card=card())
-        response = world.client.post(f"/analysis/cards/{run.id}/translate", json={"lang": "zh-Hant"})
+    gather = api.gather_evidence
+    def changed_gather(*args, **kwargs):
+        mutate()
+        return gather(*args, **kwargs)
+    monkeypatch.setattr(api, "gather_evidence", changed_gather)
+    response = world.client.post("/analysis/card/AAPL", json={"include_sa": False})
     assert response.status_code == 200, response.text
     assert len(wire.calls) == 1
     actual_provider, auth, sent = wire.calls[0]
@@ -238,86 +227,32 @@ def test_api_fixed_dispatch_pins_complete_selection(world, wire, monkeypatch, sa
     assert response.json()["execution_receipt"] == receipt
     rid = response.json()["run_id"]
     reopened = CardRunStore(world.cards.db_path)
-    if task == "card_synthesis":
-        assert reopened.get(rid).execution_receipt.model_dump() == receipt
-        assert world.client.get(f"/analysis/cards/{rid}").json()["execution_receipt"] == receipt
-        assert world.client.get("/analysis/cards").json()["cards"][0]["execution_receipt"] == receipt
-    else:
-        cached = world.client.post(f"/analysis/cards/{rid}/translate", json={"lang": "zh-Hant"}).json()
-        assert cached["cached"] is True and cached["execution_receipt"] == receipt
-        assert len(wire.calls) == 1
+    assert reopened.get(rid).execution_receipt.model_dump() == receipt
+    assert world.client.get(f"/analysis/cards/{rid}").json()["execution_receipt"] == receipt
+    assert world.client.get("/analysis/cards").json()["cards"][0]["execution_receipt"] == receipt
     with sqlite3.connect(world.cards.db_path) as conn:
         dump = "\n".join(conn.iterdump())
     for secret in ("chosen-card-secret", "synthetic-token", "mutated-card-secret", "replacement-card-secret", "credential_id"):
         assert secret not in response.text + dump
 
 
-def test_cache_refresh_failure_and_prior_versions_survive_reopen(world, wire):
-    select(world, "card_translation", *CASES[0])
-    run = world.cards.record(ticker="AAPL", result_card=card())
-    url = f"/analysis/cards/{run.id}/translate"
-    first = world.client.post(url, json={"lang": "zh-Hant"})
-    assert first.status_code == 200
-    first_receipt = {"provider": "openai", "model": "gpt-5.6-luna", "effort": "xhigh", "auth_mode": "api_key"}
-    wire.result = "second"
-    world.routes.set("card_translation", "openai", "gpt-5.6-sol", "low")
-    cached = world.client.post(url, json={"lang": "zh-Hant"}).json()
-    assert cached["cached"] is True and cached["card"]["conclusion"] == "first"
-    assert len(wire.calls) == 1
-    refreshed = world.client.post(url, json={"lang": "zh-Hant", "refresh": True})
-    assert refreshed.status_code == 200
-    assert refreshed.json()["card"]["conclusion"] == "second"
-    assert len(wire.calls) == 2
-    assert refreshed.json()["execution_receipt"] == {**first_receipt, "model": "gpt-5.6-sol", "effort": "low"}
-    wire.fail = True
-    assert world.client.post(url, json={"lang": "zh-Hant", "refresh": True}).status_code == 502
-    assert len(wire.calls) == 3
-    reopened = CardRunStore(world.cards.db_path)
-    assert reopened.get_translation(run.id, "zh-Hant")["conclusion"] == "second"
-    versions = reopened.translation_versions(run.id, "zh-Hant")
-    assert [v["card"]["conclusion"] for v in versions] == ["first", "second"]
-    assert versions[0]["execution_receipt"] == first_receipt
-
-
-def test_legacy_unknown_cache_never_reads_settings_or_auth(world, monkeypatch):
+def test_legacy_original_card_never_reads_settings_or_auth(world, monkeypatch):
     run = world.cards.record(ticker="AAPL", result_card=card(), provider="openai", model="gpt-5.4-mini")
-    with sqlite3.connect(world.cards.db_path) as conn:
-        conn.execute("UPDATE ai_card_runs SET translations_json = ? WHERE id = ?",
-                     (json.dumps({"zh-Hant": card("legacy translation")}), run.id))
     def forbidden(*args, **kwargs):
-        pytest.fail("cache/history must not resolve current Settings")
+        pytest.fail("history must not resolve current Settings")
     monkeypatch.setattr(api, "task_route", forbidden)
     monkeypatch.setattr(CredentialStore, "list", forbidden)
-    cached = world.client.post(f"/analysis/cards/{run.id}/translate", json={"lang": "zh-Hant"})
-    assert cached.status_code == 200 and cached.json()["cached"] is True
-    assert cached.json()["execution_receipt"] == UNKNOWN
     detail = world.client.get(f"/analysis/cards/{run.id}").json()
+    assert detail["card"] == card()
     assert detail["execution_receipt"] == {**UNKNOWN, "provider": "openai", "model": "gpt-5.4-mini"}
 
 
-def test_empty_prose_is_zero_dispatch_no_receipt_or_new_version(world, wire, monkeypatch):
-    run = world.cards.record(ticker="AAPL", result_card={"ticker": "AAPL"})
-    def forbidden(*args, **kwargs):
-        raise RuntimeError("a no-op must not select an execution")
-    monkeypatch.setattr(api, "task_route", forbidden)
-    response = world.client.post(f"/analysis/cards/{run.id}/translate", json={"lang": "zh-Hant", "refresh": True})
-    assert response.status_code == 200
-    assert response.json() == {"run_id": run.id, "lang": "zh-Hant", "card": {"ticker": "AAPL"},
-                               "cached": False, "no_op": True, "execution_receipt": None}
-    assert wire.calls == []
-    assert world.cards.get(run.id).translations is None
-
-
-@pytest.mark.parametrize("task", ["card_synthesis", "card_translation"])
+@pytest.mark.parametrize("task", ["card_synthesis"])
 def test_route_read_failure_is_bounded_http_and_zero_dispatch(world, wire, monkeypatch, task):
     def fail(*args):
         raise RuntimeError("route-store-secret")
     monkeypatch.setattr(ModelRouteStore, "get", fail)
-    if task == "card_synthesis":
-        response = world.client.post("/analysis/card/AAPL", json={"include_sa": False})
-    else:
-        run = world.cards.record(ticker="AAPL", result_card=card())
-        response = world.client.post(f"/analysis/cards/{run.id}/translate", json={"lang": "zh-Hant"})
+    response = world.client.post("/analysis/card/AAPL", json={"include_sa": False})
     assert response.status_code == 503
     assert response.json()["detail"] == {"code": "model_route_unavailable"}
     assert wire.calls == []
@@ -378,9 +313,7 @@ def test_card_oauth_auth_failure_survives_sdk_to_http_without_retry_or_storage(
         assert "reauth_required" not in response.text
 
 
-def test_additive_schema_preserves_legacy_payload_and_versions(tmp_path):
-    from src.card_execution import ExecutionReceipt
-
+def test_additive_schema_preserves_original_payload_without_translation_tables(tmp_path):
     db = tmp_path / "legacy.db"
     raw = '{ "conclusion": "historical" }'
     legacy = json.dumps({"zh-Hant": {"conclusion": "old translation"}})
@@ -396,56 +329,39 @@ def test_additive_schema_preserves_legacy_payload_and_versions(tmp_path):
         conn.execute("INSERT INTO ai_card_runs (id, ticker, result_card_json, translations_json, status) VALUES (7, 'AAPL', ?, ?, 'saved')", (raw, legacy))
     store = CardRunStore(db)
     assert store.get(7).execution_receipt.model_dump() == UNKNOWN
-    receipt = ExecutionReceipt(provider="openai", model="gpt-5.6-luna", effort="xhigh", auth_mode="api_key")
-    store.set_translation(7, "zh-Hant", {"conclusion": "new translation"}, execution_receipt=receipt)
-    store = CardRunStore(db)
+    assert store.get(7).result_card == json.loads(raw)
+    CardRunStore(db)
     with sqlite3.connect(db) as conn:
         assert conn.execute("SELECT result_card_json FROM ai_card_runs").fetchone()[0] == raw
-    versions = store.translation_versions(7, "zh-Hant")
-    assert [v["card"]["conclusion"] for v in versions] == ["old translation", "new translation"]
-    assert versions[0]["execution_receipt"] == UNKNOWN
-    assert versions[1]["execution_receipt"] == receipt.model_dump()
+        assert not conn.execute("SELECT name FROM sqlite_schema WHERE name LIKE 'ai_card_translation%'").fetchall()
 
 
-@pytest.mark.parametrize("operation", ["generation", "translation"])
-def test_output_and_receipt_commit_atomically(world, operation):
+def test_output_and_receipt_commit_atomically(world):
     from src.card_execution import ExecutionReceipt
 
     receipt = ExecutionReceipt(provider="openai", model="gpt-5.6-luna", effort="xhigh", auth_mode="api_key")
-    run = world.cards.record(ticker="AAPL", result_card=card())
-    world.cards.set_translation(run.id, "zh-Hant", card("prior"), execution_receipt=receipt)
-    table = "ai_card_execution_receipts" if operation == "generation" else "ai_card_translation_versions"
+    run = world.cards.record(ticker="AAPL", result_card=card("prior"), execution_receipt=receipt)
     with sqlite3.connect(world.cards.db_path) as conn:
-        conn.execute(f"CREATE TRIGGER reject_receipt BEFORE INSERT ON {table} BEGIN SELECT RAISE(ABORT, 'synthetic storage failure'); END")
+        conn.execute("CREATE TRIGGER reject_receipt BEFORE INSERT ON ai_card_execution_receipts BEGIN SELECT RAISE(ABORT, 'synthetic storage failure'); END")
     with pytest.raises(sqlite3.IntegrityError):
-        if operation == "generation":
-            world.cards.record(ticker="AAPL", result_card=card("not committed"), execution_receipt=receipt)
-        else:
-            world.cards.set_translation(run.id, "zh-Hant", card("not committed"), execution_receipt=receipt)
+        world.cards.record(ticker="AAPL", result_card=card("not committed"), execution_receipt=receipt)
     reopened = CardRunStore(world.cards.db_path)
     assert len(reopened.recent()) == 1
-    assert reopened.get_translation(run.id, "zh-Hant")["conclusion"] == "prior"
-    assert len(reopened.translation_versions(run.id, "zh-Hant")) == 1
+    assert reopened.get(run.id).result_card == card("prior")
+    assert reopened.get(run.id).execution_receipt == receipt
 
 
 @pytest.mark.parametrize("task,provider,model,effort,mode,code", [
     ("card_synthesis", "openai", "gpt-5.3-codex-spark", "high", "chatgpt_oauth", "model_retired"),
-    ("card_translation", "openai", "gpt-5.3-codex-spark", "high", "api_key", "model_retired"),
+    ("card_synthesis", "openai", "gpt-5.3-codex-spark", "high", "api_key", "model_retired"),
     ("card_synthesis", "anthropic", "claude-opus-4-7", "high", "api_key", "model_retired"),
-    ("card_translation", "anthropic", "claude-opus-4-7", "high", "api_key", "model_retired"),
     ("card_synthesis", "anthropic", "claude-fable-5-1", "high", "claude_code_oauth", "model_auth_unverified"),
-    ("card_translation", "anthropic", "claude-fable-5-1", "high", "claude_code_oauth", "model_auth_unverified"),
-    ("card_translation", "openai", "gpt-5.6-luna", "default", "api_key", "effort_required"),
+    ("card_synthesis", "openai", "gpt-5.6-luna", "default", "api_key", "effort_required"),
 ])
 def test_model_auth_admission_stays_typed_without_dispatch(world, wire, task, provider, model, effort, mode, code):
     select(world, task, provider, model, effort, mode)
-    if task == "card_synthesis":
-        response = world.client.post("/analysis/card/AAPL", json={"include_sa": False})
-        assert world.cards.recent() == []
-    else:
-        run = world.cards.record(ticker="AAPL", result_card=card())
-        response = world.client.post(f"/analysis/cards/{run.id}/translate", json={"lang": "zh-Hant"})
-        assert world.cards.get(run.id).translations is None
+    response = world.client.post("/analysis/card/AAPL", json={"include_sa": False})
+    assert world.cards.recent() == []
     assert response.status_code == 400
     assert response.json()["detail"]["code"] == code
     assert wire.calls == []
@@ -453,24 +369,22 @@ def test_model_auth_admission_stays_typed_without_dispatch(world, wire, task, pr
 
 @pytest.mark.parametrize("provider,model,effort,mode", CASES[2:])
 def test_oauth_selected_token_missing_never_bills_replacement_key(world, wire, monkeypatch, provider, model, effort, mode):
-    cred = select(world, "card_translation", provider, model, effort, mode)
-    run = world.cards.record(ticker="AAPL", result_card=card())
-    with sqlite3.connect(world.cards.db_path) as conn:
-        conn.execute("UPDATE ai_card_runs SET translations_json = ? WHERE id = ?",
-                     (json.dumps({"zh-Hant": card("legacy cached")}), run.id))
+    cred = select(world, "card_synthesis", provider, model, effort, mode)
+    run = world.cards.record(ticker="AAPL", result_card=card("prior"))
     runtime = api.resolve_fixed_task_runtime
     def revoke(task):
         world.tokens.records.clear()
         change_settings(world, task, provider, cred, monkeypatch)
         return runtime(task)
     monkeypatch.setattr(api, "resolve_fixed_task_runtime", revoke)
-    response = world.client.post(f"/analysis/cards/{run.id}/translate", json={"lang": "zh-Hant", "refresh": True})
+    response = world.client.post("/analysis/card/AAPL", json={"include_sa": False})
     assert response.status_code == 502
-    assert response.json()["detail"]["code"] == "translation_auth_rejected"
     assert world.tokens.loads == [(provider, mode, f"local:{cred.id}")]
     assert wire.calls == []
-    assert world.cards.get_translation(run.id, "zh-Hant")["conclusion"] == "legacy cached"
-    assert world.cards.translation_versions(run.id, "zh-Hant") == []
+    assert len(world.cards.recent()) == 1
+    assert world.cards.get(run.id).result_card == card("prior")
+    for secret in ("chosen-card-secret", "synthetic-token", "replacement-card-secret"):
+        assert secret not in response.text
 
 
 @pytest.mark.parametrize("provider,model", [("anthropic", "claude-opus-5"), ("openai", "gpt-5.6-sol")])

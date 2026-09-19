@@ -50,15 +50,11 @@ const BASELINE_SECTIONS: ReadonlyArray<{
   {
     id: "fixed_task_runtime",
     title: "固定 AI 任務執行限制",
-    description: "設定 AI 卡片生成與翻譯的模型執行上界。",
+    description: "設定 AI 卡片生成的模型執行上界。",
     keywords: [
       "timeout",
       "runtime",
       "卡片生成",
-      "內容翻譯",
-      "卡片翻譯",
-      "content translation",
-      "card translation",
       "fixed task",
     ],
   },
@@ -281,7 +277,7 @@ describe("settings workspace registry", () => {
   });
 
   it("returns_deterministic_static_matches_without_dynamic_values", () => {
-    expect(searchSettings(" ｍｏｄｅｌ ").map((section) => section.id)).toEqual(["models"]);
+    expect(searchSettings(" ｍｏｄｅｌ ").map((section) => section.id)).toEqual(["models", "fixed_task_runtime"]);
     expect(searchSettings(" ").map((section) => section.id)).toEqual(SETTINGS_ANCHOR_IDS);
     expect(searchSettings("personal brokerage account")).toEqual([]);
     expect(searchSettings("sk-user-specific-secret")).toEqual([]);

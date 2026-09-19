@@ -6,7 +6,6 @@ import {
   getProvidersConfig,
   putProviderConfig,
   setUiLocale,
-  translateCard,
 } from "./api";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -140,9 +139,9 @@ describe("typed API errors", () => {
     }
   });
 
-  it("keeps only bounded translation failure metadata for GET and mutation errors", async () => {
+  it("does not expose unrecognized provider metadata on GET or mutation errors", async () => {
     const detail = {
-      code: "translation_auth_rejected",
+      code: "provider_error",
       provider: " anthropic ",
       model: "claude-sonnet-5",
       harness: "claude_subscription_structured_output",
@@ -156,20 +155,15 @@ describe("typed API errors", () => {
 
     const errors = [
       await rejected(getProvidersConfig()),
-      await rejected(translateCard(1, "zh-Hant")),
+      await rejected(putProviderConfig("ibkr", {})),
     ];
 
     for (const error of errors) {
       expect(error).toBeInstanceOf(ApiError);
       expect(error).toMatchObject({
-        code: "translation_auth_rejected",
-        metadata: {
-          provider: "anthropic",
-          model: "claude-sonnet-5",
-          harness: "claude_subscription_structured_output",
-          retryable: false,
-        },
+        code: "provider_error",
       });
+      expect(error).not.toHaveProperty("metadata");
       expect(JSON.stringify(error)).not.toContain("secret-value");
     }
   });

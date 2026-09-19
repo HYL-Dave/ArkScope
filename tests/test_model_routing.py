@@ -53,23 +53,20 @@ def test_model_catalog_exposes_seed_models(tmp_path):
     assert by_id["gpt-5.6-luna"]["effort_options"] == [
         "none", "low", "medium", "high", "xhigh", "max",
     ]
-    assert set(res["routes"]) == {"card_synthesis", "card_translation", "ai_research", "lifecycle_investigation"}
-    translation = next(
-        task for task in res["tasks"] if task["id"] == "card_translation"
+    assert set(res["routes"]) == {'card_synthesis', 'ai_research', 'lifecycle_investigation'}
+    synthesis = next(
+        task for task in res["tasks"] if task["id"] == "card_synthesis"
     )
-    assert translation["label"] == "Content translation"
-    assert translation["description"] == (
-        "Translate cards and source excerpts while preserving structure, "
-        "citations, identifiers, and numbers."
-    )
+    assert synthesis["label"] == "Card synthesis"
+    assert "structured" in synthesis["description"]
 
 
-def test_content_translation_is_the_canonical_visible_product_term():
+def test_retired_translation_is_not_in_the_active_product_terminology():
     from pathlib import Path
 
     terminology = Path("docs/design/ARKSCOPE_TERMINOLOGY.md").read_text()
 
-    assert "| Fixed AI task | Content translation | 內容翻譯 |" in terminology
+    assert "| Fixed AI task | Content translation | 內容翻譯 |" not in terminology
 
 
 def test_catalog_exposes_canonical_current_and_retired_model_policy():
@@ -157,7 +154,7 @@ def test_spark_task_route_admission_rejects_all_former_contexts():
         "openai",
         "gpt-5.3-codex-spark",
         "medium",
-        task="card_translation",
+        task="card_synthesis",
         auth_mode="chatgpt_oauth",
         plan_type="pro",
     ) == {"code": "model_retired", "field": "model"}
@@ -166,7 +163,7 @@ def test_spark_task_route_admission_rejects_all_former_contexts():
             "openai",
             "gpt-5.3-codex-spark",
             "medium",
-            task="card_translation",
+            task="card_synthesis",
             auth_mode="chatgpt_oauth",
             plan_type=diagnostic_plan,
         ) == {"code": "model_retired", "field": "model"}
@@ -196,7 +193,7 @@ def test_update_model_routes_persists_to_profile_db(tmp_path, monkeypatch):
         ModelRoutesUpdate(
             routes={
                 "card_synthesis": RouteUpdate(provider="openai", model="gpt-5.6-sol", effort="high"),
-                "card_translation": RouteUpdate(provider="anthropic", model="claude-sonnet-5", effort="medium"),
+
             }
         ),
         store=CredentialStore(db),  # route store shares this profile DB
@@ -274,7 +271,7 @@ def test_update_model_routes_rejects_discovered_spark_regardless_of_plan_name(
     with pytest.raises(HTTPException) as caught:
         update_model_routes(
             ModelRoutesUpdate(routes={
-                "card_translation": RouteUpdate(
+                "card_synthesis": RouteUpdate(
                     provider="openai",
                     model="gpt-5.3-codex-spark",
                     effort="medium",
@@ -287,7 +284,7 @@ def test_update_model_routes_rejects_discovered_spark_regardless_of_plan_name(
 
     assert caught.value.status_code == 400
     assert caught.value.detail == {"code": "model_retired", "field": "model"}
-    assert ModelRouteStore(store.db_path).get("card_translation") is None
+    assert ModelRouteStore(store.db_path).get("card_synthesis") is None
 
 
 @pytest.mark.parametrize(
@@ -317,7 +314,7 @@ def test_update_model_routes_rejects_retired_spark_without_discovery(
     with pytest.raises(HTTPException) as exc_info:
         update_model_routes(
             ModelRoutesUpdate(routes={
-                "card_translation": RouteUpdate(
+                "card_synthesis": RouteUpdate(
                     provider="openai",
                     model="gpt-5.3-codex-spark",
                     effort="medium",
@@ -329,7 +326,7 @@ def test_update_model_routes_rejects_retired_spark_without_discovery(
         )
 
     assert exc_info.value.detail == expected_detail
-    assert ModelRouteStore(store.db_path).get("card_translation") is None
+    assert ModelRouteStore(store.db_path).get("card_synthesis") is None
 
 
 def test_update_research_runtime_persists_to_profile_db(tmp_path, monkeypatch):
@@ -390,10 +387,7 @@ def test_runtime_config_exposes_fixed_task_runtime(tmp_path, monkeypatch):
 
     result = runtime_config(store=CredentialStore(db))
 
-    assert set(result["fixed_task_runtime"]) == {
-        "card_synthesis",
-        "card_translation",
-    }
+    assert set(result["fixed_task_runtime"]) == {'card_synthesis'}
     assert result["fixed_task_runtime"]["card_synthesis"] == {
         "task": "card_synthesis",
         "model_timeout_s": 900.0,
@@ -428,7 +422,7 @@ def test_update_fixed_task_runtime_validates_then_gates_then_writes(
         FixedTaskRuntimeUpdate(
             tasks={
                 "card_synthesis": FixedTaskRuntimeValue(model_timeout_s=1200),
-                "card_translation": FixedTaskRuntimeValue(model_timeout_s=600),
+
             }
         ),
         store=CredentialStore(db),
@@ -437,10 +431,9 @@ def test_update_fixed_task_runtime_validates_then_gates_then_writes(
     assert [event[0] for event in events] == ["gate", "set_many"]
     assert events[0][1] == "fixed_task_runtime_update"
     assert events[0][2] == {
-        "tasks": ["card_synthesis", "card_translation"]
+        "tasks": ['card_synthesis']
     }
     assert result["fixed_task_runtime"]["card_synthesis"]["model_timeout_s"] == 1200.0
-    assert result["fixed_task_runtime"]["card_translation"]["model_timeout_s"] == 600.0
 
 
 def test_update_fixed_task_runtime_rejects_unknown_task_without_gate_or_write(
@@ -513,7 +506,7 @@ def test_update_fixed_task_runtime_rejects_mixed_payload_atomically(
             FixedTaskRuntimeUpdate(
                 tasks={
                     "card_synthesis": FixedTaskRuntimeValue(model_timeout_s=800),
-                    "card_translation": FixedTaskRuntimeValue(model_timeout_s=59),
+                    "ai_research": FixedTaskRuntimeValue(model_timeout_s=900),
                 }
             ),
             store=CredentialStore(db),
@@ -523,7 +516,7 @@ def test_update_fixed_task_runtime_rejects_mixed_payload_atomically(
     assert gates == []
     rows = runtime_store.get_all()
     assert rows["card_synthesis"].model_timeout_s == 700.0
-    assert "card_translation" not in rows
+    assert "ai_research" not in rows
 
 
 def test_delete_fixed_task_runtime_gates_and_restores_defaults(
@@ -534,7 +527,7 @@ def test_delete_fixed_task_runtime_gates_and_restores_defaults(
 
     db = tmp_path / "profile_state.db"
     runtime_store = FixedTaskRuntimeStore(db)
-    runtime_store.set_many({"card_synthesis": 1200, "card_translation": 600})
+    runtime_store.set_many({"card_synthesis": 1200})
     calls = []
     monkeypatch.setattr(
         cr,
@@ -548,7 +541,7 @@ def test_delete_fixed_task_runtime_gates_and_restores_defaults(
     assert result["deleted"] is True
     assert result["fixed_task_runtime"]["card_synthesis"]["model_timeout_s"] == 900.0
     assert result["fixed_task_runtime"]["card_synthesis"]["source"] == "default"
-    assert result["fixed_task_runtime"]["card_translation"]["db_saved"] is False
+    assert result["fixed_task_runtime"]["card_synthesis"]["db_saved"] is False
 
 
 def test_update_model_routes_rejects_provider_model_mismatch():
@@ -626,7 +619,7 @@ def test_save_route_rejects_fable_5_1_for_claude_oauth(tmp_path):
     with pytest.raises(HTTPException) as exc_info:
         update_model_routes(
             ModelRoutesUpdate(routes={
-                "card_translation": RouteUpdate(
+                "card_synthesis": RouteUpdate(
                     provider="anthropic",
                     model="claude-fable-5-1",
                     effort="high",
@@ -638,7 +631,7 @@ def test_save_route_rejects_fable_5_1_for_claude_oauth(tmp_path):
         )
 
     assert exc_info.value.detail == {"code": "model_auth_unverified", "field": "model"}
-    assert ModelRouteStore(store.db_path).get("card_translation") is None
+    assert ModelRouteStore(store.db_path).get("card_synthesis") is None
 
 
 def test_save_route_accepts_fable_5_1_for_anthropic_api_key(tmp_path):
@@ -655,7 +648,7 @@ def test_save_route_accepts_fable_5_1_for_anthropic_api_key(tmp_path):
 
     result = update_model_routes(
         ModelRoutesUpdate(routes={
-            "card_translation": RouteUpdate(
+            "card_synthesis": RouteUpdate(
                 provider="anthropic",
                 model="claude-fable-5-1",
                 effort="high",
@@ -666,8 +659,8 @@ def test_save_route_accepts_fable_5_1_for_anthropic_api_key(tmp_path):
         observation_store=None,
     )
 
-    assert result["routes"]["card_translation"]["model"] == "claude-fable-5-1"
-    saved = ModelRouteStore(store.db_path).get("card_translation")
+    assert result["routes"]["card_synthesis"]["model"] == "claude-fable-5-1"
+    saved = ModelRouteStore(store.db_path).get("card_synthesis")
     assert saved is not None
     assert saved.model == "claude-fable-5-1"
 
@@ -1190,9 +1183,7 @@ def test_import_skips_ambiguous_or_retired_route(make_route_store, tmp_path, mod
     assert rs.get("ai_research") is None
 
 
-@pytest.mark.parametrize("task", [
-    "card_synthesis", "card_translation", "ai_research", "lifecycle_investigation",
-])
+@pytest.mark.parametrize("task", ['card_synthesis', 'ai_research', 'lifecycle_investigation'])
 def test_task_route_read_failure_never_substitutes_yaml(make_route_store, task):
     import sqlite3
     from src.agents.config import task_route
@@ -1333,7 +1324,7 @@ def test_export_audits_both_write_and_clear_branches(make_route_store, tmp_path,
     audited_tasks = {t for _, t in calls}
     assert "model_route_export" in actions          # write branch audited
     assert "model_route_export_clear" in actions    # destructive clear branch audited too
-    assert {"card_synthesis", "card_translation"} <= audited_tasks
+    assert {'card_synthesis'} <= audited_tasks
 
 
 def test_export_cleared_reports_only_tasks_whose_keys_were_removed(make_route_store, tmp_path):
@@ -1347,7 +1338,7 @@ def test_export_cleared_reports_only_tasks_whose_keys_were_removed(make_route_st
     res = export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
 
     # 'cleared' must mean "keys actually removed", not "task has no DB row" — so it should NOT
-    # overcount card_translation / ai_research (which had nothing to clear).
+    # overcount card_synthesis / ai_research (which had nothing to clear).
     assert res["cleared"] == ["card_synthesis"]
     assert res["exported"] == []
 

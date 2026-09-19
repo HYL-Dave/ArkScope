@@ -175,15 +175,13 @@ def test_dispatch_matrix_zero_call_arms(monkeypatch, tmp_path):
     [
         *[(provider, "api_key", task, None, "api")
           for provider in ("openai", "anthropic")
-          for task in ("card_synthesis", "card_translation", "ai_research")],
+          for task in ('card_synthesis', 'ai_research')],
         *[(provider, "api_key_pool", task, "task_test_unsupported", None)
           for provider in ("openai", "anthropic")
-          for task in ("card_synthesis", "card_translation", "ai_research")],
+          for task in ('card_synthesis', 'ai_research')],
         ("openai", "chatgpt_oauth", "card_synthesis", None, "subscription"),
-        ("openai", "chatgpt_oauth", "card_translation", None, "subscription"),
         ("openai", "chatgpt_oauth", "ai_research", None, "driver"),
         ("anthropic", "claude_code_oauth", "card_synthesis", None, "subscription"),
-        ("anthropic", "claude_code_oauth", "card_translation", None, "subscription"),
         ("anthropic", "claude_code_oauth", "ai_research", "task_test_unsupported", None),
     ],
 )
@@ -245,7 +243,7 @@ def test_fable_5_1_oauth_test_is_rejected_before_any_provider_call(
         monkeypatch,
         tmp_path,
         active=_active("claude_code_oauth", "anthropic"),
-        task="card_translation",
+        task="card_synthesis",
         provider="anthropic",
         model="claude-fable-5-1",
         effort="low",
@@ -269,7 +267,7 @@ def test_dispatch_precedence_rejects_cross_provider_oauth_before_capability(monk
     for capability in all_models():
         if not capability.new_execution_allowed or capability.allowed_auth_modes:
             continue
-        for task in ("card_synthesis", "card_translation", "ai_research"):
+        for task in ('card_synthesis', 'ai_research'):
             assert task_capability_ok(task, capability) == task_auth_executable(
                 task, capability.provider, "api_key", capability
             )
@@ -337,9 +335,8 @@ def test_oauth_research_canary_bounds(monkeypatch, tmp_path):
     ("provider", "auth_mode", "task", "model"),
     [
         ("openai", "chatgpt_oauth", "card_synthesis", "gpt-5.4-mini"),
-        ("openai", "chatgpt_oauth", "card_translation", "gpt-5.4-mini"),
         ("anthropic", "claude_code_oauth", "card_synthesis", "claude-opus-4-8"),
-        ("anthropic", "claude_code_oauth", "card_translation", "claude-sonnet-5"),
+        ("anthropic", "claude_code_oauth", "card_synthesis", "claude-sonnet-5"),
     ],
 )
 def test_oauth_card_canary_uses_one_subscription_structured_call(
@@ -370,7 +367,7 @@ def test_oauth_card_canary_uses_one_subscription_structured_call(
 @pytest.mark.parametrize(
     ("active", "task", "expected"),
     [
-        (_active("api_key", plan_type=None), "card_translation", "model_retired"),
+        (_active("api_key", plan_type=None), "card_synthesis", "model_retired"),
         (_active("chatgpt_oauth", plan_type="pro"), "card_synthesis", "model_retired"),
     ],
 )
@@ -403,7 +400,7 @@ def test_unknown_spark_plan_does_not_allow_dispatch(monkeypatch, tmp_path):
         monkeypatch,
         tmp_path,
         active=_active("chatgpt_oauth", plan_type=None),
-        task="card_translation",
+        task="card_synthesis",
         provider="openai",
         model="gpt-5.3-codex-spark",
         effort="medium",
@@ -420,7 +417,7 @@ def test_spark_is_retired_even_without_discovery(monkeypatch, tmp_path):
         monkeypatch,
         tmp_path,
         active=_active("chatgpt_oauth", plan_type="pro"),
-        task="card_translation",
+        task="card_synthesis",
         provider="openai",
         model="gpt-5.3-codex-spark",
         effort="medium",
@@ -446,7 +443,7 @@ def test_spark_task_test_never_dispatches_after_exact_discovery(
         monkeypatch,
         tmp_path,
         active=_active("chatgpt_oauth", plan_type=diagnostic_plan),
-        task="card_translation",
+        task="card_synthesis",
         provider="openai",
         model="gpt-5.3-codex-spark",
         effort="medium",
@@ -474,7 +471,7 @@ def test_dispatch_passes_token_store_to_active_credential_resolution(
     store = _Store(tmp_path / "profile_state.db")
     result = asyncio.run(
         mt.dispatch_task_model_test(
-            task="card_translation",
+            task="card_synthesis",
             provider="openai",
             model="gpt-5.6-luna",
             effort="medium",
@@ -707,7 +704,7 @@ def test_task_test_route_rejects_retired_spark_before_dispatch(
     with pytest.raises(HTTPException) as caught:
         cr.run_task_model_test(
             cr.TaskModelTestRequest(
-                task="card_translation",
+                task="card_synthesis",
                 provider="openai",
                 model="gpt-5.3-codex-spark",
                 effort="medium",
