@@ -1,6 +1,9 @@
 # Explicit Financial Datasets Freshness
 
-Status: implemented and focused tests pass; frozen full acceptance pending.
+Status: implemented, offline-verified at `bd316536` and merged into local master.
+Full backend: **11,796 passed / 12 unchanged skips**. Frontend, channel checks
+and the existing default-worker timing limitation are recorded in the
+[acceptance evidence](../evidence/2026-09-20-quote-financial-freshness/README.md).
 This follows the user's explicit correction to the previous cache-first policy.
 No production cache is deleted and no paid request policy is activated.
 

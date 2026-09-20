@@ -135,8 +135,11 @@ or fundamentals calls fail, nor that buying data subscriptions fixes the errors.
    Add deterministic boundary tests and a separately authorized live Gateway
    check. The [bounded follow-up](../superpowers/plans/2026-09-20-quote-freshness-repair.md)
    records the source-to-tool repair and acceptance boundary. The implementation
-   now separates receipt from trade time and retains unknown freshness; the
-   frozen full regression and a separately approved live check remain distinct.
+   now separates receipt from trade time and retains unknown freshness. Frozen
+   `bd316536` passes **11,796 backend / 12 unchanged skips** and is merged;
+   [offline acceptance](../superpowers/evidence/2026-09-20-quote-financial-freshness/README.md)
+   includes all four transports. A separately approved live Gateway check is
+   still outstanding and is not implied by these deterministic results.
 2. **SA article/comment access and holdings context across auth channels.** The
    archived 17-tool OAuth allowlists omit direct article/comment/holdings tools.
    The saved questions need those capabilities even when a particular tool has

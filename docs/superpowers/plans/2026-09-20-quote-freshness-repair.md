@@ -1,7 +1,10 @@
 # Quote Freshness Repair
 
-Status: implemented with offline RED-to-GREEN checks; frozen full regression
-pending. No live Gateway acceptance is claimed. Keep the quote capability.
+Status: implemented and offline-verified at `bd316536`, merged into local master.
+Full backend: **11,796 passed / 12 unchanged skips**; final gates and the existing
+frontend timing limitation are in the
+[acceptance evidence](../evidence/2026-09-20-quote-financial-freshness/README.md).
+No live Gateway acceptance is claimed. Keep the quote capability.
 This slice also implements the separately requested
 [FD freshness contract](2026-09-20-financial-datasets-freshness.md).
 
