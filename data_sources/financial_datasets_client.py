@@ -184,6 +184,7 @@ class FinancialDatasetsClient:
                 or period not in _DEFAULT_TTL or type(limit) is not int or limit < 1):
             raise FinancialDatasetsFailure("financial_datasets_query_invalid")
         validate_freshness(freshness, max_age_seconds)
+        ticker = ticker.upper()
         legacy_key = f"{cache_prefix}_{ticker.upper()}_{period}"
         cache_key = f"fd_v1_{legacy_key}_{limit}"
         response_key = {"income": "income_statements", "balance": "balance_sheets",

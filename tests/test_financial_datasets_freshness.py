@@ -146,6 +146,17 @@ def test_new_cache_records_requested_limit_even_for_empty_response(fd):
     assert request.call_count == 1
 
 
+def test_lowercase_ticker_can_reopen_a_refreshed_file_without_another_request(fd):
+    client, request = fd
+    client._request_policy = TEST_POLICY
+    fresh = client.get_income_statements("aapl", period="annual", limit=1)
+    stored = client.get_income_statements("AAPL", period="annual", limit=1, freshness="stored")
+    assert stored == fresh
+    assert request.call_args.kwargs["params"]["ticker"] == "AAPL"
+    assert request.call_count == 1
+    assert client.observations[-1]["retrieval"] == "stored"
+
+
 def test_refresh_failure_does_not_fall_back_to_cache(fd):
     import requests
 
