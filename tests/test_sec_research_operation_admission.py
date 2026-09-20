@@ -74,6 +74,7 @@ def test_closed_admission_failure_is_local_to_sec_tool(
     from src.auth_drivers.runtime_binding import RuntimeAuthBinding
     from src import research_run_manager as manager
     from src.sec_research import runtime
+    from src.sec_research.citations import citation_event_fields
     from src.sec_research.tool_execution import invoke_sec_tool
     from src.sec_research.tool_service import ToolService
 
@@ -99,8 +100,10 @@ def test_closed_admission_failure_is_local_to_sec_tool(
         if use_sec:
             result = await invoke_sec_tool("list_sec_filings", {"issuer": "0000320193"})
             results.append(result)
+            fields = citation_event_fields("list_sec_filings", result)
+            assert fields == {}
             yield AgentEvent(EventType.tool_end, {"tool": "list_sec_filings", "input": {},
-                "summary": json.dumps(result), "is_error": True})
+                "summary": json.dumps(result), "is_error": True, **fields})
         yield AgentEvent(EventType.done, {"answer": "Research remains available", "provider": "openai", "model": "gpt-5.4-mini"})
 
     def stream(**kwargs):

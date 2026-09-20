@@ -99,6 +99,8 @@ def test_direct_non_sec_publication_does_not_need_capture_paths(trace_stores, mo
 def test_real_sec_dispatch_retains_protection_or_returns_local_gap(
     tool_fixture, registry, monkeypatch, channel, busy,
 ):
+    from src.sec_research.citations import citation_event_fields
+
     fixture = tool_fixture
     seed(fixture)
     wire(monkeypatch, fixture.service)
@@ -109,14 +111,18 @@ def test_real_sec_dispatch_retains_protection_or_returns_local_gap(
             assert other_owner(root) == "entered"
             with capture_lock.research_operation(root, exclusive=True) if busy else nullcontext():
                 # Real adapters include worker threads and SDK child tasks.
-                result = unwrap(await asyncio.create_task(dispatch(
+                raw_result = await asyncio.create_task(dispatch(
                     channel, registry, "get_sec_financial_facts", {"issuer": CIK, "freshness": "stored"},
-                )))
+                ))
+                result = unwrap(raw_result)
+                fields = citation_event_fields("get_sec_financial_facts", raw_result)
                 if busy:
                     assert result["status"] == "unavailable" and result["data"] == []
                     assert result["gaps"] == [{"code": "sec_research_operation_busy"}]
+                    assert fields == {}, "unavailable evidence must not require a citation write lease"
                 else:
                     assert result["status"] == "ok" and result["data"]
+                    assert fields.get("sec_citations")
             assert other_owner(root) == ("entered" if busy else "sec_research_operation_busy")
         assert other_owner(root) == "entered"
 

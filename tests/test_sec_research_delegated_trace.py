@@ -1,6 +1,7 @@
 """Delegated SEC completions use native loops and retained Research records."""
 
 import asyncio
+from contextlib import nullcontext
 import json
 import threading
 from types import SimpleNamespace
@@ -557,8 +558,9 @@ def test_explicit_close_does_not_yield_remaining_child_events(parent, delegated_
     asyncio.run(execute())
 
 
+@pytest.mark.parametrize("read_source", [False, True], ids=["before-source-read", "after-source-read"])
 def test_openai_child_joins_cancelled_sec_worker_before_client_and_parent_release(
-        delegated_trace, isolated, evidence, monkeypatch):
+        delegated_trace, isolated, evidence, monkeypatch, read_source):
     from src.agents.shared.output_boundary import current_output_guard, output_scope
     from src.auth_drivers.runtime_binding import current_runtime_auth
     from src.sec_research.capture_lock import research_operation
@@ -571,6 +573,11 @@ def test_openai_child_joins_cancelled_sec_worker_before_client_and_parent_releas
     def waiting(name, arguments, *, check):
         if name != "get_sec_financial_facts":
             return invoke(name, arguments, check=check)
+        # A paused fake call is not a source read. Exercise both sides of the
+        # real read before cancellation starts the worker's delayed cleanup.
+        result = invoke(name, arguments, check=check) if read_source else None
+        if read_source:
+            assert result["status"] == "ok" and result["data"]
         scopes.append((current_runtime_auth("openai"), current_output_guard()))
         entered.set()
         try:
@@ -581,7 +588,7 @@ def test_openai_child_joins_cancelled_sec_worker_before_client_and_parent_releas
             assert release.wait(3), "test did not release SEC cleanup"
             scopes.append((current_runtime_auth("openai"), current_output_guard()))
             finished.set()
-        return invoke(name, arguments, check=check)
+        return result if read_source else invoke(name, arguments, check=check)
 
     monkeypatch.setattr(state.service, "invoke", waiting)
 
@@ -597,7 +604,8 @@ def test_openai_child_joins_cancelled_sec_worker_before_client_and_parent_releas
                     await asyncio.sleep(0)
                     assert not task.done(), "child SDK abandoned the cancelled SEC worker"
                     assert not state.clients[-1].is_closed()
-                    with pytest.raises(ValueError, match="sec_research_operation_busy"):
+                    with (pytest.raises(ValueError, match="sec_research_operation_busy")
+                          if read_source else nullcontext()):
                         with research_operation(evidence.rig.store.paths.capture_root, exclusive=True):
                             pass
                 release.set()
