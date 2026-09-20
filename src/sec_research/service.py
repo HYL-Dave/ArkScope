@@ -19,7 +19,7 @@ _TRANSPORT_CODES = frozenset({
     "sec_request_cancelled",
 })
 _STORAGE_CODES = frozenset({
-    "sec_research_operation_busy",
+    "sec_research_operation_busy", "sec_research_operation_invalid",
     "capture_budget_exceeded", "storage_space_insufficient", "capture_store_write_failed",
     "capture_store_busy", "capture_path_unsafe", "capture_integrity_failed",
     "capture_platform_unsupported", "capture_body_invalid",

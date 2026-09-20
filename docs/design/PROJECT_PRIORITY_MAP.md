@@ -22,6 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
+| **P1** | **SOURCE-LOCAL SEC RESEARCH PROTECTION** | **FOCUSED VERIFIED; COMPLETE ACCEPTANCE PENDING.** Ordinary research/messages no longer require a healthy SEC capture root. Actual SEC operations lazily retain shared protection through result persistence; new citation/gap writes and maintenance exclusion stay guarded. The original whole-run lease already prevented maintenance from entering before final commit; the demonstrated defect was unnecessary no-SEC admission/persistence coupling. The three named old worktrees are removed with ignored test data retained outside the repo. Owner/evidence: `docs/superpowers/evidence/2026-09-20-research-sec-isolation/README.md`. | Resolve the reported SEC dependency before native-session continuation without weakening source retention. |
 | **P1** | **RESEARCH CONTINUITY AND DURABLE COMPLETION** | **SLICE 1 VERIFIED AND MERGED; NATIVE SESSION REUSE STILL PLANNED.** Frozen `b6ed44a2` passes **11,505 backend / 12 unchanged skips**, **1,867 frontend / 124 files**, typecheck/build and offline browser acceptance. Main-tree recheck: **601 related backend**, same complete frontend and build. Server-owned answer/event/status now commit atomically; local persistence failure cannot claim success or retry the model. Startup verifies exact legacy active-run evidence, otherwise preserves surviving output with a typed unverified state. Already-terminal historical rows are not rewritten. Native Claude OAuth session reuse remains a separate, unimplemented slice; text-history behavior stays. Owner: `docs/superpowers/plans/2026-09-20-research-continuity-repair.md`; evidence: `docs/superpowers/evidence/2026-09-20-research-completion-repair/`. | Preserve the useful research workflow without reviving token monitoring, notebooks, or adopting unreviewed native transcript storage. |
 | **P1** | **SPARK RETIREMENT; CARD TRANSLATION PRESERVED** | **MERGED INTO MASTER; PRODUCTION CLEANUP NOT EXECUTED.** Translation and subscription usage display/sync stay; Spark execution/options remain retired. The cleanup scope remains exact Spark version rows plus run 13 / zh-Hant only on verified canonical hash match, with mandatory private backup. Main-tree integration at `097a7cc1` also includes the independent schedule layout fix: **1859 frontend / 124 files**, **171 related backend**, **8 desktop**, typecheck/build/i18n and isolated Electron/browser smoke pass. No new complete backend run is claimed; previous full `b7e1886b` remains **11437P/12S**. Evidence: `docs/superpowers/evidence/2026-09-20-master-merge-and-branch-audit.md`. | Retiring Spark does not remove translation or turn usage-group labels into model authorization. |
 | **P0** | **REPORT FILE BOUNDARY** | **MERGED AND VERIFIED ON THE MAIN TREE.** Canonical Markdown paths, pinned directory descriptors and no-follow/exclusive file operations reject traversal, absolute paths, links and non-regular files for report reading/listing/saving. Twenty-four adversarial tests pass in the main-tree 171-test related run. This does not implement external-tool authorization or fix quote freshness, earnings alignment or metric comparability. Evidence: `docs/superpowers/evidence/2026-09-20-report-file-boundary.md`. | Close the demonstrated file-read escape before further tool expansion. |
@@ -655,6 +656,21 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-20 (SOURCE-LOCAL SEC PROTECTION AND NAMED WORKTREE CLEANUP):**
+  Baseline `d298cb00` couples ordinary Research admission and all message/event
+  writes to SEC operation availability; 14 RED cases demonstrate it. The normal
+  running executor already excludes intervening maintenance, so its completed
+  answer was not independently shown lost to that race. Protection is now lazy
+  and retained by the result owner only after SEC use, including copied child
+  contexts and direct citation publishers. Unrelated work can save during SEC
+  maintenance; SEC calls still fail closed without acquisition. Old global
+  admission expectations become source-local fault tests, not removed coverage.
+  The broader focused gate passes 718 cases; full acceptance is pending.
+  The three explicitly named detached worktrees are removed without force,
+  preserving their commit/tag coverage and small ignored local data separately.
+  Other historical worktrees, production data and native-session scope are not
+  changed. Evidence: `docs/superpowers/evidence/2026-09-20-research-sec-isolation/`.
 
 - **2026-09-20 (RESEARCH ATOMIC COMPLETION AND EVIDENCE-BASED RECOVERY):**
   After the user pushed the archive/cleanup checkpoint, Slice 1 implements one

@@ -10,18 +10,12 @@ from typing import Any
 from src.auth_drivers.runtime_binding import RuntimeAuthBinding, sanitize_runtime_error
 
 
-_SEC_RESEARCH_ADMISSION_DETAILS = {
-    "sec_research_operation_busy": "Research was not started because SEC research maintenance is in progress. "
-                                   "Try again after maintenance finishes.",
-    "capture_platform_unsupported": "Research was not started because this platform does not support "
-                                    "SEC operation protection.",
-    "capture_path_unsafe": "Research was not started because its SEC capture path failed safety checks.",
-    "sec_research_operation_invalid": "Research was not started because its SEC operation protection "
-                                      "configuration is invalid.",
-    "storage_space_insufficient": "Research was not started because SEC operation protection could not "
-                                  "allocate storage space.",
-    "capture_store_write_failed": "Research was not started because SEC operation protection could not be acquired.",
-}
+# Existing run rows retain their public codes; SEC admission now belongs to
+# the SEC tool, not a global gate before every Research provider request.
+_LEGACY_SEC_ADMISSION_CODES = frozenset({
+    "sec_research_operation_busy", "capture_platform_unsupported", "capture_path_unsafe",
+    "sec_research_operation_invalid", "storage_space_insufficient", "capture_store_write_failed",
+})
 
 
 RESEARCH_ERROR_CODES = frozenset(
@@ -36,7 +30,7 @@ RESEARCH_ERROR_CODES = frozenset(
         "run_interrupted",
         "run_persistence_failed",
         "run_completion_unverified",
-        *_SEC_RESEARCH_ADMISSION_DETAILS,
+        *_LEGACY_SEC_ADMISSION_CODES,
     }
 )
 
@@ -77,15 +71,6 @@ class ResearchRunPersistenceError(RuntimeError):
 
     def __init__(self):
         super().__init__(RUN_PERSISTENCE_FAILURE.code)
-
-
-def classify_sec_research_admission_failure(error: ValueError) -> ResearchFailure | None:
-    """Map only exact closed lease failures, never arbitrary exception prose."""
-    if type(error) is not ValueError or len(error.args) != 1 or type(error.args[0]) is not str:
-        return None
-    code = error.args[0]
-    detail = _SEC_RESEARCH_ADMISSION_DETAILS.get(code)
-    return ResearchFailure(code=code, detail=detail) if detail is not None else None
 
 
 def sanitize_research_detail(value: Any, *, binding: RuntimeAuthBinding | None = None) -> str:

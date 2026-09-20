@@ -102,6 +102,20 @@ reopen after constructing fresh stores; provider dispatch count stays one.
   overwrite a cancelled or deleted run. No schema, native session, runtime,
   credential authority, subscription usage or card-translation change is made.
 
+### SEC Isolation Follow-Up Before Native Sessions
+
+The September 20 follow-up confirms an existing coupling: even non-SEC runs,
+messages and progress writes acquire SEC operation protection. The stronger
+claim that maintenance can enter between a normal active run's answer and its
+final commit is not supported: the existing executor already holds a shared
+lease throughout that interval. The follow-up removes the unnecessary global
+dependency, not citation protection. Source reads retain a lazy, execution-owned
+shared lease through persistence; unrelated research can complete while SEC is
+busy, unavailable or unsupported. Existing direct citation publishers still
+lock before writing, and historical admission error codes remain readable.
+Evidence and full-acceptance status:
+`docs/superpowers/evidence/2026-09-20-research-sec-isolation/README.md`.
+
 ## Slice 2: Isolated Native Session Continuity
 
 Only after Slice 1, review the archived storage proposal against the installed

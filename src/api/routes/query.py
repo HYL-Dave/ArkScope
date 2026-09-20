@@ -501,31 +501,25 @@ async def query_agent_stream(
     persist = valid_thread_id(request.thread_id)
 
     async def event_generator():
-        from contextlib import ExitStack, aclosing
-        from src.agents.shared.events import AgentEvent, EventType
-        from src.research_errors import classify_sec_research_admission_failure
-        from src.sec_research.capture_lock import research_operation
-        from src.sec_research.paths import SecResearchPaths
+        from src.sec_research.capture_lock import ResearchPublication
 
-        with ExitStack() as lease:
+        with ResearchPublication() as publication:
+            events = protected_event_generator()
             try:
-                lease.enter_context(research_operation(SecResearchPaths.resolve().capture_root))
-            except ValueError as exc:
-                failure = classify_sec_research_admission_failure(exc)
-                if failure is None:
-                    raise
-                # No user turn or provider dispatch has been admitted.
-                yield AgentEvent(EventType.error, {
-                    "error": failure.detail,
-                    "code": failure.code,
-                }).to_sse()
-                return
-            async with aclosing(protected_event_generator()) as events:
-                async for event in events:
+                while True:
+                    with publication.activate():
+                        try:
+                            event = await anext(events)
+                        except StopAsyncIteration:
+                            break
                     yield event
+            finally:
+                with publication.activate():
+                    await events.aclose()
 
     async def protected_event_generator():
         import time as _time
+        from src.sec_research.capture_lock import citation_publication
 
         # Multi-turn (C-2c): prior thread turns seed the agent. Fetch BEFORE
         # persisting this turn's user message so it isn't duplicated. full_thread
@@ -568,6 +562,10 @@ async def query_agent_stream(
                     stream = protect_events(stream, guard=guard)
 
                 async for event in stream:
+                    # The outer publication owner retains any new reference
+                    # before it can escape via SSE, including transient runs.
+                    with citation_publication(event=event.data):
+                        pass
                     etype = getattr(event.type, "value", event.type)
                     if etype == "error":
                         event.data = {

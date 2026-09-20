@@ -25,6 +25,23 @@ own transaction locks still apply, so this is not a fixed latency guarantee.
 Protection currently requires supported POSIX/no-follow filesystem semantics;
 it does not exclude arbitrary external SQL or filesystem editors.
 
+Research does not acquire a SEC lease at model admission. An execution-local
+publication owner acquires protection lazily at its first actual SEC operation
+and retains an independent shared descriptor through worker cleanup and result
+persistence. Child tasks and workers may retain that protection, but cannot
+inherit operation ownership or upgrade to maintenance. Closed publication
+contexts reject late SEC work. SSE activates the owner only while advancing or
+closing its producer, never in the consumer's context.
+
+Ordinary user/assistant messages and progress events do not resolve capture
+paths or acquire SEC locks. New citation or citation-gap fields still require
+protection before a profile write, including empty or malformed fields. Copying
+references from already-durable events to a final message occurs in the same
+profile transaction; it introduces no otherwise-unobserved source reference.
+While maintenance owns the root, a new SEC tool call returns its unavailable
+envelope without source acquisition; unrelated research can proceed and save.
+This does not bypass profile SQLite contention, disk errors or reference checks.
+
 ## Scheduled Acquisition
 
 `sec_research_filings` is a separate, default-disabled source in Settings' shared

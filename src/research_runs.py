@@ -515,11 +515,10 @@ class ResearchRunStore:
         personalization: Optional[dict] = None,
     ) -> Optional[ResearchRun]:
         """Atomically persist terminal status, replay event, and linked turn."""
-        from src.sec_research.capture_lock import research_operation
-        from src.sec_research.paths import SecResearchPaths
+        from src.sec_research.capture_lock import citation_publication
 
         self._require_shared_database(thread_store)
-        with research_operation(SecResearchPaths.resolve().capture_root), self._write_lock, thread_store._write_lock, self._connect() as conn:
+        with citation_publication(event=event_data, tool_calls=tool_calls), self._write_lock, thread_store._write_lock, self._connect() as conn:
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 terminal = self._terminalize_error_on_connection(
@@ -567,12 +566,11 @@ class ResearchRunStore:
         elapsed_seconds: Optional[float] = None,
     ) -> Optional[ResearchRun]:
         """Commit answer, completion event and status before releasing admission."""
-        from src.sec_research.capture_lock import research_operation
-        from src.sec_research.paths import SecResearchPaths
+        from src.sec_research.capture_lock import citation_publication
 
         self._require_shared_database(thread_store)
         ts = _now()
-        with research_operation(SecResearchPaths.resolve().capture_root), self._write_lock, thread_store._write_lock, self._connect() as conn:
+        with citation_publication(event=done_data, tool_calls=tool_calls), self._write_lock, thread_store._write_lock, self._connect() as conn:
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 current = conn.execute(
@@ -832,20 +830,18 @@ class ResearchRunStore:
         )
 
     def append_event(self, run_id: str, type: str, data: dict) -> ResearchRunEvent:
-        from src.sec_research.capture_lock import research_operation
-        from src.sec_research.paths import SecResearchPaths
+        from src.sec_research.capture_lock import citation_publication
 
-        with research_operation(SecResearchPaths.resolve().capture_root), self._write_lock, self._connect() as conn:
+        with citation_publication(event=data), self._write_lock, self._connect() as conn:
             event = self._append_event_on_connection(conn, run_id, type, data)
             conn.commit()
         return event
 
     def append_running_event(self, run_id: str, type: str, data: dict) -> Optional[ResearchRunEvent]:
         """Reject a late worker frame after cancellation, deletion or completion."""
-        from src.sec_research.capture_lock import research_operation
-        from src.sec_research.paths import SecResearchPaths
+        from src.sec_research.capture_lock import citation_publication
 
-        with research_operation(SecResearchPaths.resolve().capture_root), self._write_lock, self._connect() as conn:
+        with citation_publication(event=data), self._write_lock, self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             current = conn.execute("SELECT status FROM research_runs WHERE id = ?", (run_id,)).fetchone()
             if current is None or current["status"] != "running":

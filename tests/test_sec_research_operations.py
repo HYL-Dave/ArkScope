@@ -186,6 +186,7 @@ def test_legacy_stream_keeps_result_lease_until_transcript(evidence, trace_store
     from src.api.routes import query
     from src.agents.shared.events import AgentEvent, EventType
     from src.auth_drivers.runtime_binding import RuntimeAuthBinding
+    from src.sec_research.citations import read_sec_citation
 
     _, threads = trace_stores
     paths = evidence.rig.store.paths
@@ -199,6 +200,8 @@ def test_legacy_stream_keeps_result_lease_until_transcript(evidence, trace_store
     admissions = []
 
     async def stream(**kwargs):
+        result = read_sec_citation(evidence.rig.store, evidence.rig.captures, citation=evidence.document_ref)
+        assert result["status"] == "ok"
         admissions.append(other_owner(paths.capture_root))
         yield AgentEvent(EventType.tool_end, {"tool": "read_sec_filing", "call_id": "saved",
             "input": {}, "summary": "preview", "sec_citations": [evidence.document_ref]})
@@ -212,6 +215,10 @@ def test_legacy_stream_keeps_result_lease_until_transcript(evidence, trace_store
             thread_id="trace-thread"), dal=object(), store=threads)
         async for _ in response.body_iterator:
             admissions.append(other_owner(paths.capture_root))
+            unrelated = paths.capture_root.parent / "consumer-only"
+            with operation(unrelated):
+                pass
+            assert other_owner(unrelated) == "entered", "SSE must not lend its publication scope to its consumer"
 
     asyncio.run(execute())
     assert len(admissions) == 4
@@ -279,7 +286,7 @@ def test_research_result_lease_reaches_durable_commit(evidence, trace_stores, mo
 
 @pytest.mark.parametrize("scheduled", [False, True], ids=["direct", "scheduled"])
 @pytest.mark.parametrize("busy", [True, False], ids=["maintenance", "available"])
-def test_research_busy_admission_terminalizes_without_dispatch(store, trace_stores, monkeypatch, scheduled, busy):
+def test_research_without_sec_dispatches_during_maintenance(store, trace_stores, monkeypatch, scheduled, busy):
     from src.agents.shared.events import AgentEvent, EventType
     from src.api.routes import query
     from src.auth_drivers.runtime_binding import RuntimeAuthBinding
@@ -312,35 +319,28 @@ def test_research_busy_admission_terminalizes_without_dispatch(store, trace_stor
             await asyncio.sleep(0)  # Drain the actual scheduler's done callback.
             assert "trace-run" not in manager._TASKS
             run = runs.get_run("trace-run")
-            assert run.status == ("failed" if busy else "succeeded"), (run.status, errors)
+            assert run.status == "succeeded", (run.status, errors)
             assert run.completed_at is not None
             messages = threads.list_messages("trace-thread")
             events = runs.list_events("trace-run")
             assert len(messages) == 2 and messages[-1].role == "assistant"
             assert len(events) == 1
-            if busy:
-                assert run.error_code == "sec_research_operation_busy"
-                assert run.started_at is None and run.personalization is None
-                assert messages[-1].is_error and messages[-1].error_code == run.error_code
-                assert not messages[-1].tool_calls and not messages[-1].token_usage
-                assert events[0].type == "error"
-                assert events[0].data == {"error": run.error, "code": run.error_code}
-                assert "maintenance" in run.error.lower() and "not started" in run.error.lower()
-            else:
-                assert events[0].type == "done" and messages[-1].content == "Answer"
+            assert run.error_code is None and run.started_at is not None
+            assert events[0].type == "done" and messages[-1].content == "Answer"
+            assert not messages[-1].is_error
             await asyncio.create_task(manager.execute_research_run(**args, stream_factory=stream))
             assert runs.list_events("trace-run") == events
             assert threads.list_messages("trace-thread") == messages
 
     asyncio.run(execute())
     assert errors == []
-    assert dispatched == ([] if busy else [True])
+    assert dispatched == [True]
     assert other_owner(store.paths.capture_root) == "entered"
 
 
 @pytest.mark.parametrize("busy", [True, False], ids=["maintenance", "available"])
 @pytest.mark.parametrize("asgi_version", ["2.3", "2.4"])
-def test_legacy_busy_admission_completes_http_sse_without_dispatch(store, trace_stores, monkeypatch, busy, asgi_version):
+def test_legacy_without_sec_completes_during_maintenance(store, trace_stores, monkeypatch, busy, asgi_version):
     from src.agents.shared.events import AgentEvent, EventType
     from src.api.routes import query
     from src.auth_drivers.runtime_binding import RuntimeAuthBinding
@@ -385,15 +385,9 @@ def test_legacy_busy_admission_completes_http_sse_without_dispatch(store, trace_
     body = b"".join(message.get("body", b"") for message in messages).decode()
     events = [json.loads(frame.removeprefix("data: ")) for frame in body.strip().split("\n\n")]
     assert len(events) == 1
-    if busy:
-        assert events[0]["type"] == "error"
-        assert events[0]["data"]["code"] == "sec_research_operation_busy"
-        assert "maintenance" in events[0]["data"]["error"].lower()
-        assert len(threads.list_messages("trace-thread")) == 1  # No user turn admitted.
-    else:
-        assert events[0]["type"] == "done"
-        assert threads.list_messages("trace-thread")[-1].content == "Answer"
-    assert dispatched == ([] if busy else [True])
+    assert events[0]["type"] == "done"
+    assert threads.list_messages("trace-thread")[-1].content == "Answer"
+    assert dispatched == [True]
     assert other_owner(store.paths.capture_root) == "entered"
 
 

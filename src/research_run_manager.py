@@ -8,7 +8,7 @@ provider stream lifecycle.
 from __future__ import annotations
 
 import asyncio
-from contextlib import ExitStack, aclosing
+from contextlib import aclosing
 import logging
 import time
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
@@ -23,12 +23,11 @@ from src.auth_drivers.runtime_binding import (
 from src.research_tool_trace import accumulate_tool_calls
 from src.research_errors import (
     ResearchFailure, ResearchRunPersistenceError,
-    classify_research_failure, classify_sec_research_admission_failure,
+    classify_research_failure,
 )
 from src.research_runs import ResearchRunStore
 from src.research_threads import MAX_TOOL_CALLS_SENTINEL, ResearchThreadStore
-from src.sec_research.capture_lock import research_operation
-from src.sec_research.paths import SecResearchPaths
+from src.sec_research.capture_lock import ResearchPublication
 
 logger = logging.getLogger(__name__)
 
@@ -107,20 +106,7 @@ async def execute_research_run(
     run = run_store.get_run(run_id)
     if run is None or run.status != "queued":
         return
-    with ExitStack() as lease:
-        try:
-            lease.enter_context(research_operation(SecResearchPaths.resolve().capture_root))
-        except ValueError as exc:
-            failure = classify_sec_research_admission_failure(exc)
-            if failure is None:
-                raise
-            # No provider/result exists yet; this transaction publishes no refs.
-            _persist(run_store, run_id, run_store.fail_queued_run_handoff,
-                run_id=run_id, thread_store=thread_store,
-                message=failure.detail,
-                error_code=failure.code,
-            )
-            return
+    with ResearchPublication() as publication, publication.activate():
         with output_scope(inherit=True):
             await _execute_research_run(
                 run_id=run_id, run_store=run_store, thread_store=thread_store,

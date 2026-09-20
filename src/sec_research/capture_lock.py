@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import wraps
 import asyncio
 import errno
@@ -17,6 +18,69 @@ from src.ibkr_gateway_lock import lock_dir
 
 
 _operations = threading.local()
+_publication = ContextVar("sec_research_publication", default=None)
+
+
+class ResearchPublication:
+    """Retain lazily acquired SEC protection until the owning result is saved.
+
+    Child tasks/workers may retain a root, but never inherit operation ownership
+    or permission to upgrade to maintenance. Closed/copied scopes cannot reopen.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._fds = {}
+        self._closed = False
+        self._pid = os.getpid()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        with self._lock:
+            self._closed = True
+            for fd in self._fds.values():
+                os.close(fd)
+            self._fds.clear()
+
+    @contextmanager
+    def activate(self):
+        token = _publication.set(self)
+        try:
+            yield
+        finally:
+            _publication.reset(token)
+
+    def _retain(self, root):
+        with self._lock:
+            if self._closed or self._pid != os.getpid():
+                raise ValueError("sec_research_operation_invalid")
+            if root not in self._fds:
+                self._fds[root] = _operation_fd(root, exclusive=False)
+
+
+@contextmanager
+def citation_publication(*, event=None, tool_calls=None):
+    """Guard new citation fields, not ordinary profile text or progress writes.
+
+    Presence, including malformed/empty fields, is deliberately conservative.
+    Copies of already-durable event references remain protected by the profile
+    transaction; new references need operation protection before that write.
+    """
+    def carries_refs(record):
+        return not isinstance(record, dict) or bool(
+            {"sec_citations", "sec_citation_gaps"} & record.keys())
+
+    requires = event is not None and carries_refs(event)
+    if tool_calls is not None:
+        requires = requires or not isinstance(tool_calls, list) or any(map(carries_refs, tool_calls))
+    if not requires:
+        yield
+        return
+    from .paths import SecResearchPaths
+    with research_operation(SecResearchPaths.resolve().capture_root):
+        yield
 
 
 def _owner():
@@ -42,6 +106,41 @@ def _check_root(root):
         os.close(fd)
 
 
+def _operation_fd(root, *, exclusive):
+    """Open one independent flock descriptor; the caller owns its lifetime."""
+    import fcntl
+
+    fd = parent = None
+    try:
+        path = lock_dir().absolute()
+        parent = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
+        for part in path.parts[1:]:
+            try:
+                child = _directory(parent, part)
+            except FileNotFoundError:
+                child = _directory(parent, part, create=True)
+            os.close(parent)
+            parent = child
+        key = "sec-research-" + hashlib.sha256(str(root).encode()).hexdigest() + ".operation.lock"
+        fd = os.open(key, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
+                     0o600, dir_fd=parent)
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise ValueError("capture_path_unsafe")
+        fcntl.flock(fd, (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH) | fcntl.LOCK_NB)
+        return fd
+    except BlockingIOError:
+        if fd is not None:
+            os.close(fd)
+        raise ValueError("sec_research_operation_busy") from None
+    except BaseException:
+        if fd is not None:
+            os.close(fd)
+        raise
+    finally:
+        if parent is not None:
+            os.close(parent)
+
+
 @contextmanager
 def research_operation(root: Path, *, exclusive=False, create=False):
     """Crash-released maintenance exclusion, reentrant only in this thread/task.
@@ -64,44 +163,25 @@ def research_operation(root: Path, *, exclusive=False, create=False):
     inherited = held.get(owner)
     if inherited is not None and exclusive and not inherited:
         raise ValueError("sec_research_operation_busy")
-    fd = parent = None
+    fd = None
     registered = False
     acquired = False
     try:
         _check_root(root)
         if inherited is None:
-            import fcntl
-            path = lock_dir().absolute()
-            parent = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
-            for part in path.parts[1:]:
-                try:
-                    child = _directory(parent, part)
-                except FileNotFoundError:
-                    child = _directory(parent, part, create=True)
-                os.close(parent)
-                parent = child
-            key = "sec-research-" + hashlib.sha256(str(root).encode()).hexdigest() + ".operation.lock"
-            fd = os.open(key, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
-                         0o600, dir_fd=parent)
-            if not stat.S_ISREG(os.fstat(fd).st_mode):
-                raise ValueError("capture_path_unsafe")
-            fcntl.flock(fd, (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH) | fcntl.LOCK_NB)
+            fd = _operation_fd(root, exclusive=exclusive)
             held[owner] = exclusive
             registered = True
+        publication = _publication.get()
+        if publication is not None and not exclusive:
+            publication._retain(root)
         if create:
             directory = CaptureDirectory(root, create=True)
             directory.close()
         acquired = True
-    except BlockingIOError:
-        if fd is not None:
-            os.close(fd)
-            fd = None
-        raise ValueError("sec_research_operation_busy") from None
     except OSError as exc:
         raise _io_failure(exc) from None
     finally:
-        if parent is not None:
-            os.close(parent)
         if not acquired:
             if registered:
                 del held[owner]
