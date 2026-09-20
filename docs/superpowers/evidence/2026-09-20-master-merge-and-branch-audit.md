@@ -24,13 +24,23 @@ was introduced by the schedule merge.
 | `schedule-status-layout` | `bcbe9aeb` | Merged at `097a7cc1`; branch deleted. |
 | `c15-current-installation-cleanup` | `3132d56e` | Exact patch equivalent of `34a112ba`; archived, then branch deleted. |
 | `listing-sec-macro-convergence` | `ba4f2619` | Original WIP already replayed at `3fef138d`; archived, then branch deleted. |
-| `research-source-workflow` | `5c123120` | Retained pending the user's archive-or-retain decision; 31 unique commits remain after the schedule merge. |
-| `research-session-continuity` | `650130cb` | Retained pending the same decision; design documents only, not a delivered feature. |
+| `research-source-workflow` | `5c123120` | User-approved tag archive, then branch deleted; the remaining 31 unique commits are not merged. |
+| `research-session-continuity` | `650130cb` | User-approved tag archive after verified issues entered the active repair plan; branch deleted, no native-session implementation adopted. |
 
-Two annotated local tags retain the non-ancestral source commits:
+Four annotated local tags retain the non-ancestral source commits:
 
 - `archive/2026-09-20/c15-current-installation-cleanup`
 - `archive/2026-09-20/listing-sec-macro-convergence`
+- `archive/2026-09-20/research-source-workflow`
+- `archive/2026-09-20/research-session-continuity`
+
+The final two archives were explicitly approved by the user. Before removing
+their branch refs, commit `41a1e4f5` put the continuity repair plan, evidence and
+offline reproducer on master and linked them from the priority map. Its 258-test
+baseline run is not a claim that the observed completion defects are repaired.
+The original continuity specification and both source/research-history audits
+remain readable directly from their tags. The only remaining local branch is
+`master`; no unaccepted feature implementation was merged in this handoff.
 
 `git cherry master codex/c15-current-installation-cleanup` reported the C15
 commit as patch-equivalent before deletion. The SEC replay and its follow-up
@@ -103,3 +113,13 @@ one historical test EOF; those historical artifacts were not reformatted.
 The main tree's two pre-existing untracked documentation items remain untouched
 and outside every commit. Local archive tags are not included in
 `git push origin master`; publishing them is a separate explicit operation.
+
+To publish master together with only these four dated archive tags, the user
+can run (not executed by the agent):
+
+```bash
+git push origin master 'refs/tags/archive/2026-09-20/*:refs/tags/archive/2026-09-20/*'
+```
+
+No force option or unrelated branch/tag push is required. Archived tags retain
+history; they do not make those feature implementations part of master.
