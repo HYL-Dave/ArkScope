@@ -14,7 +14,8 @@ quote does not establish all account entitlements or trading readiness.
 - [x] One acquisition-age policy for FD and the two legacy SEC financial tools.
 - [x] Four-channel fundamental-analysis `freshness=auto|stored|refresh`, optional strict integer age.
 - [x] Detailed-financials Finnhub supplements use a separate short reuse window.
-- [ ] Sequential regression, frozen-revision full acceptance, local merge.
+- [x] Related regression and frozen-revision complete backend/frontend acceptance.
+- [ ] Local merge, main-tree recheck and cleanup of this slice's branch/worktrees.
 
 `auto` first reuses a valid local observation. The existing
 `data_preferences.fundamentals_sources.refresh_days` is the default authority

@@ -59,7 +59,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `calculate_peer_statistics` | calculation | values*, target_value? | pure caller-supplied peer statistics |
 | `calculate_weighted_scenarios` | calculation | values*, weights*, labels?, current_price? | pure caller-supplied scenario weighting |
 | `get_fundamentals_analysis` | analysis | ticker*, period?, freshness?, max_age_seconds? | dated local SEC/FD statements first; explicit refresh remains separately metered |
-| `get_detailed_financials` | analysis | ticker* | normalized SEC/provider financial facts |
+| `get_detailed_financials` | analysis | ticker*, freshness?, max_age_seconds? | local SEC static metrics, separately dated Finnhub earnings supplements and request-time qualified local valuation price; native/registry only |
 | `list_sec_filings` | analysis | issuer*, forms?, filed_from?, filed_to?, include_amendments?, cursor?, limit?, freshness? | receipt-bound whole filing observations with full sources |
 | `get_sec_financial_facts` | analysis | issuer*, metrics?, concepts?, fact_ids?, accession?, as_of?, period?, start?, end?, revisions?, cursor?, limit?, freshness? | exact decimal facts, revisions and immutable source provenance |
 | `read_sec_filing` | analysis | filing_id*, document_id?, section_id?, query?, capture_id?, cursor?, max_chars?, freshness? | stored document indexes and whole cited UTF-8 passages |
