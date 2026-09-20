@@ -761,7 +761,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1052,
+      settings: 1056,
       research: 236,
       explore: 1178,
       portfolio: 374,
@@ -847,7 +847,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2983);
+      expect(total, `${locale}.total`).toBe(2987);
       expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys, "schedule", "formGroups", "formNames"].sort());
       expect(Object.keys(resources[locale].settings.secResearch.schedule).sort()).toEqual([...secScheduleKeys].sort());
       expect(Object.keys(resources[locale].settings.secResearch.formGroups).sort()).toEqual([...secFormGroupKeys].sort());
@@ -1225,6 +1225,10 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      "dataSources.schedule.controls.schedule",
+      "dataSources.schedule.controls.interval",
+      "dataSources.schedule.controls.apply",
+      "dataSources.schedule.controls.run",
       ...secScheduleKeys.map((key) => `secResearch.schedule.${key}`),
       ...secFormGroupKeys.map((key) => `secResearch.formGroups.${key}`),
       ...secFormNameKeys.map((key) => `secResearch.formNames.${key}`),
