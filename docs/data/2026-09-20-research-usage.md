@@ -22,6 +22,15 @@ Private questions, holdings, answers and tool previews remain outside git.
 contains the reproducible method, aggregate JSON and topic annotations, not raw
 conversations.
 
+The earlier complete 56-tool source/effect/cost/rate-owner matrix and full
+saved-research review remain recoverable at archive commit `5c123120` (tag
+`archive/2026-09-20/research-source-workflow`), respectively:
+`docs/data/2026-09-19-tool-capability-audit.md` and
+`docs/data/2026-09-19-research-history-audit.md`. They are dated findings, not
+current acceptance: the report-file boundary, SEC defaults and FD governance
+have since changed. Preserving that evidence does not adopt the archived 57th
+fundamentals tool or its unaccepted implementation.
+
 ## Questions Actually Asked
 
 One manually reviewed primary intent per user message. Follow-ups use their

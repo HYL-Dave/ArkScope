@@ -1,6 +1,6 @@
 # ArkScope Tool Catalog (canonical)
 
-**Updated**: 2026-09-12
+**Updated**: 2026-09-20
 **Status**: CANONICAL current registry authority
 **Live registry**: 56 tools; agent bridges add `delegate_to_subagent` for 57
 
@@ -8,6 +8,10 @@ This document describes the current `ToolRegistry`, not removed implementations
 or possible future products. Historical catalog versions remain recoverable from
 Git. Product boundaries belong to `ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`; provider
 facts belong to `ARKSCOPE_PROVIDER_CATALOG.md`.
+Registration and an intended role do not certify correct calculations, source
+coverage, channel availability or execution authorization. Current repair
+priorities and observed use are in
+[`2026-09-20-research-usage.md`](../data/2026-09-20-research-usage.md).
 
 ## 0. Rules
 
@@ -54,7 +58,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `calculate_implied_valuation` | calculation | target_metric*, multiples*, value_basis*, cash?, total_debt?, shares_outstanding?, current_price? | pure caller-supplied multiple valuation |
 | `calculate_peer_statistics` | calculation | values*, target_value? | pure caller-supplied peer statistics |
 | `calculate_weighted_scenarios` | calculation | values*, weights*, labels?, current_price? | pure caller-supplied scenario weighting |
-| `get_fundamentals_analysis` | analysis | ticker*, period? | cached SEC facts with qualified local price |
+| `get_fundamentals_analysis` | analysis | ticker*, period? | legacy SEC statements/ratios; optional metered Financial Datasets fallback with operator request policy |
 | `get_detailed_financials` | analysis | ticker* | normalized SEC/provider financial facts |
 | `list_sec_filings` | analysis | issuer*, forms?, filed_from?, filed_to?, include_amendments?, cursor?, limit?, freshness? | receipt-bound whole filing observations with full sources |
 | `get_sec_financial_facts` | analysis | issuer*, metrics?, concepts?, fact_ids?, accession?, as_of?, period?, start?, end?, revisions?, cursor?, limit?, freshness? | exact decimal facts, revisions and immutable source provenance |
@@ -78,13 +82,13 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `refresh_sa_alpha_picks` | portfolio | none | read-only extension refresh status |
 | `get_sa_articles` | portfolio | ticker?, keyword?, article_type?, limit? | captured SA article index |
 | `get_sa_article_detail` | portfolio | article_id* | captured SA article detail |
-| `save_report` | reports | title*, tickers*, report_type*, summary*, content*, conclusion?, confidence? | permission-gated report write |
+| `save_report` | reports | title*, tickers*, report_type*, summary*, content*, conclusion?, confidence? | local report body and metadata write |
 | `list_reports` | reports | ticker?, days?, report_type?, limit? | report index read |
 | `get_report` | reports | report_id?, file_path? | report read |
-| `save_memory` | memory | title*, content*, category?, tickers?, tags?, importance? | permission-gated memory write |
+| `save_memory` | memory | title*, content*, category?, tickers?, tags?, importance? | local memory write |
 | `recall_memories` | memory | query?, category?, tickers?, tags?, days?, limit? | memory search |
 | `list_memories` | memory | category?, days?, limit? | memory index read |
-| `delete_memory` | memory | memory_id* | permission-gated memory delete |
+| `delete_memory` | memory | memory_id* | local memory deletion |
 | `web_browse` | web | url*, wait_for?, extract_links?, offset?, max_chars? | browser automation |
 | `scan_alerts` | monitor | tickers? | current monitor scan |
 
@@ -110,8 +114,26 @@ its portable Python-analysis level does not imply terminal or workspace access.
 - Lifecycle tools read the local market/profile stores only. They expose
   observation and review evidence but never search the web, write state, or
   apply an action proposal.
+- The three SEC research tools default to `freshness="stored"`. Explicit
+  `auto`/`refresh` can acquire, install and write; model-supplied arguments are
+  not user consent. The legacy SEC financial-mapping path is separate and still
+  fetches automatically. The stored default does not change Settings refresh
+  or schedules.
+- Financial Datasets cache misses require trusted operator request/rate limits;
+  absent limits keep that source cache-only. Refusals remain `acquisition_gaps`,
+  not evidence of absent financials. Counts are not a provider credit balance
+  or enforced dollar cap. See the
+  [governance contract](../superpowers/plans/2026-09-20-source-read-governance.md).
 
 ### 1.3 Permission boundaries
+
+The following names are the intended capability taxonomy, **not a statement
+that user grants are currently enforced**. `src/api/permissions.py` currently
+logs through `require_permission`; legacy report/memory helpers are not uniformly
+routed through even that hook. The Financial Datasets HTTP governor enforces
+only its own request policy. External exposure still requires actor/capability
+authorization before executing tools; logging and output redaction cannot
+substitute for it.
 
 | Capability | Gate |
 |---|---|
