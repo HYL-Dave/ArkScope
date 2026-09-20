@@ -1,8 +1,8 @@
 # Source Read Governance And Usage Evidence
 
-Status: implementation and focused RED-to-GREEN checks complete; frozen full
-regression pending. Base: `ec574482`. No production writer/provider probe or
-purchase is authorized by this plan.
+Status: implemented, verified offline and fast-forwarded to local master.
+Base: `ec574482`; frozen code/tests: `5172ede6`; integration: `d6db46cc`.
+No production writer/provider probe or purchase is authorized by this plan.
 
 ## This Slice
 
@@ -132,7 +132,13 @@ cache reads never promote an existing entry into the market cache.
   attempts, outcome uncertainty, annotation coverage, readonly/no-create access
   and dated inventory/count consistency. No live metadata is recomputed by tests.
 
-Full regression runs alone in an isolated worktree after the code/test revision
-is frozen. Frontend/build and desktop checks run outside that backend session.
-Final evidence belongs in
-`docs/superpowers/evidence/2026-09-20-source-read-governance/README.md`.
+Frozen plain `pytest tests/` ran alone: **11,678 passed / 12 unchanged skips**.
+The same revision passed **1,867 frontend tests / 124 files**, typecheck/build,
+eight desktop tests and the i18n check. Main-tree integration passed **231 related
+tests** with an isolated market path. Relative to the preceding acceptance,
+there are 101 additional cases and no lost coverage; one existing FD test was
+renamed to require an explicit failure instead of empty data. The initial
+failed full run and its acquisition-fixture corrections remain in the
+[final evidence](../evidence/2026-09-20-source-read-governance/README.md).
+This slice's two test worktrees and merged branch are removed; no push or live
+paid activation occurred. Remaining boundaries above are not declared fixed.
