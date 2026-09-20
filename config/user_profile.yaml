@@ -194,7 +194,9 @@ data_preferences:
       enabled: true                # false = 完全不呼叫
       cache_days_annual: 180       # 年報快取天數
       cache_days_quarterly: 90     # 季報快取天數
-      # Required for paid cache misses; null keeps this source cache-only.
+      # Cache days retain observations; they do not authorize fresh-data claims.
+      # FD defaults to refresh. Reuse needs explicit stored or auto + maximum age.
+      # Required for paid dispatch; null refuses it, without implicit cache fallback.
       # Set from the user's approved request budget and actual account plan.
       daily_request_limit: null
       requests_per_minute: null

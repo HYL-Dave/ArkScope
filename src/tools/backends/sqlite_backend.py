@@ -544,6 +544,32 @@ class SqliteBackend:
         except (ValueError, TypeError):
             return None
 
+    def get_financial_cache_entry(self, cache_key: str) -> Optional[dict]:
+        """Read stored bytes and original timestamps, including expired entries.
+
+        The caller must explicitly decide freshness; the legacy TTL-aware getter
+        above is unchanged for other consumers. This method never creates a DB.
+        """
+        try:
+            conn = self._connect()
+        except sqlite3.OperationalError:
+            return None
+        try:
+            row = conn.execute(
+                "SELECT source, ticker, data, fetched_at, expires_at FROM financial_cache WHERE cache_key = ?",
+                (cache_key,),
+            ).fetchone()
+        except sqlite3.OperationalError:
+            return None
+        finally:
+            conn.close()
+        if row is None:
+            return None
+        try:
+            return {**dict(row), "data": json.loads(row["data"])}
+        except (ValueError, TypeError):
+            return None
+
     def set_financial_cache(self, cache_key: str, ticker: str, data: dict,
                             ttl_days: int = 90, source: str = "sec_edgar",
                             *, fetched_at: Optional[str] = None,

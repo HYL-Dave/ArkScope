@@ -101,6 +101,13 @@ class LocalMarketBackend:
             logger.warning("local get_financial_cache failed (%s)", exc)
             return None
 
+    def get_financial_cache_entry(self, cache_key: str):
+        try:
+            return self._market.get_financial_cache_entry(cache_key)
+        except Exception as exc:
+            logger.warning("local cache metadata read failed (%s)", type(exc).__name__)
+            return None
+
     def set_financial_cache(
         self,
         cache_key: str,
@@ -108,14 +115,21 @@ class LocalMarketBackend:
         data: dict,
         ttl_days: int = 90,
         source: str = "sec_edgar",
+        *, fetched_at: str | None = None, expires_at: str | None = None,
     ):
         try:
+            timestamps = {}
+            if fetched_at is not None:
+                timestamps["fetched_at"] = fetched_at
+            if expires_at is not None:
+                timestamps["expires_at"] = expires_at
             return self._market.set_financial_cache(
                 cache_key,
                 ticker,
                 data,
                 ttl_days=ttl_days,
                 source=source,
+                **timestamps,
             )
         except Exception as exc:
             logger.warning("local set_financial_cache failed (%s)", exc)

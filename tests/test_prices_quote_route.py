@@ -5,8 +5,8 @@ from src.tools.schemas import CurrentQuoteResult
 def test_quote_route_returns_model_dump(monkeypatch):
     seen = {}
 
-    def fake_quote(dal, ticker, source="auto"):
-        seen.update({"dal": dal, "ticker": ticker, "source": source})
+    def fake_quote(dal, ticker, source="auto", max_age_seconds=60):
+        seen.update({"dal": dal, "ticker": ticker, "source": source, "max_age_seconds": max_age_seconds})
         return CurrentQuoteResult(
             ticker="NVDA",
             provider="ibkr",
@@ -17,10 +17,11 @@ def test_quote_route_returns_model_dump(monkeypatch):
 
     monkeypatch.setattr(route, "get_current_quote", fake_quote)
 
-    out = route.current_quote("nvda", source="ibkr", dal=object())
+    out = route.current_quote("nvda", source="ibkr", max_age_seconds=17, dal=object())
 
     assert seen["ticker"] == "nvda"
     assert seen["source"] == "ibkr"
+    assert seen["max_age_seconds"] == 17
     assert out["ticker"] == "NVDA"
     assert out["mode"] == "ibkr_snapshot"
     assert out["price"] == 123.45

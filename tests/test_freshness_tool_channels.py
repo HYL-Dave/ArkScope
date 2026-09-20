@@ -1,0 +1,118 @@
+"""The two API-key and two OAuth adapters retain explicit freshness choices."""
+
+import asyncio
+from datetime import datetime, timedelta, timezone
+import json
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+import pytest
+
+
+async def invoke(channel, name, arguments, dal):
+    from src.tools.registry import create_default_registry
+
+    if channel == "openai":
+        from agents.tool_context import ToolContext
+        from src.agents.openai_agent.tools import create_openai_tools
+        tool = next(t for t in create_openai_tools(dal) if t.name == "tool_" + name)
+        payload = json.dumps(arguments)
+        context = ToolContext(context=None, tool_name=tool.name, tool_call_id="freshness-test", tool_arguments=payload)
+        return await tool.on_invoke_tool(context, payload)
+    if channel == "anthropic":
+        from src.agents.anthropic_agent.tools import execute_tool_async
+        return await execute_tool_async(name, arguments, dal)
+    registry = create_default_registry()
+    if channel == "chatgpt":
+        from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
+        ok, result = await OpenAIChatGPTOAuthDriver(registry=registry, dal=dal)._invoke_tool(
+            name=name, args=arguments, token=None)
+        assert ok
+        return result
+    from src.auth_drivers.claude_code_sdk_driver import _invoke_bridged_tool
+    result = await _invoke_bridged_tool(name=name, args=arguments, registry=registry,
+                                      dal=dal, token=None, per_tool_timeout_s=5)
+    assert not result["is_error"]
+    return result["content"][0]["text"]
+
+
+@pytest.mark.parametrize("channel", ["openai", "anthropic", "chatgpt", "claude"])
+@pytest.mark.parametrize("price_fields,basis", [({"close": 99.0}, "previous_close"), ({"last": 101.0}, "last_trade")])
+def test_quote_age_and_unknowns_survive_all_channels(channel, price_fields, basis, monkeypatch):
+    from src.tools import current_quote as module
+    from tests.test_sec_research_tool_adapters import unwrap
+
+    seen = []
+    def fetch(ticker, max_age_seconds):
+        seen.append((ticker, max_age_seconds))
+        return module._quote_from_ibkr_payload(ticker, price_fields, max_age_seconds=max_age_seconds)
+    monkeypatch.setattr(module, "_fetch_ibkr_quote", fetch)
+    result = unwrap(asyncio.run(invoke(channel, "get_current_quote",
+        {"ticker": "AAPL", "source": "ibkr", "max_age_seconds": 17}, object())))
+    assert seen == [("AAPL", 17)]
+    assert result["max_age_seconds"] == 17 and result["price_basis"] == basis
+    assert result["market_data_type"] == "unknown" and result["timestamp"] is None
+    assert result["stale"] is (True if basis == "previous_close" else None)
+
+
+@pytest.mark.parametrize("channel", ["openai", "anthropic", "chatgpt", "claude"])
+@pytest.mark.parametrize("freshness", ["stored", "auto"])
+def test_fd_period_policy_and_original_acquisition_time_survive_all_channels(
+    channel, freshness, monkeypatch, tmp_path,
+):
+    from data_sources import financial_datasets_client as fd_module
+    from src.tools.backends.local_market_backend import LocalMarketBackend
+    from src.fundamentals.cache import fundamentals_analysis_cache_key
+    from tests.test_sec_research_tool_adapters import unwrap
+
+    monkeypatch.setenv("FINANCIAL_DATASETS_API_KEY", "offline-test-key")
+    monkeypatch.setattr(fd_module, "_FILE_CACHE_DIR", tmp_path / "files")
+    http = Mock(side_effect=AssertionError("stored statements must not spend"))
+    monkeypatch.setattr(fd_module.requests, "get", http)
+    sec = Mock(side_effect=AssertionError("FD-only fixture must not acquire SEC data"))
+    monkeypatch.setattr("data_sources.sec_edgar_financials.SECEdgarFinancials", sec)
+    backend = LocalMarketBackend(market_db=str(tmp_path / "market.db"))
+    now = datetime.now(timezone.utc)
+    fetched = now - timedelta(days=20)
+    expires = now + timedelta(days=70)
+    assert backend.set_financial_cache(fundamentals_analysis_cache_key("AAPL", "quarterly"), "AAPL", {"_negative": True})
+    for prefix, dataset, limit in [("income", "income_statements", 4), ("balance", "balance_sheets", 1), ("cashflow", "cash_flow_statements", 4)]:
+        item = {"ticker": "AAPL", "report_period": "2026-06-30", "fiscal_period": "2026-Q3",
+                "period": "quarterly", "currency": "USD"}
+        data = fd_module.FinancialDatasetsClient._envelope({dataset: [item]}, "AAPL", "quarterly", limit)
+        assert backend.set_financial_cache(f"fd_v1_{prefix}_AAPL_quarterly_{limit}", "AAPL", data,
+            source="financial_datasets", fetched_at=fetched.isoformat(), expires_at=expires.isoformat())
+    dal = SimpleNamespace(_backend=backend, get_user_profile=lambda: {
+        "data_preferences": {"paid_sources": {"financial_datasets": {"enabled": True}}}})
+    result = unwrap(asyncio.run(invoke(channel, "get_fundamentals_analysis", {
+        "ticker": "AAPL", "period": "quarterly", "fd_freshness": freshness,
+        "fd_max_age_seconds": 30 * 86400,
+    }, dal)))
+    assert result["data_source"] == "financial_datasets", result
+    assert result["income_statements"][0]["period_type"] == "quarterly"
+    assert len(result["source_observations"]) == 3
+    for observed in result["source_observations"]:
+        assert observed["fetched_at"] == fetched.isoformat()
+        assert observed["freshness_mode"] == freshness and observed["retrieval"] == "stored"
+        assert observed["within_max_age"] is True
+        assert observed["latest_period_verified"] is False
+    assert result["acquisition_gaps"] == []
+    http.assert_not_called()
+    sec.assert_not_called()
+
+
+def test_all_schema_exporters_offer_freshness_options():
+    from src.tools.registry import create_default_registry
+    from src.agents.anthropic_agent.tools import get_anthropic_tools
+    from src.agents.openai_agent.tools import create_openai_tools
+
+    registry = create_default_registry()
+    for name, required in (
+        ("get_current_quote", {"max_age_seconds"}),
+        ("get_fundamentals_analysis", {"period", "fd_freshness", "fd_max_age_seconds"}),
+    ):
+        assert required <= {p.name for p in registry.get(name).parameters}
+        native_anthropic = next(t for t in get_anthropic_tools() if t["name"] == name)
+        assert required <= set(native_anthropic["input_schema"]["properties"])
+        native_openai = next(t for t in create_openai_tools(object()) if t.name == "tool_" + name)
+        assert required <= set(native_openai.params_json_schema["properties"])

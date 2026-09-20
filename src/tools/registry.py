@@ -279,7 +279,9 @@ class ToolRegistry:
             description=(
                 "Get a read-through current quote for a stock ticker. Uses IBKR snapshot "
                 "when available; source='auto' may fall back to the latest local bar, "
-                "explicitly marked as local_last_bar."
+                "explicitly marked as local_last_bar. Price basis, live/delayed/frozen feed and "
+                "price timestamp are separate; stale=null means freshness is unverified. "
+                "Previous close is historical and receipt time is not trade time."
             ),
             function=get_current_quote,
             category="prices",
@@ -287,6 +289,8 @@ class ToolRegistry:
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
                 ToolParameter("source", "string", "Quote source", required=False, default="auto",
                               enum=["auto", "ibkr", "local"]),
+                ToolParameter("max_age_seconds", "integer", "Maximum age of an evidenced live trade (default 60); does not make historical/unknown prices current",
+                              required=False, default=60),
             ],
         ))
 
@@ -579,9 +583,10 @@ class ToolRegistry:
             description=(
                 "Get fundamental analysis (P/E, ROE, margins, financial statements) for a ticker. "
                 "Use period='quarterly' for recent quarterly trends (QoQ/YoY growth). "
-                "Financial Datasets fallback may incur charges; cache misses require an operator-configured "
+                "Financial Datasets fallback may incur charges; refresh is the default and requires an operator-configured "
                 "request budget and account rate limit. Acquisition refusals appear in acquisition_gaps, "
-                "not as evidence that financial data does not exist."
+                "not as evidence that financial data does not exist. FD stored mode reads saved observations; "
+                "FD auto requires fd_max_age_seconds. These flags do not govern the separate legacy SEC path."
             ),
             function=get_fundamentals_analysis,
             category="analysis",
@@ -590,6 +595,10 @@ class ToolRegistry:
                 ToolParameter("period", "string", "Report period type",
                               required=False, default="annual",
                               enum=["annual", "quarterly"]),
+                ToolParameter("fd_freshness", "string", "Financial Datasets only: bypass cache, read stored data, or honor an explicit age",
+                              required=False, default="refresh", enum=["refresh", "stored", "auto"]),
+                ToolParameter("fd_max_age_seconds", "integer", "FD acquisition age tolerance; required for auto, optional for stored, omit for refresh",
+                              required=False),
             ],
         ))
 

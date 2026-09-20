@@ -134,8 +134,9 @@ or fundamentals calls fail, nor that buying data subscriptions fixes the errors.
    previous close, live/delayed/frozen/unknown, request time and observation time.
    Add deterministic boundary tests and a separately authorized live Gateway
    check. The [bounded follow-up](../superpowers/plans/2026-09-20-quote-freshness-repair.md)
-   records the inspected source-to-tool gap. This does not need to wait for a
-   SEC retention decision.
+   records the source-to-tool repair and acceptance boundary. The implementation
+   now separates receipt from trade time and retains unknown freshness; the
+   frozen full regression and a separately approved live check remain distinct.
 2. **SA article/comment access and holdings context across auth channels.** The
    archived 17-tool OAuth allowlists omit direct article/comment/holdings tools.
    The saved questions need those capabilities even when a particular tool has
@@ -145,9 +146,10 @@ or fundamentals calls fail, nor that buying data subscriptions fixes the errors.
    repair numerator/period/session/window labels or suppress unjustified derived
    values. The archived fundamentals alternative is not accepted replacement
    evidence. Earnings scheduling follows correct event alignment, not vice versa.
-   The native API-key fundamentals wrappers currently expose only `ticker`,
-   unlike the registry's `period` option; period forwarding still needs
-   channel-parity acceptance before claiming equivalent quarterly capability.
+   The native API-key wrappers' omitted `period` option was repaired with FD
+   freshness forwarding, and offline four-channel tests now preserve quarterly
+   results and their original acquisition time. This is not acceptance of the
+   legacy financial formulas or of a provider subscription's coverage.
    Paid-fallback descriptions and the metered HTTP guard are covered across
    all four channels in this slice.
 4. **Operational decisions still separate.** Provider alternatives and plan

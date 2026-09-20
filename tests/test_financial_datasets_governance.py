@@ -2,7 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import multiprocessing
 from pathlib import Path
@@ -79,9 +79,14 @@ def test_invalid_or_missing_policy_fails_before_ledger_or_network(client_fixture
 def test_local_cache_hit_needs_neither_permission_nor_ledger(client_fixture):
     client, governor, request = client_fixture
     client._cache_backend = Mock()
-    client._cache_backend.get_financial_cache.return_value = {"income_statements": []}
+    now = datetime.now(timezone.utc)
+    client._cache_backend.get_financial_cache_entry.return_value = {
+        "source": "financial_datasets", "ticker": "TEST", "fetched_at": now.isoformat(),
+        "expires_at": (now + timedelta(days=90)).isoformat(),
+        "data": client._envelope({"income_statements": []}, "TEST", "quarterly", 4),
+    }
     client._request_policy = None
-    assert client.get_income_statements("TEST") == []
+    assert client.get_income_statements("TEST", freshness="stored") == []
     assert not governor.path.exists()
     request.assert_not_called()
 
@@ -89,7 +94,7 @@ def test_local_cache_hit_needs_neither_permission_nor_ledger(client_fixture):
 def test_bounded_endpoint_fanout_and_cache_hits(client_fixture):
     client, governor, request = client_fixture
     client.get_income_statements("TEST")
-    client.get_income_statements("TEST")
+    client.get_income_statements("TEST", freshness="stored")
     assert request.call_count == 1
     client.get_balance_sheets("TEST")
     client.get_cash_flow_statements("TEST")

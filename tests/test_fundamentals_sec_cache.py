@@ -316,6 +316,7 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
     class _FakeFD:
         def __init__(self, *_args, **_kwargs):
             events.append("fd:init")
+            self.observations = []
 
         def get_income_statements(self, *_args, **_kwargs):
             events.append("fd:income")

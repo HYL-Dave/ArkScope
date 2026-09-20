@@ -266,14 +266,16 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "get_ticker_prices")
 
     @function_tool
-    def tool_get_current_quote(ticker: str, source: str = "auto") -> str:
+    def tool_get_current_quote(ticker: str, source: str = "auto", max_age_seconds: int = 60) -> str:
         """Get a read-through current quote for a stock ticker.
 
         source='auto' tries IBKR first and may fall back to latest local bar.
         source='ibkr' is strict IBKR snapshot.
         source='local' returns latest stored local bar only.
+        Price basis, feed mode and timestamp are separate. stale=null is unknown.
+        max_age_seconds limits evidenced trade age, not acquisition time.
         """
-        result = get_current_quote(dal, ticker, source=source)
+        result = get_current_quote(dal, ticker, source=source, max_age_seconds=max_age_seconds)
         return _serialize_result(result, "get_current_quote")
 
     @function_tool
@@ -492,19 +494,29 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     # ================================================================
 
     @function_tool
-    def tool_get_fundamentals_analysis(ticker: str) -> str:
+    def tool_get_fundamentals_analysis(
+        ticker: str, period: str = "annual", fd_freshness: str = "refresh",
+        fd_max_age_seconds: Optional[int] = None,
+    ) -> str:
         """Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker.
 
-        Financial Datasets fallback may incur charges; paid cache misses require
+        Financial Datasets fallback may incur charges; default refresh requires
         an operator-configured request budget and account rate limit.
         Acquisition refusals appear in acquisition_gaps, not as proof of absent data.
+        FD stored reads saved observations; auto requires fd_max_age_seconds.
+        These controls do not govern the separate legacy SEC source path.
 
         Args:
             ticker: Stock ticker symbol
+            period: annual or quarterly
+            fd_freshness: Financial Datasets refresh (default), stored or auto
+            fd_max_age_seconds: Allowed acquisition age, required for auto;
+                optional for stored, omit for refresh
 
         Returns market_cap, pe_ratio, roe, profit_margin, etc.
         """
-        result = get_fundamentals_analysis(dal, ticker)
+        result = get_fundamentals_analysis(dal, ticker, period=period,
+                                          fd_freshness=fd_freshness, fd_max_age_seconds=fd_max_age_seconds)
         return _serialize_result(result, "get_fundamentals_analysis")
 
     @function_tool

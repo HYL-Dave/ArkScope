@@ -162,7 +162,8 @@ def _build_result_from_statements(
 ) -> FundamentalsResult:
     """Build FundamentalsResult from statement dataclasses (shared by SEC + FD)."""
     snapshot_date = income_stmts[0].report_period if income_stmts else (
-        balance_sheets[0].report_period if balance_sheets else None
+        balance_sheets[0].report_period if balance_sheets else (
+            cashflow_stmts[0].report_period if cashflow_stmts else None)
     )
     metrics = _derive_metrics_from_sec(income_stmts, balance_sheets, cashflow_stmts)
 
@@ -192,6 +193,8 @@ def get_fundamentals_analysis(
     dal: DataAccessLayer,
     ticker: str,
     period: str = "annual",
+    fd_freshness: str = "refresh",
+    fd_max_age_seconds: Optional[int] = None,
 ) -> FundamentalsResult:
     """
     Get fundamental analysis for a ticker.
@@ -199,17 +202,27 @@ def get_fundamentals_analysis(
     Data source priority:
     1. Positive/negative SEC cache
     2. SEC EDGAR XBRL API (free, real-time) — structured financial statements
-    3. Financial Datasets API (paid, cached) — Q4, TTM, most complete
+    3. Financial Datasets API (paid admission; explicit saved-data policy)
 
     Args:
         dal: DataAccessLayer instance
         ticker: Stock ticker symbol
         period: 'annual' or 'quarterly'
+        fd_freshness: FD only: refresh (default), stored, or auto
+        fd_max_age_seconds: Acquisition age allowed for FD auto/stored reads;
+            required for auto. Fiscal period does not establish freshness.
 
     Returns:
         FundamentalsResult with financial metrics and statements
     """
     result = FundamentalsResult(ticker=ticker.upper())
+    from data_sources.financial_datasets_client import validate_freshness
+    from data_sources.financial_datasets_governance import FinancialDatasetsFailure
+    try:
+        validate_freshness(fd_freshness, fd_max_age_seconds)
+    except FinancialDatasetsFailure as exc:
+        result.acquisition_gaps = [{"provider": "financial_datasets", "code": exc.code}]
+        return result
 
     # 2. Fallback: SEC EDGAR XBRL (free, covers all US public companies). LOCAL-FIRST
     # CACHE (#3): the SEC fetch is free but live + rate-limited (10 req/s, declared UA),
@@ -271,9 +284,8 @@ def get_fundamentals_analysis(
         except Exception:  # noqa: BLE001
             pass
 
-    # 3. Financial Datasets API (paid, cached — local-primary via the DAL backend)
-    if _is_fd_enabled(dal):
-        from data_sources.financial_datasets_governance import FinancialDatasetsFailure
+    # These controls apply only to FD; the legacy SEC path above is separate.
+    if _is_fd_enabled(dal) or fd_freshness == "stored":
         try:
             from data_sources.financial_datasets_client import FinancialDatasetsClient
             cache_days = _get_fd_cache_days(dal)
@@ -283,22 +295,31 @@ def get_fundamentals_analysis(
             fd = FinancialDatasetsClient(cache_days=cache_days, cache_backend=backend, request_policy=policy)
 
             n = 4 if period == "quarterly" else 2
-            fd_income, fd_balance, fd_cashflow = [], [], []
+            statements = {"income_statements": [], "balance_sheets": [], "cash_flow_statements": []}
             gaps = []
-            try:
-                fd_income = fd.get_income_statements(ticker, period=period, limit=n)
-                fd_balance = fd.get_balance_sheets(ticker, period=period, limit=1)
-                fd_cashflow = fd.get_cash_flow_statements(ticker, period=period, limit=n)
-            except FinancialDatasetsFailure as exc:
-                # Stop fan-out on denial/failure, retaining already acquired data.
-                gaps.append({"provider": "financial_datasets", "code": exc.code})
+            freshness_args = {"freshness": fd_freshness, "max_age_seconds": fd_max_age_seconds}
+            for dataset, read, limit in (
+                ("income_statements", fd.get_income_statements, n),
+                ("balance_sheets", fd.get_balance_sheets, 1),
+                ("cash_flow_statements", fd.get_cash_flow_statements, n),
+            ):
+                try:
+                    statements[dataset] = read(ticker, period=period, limit=limit, **freshness_args)
+                except FinancialDatasetsFailure as exc:
+                    gap = {"provider": "financial_datasets", "code": exc.code}
+                    if fd_freshness == "stored" and exc.code == "financial_datasets_cache_miss":
+                        gaps.append({**gap, "dataset": dataset})
+                        continue
+                    gaps.append(gap)
+                    break
 
-            if fd_income or fd_balance:
+            if any(statements.values()):
                 result = _build_result_from_statements(
                     ticker, "financial_datasets",
-                    fd_income, fd_balance, fd_cashflow,
+                    statements["income_statements"], statements["balance_sheets"], statements["cash_flow_statements"],
                 )
             result.acquisition_gaps = gaps
+            result.source_observations = list(fd.observations)
             return result
         except FinancialDatasetsFailure as exc:
             result.acquisition_gaps = [{"provider": "financial_datasets", "code": exc.code}]

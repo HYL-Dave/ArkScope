@@ -46,7 +46,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `list_high_value_comments` | news | window_days?, ticker?, min_score?, limit? | rule-based SA comment ranking |
 | `get_sa_comment_focus` | news | window_days?, min_score?, limit? | rule-based SA comment focus |
 | `get_sa_feed` | news | q?, ticker?, item_type?, days?, limit?, offset? | unified SA evidence feed |
-| `get_current_quote` | prices | ticker*, source? | typed quote or qualified local bar |
+| `get_current_quote` | prices | ticker*, source?, max_age_seconds? | quote price basis, observed feed mode and trade age; historical local fallback |
 | `get_ticker_prices` | prices | ticker*, interval?, days? | local market-data bars |
 | `get_price_change` | prices | ticker*, days? | deterministic price change |
 | `get_sector_performance` | prices | sector*, days? | deterministic sector performance |
@@ -58,7 +58,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `calculate_implied_valuation` | calculation | target_metric*, multiples*, value_basis*, cash?, total_debt?, shares_outstanding?, current_price? | pure caller-supplied multiple valuation |
 | `calculate_peer_statistics` | calculation | values*, target_value? | pure caller-supplied peer statistics |
 | `calculate_weighted_scenarios` | calculation | values*, weights*, labels?, current_price? | pure caller-supplied scenario weighting |
-| `get_fundamentals_analysis` | analysis | ticker*, period? | legacy SEC statements/ratios; optional metered Financial Datasets fallback with operator request policy |
+| `get_fundamentals_analysis` | analysis | ticker*, period?, fd_freshness?, fd_max_age_seconds? | legacy SEC statements/ratios; metered FD fallback with explicit acquisition age and saved-data policy |
 | `get_detailed_financials` | analysis | ticker* | normalized SEC/provider financial facts |
 | `list_sec_filings` | analysis | issuer*, forms?, filed_from?, filed_to?, include_amendments?, cursor?, limit?, freshness? | receipt-bound whole filing observations with full sources |
 | `get_sec_financial_facts` | analysis | issuer*, metrics?, concepts?, fact_ids?, accession?, as_of?, period?, start?, end?, revisions?, cursor?, limit?, freshness? | exact decimal facts, revisions and immutable source provenance |
@@ -119,11 +119,19 @@ its portable Python-analysis level does not imply terminal or workspace access.
   not user consent. The legacy SEC financial-mapping path is separate and still
   fetches automatically. The stored default does not change Settings refresh
   or schedules.
-- Financial Datasets cache misses require trusted operator request/rate limits;
-  absent limits keep that source cache-only. Refusals remain `acquisition_gaps`,
-  not evidence of absent financials. Counts are not a provider credit balance
-  or enforced dollar cap. See the
-  [governance contract](../superpowers/plans/2026-09-20-source-read-governance.md).
+- Financial Datasets defaults to `fd_freshness="refresh"`, bypassing saved data
+  without bypassing the operator's request/rate policy. `stored` explicitly reads
+  saved observations without HTTP or cache promotion. `auto` requires a caller's
+  `fd_max_age_seconds`; fiscal period and old TTL settings do not prove freshness.
+  `source_observations` preserves original acquisition times and periods, not a
+  latest-filing guarantee. Missing authority never silently falls back to old
+  data. Refusals remain `acquisition_gaps`; counters are not a credit balance or
+  dollar cap. These controls apply to FD, not the separate legacy SEC fallback.
+  See [freshness](../superpowers/plans/2026-09-20-financial-datasets-freshness.md)
+  and [paid governance](../superpowers/plans/2026-09-20-source-read-governance.md).
+- Current quotes separate `price_basis`, `market_data_type`, price `timestamp`
+  and local `received_at`. `stale=null` means unknown. Previous close, delayed,
+  frozen and local-bar values cannot become current by relaxing the allowed age.
 
 ### 1.3 Permission boundaries
 

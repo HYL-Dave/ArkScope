@@ -106,7 +106,7 @@ def test_auto_falls_back_to_local_when_ibkr_unavailable(monkeypatch):
     monkeypatch.setattr(
         mod,
         "_fetch_ibkr_quote",
-        lambda ticker: (_ for _ in ()).throw(RuntimeError("gateway down")),
+        lambda ticker, **kwargs: (_ for _ in ()).throw(RuntimeError("gateway down")),
     )
 
     result = mod.get_current_quote(_FakeDAL([_bar(close=88.0)]), "aapl", source="auto")
@@ -123,7 +123,7 @@ def test_strict_ibkr_does_not_fallback(monkeypatch):
     monkeypatch.setattr(
         mod,
         "_fetch_ibkr_quote",
-        lambda ticker: (_ for _ in ()).throw(RuntimeError("gateway down")),
+        lambda ticker, **kwargs: (_ for _ in ()).throw(RuntimeError("gateway down")),
     )
 
     result = mod.get_current_quote(_FakeDAL([_bar(close=88.0)]), "aapl", source="ibkr")

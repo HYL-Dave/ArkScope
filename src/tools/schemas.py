@@ -103,7 +103,8 @@ class CurrentQuoteResult(BaseModel):
     """Read-through current quote result.
 
     ``mode`` is intentionally explicit:
-      - ibkr_snapshot: IBKR returned a snapshot; live-vs-delayed depends on account entitlement.
+      - ibkr_snapshot: observed quote; freshness requires independent evidence.
+      - ibkr_previous_close: historical IBKR close, not a current quote.
       - local_last_bar: fallback to latest stored OHLCV close; not current.
       - unavailable: no usable quote from the requested source.
     """
@@ -119,7 +120,22 @@ class CurrentQuoteResult(BaseModel):
     volume: Optional[int] = None
     timestamp: Optional[str] = None
     currency: Optional[str] = None
-    stale: bool = False
+    stale: Optional[bool] = None
+    freshness: str = "unknown"
+    freshness_reason: Optional[str] = None
+    price_basis: Optional[str] = None
+    timestamp_basis: Optional[str] = None
+    market_data_type: str = "unknown"
+    requested_at: Optional[str] = None
+    received_at: Optional[str] = None
+    evaluated_at: Optional[str] = None
+    last_trade_at: Optional[str] = None
+    quote_age_seconds: Optional[float] = None
+    max_age_seconds: int = 60
+    contract_id: Optional[int] = None
+    snapshot_complete: Optional[bool] = None
+    provider_error_codes: List[int] = Field(default_factory=list)
+    fallback_reason: Optional[str] = None
     source_note: str = ""
     error: Optional[str] = None
 
@@ -145,6 +161,10 @@ class FundamentalsResult(BaseModel):
     data_source: str = Field(default="none", description="ibkr, sec_edgar, financial_datasets, or none")
     acquisition_gaps: List[Dict[str, str]] = Field(
         default_factory=list, description="Provider acquisition refusal/failure; not evidence of absent financial data"
+    )
+    source_observations: List[dict] = Field(
+        default_factory=list,
+        description="Per-statement provider, retrieval mode, original acquisition time and allowed age; not a latest-filing guarantee",
     )
     # Key metrics (derived from IBKR snapshot or SEC)
     market_cap: Optional[float] = None

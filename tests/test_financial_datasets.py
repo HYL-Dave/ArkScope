@@ -134,7 +134,7 @@ class TestFinancialDatasetsClient:
         }))
 
         try:
-            stmts = self.client.get_income_statements("AAPL", period="annual", limit=1)
+            stmts = self.client.get_income_statements("AAPL", period="annual", limit=1, freshness="stored")
             # API should NOT have been called
             mock_get.assert_not_called()
             # Should still return data from cache
@@ -170,15 +170,15 @@ class TestFinancialDatasetsClient:
 
     @patch("data_sources.financial_datasets_client._FILE_CACHE_DIR",
            Path("/tmp/_fd_test_nonexistent_cache"))
-    def test_no_api_key_returns_empty(self):
-        """Without API key and no cache, should return empty list."""
+    def test_no_api_key_is_not_misreported_as_empty_data(self):
+        """Missing acquisition authority is not proof of absent statements."""
         # config/.env may have the key loaded into os.environ — must patch it out
         with patch.dict("os.environ", {}, clear=False):
             os.environ.pop("FINANCIAL_DATASETS_API_KEY", None)
             client = FinancialDatasetsClient(api_key=None)
             client._db_url = None
-            stmts = client.get_income_statements("AAPL")
-            assert stmts == []
+            with pytest.raises(FinancialDatasetsFailure, match="api_key_missing"):
+                client.get_income_statements("AAPL")
 
     @patch("data_sources.financial_datasets_client._FILE_CACHE_DIR",
            Path("/tmp/_fd_test_nonexistent_cache"))
@@ -214,7 +214,7 @@ class TestFinancialDatasetsClient:
         mock_resp.raise_for_status = MagicMock()
         mock_get.return_value = mock_resp
 
-        stmts = self.client.get_income_statements("AAPL", limit=1)
+        stmts = self.client.get_income_statements("AAPL", period="annual", limit=1)
         assert len(stmts) == 1
         assert stmts[0].revenue == 100.0
 
@@ -309,14 +309,28 @@ class _FakeCacheBackend:
     def __init__(self, store=None):
         self.store = dict(store or {})
         self.set_calls = []
+        self.metadata = {}
+        self.fetched = datetime.now(timezone.utc)
 
     def get_financial_cache(self, cache_key):
         return self.store.get(cache_key)
 
-    def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar"):
+    def get_financial_cache_entry(self, cache_key):
+        if cache_key not in self.store:
+            return None
+        return {"source": "financial_datasets", "ticker": "AAPL",
+                "fetched_at": self.fetched.isoformat(),
+                "expires_at": (self.fetched + timedelta(days=180)).isoformat(),
+                **self.metadata.get(cache_key, {}), "data": self.store[cache_key]}
+
+    def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar",
+                            *, fetched_at=None, expires_at=None):
         self.set_calls.append({"cache_key": cache_key, "ticker": ticker,
-                               "ttl_days": ttl_days, "source": source})
+                               "ttl_days": ttl_days, "source": source,
+                               "fetched_at": fetched_at, "expires_at": expires_at})
         self.store[cache_key] = data
+        self.metadata[cache_key] = {"ticker": ticker, "source": source,
+                                    "fetched_at": fetched_at, "expires_at": expires_at}
         return True
 
 
@@ -327,7 +341,7 @@ class TestCacheBackendMode:
         backend = _FakeCacheBackend({"income_AAPL_annual": MOCK_INCOME_RESPONSE})
         with patch("data_sources.financial_datasets_client._FILE_CACHE_DIR", tmp_path):
             client = FinancialDatasetsClient(api_key="k", cache_backend=backend)
-            stmts = client.get_income_statements("AAPL", period="annual", limit=1)
+            stmts = client.get_income_statements("AAPL", period="annual", limit=1, freshness="stored")
         mock_get.assert_not_called()
         assert len(stmts) == 1 and stmts[0].revenue == 416161000000.0
 
@@ -343,8 +357,12 @@ class TestCacheBackendMode:
             client = FinancialDatasetsClient(api_key="k", cache_backend=backend, request_policy=TEST_POLICY)
             stmts = client.get_income_statements("AAPL", period="annual", limit=1)
         assert len(stmts) == 1
-        assert backend.set_calls == [{"cache_key": "income_AAPL_annual", "ticker": "AAPL",
-                                      "ttl_days": 180, "source": "financial_datasets"}]
+        assert len(backend.set_calls) == 1
+        call = backend.set_calls[0]
+        assert {k: call[k] for k in ("cache_key", "ticker", "ttl_days", "source")} == {
+            "cache_key": "fd_v1_income_AAPL_annual_1", "ticker": "AAPL",
+            "ttl_days": 180, "source": "financial_datasets"}
+        assert datetime.fromisoformat(call["expires_at"]) - datetime.fromisoformat(call["fetched_at"]) == timedelta(days=180)
         assert list(tmp_path.glob("*.json")) == []  # no new file writes in backend mode
 
     @patch("data_sources.financial_datasets_client.requests.get")
@@ -361,13 +379,15 @@ class TestCacheBackendMode:
         backend = _FakeCacheBackend()
         with patch("data_sources.financial_datasets_client._FILE_CACHE_DIR", tmp_path):
             client = FinancialDatasetsClient(api_key="k", cache_backend=backend)
-            stmts = client.get_income_statements("AAPL", period="annual", limit=1)
+            stmts = client.get_income_statements("AAPL", period="annual", limit=1,
+                                                freshness="auto", max_age_seconds=180 * 86400)
         mock_get.assert_not_called()
         assert len(stmts) == 1
         assert len(backend.set_calls) == 1
         promo = backend.set_calls[0]
         assert promo["source"] == "financial_datasets" and promo["ticker"] == "AAPL"
-        assert promo["ttl_days"] == 150  # 180 - 30 elapsed → remaining TTL preserved
+        assert promo["fetched_at"] == fetched.isoformat()
+        assert promo["expires_at"] == (fetched + timedelta(days=180)).isoformat()
 
     def test_explicit_cache_capability_is_not_shape_probed(self):
         capability = object()
@@ -400,9 +420,10 @@ class TestCacheBackendMode:
             assert len(stmts) == 1
             assert mock_get.call_count == 1
             # paid response landed in the file fallback + the failure is observable
-            assert (tmp_path / "income_AAPL_annual.json").exists()
+            assert (tmp_path / "fd_v1_income_AAPL_annual_1.json").exists()
             assert "NOT cached by the backend" in caplog.text
             # second call: backend still misses → FILE serves it → NO second paid call
-            stmts2 = client.get_income_statements("AAPL", period="annual", limit=1)
+            stmts2 = client.get_income_statements("AAPL", period="annual", limit=1,
+                                                 freshness="auto", max_age_seconds=180 * 86400)
         assert len(stmts2) == 1
         assert mock_get.call_count == 1  # still one paid call total

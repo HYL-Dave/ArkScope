@@ -1152,27 +1152,22 @@ class IBKRDataSource(BaseDataSource):
         self._ensure_connected()
         self._rate_limit_wait()
 
+        previous_timeout = self._ib.RequestTimeout
+        self._ib.RequestTimeout = self.timeout
         try:
             contract = self._create_contract(ticker)
-            self._ib.qualifyContracts(contract)
-
-            # Request snapshot
-            ticker_data = self._ib.reqMktData(contract, '', True, False)
-            self._ib.sleep(2)  # Wait for data
-
-            return {
-                'ticker': ticker,
-                'bid': ticker_data.bid,
-                'ask': ticker_data.ask,
-                'last': ticker_data.last,
-                'volume': ticker_data.volume,
-                'high': ticker_data.high,
-                'low': ticker_data.low,
-                'close': ticker_data.close,
-            }
+            qualified = self._ib.qualifyContracts(contract)
+            if len(qualified) != 1 or not qualified[0].conId:
+                return {'ticker': ticker, 'error': 'ibkr_contract_unresolved'}
+            from .ibkr_quote_snapshot import request_quote_snapshot
+            return request_quote_snapshot(self._ib, qualified[0], ticker)
+        except TimeoutError:
+            return {'ticker': ticker, 'error': 'ibkr_quote_timeout'}
         except Exception as e:
-            logger.error(f"Error getting quote for {ticker}: {e}")
-            return None
+            logger.warning("Quote request failed for %s (%s)", ticker, type(e).__name__)
+            return {'ticker': ticker, 'error': 'ibkr_quote_request_failed'}
+        finally:
+            self._ib.RequestTimeout = previous_timeout
 
     def fetch_historical_volatility(
         self,

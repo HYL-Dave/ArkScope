@@ -18,10 +18,11 @@ router = APIRouter(prefix="/prices", tags=["prices"])
 def current_quote(
     ticker: str,
     source: str = Query("auto", pattern="^(auto|ibkr|local)$"),
+    max_age_seconds: int = Query(60, ge=0),
     dal: DataAccessLayer = Depends(get_dal),
 ):
     """Get a read-through current quote for a ticker."""
-    result = get_current_quote(dal, ticker=ticker, source=source)
+    result = get_current_quote(dal, ticker=ticker, source=source, max_age_seconds=max_age_seconds)
     return result.model_dump()
 
 

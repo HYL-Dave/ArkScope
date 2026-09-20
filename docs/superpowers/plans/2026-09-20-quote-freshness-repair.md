@@ -1,10 +1,11 @@
 # Quote Freshness Repair
 
-Status: inspected follow-up, not implemented or live-tested by the source-read
-governance slice. Keep the quote capability. No SEC retirement or subscription
-purchase decision is needed to stop overstating freshness.
+Status: implemented with offline RED-to-GREEN checks; frozen full regression
+pending. No live Gateway acceptance is claimed. Keep the quote capability.
+This slice also implements the separately requested
+[FD freshness contract](2026-09-20-financial-datasets-freshness.md).
 
-## Confirmed Local Evidence
+## Baseline Evidence
 
 - `src/tools/current_quote.py::_quote_from_ibkr_payload` chooses last, midpoint
   or close, then assigns `mode="ibkr_snapshot"`, `stale=False` and the current
@@ -54,3 +55,40 @@ purchase decision is needed to stop overstating freshness.
   a single manual observation establishes all subscriptions or sessions.
 - Keep this distinct from earnings announcement/session-window repair in
   `2026-09-20-earnings-observation-followup.md`.
+
+## Implemented Contract
+
+- `get_current_quote` and all four adapters expose `max_age_seconds` (default
+  60, nonnegative integer). It classifies an evidenced live trade's age, not a
+  provider's capacity or a license to call historical data current.
+- `price_basis` separates last trade, bid/ask midpoint, previous close and local
+  bar. `timestamp` is the selected price's known time; receipt and evaluation
+  are separate. Missing/naive/future trade times or unobserved mode stay unknown
+  (`stale=null`). Frozen/delayed, previous close and local bars stay historical.
+  Midpoint has no invented exchange timestamp. Crossed/one-sided quotes and
+  nonpositive/nonfinite/bool prices cannot form a valid midpoint/last.
+- Installed ib_insync initializes `Ticker.marketDataType=1`, sets `Ticker.time`
+  on local receipt, and does not retain default last-timestamp ticks 45/88.
+  The source therefore observes request-ID-bound callbacks, forwarding the
+  normal SDK handlers and restoring instance methods in `finally`. A new last
+  price invalidates an older timestamp; live/delayed tick pairs must agree.
+- The existing two-second snapshot window is preserved and explicitly partial
+  unless snapshot-end arrives. No generic tick request, delayed-mode switch or
+  fee-bearing regulatory snapshot is added. Contract qualification is bounded
+  by the source timeout, restored after use. Requests and observers are cleaned
+  up on success, timeout, exception and propagated cancellation.
+- Subscription failures come only from this request's error codes, never an
+  unrelated Gateway error. Strict IBKR does not choose another source. `auto`
+  can still return a historical local bar with `fallback_reason` preserved.
+- The direct option-strike consumers keep their existing last/close inputs.
+  This slice does not certify those option analytics' price-age semantics or
+  replace the separate completed-session valuation-price contract. Native
+  Anthropic non-SEC dispatch is still synchronous; source cancellation cleanup
+  tests are not proof of end-to-end cancellation of that dispatcher.
+
+Vendor references: [market-data modes](https://interactivebrokers.github.io/tws-api/market_data_type.html),
+[snapshot behavior](https://interactivebrokers.github.io/tws-api/md_request.html),
+[tick types](https://interactivebrokers.github.io/tws-api/tick_types.html),
+[error-code semantics](https://interactivebrokers.github.io/tws-api/message_codes.html).
+These pages describe the installed SDK's protocol; current documentation is
+linked from [IBKR's API documentation](https://www.interactivebrokers.com/docs/tws-api/doc/introduction).

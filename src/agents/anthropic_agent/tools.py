@@ -179,6 +179,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                         "enum": ["auto", "ibkr", "local"],
                         "description": "Quote source. auto=IBKR then explicit local fallback.",
                         "default": "auto"
+                    },
+                    "max_age_seconds": {
+                        "type": "integer", "minimum": 0, "default": 60,
+                        "description": "Maximum evidenced live trade age; receipt time is not trade time and unknown freshness stays unknown."
                     }
                 },
                 "required": ["ticker"]
@@ -497,16 +501,24 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "name": "get_fundamentals_analysis",
             "description": (
                 "Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker. "
-                "Financial Datasets fallback may incur charges; paid cache misses require an "
+                "Financial Datasets fallback may incur charges; default refresh requires an "
                 "operator-configured request budget and account rate limit. "
-                "Acquisition refusals appear in acquisition_gaps, not as proof of absent data."
+                "Acquisition refusals appear in acquisition_gaps, not as proof of absent data. "
+                "FD stored reads saved observations; auto requires fd_max_age_seconds. "
+                "These controls do not govern the separate legacy SEC source path."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "ticker": {
-                        "type": "string",
-                        "description": "Stock ticker symbol"
+                    "ticker": {"type": "string", "description": "Stock ticker symbol"},
+                    "period": {"type": "string", "enum": ["annual", "quarterly"], "default": "annual"},
+                    "fd_freshness": {
+                        "type": "string", "enum": ["refresh", "stored", "auto"], "default": "refresh",
+                        "description": "Financial Datasets only: bypass cache, read stored data, or honor an explicit age."
+                    },
+                    "fd_max_age_seconds": {
+                        "type": "integer", "minimum": 0,
+                        "description": "FD acquisition age tolerance; required for auto, optional for stored, omit for refresh."
                     }
                 },
                 "required": ["ticker"]
@@ -1463,6 +1475,7 @@ def execute_tool(
             dal,
             tool_input["ticker"],
             source=tool_input.get("source", "auto"),
+            max_age_seconds=tool_input.get("max_age_seconds", 60),
         ),
         "get_price_change": lambda: get_price_change(
             dal,
@@ -1535,7 +1548,10 @@ def execute_tool(
         ),
         "get_fundamentals_analysis": lambda: get_fundamentals_analysis(
             dal,
-            tool_input["ticker"]
+            tool_input["ticker"],
+            period=tool_input.get("period", "annual"),
+            fd_freshness=tool_input.get("fd_freshness", "refresh"),
+            fd_max_age_seconds=tool_input.get("fd_max_age_seconds"),
         ),
         "get_detailed_financials": lambda: get_detailed_financials(
             dal,
