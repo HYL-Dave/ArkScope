@@ -1,8 +1,10 @@
 # Research Continuity Repair
 
-Status: accepted follow-up scope; **not implemented**. This plan carries the
-remaining problems out of the archived `research-session-continuity` branch.
-Archiving the branch does not close these issues or adopt its proposed schema.
+Status: **Slice 1 implemented; final regression pending**. Slices 2 and 3 remain
+unimplemented. This plan carries the remaining problems out of the archived
+`research-session-continuity` branch. Archiving the branch did not close these
+issues or adopt its proposed schema. Slice 1 evidence:
+`docs/superpowers/evidence/2026-09-20-research-completion-repair/`.
 
 ## Decision And Boundaries
 
@@ -26,7 +28,7 @@ Historical design authority for review, not an implementation mandate:
   inputs to the broader tool-repair queue, not evidence that the archived
   fundamentals implementation has been adopted.
 
-## Current Evidence
+## Baseline Evidence
 
 Rechecked against master `f0024782`; no production database or model call was
 used. Reproducer and results:
@@ -75,6 +77,28 @@ trustworthy. This slice does not need a new provider session or model request.
 Acceptance: both reproduced defects have RED-to-GREEN owners; ordinary failure
 and cancellation retain their truthful state; committed answers and citations
 reopen after constructing fresh stores; provider dispatch count stays one.
+
+### Implemented Boundary
+
+- Server-owned completion now commits the linked assistant, terminal event and
+  status in one transaction. Ordinary provider failure reuses the existing
+  atomic error helper. The legacy page-owned query endpoint is unchanged.
+- Local write failure exposes `run_persistence_failed`, leaves the durable
+  queued/running exclusion intact, retains already received UI output and never
+  automatically sends another model request. The observation is process-local,
+  not a fabricated durable status. If storage is unavailable, the answer is not
+  promised saved; cancellation or restart remains an explicit next action.
+- Startup can complete a legacy active run only from one matching linked
+  assistant and one final completion event, including exact JSON receipts,
+  owning thread, tool/citation trace and personalization. Otherwise it preserves
+  surviving messages and records `run_completion_unverified` without adding a
+  contradictory second assistant. Active runs without completion evidence keep
+  the ordinary interrupted behavior. Already-terminal historical rows are not
+  repaired; any production audit/disposal remains separately authorized.
+- Event polling reads status and events from one snapshot; the browser only
+  applies terminal events consistent with that status. Late worker frames cannot
+  overwrite a cancelled or deleted run. No schema, native session, runtime,
+  credential authority, subscription usage or card-translation change is made.
 
 ## Slice 2: Isolated Native Session Continuity
 
@@ -139,11 +163,12 @@ Read the archived original without recreating or merging the branch:
 
 ```bash
 git show archive/2026-09-20/research-session-continuity:docs/superpowers/specs/2026-09-10-research-session-continuity-design.md
-python docs/superpowers/evidence/2026-09-20-research-continuity-audit/observe.py
-python -m pytest tests/test_research_runs.py tests/test_research_threads.py tests/test_claude_code_sdk_driver.py tests/test_task_runtime_binding.py -q
+python -m pytest tests/test_research_runs.py tests/test_research_threads.py tests/test_sec_research_trace.py tests/test_claude_code_sdk_driver.py tests/test_task_runtime_binding.py -q
 ```
 
-The observer reports current faults; exit 0 means its working control and
-isolation checks held, **not that these defects are fixed**. Convert its cases
-into behavior-correct acceptance tests when Slice 1 opens. The existing baseline
-suite passed 258 tests during this archive handoff.
+The observer is retained for historical baseline reproduction only. It refuses
+to certify a changed implementation when its old injection hooks are unused;
+exit 0 never meant that these defects were fixed. Slice 1's current acceptance
+owners are the fault/commit/recovery tests in `tests/test_research_runs.py` and
+the fresh-store citation test in `tests/test_sec_research_trace.py`. The baseline
+suite passed 258 tests during the archive handoff.

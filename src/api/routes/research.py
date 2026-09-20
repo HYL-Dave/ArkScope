@@ -13,6 +13,7 @@ from src.api.routes.query import _compose_agent_question, TITLE_MAX
 from src.auth_drivers.live_resolver import resolve_live_auth
 from src.auth_drivers.runtime_binding import activate_runtime_auth, capture_runtime_auth
 from src.research_errors import (
+    RUN_PERSISTENCE_FAILURE,
     classify_research_failure,
     public_research_error_code,
     sanitize_research_detail,
@@ -460,7 +461,16 @@ def get_research_run(
     run = run_store.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="run not found")
+    _require_persistence_available(run, run_store)
     return {"run": _run_dict(run)}
+
+
+def _require_persistence_available(run: ResearchRun, run_store) -> None:
+    if run.status in ACTIVE_STATUSES and run_store.has_persistence_failure(run.id):
+        raise HTTPException(status_code=503, detail={
+            "code": RUN_PERSISTENCE_FAILURE.code,
+            "message": RUN_PERSISTENCE_FAILURE.detail,
+        })
 
 
 @router.get("/research/runs/{run_id}/events")
@@ -469,10 +479,10 @@ def list_research_run_events(
     after: int = Query(0, ge=0),
     run_store=Depends(get_run_store),
 ) -> dict:
-    run = run_store.get_run(run_id)
+    run, events = run_store.get_run_with_events(run_id, after=after, limit=_RUN_EVENT_PAGE_SIZE + 1)
     if run is None:
         raise HTTPException(status_code=404, detail="run not found")
-    events = run_store.list_events(run_id, after=after, limit=_RUN_EVENT_PAGE_SIZE + 1)
+    _require_persistence_available(run, run_store)
     has_more = len(events) > _RUN_EVENT_PAGE_SIZE
     events = events[:_RUN_EVENT_PAGE_SIZE]
     return {

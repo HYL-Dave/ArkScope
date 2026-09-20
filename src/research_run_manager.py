@@ -20,8 +20,11 @@ from src.anthropic_refusal import safe_refusal_details
 from src.auth_drivers.runtime_binding import (
     RuntimeAuthBinding, RuntimeAuthUnavailable, activate_runtime_auth,
 )
-from src.api.routes.query import accumulate_tool_calls, _persist_assistant_turn, _persist_error_turn
-from src.research_errors import ResearchFailure, classify_research_failure, classify_sec_research_admission_failure
+from src.research_tool_trace import accumulate_tool_calls
+from src.research_errors import (
+    ResearchFailure, ResearchRunPersistenceError,
+    classify_research_failure, classify_sec_research_admission_failure,
+)
 from src.research_runs import ResearchRunStore
 from src.research_threads import MAX_TOOL_CALLS_SENTINEL, ResearchThreadStore
 from src.sec_research.capture_lock import research_operation
@@ -35,8 +38,23 @@ _TASKS: dict[str, asyncio.Task] = {}
 
 
 def _remove_task_if_current(run_id: str, task: asyncio.Task) -> None:
+    # The public failure is reported by the store observation, not an unhandled
+    # task traceback (which can contain provider or storage details).
+    if not task.cancelled():
+        failure = task.exception()
+        if failure is not None and not isinstance(failure, ResearchRunPersistenceError):
+            logger.error("research run %s exited unexpectedly before finalization", run_id)
     if _TASKS.get(run_id) is task:
         _TASKS.pop(run_id, None)
+
+
+def _persist(run_store: ResearchRunStore, owning_run_id: str, operation, *args, **kwargs):
+    try:
+        return operation(*args, **kwargs)
+    except Exception:
+        run_store.note_persistence_failure(owning_run_id)
+        logger.error("research run %s could not be saved (run_persistence_failed)", owning_run_id)
+        raise ResearchRunPersistenceError() from None
 
 
 def _etype(event: AgentEvent) -> str:
@@ -97,7 +115,7 @@ async def execute_research_run(
             if failure is None:
                 raise
             # No provider/result exists yet; this transaction publishes no refs.
-            run_store.fail_queued_run_handoff(
+            _persist(run_store, run_id, run_store.fail_queued_run_handoff,
                 run_id=run_id, thread_store=thread_store,
                 message=failure.detail,
                 error_code=failure.code,
@@ -136,7 +154,9 @@ async def _execute_research_run(
             "profile_active": False, "assistant_stance": "off", "skill_mode": "off",
             "suggested_skills": [], "applied_skills": [], "context_snapshot": "",
         }
-    claimed = run_store.mark_running_with_personalization(run_id, personalization)
+    claimed = _persist(
+        run_store, run_id, run_store.mark_running_with_personalization, run_id, personalization,
+    )
     if not claimed:
         return
     run = run_store.get_run(run_id)
@@ -150,6 +170,7 @@ async def _execute_research_run(
     done_data: Optional[dict] = None
     failure: Optional[ResearchFailure] = None
     terminal_token_usage: Optional[dict] = None
+    error_data: Optional[dict] = None
     t0 = time.monotonic()
 
     if stream_factory is None:
@@ -178,27 +199,20 @@ async def _execute_research_run(
                     etype = _etype(event)
                     data = dict(event.data or {})
                     if etype in ("tool_start", "tool_end"):
-                        run_store.append_event(run_id, etype, data)
+                        if _persist(run_store, run_id, run_store.append_running_event, run_id, etype, data) is None:
+                            return
                         collected.append((etype, data))
                         continue
                     if etype == "done" and data.get("answer") == MAX_TOOL_CALLS_SENTINEL:
                         failure = classify_research_failure(data.get("answer"))
                         terminal_token_usage = data.get("token_usage")
-                        run_store.append_event(
-                            run_id,
-                            "error",
-                            _typed_error_event_data(
-                                data,
-                                failure,
-                                personalization=personalization,
-                                binding=auth_binding,
-                            ),
+                        error_data = _typed_error_event_data(
+                            data, failure, personalization=personalization, binding=auth_binding,
                         )
                         break
                     if etype == "done":
                         # Replay and transcript carry the same prompt trace.
                         data = {**data, "personalization": dict(personalization)}
-                        run_store.append_event(run_id, etype, data)
                         done_data = data
                         break
                     if etype == "error":
@@ -209,25 +223,19 @@ async def _execute_research_run(
                             binding=auth_binding,
                         )
                         terminal_token_usage = data.get("token_usage")
-                        run_store.append_event(
-                            run_id,
-                            "error",
-                            _typed_error_event_data(
-                                data,
-                                failure,
-                                personalization=personalization,
-                                binding=auth_binding,
-                            ),
+                        error_data = _typed_error_event_data(
+                            data, failure, personalization=personalization, binding=auth_binding,
                         )
                         break
-                    run_store.append_event(run_id, etype, data)
+                    if _persist(run_store, run_id, run_store.append_running_event, run_id, etype, data) is None:
+                        return
     except asyncio.CancelledError:
         cancelled = classify_research_failure(
             "research run cancelled",
             explicit_code="run_cancelled",
         )
         try:
-            run_store.terminalize_error_with_message(
+            _persist(run_store, run_id, run_store.terminalize_error_with_message,
                 thread_store=thread_store,
                 run_id=run_id,
                 status="cancelled",
@@ -237,8 +245,10 @@ async def _execute_research_run(
                 elapsed_seconds=round(time.monotonic() - t0, 3),
                 personalization=personalization,
             )
-        except Exception:
-            logger.exception("failed to persist atomic cancellation for research run %s", run_id)
+        except ResearchRunPersistenceError:
+            pass  # The write observation remains visible; cancellation still propagates.
+        raise
+    except ResearchRunPersistenceError:
         raise
     except Exception as exc:  # noqa: BLE001 — terminal error, not route crash
         failure = classify_research_failure(exc, binding=auth_binding)
@@ -248,44 +258,26 @@ async def _execute_research_run(
             failure.code,
             failure.detail,
         )
-        run_store.append_event(
-            run_id,
-            "error",
-            {
-                "error": failure.detail,
-                "code": failure.code,
-                "personalization": dict(personalization),
-            },
-        )
+        done_data = None
+        error_data = {
+            "error": failure.detail,
+            "code": failure.code,
+            "personalization": dict(personalization),
+        }
 
     elapsed = round(time.monotonic() - t0, 3)
     if done_data is not None:
-        _persist_assistant_turn(
-            thread_store, thread_id=run.thread_id, done_data=done_data,
-            collected=collected, elapsed=elapsed, effort=run.effort,
-            personalization=personalization,
-            run_id=run_id,
-        )
-        run_store.mark_terminal(
-            run_id, "succeeded",
-            token_usage=done_data.get("token_usage") if isinstance(done_data, dict) else None,
+        _persist(run_store, run_id, run_store.terminalize_success_with_message,
+            thread_store=thread_store, run_id=run_id, done_data=done_data,
+            tool_calls=accumulate_tool_calls(collected), elapsed_seconds=elapsed,
         )
     else:
         failure = failure or classify_research_failure("research run failed")
-        _persist_error_turn(
-            thread_store, thread_id=run.thread_id, content=failure.detail, collected=collected,
-            provider=run.provider, model=run.model, effort=run.effort, elapsed=elapsed,
-            personalization=personalization,
-            run_id=run_id,
-            error_code=failure.code,
-            token_usage=terminal_token_usage,
-        )
-        run_store.mark_terminal(
-            run_id,
-            "failed",
-            error=failure.detail,
-            error_code=failure.code,
-            token_usage=terminal_token_usage,
+        _persist(run_store, run_id, run_store.terminalize_error_with_message,
+            thread_store=thread_store, run_id=run_id, status="failed",
+            error=failure.detail, error_code=failure.code, event_data=error_data,
+            tool_calls=accumulate_tool_calls(collected), elapsed_seconds=elapsed,
+            personalization=personalization, token_usage=terminal_token_usage,
         )
 
 

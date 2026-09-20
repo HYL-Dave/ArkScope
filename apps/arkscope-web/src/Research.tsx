@@ -62,7 +62,7 @@ import {
 } from "./researchSelection";
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse } from "./api";
 import { stanceLabel, traceSummary } from "./personalizationDisplay";
-import { shouldEndResearchReplay } from "./researchRunReplay";
+import { shouldApplyResearchEvent, shouldEndResearchReplay } from "./researchRunReplay";
 import type { NavigationRequest, NavigationTarget } from "./shell/navigation";
 import { Button, PageHeader, useShellOverlay } from "./ui";
 import {
@@ -126,6 +126,7 @@ type ThreadOutcome =
   | "thread_not_found"
   | "thread_load_failed"
   | "run_status_refresh_failed"
+  | "run_persistence_failed"
   | "stop_failed";
 
 function threadOutcomeLabel(outcome: ThreadOutcome, t: ResearchT): string {
@@ -134,6 +135,7 @@ function threadOutcomeLabel(outcome: ThreadOutcome, t: ResearchT): string {
     case "thread_not_found": return t(($) => $.workspace.threadNotFound);
     case "thread_load_failed": return t(($) => $.workspace.threadLoadFailed);
     case "run_status_refresh_failed": return t(($) => $.workspace.runStatusRefreshFailed);
+    case "run_persistence_failed": return t(($) => $.errors.persistenceDetail);
     case "stop_failed": return t(($) => $.workspace.stopFailed);
   }
 }
@@ -493,6 +495,7 @@ export function ResearchView({
         });
         for (const event of res.events) {
           after = Math.max(after, event.seq);
+          if (!shouldApplyResearchEvent(res.run, event)) continue;
           const parsedTs = Date.parse(event.created_at);
           dispatch({
             kind: "frame",
@@ -506,8 +509,14 @@ export function ResearchView({
         }
         await sleep(1000, controller.signal);
       }
-    } catch {
+    } catch (error) {
       if (abortRef.current !== controller || controller.signal.aborted) return;
+      if (error instanceof ApiError && error.code === "run_persistence_failed") {
+        // Keep the partial turn and admission lock; this is not a model error
+        // or a durable completion. Reattaching immediately would loop on 503.
+        setThreadError("run_persistence_failed");
+        return;
+      }
       setThreadError("run_status_refresh_failed");
       dispatch({ kind: "abort", runId: run.id, ts: Date.now() });
     } finally {
@@ -726,6 +735,7 @@ export function ResearchView({
   const evidenceVisible = evidenceOpen && !(shellOverlay && historyOpen);
   const threadActiveRun = state.activeThreadId ? activeRunsByThread[state.activeThreadId] ?? null : null;
   const threadLatestRun = state.activeThreadId ? latestRunsByThread[state.activeThreadId] ?? null : null;
+  const persistenceFailed = threadError === "run_persistence_failed" && Boolean(state.pending || threadActiveRun);
   const pendingRunId = state.pending?.runId ?? null;
   const currentRun = state.pending
     ? pendingRunId
@@ -886,7 +896,8 @@ export function ResearchView({
     [activeRunsByThread],
   );
   const suggestedPrompts = researchSuggestedPrompts(researchT);
-  const threadErrorLabel = threadError ? threadOutcomeLabel(threadError, researchT) : null;
+  const threadErrorLabel = threadError && threadError !== "run_persistence_failed"
+    ? threadOutcomeLabel(threadError, researchT) : null;
 
   return (
     <main className="main research">
@@ -976,7 +987,7 @@ export function ResearchView({
                 {researchT(($) => $.workspace.archivedThread)}
               </span>
             ) : null}
-            {state.pending ? (
+            {state.pending && !persistenceFailed ? (
               <span className="muted tiny">
                 {researchT(($) => $.workspace.backgroundContinuation)}
               </span>
@@ -1029,7 +1040,7 @@ export function ResearchView({
             )}
 
             {state.pending && (
-              <PendingAssistantBubble pending={state.pending} />
+              <PendingAssistantBubble pending={state.pending} persistenceFailed={persistenceFailed} />
             )}
           </div>
 
@@ -1038,6 +1049,7 @@ export function ResearchView({
             run={currentRun}
             runtime={runtime}
             developerMode={developerMode}
+            persistenceFailed={persistenceFailed}
             onStop={stopStream}
             onNavigate={onNavigate}
           />
@@ -1383,7 +1395,10 @@ function Bubble({
   );
 }
 
-export function PendingAssistantBubble({ pending }: { pending: PendingTurn }) {
+export function PendingAssistantBubble({ pending, persistenceFailed = false }: {
+  pending: PendingTurn;
+  persistenceFailed?: boolean;
+}) {
   const { t: researchT } = useTranslation("research");
   const provider = pending.provider as ProviderId;
   const behavior = PROVIDER_BEHAVIOR[provider];
@@ -1400,7 +1415,7 @@ export function PendingAssistantBubble({ pending }: { pending: PendingTurn }) {
   return (
     <div className="research-bubble assistant pending">
       {hasInterimText && <div className="research-interim research-bubble-body">{pending.interimText}</div>}
-      {(pending.thinkingActive || hasInterimText) && (
+      {!persistenceFailed && (pending.thinkingActive || hasInterimText) && (
         <div className="research-thinking muted tiny">
           <span className="research-spinner" />
           {status}

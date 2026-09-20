@@ -22,7 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
-| **P1** | **RESEARCH CONTINUITY AND DURABLE COMPLETION** | **FOLLOW-UP PLANNED; DEFECTS STILL OPEN.** Archiving the old continuity branch preserves its findings, not its proposed implementation. Offline fault injection confirms successful runs without materialized answers after persistence failure, and completed answers relabeled interrupted with an extra error reply after a commit gap. Repair shared completion/recovery first, then separately review isolated Claude OAuth native-session continuity. Current text history survives; native SDK resume does not exist yet. Existing baseline: **258 passed**. Owner: `docs/superpowers/plans/2026-09-20-research-continuity-repair.md`. | Preserve the useful research workflow without reviving token monitoring, notebooks, or adopting unreviewed native transcript storage. |
+| **P1** | **RESEARCH CONTINUITY AND DURABLE COMPLETION** | **SLICE 1 IMPLEMENTED; FINAL REGRESSION PENDING.** Server-owned answer/event/status commit atomically; local persistence failure cannot claim success or retry the model. Startup verifies exact legacy active-run completion evidence, otherwise preserves surviving output with a typed unverified state. Existing terminal historical rows are not rewritten. Event replay uses a consistent snapshot and truthful UI failure states. Native Claude OAuth session reuse remains a separate, unimplemented slice; current text-history behavior is retained. Owner: `docs/superpowers/plans/2026-09-20-research-continuity-repair.md`; evidence: `docs/superpowers/evidence/2026-09-20-research-completion-repair/`. | Preserve the useful research workflow without reviving token monitoring, notebooks, or adopting unreviewed native transcript storage. |
 | **P1** | **SPARK RETIREMENT; CARD TRANSLATION PRESERVED** | **MERGED INTO MASTER; PRODUCTION CLEANUP NOT EXECUTED.** Translation and subscription usage display/sync stay; Spark execution/options remain retired. The cleanup scope remains exact Spark version rows plus run 13 / zh-Hant only on verified canonical hash match, with mandatory private backup. Main-tree integration at `097a7cc1` also includes the independent schedule layout fix: **1859 frontend / 124 files**, **171 related backend**, **8 desktop**, typecheck/build/i18n and isolated Electron/browser smoke pass. No new complete backend run is claimed; previous full `b7e1886b` remains **11437P/12S**. Evidence: `docs/superpowers/evidence/2026-09-20-master-merge-and-branch-audit.md`. | Retiring Spark does not remove translation or turn usage-group labels into model authorization. |
 | **P0** | **REPORT FILE BOUNDARY** | **MERGED AND VERIFIED ON THE MAIN TREE.** Canonical Markdown paths, pinned directory descriptors and no-follow/exclusive file operations reject traversal, absolute paths, links and non-regular files for report reading/listing/saving. Twenty-four adversarial tests pass in the main-tree 171-test related run. This does not implement external-tool authorization or fix quote freshness, earnings alignment or metric comparability. Evidence: `docs/superpowers/evidence/2026-09-20-report-file-boundary.md`. | Close the demonstrated file-read escape before further tool expansion. |
 | **P1** | **EARNINGS EVENT OBSERVATION** | **CAPABILITY RETAINED; REPAIR / SCHEDULING NOT IMPLEMENTED.** Earnings price reactions are not replaced by SEC financial reports. Fix announcement/session/window/freshness semantics before adding idempotent scheduled observations and delivery. Existing calendar scheduling is not an earnings-reaction monitor. Owner: `docs/superpowers/plans/2026-09-20-earnings-observation-followup.md`. | Preserve useful descriptive market research without scheduling known inaccurate estimates or advertising a predictive signal. |
@@ -655,6 +655,22 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-20 (RESEARCH ATOMIC COMPLETION AND EVIDENCE-BASED RECOVERY):**
+  After the user pushed the archive/cleanup checkpoint, Slice 1 implements one
+  shared transaction for a server-owned assistant, completion event and terminal
+  status. It reuses atomic error/cancellation ownership, retains exact receipts
+  and SEC references, and rejects late worker writes. Persistence errors are
+  visible without claiming a durable state or resending the provider request.
+  Startup only accepts matching legacy active-run completion evidence; ambiguous
+  survivors are retained and marked unverified rather than duplicated or
+  presented as success. Already-terminal history is not automatically repaired.
+  Fault injection covers before/after commit, concurrent admission, repeated
+  cancellation and deletion; fresh stores reopen the same SEC passage. Browser
+  checks cover both locales at desktop/mobile widths using offline fixtures.
+  Final regression is pending. Native sessions, notebooks, token monitoring,
+  production rewrites, runtime changes and paid requests remain outside this
+  slice. Evidence: `docs/superpowers/evidence/2026-09-20-research-completion-repair/`.
 
 - **2026-09-20 (BRANCH ARCHIVE WITH RESEARCH CONTINUITY REPAIR HANDOFF):**
   The user approved archiving `research-source-workflow` without adopting its

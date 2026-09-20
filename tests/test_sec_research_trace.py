@@ -144,6 +144,40 @@ def test_sec_citations_roundtrip_event_message_and_legacy_rows(evidence, trace_s
     assert research.list_research_messages("trace-thread", store=threads)["messages"][-1] == message
 
 
+def test_recovered_legacy_completion_reopens_exact_sec_citation(evidence, trace_stores):
+    from src.api.routes import query
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore
+    from src.sec_research.captures import CaptureStore
+    from src.sec_research.citations import read_sec_citation
+    from src.sec_research.store import Store
+    from tests.test_sec_research_citations import TEXT
+
+    runs, threads = trace_stores
+    runs.mark_running_with_personalization("trace-run", {})
+    end = {"tool": "read_sec_filing", "call_id": "retained", "input": {}, "summary": "preview",
+           "sec_citations": [evidence.document_ref]}
+    runs.append_event("trace-run", "tool_end", end)
+    done = {"answer": "Cited answer", "provider": "openai", "model": "gpt-5.4-mini", "personalization": {}}
+    runs.append_event("trace-run", "done", done)
+    query._persist_assistant_turn(
+        threads, thread_id="trace-thread", run_id="trace-run", done_data=done,
+        collected=[("tool_end", end)], elapsed=1, effort="low", personalization={},
+    )
+    original = threads.list_messages("trace-thread")[-1]
+    runs, threads = ResearchRunStore(runs.db_path), ResearchThreadStore(threads.db_path)
+    assert runs.reconcile_interrupted(thread_store=threads) == ["trace-run"]
+    assert runs.get_run("trace-run").status == "succeeded"
+    assert threads.list_messages("trace-thread")[-1] == original
+    citation = original.tool_calls[0]["sec_citations"][0]
+    source = Store(evidence.rig.store.paths)
+    captures = CaptureStore(source, budget=lambda: 100 * 1024**3)
+    reopened = read_sec_citation(source, captures, citation=citation)
+    assert reopened["status"] == "ok"
+    assert reopened["data"]["text"] == TEXT
+    assert reopened["data"]["citation"] == evidence.document_ref
+
+
 @pytest.mark.parametrize("terminal", ["restart", "no-task-cancel"])
 def test_restart_and_no_task_cancel_rebuild_all_sec_tool_calls(terminal, evidence, trace_stores):
     from src.api.routes import research

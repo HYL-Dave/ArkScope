@@ -228,7 +228,7 @@ def get_run_store():
     """Singleton local store for server-owned AI 研究 runs/events.
 
     On process boot, any queued/running rows from a previous sidecar lifetime are
-    terminalized as interrupted so the UI never shows stale work as still live.
+    reconciled from committed records so the UI never shows stale work as live.
     """
     from src.research_runs import ResearchRunStore
     from src.research_threads import ResearchThreadStore

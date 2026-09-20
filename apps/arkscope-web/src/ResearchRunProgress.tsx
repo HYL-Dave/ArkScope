@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Square } from "lucide-react";
 
 import type { ResearchRunDTO, RuntimeConfig } from "./api";
 import { researchProgressCopy } from "./i18n/researchPresentation";
 import { presentResearchError } from "./researchErrors";
 import type { PendingTurn } from "./researchReducer";
 import type { NavigationTarget } from "./shell/navigation";
-import { BoundedProgress, Button, type BoundedWorkStatus } from "./ui";
+import { BoundedProgress, Button, InlineAlert, type BoundedWorkStatus } from "./ui";
 
 export interface ResearchProgressProjection {
   status: BoundedWorkStatus;
@@ -119,6 +120,7 @@ export function ResearchRunProgress({
   run,
   runtime,
   developerMode = false,
+  persistenceFailed = false,
   onStop,
   onNavigate,
 }: {
@@ -126,13 +128,15 @@ export function ResearchRunProgress({
   run: ResearchRunDTO | null;
   runtime: RuntimeConfig | null | undefined;
   developerMode?: boolean;
+  persistenceFailed?: boolean;
   onStop: () => void;
   onNavigate?: (target: NavigationTarget) => void;
 }) {
   const { t: researchT, i18n: researchI18n } = useTranslation("research");
+  const { t: commonT } = useTranslation("common");
   const researchLocale = researchI18n.resolvedLanguage;
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const active = Boolean(pending || run?.status === "queued" || run?.status === "running");
+  const active = !persistenceFailed && Boolean(pending || run?.status === "queued" || run?.status === "running");
   useEffect(() => {
     if (!active) return;
     setNowMs(Date.now());
@@ -148,6 +152,19 @@ export function ResearchRunProgress({
     () => projection ? researchProgressCopy(projection.stage, researchT) : null,
     [projection, researchLocale, researchT],
   );
+  if (persistenceFailed) {
+    return (
+      <div className="research-run-progress" data-testid="research-run-progress" data-stage="persistence_failed">
+        <InlineAlert state="blocked" title={researchT(($) => $.errors.persistenceTitle)} action={
+          <Button tone="danger" size="compact" icon={<Square size={13} />} onClick={onStop}>
+            {commonT(($) => $.actions.stop)}
+          </Button>
+        }>
+          {researchT(($) => $.errors.persistenceDetail)}
+        </InlineAlert>
+      </div>
+    );
+  }
   if (!projection || !progressCopy) return null;
 
   const error = projection.errorCode
@@ -156,6 +173,13 @@ export function ResearchRunProgress({
       researchT,
     )
     : null;
+  if (projection.errorCode === "run_completion_unverified" && error) {
+    return (
+      <div className="research-run-progress" data-testid="research-run-progress" data-stage={projection.stage}>
+        <InlineAlert state="interrupted" title={error.title}>{error.detail}</InlineAlert>
+      </div>
+    );
+  }
   return (
     <div className="research-run-progress" data-testid="research-run-progress" data-stage={projection.stage}>
       <BoundedProgress

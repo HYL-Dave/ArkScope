@@ -762,7 +762,7 @@ describe("bundled i18n resources", () => {
       common: 82,
       shell: 37,
       settings: 1056,
-      research: 236,
+      research: 240,
       explore: 1178,
       portfolio: 374,
       system: 24,
@@ -847,7 +847,13 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2987);
+      expect(total, `${locale}.total`).toBe(2991);
+      const research = flattenResource(localeResources.research as ResourceTree);
+      expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
+        .toEqual([
+          "errors.completionUnverifiedDetail", "errors.completionUnverifiedTitle",
+          "errors.persistenceDetail", "errors.persistenceTitle",
+        ]);
       expect(Object.keys(resources[locale].settings.secResearch).sort()).toEqual([...secResearchKeys, "schedule", "formGroups", "formNames"].sort());
       expect(Object.keys(resources[locale].settings.secResearch.schedule).sort()).toEqual([...secScheduleKeys].sort());
       expect(Object.keys(resources[locale].settings.secResearch.formGroups).sort()).toEqual([...secFormGroupKeys].sort());

@@ -61,6 +61,18 @@ describe("research error presentation", () => {
     expect(refusal.detail).not.toBe(providerFailure.detail);
   });
 
+  it.each([
+    ["run_persistence_failed", "Research could not be saved", "研究結果無法儲存", "blocked"],
+    ["run_completion_unverified", "Saved completion could not be verified", "無法確認研究是否完整保存", "interrupted"],
+  ])("keeps %s distinct from a provider failure", (code, english, chinese, state) => {
+    for (const locale of ["en", "zh-Hant"] as const) {
+      const result = presentResearchError({ code }, researchT(locale));
+      expect(result).toMatchObject({ code, state, preservePartial: true, actionLabel: null, target: null });
+      expect(result.title).toBe(locale === "en" ? english : chinese);
+      expect(result.detail).not.toMatch(/Provider|retry the model/i);
+    }
+  });
+
   it("keeps maintenance admission distinct from a dispatched provider failure", () => {
     for (const locale of ["en", "zh-Hant"] as const) {
       const result = presentResearchError({ code: "sec_research_operation_busy" }, researchT(locale));

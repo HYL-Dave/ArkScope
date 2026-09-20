@@ -201,6 +201,16 @@ describe("Research run progress", () => {
     expect(node.textContent).not.toContain("SECRET");
   });
 
+  it("does not promise continuing work for an unverified saved completion", async () => {
+    await i18n.changeLanguage("en");
+    await mountProgress({ run: run("interrupted", { error_code: "run_completion_unverified" }) });
+    const node = progressNode();
+    expect(node.textContent).toContain("Saved completion could not be verified");
+    expect(node.textContent).toContain("Existing output has been retained without claiming completion.");
+    expect(node.textContent).not.toContain("Continues after leaving this page");
+    expect(node.querySelector("button")).toBeNull();
+  });
+
   it("preserves node identity while locale changes", async () => {
     await i18n.changeLanguage("zh-Hant");
     await mountProgress({ run: run("running") });

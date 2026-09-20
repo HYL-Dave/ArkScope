@@ -198,6 +198,10 @@ const research = {
   },
   errors: {
     providerCallFailedTitle: "Provider 呼叫失敗",
+    persistenceTitle: "研究結果無法儲存",
+    persistenceDetail: "研究輸出無法保存至本機，請先確認儲存空間與寫入狀態。系統沒有重新送出模型請求。",
+    completionUnverifiedTitle: "無法確認研究是否完整保存",
+    completionUnverifiedDetail: "現有紀錄不足以確認結果已完整保存。已取得的內容仍保留，但不會標示為完成。",
     maintenanceTitle: "研究資料維護中",
     maintenanceDetail: "研究尚未開始。請等維護完成後重試。",
     protectionPlatformTitle: "此平台不支援研究保護",

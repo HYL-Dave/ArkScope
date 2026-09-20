@@ -34,6 +34,8 @@ RESEARCH_ERROR_CODES = frozenset(
         "provider_call_failed",
         "run_cancelled",
         "run_interrupted",
+        "run_persistence_failed",
+        "run_completion_unverified",
         *_SEC_RESEARCH_ADMISSION_DETAILS,
     }
 )
@@ -56,6 +58,25 @@ _DIRECT_TIMEOUT_PREFIXES = ("APITimeoutError:", "TimeoutError:")
 class ResearchFailure:
     code: str
     detail: str
+
+
+RUN_PERSISTENCE_FAILURE = ResearchFailure(
+    "run_persistence_failed",
+    "Research output could not be saved locally. Check local storage before continuing. "
+    "The model request has not been sent again.",
+)
+RUN_COMPLETION_UNVERIFIED = ResearchFailure(
+    "run_completion_unverified",
+    "The saved research records do not establish a complete result. "
+    "Existing output has been retained without claiming completion.",
+)
+
+
+class ResearchRunPersistenceError(RuntimeError):
+    """A local write failed; never reclassify it as a provider failure."""
+
+    def __init__(self):
+        super().__init__(RUN_PERSISTENCE_FAILURE.code)
 
 
 def classify_sec_research_admission_failure(error: ValueError) -> ResearchFailure | None:
@@ -129,6 +150,8 @@ def classify_research_failure(
         shape = ""
     detail = sanitize_research_detail(value, binding=binding) or "research run failed"
     code = public_research_error_code(explicit_code)
+    if code in {RUN_PERSISTENCE_FAILURE.code, RUN_COMPLETION_UNVERIFIED.code}:
+        code = None  # Only local storage/recovery can attest these states.
     if code is None:
         code = (
             "model_timeout"

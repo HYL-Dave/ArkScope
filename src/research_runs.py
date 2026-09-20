@@ -135,7 +135,18 @@ class ResearchRunStore:
         self.db_path = str(db_path)
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._write_lock = threading.Lock()
+        # Process-local observation only. An unwritable DB cannot durably claim
+        # a terminal state; admission stays blocked by its existing active run.
+        self._persistence_failures: set[str] = set()
         self._ensure_schema()
+
+    def note_persistence_failure(self, run_id: str) -> None:
+        with self._write_lock:
+            self._persistence_failures.add(run_id)
+
+    def has_persistence_failure(self, run_id: str) -> bool:
+        with self._write_lock:
+            return run_id in self._persistence_failures
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=5.0)
@@ -426,6 +437,7 @@ class ResearchRunStore:
         token_usage: Optional[dict] = None,
         elapsed_seconds: Optional[float] = None,
         personalization: Optional[dict] = None,
+        append_message: bool = True,
         now: Optional[str] = None,
     ) -> Optional[ResearchRun]:
         """Apply one linked terminal error under a caller-owned transaction."""
@@ -442,15 +454,7 @@ class ResearchRunStore:
             personalization = persisted_personalization
         # Recovery must see every durable completion on this same transaction,
         # including events beyond the bounded public replay page.
-        events = conn.execute(
-            "SELECT type, data_json FROM research_run_events "
-            "WHERE run_id = ? AND type IN ('tool_start', 'tool_end') ORDER BY seq",
-            (run_id,),
-        )
-        tool_calls = accumulate_tool_calls(
-            ((row["type"], json.loads(row["data_json"])) for row in events),
-            tool_calls=tool_calls,
-        )
+        tool_calls = self._tool_calls_on_connection(conn, run_id, tool_calls=tool_calls)
         terminal = self._mark_terminal_on_connection(
             conn,
             run_id,
@@ -475,23 +479,24 @@ class ResearchRunStore:
             normalized_event,
             now=ts,
         )
-        thread_store._append_message_on_connection(
-            conn,
-            thread_id=terminal.thread_id,
-            run_id=run_id,
-            role="assistant",
-            content=error,
-            provider=terminal.provider,
-            model=terminal.model,
-            effort=terminal.effort,
-            tool_calls=tool_calls,
-            token_usage=token_usage,
-            elapsed_seconds=elapsed_seconds,
-            is_error=True,
-            error_code=error_code,
-            personalization=personalization,
-            now=ts,
-        )
+        if append_message:
+            thread_store._append_message_on_connection(
+                conn,
+                thread_id=terminal.thread_id,
+                run_id=run_id,
+                role="assistant",
+                content=error,
+                provider=terminal.provider,
+                model=terminal.model,
+                effort=terminal.effort,
+                tool_calls=tool_calls,
+                token_usage=token_usage,
+                elapsed_seconds=elapsed_seconds,
+                is_error=True,
+                error_code=error_code,
+                personalization=personalization,
+                now=ts,
+            )
         return terminal
 
     def terminalize_error_with_message(
@@ -532,6 +537,70 @@ class ResearchRunStore:
                     personalization=personalization,
                 )
                 conn.commit()
+                self._persistence_failures.discard(run_id)
+            except BaseException:
+                conn.rollback()
+                raise
+        return terminal
+
+    @staticmethod
+    def _tool_calls_on_connection(
+        conn: sqlite3.Connection, run_id: str, *, tool_calls: Optional[list] = None,
+    ) -> list:
+        events = conn.execute(
+            "SELECT type, data_json FROM research_run_events "
+            "WHERE run_id = ? AND type IN ('tool_start', 'tool_end') ORDER BY seq",
+            (run_id,),
+        )
+        return accumulate_tool_calls(
+            ((row["type"], json.loads(row["data_json"])) for row in events),
+            tool_calls=tool_calls,
+        )
+
+    def terminalize_success_with_message(
+        self,
+        *,
+        thread_store: ResearchThreadStore,
+        run_id: str,
+        done_data: dict,
+        tool_calls: Optional[list] = None,
+        elapsed_seconds: Optional[float] = None,
+    ) -> Optional[ResearchRun]:
+        """Commit answer, completion event and status before releasing admission."""
+        from src.sec_research.capture_lock import research_operation
+        from src.sec_research.paths import SecResearchPaths
+
+        self._require_shared_database(thread_store)
+        ts = _now()
+        with research_operation(SecResearchPaths.resolve().capture_root), self._write_lock, thread_store._write_lock, self._connect() as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                current = conn.execute(
+                    "SELECT * FROM research_runs WHERE id = ?", (run_id,),
+                ).fetchone()
+                if current is None or current["status"] != "running":
+                    return self._run(current) if current is not None else None
+                trace = _loads_optional_dict(current["personalization_json"])
+                data = dict(done_data)
+                data.pop("personalization", None)
+                if trace is not None:
+                    data["personalization"] = trace
+                tool_calls = self._tool_calls_on_connection(conn, run_id, tool_calls=tool_calls)
+                thread_store._append_message_on_connection(
+                    conn, thread_id=current["thread_id"], run_id=run_id, role="assistant",
+                    content=data.get("answer", "") or "", provider=data.get("provider"),
+                    model=data.get("model"), effort=current["effort"],
+                    tools_used=data.get("tools_used"), tool_calls=tool_calls,
+                    token_usage=data.get("token_usage"), elapsed_seconds=elapsed_seconds,
+                    personalization=trace, now=ts,
+                )
+                self._append_event_on_connection(conn, run_id, "done", data, now=ts)
+                terminal = self._mark_terminal_on_connection(
+                    conn, run_id, "succeeded", token_usage=data.get("token_usage"),
+                    expected_status="running", now=ts,
+                )
+                conn.commit()
+                self._persistence_failures.discard(run_id)
             except BaseException:
                 conn.rollback()
                 raise
@@ -771,6 +840,20 @@ class ResearchRunStore:
             conn.commit()
         return event
 
+    def append_running_event(self, run_id: str, type: str, data: dict) -> Optional[ResearchRunEvent]:
+        """Reject a late worker frame after cancellation, deletion or completion."""
+        from src.sec_research.capture_lock import research_operation
+        from src.sec_research.paths import SecResearchPaths
+
+        with research_operation(SecResearchPaths.resolve().capture_root), self._write_lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            current = conn.execute("SELECT status FROM research_runs WHERE id = ?", (run_id,)).fetchone()
+            if current is None or current["status"] != "running":
+                return None
+            event = self._append_event_on_connection(conn, run_id, type, data)
+            conn.commit()
+        return event
+
     def list_events(self, run_id: str, *, after: int = 0, limit: int = 500) -> list[ResearchRunEvent]:
         with self._connect() as conn:
             rows = conn.execute(
@@ -780,48 +863,139 @@ class ResearchRunStore:
             ).fetchall()
         return [self._event(r) for r in rows]
 
+    def get_run_with_events(
+        self, run_id: str, *, after: int = 0, limit: int = 500,
+    ) -> tuple[Optional[ResearchRun], list[ResearchRunEvent]]:
+        """Read status and replay from one snapshot, including across a commit."""
+        with self._connect() as conn:
+            conn.execute("BEGIN")
+            row = conn.execute("SELECT * FROM research_runs WHERE id = ?", (run_id,)).fetchone()
+            events = conn.execute(
+                "SELECT * FROM research_run_events WHERE run_id = ? AND seq > ? "
+                "ORDER BY seq ASC LIMIT ?", (run_id, after, limit),
+            ).fetchall()
+        return (self._run(row) if row is not None else None, [self._event(event) for event in events])
+
+    def _recover_completion_on_connection(
+        self, conn: sqlite3.Connection, *, current: sqlite3.Row,
+        thread_store: ResearchThreadStore, now: str,
+    ) -> bool:
+        """Reconcile an old split commit without manufacturing a transcript."""
+        from src.research_errors import RUN_COMPLETION_UNVERIFIED
+
+        run_id = current["id"]
+        messages = conn.execute(
+            "SELECT * FROM research_messages WHERE run_id = ? AND role = 'assistant' ORDER BY id",
+            (run_id,),
+        ).fetchall()
+        events = conn.execute(
+            "SELECT * FROM research_run_events WHERE run_id = ? AND type IN ('done', 'error') ORDER BY seq",
+            (run_id,),
+        ).fetchall()
+        if not messages and not events:
+            return False
+        last_seq = conn.execute(
+            "SELECT MAX(seq) FROM research_run_events WHERE run_id = ?", (run_id,),
+        ).fetchone()[0]
+        if len(messages) == len(events) == 1 and events[0]["seq"] == last_seq:
+            data = self._verified_legacy_completion(
+                conn, current=current, message=messages[0], event=events[0], thread_store=thread_store,
+            )
+            if data is not None:
+                code = data.get("code") if events[0]["type"] == "error" else None
+                status = "succeeded" if events[0]["type"] == "done" else {
+                    "run_cancelled": "cancelled", "run_interrupted": "interrupted",
+                }.get(code, "failed")
+                self._mark_terminal_on_connection(
+                    conn, run_id, status, error=data.get("error") if code else None,
+                    error_code=code, token_usage=data.get("token_usage"),
+                    expected_status=current["status"], now=events[0]["created_at"],
+                )
+                return True
+        self._terminalize_error_on_connection(
+            conn, thread_store=thread_store, run_id=run_id, status="interrupted",
+            error=RUN_COMPLETION_UNVERIFIED.detail, error_code=RUN_COMPLETION_UNVERIFIED.code,
+            expected_statuses=(current["status"],), append_message=not messages, now=now,
+        )
+        return True
+
+    def _verified_legacy_completion(
+        self, conn: sqlite3.Connection, *, current: sqlite3.Row, message: sqlite3.Row,
+        event: sqlite3.Row, thread_store: ResearchThreadStore,
+    ) -> Optional[dict]:
+        from src.research_errors import public_research_error_code
+        from src.research_threads import MAX_TOOL_CALLS_SENTINEL
+
+        try:
+            data = json.loads(event["data_json"])
+            if not isinstance(data, dict):
+                return None
+            saved = thread_store._message(message)
+            trace = _loads(current["personalization_json"])
+            tools = self._tool_calls_on_connection(conn, current["id"])
+            # Python equality would treat 9 == 9.0 and False == 0 as the same
+            # receipt. Recovery needs matching JSON values *and* value types.
+            observed = [saved.personalization, data.get("personalization"), saved.token_usage,
+                        _loads(message["tool_calls_json"])]
+            expected = [trace, trace, data.get("token_usage"), tools]
+            if event["type"] == "done":
+                observed.append(_loads(message["tools_used_json"]))
+                expected.append(data.get("tools_used"))
+            matching_receipt = json.dumps(observed, sort_keys=True, allow_nan=False) == json.dumps(
+                expected, sort_keys=True, allow_nan=False,
+            )
+        except (ValueError, TypeError, RecursionError):
+            return None
+        if (
+            current["status"] != "running" or current["started_at"] is None
+            or saved.thread_id != current["thread_id"]
+            or saved.effort != current["effort"]
+            or (trace is not None and not isinstance(trace, dict))
+            or not matching_receipt
+        ):
+            return None
+        if event["type"] == "done":
+            if (
+                saved.is_error or saved.error_code is not None
+                or not isinstance(data.get("answer"), str)
+                or data["answer"] == MAX_TOOL_CALLS_SENTINEL
+                or saved.content != data["answer"]
+                or data.get("provider") != current["provider"]
+                or saved.provider != data.get("provider")
+                or not isinstance(data.get("model"), str) or not data["model"]
+                or saved.model != data["model"]
+            ):
+                return None
+        elif (
+            not saved.is_error or not isinstance(data.get("error"), str)
+            or saved.content != data["error"] or not public_research_error_code(data.get("code"))
+            or saved.error_code != data["code"]
+            or saved.provider != current["provider"] or saved.model != current["model"]
+            or data.get("provider", saved.provider) != saved.provider
+            or data.get("model", saved.model) != saved.model
+        ):
+            return None
+        return data
+
     def reconcile_interrupted(self, *, thread_store=None) -> list[str]:
         """Mark orphaned queued/running runs terminal on process boot/store init.
 
-        With a thread store, status/event/linked message commit as one write so a
-        new run can never observe a terminal predecessor without its transcript.
+        Status/event/linked message commit as one write. An exact old split
+        completion is finalized; ambiguous surviving output is left intact.
         """
         from src.research_errors import classify_research_failure
+        from src.research_threads import ResearchThreadStore
 
+        if thread_store is None:
+            thread_store = ResearchThreadStore(self.db_path)
+        self._require_shared_database(thread_store)
         ts = _now()
         failure = classify_research_failure(
             "research run interrupted by sidecar restart",
             explicit_code="run_interrupted",
         )
 
-        if thread_store is not None:
-            self._require_shared_database(thread_store)
-            with self._write_lock, thread_store._write_lock, self._connect() as conn:
-                try:
-                    conn.execute("BEGIN IMMEDIATE")
-                    rows = conn.execute(
-                        "SELECT * FROM research_runs "
-                        "WHERE status IN ('queued','running') ORDER BY created_at, id"
-                    ).fetchall()
-                    ids = [row["id"] for row in rows]
-                    for row in rows:
-                        self._terminalize_error_on_connection(
-                            conn,
-                            thread_store=thread_store,
-                            run_id=row["id"],
-                            status="interrupted",
-                            error=failure.detail,
-                            error_code=failure.code,
-                            expected_statuses=(row["status"],),
-                            now=ts,
-                        )
-                    conn.commit()
-                except BaseException:
-                    conn.rollback()
-                    raise
-            return ids
-
-        with self._write_lock, self._connect() as conn:
+        with self._write_lock, thread_store._write_lock, self._connect() as conn:
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 rows = conn.execute(
@@ -830,29 +1004,22 @@ class ResearchRunStore:
                 ).fetchall()
                 ids = [row["id"] for row in rows]
                 for row in rows:
-                    event_data = {"error": failure.detail, "code": failure.code}
-                    personalization = _loads_optional_dict(
-                        row["personalization_json"]
-                    )
-                    if personalization is not None:
-                        event_data["personalization"] = personalization
-                    self._mark_terminal_on_connection(
+                    if self._recover_completion_on_connection(
+                        conn, current=row, thread_store=thread_store, now=ts,
+                    ):
+                        continue
+                    self._terminalize_error_on_connection(
                         conn,
-                        row["id"],
-                        "interrupted",
+                        thread_store=thread_store,
+                        run_id=row["id"],
+                        status="interrupted",
                         error=failure.detail,
                         error_code=failure.code,
-                        expected_status=row["status"],
-                        now=ts,
-                    )
-                    self._append_event_on_connection(
-                        conn,
-                        row["id"],
-                        "error",
-                        event_data,
+                        expected_statuses=(row["status"],),
                         now=ts,
                     )
                 conn.commit()
+                self._persistence_failures.difference_update(ids)
             except BaseException:
                 conn.rollback()
                 raise

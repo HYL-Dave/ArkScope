@@ -1267,6 +1267,53 @@ describe("Research workspace contracts", () => {
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
 
+  it("reports local persistence failure without claiming a provider failure or reattaching in a loop", async () => {
+    await i18n.changeLanguage("en");
+    const active = run("unsaved-run", "unsaved-thread", "running");
+    const fetchMock = stubFetch({
+      threads: [thread("unsaved-thread", "Unsaved output", active)],
+      messages: { "unsaved-thread": [message("Original question", { role: "user" })] },
+      events: { "unsaved-run": json({ detail: { code: "run_persistence_failed", message: "RAW_STORAGE_DETAIL" } }, 503) },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "unsaved-thread");
+    await mountResearch();
+    await vi.waitFor(() => expect(host!.textContent).toContain("Research output could not be saved locally."));
+    await flush();
+    expect(host!.textContent).toContain("Research could not be saved");
+    expect(host!.textContent).not.toContain("Running model and tools");
+    expect(host!.textContent).not.toContain("OpenAI is running");
+    expect(host!.textContent).not.toContain("The background service continues the response.");
+    expect(host!.textContent).not.toContain("Provider call failed");
+    expect(host!.textContent).not.toContain("RAW_STORAGE_DETAIL");
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/events"))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+    expect(button("Stop")).not.toBeNull();
+  });
+
+  it("does not present an unverified old done event as a completed answer", async () => {
+    await i18n.changeLanguage("en");
+    const active = run("legacy-run", "legacy-thread", "running");
+    const fetchMock = stubFetch({
+      threads: [thread("legacy-thread", "Interrupted save", active)],
+      messages: { "legacy-thread": [message("Original question", { role: "user" })] },
+      events: { "legacy-run": json({
+        run: { ...active, status: "interrupted", error_code: "run_completion_unverified" }, has_more: false,
+        events: [
+          { run_id: active.id, seq: 1, type: "done", data: { answer: "UNVERIFIED_COMPLETION" }, created_at: active.created_at },
+          { run_id: active.id, seq: 2, type: "error", data: { code: "run_completion_unverified" }, created_at: active.created_at },
+        ],
+      }) },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    window.sessionStorage.setItem("arkscope.aiResearch.activeThreadId", "legacy-thread");
+    await mountResearch();
+    await vi.waitFor(() => expect(host!.textContent).toContain("Saved completion could not be verified"));
+    expect(host!.textContent).not.toContain("UNVERIFIED_COMPLETION");
+    expect(host!.textContent).not.toContain("Research completed");
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(0);
+  });
+
   it("uses structured thread not-found facts instead of parsing Error.message", async () => {
     await i18n.changeLanguage("en");
     const missingCopy = "The requested Research conversation was not found and may have been deleted.";

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
@@ -29,7 +30,8 @@ async def _execute_test_run(**kwargs):
 
 
 @pytest.fixture()
-def stores(tmp_path):
+def stores(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(tmp_path / "market_data.db"))
     db = tmp_path / "profile_state.db"
     return ResearchRunStore(db), ResearchThreadStore(db)
 
@@ -259,6 +261,527 @@ def test_execute_run_error_event_persists_error_assistant(stores):
     assert msgs[-1].is_error is True
     assert msgs[-1].content == "backend timeout"
     assert msgs[-1].effort == "low"
+
+
+@pytest.mark.parametrize("terminal", ["done", "error"])
+@pytest.mark.parametrize("fault_at", ["message", "event", "status"])
+def test_terminal_write_failure_never_publishes_a_partial_completion(
+    stores, monkeypatch, terminal, fault_at,
+):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="atomic", run_id="atomic-run")
+    owner, method = {
+        "message": (thread_store, "_append_message_on_connection"),
+        "event": (run_store, "_append_event_on_connection"),
+        "status": (run_store, "_mark_terminal_on_connection"),
+    }[fault_at]
+    original = getattr(owner, method)
+    injections = []
+
+    def fail_after_write(*args, **kwargs):
+        result = original(*args, **kwargs)
+        if fault_at != "event" or args[2] in ("done", "error"):
+            injections.append(fault_at)
+            raise sqlite3.OperationalError("injected terminal write failure")
+        return result
+
+    monkeypatch.setattr(owner, method, fail_after_write)
+    dispatches = []
+
+    async def stream_factory(**kwargs):
+        dispatches.append(kwargs)
+        yield AgentEvent(EventType.tool_end, {"tool": "get_sa_feed", "call_id": "completed", "summary": "2 articles"})
+        data = {"provider": "openai", "model": "gpt-5.4-mini", "token_usage": {"total_tokens": 7}}
+        data.update({"answer": "Saved answer"} if terminal == "done" else {
+            "error": "model declined", "code": "model_refusal",
+        })
+        yield AgentEvent(EventType(terminal), data)
+
+    with pytest.raises(RuntimeError, match="run_persistence_failed"):
+        asyncio.run(_execute_test_run(
+            run_id="atomic-run", run_store=run_store, thread_store=thread_store,
+            dal=object(), history=[], stream_factory=stream_factory,
+        ))
+
+    assert injections
+    assert len(dispatches) == 1
+    assert run_store.get_run("atomic-run").status == "running"
+    assert [message.role for message in thread_store.list_messages("atomic")] == ["user"]
+    assert [event.type for event in run_store.list_events("atomic-run")] == ["tool_end"]
+    with pytest.raises(HTTPException) as failure:
+        r.list_research_run_events("atomic-run", after=0, run_store=run_store)
+    assert failure.value.status_code == 503
+    assert failure.value.detail["code"] == "run_persistence_failed"
+    assert "injected" not in str(failure.value.detail)
+
+    # A fresh process cannot recover output that never committed. It must not
+    # silently claim success or dispatch the provider again.
+    reopened = ResearchRunStore(run_store.db_path)
+    reopened_threads = ResearchThreadStore(thread_store.db_path)
+    assert reopened.reconcile_interrupted(thread_store=reopened_threads) == ["atomic-run"]
+    assert reopened.reconcile_interrupted(thread_store=reopened_threads) == []
+    assert reopened.get_run("atomic-run").status == "interrupted"
+    assert [event.type for event in reopened.list_events("atomic-run")] == ["tool_end", "error"]
+    assert len(reopened_threads.list_messages("atomic")) == 2
+    assert reopened_threads.list_messages("atomic")[-1].tool_calls[0]["call_id"] == "completed"
+    assert len(dispatches) == 1
+
+
+def _seed_legacy_completion(run_store, thread_store, *, terminal="done"):
+    _seed_run(run_store, thread_store, thread_id="legacy", run_id="legacy-run")
+    trace = {"profile_active": False, "assistant_stance": "off", "context_snapshot": "exact prompt"}
+    run_store.mark_running_with_personalization("legacy-run", trace)
+    tool_end = {"tool": "get_sa_feed", "call_id": "call-1", "input": {"ticker": "AAPL"}, "summary": "2 articles"}
+    run_store.append_event("legacy-run", "tool_end", tool_end)
+    data = {"provider": "openai", "model": "gpt-5.4-mini", "token_usage": {"total_tokens": 9}, "personalization": trace}
+    if terminal == "done":
+        data.update(answer="Saved answer", tools_used=["get_sa_feed"])
+    else:
+        data.update(error="model declined", code="model_refusal")
+    event = run_store.append_event("legacy-run", terminal, data)
+    message = thread_store.append_message(
+        thread_id="legacy", run_id="legacy-run", role="assistant",
+        content=data.get("answer", data.get("error")), provider=data["provider"], model=data["model"],
+        effort="low", tools_used=data.get("tools_used"), token_usage=data["token_usage"],
+        tool_calls=q.accumulate_tool_calls([("tool_end", tool_end)]),
+        personalization=trace, is_error=terminal == "error", error_code=data.get("code"),
+    )
+    return event, message
+
+
+@pytest.mark.parametrize("terminal,status", [("done", "succeeded"), ("error", "failed")])
+@pytest.mark.parametrize("explicit_thread_store", [False, True])
+def test_restart_finishes_exact_legacy_completion_without_duplicate_reply(stores, terminal, status, explicit_thread_store):
+    run_store, thread_store = stores
+    event, message = _seed_legacy_completion(run_store, thread_store, terminal=terminal)
+    before_events = run_store.list_events("legacy-run")
+    before_messages = thread_store.list_messages("legacy")
+    run_store = ResearchRunStore(run_store.db_path)
+    thread_store = ResearchThreadStore(thread_store.db_path)
+
+    args = {"thread_store": thread_store} if explicit_thread_store else {}
+    assert run_store.reconcile_interrupted(**args) == ["legacy-run"]
+    assert run_store.reconcile_interrupted(**args) == []
+    run = run_store.get_run("legacy-run")
+    assert run.status == status
+    assert run.token_usage == message.token_usage
+    assert run.error_code == message.error_code
+    assert run.completed_at == event.created_at
+    assert run_store.list_events("legacy-run") == before_events
+    assert thread_store.list_messages("legacy") == before_messages
+
+
+@pytest.mark.parametrize("mismatch", [
+    "missing_message", "missing_event", "foreign_thread", "answer", "provider", "model",
+    "effort", "usage", "tools", "personalization", "duplicate_message", "later_event",
+    "usage_number_type", "trace_number_type", "duplicate_terminal", "missing_receipt",
+])
+def test_restart_does_not_invent_completion_from_unverified_legacy_evidence(stores, mismatch):
+    run_store, thread_store = stores
+    event, message = _seed_legacy_completion(run_store, thread_store)
+    thread_store.ensure_thread(id="foreign", title="Unrelated thread")
+    with sqlite3.connect(run_store.db_path) as conn:
+        if mismatch == "missing_message":
+            conn.execute("DELETE FROM research_messages WHERE id = ?", (message.id,))
+        elif mismatch == "missing_event":
+            conn.execute("DELETE FROM research_run_events WHERE run_id = ? AND seq = ?", (event.run_id, event.seq))
+        elif mismatch in {"foreign_thread", "answer", "provider", "model", "effort", "usage", "tools", "personalization", "usage_number_type", "trace_number_type"}:
+            column, value = {
+                "foreign_thread": ("thread_id", "foreign"), "answer": ("content", "different answer"),
+                "provider": ("provider", "anthropic"), "model": ("model", "different-model"),
+                "effort": ("effort", "high"), "usage": ("token_usage_json", '{"total_tokens":10}'),
+                "tools": ("tool_calls_json", "[]"), "personalization": ("personalization_json", "{}"),
+                "usage_number_type": ("token_usage_json", '{"total_tokens":9.0}'),
+                "trace_number_type": ("personalization_json", json.dumps({**message.personalization, "profile_active": 0})),
+            }[mismatch]
+            conn.execute(f"UPDATE research_messages SET {column} = ? WHERE id = ?", (value, message.id))
+        elif mismatch == "missing_receipt":
+            conn.execute("UPDATE research_run_events SET data_json = ? WHERE run_id = ? AND seq = ?", (
+                json.dumps({key: value for key, value in event.data.items() if key != "model"}), event.run_id, event.seq,
+            ))
+    if mismatch == "duplicate_message":
+        thread_store.append_message(thread_id="legacy", run_id="legacy-run", role="assistant", content="second answer")
+    elif mismatch == "later_event":
+        run_store.append_event("legacy-run", "tool_start", {"tool": "unexpected"})
+    elif mismatch == "duplicate_terminal":
+        run_store.append_event("legacy-run", "done", event.data)
+    before = thread_store.list_messages("legacy") + thread_store.list_messages("foreign")
+    assistants = [message for message in before if message.role == "assistant"]
+
+    assert run_store.reconcile_interrupted(thread_store=thread_store) == ["legacy-run"]
+    assert run_store.reconcile_interrupted(thread_store=thread_store) == []
+    assert (run_store.get_run("legacy-run").status, run_store.get_run("legacy-run").error_code) == (
+        "interrupted", "run_completion_unverified",
+    )
+    after = thread_store.list_messages("legacy") + thread_store.list_messages("foreign")
+    if assistants:
+        assert after == before  # Do not rewrite a surviving answer or append a contradictory reply.
+    else:
+        assert len(after) == len(before) + 1
+        assert after[-1].is_error and after[-1].error_code == "run_completion_unverified"
+    assert run_store.list_events("legacy-run")[-1].data["code"] == "run_completion_unverified"
+
+
+@pytest.mark.parametrize("terminal", ["done", "error"])
+@pytest.mark.parametrize("crash_at", ["message", "event", "status", "before_commit", "after_commit"])
+def test_restart_at_each_terminal_write_boundary_is_all_or_nothing(stores, monkeypatch, terminal, crash_at):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="crash", run_id="crash-run")
+    class ProcessStopped(BaseException):
+        pass
+
+    if crash_at in {"message", "event", "status"}:
+        owner, method = {
+            "message": (thread_store, "_append_message_on_connection"),
+            "event": (run_store, "_append_event_on_connection"),
+            "status": (run_store, "_mark_terminal_on_connection"),
+        }[crash_at]
+        original = getattr(owner, method)
+        def crash_after_write(*args, **kwargs):
+            original(*args, **kwargs)
+            raise ProcessStopped()
+        monkeypatch.setattr(owner, method, crash_after_write)
+    else:
+        class InterruptedCommit(sqlite3.Connection):
+            def commit(self):
+                row = self.execute("SELECT status FROM research_runs WHERE id = 'crash-run'").fetchone()
+                if row is not None and row[0] in {"succeeded", "failed"}:
+                    if crash_at == "after_commit":
+                        super().commit()
+                    raise ProcessStopped()
+                return super().commit()
+        def connect():
+            conn = sqlite3.connect(run_store.db_path, factory=InterruptedCommit)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            return conn
+        monkeypatch.setattr(run_store, "_connect", connect)
+
+    dispatches = []
+    async def stream_factory(**kwargs):
+        dispatches.append(kwargs)
+        yield AgentEvent(EventType(terminal), {
+            "provider": "openai", "model": "gpt-5.4-mini",
+            **({"answer": "Exact answer"} if terminal == "done" else {"error": "model declined", "code": "model_refusal"}),
+        })
+
+    with pytest.raises(ProcessStopped):
+        asyncio.run(_execute_test_run(
+            run_id="crash-run", run_store=run_store, thread_store=thread_store,
+            dal=object(), history=[], stream_factory=stream_factory,
+        ))
+    reopened, threads = ResearchRunStore(run_store.db_path), ResearchThreadStore(thread_store.db_path)
+    committed = crash_at == "after_commit"
+    expected_status = ("succeeded" if terminal == "done" else "failed") if committed else "running"
+    assert reopened.get_run("crash-run").status == expected_status
+    assert [message.role for message in threads.list_messages("crash")] == (["user", "assistant"] if committed else ["user"])
+    assert [event.type for event in reopened.list_events("crash-run")] == ([terminal] if committed else [])
+    assert reopened.reconcile_interrupted(thread_store=threads) == ([] if committed else ["crash-run"])
+    assert reopened.reconcile_interrupted(thread_store=threads) == []
+    assert len(threads.list_messages("crash")) == 2
+    assert len(dispatches) == 1
+
+
+@pytest.mark.parametrize("terminal", ["done", "error"])
+def test_next_turn_cannot_pass_terminal_commit_without_its_history(stores, monkeypatch, terminal):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="race", run_id="race-run")
+    contender, contender_threads = ResearchRunStore(run_store.db_path), ResearchThreadStore(thread_store.db_path)
+    paused, release, entering = threading.Event(), threading.Event(), threading.Event()
+    original = run_store._append_event_on_connection
+    def pause(conn, run_id, kind, data, **kwargs):
+        result = original(conn, run_id, kind, data, **kwargs)
+        if kind in {"done", "error"}:
+            paused.set()
+            assert release.wait(5)
+        return result
+    monkeypatch.setattr(run_store, "_append_event_on_connection", pause)
+    async def stream_factory(**kwargs):
+        yield AgentEvent(EventType(terminal), {
+            "provider": "openai", "model": "gpt-5.4-mini",
+            **({"answer": "Committed answer"} if terminal == "done" else {"error": "model declined", "code": "model_refusal"}),
+        })
+    def complete():
+        asyncio.run(_execute_test_run(
+            run_id="race-run", run_store=run_store, thread_store=thread_store,
+            dal=object(), history=[], stream_factory=stream_factory,
+        ))
+    def admit():
+        entering.set()
+        return contender.create_run_with_user_message(
+            thread_store=contender_threads, new_thread_title=None, id="next", thread_id="race",
+            question="next question", user_content="next question", user_tickers=None, ticker=None,
+            provider="openai", model="gpt-5.4-mini", effort="low", auth_mode="api_key", credential_id="local:test",
+        )
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        writer = pool.submit(complete)
+        try:
+            assert paused.wait(5)
+            snapshot = r.list_research_run_events("race-run", after=0, run_store=contender)
+            assert snapshot["run"]["status"] == "running"
+            assert snapshot["events"] == []
+            assert len(contender_threads.list_messages("race")) == 1
+            reader = pool.submit(admit)
+            assert entering.wait(5)
+            with pytest.raises(FutureTimeoutError):
+                reader.result(timeout=0.05)
+        finally:
+            release.set()
+        writer.result(timeout=5)
+        new_run, history = reader.result(timeout=5)
+    assert new_run.status == "queued"
+    expected = [{"role": "user", "content": "question race"}]
+    if terminal == "done":
+        expected.append({"role": "assistant", "content": "Committed answer"})
+    assert history == expected
+
+
+def test_worker_late_events_and_done_cannot_overwrite_cancellation(stores):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="late", run_id="late-run")
+    async def stream_factory(**kwargs):
+        r.cancel_research_run_route("late-run", run_store=run_store, thread_store=thread_store)
+        yield AgentEvent(EventType.tool_end, {"tool": "late_tool", "summary": "must not be published"})
+        yield AgentEvent(EventType.done, {"answer": "late answer"})
+    asyncio.run(_execute_test_run(
+        run_id="late-run", run_store=run_store, thread_store=thread_store,
+        dal=object(), history=[], stream_factory=stream_factory,
+    ))
+    assert run_store.get_run("late-run").status == "cancelled"
+    assert [event.type for event in run_store.list_events("late-run")] == ["error"]
+    assert len(thread_store.list_messages("late")) == 2
+    assert thread_store.list_messages("late")[-1].is_error
+
+
+def test_poll_reads_status_and_events_from_the_same_database_snapshot(stores, monkeypatch):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="snapshot", run_id="snapshot-run")
+    run_store.mark_running_with_personalization("snapshot-run", {})
+    reader = ResearchRunStore(run_store.db_path)
+    paused, release = threading.Event(), threading.Event()
+    original_connect = reader._connect
+
+    def connect():
+        conn = original_connect()
+        def before_events(sql):
+            if sql.startswith("SELECT * FROM research_run_events"):
+                paused.set()
+                assert release.wait(5)
+        conn.set_trace_callback(before_events)
+        return conn
+    monkeypatch.setattr(reader, "_connect", connect)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        polling = pool.submit(r.list_research_run_events, "snapshot-run", after=0, run_store=reader)
+        try:
+            assert paused.wait(5)
+            run_store.terminalize_success_with_message(
+                thread_store=thread_store, run_id="snapshot-run",
+                done_data={"answer": "Atomic answer", "provider": "openai", "model": "gpt-5.4-mini"},
+            )
+        finally:
+            release.set()
+        snapshot = polling.result(timeout=5)
+    assert snapshot["run"]["status"] == "running"
+    assert snapshot["events"] == []
+    current = r.list_research_run_events("snapshot-run", after=0, run_store=reader)
+    assert current["run"]["status"] == "succeeded"
+    assert [event["type"] for event in current["events"]] == ["done"]
+
+
+def test_local_failure_observation_is_profile_scoped_and_clears_after_cancellation(stores, tmp_path, monkeypatch):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="scope", run_id="same-id")
+    other_runs, other_threads = ResearchRunStore(tmp_path / "other.db"), ResearchThreadStore(tmp_path / "other.db")
+    _seed_run(other_runs, other_threads, thread_id="scope", run_id="same-id")
+    run_store.note_persistence_failure("same-id")
+    with pytest.raises(HTTPException) as caught:
+        r.get_research_run("same-id", run_store=run_store)
+    assert caught.value.detail["code"] == "run_persistence_failed"
+    assert r.get_research_run("same-id", run_store=other_runs)["run"]["status"] == "queued"
+    monkeypatch.setattr(r, "cancel_research_run", lambda _: False)
+    r.cancel_research_run_route("same-id", run_store=run_store, thread_store=thread_store)
+    assert not run_store.has_persistence_failure("same-id")
+    assert r.get_research_run("same-id", run_store=run_store)["run"]["status"] == "cancelled"
+    assert other_runs.get_run("same-id").status == "queued"
+
+
+def test_terminalization_is_idempotent_and_late_callbacks_cannot_recreate_a_deleted_thread(stores):
+    from src.research_threads import ResearchThreadActiveError
+
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="owned", run_id="owned-run")
+    with pytest.raises(ResearchThreadActiveError):
+        thread_store.delete_thread("owned")
+    run_store.mark_running_with_personalization("owned-run", {})
+    kwargs = {"thread_store": thread_store, "run_id": "owned-run", "done_data": {
+        "answer": "Original result", "provider": "openai", "model": "reported-model-revision",
+        "tools_used": [], "token_usage": {"input_tokens": 19, "output_tokens": 3},
+    }}
+    run_store.terminalize_success_with_message(**kwargs)
+    before = thread_store.list_messages("owned")
+    run_store.terminalize_success_with_message(**{**kwargs, "done_data": {"answer": "late replacement"}})
+    run_store.terminalize_error_with_message(
+        thread_store=thread_store, run_id="owned-run", status="cancelled", error="late cancel", error_code="run_cancelled",
+    )
+    assert thread_store.list_messages("owned") == before
+    assert before[-1].model == "reported-model-revision"
+    assert before[-1].token_usage == kwargs["done_data"]["token_usage"]
+    assert run_store.get_run("owned-run").model == "gpt-5.4-mini"
+    assert [event.type for event in run_store.list_events("owned-run")] == ["done"]
+    assert thread_store.delete_thread("owned")
+    assert run_store.terminalize_success_with_message(**kwargs) is None
+    assert run_store.append_running_event("owned-run", "tool_end", {"tool": "late"}) is None
+    assert thread_store.get_thread("owned") is None
+    assert thread_store.list_messages("owned") == []
+    assert run_store.list_events("owned-run") == []
+
+
+def test_success_retry_only_retries_local_storage_not_model_execution(stores, monkeypatch):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="retry", run_id="retry-run")
+    run_store.mark_running_with_personalization("retry-run", {})
+    data = {"answer": "Retained output", "provider": "openai", "model": "reported-model", "token_usage": {"total_tokens": 5}}
+    original = thread_store._append_message_on_connection
+    def fail_once(*args, **kwargs):
+        monkeypatch.setattr(thread_store, "_append_message_on_connection", original)
+        raise sqlite3.OperationalError("injected local write failure")
+    monkeypatch.setattr(thread_store, "_append_message_on_connection", fail_once)
+    with pytest.raises(sqlite3.OperationalError):
+        run_store.terminalize_success_with_message(thread_store=thread_store, run_id="retry-run", done_data=data)
+    assert run_store.get_run("retry-run").status == "running"
+    assert run_store.list_events("retry-run") == []
+    run_store.terminalize_success_with_message(thread_store=thread_store, run_id="retry-run", done_data=data)
+    assert run_store.get_run("retry-run").status == "succeeded"
+    assert thread_store.list_messages("retry")[-1].content == "Retained output"
+    assert len(thread_store.list_messages("retry")) == 2
+
+
+@pytest.mark.parametrize("terminal", ["done", "error"])
+def test_recovery_rollback_and_retry_preserve_legacy_output(stores, monkeypatch, terminal):
+    run_store, thread_store = stores
+    _seed_legacy_completion(run_store, thread_store, terminal=terminal)
+    before_messages = thread_store.list_messages("legacy")
+    before_events = run_store.list_events("legacy-run")
+    original = run_store._mark_terminal_on_connection
+    def fail_after_write(*args, **kwargs):
+        original(*args, **kwargs)
+        raise sqlite3.OperationalError("injected recovery failure")
+    with monkeypatch.context() as patcher:
+        patcher.setattr(run_store, "_mark_terminal_on_connection", fail_after_write)
+        with pytest.raises(sqlite3.OperationalError):
+            run_store.reconcile_interrupted(thread_store=thread_store)
+    assert run_store.get_run("legacy-run").status == "running"
+    assert thread_store.list_messages("legacy") == before_messages
+    assert run_store.list_events("legacy-run") == before_events
+    assert run_store.reconcile_interrupted(thread_store=thread_store) == ["legacy-run"]
+    assert run_store.reconcile_interrupted(thread_store=thread_store) == []
+    assert thread_store.list_messages("legacy") == before_messages
+    assert run_store.list_events("legacy-run") == before_events
+
+
+def test_already_terminal_historical_rows_are_not_repaired_without_a_separate_audit(stores):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="historical", run_id="historical-run")
+    run_store.append_event("historical-run", "done", {"answer": "legacy event without a message"})
+    run_store.mark_terminal("historical-run", "succeeded")
+    before = (run_store.get_run("historical-run"), run_store.list_events("historical-run"), thread_store.list_messages("historical"))
+    assert run_store.reconcile_interrupted(thread_store=thread_store) == []
+    assert before == (run_store.get_run("historical-run"), run_store.list_events("historical-run"), thread_store.list_messages("historical"))
+
+
+def test_concurrent_thread_completions_do_not_exchange_answers_or_receipts(stores):
+    run_store, thread_store = stores
+    barrier = threading.Barrier(2)
+    for name in ("first", "second"):
+        _seed_run(run_store, thread_store, thread_id=name, run_id=name + "-run")
+    workers = [(ResearchRunStore(run_store.db_path), ResearchThreadStore(thread_store.db_path)) for _ in range(2)]
+    def finish(name, stores):
+        runs, threads = stores
+        async def stream_factory(**kwargs):
+            barrier.wait(5)
+            yield AgentEvent(EventType.tool_end, {"tool": "get_sa_feed", "call_id": name, "summary": name})
+            yield AgentEvent(EventType.done, {
+                "answer": name + " answer", "provider": "openai", "model": name + " reported model",
+                "token_usage": {"total_tokens": len(name)},
+            })
+        asyncio.run(_execute_test_run(
+            run_id=name + "-run", run_store=runs, thread_store=threads,
+            dal=object(), history=[], stream_factory=stream_factory,
+        ))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(finish, name, worker) for name, worker in zip(("first", "second"), workers)]
+        for future in futures:
+            future.result(timeout=10)
+    for name in ("first", "second"):
+        message = thread_store.list_messages(name)[-1]
+        assert message.content == name + " answer"
+        assert message.model == name + " reported model"
+        assert message.token_usage == {"total_tokens": len(name)}
+        assert message.tool_calls[0]["call_id"] == name
+        assert run_store.get_run(name + "-run").status == "succeeded"
+
+
+def test_repeated_cancel_joins_cleanup_before_publishing_exactly_one_terminal(stores):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="cancel", run_id="cancel-run")
+
+    async def scenario():
+        advancing, closing, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        closes = []
+        class Stream:
+            sent_tool = False
+            def __aiter__(self):
+                return self
+            async def __anext__(self):
+                if not self.sent_tool:
+                    self.sent_tool = True
+                    return AgentEvent(EventType.tool_end, {"tool": "get_sa_feed", "call_id": "finished", "summary": "retained"})
+                advancing.set()
+                await asyncio.Event().wait()
+            async def aclose(self):
+                closes.append("close")
+                closing.set()
+                await release.wait()
+
+        task = asyncio.create_task(_execute_test_run(
+            run_id="cancel-run", run_store=run_store, thread_store=thread_store,
+            dal=object(), history=[], stream_factory=lambda **kwargs: Stream(),
+        ))
+        try:
+            await asyncio.wait_for(advancing.wait(), 5)
+            task.cancel()
+            await asyncio.wait_for(closing.wait(), 5)
+            for _ in range(3):
+                task.cancel()
+                await asyncio.sleep(0)
+            assert not task.done()
+            assert run_store.get_run("cancel-run").status == "running"
+            assert [event.type for event in run_store.list_events("cancel-run")] == ["tool_end"]
+        finally:
+            release.set()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, 5)
+        assert closes == ["close"]
+    asyncio.run(scenario())
+    assert run_store.get_run("cancel-run").status == "cancelled"
+    assert [event.type for event in run_store.list_events("cancel-run")] == ["tool_end", "error"]
+    assert len(thread_store.list_messages("cancel")) == 2
+    assert thread_store.list_messages("cancel")[-1].tool_calls[0]["call_id"] == "finished"
+
+
+@pytest.mark.parametrize("code", ["run_persistence_failed", "run_completion_unverified"])
+def test_provider_error_cannot_claim_a_local_completion_failure(stores, code):
+    run_store, thread_store = stores
+    _seed_run(run_store, thread_store, thread_id="provider", run_id="provider-run")
+    async def stream_factory(**kwargs):
+        yield AgentEvent(EventType.error, {"error": "provider failure", "code": code})
+    asyncio.run(_execute_test_run(
+        run_id="provider-run", run_store=run_store, thread_store=thread_store,
+        dal=object(), history=[], stream_factory=stream_factory,
+    ))
+    assert run_store.get_run("provider-run").error_code == "provider_call_failed"
+    assert not run_store.has_persistence_failure("provider-run")
+    assert r.get_research_run("provider-run", run_store=run_store)["run"]["status"] == "failed"
 
 
 def test_create_run_route_persists_user_and_schedules_with_prior_history(stores, monkeypatch):

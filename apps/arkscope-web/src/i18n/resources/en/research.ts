@@ -198,6 +198,10 @@ const research = {
   },
   errors: {
     providerCallFailedTitle: "Provider call failed",
+    persistenceTitle: "Research could not be saved",
+    persistenceDetail: "Research output could not be saved locally. Check local storage before continuing. The model request has not been sent again.",
+    completionUnverifiedTitle: "Saved completion could not be verified",
+    completionUnverifiedDetail: "The saved records do not establish a complete result. Existing output has been retained without claiming completion.",
     maintenanceTitle: "Research maintenance in progress",
     maintenanceDetail: "Research was not started. Try again after maintenance finishes.",
     protectionPlatformTitle: "Research protection unsupported on this platform",

@@ -3977,7 +3977,8 @@ a.news-title:hover { color: var(--accent); text-decoration: underline; }
   gap: 8px;
   margin: 8px 0;
 }
-.research-run-progress > .ui-bounded-progress { flex: 1; min-width: 0; }
+.research-run-progress > .ui-bounded-progress,
+.research-run-progress > .ui-inline-alert { flex: 1; min-width: 0; }
 .research-evidence { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .research-evidence section { min-width: 0; }
 .research-run-details { border-top: 1px solid var(--border); padding-top: 12px; }

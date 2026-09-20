@@ -16,7 +16,7 @@ export interface ResearchErrorPresentation {
 interface ErrorDefinition {
   state: CommonUiState;
   copy: "reauth" | "missingCredential" | "timeout" | "refusal" | "providerCallFailed"
-    | "toolLimit" | "cancelled" | "interrupted" | "maintenance"
+    | "toolLimit" | "cancelled" | "interrupted" | "maintenance" | "persistence" | "completionUnverified"
     | "protectionPlatform" | "protectionPath" | "protectionConfiguration" | "protectionSpace" | "protectionUnavailable";
   target?: NavigationTarget;
   preservePartial?: boolean;
@@ -54,6 +54,16 @@ const DEFINITIONS: Record<string, ErrorDefinition> = {
   provider_call_failed: {
     state: "failed",
     copy: "providerCallFailed",
+  },
+  run_persistence_failed: {
+    state: "blocked",
+    copy: "persistence",
+    preservePartial: true,
+  },
+  run_completion_unverified: {
+    state: "interrupted",
+    copy: "completionUnverified",
+    preservePartial: true,
   },
   sec_research_operation_busy: {
     state: "blocked",
@@ -138,6 +148,18 @@ function errorCopy(
       return {
         title: t(($) => $.errors.providerCallFailedTitle),
         detail: t(($) => $.errors.providerCallFailedDetail),
+        actionLabel: null,
+      };
+    case "persistence":
+      return {
+        title: t(($) => $.errors.persistenceTitle),
+        detail: t(($) => $.errors.persistenceDetail),
+        actionLabel: null,
+      };
+    case "completionUnverified":
+      return {
+        title: t(($) => $.errors.completionUnverifiedTitle),
+        detail: t(($) => $.errors.completionUnverifiedDetail),
         actionLabel: null,
       };
     case "maintenance":
