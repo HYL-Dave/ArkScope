@@ -1964,7 +1964,7 @@ table.wl tbody tr.archived td {
 .settings-sa-health-table { min-width: 720px; table-layout: auto; }
 .settings-fred-table { min-width: 760px; table-layout: auto; }
 .settings-provider-config-table { min-width: 940px; }
-.settings-schedule-table { min-width: 980px; table-layout: fixed; }
+.settings-schedule-table { min-width: 900px; table-layout: fixed; }
 .settings-wrap-text {
   white-space: normal;
   overflow-wrap: anywhere;
@@ -1984,18 +1984,49 @@ table.wl tbody tr.archived td {
 .ds-missing_key { color: #f85149; border-color: #f8514966; background: #f8514914; }
 .ds-disabled { color: var(--muted); text-decoration: line-through; }
 .ds-running { color: #58a6ff; border-color: #58a6ff66; background: #58a6ff14; }
-.settings-schedule-table td { vertical-align: middle; }
+.settings-schedule-table th,
+.settings-schedule-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 10px 8px;
+}
 .settings-schedule-table td.settings-schedule-source-cell {
   white-space: normal;
   overflow-wrap: anywhere;
   vertical-align: top;
   line-height: 1.45;
 }
-.settings-schedule-table th:nth-child(1) { width: 30%; }
-.settings-schedule-table th:nth-child(2) { width: 11%; }
-.settings-schedule-table th:nth-child(3) { width: 12%; }
-.settings-schedule-table th:nth-child(4) { width: 12%; }
-.settings-schedule-table th:nth-child(5) { width: 35%; }
+.settings-schedule-table th:nth-child(1) { width: 26%; }
+.settings-schedule-table th:nth-child(2) { width: 136px; }
+.settings-schedule-table th:nth-child(3) { width: 132px; }
+.settings-schedule-table th:nth-child(5) { width: 72px; text-align: center; }
+.settings-schedule-table td.ds-run-action { text-align: center; }
+.settings-schedule-table .ds-toggle { margin-left: 0; min-height: var(--control-height-compact); }
+.ds-interval-controls { display: flex; align-items: center; gap: 6px; min-height: var(--control-height-compact); }
+.settings-schedule-table .ui-icon-button {
+  width: var(--control-height-compact);
+  height: var(--control-height-compact);
+  padding: 0;
+  flex-shrink: 0;
+}
+.settings-schedule-table .source-run-progress {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+.settings-schedule-table .source-run-current { text-align: right; }
+.settings-schedule-table .source-run-track,
+.settings-schedule-table .source-run-counts { grid-column: 1 / -1; }
+.settings-schedule-table .source-run-counts { text-align: right; }
+.settings-schedule-table .ui-status-badge {
+  min-width: 0;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.settings-schedule-table .ui-status-badge svg { flex-shrink: 0; }
+.ds-last-run-summary > .ui-status-badge { align-items: flex-start; }
+.ds-last-run-summary > .ui-status-badge svg { margin-top: 2px; }
 .ds-interval {
   width: 72px;
   background: var(--bg);
@@ -2012,6 +2043,8 @@ table.wl tbody tr.archived td {
   white-space: normal;
 }
 .ds-last-run {
+  display: grid;
+  gap: 6px;
   max-width: 100%;
 }
 .ds-last-run-summary {
@@ -2019,11 +2052,13 @@ table.wl tbody tr.archived td {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  max-height: 3.2em;
-  overflow: hidden;
   overflow-wrap: anywhere;
   line-height: 1.45;
 }
+.ds-last-run-summary:empty { display: none; }
+.ds-last-run-history-label { flex-shrink: 0; }
+.ds-last-run-time,
+.ds-skipped-trigger { flex-basis: 100%; }
 .ds-last-run-summary > span {
   min-width: 0;
   max-width: 100%;

@@ -728,6 +728,12 @@ const settings = {
       autoRefreshing: "（執行中，自動更新）",
       protection: "同一資料來源與 IBKR 工作同時間只執行一次；若已有工作進行中，新觸發會顯示為已跳過，不會重複抓取。",
       triggerSkipped: "新觸發已略過",
+      controls: {
+        schedule: "{{source}}：排程",
+        interval: "{{source}}：間隔（分）",
+        apply: "套用：{{source}}",
+        run: "立即執行：{{source}}",
+      },
       skippedPrefix: "已跳過：{{value}}",
       details: {
         skipReason: "跳過原因",

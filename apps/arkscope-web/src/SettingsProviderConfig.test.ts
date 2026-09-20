@@ -1027,7 +1027,7 @@ describe("Settings provider config authority", () => {
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
       button.textContent?.trim() === "補抓")).toBe(false);
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
-      button.textContent?.includes("執行"))).toBe(true);
+      button.getAttribute("aria-label")?.includes("執行"))).toBe(true);
   });
 
   it("renders succeeded IBKR run and scheduled body backlog as separate facts", async () => {
@@ -1055,7 +1055,7 @@ describe("Settings provider config authority", () => {
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
       button.textContent?.trim() === "補抓")).toBe(false);
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
-      button.textContent?.includes("執行"))).toBe(true);
+      button.getAttribute("aria-label")?.includes("執行"))).toBe(true);
     expect(row.textContent).not.toContain("provider_article_id");
   });
 
@@ -1108,7 +1108,7 @@ describe("Settings provider config authority", () => {
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
       button.textContent?.trim() === "補抓")).toBe(false);
     expect(Array.from(row.querySelectorAll("button")).some((button) =>
-      button.textContent?.includes("執行"))).toBe(true);
+      button.getAttribute("aria-label")?.includes("執行"))).toBe(true);
   });
 
   it("renders_known_schedule_progress_without_covering_the_last_run_cell", async () => {
@@ -1172,7 +1172,7 @@ describe("Settings provider config authority", () => {
       expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
       expect(row.querySelector("input[type='number']")).not.toBeNull();
       expect(Array.from(row.querySelectorAll("button")).some((button) =>
-        button.textContent?.includes("執行"))).toBe(true);
+        button.getAttribute("aria-label")?.includes("執行"))).toBe(true);
       expect(row.textContent).not.toMatch(/唯讀|已退役/);
     }
     const fredRow = zhMacroRows.find((row) =>
@@ -1190,7 +1190,7 @@ describe("Settings provider config authority", () => {
       expect(row.querySelector("input[type='checkbox']")).not.toBeNull();
       expect(row.querySelector("input[type='number']")).not.toBeNull();
       expect(Array.from(row.querySelectorAll("button")).some((button) =>
-        button.textContent?.includes("Run"))).toBe(true);
+        button.getAttribute("aria-label")?.includes("Run"))).toBe(true);
       expect(row.textContent).not.toMatch(/Read-only|Retired/);
     }
     expect(host!.textContent).not.toMatch(/Price Gap Backfill|Local Mirror Incremental|IV History/);
