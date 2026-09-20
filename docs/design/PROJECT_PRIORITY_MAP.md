@@ -22,6 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
+| **P0** | **SOURCE READ GOVERNANCE AND ACTUAL USAGE** | **IMPLEMENTED; FROZEN REGRESSION PENDING.** All three SEC tool/service defaults are local `stored`; explicit acquisition still needs future enforceable external authorization. Financial Datasets cache misses require operator-configured request budgets/rate limits, with durable per-installation/key admission before HTTP; unknown limits remain cache-only. Research evidence now has question-topic and channel/outcome tables, without deleting history or treating uncalled tools as retired. Named abandoned `lifecycle-final-audit` tree removed after preserving its residual files. Owner: `docs/superpowers/plans/2026-09-20-source-read-governance.md`; tables: `docs/data/2026-09-20-research-usage.md`. | Remove surprise acquisition/spending and prioritize repairs from observed research needs without waiting for SEC retirement decisions. |
 | **P1** | **SOURCE-LOCAL SEC RESEARCH PROTECTION** | **VERIFIED AND MERGED.** Frozen `00eaaefb`: **11,577 backend / 12 unchanged skips**. Master `c8846ee2`: **442 related backend**, **1,867 frontend / 124 files**, typecheck/build, **8 desktop**, i18n checks. Ordinary research/messages no longer require a healthy SEC capture root; actual SEC use retains protection through persistence. The original whole-run lease already prevented intervening maintenance, so the demonstrated defect was unnecessary no-SEC coupling, not a reproduced lost-answer race. The three named old worktrees and this slice's acceptance tree/branch are removed; ignored old test data is retained separately. Other historical trees are untouched. Owner/evidence: `docs/superpowers/evidence/2026-09-20-research-sec-isolation/README.md`. | Resolve the reported SEC dependency before native-session continuation without weakening source retention. |
 | **P1** | **RESEARCH CONTINUITY AND DURABLE COMPLETION** | **SLICE 1 VERIFIED AND MERGED; NATIVE SESSION REUSE STILL PLANNED.** Frozen `b6ed44a2` passes **11,505 backend / 12 unchanged skips**, **1,867 frontend / 124 files**, typecheck/build and offline browser acceptance. Main-tree recheck: **601 related backend**, same complete frontend and build. Server-owned answer/event/status now commit atomically; local persistence failure cannot claim success or retry the model. Startup verifies exact legacy active-run evidence, otherwise preserves surviving output with a typed unverified state. Already-terminal historical rows are not rewritten. Native Claude OAuth session reuse remains a separate, unimplemented slice; text-history behavior stays. Owner: `docs/superpowers/plans/2026-09-20-research-continuity-repair.md`; evidence: `docs/superpowers/evidence/2026-09-20-research-completion-repair/`. | Preserve the useful research workflow without reviving token monitoring, notebooks, or adopting unreviewed native transcript storage. |
 | **P1** | **SPARK RETIREMENT; CARD TRANSLATION PRESERVED** | **MERGED INTO MASTER; PRODUCTION CLEANUP NOT EXECUTED.** Translation and subscription usage display/sync stay; Spark execution/options remain retired. The cleanup scope remains exact Spark version rows plus run 13 / zh-Hant only on verified canonical hash match, with mandatory private backup. Main-tree integration at `097a7cc1` also includes the independent schedule layout fix: **1859 frontend / 124 files**, **171 related backend**, **8 desktop**, typecheck/build/i18n and isolated Electron/browser smoke pass. No new complete backend run is claimed; previous full `b7e1886b` remains **11437P/12S**. Evidence: `docs/superpowers/evidence/2026-09-20-master-merge-and-branch-audit.md`. | Retiring Spark does not remove translation or turn usage-group labels into model authorization. |
@@ -656,6 +657,29 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-20 (SOURCE READ GOVERNANCE AND RESEARCH USAGE):**
+  User authorizes continued repair and evidence-based inventory, not paid
+  sampling or history deletion. The three SEC research tools now default to
+  `stored` through actual services and four transports; acquisition/cancellation
+  fixtures explicitly request `auto`, retaining their assertions. This is not
+  an authorization engine: the existing audit-only write hook remains and
+  explicit model arguments are not user consent. Financial Datasets requires
+  trusted configured request budgets/rate limits before each HTTP attempt;
+  failed/uncertain requests consume reservations, shared processes serialize
+  admission, and unknown account limits stay cache-only. No dollar price is
+  invented from the old generic budget setting. Malformed responses and partial
+  ledgers fail closed rather than becoming empty data or reset budgets.
+  Current read-only research evidence matches the private audit snapshot:
+  54 user messages, 23 threads, 33 runs and 32,887 events. Two published tables
+  distinguish 1,242 start records, 152 header-only completions and 1,603 saved
+  message copies; historical transport flags are not current data success rates.
+  Twenty-eight current tools have recorded use and 28 do not; absence alone is
+  not a retirement criterion. Next repair priority is quote freshness/basis,
+  SA article/comment access and financial/earnings comparability. The named
+  abandoned worktree is removed only after preserving its residual files.
+  Frozen complete regression remains pending; no live fee, production mutation,
+  broad data disposal or external MCP exposure is part of this slice.
 
 - **2026-09-20 (SOURCE-LOCAL SEC PROTECTION AND NAMED WORKTREE CLEANUP):**
   Baseline `d298cb00` couples ordinary Research admission and all message/event
