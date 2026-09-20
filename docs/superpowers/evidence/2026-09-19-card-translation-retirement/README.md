@@ -86,9 +86,26 @@ apply has run. Private translation YAML/environment keys are retained.
 - Three preservation tests fail when run against the previous `0fbea0b5`
   schema-dropping operator, using only in-memory fixtures. They prevent this
   scope error from returning as a supposedly valid cleanup.
-- Full backend, frontend, typecheck/build and desktop acceptance of this
-  corrected revision are pending. Prior all-feature-removal results are not
-  acceptance of the clarified scope.
+- Frozen revision: `b7e1886b7586ec78fe8ac08eae45adc59f0e80a7`.
+  Complete backend: **11,437 passed / 12 skipped**, exit 0, **1,799.58s**.
+  Command: `/home/hyl/.virtualenvs/llm_app/bin/python -m pytest tests/ -q
+  --tb=short --disable-warnings`, with one pytest process and no concurrent
+  source edits or other pytest session in this tree.
+- Complete frontend: **1,854 passed / 124 files**, **13.84s**. TypeScript and
+  production build pass; the pre-existing large-bundle warning remains.
+  i18n: 37 candidates, 20 signatures, **zero debt**. Desktop shell: **8 passed**.
+- All **1,169** tracked files under `src`, `data_sources`, `tests`, `apps`,
+  this packet's `checks/` and `browser_check.py`, and the restored generic
+  `2026-09-08-sdk152-fixed-output/live_api_canary.py` have the same pre/post
+  fingerprint: `fb00fcabb093ede32a61843afeb18f19ded6e8c42964ffb1edd5ea38bc7854e7`.
+  Method: `git ls-files -z <those paths> | sort -z | xargs -0 sha256sum |
+  sha256sum`. The worktree was clean after every complete gate.
+- Compared with the preserved `544d8dfd` baseline, `src` and `apps` differ
+  only in the independent report-file security fix. The 37 additional backend
+  cases are its 24 adversarial tests and 13 record-cleanup/API cases.
+  Full-run logs: `/tmp/arkscope-translation-preserved-backend.log`,
+  `/tmp/arkscope-translation-preserved-frontend.log`, and
+  `/tmp/arkscope-translation-preserved-build.log`.
 
 The first focused run had 118 passes and one test-harness failure: SQLite's
 authorizer reported virtual PRAGMA schema preparation as apparent metadata
@@ -101,7 +118,9 @@ The earlier unmerged full-feature-removal revision `033c4515` passed
 11,266 backend / 12 skipped and 1,830 frontend / 124 files. Those tests proved
 the mistaken removal was internally consistent, not that it met user intent.
 The correct preservation baseline `544d8dfd` had passed 11,400 backend /
-12 skipped and 1,854 frontend / 124 files. The corrected branch must be rerun.
+12 skipped and 1,854 frontend / 124 files. The corrected branch has now been
+independently rerun as recorded above; the mistaken-removal numbers are not
+reused as its acceptance.
 
 Master remains `52037620`; the App was running at the last check. No merge,
 App restart, production translation deletion, backup deletion or push occurred.

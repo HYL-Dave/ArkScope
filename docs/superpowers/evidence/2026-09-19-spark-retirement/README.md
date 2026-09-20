@@ -12,6 +12,12 @@ cleanup, as the user also permits clearing all translation results. See
 `../2026-09-19-card-translation-retirement/README.md` for that correction and
 current verification. The original test results below belong to `544d8dfd`.
 
+The remainder is the original September 19 audit. Its no-cleanup/no-merge
+authorization boundary and retained-output policy were subsequently updated
+by the user's record-only cleanup and appropriate merge permissions, not by
+permission to remove the feature. The report-file defect below is also now
+fixed independently; current acceptance is recorded in the correction packet.
+
 The user requested rechecking disagreements with the tool audit review and
 explicitly authorized removing Spark use, options and its translation-specific
 implementation. This is not authorization to remove other translation models,

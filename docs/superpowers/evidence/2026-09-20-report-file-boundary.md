@@ -28,5 +28,6 @@ This repairs report file access, not the still-open quote freshness, earnings
 event alignment, financial-ratio or future external authorization findings.
 Existing app-record-store initialization is unchanged; this is not a guarantee
 that the whole tool has no database side effects. Complete regression at
-`033c4515` is recorded in the [retirement packet](2026-09-19-card-translation-retirement/README.md).
+`b7e1886b`, preserving card translation, passes 11,437 backend tests with 12
+skipped; see the [scope correction packet](2026-09-19-card-translation-retirement/README.md).
 The running production App has not yet been switched to the fixed code.
