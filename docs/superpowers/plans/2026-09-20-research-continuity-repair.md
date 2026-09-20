@@ -1,8 +1,10 @@
 # Research Continuity Repair
 
-Status: **Slice 1 implemented; final regression pending**. Slices 2 and 3 remain
-unimplemented. This plan carries the remaining problems out of the archived
-`research-session-continuity` branch. Archiving the branch did not close these
+Status: **Slice 1 verified and merged into master** at `b6ed44a2`. Complete
+backend: **11,505 passed / 12 unchanged skipped**; complete frontend:
+**1,867 passed / 124 files**, with typecheck/build and browser acceptance.
+Slices 2 and 3 remain unimplemented. This plan carries the remaining problems
+out of the archived `research-session-continuity` branch. Archiving the branch did not close these
 issues or adopt its proposed schema. Slice 1 evidence:
 `docs/superpowers/evidence/2026-09-20-research-completion-repair/`.
 
