@@ -588,7 +588,7 @@ class TestFundamentalsEndpoints:
         from tests.test_sec_research_tool_adapters import tool_fixture, wire, CIK
         fixture = tool_fixture.__wrapped__(tmp_path)
         wire(monkeypatch, fixture.service)
-        result = create_default_registry().get("list_sec_filings").function(issuer=CIK)
+        result = create_default_registry().get("list_sec_filings").function(issuer=CIK, freshness="auto")
         assert len(result["data"]) == 2
 
 

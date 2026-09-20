@@ -77,7 +77,7 @@ def test_each_research_transport_dispatches_three_real_sec_tools(
         assert registry.get(name).category == "analysis"
         assert registry.get(name).requires_dal is False
     wire(monkeypatch, f.service)
-    filings = unwrap(asyncio.run(dispatch(channel, registry, NAMES[0], dict(issuer=CIK))))
+    filings = unwrap(asyncio.run(dispatch(channel, registry, NAMES[0], dict(issuer=CIK, freshness="auto"))))
     assert len(filings["data"]) == 2
     assert filings["data"][0]["sources"][0]["object_sha256"]
     facts = unwrap(asyncio.run(dispatch(channel, registry, NAMES[1], dict(issuer=CIK))))
@@ -89,7 +89,7 @@ def test_each_research_transport_dispatches_three_real_sec_tools(
     wire(monkeypatch, service)
     r.enqueue(b"<p>Complete SEC passage.</p>")
     from tests.test_sec_research_document_service import FILING_ID
-    index = unwrap(asyncio.run(dispatch(channel, registry, NAMES[2], dict(filing_id=FILING_ID))))
+    index = unwrap(asyncio.run(dispatch(channel, registry, NAMES[2], dict(filing_id=FILING_ID, freshness="auto"))))
     args = dict(filing_id=FILING_ID, cursor=index["data"]["text_start_cursor"])
     text = unwrap(asyncio.run(dispatch(channel, registry, NAMES[2], args)))
     passage = text["data"]["passages"][0]
@@ -199,7 +199,7 @@ def test_oauth_sec_boundary_rejects_serialization_corruption(channel, registry, 
             return '{"broken":'
         return original(result, policy=policy, **kwargs)
     monkeypatch.setattr(result_policy, "admit_tool_result", corrupt_success)
-    result = unwrap(asyncio.run(dispatch(channel, registry, "list_sec_filings", dict(issuer=CIK))))
+    result = unwrap(asyncio.run(dispatch(channel, registry, "list_sec_filings", dict(issuer=CIK, freshness="auto"))))
     assert result["status"] == "unavailable"
     assert result["gaps"] == [{"code": "sec_result_invalid"}]
 
@@ -211,7 +211,7 @@ def test_sec_worker_preserves_permission_rejection_before_acquisition(channel, r
     def reject(*args, **kwargs):
         raise RuntimeError("PRIVATE sk-never-show-this-provider-error")
     monkeypatch.setattr(permissions, "require_db_write", reject)
-    result = asyncio.run(dispatch(channel, registry, "list_sec_filings", dict(issuer=CIK)))
+    result = asyncio.run(dispatch(channel, registry, "list_sec_filings", dict(issuer=CIK, freshness="auto")))
     assert unwrap(result)["status"] == "unavailable"
     assert "PRIVATE" not in result and "never-show" not in result
     assert not tool_fixture.acquisitions and not tool_fixture.transport.calls

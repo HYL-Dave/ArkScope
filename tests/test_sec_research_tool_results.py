@@ -39,7 +39,7 @@ def test_whole_pages_use_active_layer0_budget_without_changing_filters(
     seen, cursor = [], None
     for _ in range(30):
         payload = asyncio.run(dispatch(channel, registry, "list_sec_filings",
-            dict(issuer=CIK, limit=20, cursor=cursor)))
+            dict(issuer=CIK, limit=20, cursor=cursor, freshness="auto")))
         assert len(payload) <= 3500
         page = unwrap(payload)
         assert page["data"], page
@@ -84,7 +84,7 @@ def test_sec_cancel_awaits_worker_and_prevents_later_dispatch(tool_fixture, monk
     async def run():
         token = marker.set("copied")
         try:
-            task = asyncio.create_task(invoke_sec_tool("list_sec_filings", dict(issuer=CIK),
+            task = asyncio.create_task(invoke_sec_tool("list_sec_filings", dict(issuer=CIK, freshness="auto"),
                 timeout_s=0.15 if mode == "timeout" else None))
             while not entered.is_set() and not task.done():
                 await asyncio.sleep(0.001)
@@ -163,7 +163,7 @@ def test_sec_cancel_stops_actual_document_reader_before_next_source(document_rig
     monkeypatch.setattr(r.queue[0], "read", blocked_read)
 
     async def run():
-        task = asyncio.create_task(invoke_sec_tool("read_sec_filing", dict(filing_id=FILING_ID),
+        task = asyncio.create_task(invoke_sec_tool("read_sec_filing", dict(filing_id=FILING_ID, freshness="auto"),
             timeout_s=0.15 if mode == "timeout" else None))
         while not entered.is_set() and not task.done():
             await asyncio.sleep(0.001)
@@ -200,7 +200,7 @@ def test_whole_document_size_gap_advances_with_original_max_chars(
     service, _ = doc_tool(r)
     wire(monkeypatch, service)
     r.enqueue(("<p>" + "needle " * 3500 + "</p>").encode())
-    index = unwrap(asyncio.run(dispatch(channel, registry, "read_sec_filing", dict(filing_id=FILING_ID))))
+    index = unwrap(asyncio.run(dispatch(channel, registry, "read_sec_filing", dict(filing_id=FILING_ID, freshness="auto"))))
     arguments = dict(filing_id=FILING_ID, max_chars=6000)
     if mode == "search":
         arguments["query"] = "needle"
@@ -259,7 +259,7 @@ def test_exact_facts_page_by_wrapped_budget_with_unchanged_limit(channel, regist
     ids, cursor = [], None
     for _ in range(16):
         payload = asyncio.run(dispatch(channel, registry, "get_sec_financial_facts",
-            dict(issuer=CIK, limit=40, cursor=cursor)))
+            dict(issuer=CIK, limit=40, cursor=cursor, freshness="auto")))
         assert len(payload) <= 3500
         page = unwrap(payload)
         assert page["data"], page
@@ -284,7 +284,7 @@ def test_non_ascii_passages_keep_exact_citations_through_transport(channel, regi
     body = "A\u4e2d\u6587 needle \U0001f642 needle Z"
     r.enqueue(body.encode(), mime="text/plain")
     index = unwrap(asyncio.run(dispatch(channel, registry, "read_sec_filing",
-        dict(filing_id=FILING_ID, max_chars=3))))
+        dict(filing_id=FILING_ID, max_chars=3, freshness="auto"))))
     cursor, emitted = index["data"]["text_start_cursor"], []
     while cursor:
         payload = asyncio.run(dispatch(channel, registry, "read_sec_filing",
@@ -306,7 +306,7 @@ def test_document_pager_measures_final_status_with_each_candidate(document_rig):
     r = document_rig
     service, _ = doc_tool(r)
     r.enqueue()
-    service.invoke("read_sec_filing", dict(filing_id=FILING_ID))
+    service.invoke("read_sec_filing", dict(filing_id=FILING_ID, freshness="auto"))
     read = DocumentQueries(r.store, r.captures)
     checked = []
     def fit(value):
@@ -342,7 +342,7 @@ def test_default_sec_document_budget_returns_usable_text_without_skips(
     wire(monkeypatch, service)
     body = (alphabet * 7000)[:14000]
     r.enqueue(body.encode(), mime="text/plain")
-    index = unwrap(asyncio.run(dispatch(channel, registry, "read_sec_filing", dict(filing_id=FILING_ID))))
+    index = unwrap(asyncio.run(dispatch(channel, registry, "read_sec_filing", dict(filing_id=FILING_ID, freshness="auto"))))
     cursor, emitted, end_byte = index["data"]["text_start_cursor"], [], 0
     while cursor:
         assert _decode(cursor)["filters_hash"] == _filters(None, None, 6000)
@@ -377,7 +377,7 @@ def test_default_search_returns_complete_matches_with_bounded_context(channel, r
     cursor, matches = None, []
     for _ in range(3):
         payload = asyncio.run(dispatch(channel, registry, "read_sec_filing",
-            dict(filing_id=FILING_ID, query="needle", cursor=cursor)))
+            dict(filing_id=FILING_ID, query="needle", cursor=cursor, freshness="auto")))
         assert len(payload) <= 8000
         page = unwrap(payload)
         assert page["data"]["passages"] and not page["gaps"]

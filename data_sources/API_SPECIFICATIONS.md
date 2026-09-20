@@ -346,9 +346,15 @@ revenue = facts['facts']['us-gaap']['Revenues']['units']['USD']
 
 `src/tools/sec_research_tools.py` 提供三個 `analysis` 工具，皆不需要 DAL 參數：
 
-- `list_sec_filings(issuer, forms=None, filed_from=None, filed_to=None, include_amendments=True, cursor=None, limit=20, freshness="auto")`
-- `get_sec_financial_facts(issuer, metrics=None, concepts=None, fact_ids=None, accession=None, as_of=None, period="all", start=None, end=None, revisions="latest", cursor=None, limit=40, freshness="auto")`
-- `read_sec_filing(filing_id, document_id="primary", section_id=None, query=None, capture_id=None, cursor=None, max_chars=6000, freshness="auto")`
+- `list_sec_filings(issuer, forms=None, filed_from=None, filed_to=None, include_amendments=True, cursor=None, limit=20, freshness="stored")`
+- `get_sec_financial_facts(issuer, metrics=None, concepts=None, fact_ids=None, accession=None, as_of=None, period="all", start=None, end=None, revisions="latest", cursor=None, limit=40, freshness="stored")`
+- `read_sec_filing(filing_id, document_id="primary", section_id=None, query=None, capture_id=None, cursor=None, max_chars=6000, freshness="stored")`
+
+Omitting `freshness` reads only stored data. Missing/old data does not enable
+acquisition. Explicit `auto`/`refresh` may download and persist data; these modes
+are not read-only capabilities or proof of user authorization. The current
+internal permission hook records intent, not interactive consent. Do not expose
+them externally without an enforceable actor/capability gate.
 
 回傳固定 envelope：`status`、`data`、`gaps`、`observed_at`、`coverage`、`next_cursor`。
 保留精確 Decimal TEXT、來源 SHA-256、完整引用及 UTF-8 半開位元組範圍。

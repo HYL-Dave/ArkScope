@@ -121,11 +121,12 @@ def release_fixture(tmp_path, monkeypatch):
                                "result_preview": raw[:160], **fields})
         return page
 
-    f.filings = observe("catalog", "list_sec_filings", issuer="AAPL")
-    f.facts = observe("facts", "get_sec_financial_facts", issuer="AAPL", concepts=["us-gaap:Revenues"])
+    f.filings = observe("catalog", "list_sec_filings", issuer="AAPL", freshness="auto")
+    f.facts = observe("facts", "get_sec_financial_facts", issuer="AAPL", freshness="auto",
+                      concepts=["us-gaap:Revenues"])
     f.filing_id = next(row["filing_id"] for row in f.filings["data"] if row["form"] == "10-K")
     enqueue(HTML)
-    index = observe("document-index", "read_sec_filing", filing_id=f.filing_id)
+    index = observe("document-index", "read_sec_filing", filing_id=f.filing_id, freshness="auto")
     f.passage = observe("document-passage", "read_sec_filing", filing_id=f.filing_id,
                         cursor=index["data"]["text_start_cursor"])
 

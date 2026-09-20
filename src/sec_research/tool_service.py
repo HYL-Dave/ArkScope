@@ -55,7 +55,7 @@ def _validate(name, arguments, check):
     if not isinstance(arguments, dict) or check is not None and not callable(check):
         raise ValueError("sec_research_query_invalid")
     params = dict(arguments)
-    freshness = params.pop("freshness", "auto")
+    freshness = params.pop("freshness", "stored")
     if freshness not in ("auto", "stored", "refresh"):
         raise ValueError("sec_research_query_invalid")
     if name == "read_sec_filing":

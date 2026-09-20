@@ -34,7 +34,7 @@ def test_anthropic_actual_stream_returns_exact_sec_result_to_model(
     if name == "read_sec_filing":
         service, _ = doc_tool(document_rig)
         document_rig.enqueue(b"<p>Consolidated 391035000000.</p>")
-        index = service.invoke(name, dict(filing_id=FILING_ID))
+        index = service.invoke(name, dict(filing_id=FILING_ID, freshness="auto"))
         arguments = dict(filing_id=FILING_ID, freshness="stored",
                          cursor=index["data"]["text_start_cursor"])
     else:
@@ -119,7 +119,7 @@ def test_owned_metadata_worker_never_dispatches_after_governor_stop(
     wire(monkeypatch, f.service)
 
     async def run():
-        task = asyncio.create_task(invoke_sec_tool("list_sec_filings", dict(issuer=issuer),
+        task = asyncio.create_task(invoke_sec_tool("list_sec_filings", dict(issuer=issuer, freshness="auto"),
             timeout_s=0.2 if stop_kind == "timeout" else None))
         try:
             assert await asyncio.to_thread(entered.wait, 3)

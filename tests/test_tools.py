@@ -434,7 +434,7 @@ class TestAnalysisTools:
         wire(monkeypatch, fixture.service)
         tool = create_default_registry().get("list_sec_filings")
         assert not tool.requires_dal
-        assert len(tool.function(issuer=CIK)["data"]) == 2
+        assert len(tool.function(issuer=CIK, freshness="auto")["data"]) == 2
 
     def test_get_watchlist_overview(self, dal):
         from src.tools.analysis_tools import get_watchlist_overview

@@ -116,7 +116,7 @@ def test_delegated_sec_envelope_reaches_child_next_turn(
     if name == "read_sec_filing":
         service, acquisitions = doc_tool(document_rig)
         document_rig.enqueue(b"<p>Retained document 391035000000.</p>")
-        index = service.invoke(name, dict(filing_id=FILING_ID))
+        index = service.invoke(name, dict(filing_id=FILING_ID, freshness="auto"))
         arguments = dict(filing_id=FILING_ID, freshness="stored",
                          cursor=index["data"]["text_start_cursor"])
         calls = document_rig.requests
@@ -191,7 +191,7 @@ def test_parent_cancel_joins_delegated_sec_before_releasing_protection(
 
     d, f = delegated, tool_fixture
     d.close_error = close_error
-    d.name, d.arguments = "list_sec_filings", dict(issuer=CIK)
+    d.name, d.arguments = "list_sec_filings", dict(issuer=CIK, freshness="auto")
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(f.store.paths.market_db_path))
     entered, stopped, closing, release, finished = (threading.Event() for _ in range(5))
     observed, calls = [], []

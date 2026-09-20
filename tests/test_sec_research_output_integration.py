@@ -41,7 +41,7 @@ def test_four_sec_transports_return_identical_document_citations(registry, docum
     service, _ = doc_tool(document_rig)
     wire(monkeypatch, service)
     document_rig.enqueue("<p>Consolidated 391035000000 \u4e2d\u6587.</p>".encode())
-    index = service.invoke("read_sec_filing", dict(filing_id=FILING_ID))
+    index = service.invoke("read_sec_filing", dict(filing_id=FILING_ID, freshness="auto"))
     arguments = dict(filing_id=FILING_ID, freshness="stored",
                      cursor=index["data"]["text_start_cursor"])
     results = [asyncio.run(dispatch(channel, registry, "read_sec_filing", arguments))
@@ -73,7 +73,7 @@ def test_oauth_sec_timeout_returns_closed_result_after_owned_worker_stops(
     monkeypatch.setattr(f.transport, "get", read)
     monkeypatch.setattr(f.transport, "close", stopped.set, raising=False)
     result = asyncio.run(dispatch(channel, registry, "list_sec_filings",
-                                  dict(issuer=CIK), timeout=0.15))
+                                  dict(issuer=CIK, freshness="auto"), timeout=0.15))
     assert finished.is_set(), "OAuth returned while SEC acquisition was still running"
     assert unwrap(result)["gaps"] == [{"code": "sec_result_timeout"}]
 

@@ -84,7 +84,7 @@ def test_invalid_query_rejected_before_resolution(tool_fixture, monkeypatch, arg
 
 def test_cursor_survives_ticker_map_change(tool_fixture):
     f = tool_fixture
-    first = f.service.invoke("list_sec_filings", dict(issuer="AAPL", limit=1))
+    first = f.service.invoke("list_sec_filings", dict(issuer="AAPL", limit=1, freshness="auto"))
     assert first["next_cursor"]
     f.transport.responses[MAP_URL] = map_body(("AAPL", 1))
     owner("issuer_store").IssuerStore(f.store).refresh(f.transport, f.captures, clock=lambda: NOW, check=None)
@@ -110,7 +110,7 @@ def test_one_map_plus_bounded_metadata_requests(tool_fixture):
     f.transport.responses[SUBMISSIONS] = catalog(history=8)
     for i in range(8):
         f.transport.responses[f"https://data.sec.gov/submissions/CIK{CIK}-submissions-{i:03}.json"] = b'{"accessionNumber":[],"filingDate":[],"form":[]}'
-    result = f.service.invoke("list_sec_filings", dict(issuer="AAPL"))
+    result = f.service.invoke("list_sec_filings", dict(issuer="AAPL", freshness="auto"))
     assert result["status"] == "partial" and len(result["data"]) == 2
     assert f.transport.calls[0] == MAP_URL and len(f.transport.calls) == 5
     assert len(f.store.latest_receipt(CIK)["pending"]) == 6
@@ -120,10 +120,10 @@ def test_one_map_plus_bounded_metadata_requests(tool_fixture):
 def test_auto_resumes_partial_without_retrying_in_same_call(tool_fixture):
     f = tool_fixture
     f.transport.responses[FACTS] = RuntimeError("fixture failure")
-    first = f.service.invoke("get_sec_financial_facts", dict(issuer=CIK))
+    first = f.service.invoke("get_sec_financial_facts", dict(issuer=CIK, freshness="auto"))
     assert first["status"] == "unavailable" and f.transport.calls == [SUBMISSIONS, FACTS]
     f.transport.responses[FACTS] = EXACT
-    second = f.service.invoke("get_sec_financial_facts", dict(issuer=CIK))
+    second = f.service.invoke("get_sec_financial_facts", dict(issuer=CIK, freshness="auto"))
     assert second["data"][0]["value"] == "1234567890123456789.123"
     assert f.transport.calls == [SUBMISSIONS, FACTS, FACTS]
 
@@ -145,7 +145,7 @@ def test_cancel_stops_before_next_source(tool_fixture):
     def check():
         if f.transport.calls:
             raise RuntimeError("PRIVATE cancellation")
-    result = f.service.invoke("get_sec_financial_facts", dict(issuer=CIK), check=check)
+    result = f.service.invoke("get_sec_financial_facts", dict(issuer=CIK, freshness="auto"), check=check)
     assert f.transport.calls == [SUBMISSIONS]
     assert result["status"] == "unavailable"
     assert f.store.latest_receipt(CIK)["gaps"] == [{"source": "companyfacts", "code": "cancelled"}]
@@ -156,10 +156,10 @@ def test_recent_observation_reused_and_24h_boundary_revalidates(tool_fixture):
     f = tool_fixture
     seed(f)
     f.now = "2026-09-13T11:59:59Z"
-    assert f.service.invoke("list_sec_filings", dict(issuer=CIK))["status"] == "ok"
+    assert f.service.invoke("list_sec_filings", dict(issuer=CIK, freshness="auto"))["status"] == "ok"
     assert f.acquisitions == []
     f.now = "2026-09-13T12:00:00Z"
-    assert f.service.invoke("list_sec_filings", dict(issuer=CIK))["status"] == "ok"
+    assert f.service.invoke("list_sec_filings", dict(issuer=CIK, freshness="auto"))["status"] == "ok"
     assert f.transport.calls == [SUBMISSIONS, FACTS]
 
 
@@ -172,7 +172,7 @@ def test_missing_contact_never_installs_or_dispatches(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.SecResearchPaths, "resolve", lambda: store.paths)
     monkeypatch.setattr(dependencies, "get_profile_store", lambda: profile)
     monkeypatch.setattr(dependencies, "get_data_provider_store", lambda: SimpleNamespace(get_all=lambda: {"sec_edgar": {"user_agent": ""}}))
-    result = runtime.build_tool_service().invoke("list_sec_filings", dict(issuer=CIK))
+    result = runtime.build_tool_service().invoke("list_sec_filings", dict(issuer=CIK, freshness="auto"))
     assert result["gaps"] == [{"code": "sec_identity_unconfigured"}]
     assert not store.paths.market_db_path.parent.exists()
 
@@ -191,13 +191,13 @@ def test_document_auto_reuses_capture_and_secondary_uses_observed_file_id(docume
     r = document_rig
     service, acquisitions = doc_tool(r)
     r.enqueue()
-    first = service.invoke("read_sec_filing", dict(filing_id=FILING_ID))
+    first = service.invoke("read_sec_filing", dict(filing_id=FILING_ID, freshness="auto"))
     assert first["data"]["document"]["capture_id"]
     first_id = first["data"]["document"]["capture_id"]
-    assert service.invoke("read_sec_filing", dict(filing_id=FILING_ID))["data"]["document"]["capture_id"] == first_id
+    assert service.invoke("read_sec_filing", dict(filing_id=FILING_ID, freshness="auto"))["data"]["document"]["capture_id"] == first_id
     assert len(acquisitions) == 1 and len(r.requests) == 2
     r.enqueue(b"<p>secondary</p>")
-    secondary = service.invoke("read_sec_filing", dict(filing_id=FILING_ID, document_id="file:exhibit.xml"))
+    secondary = service.invoke("read_sec_filing", dict(filing_id=FILING_ID, document_id="file:exhibit.xml", freshness="auto"))
     assert secondary["data"]["document"]["document_id"] == "file:exhibit.xml"
     assert r.requests[-1].requests[0][1].endswith("/exhibit.xml")
     pinned = service.invoke("read_sec_filing", dict(filing_id=FILING_ID, capture_id=first_id))
@@ -208,7 +208,7 @@ def test_document_refresh_failure_blocks_old_capture_but_pin_reopens(document_ri
     r = document_rig
     service, acquisitions = doc_tool(r)
     r.enqueue()
-    first = service.invoke("read_sec_filing", dict(filing_id=FILING_ID))
+    first = service.invoke("read_sec_filing", dict(filing_id=FILING_ID, freshness="auto"))
     from tests.test_lifecycle_public_sources import Response
     r.queue.append(Response(b"failed", status=503))
     failed = service.invoke("read_sec_filing", dict(filing_id=FILING_ID, freshness="refresh"))
@@ -231,7 +231,7 @@ def test_handwritten_tools_have_typed_exact_signatures_and_delegate(tool_fixture
         assert list(signature.parameters) == params.split()
         assert all(p.annotation is not inspect.Parameter.empty for p in signature.parameters.values())
         assert signature.return_annotation in (dict, "dict") and fn.__doc__
-    assert module.get_sec_financial_facts(CIK)["data"][0]["value"] == "1234567890123456789.123"
+    assert module.get_sec_financial_facts(CIK, freshness="auto")["data"][0]["value"] == "1234567890123456789.123"
 
 
 @pytest.mark.parametrize("name,args", [
@@ -291,7 +291,7 @@ def test_permission_rejection_precedes_acquisition(tool_fixture, monkeypatch):
     def reject(*args, **kwargs):
         raise RuntimeError("PRIVATE denial")
     monkeypatch.setattr(permissions, "require_db_write", reject)
-    result = tool_fixture.service.invoke("list_sec_filings", dict(issuer=CIK))
+    result = tool_fixture.service.invoke("list_sec_filings", dict(issuer=CIK, freshness="auto"))
     assert result["status"] == "unavailable" and "PRIVATE" not in json.dumps(result)
     assert tool_fixture.acquisitions == [] and tool_fixture.transport.calls == []
 
@@ -317,7 +317,7 @@ def test_document_first_read_obtains_catalog_once(document_rig):
         yield r.captures, transport, r.factory
     service = owner("tool_service").ToolService(r.store, acquisition_factory=acquire, clock=lambda: NOW)
     r.enqueue()
-    result = service.invoke("read_sec_filing", dict(filing_id=FILING_ID))
+    result = service.invoke("read_sec_filing", dict(filing_id=FILING_ID, freshness="auto"))
     assert result["data"]["document"]["document_id"] == "file:actual.htm"
     assert transport.calls == [SUBMISSIONS, FACTS] and len(r.requests) == 2
 
@@ -342,7 +342,7 @@ def test_runtime_map_429_has_one_real_dispatch_and_closes(tmp_path, monkeypatch)
     monkeypatch.setattr(sec_transport.requests, "Session", lambda: session)
     governor = sec_transport.SecRequestGovernor(lock_dir=tmp_path / "governor", clock=clock.time, sleep=clock.sleep)
     monkeypatch.setattr(sec_transport, "SecRequestGovernor", lambda **kwargs: governor)
-    result = runtime.build_tool_service().invoke("list_sec_filings", dict(issuer="AAPL"))
+    result = runtime.build_tool_service().invoke("list_sec_filings", dict(issuer="AAPL", freshness="auto"))
     assert result["gaps"] == [{"code": "sec_rate_limited"}]
     assert len(session.calls) == 1 and session.calls[0]["url"] == MAP_URL
     assert clock.sleeps == [] and closed == [True] and response.closed
@@ -353,13 +353,13 @@ def test_stale_map_revalidates_before_issuer_metadata(tool_fixture):
     issuers = owner("issuer_store").IssuerStore(f.store)
     issuers.refresh(f.transport, f.captures, clock=lambda: "2026-09-10T00:00:00Z", check=None)
     f.transport.calls.clear()
-    result = f.service.invoke("list_sec_filings", dict(issuer="AAPL"))
+    result = f.service.invoke("list_sec_filings", dict(issuer="AAPL", freshness="auto"))
     assert result["status"] == "ok" and f.transport.calls == [MAP_URL, SUBMISSIONS, FACTS]
 
 
 def test_failed_map_refresh_stops_before_metadata_and_never_borrows_old_mapping(tool_fixture):
     f = tool_fixture
-    assert f.service.invoke("list_sec_filings", dict(issuer="AAPL"))["status"] == "ok"
+    assert f.service.invoke("list_sec_filings", dict(issuer="AAPL", freshness="auto"))["status"] == "ok"
     f.transport.calls.clear()
     f.transport.responses[MAP_URL] = RuntimeError("PRIVATE map response")
     result = f.service.invoke("list_sec_filings", dict(issuer="AAPL", freshness="refresh"))
@@ -370,10 +370,10 @@ def test_failed_map_refresh_stops_before_metadata_and_never_borrows_old_mapping(
 def test_auto_retries_failed_map_in_next_invocation_not_same_call(tool_fixture):
     f = tool_fixture
     f.transport.responses[MAP_URL] = RuntimeError("fixture unavailable")
-    first = f.service.invoke("list_sec_filings", dict(issuer="AAPL"))
+    first = f.service.invoke("list_sec_filings", dict(issuer="AAPL", freshness="auto"))
     assert first["status"] == "unavailable" and f.transport.calls == [MAP_URL]
     f.transport.responses[MAP_URL] = map_body(("AAPL", 320193))
-    second = f.service.invoke("list_sec_filings", dict(issuer="AAPL"))
+    second = f.service.invoke("list_sec_filings", dict(issuer="AAPL", freshness="auto"))
     assert second["status"] == "ok"
     assert f.transport.calls == [MAP_URL, MAP_URL, SUBMISSIONS, FACTS]
 
@@ -392,6 +392,6 @@ def test_recent_schedule_never_satisfies_tool_history_resume_or_changes_cursor(t
     pinned = f.service.invoke("list_sec_filings", dict(issuer=CIK, cursor=page["next_cursor"], limit=1))
     assert pinned["coverage"]["receipt_id"] == full["receipt_id"]
     assert f.transport.calls == []
-    result = f.service.invoke("list_sec_filings", dict(issuer=CIK))
+    result = f.service.invoke("list_sec_filings", dict(issuer=CIK, freshness="auto"))
     assert f.transport.calls == [history_url], "recent receipt hid full-history continuation"
     assert result["status"] == "ok"
