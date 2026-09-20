@@ -130,8 +130,11 @@ absence of that message therefore cannot certify mirror completeness. Require
 both adapter failure accounting and positive coverage evidence before publishing
 a checkpoint. Also separate the current per-call config directory from a stable,
 owned workspace identity; today it is used as `cwd` and changes the project key
-on every call. The preflight's four additional named controls belong to Slice 2;
-the offline observer is not native-resume acceptance or a schema decision.
+on every call. Store-backed resume additionally substitutes and cleans up an
+SDK-owned temporary config directory, so inspecting the application's original
+directory cannot certify the resumed transcript. The preflight's five additional
+named controls belong to Slice 2; the offline observer is not native-resume
+acceptance or a schema decision.
 
 1. Bind native state to profile, thread, provider/auth channel, credential
    identity, model/effort, runtime compatibility, instructions and ordered
