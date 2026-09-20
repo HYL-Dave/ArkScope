@@ -578,7 +578,10 @@ class ToolRegistry:
             result_policy=PUBLIC_JSON,
             description=(
                 "Get fundamental analysis (P/E, ROE, margins, financial statements) for a ticker. "
-                "Use period='quarterly' for recent quarterly trends (QoQ/YoY growth)."
+                "Use period='quarterly' for recent quarterly trends (QoQ/YoY growth). "
+                "Financial Datasets fallback may incur charges; cache misses require an operator-configured "
+                "request budget and account rate limit. Acquisition refusals appear in acquisition_gaps, "
+                "not as evidence that financial data does not exist."
             ),
             function=get_fundamentals_analysis,
             category="analysis",

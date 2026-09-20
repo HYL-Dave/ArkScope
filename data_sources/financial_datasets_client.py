@@ -23,6 +23,10 @@ Usage:
 
     client = FinancialDatasetsClient(cache_backend=dal._backend)
     stmts = client.get_income_statements("AAPL", period="quarterly", limit=4)
+
+Without an explicit request_policy this only serves caches. Paid misses need
+enabled=True, daily_request_limit and the account's requests_per_minute. The
+governor counts attempted HTTP requests, not dollars or provider credit balance.
 """
 
 from __future__ import annotations
@@ -30,13 +34,18 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from dataclasses import fields
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
 import requests
 
+from .financial_datasets_governance import (
+    FinancialDatasetsFailure, FinancialDatasetsGovernor, FinancialDatasetsPolicy,
+)
 from .sec_edgar_financials import (
     BalanceSheet,
     CashFlowStatement,
@@ -65,11 +74,15 @@ class FinancialDatasetsClient:
         api_key: Optional[str] = None,
         cache_days: Optional[Dict[str, int]] = None,
         cache_backend: Optional[Any] = None,
+        request_policy: Optional[Dict[str, Any]] = None,
+        governor: Optional[FinancialDatasetsGovernor] = None,
     ):
         """Use the explicitly supplied local cache owner when present."""
         self.api_key = api_key or os.getenv("FINANCIAL_DATASETS_API_KEY")
         self._cache_backend = cache_backend
         self._cache_days = {**_DEFAULT_TTL, **(cache_days or {})}
+        self._request_policy = dict(request_policy) if isinstance(request_policy, dict) else request_policy
+        self._governor = governor
 
     # ------------------------------------------------------------------
     # Public API
@@ -145,6 +158,9 @@ class FinancialDatasetsClient:
         limit: int,
     ) -> Dict[str, Any]:
         """Check cache → call API → store in cache."""
+        if (not isinstance(ticker, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]*", ticker)
+                or period not in _DEFAULT_TTL or type(limit) is not int or limit < 1):
+            raise FinancialDatasetsFailure("financial_datasets_query_invalid")
         cache_key = f"{cache_prefix}_{ticker.upper()}_{period}"
 
         # 1. Try cache
@@ -265,17 +281,50 @@ class FinancialDatasetsClient:
     # ------------------------------------------------------------------
 
     def _request(self, endpoint: str, **params: Any) -> Dict:
-        """Make authenticated GET request to Financial Datasets API."""
+        """Admit one metered dispatch. No redirects or implicit retries."""
+        response_keys = {
+            "/financials/income-statements": "income_statements",
+            "/financials/balance-sheets": "balance_sheets",
+            "/financials/cash-flow-statements": "cash_flow_statements",
+        }
+        if endpoint not in response_keys:
+            raise FinancialDatasetsFailure("financial_datasets_query_invalid")
+        policy = FinancialDatasetsPolicy.from_config(self._request_policy)
+        governor = self._governor or FinancialDatasetsGovernor()
+        governor.reserve(self.api_key, policy)
         url = f"{self.BASE_URL}{endpoint}"
         headers = {"X-API-Key": self.api_key}
 
+        resp = None
         try:
-            resp = requests.get(url, headers=headers, params=params, timeout=30)
+            resp = requests.get(url, headers=headers, params=params, timeout=30, allow_redirects=False)
+            if resp.status_code == 429:
+                retry = resp.headers.get("Retry-After")
+                if isinstance(retry, str):
+                    try:
+                        seconds = float(retry)
+                    except ValueError:
+                        try:
+                            seconds = (parsedate_to_datetime(retry) - datetime.now(timezone.utc)).total_seconds()
+                        except (TypeError, ValueError, OverflowError):
+                            seconds = 0
+                    governor.defer(self.api_key, seconds)
+                raise FinancialDatasetsFailure("financial_datasets_rate_limited")
+            if resp.status_code in (301, 302, 303, 307, 308):
+                raise FinancialDatasetsFailure("financial_datasets_redirect_refused")
+            if resp.status_code in (401, 403):
+                raise FinancialDatasetsFailure("financial_datasets_access_denied")
             resp.raise_for_status()
-            return resp.json()
-        except requests.RequestException as e:
-            logger.warning(f"Financial Datasets API error: {e}")
-            return {}
+            data = resp.json()
+            rows = data.get(response_keys[endpoint]) if isinstance(data, dict) else None
+            if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+                raise FinancialDatasetsFailure("financial_datasets_response_invalid")
+            return data
+        except (requests.RequestException, ValueError) as exc:
+            raise FinancialDatasetsFailure("financial_datasets_request_failed") from exc
+        finally:
+            if resp is not None:
+                resp.close()
 
     # ------------------------------------------------------------------
     # Dataclass conversion

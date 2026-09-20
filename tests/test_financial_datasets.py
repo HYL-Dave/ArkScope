@@ -12,7 +12,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from data_sources.financial_datasets_client import FinancialDatasetsClient
+from data_sources import financial_datasets_client as fd_module
+from data_sources.financial_datasets_governance import FinancialDatasetsFailure
 from data_sources.sec_edgar_financials import IncomeStatement, BalanceSheet
+
+
+TEST_POLICY = {"enabled": True, "daily_request_limit": 20, "requests_per_minute": 20}
+
+
+@pytest.fixture(autouse=True)
+def isolate_file_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(fd_module, "_FILE_CACHE_DIR", tmp_path / "cache")
 
 
 # ============================================================
@@ -79,7 +89,7 @@ MOCK_CASHFLOW_RESPONSE = {
 class TestFinancialDatasetsClient:
 
     def setup_method(self):
-        self.client = FinancialDatasetsClient(api_key="test-key")
+        self.client = FinancialDatasetsClient(api_key="test-key", request_policy=TEST_POLICY)
         self.client._db_url = None  # Disable DB cache for unit tests
 
     @patch("data_sources.financial_datasets_client.requests.get")
@@ -113,7 +123,7 @@ class TestFinancialDatasetsClient:
     def test_cache_hit_skips_api(self, mock_get):
         """When file cache has fresh data, API should not be called."""
         # Pre-populate file cache
-        cache_dir = Path("data/cache/financial_datasets")
+        cache_dir = fd_module._FILE_CACHE_DIR
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_file = cache_dir / "income_AAPL_annual.json"
         cache_file.write_text(json.dumps({
@@ -136,7 +146,7 @@ class TestFinancialDatasetsClient:
     @patch("data_sources.financial_datasets_client.requests.get")
     def test_cache_expired_calls_api(self, mock_get):
         """When file cache is expired, API should be called."""
-        cache_dir = Path("data/cache/financial_datasets")
+        cache_dir = fd_module._FILE_CACHE_DIR
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_file = cache_dir / "income_AAPL_annual.json"
         cache_file.write_text(json.dumps({
@@ -173,15 +183,16 @@ class TestFinancialDatasetsClient:
     @patch("data_sources.financial_datasets_client._FILE_CACHE_DIR",
            Path("/tmp/_fd_test_nonexistent_cache"))
     @patch("data_sources.financial_datasets_client.requests.get")
-    def test_api_error_returns_empty(self, mock_get):
-        """API errors with no cache should return empty list, not raise."""
+    def test_api_error_is_not_misreported_as_empty_data(self, mock_get):
+        """A failed metered request must not masquerade as an empty statement."""
         import requests as req
         mock_get.side_effect = req.RequestException("Connection error")
 
-        client = FinancialDatasetsClient(api_key="test-key")
+        client = FinancialDatasetsClient(api_key="test-key", request_policy=TEST_POLICY)
         client._db_url = None
-        stmts = client.get_income_statements("AAPL")
-        assert stmts == []
+        with pytest.raises(FinancialDatasetsFailure, match="request_failed"):
+            client.get_income_statements("AAPL")
+        mock_get.assert_called_once()
 
     @patch("data_sources.financial_datasets_client.requests.get")
     def test_extra_fields_ignored(self, mock_get):
@@ -329,7 +340,7 @@ class TestCacheBackendMode:
         mock_get.return_value = mock_resp
         backend = _FakeCacheBackend()
         with patch("data_sources.financial_datasets_client._FILE_CACHE_DIR", tmp_path):
-            client = FinancialDatasetsClient(api_key="k", cache_backend=backend)
+            client = FinancialDatasetsClient(api_key="k", cache_backend=backend, request_policy=TEST_POLICY)
             stmts = client.get_income_statements("AAPL", period="annual", limit=1)
         assert len(stmts) == 1
         assert backend.set_calls == [{"cache_key": "income_AAPL_annual", "ticker": "AAPL",
@@ -383,7 +394,7 @@ class TestCacheBackendMode:
 
         backend = _RejectingBackend()
         with patch("data_sources.financial_datasets_client._FILE_CACHE_DIR", tmp_path):
-            client = FinancialDatasetsClient(api_key="k", cache_backend=backend)
+            client = FinancialDatasetsClient(api_key="k", cache_backend=backend, request_policy=TEST_POLICY)
             with caplog.at_level(logging.WARNING):
                 stmts = client.get_income_statements("AAPL", period="annual", limit=1)
             assert len(stmts) == 1

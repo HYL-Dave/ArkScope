@@ -351,6 +351,9 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
         lambda _dal: events.append("fd:enabled") or True,
     )
     enabled_dal = _FakeDAL(_FakeBackend(), legacy_result=legacy)
+    enabled_dal.get_user_profile = lambda: {"data_preferences": {"paid_sources": {"financial_datasets": {
+        "enabled": True, "daily_request_limit": 3, "requests_per_minute": 3,
+    }}}}
     enabled = at.get_fundamentals_analysis(enabled_dal, ticker)
     assert enabled.data_source == "financial_datasets"
     assert enabled.roe == 0.52

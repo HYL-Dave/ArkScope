@@ -142,7 +142,10 @@ class FundamentalsResult(BaseModel):
     """Fundamental analysis result for a ticker."""
     ticker: str
     snapshot_date: Optional[str] = None
-    data_source: str = Field(default="none", description="ibkr, sec_edgar, or none")
+    data_source: str = Field(default="none", description="ibkr, sec_edgar, financial_datasets, or none")
+    acquisition_gaps: List[Dict[str, str]] = Field(
+        default_factory=list, description="Provider acquisition refusal/failure; not evidence of absent financial data"
+    )
     # Key metrics (derived from IBKR snapshot or SEC)
     market_cap: Optional[float] = None
     pe_ratio: Optional[float] = None

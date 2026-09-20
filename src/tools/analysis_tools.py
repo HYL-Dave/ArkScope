@@ -132,7 +132,7 @@ def _is_fd_enabled(dal: DataAccessLayer) -> bool:
     try:
         profile = dal.get_user_profile()
         paid = profile.get("data_preferences", {}).get("paid_sources", {})
-        return paid.get("financial_datasets", {}).get("enabled", False)
+        return paid.get("financial_datasets", {}).get("enabled") is True
     except Exception:
         return False
 
@@ -273,23 +273,35 @@ def get_fundamentals_analysis(
 
     # 3. Financial Datasets API (paid, cached — local-primary via the DAL backend)
     if _is_fd_enabled(dal):
+        from data_sources.financial_datasets_governance import FinancialDatasetsFailure
         try:
             from data_sources.financial_datasets_client import FinancialDatasetsClient
             cache_days = _get_fd_cache_days(dal)
             # Route the paid cache through the current local capability.
             backend = getattr(dal, "_backend", None)
-            fd = FinancialDatasetsClient(cache_days=cache_days, cache_backend=backend)
+            policy = dal.get_user_profile().get("data_preferences", {}).get("paid_sources", {}).get("financial_datasets")
+            fd = FinancialDatasetsClient(cache_days=cache_days, cache_backend=backend, request_policy=policy)
 
             n = 4 if period == "quarterly" else 2
-            fd_income = fd.get_income_statements(ticker, period=period, limit=n)
-            fd_balance = fd.get_balance_sheets(ticker, period=period, limit=1)
-            fd_cashflow = fd.get_cash_flow_statements(ticker, period=period, limit=n)
+            fd_income, fd_balance, fd_cashflow = [], [], []
+            gaps = []
+            try:
+                fd_income = fd.get_income_statements(ticker, period=period, limit=n)
+                fd_balance = fd.get_balance_sheets(ticker, period=period, limit=1)
+                fd_cashflow = fd.get_cash_flow_statements(ticker, period=period, limit=n)
+            except FinancialDatasetsFailure as exc:
+                # Stop fan-out on denial/failure, retaining already acquired data.
+                gaps.append({"provider": "financial_datasets", "code": exc.code})
 
             if fd_income or fd_balance:
-                return _build_result_from_statements(
+                result = _build_result_from_statements(
                     ticker, "financial_datasets",
                     fd_income, fd_balance, fd_cashflow,
                 )
+            result.acquisition_gaps = gaps
+            return result
+        except FinancialDatasetsFailure as exc:
+            result.acquisition_gaps = [{"provider": "financial_datasets", "code": exc.code}]
         except Exception as e:
             logger.warning(f"Financial Datasets fallback failed for {ticker}: {e}")
 
