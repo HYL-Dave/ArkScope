@@ -124,7 +124,9 @@ or fundamentals calls fail, nor that buying data subscriptions fixes the errors.
    corrections about real-time prices. Preserve the useful tool; distinguish
    previous close, live/delayed/frozen/unknown, request time and observation time.
    Add deterministic boundary tests and a separately authorized live Gateway
-   check. This does not need to wait for a SEC retention decision.
+   check. The [bounded follow-up](../superpowers/plans/2026-09-20-quote-freshness-repair.md)
+   records the inspected source-to-tool gap. This does not need to wait for a
+   SEC retention decision.
 2. **SA article/comment access and holdings context across auth channels.** The
    archived 17-tool OAuth allowlists omit direct article/comment/holdings tools.
    The saved questions need those capabilities even when a particular tool has
@@ -134,6 +136,11 @@ or fundamentals calls fail, nor that buying data subscriptions fixes the errors.
    repair numerator/period/session/window labels or suppress unjustified derived
    values. The archived fundamentals alternative is not accepted replacement
    evidence. Earnings scheduling follows correct event alignment, not vice versa.
+   The native API-key fundamentals wrappers currently expose only `ticker`,
+   unlike the registry's `period` option; period forwarding still needs
+   channel-parity acceptance before claiming equivalent quarterly capability.
+   Paid-fallback descriptions and the metered HTTP guard are covered across
+   all four channels in this slice.
 4. **Operational decisions still separate.** Provider alternatives and plan
    upgrades require coverage/cost evidence. Unattended lifetime/failure delivery,
    retained-source policy, external authorization, native-session continuity,

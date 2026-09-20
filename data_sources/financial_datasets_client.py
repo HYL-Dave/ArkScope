@@ -312,6 +312,8 @@ class FinancialDatasetsClient:
                 raise FinancialDatasetsFailure("financial_datasets_rate_limited")
             if resp.status_code in (301, 302, 303, 307, 308):
                 raise FinancialDatasetsFailure("financial_datasets_redirect_refused")
+            if resp.status_code == 402:
+                raise FinancialDatasetsFailure("financial_datasets_payment_required")
             if resp.status_code in (401, 403):
                 raise FinancialDatasetsFailure("financial_datasets_access_denied")
             resp.raise_for_status()

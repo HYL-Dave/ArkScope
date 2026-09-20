@@ -235,15 +235,24 @@ def test_rate_limit_cooldown_is_shared_and_not_retried(client_fixture, clock):
     assert request.call_count == 2
 
 
-@pytest.mark.parametrize("status,code", [(302, "redirect_refused"), (401, "access_denied"), (403, "access_denied")])
+@pytest.mark.parametrize("status,code", [
+    (302, "redirect_refused"), (401, "access_denied"),
+    (402, "payment_required"), (403, "access_denied"),
+])
 def test_http_refusal_is_closed_and_consumes_attempt(client_fixture, status, code):
+    import requests
+
     client, governor, request = client_fixture
     request.return_value.status_code = status
+    if status >= 400:
+        request.return_value.raise_for_status.side_effect = requests.HTTPError("PRIVATE provider diagnostic")
     with pytest.raises(FinancialDatasetsFailure, match="^financial_datasets_" + code + "$"):
         client.get_income_statements("TEST")
     request.assert_called_once()
     assert request.call_args.kwargs["allow_redirects"] is False
+    request.return_value.json.assert_not_called()
     request.return_value.close.assert_called_once()
+    assert not (governor.path.parent / "cache").exists()
     with sqlite3.connect(governor.path) as conn:
         assert conn.execute("SELECT attempts FROM fd_request_accounts").fetchone() == (1,)
 
@@ -284,13 +293,18 @@ def test_all_channels_expose_unconfigured_spend_as_a_gap(
             from agents.tool_context import ToolContext
             from src.agents.openai_agent.tools import create_openai_tools
             tool = next(t for t in create_openai_tools(dal) if t.name == "tool_" + name)
+            assert "Financial Datasets" in tool.description and "charges" in tool.description
             payload = json.dumps(arguments)
             context = ToolContext(context=None, tool_name=tool.name, tool_call_id="offline-fd", tool_arguments=payload)
             return await tool.on_invoke_tool(context, payload)
         if channel == "anthropic":
-            from src.agents.anthropic_agent.tools import execute_tool_async
+            from src.agents.anthropic_agent.tools import execute_tool_async, get_anthropic_tools
+            description = next(t["description"] for t in get_anthropic_tools() if t["name"] == name)
+            assert "Financial Datasets" in description and "charges" in description
             return await execute_tool_async(name, arguments, dal)
         registry = create_default_registry()
+        description = registry.get(name).description
+        assert "Financial Datasets" in description and "charges" in description
         if channel == "chatgpt":
             from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
             ok, result = await OpenAIChatGPTOAuthDriver(registry=registry, dal=dal)._invoke_tool(

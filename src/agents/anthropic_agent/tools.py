@@ -495,7 +495,12 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         # Analysis Tools
         {
             "name": "get_fundamentals_analysis",
-            "description": "Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker.",
+            "description": (
+                "Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker. "
+                "Financial Datasets fallback may incur charges; paid cache misses require an "
+                "operator-configured request budget and account rate limit. "
+                "Acquisition refusals appear in acquisition_gaps, not as proof of absent data."
+            ),
             "input_schema": {
                 "type": "object",
                 "properties": {

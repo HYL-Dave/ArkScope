@@ -495,6 +495,10 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     def tool_get_fundamentals_analysis(ticker: str) -> str:
         """Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker.
 
+        Financial Datasets fallback may incur charges; paid cache misses require
+        an operator-configured request budget and account rate limit.
+        Acquisition refusals appear in acquisition_gaps, not as proof of absent data.
+
         Args:
             ticker: Stock ticker symbol
 

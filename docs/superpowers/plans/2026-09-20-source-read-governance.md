@@ -21,6 +21,8 @@ purchase is authorized by this plan.
    governor commits an attempt before HTTP, atomically across threads/processes.
    UTC-day and rolling-minute limits are separate. Errors/uncertain dispatches
    consume the reservation; no implicit retry/redirect/second paid source.
+   All four research channels describe the paid fallback, and HTTP 402 is a
+   typed payment refusal rather than missing data or a generic transport error.
 3. **Actual research usage: complete.** The four research tables' current
    question/tool evidence matches the previous read-only private snapshot.
    Two [tables](../../data/2026-09-20-research-usage.md) distinguish topic judgment,
@@ -45,10 +47,34 @@ cache configuration. They are not model-controlled tool parameters.
 The old generic `cost_control.daily_budget_usd: 1.0` is not an implemented dollar
 cap. This slice does not convert dollars to requests with an invented price.
 Per-request credits/multipliers, fixed subscriptions and auto-reload remain
-account evidence to obtain, not assumptions. A cold legacy fallback attempts
+account evidence to obtain, not assumptions. Public pricing is not evidence of
+this account's billing terms. A cold legacy fallback attempts
 at most the existing three statement endpoints and stops fan-out on the first
 refusal/failure. Partial acquired statements survive with `acquisition_gaps`;
 denied acquisition is not represented as proved absence of financial data.
+
+### Public Billing Evidence (2026-09-20)
+
+The current [official pricing](https://www.financialdatasets.ai/pricing) lists
+Credits at USD 20 for 1,000 standard requests. Conditional arithmetic: USD 0.02
+per standard request, or USD 0.06 for this client's three cold statement calls.
+Premium endpoints have different multipliers and Credits offers optional
+auto-reload. The listed Credits core-history window is one year; older account
+entitlements have not been verified. No price is hardcoded into admission;
+the recalled account balance is neither verified nor a daily spending authorization.
+
+The [billing terms](https://www.financialdatasets.ai/terms-of-use) describe
+prepaid usage and HTTP 402 at zero balance. The
+[statement endpoint](https://docs.financialdatasets.ai/api/financials/income-statements)
+also documents 402 for paid access, so the typed reason is `payment_required`,
+not a fabricated exact balance diagnosis. It must not retry, cache the refusal,
+or trigger funding. This is distinct from the installation's request budget.
+
+The reviewed pricing, quickstart, statement documentation and documentation
+index do not establish a numeric per-minute allowance for this account. Do not
+fill that field from third-party estimates. Account limits and a daily grant
+remain necessary before activation; public-document research used no API key
+and incurred no provider API request.
 
 The governor stores hashed key identity, UTC-day counters, recent request-start
 times and provider cooldown, not the API key, ticker, response or research text.
@@ -77,6 +103,10 @@ cache reads never promote an existing entry into the market cache.
 - Existing legacy SEC financial mapping is outside the three stored-by-default
   tools. Its automatic fetching/ratio/period defects are not silently declared
   fixed. Provider and tool retirement require accepted replacement evidence.
+- This does not rewrite legacy financial-tool cancellation. Native Anthropic
+  non-SEC dispatch still calls its synchronous tool implementation; a counted
+  HTTP attempt is not proof of prompt cancellation or ownership of its worker.
+  Async dispatch/cleanup needs its own acceptance before unattended paid use.
 - Next product repairs: current quote freshness/basis; SA article/comment and
   holdings channel access; financial comparability and earnings release/session
   alignment. No-use is not a retirement rule. Unattended delivery/lifetime,
@@ -92,7 +122,7 @@ cache reads never promote an existing entry into the market cache.
 - `test_financial_datasets_governance.py`: key-alone RED; missing/invalid/disabled
   policy; cache hits; durable/key-scoped and cross-process limits; UTC rollover
   with rolling-window continuity; time regression; corrupt/partial ledger; no-refund
-  timeout; 429 cooldown; redirects/access denial; all four output channels;
+  timeout; 429 cooldown; redirects/access/payment denial; all four output channels;
   typed refusal, invalid-response cache exclusion and partial-result preservation.
 - `test_financial_datasets.py`: prior conversion/cache/backend-promotion/file
   fallback coverage retained with explicit offline policy. HTTP failure is now
