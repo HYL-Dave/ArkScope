@@ -517,14 +517,14 @@ def test_actual_producer_and_manager_have_one_rolling_tail(make_producer, manage
     text = ("Public answer " * 800)[:10400]
     producer = make_producer("chatgpt", chunks=[text[i:i + 3] for i in range(0, len(text), 3)], answer=text, secret=bearer)
     first_emission = []
-    append = isolated.runs.append_event
+    append = isolated.runs._append_event_on_connection
 
-    def observe(run_id, kind, data):
+    def observe(conn, run_id, kind, data, **kwargs):
         if kind == "text" and data.get("content") and not first_emission:
             first_emission.append(producer.input_chars)
-        return append(run_id, kind, data)
+        return append(conn, run_id, kind, data, **kwargs)
 
-    monkeypatch.setattr(isolated.runs, "append_event", observe)
+    monkeypatch.setattr(isolated.runs, "_append_event_on_connection", observe)
     kwargs = {**managed_run, "auth_binding": replace(managed_run["auth_binding"], _api_key=bearer)}
     asyncio.run(execute_research_run(**kwargs, stream_factory=lambda **kw: producer.stream()))
     assert first_emission == [2736], "producer/manager must retain exactly one 2735-character undecided suffix"

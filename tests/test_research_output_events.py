@@ -577,13 +577,13 @@ def test_managed_injected_stream_is_protected_before_event_append_and_replay(man
 
     text = "Before|" + SECRET + "|After"
     appended = []
-    append = isolated.runs.append_event
+    append = isolated.runs._append_event_on_connection
 
-    def observe(run_id, kind, data):
+    def observe(conn, run_id, kind, data, **kwargs):
         appended.append((kind, dict(data)))
-        return append(run_id, kind, data)
+        return append(conn, run_id, kind, data, **kwargs)
 
-    monkeypatch.setattr(isolated.runs, "append_event", observe)
+    monkeypatch.setattr(isolated.runs, "_append_event_on_connection", observe)
 
     async def raw(**kwargs):
         for offset in range(0, len(text), width):
@@ -593,6 +593,7 @@ def test_managed_injected_stream_is_protected_before_event_append_and_replay(man
     asyncio.run(execute_research_run(**managed_run, stream_factory=raw))
     assert "".join(data["content"] for kind, data in appended if kind == "text") == "Before|[REDACTED]|After", "final-only protection left unsafe pre-append text"
     durable = isolated.runs.list_events("boundary-run")
+    assert len(appended) == len(durable), "the observer must cover every durable event"
     assert "".join(event.data["content"] for event in durable if event.type == "text") == "Before|[REDACTED]|After"
     replay = list_research_run_events("boundary-run", after=0, run_store=isolated.runs)
     assert SECRET_JSON not in json.dumps(replay)

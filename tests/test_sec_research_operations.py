@@ -241,14 +241,14 @@ def test_research_result_lease_reaches_durable_commit(evidence, trace_stores, mo
         return original(*args, **kwargs)
 
     monkeypatch.setattr(threads, "_append_message_on_connection", append)
-    original_event = runs.append_event
+    original_event = runs._append_event_on_connection
 
-    def event(run_id, kind, data):
+    def event(conn, run_id, kind, data, **kwargs):
         if kind == "tool_end":
             admissions.append(("event", other_owner(paths.capture_root)))
-        return original_event(run_id, kind, data)
+        return original_event(conn, run_id, kind, data, **kwargs)
 
-    monkeypatch.setattr(runs, "append_event", event)
+    monkeypatch.setattr(runs, "_append_event_on_connection", event)
 
     async def stream(**kwargs):
         result = read_sec_citation(evidence.rig.store, evidence.rig.captures, citation=evidence.document_ref)
