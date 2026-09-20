@@ -34,11 +34,12 @@ def old_file(*, age_days=2, data=None, **metadata):
     return path, fetched
 
 
-def test_default_does_not_silently_return_cached_financials(fd):
+def test_default_reuses_recent_financials_and_exposes_the_policy(fd):
     client, request = fd
     old_file()
-    with pytest.raises(FinancialDatasetsFailure, match="policy_unconfigured"):
-        client.get_income_statements("AAPL", period="annual", limit=1)
+    assert client.get_income_statements("AAPL", period="annual", limit=1)
+    assert client.observations[-1]["max_age_seconds"] == 7 * 86400
+    assert client.observations[-1]["within_max_age"] is True
     request.assert_not_called()
 
 
@@ -51,7 +52,7 @@ def test_stored_is_explicit_offline_and_can_reopen_old_observations(fd):
     assert client.observations[-1]["fetched_at"] == fetched.isoformat()
     assert client.observations[-1]["retrieval"] == "stored"
     assert client.observations[-1]["within_max_age"] is None
-    assert client.observations[-1]["latest_period_verified"] is False
+    assert "latest_period_verified" not in client.observations[-1]
     assert path.read_bytes() == before
     request.assert_not_called()
 
@@ -69,7 +70,7 @@ def test_auto_uses_requested_acquisition_age_not_financial_period(fd, age, limit
     request.assert_not_called()
 
 
-@pytest.mark.parametrize("freshness,age", [("auto", None), ("auto", True), ("auto", -1), ("auto", 2.5), ("bad", 10), ("refresh", 10)])
+@pytest.mark.parametrize("freshness,age", [("auto", "60"), ("auto", True), ("auto", -1), ("auto", 2.5), ("bad", 10), ("refresh", 10)])
 def test_invalid_freshness_contract_never_calls_provider(fd, freshness, age):
     client, request = fd
     with pytest.raises(FinancialDatasetsFailure, match="freshness_invalid"):
@@ -228,7 +229,7 @@ def test_stored_partial_data_survives_another_missing_dataset(fd, tmp_path, monk
     data = client._envelope({dataset: [row]}, "AAPL", "annual", limit)
     assert backend.set_financial_cache(f"fd_v1_{prefix}_AAPL_annual_{limit}", "AAPL", data, source="financial_datasets")
     dal = SimpleNamespace(_backend=backend, get_user_profile=lambda: {})
-    result = get_fundamentals_analysis(dal, "AAPL", fd_freshness="stored")
+    result = get_fundamentals_analysis(dal, "AAPL", freshness="stored")
     assert result.data_source == "financial_datasets"
     assert len(getattr(result, result_field)) == 1
     assert result.snapshot_date == row["report_period"]

@@ -56,7 +56,7 @@ def test_quote_age_and_unknowns_survive_all_channels(channel, price_fields, basi
 
 
 @pytest.mark.parametrize("channel", ["openai", "anthropic", "chatgpt", "claude"])
-@pytest.mark.parametrize("freshness", ["stored", "auto"])
+@pytest.mark.parametrize("freshness", ["stored", "auto", None])
 def test_fd_period_policy_and_original_acquisition_time_survive_all_channels(
     channel, freshness, monkeypatch, tmp_path,
 ):
@@ -73,7 +73,7 @@ def test_fd_period_policy_and_original_acquisition_time_survive_all_channels(
     monkeypatch.setattr("data_sources.sec_edgar_financials.SECEdgarFinancials", sec)
     backend = LocalMarketBackend(market_db=str(tmp_path / "market.db"))
     now = datetime.now(timezone.utc)
-    fetched = now - timedelta(days=20)
+    fetched = now - timedelta(days=2 if freshness is None else 20)
     expires = now + timedelta(days=70)
     assert backend.set_financial_cache(fundamentals_analysis_cache_key("AAPL", "quarterly"), "AAPL", {"_negative": True})
     for prefix, dataset, limit in [("income", "income_statements", 4), ("balance", "balance_sheets", 1), ("cashflow", "cash_flow_statements", 4)]:
@@ -84,18 +84,18 @@ def test_fd_period_policy_and_original_acquisition_time_survive_all_channels(
             source="financial_datasets", fetched_at=fetched.isoformat(), expires_at=expires.isoformat())
     dal = SimpleNamespace(_backend=backend, get_user_profile=lambda: {
         "data_preferences": {"paid_sources": {"financial_datasets": {"enabled": True}}}})
-    result = unwrap(asyncio.run(invoke(channel, "get_fundamentals_analysis", {
-        "ticker": "AAPL", "period": "quarterly", "fd_freshness": freshness,
-        "fd_max_age_seconds": 30 * 86400,
-    }, dal)))
+    arguments = {"ticker": "AAPL", "period": "quarterly"}
+    if freshness is not None:
+        arguments.update(freshness=freshness, max_age_seconds=30 * 86400)
+    result = unwrap(asyncio.run(invoke(channel, "get_fundamentals_analysis", arguments, dal)))
     assert result["data_source"] == "financial_datasets", result
     assert result["income_statements"][0]["period_type"] == "quarterly"
     assert len(result["source_observations"]) == 3
     for observed in result["source_observations"]:
         assert observed["fetched_at"] == fetched.isoformat()
-        assert observed["freshness_mode"] == freshness and observed["retrieval"] == "stored"
+        assert observed["freshness_mode"] == (freshness or "auto") and observed["retrieval"] == "stored"
         assert observed["within_max_age"] is True
-        assert observed["latest_period_verified"] is False
+        assert "latest_period_verified" not in observed
     assert result["acquisition_gaps"] == []
     http.assert_not_called()
     sec.assert_not_called()
@@ -109,7 +109,8 @@ def test_all_schema_exporters_offer_freshness_options():
     registry = create_default_registry()
     for name, required in (
         ("get_current_quote", {"max_age_seconds"}),
-        ("get_fundamentals_analysis", {"period", "fd_freshness", "fd_max_age_seconds"}),
+        ("get_fundamentals_analysis", {"period", "freshness", "max_age_seconds"}),
+        ("get_detailed_financials", {"freshness", "max_age_seconds"}),
     ):
         assert required <= {p.name for p in registry.get(name).parameters}
         native_anthropic = next(t for t in get_anthropic_tools() if t["name"] == name)
@@ -118,23 +119,49 @@ def test_all_schema_exporters_offer_freshness_options():
         assert required <= set(native_openai.params_json_schema["properties"])
 
 
-@pytest.mark.parametrize("channel", ["openai", "anthropic", "chatgpt", "claude"])
 @pytest.mark.parametrize("age", [True, "60"])
-@pytest.mark.parametrize("name", ["get_current_quote", "get_fundamentals_analysis"])
+@pytest.mark.parametrize("channel,name", [
+    (channel, name)
+    for channel in ("openai", "anthropic", "chatgpt", "claude")
+    for name in ("get_current_quote", "get_fundamentals_analysis", "get_detailed_financials")
+    if name != "get_detailed_financials" or channel in ("openai", "anthropic")
+])
 def test_invalid_age_is_not_coerced_into_acquisition_authority(channel, age, name, monkeypatch):
     from src.tools import current_quote
-    from src.fundamentals import cache
+    from src.tools import analysis_tools
 
     acquire_quote = Mock(side_effect=AssertionError("invalid age must not request a quote"))
     read_fundamentals = Mock(side_effect=AssertionError("invalid age must not start data access"))
     monkeypatch.setattr(current_quote, "_fetch_ibkr_quote", acquire_quote)
-    monkeypatch.setattr(cache, "read_cached_sec_fundamentals", read_fundamentals)
+    monkeypatch.setattr(analysis_tools, "read_entry", read_fundamentals)
+    monkeypatch.setattr(analysis_tools, "cached_dataset", read_fundamentals)
     arguments = {"ticker": "AAPL"}
     if name == "get_current_quote":
         arguments.update(source="ibkr", max_age_seconds=age)
     else:
-        arguments.update(fd_freshness="auto", fd_max_age_seconds=age)
+        arguments.update(freshness="auto", max_age_seconds=age)
     result = asyncio.run(invoke(channel, name, arguments, object()))
     assert result
     acquire_quote.assert_not_called()
     read_fundamentals.assert_not_called()
+
+
+@pytest.mark.parametrize("channel", ["openai", "anthropic"])
+def test_retired_fd_only_arguments_cannot_silently_enable_auto_acquisition(channel, monkeypatch):
+    from src.tools import analysis_tools
+
+    access = Mock(side_effect=AssertionError("an obsolete stored flag must not turn into default auto"))
+    monkeypatch.setattr(analysis_tools, "read_entry", access)
+    result = asyncio.run(invoke(channel, "get_fundamentals_analysis", {
+        "ticker": "AAPL", "fd_freshness": "stored",
+    }, object()))
+    assert result
+    access.assert_not_called()
+
+
+def test_detailed_financials_remains_outside_oauth_allowlists():
+    from src.auth_drivers.claude_code_sdk_driver import _RESEARCH_READONLY_TOOLS as claude
+    from src.auth_drivers.chatgpt_oauth_driver import _RESEARCH_READONLY_TOOLS as chatgpt
+
+    assert "get_detailed_financials" not in claude
+    assert "get_detailed_financials" not in chatgpt

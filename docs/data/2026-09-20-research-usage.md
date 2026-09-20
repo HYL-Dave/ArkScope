@@ -129,6 +129,13 @@ or fundamentals calls fail, nor that buying data subscriptions fixes the errors.
 
 ## Next Repair Order
 
+The September 21 user clarification first requires the bounded
+[local reuse correction](../superpowers/plans/2026-09-21-local-data-reuse.md).
+This changes the retrieval contract, not the reliability verdict for the legacy
+financial formulas below. Verification also confirms that `get_detailed_financials`
+is absent from both current OAuth allowlists; schema registration alone is not
+proof that a research channel can invoke it. This slice preserves those gates.
+
 1. **Quote truthfulness and price basis.** High observed use plus direct user
    corrections about real-time prices. Preserve the useful tool; distinguish
    previous close, live/delayed/frozen/unknown, request time and observation time.

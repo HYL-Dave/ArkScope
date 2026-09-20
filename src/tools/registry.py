@@ -583,10 +583,10 @@ class ToolRegistry:
             description=(
                 "Get fundamental analysis (P/E, ROE, margins, financial statements) for a ticker. "
                 "Use period='quarterly' for recent quarterly trends (QoQ/YoY growth). "
-                "Financial Datasets fallback may incur charges; refresh is the default and requires an operator-configured "
-                "request budget and account rate limit. Acquisition refusals appear in acquisition_gaps, "
-                "not as evidence that financial data does not exist. FD stored mode reads saved observations; "
-                "FD auto requires fd_max_age_seconds. These flags do not govern the separate legacy SEC path."
+                "Default auto reuses dated local SEC/Financial Datasets observations within the configured financial window. "
+                "Stored never fetches or writes; refresh requests acquisition. max_age_seconds optionally overrides the window. "
+                "FD acquisition may incur charges and requires an operator-configured request budget and rate limit. "
+                "Acquisition refusals appear in acquisition_gaps, not as evidence that financial data does not exist."
             ),
             function=get_fundamentals_analysis,
             category="analysis",
@@ -595,9 +595,9 @@ class ToolRegistry:
                 ToolParameter("period", "string", "Report period type",
                               required=False, default="annual",
                               enum=["annual", "quarterly"]),
-                ToolParameter("fd_freshness", "string", "Financial Datasets only: bypass cache, read stored data, or honor an explicit age",
-                              required=False, default="refresh", enum=["refresh", "stored", "auto"]),
-                ToolParameter("fd_max_age_seconds", "integer", "FD acquisition age tolerance; required for auto, optional for stored, omit for refresh",
+                ToolParameter("freshness", "string", "Reuse local observations by default, read stored only, or request refresh",
+                              required=False, default="auto", enum=["auto", "stored", "refresh"]),
+                ToolParameter("max_age_seconds", "integer", "Optional acquisition-age override for auto/stored; omit for refresh",
                               required=False),
             ],
         ))
@@ -610,12 +610,18 @@ class ToolRegistry:
                 "EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, "
                 "tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), "
                 "and earnings surprise. "
-                "Static SEC facts plus a qualified local completed-session price, or typed unavailable."
+                "Static SEC facts plus a qualified local completed-session price, or typed unavailable. "
+                "Auto reuses configured financial and shorter earnings observations; stored never fetches or writes. "
+                "Refresh bypasses old observations; max_age_seconds overrides both reuse windows."
             ),
             function=get_detailed_financials,
             category="analysis",
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
+                ToolParameter("freshness", "string", "Auto local reuse, stored only, or explicit refresh",
+                              required=False, default="auto", enum=["auto", "stored", "refresh"]),
+                ToolParameter("max_age_seconds", "integer", "Optional acquisition-age override for auto/stored; omit for refresh",
+                              required=False),
             ],
         ))
 

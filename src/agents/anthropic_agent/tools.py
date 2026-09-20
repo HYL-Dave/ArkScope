@@ -501,24 +501,24 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "name": "get_fundamentals_analysis",
             "description": (
                 "Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker. "
-                "Financial Datasets fallback may incur charges; default refresh requires an "
+                "Auto reuses dated local SEC/FD observations within the configured financial window. "
+                "Financial Datasets acquisition may incur charges and requires an "
                 "operator-configured request budget and account rate limit. "
                 "Acquisition refusals appear in acquisition_gaps, not as proof of absent data. "
-                "FD stored reads saved observations; auto requires fd_max_age_seconds. "
-                "These controls do not govern the separate legacy SEC source path."
+                "Stored never fetches or writes. Refresh bypasses old observations."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
                     "ticker": {"type": "string", "description": "Stock ticker symbol"},
                     "period": {"type": "string", "enum": ["annual", "quarterly"], "default": "annual"},
-                    "fd_freshness": {
-                        "type": "string", "enum": ["refresh", "stored", "auto"], "default": "refresh",
-                        "description": "Financial Datasets only: bypass cache, read stored data, or honor an explicit age."
+                    "freshness": {
+                        "type": "string", "enum": ["auto", "stored", "refresh"], "default": "auto",
+                        "description": "Auto local reuse, stored only, or explicit refresh."
                     },
-                    "fd_max_age_seconds": {
+                    "max_age_seconds": {
                         "type": "integer", "minimum": 0,
-                        "description": "FD acquisition age tolerance; required for auto, optional for stored, omit for refresh."
+                        "description": "Optional acquisition-age override for auto/stored; omit for refresh."
                     }
                 },
                 "required": ["ticker"]
@@ -531,7 +531,9 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, "
                 "tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), "
                 "and earnings surprise. "
-                "Static SEC facts plus a qualified local completed-session price, or typed unavailable."
+                "Static SEC facts plus a qualified local completed-session price, or typed unavailable. "
+                "Auto reuses configured financial and shorter earnings observations. "
+                "Stored never fetches or writes. Refresh bypasses old observations."
             ),
             "input_schema": {
                 "type": "object",
@@ -539,6 +541,13 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "ticker": {
                         "type": "string",
                         "description": "Stock ticker symbol"
+                    },
+                    "freshness": {
+                        "type": "string", "enum": ["auto", "stored", "refresh"], "default": "auto"
+                    },
+                    "max_age_seconds": {
+                        "type": "integer", "minimum": 0,
+                        "description": "Optional override for both reuse windows; omit for refresh."
                     }
                 },
                 "required": ["ticker"]
@@ -1550,12 +1559,14 @@ def execute_tool(
             dal,
             tool_input["ticker"],
             period=tool_input.get("period", "annual"),
-            fd_freshness=tool_input.get("fd_freshness", "refresh"),
-            fd_max_age_seconds=tool_input.get("fd_max_age_seconds"),
+            freshness=tool_input.get("freshness", "auto"),
+            max_age_seconds=tool_input.get("max_age_seconds"),
         ),
         "get_detailed_financials": lambda: get_detailed_financials(
             dal,
-            tool_input["ticker"]
+            tool_input["ticker"],
+            freshness=tool_input.get("freshness", "auto"),
+            max_age_seconds=tool_input.get("max_age_seconds"),
         ),
         "get_peer_comparison": lambda: get_peer_comparison(
             dal,
@@ -1753,6 +1764,11 @@ def execute_tool(
         return json.dumps({"error": exc.code})
 
     try:
+        if tool_name in {"get_fundamentals_analysis", "get_detailed_financials"}:
+            allowed = next(item["input_schema"]["properties"] for item in get_anthropic_tools()
+                           if item["name"] == tool_name)
+            if not isinstance(tool_input, dict) or set(tool_input) - set(allowed):
+                raise ValueError("financial_tool_arguments_invalid")
         if tool_name in SEC_TOOL_NAMES:
             import asyncio
             return asyncio.run(execute_tool_async(tool_name, tool_input, dal))

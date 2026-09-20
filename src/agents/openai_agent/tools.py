@@ -64,7 +64,11 @@ def function_tool(fn):
 
             # The SDK parses/logs arguments before calling the Python handler.
             check_output_value(arguments)
-            check_output_value(json.loads(arguments) if arguments else {})
+            parsed = json.loads(arguments) if arguments else {}
+            check_output_value(parsed)
+            if tool.name in {"tool_get_fundamentals_analysis", "tool_get_detailed_financials"}:
+                if not isinstance(parsed, dict) or set(parsed) - set(tool.params_json_schema["properties"]):
+                    raise ValueError("financial_tool_arguments_invalid")
             return await invoke(context, arguments)
         except Exception as exc:
             from agents.tracing import get_current_span
@@ -501,40 +505,47 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
 
     @function_tool
     def tool_get_fundamentals_analysis(
-        ticker: str, period: str = "annual", fd_freshness: str = "refresh",
-        fd_max_age_seconds: Annotated[Optional[int], Field(strict=True)] = None,
+        ticker: str, period: str = "annual", freshness: str = "auto",
+        max_age_seconds: Annotated[Optional[int], Field(strict=True)] = None,
     ) -> str:
         """Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker.
 
-        Financial Datasets fallback may incur charges; default refresh requires
-        an operator-configured request budget and account rate limit.
+        Default auto reuses dated local SEC/FD observations within the configured
+        financial window. Financial Datasets acquisition may incur charges and
+        requires an operator-configured request budget and account rate limit.
         Acquisition refusals appear in acquisition_gaps, not as proof of absent data.
-        FD stored reads saved observations; auto requires fd_max_age_seconds.
-        These controls do not govern the separate legacy SEC source path.
+        Stored never fetches or writes. Refresh bypasses old observations.
 
         Args:
             ticker: Stock ticker symbol
             period: annual or quarterly
-            fd_freshness: Financial Datasets refresh (default), stored or auto
-            fd_max_age_seconds: Allowed acquisition age, required for auto;
-                optional for stored, omit for refresh
+            freshness: Auto local reuse (default), stored only or refresh
+            max_age_seconds: Optional acquisition-age override for auto/stored;
+                omit for refresh
 
         Returns market_cap, pe_ratio, roe, profit_margin, etc.
         """
         result = get_fundamentals_analysis(dal, ticker, period=period,
-                                          fd_freshness=fd_freshness, fd_max_age_seconds=fd_max_age_seconds)
+                                          freshness=freshness, max_age_seconds=max_age_seconds)
         return _serialize_result(result, "get_fundamentals_analysis")
 
     @function_tool
-    def tool_get_detailed_financials(ticker: str) -> str:
+    def tool_get_detailed_financials(
+        ticker: str, freshness: str = "auto",
+        max_age_seconds: Annotated[Optional[int], Field(strict=True)] = None,
+    ) -> str:
         """Get comprehensive financial metrics: EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), and earnings surprise.
 
         Static SEC facts plus a qualified local completed-session price, or typed unavailable.
+        Auto reuses configured financial and shorter earnings observations.
+        Stored never fetches or writes. Refresh bypasses old observations.
 
         Args:
             ticker: Stock ticker symbol
+            freshness: Auto local reuse (default), stored only or refresh
+            max_age_seconds: Optional override for both reuse windows; omit for refresh
         """
-        result = get_detailed_financials(dal, ticker)
+        result = get_detailed_financials(dal, ticker, freshness=freshness, max_age_seconds=max_age_seconds)
         return _serialize_result(result, "get_detailed_financials")
 
     @function_tool

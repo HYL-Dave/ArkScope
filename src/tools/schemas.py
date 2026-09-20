@@ -250,6 +250,8 @@ class DetailedFinancials(BaseModel):
     ticker: str
     report_date: Optional[str] = None
     data_source: str = Field(default="sec_edgar")
+    acquisition_gaps: List[Dict[str, str]] = Field(default_factory=list)
+    source_observations: List[dict] = Field(default_factory=list)
     valuation_price_basis: ValuationPriceBasis = Field(
         default_factory=ValuationPriceBasis
     )

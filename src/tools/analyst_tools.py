@@ -127,9 +127,11 @@ def _fetch_recommendations(ticker: str) -> Dict[str, Any]:
     return {"current": current, "trend": trend}
 
 
-def _fetch_earnings_history(ticker: str) -> List[Dict[str, Any]]:
+def _fetch_earnings_history(ticker: str, *, require_success: bool = False) -> List[Dict[str, Any]]:
     """Fetch last 4 quarters earnings from /stock/earnings."""
     data = _finnhub_get("/stock/earnings", {"symbol": ticker})
+    if require_success and (not isinstance(data, list) or not all(isinstance(row, dict) for row in data)):
+        raise ValueError("finnhub_earnings_unavailable")
     if not data:
         return []
 
@@ -144,10 +146,14 @@ def _fetch_earnings_history(ticker: str) -> List[Dict[str, Any]]:
     return history
 
 
-def _fetch_upcoming_earnings(ticker: str) -> Optional[Dict[str, Any]]:
+def _fetch_upcoming_earnings(ticker: str, *, require_success: bool = False,
+                             from_date: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Fetch upcoming earnings from /calendar/earnings."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now = from_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     data = _finnhub_get("/calendar/earnings", {"symbol": ticker, "from": now})
+    if require_success and (not isinstance(data, dict) or not isinstance(data.get("earningsCalendar"), list)
+                            or not all(isinstance(row, dict) for row in data["earningsCalendar"])):
+        raise ValueError("finnhub_earnings_unavailable")
 
     if not data or not isinstance(data, dict):
         return None

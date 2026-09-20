@@ -275,8 +275,12 @@ def test_invalid_query_never_reaches_cache_or_governor(client_fixture, ticker, p
 def fallback_dal(monkeypatch):
     monkeypatch.setenv("FINANCIAL_DATASETS_API_KEY", "offline-test-key")
     backend = Mock()
-    backend.get_financial_cache.side_effect = lambda key: ({"_negative": True}
-        if key.startswith("fundamentals_analysis:sec_edgar:") else None)
+    backend.get_financial_cache_entry.return_value = None
+    sec = Mock()
+    sec.get_income_statement.return_value = []
+    sec.get_balance_sheet.return_value = []
+    sec.get_cash_flow_statement.return_value = []
+    monkeypatch.setattr("data_sources.sec_edgar_financials.SECEdgarFinancials", lambda: sec)
     return SimpleNamespace(_backend=backend, get_user_profile=lambda: {
         "data_preferences": {"paid_sources": {"financial_datasets": {"enabled": True}}},
     })
@@ -324,7 +328,12 @@ def test_all_channels_expose_unconfigured_spend_as_a_gap(
 
     result = unwrap(asyncio.run(invoke()))
     assert result["data_source"] == "none"
-    assert result["acquisition_gaps"] == [{"provider": "financial_datasets", "code": "financial_datasets_policy_unconfigured"}]
+    assert result["acquisition_gaps"] == [
+        {"provider": "sec_edgar", "code": "sec_financials_unavailable"},
+        {"provider": "financial_datasets", "dataset": "income_statements", "code": "financial_datasets_policy_unconfigured"},
+        {"provider": "financial_datasets", "dataset": "balance_sheets", "code": "financial_datasets_not_attempted_after_refusal"},
+        {"provider": "financial_datasets", "dataset": "cash_flow_statements", "code": "financial_datasets_not_attempted_after_refusal"},
+    ]
     request.assert_not_called()
 
 
@@ -343,6 +352,10 @@ def test_partial_paid_result_is_preserved_and_fanout_stops(
     result = get_fundamentals_analysis(fallback_dal, "AAPL")
     assert result.data_source == "financial_datasets"
     assert result.income_statements[0].data["revenue"] == 416161000000.0
-    assert result.acquisition_gaps == [{"provider": "financial_datasets", "code": "financial_datasets_budget_exhausted"}]
+    assert result.acquisition_gaps == [
+        {"provider": "sec_edgar", "code": "sec_financials_unavailable"},
+        {"provider": "financial_datasets", "dataset": "balance_sheets", "code": "financial_datasets_budget_exhausted"},
+        {"provider": "financial_datasets", "dataset": "cash_flow_statements", "code": "financial_datasets_not_attempted_after_refusal"},
+    ]
     assert result.balance_sheet == [] and result.cash_flow_statements == []
     assert request.call_count == 1

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 import json
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -116,10 +117,20 @@ class _RecordingCacheBackend:
         self.rows = copy.deepcopy(rows or {})
         self.read_keys = []
         self.writes = []
+        self.timestamps = {key: datetime.now(timezone.utc).isoformat() for key in self.rows}
 
     def get_financial_cache(self, cache_key):
         self.read_keys.append(cache_key)
         return copy.deepcopy(self.rows.get(cache_key))
+
+    def get_financial_cache_entry(self, cache_key):
+        self.read_keys.append(cache_key)
+        if cache_key not in self.rows:
+            return None
+        fetched = datetime.fromisoformat(self.timestamps[cache_key])
+        return {"data": copy.deepcopy(self.rows[cache_key]), "ticker": "TEST",
+                "source": "finnhub" if cache_key.startswith("finnhub_earnings:") else "sec_edgar",
+                "fetched_at": fetched.isoformat(), "expires_at": (fetched + timedelta(days=90)).isoformat()}
 
     def set_financial_cache(
         self,
@@ -128,6 +139,7 @@ class _RecordingCacheBackend:
         data,
         ttl_days=90,
         source="sec_edgar",
+        **metadata,
     ):
         record = {
             "cache_key": cache_key,
@@ -138,6 +150,7 @@ class _RecordingCacheBackend:
         }
         self.writes.append(record)
         self.rows[cache_key] = copy.deepcopy(data)
+        self.timestamps[cache_key] = metadata["fetched_at"]
         return True
 
 
@@ -415,9 +428,9 @@ class TestGetDetailedFinancials:
 
         result = _run_detailed(_detailed_dal(backend), _price_basis())[0][0]
 
-        assert backend.read_keys == [
+        assert [key for key in backend.read_keys if not key.startswith("finnhub_earnings:")] == [
             "detailed_financials:v2:sec_edgar:TEST:annual:y2"
-        ]
+        ] * 2  # Recheck after acquiring the same-query lock.
         assert old_key not in backend.read_keys
         assert _StaticCalculatorDouble.constructions == [("TEST", 2)]
         assert result.gross_margin == 0.40
@@ -432,8 +445,9 @@ class TestGetDetailedFinancials:
         backend = _RecordingCacheBackend()
         _run_detailed(_detailed_dal(backend), _price_basis())
 
-        assert len(backend.writes) == 1
-        write = backend.writes[0]
+        static_writes = [item for item in backend.writes if item["source"] == "sec_edgar"]
+        assert len(static_writes) == 1
+        write = static_writes[0]
         assert write["cache_key"] == (
             "detailed_financials:v2:sec_edgar:TEST:annual:y2"
         )
@@ -490,11 +504,11 @@ class TestGetDetailedFinancials:
         ]
         assert [result.pe_ratio for result in results] == [10.0, 20.0]
         assert [result.gross_margin for result in results] == [0.40, 0.40]
-        assert backend.read_keys == [key, key]
-        assert backend.writes == []
+        assert [item for item in backend.read_keys if item == key] == [key, key]
+        assert all(item["source"] == "finnhub" for item in backend.writes)
         assert selector.call_count == 2
-        assert earnings_history.call_count == 2
-        assert upcoming.call_count == 2
+        assert earnings_history.call_count == 1
+        assert upcoming.call_count == 1
         dal.get_fundamentals.assert_not_called()
 
     def test_no_qualified_price_preserves_static_and_nulls_dynamic_fields(self):

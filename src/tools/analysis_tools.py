@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from .data_access import DataAccessLayer
 
 from .schemas import DetailedFinancials, FinancialStatement, FundamentalsResult
+from src.fundamentals.reuse import (
+    ReuseFailure, cached_dataset, configured_age, policy, read_entry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -193,139 +196,139 @@ def get_fundamentals_analysis(
     dal: DataAccessLayer,
     ticker: str,
     period: str = "annual",
-    fd_freshness: str = "refresh",
-    fd_max_age_seconds: Optional[int] = None,
+    freshness: str = "auto",
+    max_age_seconds: Optional[int] = None,
 ) -> FundamentalsResult:
+    """Reuse dated local SEC/FD statements before acquiring a provider response.
+
+    Auto uses the configured financial reuse window unless explicitly overridden.
+    Stored never fetches or writes. Refresh bypasses old observations; FD still
+    requires separate paid admission. Financial period is not a freshness proof.
     """
-    Get fundamental analysis for a ticker.
-
-    Data source priority:
-    1. Positive/negative SEC cache
-    2. SEC EDGAR XBRL API (free, real-time) — structured financial statements
-    3. Financial Datasets API (paid admission; explicit saved-data policy)
-
-    Args:
-        dal: DataAccessLayer instance
-        ticker: Stock ticker symbol
-        period: 'annual' or 'quarterly'
-        fd_freshness: FD only: refresh (default), stored, or auto
-        fd_max_age_seconds: Acquisition age allowed for FD auto/stored reads;
-            required for auto. Fiscal period does not establish freshness.
-
-    Returns:
-        FundamentalsResult with financial metrics and statements
-    """
-    result = FundamentalsResult(ticker=ticker.upper())
-    from data_sources.financial_datasets_client import validate_freshness
-    from data_sources.financial_datasets_governance import FinancialDatasetsFailure
-    try:
-        validate_freshness(fd_freshness, fd_max_age_seconds)
-    except FinancialDatasetsFailure as exc:
-        result.acquisition_gaps = [{"provider": "financial_datasets", "code": exc.code}]
-        return result
-
-    # 2. Fallback: SEC EDGAR XBRL (free, covers all US public companies). LOCAL-FIRST
-    # CACHE (#3): the SEC fetch is free but live + rate-limited (10 req/s, declared UA),
-    # so cache the built result in the local financial_cache (3c-C, local-primary → works
-    # NEGATIVE (no-data: non-US / CIK miss) is cached with a SHORT TTL so we don't hammer
-    # SEC for a symbol it doesn't cover.
     from src.fundamentals.cache import (
         fundamentals_analysis_cache_key,
-        read_cached_sec_fundamentals,
+        validate_positive_annual_sec_payload,
     )
 
-    _cache_be = getattr(dal, "_backend", None)
-    _sec_key = fundamentals_analysis_cache_key(ticker, period)
-    cached_sec, _sec_negative_cached = read_cached_sec_fundamentals(
-        _cache_be, ticker, period
-    )
-    if cached_sec is not None:
-        return cached_sec
+    ticker = ticker.strip().upper()
+    result = FundamentalsResult(ticker=ticker)
+    try:
+        reuse_policy = _financial_policy(dal, freshness, max_age_seconds)
+        if period not in ("annual", "quarterly"):
+            raise ReuseFailure("financial_period_invalid")
+    except ReuseFailure as exc:
+        result.acquisition_gaps = [{"provider": "financials", "code": exc.code}]
+        return result
 
-    income_stmts = []
-    balance_sheets = []
-    cashflow_stmts = []
-    if not _sec_negative_cached:
+    backend = getattr(dal, "_backend", None)
+    key = fundamentals_analysis_cache_key(ticker, period)
+
+    def validate(data):
+        valid = validate_positive_annual_sec_payload(data, ticker=ticker)
+        return valid.model_dump() if valid is not None else None
+
+    def sec_result(observation):
+        answer = FundamentalsResult.model_validate(observation.data)
+        answer.source_observations = [observation.describe("sec_edgar", "financial_statements", reuse_policy,
+            period=period, report_periods=[answer.snapshot_date])]
+        return answer
+
+    if freshness != "refresh":
+        saved = read_entry(backend, key, "sec_edgar", ticker, validate, reuse_policy.max_age_seconds)
+        if saved is not None:
+            return sec_result(saved)
+        # An available paid-source observation does not require an enabled key,
+        # and should not first trigger a free but unnecessary SEC download.
+        stored_fd = _fd_financials(dal, ticker, period, reuse_policy, local_only=True)
+        if stored_fd.source_observations:
+            if freshness == "stored" or not stored_fd.acquisition_gaps:
+                return stored_fd
+            return _fd_financials(dal, ticker, period, reuse_policy)
+        if freshness == "stored":
+            stored_fd.acquisition_gaps.insert(0, {"provider": "sec_edgar", "code": "financial_stored_data_unavailable"})
+            return stored_fd
+
+    def fetch_sec():
         try:
             from data_sources.sec_edgar_financials import SECEdgarFinancials
             sec = SECEdgarFinancials()
-
-            if period == "quarterly":
-                n = 4  # 4 most recent quarters
-            else:
-                n = 2  # 2 most recent years
-            income_stmts = sec.get_income_statement(ticker, years=n, period=period)[:n]
-            balance_sheets = sec.get_balance_sheet(ticker, years=1, period=period)[:1]
-            cashflow_stmts = sec.get_cash_flow_statement(ticker, years=n, period=period)[:n]
-        except Exception as e:
-            logger.warning(f"SEC EDGAR fallback failed for {ticker}: {e}")
-
-    # If SEC EDGAR has sufficient data, use it (and cache it)
-    if income_stmts or balance_sheets:
-        sec_result = _build_result_from_statements(
-            ticker, "sec_edgar", income_stmts, balance_sheets, cashflow_stmts,
-        )
-        if _cache_be is not None:
-            try:  # cache only SUCCESS; never let a cache write break the analysis
-                _cache_be.set_financial_cache(
-                    _sec_key, ticker.upper(), sec_result.model_dump(),
-                    ttl_days=30 if period == "quarterly" else 90, source="sec_edgar")
-            except Exception:  # noqa: BLE001
-                logger.debug("SEC fundamentals cache write skipped for %s", ticker)
-        return sec_result
-
-    # SEC returned nothing → short negative cache (avoid re-hitting SEC for an uncovered
-    # symbol every call); the FD branch below still gets a chance THIS call. Skip the write
-    # if we already short-circuited on a cached negative.
-    if not _sec_negative_cached and _cache_be is not None:
-        try:
-            _cache_be.set_financial_cache(
-                _sec_key, ticker.upper(), {"_negative": True}, ttl_days=1, source="sec_edgar")
-        except Exception:  # noqa: BLE001
-            pass
-
-    # These controls apply only to FD; the legacy SEC path above is separate.
-    if _is_fd_enabled(dal) or fd_freshness == "stored":
-        try:
-            from data_sources.financial_datasets_client import FinancialDatasetsClient
-            cache_days = _get_fd_cache_days(dal)
-            # Route the paid cache through the current local capability.
-            backend = getattr(dal, "_backend", None)
-            policy = dal.get_user_profile().get("data_preferences", {}).get("paid_sources", {}).get("financial_datasets")
-            fd = FinancialDatasetsClient(cache_days=cache_days, cache_backend=backend, request_policy=policy)
-
             n = 4 if period == "quarterly" else 2
-            statements = {"income_statements": [], "balance_sheets": [], "cash_flow_statements": []}
-            gaps = []
-            freshness_args = {"freshness": fd_freshness, "max_age_seconds": fd_max_age_seconds}
-            for dataset, read, limit in (
-                ("income_statements", fd.get_income_statements, n),
-                ("balance_sheets", fd.get_balance_sheets, 1),
-                ("cash_flow_statements", fd.get_cash_flow_statements, n),
-            ):
-                try:
-                    statements[dataset] = read(ticker, period=period, limit=limit, **freshness_args)
-                except FinancialDatasetsFailure as exc:
-                    gap = {"provider": "financial_datasets", "code": exc.code}
-                    if fd_freshness == "stored" and exc.code == "financial_datasets_cache_miss":
-                        gaps.append({**gap, "dataset": dataset})
-                        continue
-                    gaps.append(gap)
-                    break
+            income = sec.get_income_statement(ticker, years=n, period=period)[:n]
+            balance = sec.get_balance_sheet(ticker, years=1, period=period)[:1]
+            cashflow = sec.get_cash_flow_statement(ticker, years=n, period=period)[:n]
+            if not (income or balance or cashflow):
+                raise ReuseFailure("sec_financials_unavailable")
+            return _build_result_from_statements(ticker, "sec_edgar", income, balance, cashflow).model_dump()
+        except ReuseFailure:
+            raise
+        except Exception as exc:
+            raise ReuseFailure("sec_financials_acquisition_failed") from exc
 
-            if any(statements.values()):
-                result = _build_result_from_statements(
-                    ticker, "financial_datasets",
-                    statements["income_statements"], statements["balance_sheets"], statements["cash_flow_statements"],
-                )
-            result.acquisition_gaps = gaps
-            result.source_observations = list(fd.observations)
-            return result
-        except FinancialDatasetsFailure as exc:
-            result.acquisition_gaps = [{"provider": "financial_datasets", "code": exc.code}]
-        except Exception as e:
-            logger.warning(f"Financial Datasets fallback failed for {ticker}: {e}")
+    try:
+        # Preserve legacy storage metadata; read eligibility comes from reuse_policy.
+        return sec_result(cached_dataset(backend, key, "sec_edgar", ticker, reuse_policy, validate, fetch_sec,
+                                         ttl_days=30 if period == "quarterly" else 90))
+    except ReuseFailure as exc:
+        result = _fd_financials(dal, ticker, period, reuse_policy)
+        result.acquisition_gaps.insert(0, {"provider": "sec_edgar", "code": exc.code})
+    return result
 
+
+def _financial_profile(dal):
+    try:
+        profile = dal.get_user_profile()
+        return profile if isinstance(profile, dict) else {}
+    except Exception:
+        return {}
+
+
+def _financial_policy(dal, freshness, maximum, *, earnings=False):
+    default = configured_age(_financial_profile(dal), earnings=earnings) if freshness == "auto" and maximum is None else 0
+    return policy(freshness, maximum, default_age=default)
+
+
+def _fd_financials(dal, ticker, period, reuse_policy, *, local_only=False):
+    from data_sources.financial_datasets_client import FinancialDatasetsClient
+    from data_sources.financial_datasets_governance import FinancialDatasetsFailure
+
+    profile = _financial_profile(dal)
+    preferences = profile.get("data_preferences")
+    paid = preferences.get("paid_sources") if isinstance(preferences, dict) else preferences
+    config = paid.get("financial_datasets") if isinstance(paid, dict) else paid
+    fd = FinancialDatasetsClient(cache_days=_get_fd_cache_days(dal), cache_backend=getattr(dal, "_backend", None),
+                                request_policy=config)
+    n = 4 if period == "quarterly" else 2
+    readers = (("income_statements", fd.get_income_statements, n),
+               ("balance_sheets", fd.get_balance_sheets, 1),
+               ("cash_flow_statements", fd.get_cash_flow_statements, n))
+    statements, gaps = {}, {}
+    if reuse_policy.mode != "refresh":
+        for dataset, read, limit in readers:
+            try:
+                statements[dataset] = read(ticker, period=period, limit=limit, freshness="stored",
+                                           max_age_seconds=reuse_policy.max_age_seconds)
+            except FinancialDatasetsFailure as exc:
+                gaps[dataset] = exc.code
+    if not local_only and reuse_policy.mode != "stored":
+        refusal = None
+        for dataset, read, limit in readers:
+            if dataset in statements:
+                continue
+            if refusal is not None:
+                gaps[dataset] = "financial_datasets_not_attempted_after_refusal"
+                continue
+            try:
+                statements[dataset] = read(ticker, period=period, limit=limit, freshness=reuse_policy.mode,
+                                           max_age_seconds=reuse_policy.max_age_seconds)
+                gaps.pop(dataset, None)
+            except FinancialDatasetsFailure as exc:
+                refusal = gaps[dataset] = exc.code
+    result = (_build_result_from_statements(ticker, "financial_datasets",
+        statements.get("income_statements", []), statements.get("balance_sheets", []),
+        statements.get("cash_flow_statements", [])) if statements else FundamentalsResult(ticker=ticker))
+    result.acquisition_gaps = [{"provider": "financial_datasets", "dataset": name, "code": code}
+                              for name, code in gaps.items()]
+    result.source_observations = [{**item, "freshness_mode": reuse_policy.mode} for item in fd.observations]
     return result
 
 
@@ -599,6 +602,8 @@ def get_morning_brief(
 def get_detailed_financials(
     dal: DataAccessLayer,
     ticker: str,
+    freshness: str = "auto",
+    max_age_seconds: Optional[int] = None,
 ) -> DetailedFinancials:
     """
     Combine cached SEC facts with a request-time qualified local price.
@@ -626,18 +631,14 @@ def get_detailed_financials(
     years_for_growth = 2
     cache_key = detailed_financials_cache_key(ticker)
     backend = getattr(dal, "_backend", None)
-    payload = None
-
+    observations, gaps = [], []
     try:
-        if backend is not None:
-            payload = validate_detailed_financials_static_payload(
-                backend.get_financial_cache(cache_key),
-                ticker=ticker,
-            )
-    except Exception as e:
-        logger.debug(f"Cache read failed for {ticker}: {e}")
+        reuse_policy = _financial_policy(dal, freshness, max_age_seconds)
+        earnings_policy = _financial_policy(dal, freshness, max_age_seconds, earnings=True)
+    except ReuseFailure as exc:
+        return DetailedFinancials(ticker=ticker, acquisition_gaps=[{"provider": "financials", "code": exc.code}])
 
-    if payload is None:
+    def fetch_static():
         try:
             calc = FinancialMetricsCalculator(ticker, years_for_growth=years_for_growth)
             metrics = calc.get_static_metrics_dict()
@@ -654,26 +655,19 @@ def get_detailed_financials(
                 "tech_metrics": tech,
                 "valuation_inputs": valuation_inputs,
             }
-            payload = validate_detailed_financials_static_payload(
-                candidate,
-                ticker=ticker,
-            )
+            return candidate if candidate["report_date"] else None
+        except Exception as exc:
+            raise ReuseFailure("sec_financials_acquisition_failed") from exc
 
-            if payload is not None and backend is not None:
-                try:
-                    backend.set_financial_cache(
-                        cache_key,
-                        ticker,
-                        payload,
-                        ttl_days=90,
-                        source="sec_edgar",
-                    )
-                except Exception as e:
-                    logger.debug(f"Cache write failed for {ticker}: {e}")
-
-        except Exception as e:
-            logger.warning(f"SEC EDGAR metrics failed for {ticker}: {e}")
-            payload = None
+    try:
+        observation = cached_dataset(backend, cache_key, "sec_edgar", ticker, reuse_policy,
+            lambda data: validate_detailed_financials_static_payload(data, ticker=ticker), fetch_static)
+        payload = observation.data
+        observations.append(observation.describe("sec_edgar", "detailed_financials", reuse_policy,
+            period="annual", report_periods=[payload.get("report_date")]))
+    except ReuseFailure as exc:
+        gaps.append({"provider": "sec_edgar", "code": exc.code})
+        payload = None
 
     if payload is None:
         payload = {
@@ -696,20 +690,15 @@ def get_detailed_financials(
         for product_field, calculator_field in _DETAILED_VALUATION_FIELD_MAP.items()
     }
 
-    earnings_history = None
-    upcoming = None
-    try:
-        from .analyst_tools import _fetch_earnings_history, _fetch_upcoming_earnings
-        earnings_history = _fetch_earnings_history(ticker) or None
-        upcoming = _fetch_upcoming_earnings(ticker)
-    except Exception as e:
-        logger.debug(f"Finnhub earnings failed for {ticker}: {e}")
+    earnings, earnings_observations, earnings_gaps = _detailed_earnings(backend, ticker, earnings_policy)
 
     return DetailedFinancials(
         ticker=ticker,
         report_date=payload.get("report_date"),
         data_source="sec_edgar",
         valuation_price_basis=price_basis,
+        source_observations=observations + earnings_observations,
+        acquisition_gaps=gaps + earnings_gaps,
         **detailed_valuation,
         # Profitability
         gross_margin=metrics.get("gross_margin"),
@@ -741,9 +730,45 @@ def get_detailed_financials(
         eps=metrics.get("earnings_per_share"),
         fcf_per_share=metrics.get("free_cash_flow_per_share"),
         # Earnings surprise
-        earnings_surprises=earnings_history,
-        upcoming_earnings=upcoming,
+        earnings_surprises=earnings.get("history") or None,
+        upcoming_earnings=earnings.get("upcoming"),
     )
+
+
+def _detailed_earnings(backend, ticker, reuse_policy):
+    from datetime import datetime, timezone
+    from .analyst_tools import _fetch_earnings_history, _fetch_upcoming_earnings
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    values, observations, gaps = {}, [], []
+    for dataset, query, fetch in (
+        ("history", "last4", lambda: _fetch_earnings_history(ticker, require_success=True)),
+        ("upcoming", f"from:{today}", lambda: _fetch_upcoming_earnings(ticker, require_success=True, from_date=today)),
+    ):
+        def validate(data):
+            if not isinstance(data, dict) or set(data) != {dataset}:
+                return None
+            value = data[dataset]
+            if dataset == "history":
+                valid = isinstance(value, list) and all(isinstance(item, dict) for item in value)
+            else:
+                valid = value is None or isinstance(value, dict)
+            return data if valid else None
+
+        def acquire():
+            try:
+                return {dataset: fetch()}
+            except Exception as exc:
+                raise ReuseFailure("finnhub_earnings_unavailable") from exc
+
+        try:
+            observation = cached_dataset(backend, f"finnhub_earnings:v1:{ticker}:{dataset}:{query}",
+                "finnhub", ticker, reuse_policy, validate, acquire)
+            values[dataset] = observation.data[dataset]
+            observations.append(observation.describe("finnhub", f"earnings_{dataset}", reuse_policy))
+        except ReuseFailure as exc:
+            gaps.append({"provider": "finnhub", "dataset": f"earnings_{dataset}", "code": exc.code})
+    return values, observations, gaps
 
 
 # ============================================================
@@ -797,7 +822,7 @@ def get_peer_comparison(
     2. sector only — compare all tickers in that sector
     3. tickers — explicit custom peer group
 
-    Uses get_detailed_financials() internally (SEC EDGAR cached 90 days).
+    Uses get_detailed_financials() with the configured acquisition-age policy.
 
     Args:
         dal: DataAccessLayer instance.

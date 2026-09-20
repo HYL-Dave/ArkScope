@@ -186,7 +186,8 @@ data_preferences:
     primary: "local_ibkr"          # 本地 IBKR JSON
     secondary: "sec_edgar"         # SEC 官方 (免費)
     tertiary: "financial_datasets" # 付費 fallback (有快取)
-    refresh_days: 7                # 超過 N 天重新抓取
+    refresh_days: 7                # Auto financial reuse window, not latest-period verification
+    earnings_refresh_seconds: 3600 # Shorter window for earnings history/calendar
 
   # 付費數據源控制
   paid_sources:
@@ -195,8 +196,9 @@ data_preferences:
       cache_days_annual: 180       # 年報快取天數
       cache_days_quarterly: 90     # 季報快取天數
       # Cache days retain observations; they do not authorize fresh-data claims.
-      # FD defaults to refresh. Reuse needs explicit stored or auto + maximum age.
-      # Required for paid dispatch; null refuses it, without implicit cache fallback.
+      # Auto reuses dated local observations using fundamentals_sources.refresh_days.
+      # Explicit stored never fetches; refresh bypasses old observations.
+      # Paid dispatch still requires these limits; null refuses new acquisition.
       # Set from the user's approved request budget and actual account plan.
       daily_request_limit: null
       requests_per_minute: null

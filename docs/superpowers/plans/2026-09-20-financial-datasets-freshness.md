@@ -1,5 +1,10 @@
 # Explicit Financial Datasets Freshness
 
+**Historical default, superseded September 21.** The user wanted controllable
+local reuse, not refresh-by-default. The current contract is
+[Local Data Reuse](2026-09-21-local-data-reuse.md); the record below describes the
+earlier implementation and its acceptance, not the current product requirement.
+
 Status: implemented, offline-verified at `bd316536` and merged into local master.
 Full backend: **11,796 passed / 12 unchanged skips**. Frontend, channel checks
 and the existing default-worker timing limitation are recorded in the

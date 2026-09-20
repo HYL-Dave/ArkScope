@@ -345,6 +345,15 @@ class _HermeticMarketBackend:
             free_cash_flow=500_000.0,
         ).model_dump()
 
+    def get_financial_cache_entry(self, cache_key):
+        from datetime import datetime, timedelta, timezone
+        data = self.get_financial_cache(cache_key)
+        if data is None:
+            return None
+        now = datetime.now(timezone.utc)
+        return {"source": "sec_edgar", "ticker": "NVDA", "data": data,
+                "fetched_at": now.isoformat(), "expires_at": (now + timedelta(days=90)).isoformat()}
+
     def get_available_tickers(self, data_type):
         return {
             "news": ["AMD", "NVDA"],

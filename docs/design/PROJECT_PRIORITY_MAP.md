@@ -22,6 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
+| **P1** | **LOCAL FINANCIAL REUSE CORRECTION** | **ACTIVE.** September 21 clarification supersedes FD refresh-by-default: normal reads reuse valid local observations with one configurable financial policy, distinct short-lived earnings supplements, truthful acquisition metadata and identical-scope request coalescing. Four channels must agree. Plan: `docs/superpowers/plans/2026-09-21-local-data-reuse.md`. | Efficiency and controllability were the user requirement, not opt-in cache reuse. Live quotes and portfolio freshness remain separate. |
 | **P1** | **QUOTE AND EXPLICIT FINANCIAL FRESHNESS** | **OFFLINE VERIFIED AND MERGED; LIVE GATEWAY CHECK SEPARATE.** Frozen `bd316536`: **11,796 backend / 12 unchanged skips**, **1,867 frontend / 124 files** with four workers, typecheck/build, **8 desktop**, i18n checks; merged-tree related check **323 / 1 existing live skip**. Default-worker frontend scanner timeout also reproduces on the base and remains documented. Quote basis/feed/trade time stay separate; previous close cannot claim freshness, unknown remains `stale=null`. FD refresh is the default, stored reads are explicit, and auto requires a caller-specified age; no paid policy is activated. Four-channel period/limit/time identity and strict age validation are verified. Evidence: `docs/superpowers/evidence/2026-09-20-quote-financial-freshness/README.md`; retrieval and quote contracts remain the owners. | Follow the observed quote defect and the user's correction that fiscal period or a long TTL cannot establish current data. |
 | **P0** | **SOURCE READ GOVERNANCE AND ACTUAL USAGE** | **VERIFIED AND MERGED; PAID ACTIVATION NOT ENABLED.** Frozen `5172ede6`: **11,678 backend / 12 unchanged skips**, **1,867 frontend / 124 files**, typecheck/build, **8 desktop**, i18n checks. Main-tree `d6db46cc`: **231 related tests**; product/test/config bytes match the frozen revision. All three SEC defaults are `stored`; explicit acquisition still needs enforceable external authorization. Financial Datasets requires operator-configured request budgets/rate limits; unknown limits refuse HTTP, and saved reads now require the explicit freshness choice above. Topic and tool/channel/outcome tables distinguish historical evidence from current reliability. Named abandoned tree and this slice's two test trees/branch are removed; history is preserved and no push occurred. Owner: `docs/superpowers/plans/2026-09-20-source-read-governance.md`; tables: `docs/data/2026-09-20-research-usage.md`. | Remove surprise acquisition/spending and prioritize repairs from observed research needs without waiting for SEC retirement decisions. |
 | **P1** | **SOURCE-LOCAL SEC RESEARCH PROTECTION** | **VERIFIED AND MERGED.** Frozen `00eaaefb`: **11,577 backend / 12 unchanged skips**. Master `c8846ee2`: **442 related backend**, **1,867 frontend / 124 files**, typecheck/build, **8 desktop**, i18n checks. Ordinary research/messages no longer require a healthy SEC capture root; actual SEC use retains protection through persistence. The original whole-run lease already prevented intervening maintenance, so the demonstrated defect was unnecessary no-SEC coupling, not a reproduced lost-answer race. The three named old worktrees and this slice's acceptance tree/branch are removed; ignored old test data is retained separately. Other historical trees are untouched. Owner/evidence: `docs/superpowers/evidence/2026-09-20-research-sec-isolation/README.md`. | Resolve the reported SEC dependency before native-session continuation without weakening source retention. |
@@ -658,6 +659,16 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-21 (LOCAL REUSE IS THE NORMAL PATH):** The user's clarification
+  corrects the September 20 interpretation: control over stored data does not
+  mean paying or fetching on every default call. Financial reads share a
+  configurable acquisition-age policy; explicit stored/refresh remain available.
+  The constant latest-period flag is removed rather than represented as an
+  implemented verification. Concurrency must match actual query scope, not just
+  source name. Live-market assistance may coexist with this research workbench;
+  no live-data, entitlement, scheduler or service-lifecycle claim follows from
+  this bounded repair. Owner: `docs/superpowers/plans/2026-09-21-local-data-reuse.md`.
 
 - **2026-09-20 (QUOTE TRUTHFULNESS AND EXPLICIT FD FRESHNESS):**
   User rejects implicit Financial Datasets cache reuse, while allowing explicit

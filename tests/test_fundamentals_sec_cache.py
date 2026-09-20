@@ -11,6 +11,7 @@ back-compat for the legacy vars.
 from __future__ import annotations
 
 import pytest
+from datetime import datetime, timedelta, timezone
 
 import src.tools.analysis_tools as at
 from src.tools.schemas import FundamentalsResult
@@ -21,11 +22,20 @@ class _FakeBackend:
     def __init__(self):
         self.store = {}
         self.set_calls = []
+        self.fetched = datetime.now(timezone.utc)
     def get_financial_cache(self, cache_key):
         return self.store.get(cache_key)
-    def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar"):
+    def get_financial_cache_entry(self, cache_key):
+        if cache_key not in self.store:
+            return None
+        return {"source": "sec_edgar", "ticker": cache_key.split(":")[2],
+                "data": self.store.get(cache_key), "fetched_at": self.fetched.isoformat(),
+                "expires_at": (self.fetched + timedelta(days=90)).isoformat()}
+    def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar", **metadata):
         self.set_calls.append((cache_key, ticker, ttl_days, source))
         self.store[cache_key] = data
+        self.fetched = datetime.fromisoformat(metadata["fetched_at"])
+        return True
 
 
 class _FakeDAL:
@@ -75,15 +85,12 @@ def test_sec_result_is_cached_then_served_from_cache(monkeypatch):
     assert r2.data_source == "sec_edgar" and calls["sec"] == 1  # SEC NOT hit again
 
 
-def test_sec_empty_uses_short_negative_cache(monkeypatch):
+def test_sec_ambiguous_empty_does_not_become_fresh_negative_data(monkeypatch):
     be = _FakeBackend(); dal = _FakeDAL(be)
     _sec_returns(monkeypatch, income=[], balance=[])      # no data (non-US / CIK miss)
     monkeypatch.setattr(at, "_is_fd_enabled", lambda dal: False)
     at.get_fundamentals_analysis(dal, "VISN")
-    # a negative result is cached with a SHORT ttl so we don't hammer SEC, but not the 90d one
-    assert be.set_calls, "negative result should be cached to avoid repeated SEC hits"
-    neg = be.set_calls[-1]
-    assert neg[2] <= 7  # short negative TTL (days)
+    assert be.set_calls == []
 
 
 def test_sec_cache_miss_then_hit_round_trips_result(monkeypatch):
@@ -91,7 +98,8 @@ def test_sec_cache_miss_then_hit_round_trips_result(monkeypatch):
     income = [type("S", (), {"report_period": "2025-12-31"})()]
     _sec_returns(monkeypatch, income=income)
     monkeypatch.setattr(at, "_build_result_from_statements",
-                        lambda t, src, i, b, c: FundamentalsResult(ticker=t.upper(), data_source=src, roe=0.21))
+                        lambda t, src, i, b, c: FundamentalsResult(ticker=t.upper(), data_source=src,
+                                                                  snapshot_date="2025-12-31", roe=0.21))
     r1 = at.get_fundamentals_analysis(dal, "DELL")
     r2 = at.get_fundamentals_analysis(dal, "DELL")        # served from cache
     assert r1.roe == r2.roe == 0.21 and r2.data_source == "sec_edgar"
@@ -104,23 +112,25 @@ def test_sec_cache_hit_uses_local_market_backend(monkeypatch):
         def __init__(self):
             self.calls = []
 
-        def get_financial_cache(self, cache_key):
+        def get_financial_cache_entry(self, cache_key):
             self.calls.append(cache_key)
-            return FundamentalsResult(
+            now = datetime.now(timezone.utc)
+            return {"source": "sec_edgar", "ticker": "AAPL", "fetched_at": now.isoformat(),
+                    "expires_at": (now + timedelta(days=90)).isoformat(), "data": FundamentalsResult(
                 ticker="AAPL",
                 data_source="sec_edgar",
                 snapshot_date="2025-12-31",
                 roe=0.33,
-            ).model_dump()
+            ).model_dump()}
 
     class _LocalMarketLike:
         def __init__(self):
             self._market = _Market()
             self.cache_calls = []
 
-        def get_financial_cache(self, cache_key):
+        def get_financial_cache_entry(self, cache_key):
             self.cache_calls.append(cache_key)
-            return self._market.get_financial_cache(cache_key)
+            return self._market.get_financial_cache_entry(cache_key)
 
         def set_financial_cache(self, *args, **kwargs):
             raise AssertionError("cache hit must not write")
@@ -159,7 +169,7 @@ def test_sec_cache_miss_writes_with_shared_cache_key(monkeypatch):
         def get_financial_cache(self, cache_key):
             return self.store.get(cache_key)
 
-        def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar"):
+        def set_financial_cache(self, cache_key, ticker, data, ttl_days=90, source="sec_edgar", **metadata):
             self.set_calls.append((cache_key, ticker, ttl_days, source, data))
             self.store[cache_key] = data
             return True
@@ -243,12 +253,13 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
 
     cached = at.get_fundamentals_analysis(cached_dal, ticker)
 
-    assert cached.model_dump() == FundamentalsResult(
+    assert cached.model_dump(exclude={"source_observations"}) == FundamentalsResult(
         ticker=ticker,
         snapshot_date="2025-12-31",
         data_source="sec_edgar",
         roe=0.44,
-    ).model_dump()
+    ).model_dump(exclude={"source_observations"})
+    assert cached.source_observations[0]["retrieval"] == "stored"
     assert cached_dal.legacy_calls == []
 
     # On a miss, positive SEC facts must return before the paid-provider gate.
@@ -301,8 +312,7 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
     ]
     assert sec_dal.legacy_calls == []
 
-    # When SEC has no facts, the existing paid-provider enablement gate still owns
-    # whether the FD client is unreachable or may supply the result.
+    # Paid admission remains independent of the reusable-observation policy.
     class _EmptySEC:
         def get_income_statement(self, *_args, **_kwargs):
             return []
@@ -315,18 +325,27 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
 
     class _FakeFD:
         def __init__(self, *_args, **_kwargs):
-            events.append("fd:init")
+            self.config = _kwargs.get("request_policy")
             self.observations = []
 
+        def _admit(self, kwargs):
+            from data_sources.financial_datasets_governance import FinancialDatasetsFailure, FinancialDatasetsPolicy
+            if kwargs.get("freshness") == "stored":
+                raise FinancialDatasetsFailure("financial_datasets_cache_miss")
+            FinancialDatasetsPolicy.from_config(self.config)
+
         def get_income_statements(self, *_args, **_kwargs):
+            self._admit(_kwargs)
             events.append("fd:income")
             return [object()]
 
         def get_balance_sheets(self, *_args, **_kwargs):
+            self._admit(_kwargs)
             events.append("fd:balance")
             return []
 
         def get_cash_flow_statements(self, *_args, **_kwargs):
+            self._admit(_kwargs)
             events.append("fd:cashflow")
             return []
 
@@ -340,9 +359,12 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
         lambda _dal: events.append("fd:disabled") or False,
     )
     disabled_dal = _FakeDAL(_FakeBackend(), legacy_result=legacy)
+    disabled_dal.get_user_profile = lambda: {"data_preferences": {"paid_sources": {
+        "financial_datasets": {"enabled": False}}}}
     disabled = at.get_fundamentals_analysis(disabled_dal, ticker)
-    assert disabled == FundamentalsResult(ticker=ticker)
-    assert events == ["fd:disabled"]
+    assert disabled.data_source == "none"
+    assert any(gap["code"] == "financial_datasets_paid_requests_disabled" for gap in disabled.acquisition_gaps)
+    assert events == []
     assert disabled_dal.legacy_calls == []
 
     events.clear()
@@ -359,8 +381,6 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
     assert enabled.data_source == "financial_datasets"
     assert enabled.roe == 0.52
     assert events == [
-        "fd:enabled",
-        "fd:init",
         "fd:income",
         "fd:balance",
         "fd:cashflow",

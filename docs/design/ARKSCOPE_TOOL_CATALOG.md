@@ -58,7 +58,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `calculate_implied_valuation` | calculation | target_metric*, multiples*, value_basis*, cash?, total_debt?, shares_outstanding?, current_price? | pure caller-supplied multiple valuation |
 | `calculate_peer_statistics` | calculation | values*, target_value? | pure caller-supplied peer statistics |
 | `calculate_weighted_scenarios` | calculation | values*, weights*, labels?, current_price? | pure caller-supplied scenario weighting |
-| `get_fundamentals_analysis` | analysis | ticker*, period?, fd_freshness?, fd_max_age_seconds? | legacy SEC statements/ratios; metered FD fallback with explicit acquisition age and saved-data policy |
+| `get_fundamentals_analysis` | analysis | ticker*, period?, freshness?, max_age_seconds? | dated local SEC/FD statements first; explicit refresh remains separately metered |
 | `get_detailed_financials` | analysis | ticker* | normalized SEC/provider financial facts |
 | `list_sec_filings` | analysis | issuer*, forms?, filed_from?, filed_to?, include_amendments?, cursor?, limit?, freshness? | receipt-bound whole filing observations with full sources |
 | `get_sec_financial_facts` | analysis | issuer*, metrics?, concepts?, fact_ids?, accession?, as_of?, period?, start?, end?, revisions?, cursor?, limit?, freshness? | exact decimal facts, revisions and immutable source provenance |
@@ -119,15 +119,19 @@ its portable Python-analysis level does not imply terminal or workspace access.
   not user consent. The legacy SEC financial-mapping path is separate and still
   fetches automatically. The stored default does not change Settings refresh
   or schedules.
-- Financial Datasets defaults to `fd_freshness="refresh"`, bypassing saved data
-  without bypassing the operator's request/rate policy. `stored` explicitly reads
-  saved observations without HTTP or cache promotion. `auto` requires a caller's
-  `fd_max_age_seconds`; fiscal period and old TTL settings do not prove freshness.
+- Financial analysis defaults to `freshness="auto"`, reusing dated local SEC/FD
+  responses before acquisition. The shared financial window uses configured
+  `fundamentals_sources.refresh_days` (seven days when unset). `stored` reads
+  observations without HTTP or cache promotion. Optional `max_age_seconds`
+  overrides the window; fiscal period and storage TTL do not prove freshness.
   `source_observations` preserves original acquisition times and periods, not a
   latest-filing guarantee. Missing authority never silently falls back to old
-  data. Refusals remain `acquisition_gaps`; counters are not a credit balance or
-  dollar cap. These controls apply to FD, not the separate legacy SEC fallback.
-  See [freshness](../superpowers/plans/2026-09-20-financial-datasets-freshness.md)
+  data after a refresh failure. Refusals remain `acquisition_gaps`; counters are
+  not a credit balance or dollar cap. Detailed financials share these controls
+  in their registry/API-key adapters; their Finnhub earnings supplements default
+  to one hour, independently configurable. That tool remains excluded from both
+  OAuth allowlists. Stored static facts never freeze the qualified local price.
+  See [reuse](../superpowers/plans/2026-09-21-local-data-reuse.md)
   and [paid governance](../superpowers/plans/2026-09-20-source-read-governance.md).
 - Current quotes separate `price_basis`, `market_data_type`, price `timestamp`
   and local `received_at`. `stale=null` means unknown. Previous close, delayed,

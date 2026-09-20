@@ -1,11 +1,4 @@
-"""Financial Datasets requests with explicit stored/auto/refresh semantics.
-
-The default refresh bypasses saved data and still requires paid admission.
-Stored reads never dispatch or promote files. Auto requires an explicit maximum
-acquisition age, independent of the statement's fiscal period. Cache retention
-settings do not assert freshness. Paid responses retain the local/file fallback;
-observations expose original acquisition time without claiming latest filings.
-"""
+"""Local-first paid observations with explicit stored/auto/refresh controls."""
 
 from __future__ import annotations
 
@@ -13,6 +6,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 from dataclasses import fields
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -20,6 +14,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
 import requests
+
+from src.fundamentals.reuse import (
+    Observation, ReuseFailure, instant as _instant, policy, reuse_or_acquire, storage_scope,
+)
 
 from .financial_datasets_governance import (
     FinancialDatasetsFailure, FinancialDatasetsGovernor, FinancialDatasetsPolicy,
@@ -43,21 +41,10 @@ _FILE_CACHE_DIR = Path("data/cache/financial_datasets")
 
 
 def validate_freshness(freshness, max_age_seconds):
-    if (freshness not in ("stored", "auto", "refresh")
-            or (max_age_seconds is not None and (type(max_age_seconds) is not int or max_age_seconds < 0))
-            or (freshness == "auto" and max_age_seconds is None)
-            or (freshness == "refresh" and max_age_seconds is not None)):
-        raise FinancialDatasetsFailure("financial_datasets_freshness_invalid")
-
-
-def _instant(value):
     try:
-        parsed = datetime.fromisoformat(value)
-        if parsed.tzinfo is not None and parsed.utcoffset() is not None:
-            return parsed.astimezone(timezone.utc)
-    except (TypeError, ValueError, OverflowError):
-        pass
-    return None
+        return policy(freshness, max_age_seconds)
+    except ReuseFailure as exc:
+        raise FinancialDatasetsFailure("financial_datasets_freshness_invalid") from exc
 
 
 def _valid_rows(data, response_key, ticker, period):
@@ -78,7 +65,7 @@ def _valid_rows(data, response_key, ticker, period):
 
 
 class FinancialDatasetsClient:
-    """Paid financial statements with opt-in, acquisition-dated cache reads."""
+    """Paid financial statements with acquisition-dated local reuse by default."""
 
     BASE_URL = "https://api.financialdatasets.ai"
 
@@ -107,7 +94,7 @@ class FinancialDatasetsClient:
         ticker: str,
         period: str = "quarterly",
         limit: int = 4,
-        *, freshness: str = "refresh", max_age_seconds: Optional[int] = None,
+        *, freshness: str = "auto", max_age_seconds: Optional[int] = None,
     ) -> List[IncomeStatement]:
         """Get income statements. Returns dataclass instances."""
         raw = self._cached_request(
@@ -128,7 +115,7 @@ class FinancialDatasetsClient:
         ticker: str,
         period: str = "quarterly",
         limit: int = 1,
-        *, freshness: str = "refresh", max_age_seconds: Optional[int] = None,
+        *, freshness: str = "auto", max_age_seconds: Optional[int] = None,
     ) -> List[BalanceSheet]:
         """Get balance sheets. Returns dataclass instances."""
         raw = self._cached_request(
@@ -149,7 +136,7 @@ class FinancialDatasetsClient:
         ticker: str,
         period: str = "quarterly",
         limit: int = 4,
-        *, freshness: str = "refresh", max_age_seconds: Optional[int] = None,
+        *, freshness: str = "auto", max_age_seconds: Optional[int] = None,
     ) -> List[CashFlowStatement]:
         """Get cash flow statements. Returns dataclass instances."""
         raw = self._cached_request(
@@ -183,38 +170,45 @@ class FinancialDatasetsClient:
         if (not isinstance(ticker, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]*", ticker)
                 or period not in _DEFAULT_TTL or type(limit) is not int or limit < 1):
             raise FinancialDatasetsFailure("financial_datasets_query_invalid")
-        validate_freshness(freshness, max_age_seconds)
+        reuse_policy = validate_freshness(freshness, max_age_seconds)
         ticker = ticker.upper()
         legacy_key = f"{cache_prefix}_{ticker.upper()}_{period}"
         cache_key = f"fd_v1_{legacy_key}_{limit}"
         response_key = {"income": "income_statements", "balance": "balance_sheets",
                         "cashflow": "cash_flow_statements"}[cache_prefix]
-        if freshness != "refresh":
-            cached = self._get_cache(cache_key, legacy_key, ticker, period, limit,
-                                     response_key, freshness, max_age_seconds)
-            if cached is not None:
-                data, fetched, checked_at = cached
-                self._observe(response_key, data, fetched, "stored", freshness, max_age_seconds, now=checked_at)
-                return data
-            if freshness == "stored":
-                raise FinancialDatasetsFailure("financial_datasets_cache_miss")
+        def read(max_age, not_before=None):
+            return self._get_cache(cache_key, legacy_key, ticker, period, limit,
+                                   response_key, freshness, max_age, not_before=not_before)
 
-        if not self.api_key:
-            raise FinancialDatasetsFailure("financial_datasets_api_key_missing")
-        ttl_days = self._cache_days[period]
-        if type(ttl_days) is not int or ttl_days < 0:
-            raise FinancialDatasetsFailure("financial_datasets_cache_policy_invalid")
+        def acquire():
+            if not self.api_key:
+                raise FinancialDatasetsFailure("financial_datasets_api_key_missing")
+            ttl_days = self._cache_days[period]
+            if type(ttl_days) is not int or ttl_days < 0:
+                raise FinancialDatasetsFailure("financial_datasets_cache_policy_invalid")
+            try:
+                datetime.now(timezone.utc) + timedelta(days=ttl_days)
+            except OverflowError as exc:
+                raise FinancialDatasetsFailure("financial_datasets_cache_policy_invalid") from exc
+            data = self._request(endpoint, ticker=ticker, period=period, limit=limit)
+            if not _valid_rows(data, response_key, ticker, period):
+                raise FinancialDatasetsFailure("financial_datasets_response_invalid")
+            fetched = datetime.now(timezone.utc)
+            data = {**data, response_key: data[response_key][:limit]}
+            persisted = self._set_cache(cache_key, period, ticker, self._envelope(data, ticker, period, limit), now=fetched)
+            return Observation(data, fetched, fetched, "refreshed", persisted)
+
         try:
-            datetime.now(timezone.utc) + timedelta(days=ttl_days)
-        except OverflowError as exc:
-            raise FinancialDatasetsFailure("financial_datasets_cache_policy_invalid") from exc
-        data = self._request(endpoint, ticker=ticker, period=period, limit=limit)
-        if not _valid_rows(data, response_key, ticker, period):
-            raise FinancialDatasetsFailure("financial_datasets_response_invalid")
-        fetched = datetime.now(timezone.utc)
-        data = {**data, response_key: data[response_key][:limit]}
-        self._set_cache(cache_key, period, ticker, self._envelope(data, ticker, period, limit), now=fetched)
-        self._observe(response_key, data, fetched, "refreshed", freshness, max_age_seconds)
+            observation = reuse_or_acquire(reuse_policy,
+                [storage_scope(self._cache_backend) if self._cache_backend is not None else str(_FILE_CACHE_DIR.resolve()),
+                 "financial_datasets", cache_key], read, acquire)
+        except ReuseFailure as exc:
+            code = ("financial_datasets_cache_miss" if exc.code == "financial_stored_data_unavailable"
+                    else exc.code.replace("financial_", "financial_datasets_", 1))
+            raise FinancialDatasetsFailure(code) from exc
+        data = observation.data
+        self.observations.append(observation.describe("financial_datasets", response_key, reuse_policy,
+            report_periods=[item["report_period"] for item in data[response_key]]))
         return data
 
     @staticmethod
@@ -237,7 +231,7 @@ class FinancialDatasetsClient:
         except (OSError, ValueError):
             pass
 
-    def _get_cache(self, key, legacy_key, ticker, period, limit, response_key, freshness, max_age):
+    def _get_cache(self, key, legacy_key, ticker, period, limit, response_key, freshness, max_age, *, not_before=None):
         for candidate in (key, legacy_key):
             for row, from_file in self._cache_entries(candidate):
                 fetched = _instant(row.get("fetched_at"))
@@ -246,7 +240,8 @@ class FinancialDatasetsClient:
                     continue
                 checked_at = datetime.now(timezone.utc)
                 age = (checked_at - fetched).total_seconds()
-                if age < 0 or (max_age is not None and age > max_age):
+                if (age < 0 or (max_age is not None and age > max_age)
+                        or (not_before is not None and fetched < not_before)):
                     continue
                 data = row.get("data")
                 if candidate == key:
@@ -272,24 +267,12 @@ class FinancialDatasetsClient:
                         )
                     except Exception as exc:
                         logger.debug("FD cache promotion failed (%s)", type(exc).__name__)
-                return data, fetched, checked_at
+                return Observation(data, fetched, checked_at)
         return None
-
-    def _observe(self, dataset, data, fetched, retrieval, freshness, max_age, *, now=None):
-        now = now or datetime.now(timezone.utc)
-        age = (now - fetched).total_seconds()
-        self.observations.append({
-            "provider": "financial_datasets", "dataset": dataset, "retrieval": retrieval,
-            "freshness_mode": freshness, "fetched_at": fetched.isoformat(), "evaluated_at": now.isoformat(),
-            "age_seconds": age, "max_age_seconds": max_age,
-            "within_max_age": None if max_age is None else 0 <= age <= max_age,
-            "latest_period_verified": False,
-            "report_periods": [item["report_period"] for item in data[dataset] if isinstance(item.get("report_period"), str)],
-        })
 
     def _set_cache(
         self, cache_key: str, period: str, ticker: str, data: Dict, *, now: Optional[datetime] = None,
-    ) -> None:
+    ) -> bool:
         """Persist a paid observation, with a file fallback on backend failure.
 
         Its acquisition timestamp is immutable during subsequent promotion.
@@ -310,31 +293,45 @@ class FinancialDatasetsClient:
             except Exception as e:
                 logger.debug(f"backend cache write raised: {e}")
             if ok:
-                return
+                return True
             logger.warning(
                 f"paid FD response for {cache_key} was NOT cached by the backend — "
                 "writing a file copy for explicitly requested stored/auto reads")
-            self._write_file_cache(cache_key, ticker, data, now, expires)
-            return
+            return self._write_file_cache(cache_key, ticker, data, now, expires)
 
-        self._write_file_cache(cache_key, ticker, data, now, expires)
+        return self._write_file_cache(cache_key, ticker, data, now, expires)
 
     def _write_file_cache(
         self, cache_key: str, ticker: str, data: Dict,
         now: datetime, expires: datetime,
-    ) -> None:
+    ) -> bool:
+        temporary = None
         try:
             _FILE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
             path = _FILE_CACHE_DIR / f"{cache_key}.json"
-            path.write_text(json.dumps({
+            document = json.dumps({
                 "fetched_at": now.isoformat(),
                 "expires_at": expires.isoformat(),
                 "source": "financial_datasets",
                 "ticker": ticker,
                 "data": data,
-            }, indent=2, default=str))
+            }, indent=2, default=str)
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=_FILE_CACHE_DIR, delete=False) as handle:
+                temporary = Path(handle.name)
+                handle.write(document)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+            return True
         except Exception as e:
             logger.debug(f"File cache write failed: {e}")
+            return False
+        finally:
+            if temporary is not None:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    logger.debug("FD temporary cache cleanup failed")
 
     # ------------------------------------------------------------------
     # HTTP
