@@ -122,6 +122,17 @@ Only after Slice 1, review the archived storage proposal against the installed
 and admitted SDK/CLI. The old two-table `SessionStore` approach is a candidate,
 not permission to add those tables or assume a September 10 API still fits.
 
+Installed-SDK preflight is now recorded at
+`docs/superpowers/evidence/2026-09-20-native-session-preflight/`. With SDK0.2.152,
+an unmapped mirror path is dropped without calling the adapter or its error
+callback, and a full message buffer can drop `mirror_error`. A normal flush or
+absence of that message therefore cannot certify mirror completeness. Require
+both adapter failure accounting and positive coverage evidence before publishing
+a checkpoint. Also separate the current per-call config directory from a stable,
+owned workspace identity; today it is used as `cwd` and changes the project key
+on every call. The preflight's four additional named controls belong to Slice 2;
+the offline observer is not native-resume acceptance or a schema decision.
+
 1. Bind native state to profile, thread, provider/auth channel, credential
    identity, model/effort, runtime compatibility, instructions and ordered
    committed-history digest. Use the already captured `RuntimeAuthBinding`;
