@@ -4,6 +4,8 @@ import hashlib
 import json
 from dataclasses import replace
 
+import pytest
+
 import src.model_effective as model_effective_module
 from src.model_discovery_cache import ModelDiscoveryCache
 from src.model_effective import (
@@ -479,7 +481,8 @@ def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_pat
     assert block["cache_state"] == "never_discovered"   # fail-closed shape
 
 
-def test_model_catalog_does_not_promote_historical_spark_usage(monkeypatch, tmp_path):
+@pytest.mark.parametrize("limit_name", ["GPT-5.3-Codex-Spark", "gpt-reserve", "codex", "future-quota-group"])
+def test_account_usage_stays_readable_without_promoting_quota_groups_to_models(monkeypatch, tmp_path, limit_name):
     from src.api.routes import config_routes as cr
     from src.auth_drivers import PlaintextTokenStore, StoredTokenRecord
     from src.auth_drivers.oauth_status import (
@@ -487,6 +490,7 @@ def test_model_catalog_does_not_promote_historical_spark_usage(monkeypatch, tmp_
         OAuthAccountPayload,
         OAuthObservationStore,
         OAuthRateLimitSnapshot,
+        OAuthRateLimitWindow,
         OAuthUsageSummary,
     )
     from src.model_credentials import CredentialStore
@@ -527,8 +531,10 @@ def test_model_catalog_does_not_promote_historical_spark_usage(monkeypatch, tmp_
                 rate_limits_by_limit_id={
                     "opaque-provider-limit-id": OAuthRateLimitSnapshot(
                         limit_id="opaque-provider-limit-id",
-                        limit_name="GPT-5.3-Codex-Spark",
+                        limit_name=limit_name,
                         plan_type="prolite",
+                        primary=OAuthRateLimitWindow(used_percent=100, window_duration_minutes=10080,
+                                                     resets_at=1786773600),
                     ),
                 },
                 usage_summary=OAuthUsageSummary(),
@@ -536,6 +542,7 @@ def test_model_catalog_does_not_promote_historical_spark_usage(monkeypatch, tmp_
         ),
     )
 
+    before = observation_store.read_account_snapshot(credential_id)
     out = cr.model_catalog(
         store=store,
         token_store=token_store,
@@ -543,12 +550,16 @@ def test_model_catalog_does_not_promote_historical_spark_usage(monkeypatch, tmp_
     )
 
     assert "entitlement_hints" not in out["effective"]["providers"]["openai"]
-    assert all(
-        entry["id"] != "gpt-5.3-codex-spark"
-        for entry in out["effective"]["tasks"]["card_translation"]["providers"][
-            "openai"
-        ]["models"]
-    )
+    for task in out["effective"]["tasks"].values():
+        assert all(entry["id"] not in {"gpt-5.3-codex-spark", limit_name.casefold()}
+                   for entry in task["providers"]["openai"]["models"])
+    usage = cr.get_credential_account_usage(credential_id, store=store, observation_store=observation_store)
+    assert usage.sync_status == "not_requested"
+    assert usage.snapshot == before == observation_store.read_account_snapshot(credential_id)
+    bucket = usage.snapshot.payload.rate_limits_by_limit_id["opaque-provider-limit-id"]
+    assert bucket.limit_name == limit_name
+    assert bucket.primary.used_percent == 100
+    assert bucket.primary.window_duration_minutes == 10080
     rendered = json.dumps(out, sort_keys=True)
     assert "fixture-secret-token" not in rendered
     assert "opaque-provider-limit-id" not in rendered

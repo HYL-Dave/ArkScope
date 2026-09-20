@@ -22,7 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
-| **P1** | **SPARK RETIREMENT; CARD TRANSLATION PRESERVED** | **CODE VERIFIED; STOPPED-WRITER ACTIVATION PENDING.** The user did not authorize retiring card translation. Its UI, task, settings, API, cache/version schema and tests are restored; Spark execution/options remain retired. Only translation results may be cleared, including all such records as explicitly permitted, without changing originals, receipts, Research, schema or task settings. Frozen `b7e1886b`: backend **11437P/12S**, frontend **1854P/124files**, typecheck/build/i18n and eight desktop tests pass; source/test/operator fingerprints are unchanged. The earlier full-feature removal was an interpretation error and was never activated. Evidence: `docs/superpowers/evidence/2026-09-19-card-translation-retirement/README.md`. | Separate retiring a model and its outputs from removing the feature that used it. |
+| **P1** | **SPARK RETIREMENT; CARD TRANSLATION PRESERVED** | **REVIEW CORRECTION; APP REMAINS OPEN, NO CLEANUP AUTHORIZATION.** Translation and subscription usage display/sync stay; Spark execution/options remain retired. The latest scope supersedes all-results deletion: exact Spark version rows only, plus run 13 / zh-Hant only on full canonical content-hash match, with mandatory private backup and concurrent-write refusal. Other translations, originals, receipts, Research, schema and settings are preserved. Prior frozen `b7e1886b`: backend **11437P/12S**, frontend **1854P/124files**, typecheck/build/i18n and eight desktop tests pass. Current narrowing has **147** focused backend and **1856P/124files** frontend passes; no new complete backend acceptance is claimed. Evidence: `docs/superpowers/evidence/2026-09-19-card-translation-retirement/README.md`. | Retiring Spark does not remove translation or turn usage-group labels into model authorization. |
 | **P0** | **REPORT FILE BOUNDARY** | **FIX VERIFIED, NOT YET ACTIVE IN THE RUNNING APP.** Canonical Markdown paths, pinned directory descriptors and no-follow/exclusive file operations reject traversal, absolute paths, links and non-regular files for report reading/listing/saving. Twenty-four adversarial tests pass, including the current translation-preservation focused run. This does not implement external-tool authorization or fix quote freshness, earnings alignment or metric comparability. Evidence: `docs/superpowers/evidence/2026-09-20-report-file-boundary.md`. | Close the demonstrated file-read escape before further tool expansion. |
 | **P1** | **EARNINGS EVENT OBSERVATION** | **CAPABILITY RETAINED; REPAIR / SCHEDULING NOT IMPLEMENTED.** Earnings price reactions are not replaced by SEC financial reports. Fix announcement/session/window/freshness semantics before adding idempotent scheduled observations and delivery. Existing calendar scheduling is not an earnings-reaction monitor. Owner: `docs/superpowers/plans/2026-09-20-earnings-observation-followup.md`. | Preserve useful descriptive market research without scheduling known inaccurate estimates or advertising a predictive signal. |
 | **P0-E** | **Verified renames, financial freshness, SEC research access and macro result truth** | **N1/P2 CLOSED; COMPLETE LINUX REGRESSION GREEN.** Publication recovery and disabled scheduling remain complete. User-approved `e447d394`/`24c10280` replace blocking Anthropic child I/O and own successful/error response cleanup across repeated cancellation; captured auth/model/effort, completed SEC refs and SDK retry policy are retained. Scoped re-review has no new actionable findings. A missed async test fixture found by the first full run is repaired at `39b6587f`; second single full backend **11050P/12 unchangedS**, exact11062 IDs, source1160paths/runtime/runners unchanged. Frontend **1833P**, typecheck/build/i18n pass with unchanged UI source. Current census adds no candidates/uncertainties/reductions; existing cleanup queues remain. Evidence: `docs/superpowers/evidence/2026-09-14-anthropic-child-async/README.md`. Broader release checklist, actual activation, Windows/macOS, native Anthropic parent async conversion and wider cleanup remain separate. SQLite is still3.37.2; no production access, provider call, install, cleanup/reset, App restart, merge or push. | Complete useful research/data workflows while preserving membership removals, provenance and truthful execution status. |
@@ -653,6 +653,21 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-20 (SPARK-ONLY CLEANUP NARROWED; SUBSCRIPTION USAGE RETAINED):**
+  The latest review supersedes the earlier all-translation-results scope.
+  Only exact Spark version rows are targets; embedded cleanup is restricted
+  to run 13 / zh-Hant with a full same-run/language canonical hash match.
+  Unknown or ambiguous provenance is preserved. The shared SQLite backup
+  helper is mandatory before writes, with a private non-overwritable backup,
+  verification and an intervening-writer guard. Read-only production checking
+  confirmed the reviewer's matching hash; no private text was printed and no
+  production write ran. The removed `entitlement_hints` was Spark-picker-only,
+  not subscription usage: current `gpt-reserve` / `codex` display and manual
+  synchronization remain, without granting model access. Focused backend:
+  147 passed; frontend: 1856 passed / 124 files. The App stays open; cleanup,
+  merge, restart and push remain unperformed. Evidence:
+  `docs/superpowers/evidence/2026-09-19-card-translation-retirement/README.md`.
 
 - **2026-09-20 (CORRECTION: PRESERVE CARD TRANSLATION, CLEAR RESULTS ONLY):**
   The user explicitly clarified that only Spark and its results were retired,

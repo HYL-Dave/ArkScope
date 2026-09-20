@@ -129,7 +129,7 @@ def test_generate_caches_run(store, stub_generation):
     assert det["evidence_packet"]["ticker"] == "AAPL"
 
 
-def test_translation_works_after_clearing_old_results(store, stub_generation, monkeypatch):
+def test_translation_works_after_clearing_spark_results(store, stub_generation, monkeypatch, tmp_path):
     import importlib.util
     from pathlib import Path
     import sqlite3
@@ -141,20 +141,26 @@ def test_translation_works_after_clearing_old_results(store, stub_generation, mo
     spec = importlib.util.spec_from_file_location("translation_record_cleanup", path)
     cleanup = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cleanup)
-    rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
+    for _ in range(13):
+        rid = generate_card("AAPL", GenerateBody(include_sa=False), dal=object(), store=store)["run_id"]
+    assert rid == 13
     original = get_card(rid, store=store)
     store.set_translation(rid, "zh-Hant", {"conclusion": "Old Spark output"},
                           execution_receipt=ExecutionReceipt(
                               provider="openai", model="gpt-5.3-codex-spark",
                               effort="high", auth_mode="chatgpt_oauth"))
     store.set_translation(rid, "zh-Hans", {"conclusion": "Old output with unknown provenance"})
+    kept_versions = store.translation_versions(rid, "zh-Hans")
     conn = sqlite3.connect(store.db_path)
     try:
-        assert cleanup.dispose(conn)["removed"] == {"versions": 2, "embedded_cards": 1}
+        assert cleanup.dispose(conn, backup_path=tmp_path / "before-spark-cleanup.db")["removed"] == {
+            "versions": 1, "embedded_cards": 1,
+        }
     finally:
         conn.close()
     assert get_card(rid, store=store) == original
-    assert store.get(rid).translations is None
+    assert store.get(rid).translations == {"zh-Hans": {"conclusion": "Old output with unknown provenance"}}
+    assert store.translation_versions(rid, "zh-Hans") == kept_versions
     assert store.translation_versions(rid, "zh-Hant") == []
     calls = []
 

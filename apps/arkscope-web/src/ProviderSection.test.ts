@@ -6,7 +6,7 @@ import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderSection } from "./Settings";
-import type { ModelCatalog, ModelDiscoveryResult, ProviderCredential } from "./api";
+import type { ModelCatalog, ModelDiscoveryResult, OAuthRateLimitSnapshot, ProviderCredential } from "./api";
 import { DiscoveryResultView } from "./settings/ProviderSection";
 import {
   createSettingsReadCache,
@@ -108,7 +108,7 @@ function accountSnapshot({
     payload: {
       rate_limits: {
         limit_id: "codex",
-        limit_name: "ChatGPT Plus",
+        limit_name: "ChatGPT Plus" as OAuthRateLimitSnapshot["limit_name"],
         plan_type: "plus",
         primary: {
           used_percent: usedPercent,
@@ -732,6 +732,46 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
     expect(callsFor(fetchMock, "local%3A7/account-usage", "GET")).toHaveLength(1);
     expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
     expect(cache.inspect(oauthAccountUsageKey(credential.id)).status).toBe("stale");
+  });
+
+  it.each([true, false])("keeps reserve and codex usage visible and syncable without model hints (named=%s)", async (named) => {
+    const credential = oauthCredential({ active: true });
+    function snapshot(used: number) {
+      const result = accountSnapshot({ observedAt: new Date().toISOString(), status: null, overageStatus: null, overageReason: null });
+      const buckets = Object.fromEntries(["gpt-reserve", "codex"].map((id, index) => [id, {
+        ...result.payload.rate_limits,
+        limit_id: id,
+        limit_name: named ? id : null,
+        primary: { used_percent: used, window_duration_minutes: 10080, resets_at: 1790256000 + index * 3600 },
+      } satisfies OAuthRateLimitSnapshot]));
+      return { ...result, payload: { ...result.payload, rate_limits: buckets["gpt-reserve"], rate_limits_by_limit_id: buckets } };
+    }
+    const fetchMock = vi.fn((_url: unknown, init?: RequestInit) => jsonResponse(
+      accountView(snapshot(init?.method === "POST" ? 99 : 100), init?.method === "POST" ? "succeeded" : "not_requested"),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    const value = catalog();
+    value.credentials.openai = [credential];
+    renderSection({ catalog: value });
+    await waitFor(() => host!.querySelectorAll(".account-usage-limit-group").length === 2);
+
+    const groups = () => Array.from(host!.querySelectorAll(".account-usage-limit-group"));
+    expect(groups().map((group) => group.querySelector("strong")?.textContent)).toEqual(["gpt-reserve", "codex"]);
+    for (const group of groups()) {
+      expect(group.textContent).toContain("7 天視窗");
+      expect(group.textContent).toContain("已用：100%");
+    }
+    expect(host!.textContent).toContain("codex_app_server");
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(0);
+    const sync = Array.from(credentialRow("ChatGPT subscription Plus").querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "同步使用量") as HTMLButtonElement;
+    await act(async () => { sync.click(); });
+    await waitFor(() => groups().every((group) => group.textContent?.includes("已用：99%") === true));
+    expect(callsFor(fetchMock, "/account-usage/sync", "POST")).toHaveLength(1);
+    expect(groups().map((group) => group.querySelector("strong")?.textContent)).toEqual(["gpt-reserve", "codex"]);
+    expect(Array.from(host!.querySelectorAll(".provider-model-list")).every((list) =>
+      !list.textContent?.includes("gpt-reserve") && !list.textContent?.includes("codex"))).toBe(true);
+    expect(value.models).toEqual([]);
   });
 
   it("manual_sync_replaces_only_the_affected_account_cache_entry", async () => {
