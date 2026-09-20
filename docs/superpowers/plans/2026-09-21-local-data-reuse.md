@@ -15,7 +15,13 @@ quote does not establish all account entitlements or trading readiness.
 - [x] Four-channel fundamental-analysis `freshness=auto|stored|refresh`, optional strict integer age.
 - [x] Detailed-financials Finnhub supplements use a separate short reuse window.
 - [x] Related regression and frozen-revision complete backend/frontend acceptance.
-- [ ] Local merge, main-tree recheck and cleanup of this slice's branch/worktrees.
+- [x] Local merge, main-tree recheck and cleanup of this slice's branch/worktrees.
+
+Acceptance: frozen `a400a52b` passes 11,843 backend tests with the same 12 live
+skips, 1,867 frontend tests, build/typecheck, i18n and eight desktop tests. The
+main-tree `5089ccec` recheck passes 867 tests with two existing live skips. This
+slice's branch and two test worktrees are removed; no push or production change
+was made. Evidence: `docs/superpowers/evidence/2026-09-21-local-data-reuse/README.md`.
 
 `auto` first reuses a valid local observation. The existing
 `data_preferences.fundamentals_sources.refresh_days` is the default authority
