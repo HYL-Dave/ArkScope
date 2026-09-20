@@ -414,6 +414,41 @@ def test_codex_account_sync_reads_limits_and_usage_without_starting_thread_or_tu
     _wait_for_process_exit(int(pid_path.read_text()))
 
 
+@pytest.mark.parametrize("named_buckets", [True, False])
+def test_reserve_and_codex_usage_groups_round_trip_without_model_discovery(tmp_path, monkeypatch, named_buckets):
+    from src.auth_drivers.codex_account_usage import CodexAccountUsageAdapter
+    from src.auth_drivers.oauth_status import OAuthObservationStore, cached_account_usage
+
+    buckets = {name: {
+        "limitId": name,
+        "limitName": name if named_buckets else None,
+        "planType": "pro",
+        "primary": {"usedPercent": 100, "windowDurationMins": 10080, "resetsAt": reset},
+    } for name, reset in (("gpt-reserve", 1790256000), ("codex", 1789992000))}
+    monkeypatch.setattr(sys.modules[__name__], "_rate_limits_payload",
+                        lambda: {"rateLimits": buckets["gpt-reserve"], "rateLimitsByLimitId": buckets})
+    executable, transcript, pid_path = _write_codex_fixture(tmp_path, live_plan="pro")
+    observation = CodexAccountUsageAdapter(executable=executable, timeout_seconds=2.0).read_account_usage(
+        credential_id="local:1", record=_token_record(), observed_at=_OBSERVED_AT,
+    )
+    store = OAuthObservationStore(tmp_path / "observation.db")
+    saved = store.record_account_snapshot(credential_id="local:1", provider="openai",
+                                         auth_mode="chatgpt_oauth", observation=observation)
+    cached = cached_account_usage("local:1", store)
+    assert cached.snapshot == saved
+    assert cached.sync_status == "not_requested"
+    for name, raw in buckets.items():
+        value = cached.snapshot.payload.rate_limits_by_limit_id[name]
+        assert value.limit_name == raw["limitName"]
+        assert value.primary.model_dump() == {"used_percent": 100, "window_duration_minutes": 10080,
+                                             "resets_at": raw["primary"]["resetsAt"]}
+    methods = [json.loads(line)["method"] for line in transcript.read_text().splitlines()]
+    assert "account/rateLimits/read" in methods
+    assert "model/list" not in methods
+    assert not any(method.startswith(("thread/", "turn/")) for method in methods)
+    _wait_for_process_exit(int(pid_path.read_text()))
+
+
 def test_account_sync_redetermines_and_persists_live_plan_without_relogin(tmp_path):
     from dataclasses import replace
 

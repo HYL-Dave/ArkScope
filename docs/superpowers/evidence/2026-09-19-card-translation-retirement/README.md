@@ -5,10 +5,11 @@ Preservation baseline: `544d8dfd`, based on master `52037620`.
 
 ## Binding Scope
 
-The user explicitly clarified: keep card translation; remove Spark execution
-and its generated results. Clearing all translation records is also permitted.
-That permission does not include original cards, execution receipts, saved
-reports, Research conversations, translation settings or the feature's schema.
+The latest September 20 instruction supersedes the earlier permission to clear
+all translation records: keep card translation and subscription usage display;
+prepare **Spark-only** cleanup with a backup. Do not close the App or execute
+cleanup in this review. Original cards, execution receipts, saved reports,
+Research conversations, other translations, settings and schema are protected.
 
 The entire-feature removal at `4125026b` was our interpretation error, not a
 user product decision. It was never merged or activated and no production
@@ -41,30 +42,101 @@ by App startup or a scheduler. The old destructive implementation has been
 replaced. The only data writes are:
 
 ```sql
-DELETE FROM main.ai_card_translation_versions;
-UPDATE main.ai_card_runs SET translations_json=NULL
-WHERE translations_json IS NOT NULL;
+DELETE FROM main.ai_card_translation_versions
+WHERE model = 'gpt-5.3-codex-spark';
+UPDATE main.ai_card_runs SET translations_json=:remaining_languages
+WHERE id=13;
 ```
 
+The UPDATE runs only when run 13's `zh-Hant` content has the same full canonical
+SHA-256 as a Spark version for **that run and language**. It removes that key,
+not the whole map; NULL is used only when no other language remains. Other
+cards' embedded caches are unchanged even if their content matches. Unknown
+provenance, a nonmatching value, or identical content also attributed to a
+non-Spark model is preserved. Malformed/duplicate-key JSON and numbers that
+would silently round while parsing block cleanup before backup or deletion.
+
 It preserves the table, index, embedded column, sequence state, all model-route
-and runtime rows, original card contents, receipts and Research. Old embedded
-translations can lack model provenance, so the approved all-translation-results
-scope avoids guessing which model produced them. It does not erase original
-Spark provenance on unrelated historical records.
+and runtime rows, original card contents, receipts and Research. Non-Spark
+version rows, including NULL-model rows, remain byte-for-byte unchanged.
+It does not erase original Spark provenance on unrelated historical records.
 
 Preflight rejects changed translation schema, unexpected owned objects,
 triggers on written tables and external references that could cascade. One
-transaction checks integrity/FKs before and after, unchanged schema/settings/
-originals/sequences, and rollback on failure. Counts are reported; content and
-credentials are not dumped. Repeating an already empty cleanup is a no-op.
+write transaction checks integrity/FKs and exact expected rows, including
+unchanged schema/settings/originals/sequences, and rolls back on failure.
+Counts are reported; content and credentials are not dumped. Repeating cleanup
+changes no source rows, but still requires a new backup destination.
 
-The entry point requires `--clear-all-translations --writers-stopped` and
-opens only the named main profile with `mode=rw`. The old `--apply` command
-is no longer accepted. The stop flag is an operator assertion, not a replacement
-for checking App/native-host/collector writers and DB handles. No production
-apply has run. Private translation YAML/environment keys are retained.
+Backup is mandatory, using the existing `src.sqlite_backup.backup_connection`
+owner: SQLite's WAL-inclusive backup API, a new non-overwritable destination,
+0600 file permissions, and integrity/schema/retained-row verification. The
+source read snapshot stays pinned during backup. After acquiring the write
+lock, both `data_version` and the inventory must still match; an intervening
+writer aborts cleanup. Failure retains the backup and rolls back source writes.
+The receipt records the backup path and full file hash, not `archive_created:
+False`. Backups contain private profile data and must not be committed.
 
-## Verification
+The entry point requires `--clear-spark-translations --writers-stopped
+--backup-path <new-private-file>` and opens only the named main profile with
+`mode=rw`. The old `--clear-all-translations` and `--apply` commands are rejected.
+The stop flag is an operator assertion, not a substitute for checking App/
+native-host/collector writers and DB handles. **No production apply or backup
+has run in this review.** Private translation YAML/environment keys remain.
+
+## Independent Read-Only Check
+
+With the App left running, `mode=ro`, `PRAGMA query_only=ON` and a read
+transaction observed one version row: run 13 / `zh-Hant` / Spark. No non-Spark
+version rows were present at that observation. Both retained representations
+are semantically identical. Using sorted keys, UTF-8, `ensure_ascii=False`
+and default JSON separators, their full canonical SHA-256 is:
+
+`e9dfed4f5c0490c21359d6982877d58fe201511f8785b49f2923680d36c9a6f9`
+
+That confirms the reviewer's prefix. Compact JSON uses a different hash, so
+the script fixes one serialization instead of comparing undocumented prefixes.
+No original card/translation text was printed. This observation is not cleanup
+authorization; the operator rechecks the actual rows when eventually invoked.
+
+## Usage Display Preserved
+
+The removed `EffectiveProviderSummary.entitlement_hints` field had a generic
+name but a Spark-only producer (`_subscription_entitlement_hints`) and a
+Spark-only consumer (`hasSparkUsageHint`). Its sole purpose was a model-picker
+hint. It was not the account-usage payload and is intentionally not restored.
+
+`codex_account_usage.py`, `oauth_status.py`, `ProviderSection.tsx` and
+`oauthAccountUsage.ts` are byte-identical to master `52037620`. The credential
+account-usage GET and sync POST routes remain. Bucket IDs/names, seven-day
+windows, percentages, reset times, source and observation time are still
+displayed. `gpt-reserve` and `codex` are treated as observed usage groups, not
+as model IDs or entitlement to execute a model.
+
+## Current Verification
+
+- Focused backend: **147 passed**, including cleanup, translation round trip,
+  backup failures, WAL/concurrent-write refusal, Spark admission rejection,
+  account usage parsing/persistence and model-catalog isolation.
+- The cleanup suite has **24** synthetic cases. Two preservation tests were
+  also run against the previous all-record implementation at `1c732eb6`
+  (adapting only its old function signature); they produce three expected
+  assertion failures, not import/interface failures.
+- The API test removes only the Spark result, retains unknown-provenance
+  output, and then translates and caches again using a supported-model stub.
+- Complete frontend: **1,856 passed / 124 files**. New screenshot-shaped
+  cases cover both named groups and ID-only groups, manual sync, and no model
+  options added from quota evidence. Only fixtures are used; no live sync or
+  paid provider request is made.
+- TypeScript and production build pass; the existing large-bundle warning
+  remains. The first typecheck rejected the new ID-only test fixture because
+  its helper inferred a non-null name; the fixture now uses the real nullable
+  `OAuthRateLimitSnapshot.limit_name` contract. No App code was changed.
+- No App implementation file changes in this follow-up; only the offline
+  operator, tests and documentation change. The previous complete backend run
+  below belongs to `b7e1886b`, not to the newly narrowed operator.
+
+## Previous Full Acceptance At b7e1886b
 
 - Focused backend: **119 passed**, including Spark rejection, the preserved
   translation API, original-store behavior, all-task routes, record cleanup
@@ -123,13 +195,15 @@ independently rerun as recorded above; the mistaken-removal numbers are not
 reused as its acceptance.
 
 Master remains `52037620`; the App was running at the last check. No merge,
-App restart, production translation deletion, backup deletion or push occurred.
-The user alone pushes. The stopped-writer gate remains for cleanup/activation.
+App restart, production translation deletion, production backup creation,
+backup deletion or push occurred. The user alone pushes. The latest review
+explicitly leaves the App running and withholds cleanup authorization.
 
 The existing old root-level June/July backup inventory is 29 files including
 sidecars, 13,324,488,704 logical bytes. That previously approved, named inventory
 does not include recent `data/backups/`, archives, current databases or their
-WAL/SHM files. It is separate from translation-record cleanup.
+WAL/SHM files. It is separate from translation-record cleanup and remains
+untouched while cleanup is on hold.
 
 The unaccepted fundamentals/source-workflow branch is not merged or deleted.
 Its source/tool/research audit is committed at `5c123120`. Main's pre-existing

@@ -7,8 +7,11 @@ Implementation branch: `codex/spark-retirement`.
 The Spark-only feature boundary below was committed as `544d8dfd` and is
 confirmed by the user's September 20 clarification: card translation stays.
 Our subsequent full-feature removal was an interpretation error and was never
-activated. The correction restores this boundary and prepares record-only
-cleanup, as the user also permits clearing all translation results. See
+activated. The correction restores this boundary. The latest September 20
+review narrows the prepared cleanup to Spark version rows and a hash-proven
+run 13 / zh-Hant cache entry, with a mandatory private backup. All other
+translations and subscription usage display/sync remain. The App stays open;
+cleanup and merge are on hold. This supersedes the earlier all-results scope. See
 `../2026-09-19-card-translation-retirement/README.md` for that correction and
 current verification. The original test results below belong to `544d8dfd`.
 
