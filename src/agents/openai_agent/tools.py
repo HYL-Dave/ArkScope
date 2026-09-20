@@ -10,7 +10,9 @@ from __future__ import annotations
 import json
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Literal, Optional
+
+from pydantic import Field
 
 try:
     from agents import function_tool as _sdk_function_tool, RunContextWrapper
@@ -265,8 +267,12 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         result = get_ticker_prices(dal, ticker, interval=interval, days=days)
         return _serialize_result(result, "get_ticker_prices")
 
+    # The SDK preserves Field metadata, but strips a standalone StrictInt marker.
     @function_tool
-    def tool_get_current_quote(ticker: str, source: str = "auto", max_age_seconds: int = 60) -> str:
+    def tool_get_current_quote(
+        ticker: str, source: str = "auto",
+        max_age_seconds: Annotated[int, Field(strict=True)] = 60,
+    ) -> str:
         """Get a read-through current quote for a stock ticker.
 
         source='auto' tries IBKR first and may fall back to latest local bar.
@@ -496,7 +502,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     @function_tool
     def tool_get_fundamentals_analysis(
         ticker: str, period: str = "annual", fd_freshness: str = "refresh",
-        fd_max_age_seconds: Optional[int] = None,
+        fd_max_age_seconds: Annotated[Optional[int], Field(strict=True)] = None,
     ) -> str:
         """Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker.
 

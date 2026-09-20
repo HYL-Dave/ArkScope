@@ -116,3 +116,25 @@ def test_all_schema_exporters_offer_freshness_options():
         assert required <= set(native_anthropic["input_schema"]["properties"])
         native_openai = next(t for t in create_openai_tools(object()) if t.name == "tool_" + name)
         assert required <= set(native_openai.params_json_schema["properties"])
+
+
+@pytest.mark.parametrize("channel", ["openai", "anthropic", "chatgpt", "claude"])
+@pytest.mark.parametrize("age", [True, "60"])
+@pytest.mark.parametrize("name", ["get_current_quote", "get_fundamentals_analysis"])
+def test_invalid_age_is_not_coerced_into_acquisition_authority(channel, age, name, monkeypatch):
+    from src.tools import current_quote
+    from src.fundamentals import cache
+
+    acquire_quote = Mock(side_effect=AssertionError("invalid age must not request a quote"))
+    read_fundamentals = Mock(side_effect=AssertionError("invalid age must not start data access"))
+    monkeypatch.setattr(current_quote, "_fetch_ibkr_quote", acquire_quote)
+    monkeypatch.setattr(cache, "read_cached_sec_fundamentals", read_fundamentals)
+    arguments = {"ticker": "AAPL"}
+    if name == "get_current_quote":
+        arguments.update(source="ibkr", max_age_seconds=age)
+    else:
+        arguments.update(fd_freshness="auto", fd_max_age_seconds=age)
+    result = asyncio.run(invoke(channel, name, arguments, object()))
+    assert result
+    acquire_quote.assert_not_called()
+    read_fundamentals.assert_not_called()

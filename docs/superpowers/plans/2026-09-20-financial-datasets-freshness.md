@@ -21,6 +21,8 @@ The three dedicated SEC research tools retain their separate `stored` defaults.
 An absent paid policy now produces a refusal by default, even when saved data
 exists. It is not a spending grant and is not implicit consent to reuse a cache.
 No maximum age is guessed from a quarterly/annual period or account balance.
+Invalid boolean/string ages are refused before data access in every transport;
+the API-key SDK may not coerce them into an accepted integer.
 
 Examples of tool arguments (not spending approvals):
 
