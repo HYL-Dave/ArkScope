@@ -29,7 +29,7 @@ class TestSecReplacement:
         fixture = tool_fixture.__wrapped__(tmp_path)
         wire(monkeypatch, fixture.service)
         registry = create_default_registry()
-        result = registry.get("list_sec_filings").function(issuer=CIK, forms=["10-Q"])
+        result = registry.get("list_sec_filings").function(issuer=CIK, forms=["10-Q"], freshness="auto")
         assert len(result["data"]) == 1 and result["data"][0]["form"] == "10-Q"
         assert result["data"][0]["sources"][0]["source"]["pointer"]
 

@@ -281,7 +281,7 @@ class TestSECFilings:
             assert not hasattr(owner, "query_sec_filings")
         fixture = tool_fixture.__wrapped__(tmp_path)
         wire(monkeypatch, fixture.service)
-        result = create_default_registry().get("list_sec_filings").function(issuer=CIK)
+        result = create_default_registry().get("list_sec_filings").function(issuer=CIK, freshness="auto")
         assert len(result["data"]) == 2
 
 
