@@ -113,7 +113,10 @@ dependency, not citation protection. Source reads retain a lazy, execution-owned
 shared lease through persistence; unrelated research can complete while SEC is
 busy, unavailable or unsupported. Existing direct citation publishers still
 lock before writing, and historical admission error codes remain readable.
-Evidence and full-acceptance status:
+This follow-up is verified and merged: frozen `00eaaefb` has **11,577 backend
+passed / 12 unchanged skips**; master recheck adds **442 related backend** and
+the complete **1,867 frontend / 124 files**, build/typecheck and desktop gates.
+Evidence, first-run fixture correction and cleanup scope:
 `docs/superpowers/evidence/2026-09-20-research-sec-isolation/README.md`.
 
 ## Slice 2: Isolated Native Session Continuity
