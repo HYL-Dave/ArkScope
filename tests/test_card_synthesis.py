@@ -94,6 +94,71 @@ def test_synthesize_rejects_unknown_provider():
         )  # type: ignore[arg-type]
 
 
+def test_translation_validation_rejects_list_count_change():
+    from src.card_synthesis import _validate_translation
+
+    card = ResultCard(
+        ticker="AAPL", analysis_time="t", conclusion="c",
+        primary_reasons=["a", "b"], counter_thesis=["x"],
+        confidence_level="low", traceability=Traceability(),
+    ).model_dump()
+    # same structure → ok
+    _validate_translation(card, {**card, "conclusion": "結論", "primary_reasons": ["甲", "乙"]})
+    # dropped a list item → reject (would silently lose a reason)
+    with pytest.raises(ValueError):
+        _validate_translation(card, {**card, "primary_reasons": ["只剩一條"]})
+
+
+def test_translate_text_uses_fixed_translation_shape_without_card_model(monkeypatch):
+    from types import SimpleNamespace
+
+    from src import card_synthesis as cs
+
+    calls = []
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda _task: SimpleNamespace(
+            provider="anthropic",
+            model="claude-sonnet-5",
+            effort="low",
+        ),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda _provider: SimpleNamespace(source="oauth_driver_unwired"),
+    )
+    monkeypatch.setattr(
+        cs,
+        "_translate_anthropic",
+        lambda *args, **kwargs: calls.append((args, kwargs))
+        or {"translated_text": "發行人將以 EA2 交易。"},
+    )
+
+    result = cs.translate_text(
+        "The issuer will trade as EA2.",
+        lang="zh-Hant",
+        model_timeout_s=123,
+    )
+
+    assert result == {
+        "translated_text": "發行人將以 EA2 交易。",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "harness": "claude_subscription_structured_output",
+    }
+    args, kwargs = calls[0]
+    assert args[0] == "claude-sonnet-5"
+    assert args[2] == '{"text":"The issuer will trade as EA2."}'
+    assert args[3] == {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"translated_text": {"type": "string"}},
+        "required": ["translated_text"],
+    }
+    assert kwargs["model_timeout_s"] == 123
+
+
 def test_task_model_routing(tmp_path, monkeypatch):
     from src.agents import config as cfg_mod
     from src.agents.config import get_agent_config, task_model, task_route
@@ -105,10 +170,12 @@ def test_task_model_routing(tmp_path, monkeypatch):
     monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_PROVIDER", raising=False)
     monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", raising=False)
     get_agent_config.cache_clear()
-    # Retired translation overrides cannot affect synthesis.
-    assert task_model("card_synthesis") == "claude-opus-5"
+    # translation defaults to the fast model (not the Opus synthesis model)
+    assert task_model("card_translation") == "claude-sonnet-5"
+    # env override wins for either task
     monkeypatch.setenv("ARKSCOPE_CARD_TRANSLATION_MODEL", "claude-haiku-4-5")
     monkeypatch.setenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", "test-model-x")
+    assert task_model("card_translation") == "claude-haiku-4-5"
     assert task_model("card_synthesis") == "test-model-x"
     # provider can be set independently; model-only OpenAI ids infer provider.
     monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_MODEL")
@@ -168,6 +235,29 @@ def test_card_synthesis_raises_structured_refusal(monkeypatch):
         )
 
 
+def test_card_translation_raises_structured_refusal(monkeypatch):
+    # _translate_anthropic shares the refusal error (same forced-tool pattern).
+    from src import card_synthesis as cs
+    from src.anthropic_refusal import AnthropicRefusalError
+
+    client = MagicMock()
+    client.with_options.return_value = client
+    client.messages.create.return_value = _refusal_response()
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda **kw: client,
+    )
+    with pytest.raises(AnthropicRefusalError):
+        cs._translate_anthropic(
+            "claude-fable-5-1",
+            "sys",
+            "user",
+            {},
+            "zh-TW",
+            model_timeout_s=900,
+        )
+
+
 def test_refusal_never_triggers_effort_fallback(monkeypatch):
     # Review MF6: AnthropicRefusalError's text/category can contain "effort",
     # which the effort-fallback heuristic matches — a refusal must NEVER retry
@@ -187,6 +277,19 @@ def test_refusal_never_triggers_effort_fallback(monkeypatch):
     with pytest.raises(AnthropicRefusalError):
         cs._synthesize_anthropic(
             _packet(), "claude-fable-5-1", effort="xhigh", model_timeout_s=900
+        )
+    assert client.messages.create.call_count == 1
+
+    client.messages.create.reset_mock()
+    with pytest.raises(AnthropicRefusalError):
+        cs._translate_anthropic(
+            "claude-fable-5-1",
+            "sys",
+            "user",
+            {},
+            "zh-TW",
+            effort="xhigh",
+            model_timeout_s=900,
         )
     assert client.messages.create.call_count == 1
 
@@ -236,6 +339,40 @@ def test_openai_synthesis_uses_chatgpt_subscription_when_oauth_is_active(monkeyp
     assert calls[0]["timeout_s"] == 321.0
 
 
+def test_openai_translation_uses_chatgpt_subscription_when_oauth_is_active(monkeypatch):
+    from src import card_synthesis as cs
+
+    calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: _oauth_resolution(provider, "local:7"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_openai_client",
+        lambda: (_ for _ in ()).throw(AssertionError("API-key client must not be built")),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: calls.append(kwargs) or {"conclusion": "結論"},
+    )
+
+    result = cs._translate_openai(
+        "gpt-5.4-mini",
+        "system",
+        '{"conclusion":"view"}',
+        {"type": "object"},
+        "Traditional Chinese",
+        effort="medium",
+        model_timeout_s=322,
+    )
+
+    assert result == {"conclusion": "結論"}
+    assert calls[0]["auth_mode"] == "chatgpt_oauth"
+    assert calls[0]["output_name"] == "emit_translation"
+    assert calls[0]["effort"] == "medium"
+    assert calls[0]["timeout_s"] == 322.0
+
+
 def test_anthropic_synthesis_uses_claude_subscription_when_oauth_is_active(monkeypatch):
     from src import card_synthesis as cs
 
@@ -268,7 +405,43 @@ def test_anthropic_synthesis_uses_claude_subscription_when_oauth_is_active(monke
     assert calls[0]["timeout_s"] == 323.0
 
 
-@pytest.mark.parametrize("seam", ["synthesis"])
+def test_anthropic_translation_uses_claude_subscription_when_oauth_is_active(monkeypatch):
+    from src import card_synthesis as cs
+
+    calls = []
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.resolve_live_auth",
+        lambda provider: _oauth_resolution(provider, "local:2"),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.live_resolver.live_anthropic_client",
+        lambda: (_ for _ in ()).throw(AssertionError("API-key client must not be built")),
+    )
+    monkeypatch.setattr(
+        "src.auth_drivers.subscription_structured_output.run_subscription_structured_output",
+        lambda **kwargs: calls.append(kwargs) or {"conclusion": "結論"},
+    )
+
+    result = cs._translate_anthropic(
+        "claude-sonnet-5",
+        "Respond ONLY via the emit_translation tool.",
+        '{"conclusion":"view"}',
+        {"type": "object"},
+        "Traditional Chinese",
+        effort="medium",
+        model_timeout_s=324,
+        subscription_system="Return ONLY one JSON object matching the schema.",
+    )
+
+    assert result == {"conclusion": "結論"}
+    assert calls[0]["auth_mode"] == "claude_code_oauth"
+    assert calls[0]["output_name"] == "emit_translation"
+    assert "emit_translation tool" not in calls[0]["system"]
+    assert "JSON" in calls[0]["system"]
+    assert calls[0]["timeout_s"] == 324.0
+
+
+@pytest.mark.parametrize("seam", ["synthesis", "translation"])
 def test_fable_5_1_oauth_fixed_tasks_fail_before_subscription_dispatch(
     monkeypatch, seam
 ):
@@ -285,9 +458,25 @@ def test_fable_5_1_oauth_fixed_tasks_fail_before_subscription_dispatch(
     )
 
     with pytest.raises(ValueError) as exc:
-        cs._synthesize_anthropic(
-            _packet(), "claude-fable-5-1", effort="low", model_timeout_s=45
-        )
+        if seam == "synthesis":
+            cs._synthesize_anthropic(
+                _packet(), "claude-fable-5-1", effort="low", model_timeout_s=45
+            )
+        else:
+            cs._translate_anthropic(
+                "claude-fable-5-1",
+                "Use emit_translation exactly once.",
+                "translate",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"translated_text": {"type": "string"}},
+                    "required": ["translated_text"],
+                },
+                "zh-Hant",
+                effort="low",
+                model_timeout_s=45,
+            )
 
     assert exc.value.args[0] == {"code": "model_auth_unverified", "field": "model"}
     assert calls == []
@@ -295,17 +484,44 @@ def test_fable_5_1_oauth_fixed_tasks_fail_before_subscription_dispatch(
 
 @pytest.mark.parametrize(
     ("provider", "invoke"),
-    [(
+    [
+        (
             "openai",
             lambda cs: cs._synthesize_openai(
                 _packet(), "gpt-5.4-mini", effort="high", model_timeout_s=900
             ),
-        ), (
+        ),
+        (
+            "openai",
+            lambda cs: cs._translate_openai(
+                "gpt-5.4-mini",
+                "system",
+                '{"conclusion":"view"}',
+                {"type": "object"},
+                "Traditional Chinese",
+                effort="high",
+                model_timeout_s=900,
+            ),
+        ),
+        (
             "anthropic",
             lambda cs: cs._synthesize_anthropic(
                 _packet(), "claude-sonnet-5", effort="high", model_timeout_s=900
             ),
-        )],
+        ),
+        (
+            "anthropic",
+            lambda cs: cs._translate_anthropic(
+                "claude-sonnet-5",
+                "system",
+                '{"conclusion":"view"}',
+                {"type": "object"},
+                "Traditional Chinese",
+                effort="high",
+                model_timeout_s=900,
+            ),
+        ),
+    ],
 )
 def test_subscription_effort_errors_never_retry_with_default(
     monkeypatch,
@@ -347,11 +563,22 @@ def test_subscription_effort_errors_never_retry_with_default(
 
 @pytest.mark.parametrize(
     "invoke",
-    [lambda cs: cs._synthesize_openai(
+    [
+        lambda cs: cs._synthesize_openai(
             _packet(), "gpt-5.6-luna", effort="high", model_timeout_s=900,
-        ), lambda cs: cs._synthesize_anthropic(
+        ),
+        lambda cs: cs._synthesize_anthropic(
             _packet(), "claude-sonnet-5", effort="high", model_timeout_s=900,
-        )],
+        ),
+        lambda cs: cs._translate_openai(
+            "gpt-5.6-luna", "system", '{"conclusion":"view"}',
+            {"type": "object"}, "Traditional Chinese", effort="medium", model_timeout_s=900,
+        ),
+        lambda cs: cs._translate_anthropic(
+            "claude-sonnet-5", "system", '{"conclusion":"view"}',
+            {"type": "object"}, "Traditional Chinese", effort="medium", model_timeout_s=900,
+        ),
+    ],
 )
 def test_task_provider_effort_rejection_is_not_retried_with_default(monkeypatch, invoke):
     from src import card_synthesis as cs
@@ -408,15 +635,89 @@ def test_synthesis_provider_override_uses_explicit_task_effort(monkeypatch, prov
     assert calls == [(model, "high")]
 
 
+@pytest.mark.parametrize(
+    ("provider", "model"),
+    [("openai", "gpt-5.6-luna"), ("anthropic", "claude-sonnet-5")],
+)
+@pytest.mark.parametrize("seam", ["translate_text", "translate_card"])
+def test_translation_provider_override_uses_explicit_task_effort(
+    monkeypatch, provider, model, seam
+):
+    from src import card_synthesis as cs
+    from src.model_routing import TaskRoute
+
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda task: TaskRoute(
+            task="card_translation", provider="anthropic" if provider == "openai" else "openai",
+            model="claude-sonnet-5" if provider == "openai" else "gpt-5.6-sol",
+            effort="xhigh", source="db",
+        ),
+    )
+    monkeypatch.setattr(
+        cs,
+        "translation_harness",
+        lambda selected_provider, selected_model=None: "fake",
+    )
+    calls = []
+
+    def translate(selected_model, system, user, schema, target, effort, **kwargs):
+        calls.append((selected_model, effort))
+        return (
+            {"translated_text": "translated"}
+            if seam == "translate_text"
+            else {"conclusion": "translated"}
+        )
+
+    monkeypatch.setattr(
+        cs,
+        "_translate_openai" if provider == "openai" else "_translate_anthropic",
+        translate,
+    )
+
+    if seam == "translate_text":
+        result = cs.translate_text(
+            "source", lang="zh-Hant", provider=provider, model=model,
+            model_timeout_s=900,
+        )
+        assert result["translated_text"] == "translated"
+    else:
+        result = cs.translate_card(
+            ResultCard(
+                ticker="AAPL", analysis_time="2026-08-28T00:00:00Z",
+                conclusion="source", confidence_level="low",
+                traceability=Traceability(),
+            ).model_dump(),
+            lang="zh-Hant", provider=provider, model=model, model_timeout_s=900,
+        )
+        assert result["conclusion"] == "translated"
+
+    assert calls == [(model, "medium")]
+
+
 def _invoke_fixed_task_seam(cs, seam, *, provider=None):
-    assert seam == "synthesize_card"
-    return cs.synthesize_card(
-        _packet(), now_iso="2026-08-28T00:00:00Z", model_timeout_s=900,
-        **({"provider": provider} if provider is not None else {}),
+    if seam == "synthesize_card":
+        return cs.synthesize_card(
+            _packet(), now_iso="2026-08-28T00:00:00Z", model_timeout_s=900,
+            **({"provider": provider} if provider is not None else {}),
+        )
+    if seam == "translate_text":
+        return cs.translate_text(
+            "source", lang="zh-Hant", model_timeout_s=900,
+        )
+    return cs.translate_card(
+        ResultCard(
+            ticker="AAPL", analysis_time="2026-08-28T00:00:00Z",
+            conclusion="source", confidence_level="low",
+            traceability=Traceability(),
+        ).model_dump(),
+        lang="zh-Hant",
+        model_timeout_s=900,
     )
 
 
-@pytest.mark.parametrize("seam", ["synthesize_card"])
+@pytest.mark.parametrize("seam", ["synthesize_card", "translate_text", "translate_card"])
 @pytest.mark.parametrize(
     ("provider", "model", "effort", "detail"),
     [
@@ -434,7 +735,7 @@ def test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispat
     from src import card_synthesis as cs
     from src.model_routing import TaskRoute
 
-    task = "card_synthesis"
+    task = "card_synthesis" if seam == "synthesize_card" else "card_translation"
     monkeypatch.setattr(
         cs,
         "task_route",
@@ -445,6 +746,13 @@ def test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispat
     provider_calls = []
     monkeypatch.setattr(cs, "_synthesize_openai", lambda *a, **k: provider_calls.append((a, k)))
     monkeypatch.setattr(cs, "_synthesize_anthropic", lambda *a, **k: provider_calls.append((a, k)))
+    monkeypatch.setattr(cs, "_translate_openai", lambda *a, **k: provider_calls.append((a, k)))
+    monkeypatch.setattr(cs, "_translate_anthropic", lambda *a, **k: provider_calls.append((a, k)))
+    monkeypatch.setattr(
+        cs,
+        "translation_harness",
+        lambda _provider, _model=None: "fake",
+    )
 
     with pytest.raises(ValueError) as exc:
         _invoke_fixed_task_seam(cs, seam, provider=provider)
@@ -453,7 +761,7 @@ def test_fixed_task_seams_reject_invalid_effective_routes_before_provider_dispat
     assert provider_calls == []
 
 
-@pytest.mark.parametrize("seam", ["synthesize_card"])
+@pytest.mark.parametrize("seam", ["synthesize_card", "translate_text", "translate_card"])
 @pytest.mark.parametrize("model", ["gpt-5.6-luna", "gpt-7-custom"])
 def test_fixed_task_seams_dispatch_current_and_custom_explicit_routes(
     monkeypatch, seam, model
@@ -461,7 +769,7 @@ def test_fixed_task_seams_dispatch_current_and_custom_explicit_routes(
     from src import card_synthesis as cs
     from src.model_routing import TaskRoute
 
-    task = "card_synthesis"
+    task = "card_synthesis" if seam == "synthesize_card" else "card_translation"
     monkeypatch.setattr(
         cs,
         "task_route",
@@ -475,8 +783,19 @@ def test_fixed_task_seams_dispatch_current_and_custom_explicit_routes(
         calls.append((selected_model, effort))
         return _synth(), {"effort": effort}
 
+    def translate(selected_model, _system, _user, _schema, _target, effort, **_kwargs):
+        calls.append((selected_model, effort))
+        return {"translated_text": "translated"} if seam == "translate_text" else {
+            "conclusion": "translated",
+        }
 
     monkeypatch.setattr(cs, "_synthesize_openai", synthesize)
+    monkeypatch.setattr(cs, "_translate_openai", translate)
+    monkeypatch.setattr(
+        cs,
+        "translation_harness",
+        lambda _provider, _model=None: "fake",
+    )
 
     _invoke_fixed_task_seam(cs, seam, provider="openai")
 
@@ -581,7 +900,7 @@ def test_anthropic_api_key_synthesis_keeps_existing_messages_shape(monkeypatch):
     assert kwargs["tool_choice"] == {"type": "tool", "name": "emit_result_card"}
 
 
-@pytest.mark.parametrize("seam", ["synthesis"])
+@pytest.mark.parametrize("seam", ["synthesis", "translation"])
 def test_fable_5_1_api_key_fixed_tasks_use_auto_with_one_strict_tool(
     monkeypatch, seam
 ):
@@ -590,8 +909,10 @@ def test_fable_5_1_api_key_fixed_tasks_use_auto_with_one_strict_tool(
     from src import card_synthesis as cs
     from src.auth_drivers.live_resolver import LiveAuthResolution
 
-    name = "emit_result_card"
-    payload = _synth().model_dump()
+    name = "emit_result_card" if seam == "synthesis" else "emit_translation"
+    payload = _synth().model_dump() if seam == "synthesis" else {
+        "translated_text": "譯文"
+    }
     response = SimpleNamespace(
         stop_reason="tool_use",
         content=[SimpleNamespace(type="tool_use", name=name, input=payload)],
@@ -614,10 +935,27 @@ def test_fable_5_1_api_key_fixed_tasks_use_auto_with_one_strict_tool(
         ),
     )
 
-    result, _meta = cs._synthesize_anthropic(
-        _packet(), "claude-fable-5-1", effort="low", model_timeout_s=45
-    )
-    assert result == _synth()
+    if seam == "synthesis":
+        result, _meta = cs._synthesize_anthropic(
+            _packet(), "claude-fable-5-1", effort="low", model_timeout_s=45
+        )
+        assert result == _synth()
+    else:
+        result = cs._translate_anthropic(
+            "claude-fable-5-1",
+            "Call emit_translation exactly once.",
+            "translate",
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {"translated_text": {"type": "string"}},
+                "required": ["translated_text"],
+            },
+            "zh-Hant",
+            effort="low",
+            model_timeout_s=45,
+        )
+        assert result == payload
 
     assert bounded.messages.create.call_count == 1
     kwargs = bounded.messages.create.call_args.kwargs
@@ -627,7 +965,7 @@ def test_fable_5_1_api_key_fixed_tasks_use_auto_with_one_strict_tool(
     assert kwargs["tools"][0]["strict"] is True
 
 
-@pytest.mark.parametrize("seam", ["synthesis"])
+@pytest.mark.parametrize("seam", ("synthesis", "translation"))
 def test_fable_5_1_text_only_response_is_an_explicit_failure(monkeypatch, seam):
     from types import SimpleNamespace
 
@@ -649,11 +987,27 @@ def test_fable_5_1_text_only_response_is_an_explicit_failure(monkeypatch, seam):
         "src.auth_drivers.live_resolver.live_anthropic_client", lambda: client
     )
 
-    expected_tool = "emit_result_card"
+    expected_tool = "emit_result_card" if seam == "synthesis" else "emit_translation"
     with pytest.raises(RuntimeError, match=f"did not return (?:the )?{expected_tool}"):
-        cs._synthesize_anthropic(
-            _packet(), "claude-fable-5-1", effort="low", model_timeout_s=45
-        )
+        if seam == "synthesis":
+            cs._synthesize_anthropic(
+                _packet(), "claude-fable-5-1", effort="low", model_timeout_s=45
+            )
+        else:
+            cs._translate_anthropic(
+                "claude-fable-5-1",
+                "Call emit_translation exactly once.",
+                "translate",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"translated_text": {"type": "string"}},
+                    "required": ["translated_text"],
+                },
+                "zh-Hant",
+                effort="low",
+                model_timeout_s=45,
+            )
 
     assert bounded.messages.create.call_count == 1
 
@@ -779,3 +1133,64 @@ def test_subscription_sdk_timeout_cause_is_typed(monkeypatch, provider):
         )
 
     assert caught.value.effective_seconds == 123.0
+
+
+def test_shared_text_translation_has_no_legacy_16000_character_boundary(monkeypatch):
+    from src import card_synthesis as cs
+    from src.model_routing import TaskRoute
+
+    source = "s" * 16_001
+    translated = "t" * 16_001
+    monkeypatch.setattr(cs, "ensure_env_loaded", lambda: None)
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda _task: TaskRoute(
+            task="card_translation",
+            provider="openai",
+            model="gpt-5.6-luna",
+            effort="medium",
+            source="db",
+        ),
+    )
+    monkeypatch.setattr(
+        cs,
+        "_translate_openai",
+        lambda *_args, **_kwargs: {"translated_text": translated},
+    )
+    monkeypatch.setattr(
+        cs,
+        "translation_harness",
+        lambda _provider, _model=None: "fake",
+    )
+
+    result = cs.translate_text(source, lang="zh-Hant", model_timeout_s=30.0)
+
+    assert result["translated_text"] == translated
+
+
+def test_spark_text_translation_rejects_before_dispatch(monkeypatch):
+    from src import card_synthesis as cs
+    from src.model_routing import TaskRoute
+
+    monkeypatch.setattr(cs, "ensure_env_loaded", lambda: None)
+    monkeypatch.setattr(
+        cs,
+        "task_route",
+        lambda _task: TaskRoute(
+            task="card_translation",
+            provider="openai",
+            model="gpt-5.3-codex-spark",
+            effort="medium",
+            source="db",
+        ),
+    )
+    monkeypatch.setattr(
+        cs,
+        "_translate_openai",
+        lambda *_args, **_kwargs: pytest.fail("retired model dispatched"),
+    )
+
+    with pytest.raises(cs.CardExecutionAdmissionError) as caught:
+        cs.translate_text("source", lang="zh-Hant", model_timeout_s=30.0)
+    assert caught.value.detail == {"code": "model_retired", "field": "model"}

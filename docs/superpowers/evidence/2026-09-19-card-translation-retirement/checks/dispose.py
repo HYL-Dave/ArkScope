@@ -1,8 +1,7 @@
-"""Explicit, offline card-translation disposal; never imported by the App."""
+"""Explicit, offline translation-record cleanup; the feature and schema remain."""
 
 import json
 from pathlib import Path
-import re
 import sqlite3
 import stat
 import sys
@@ -11,7 +10,6 @@ import sys
 TARGET = "ai_card_translation_versions"
 INDEX = "idx_card_translation_versions"
 COLUMN = "translations_json"
-TASK = "card_translation"
 PROTECTED = (
     "ai_card_runs", "ai_card_execution_receipts", "research_reports",
     "agent_memories", "research_threads", "research_messages", "research_runs",
@@ -25,20 +23,6 @@ VERSION_COLUMNS = (
     *((name, "TEXT", 0, None, 0, 0)
       for name in ("provider", "model", "effort", "auth_mode", "created_at")),
 )
-SETTINGS_COLUMNS = {
-    "model_route": (
-        ("task", "TEXT", 0, None, 1, 0),
-        ("provider", "TEXT", 1, None, 0, 0),
-        ("model", "TEXT", 1, None, 0, 0),
-        ("effort", "TEXT", 1, "'default'", 0, 0),
-        ("updated_at", "TEXT", 1, None, 0, 0),
-    ),
-    "fixed_task_runtime_config": (
-        ("task", "TEXT", 0, None, 1, 0),
-        ("model_timeout_s", "REAL", 1, None, 0, 0),
-        ("updated_at", "TEXT", 1, None, 0, 0),
-    ),
-}
 
 
 def require(condition, code):
@@ -82,16 +66,14 @@ def dispose(conn):
             parents = {row[0].casefold() for row in conn.execute(
                 'SELECT "table" FROM pragma_foreign_key_list(?)', (table,),
             )}
-            require(not parents.intersection({TARGET, "model_route", "fixed_task_runtime_config"}),
+            require(TARGET not in parents,
                     "translation_disposal_foreign_key_dependency")
         for kind, name, table, sql in before:
             if name == TARGET or name == "ai_card_runs" or name == INDEX:
                 continue
             require(table != TARGET, "translation_disposal_unknown_owned_object")
-            require(not re.search(r"\b(ai_card_translation_versions|translations_json)\b", sql or "", re.I),
-                    "translation_disposal_schema_dependency")
             require(not (kind == "trigger" and table in {
-                "ai_card_runs", "model_route", "fixed_task_runtime_config",
+                "ai_card_runs", TARGET,
             }), "translation_disposal_trigger_dependency")
         index = next((row for row in before if row[1] == INDEX), None)
         if index:
@@ -104,37 +86,35 @@ def dispose(conn):
         counts = lambda: {table: conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
                           for table in PROTECTED if table in tables}
         protected = counts()
+        original_columns = ",".join('"' + row[0].replace('"', '""') + '"'
+                                    for row in card_columns if row[0] != COLUMN)
+        originals = lambda: conn.execute(
+            f"SELECT {original_columns} FROM ai_card_runs ORDER BY id"
+        ).fetchall()
+        preserved_originals = originals()
         sequences = lambda: conn.execute(
-            "SELECT name,seq FROM sqlite_sequence WHERE name<>? ORDER BY name", (TARGET,),
+            "SELECT name,seq FROM sqlite_sequence ORDER BY name",
         ).fetchall() if "sqlite_sequence" in tables else []
         preserved_sequences = sequences()
         settings = {}
         for table in ("model_route", "fixed_task_runtime_config"):
             if table in tables:
-                require(columns(conn, table) == SETTINGS_COLUMNS[table],
-                        "translation_disposal_settings_schema_changed")
                 settings[table] = conn.execute(
-                    f'SELECT * FROM "{table}" WHERE task<>? ORDER BY task', (TASK,),
+                    f'SELECT * FROM "{table}" ORDER BY task',
                 ).fetchall()
-        removed = {"versions": 0, "embedded_cards": 0, "task_rows": {}}
+        removed = {"versions": 0, "embedded_cards": 0}
         if TARGET in tables:
-            removed["versions"] = conn.execute(f"SELECT COUNT(*) FROM {TARGET}").fetchone()[0]
-            conn.execute(f"DROP TABLE main.{TARGET}")
+            removed["versions"] = conn.execute(f"DELETE FROM main.{TARGET}").rowcount
         if embedded:
             removed["embedded_cards"] = conn.execute(
-                "SELECT COUNT(*) FROM ai_card_runs WHERE translations_json IS NOT NULL"
-            ).fetchone()[0]
-            conn.execute("ALTER TABLE main.ai_card_runs DROP COLUMN translations_json")
-        for table, rows in settings.items():
-            removed["task_rows"][table] = conn.execute(
-                f'DELETE FROM "{table}" WHERE task=?', (TASK,),
+                "UPDATE main.ai_card_runs SET translations_json=NULL "
+                "WHERE translations_json IS NOT NULL"
             ).rowcount
+        for table, rows in settings.items():
             require(conn.execute(f'SELECT * FROM "{table}" ORDER BY task').fetchall() == rows,
-                    "translation_disposal_other_settings_changed")
-        others = lambda rows: [row for row in rows if row[1] not in {TARGET, INDEX, "ai_card_runs"}]
-        require(others(schema(conn)) == others(before), "translation_disposal_other_schema_changed")
-        require(columns(conn, "ai_card_runs") == tuple(row for row in card_columns if row[0] != COLUMN),
-                "translation_disposal_other_columns_changed")
+                    "translation_disposal_settings_changed")
+        require(schema(conn) == before, "translation_disposal_schema_changed")
+        require(originals() == preserved_originals, "translation_disposal_originals_changed")
         require(counts() == protected, "translation_disposal_protected_counts_changed")
         require(sequences() == preserved_sequences, "translation_disposal_other_sequences_changed")
         require(conn.execute("PRAGMA integrity_check").fetchall() == [("ok",)],
@@ -144,14 +124,15 @@ def dispose(conn):
         conn.commit()
         return {"removed": removed, "protected_counts": protected,
                 "integrity_check": "ok", "foreign_key_check": "ok",
-                "other_schema_and_settings_unchanged": True, "archive_created": False}
+                "schema_and_all_settings_unchanged": True, "archive_created": False}
     except BaseException:
         conn.rollback()
         raise
 
 
 if __name__ == "__main__":
-    require(sys.argv[1:] == ["--apply", "--writers-stopped"], "explicit_stopped_writer_apply_required")
+    require(sys.argv[1:] == ["--clear-all-translations", "--writers-stopped"],
+            "explicit_stopped_writer_record_cleanup_required")
     path = Path("/mnt/md0/PycharmProjects/ArkScope/data/profile_state.db")
     require(path.resolve(strict=True) == path and not path.is_symlink(), "profile_path_unsafe")
     info = path.stat()

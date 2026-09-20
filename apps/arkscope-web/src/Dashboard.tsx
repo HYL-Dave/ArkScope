@@ -94,6 +94,8 @@ function RuntimePanel({ rt }: { rt: RuntimeConfig }) {
           <span className="mono">{rt.card_synthesis.provider} · {rt.card_synthesis.model}</span>
         </div>
         <div className="rt-row">
+          <span>{t(($) => $.runtime.cardTranslation)}</span>
+          <span className="mono">{rt.card_translation.provider} · {rt.card_translation.model}</span>
         </div>
         <div className="rt-row">
           <span>{t(($) => $.runtime.anthropicDefaultAdvanced)}</span>

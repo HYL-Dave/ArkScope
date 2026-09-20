@@ -89,6 +89,7 @@ const common = {
   },
   executionSource: {
     original: "Original request",
+    translation: "Translation request",
     previous: "Previous run request",
     next: "Next run",
     effort: "Effort",

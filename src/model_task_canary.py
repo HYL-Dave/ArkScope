@@ -34,7 +34,7 @@ from src.model_discovery_cache import ModelDiscoveryCache
 from src.model_effective import task_capability_ok
 from src.model_routing import model_provider
 
-_CARD_TASKS = frozenset({"card_synthesis"})
+_CARD_TASKS = frozenset({"card_synthesis", "card_translation"})
 
 
 class TaskModelTestResult(BaseModel):

@@ -4,11 +4,13 @@ Date: 2026-09-19. Owner: `SPARK-RETIREMENT`.
 Base: `52037620f1f661bfc7fd8f696de7e101fdfdff5c` (local master).
 Implementation branch: `codex/spark-retirement`.
 
-Historical scope and verification below were committed as `544d8dfd`. The
-subsequent user instruction expands retirement to all card translation and
-authorizes appropriate commit/merge/cleanup operations. That superseding work
-is recorded in `../2026-09-19-card-translation-retirement/README.md`; the original
-scope and test results below are retained as history, not current instructions.
+The Spark-only feature boundary below was committed as `544d8dfd` and is
+confirmed by the user's September 20 clarification: card translation stays.
+Our subsequent full-feature removal was an interpretation error and was never
+activated. The correction restores this boundary and prepares record-only
+cleanup, as the user also permits clearing all translation results. See
+`../2026-09-19-card-translation-retirement/README.md` for that correction and
+current verification. The original test results below belong to `544d8dfd`.
 
 The user requested rechecking disagreements with the tool audit review and
 explicitly authorized removing Spark use, options and its translation-specific

@@ -31,7 +31,7 @@ from src.model_capabilities import (
 from src.model_discovery_cache import ModelDiscoveryCache
 from src.model_routing import TASK_IDS
 
-_CARD_TASKS = ("card_synthesis",)
+_CARD_TASKS = ("card_synthesis", "card_translation")
 _TASKS = TASK_IDS
 _PROVIDERS = ("openai", "anthropic")
 

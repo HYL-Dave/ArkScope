@@ -44,18 +44,21 @@ class DisposalTests(unittest.TestCase):
     def snapshot(self):
         return "\n".join(self.conn.iterdump())
 
-    def test_only_translation_is_removed_and_repeat_is_noop(self):
+    def test_only_translation_records_are_removed_and_repeat_is_noop(self):
+        schema = module.schema(self.conn)
         result = module.dispose(self.conn)
-        self.assertEqual(result["removed"], {"versions": 1, "embedded_cards": 1,
-            "task_rows": {"model_route": 1, "fixed_task_runtime_config": 1}})
+        self.assertEqual(result["removed"], {"versions": 1, "embedded_cards": 1})
+        self.assertEqual(module.schema(self.conn), schema)
         self.assertEqual(self.conn.execute("SELECT * FROM ai_card_runs ORDER BY id").fetchall(), [
-            (1,'{"original":true}','original-model'), (2,'{"another":true}','historical-spark')])
+            (1,'{"original":true}',None,'original-model'), (2,'{"another":true}',None,'historical-spark')])
         self.assertEqual(self.conn.execute("SELECT * FROM ai_card_execution_receipts").fetchall(), [(1,'original-model')])
         self.assertEqual(self.conn.execute("SELECT * FROM research_threads").fetchall(), [(1,'original research')])
-        self.assertEqual(self.conn.execute("SELECT * FROM model_route").fetchall(),
-                         [('card_synthesis','anthropic','keep','high','fixture')])
-        self.assertEqual(self.conn.execute("SELECT * FROM fixed_task_runtime_config").fetchall(),
-                         [('card_synthesis',900,'fixture')])
+        self.assertEqual(self.conn.execute("SELECT * FROM model_route ORDER BY task").fetchall(),
+                         [('card_synthesis','anthropic','keep','high','fixture'),
+                          ('card_translation','openai','old','medium','fixture')])
+        self.assertEqual(self.conn.execute("SELECT * FROM fixed_task_runtime_config ORDER BY task").fetchall(),
+                         [('card_synthesis',900,'fixture'), ('card_translation',500,'fixture')])
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) FROM ai_card_translation_versions").fetchone(), (0,))
         after = self.snapshot()
         self.assertEqual(module.dispose(self.conn)["removed"]["versions"], 0)
         self.assertEqual(self.snapshot(), after)
@@ -66,7 +69,7 @@ class DisposalTests(unittest.TestCase):
 
     def test_original_write_trigger_is_refused(self):
         self.conn.executescript("""
-            CREATE TRIGGER unexpected AFTER DELETE ON model_route BEGIN DELETE FROM research_threads; END;
+            CREATE TRIGGER unexpected AFTER UPDATE ON ai_card_runs BEGIN DELETE FROM research_threads; END;
         """)
         before = self.snapshot()
         with self.assertRaisesRegex(ValueError, "trigger_dependency"):
@@ -87,22 +90,19 @@ class DisposalTests(unittest.TestCase):
             module.dispose(self.conn)
         self.assertEqual(self.snapshot(), before)
 
-    def test_setting_cascade_cannot_remove_unrelated_records(self):
+    def test_settings_and_their_dependents_are_untouched(self):
         self.conn.executescript("""
             CREATE TABLE other(task TEXT REFERENCES model_route(task) ON DELETE CASCADE, content TEXT);
             INSERT INTO other VALUES ('card_translation','must not cascade');
         """)
-        before = self.snapshot()
-        with self.assertRaisesRegex(ValueError, "foreign_key_dependency"):
-            module.dispose(self.conn)
-        self.assertEqual(self.snapshot(), before)
+        module.dispose(self.conn)
+        self.assertEqual(self.conn.execute("SELECT * FROM other").fetchall(),
+                         [('card_translation','must not cascade')])
 
-    def test_translation_view_is_refused(self):
+    def test_translation_view_survives_record_cleanup(self):
         self.conn.execute("CREATE VIEW old_translation AS SELECT translations_json FROM ai_card_runs")
-        before = self.snapshot()
-        with self.assertRaisesRegex(ValueError, "schema_dependency"):
-            module.dispose(self.conn)
-        self.assertEqual(self.snapshot(), before)
+        module.dispose(self.conn)
+        self.assertEqual(self.conn.execute("SELECT * FROM old_translation").fetchall(), [(None,), (None,)])
 
     def test_changed_target_schema_is_refused(self):
         self.conn.execute("ALTER TABLE ai_card_translation_versions ADD COLUMN unexpected TEXT")
@@ -111,12 +111,30 @@ class DisposalTests(unittest.TestCase):
             module.dispose(self.conn)
         self.assertEqual(self.snapshot(), before)
 
-    def test_changed_settings_schema_is_refused(self):
+    def test_unrelated_settings_shape_is_untouched(self):
         self.conn.execute("ALTER TABLE model_route ADD COLUMN unreviewed TEXT")
-        before = self.snapshot()
-        with self.assertRaisesRegex(ValueError, "settings_schema_changed"):
-            module.dispose(self.conn)
-        self.assertEqual(self.snapshot(), before)
+        before = self.conn.execute("SELECT * FROM model_route ORDER BY task").fetchall()
+        module.dispose(self.conn)
+        self.assertEqual(self.conn.execute("SELECT * FROM model_route ORDER BY task").fetchall(), before)
+
+    def test_new_translation_can_be_saved_without_schema_recreation(self):
+        module.dispose(self.conn)
+        self.conn.execute("INSERT INTO ai_card_translation_versions(run_id,lang,card_json,model) "
+                          "VALUES (1,'zh-Hant','{}','supported-model')")
+        self.assertEqual(self.conn.execute("SELECT id,model FROM ai_card_translation_versions").fetchall(),
+                         [(2,'supported-model')])
+
+    def test_only_two_translation_data_statements_execute(self):
+        statements = []
+        self.conn.set_trace_callback(statements.append)
+        before = self.conn.total_changes
+        module.dispose(self.conn)
+        self.assertEqual(self.conn.total_changes - before, 2)
+        self.assertEqual([sql for sql in statements if sql.lstrip().upper().startswith(
+            ('DELETE', 'UPDATE', 'INSERT', 'REPLACE', 'DROP', 'ALTER', 'CREATE'))], [
+                'DELETE FROM main.ai_card_translation_versions',
+                'UPDATE main.ai_card_runs SET translations_json=NULL WHERE translations_json IS NOT NULL',
+            ])
 
     def test_failed_commit_rolls_back_every_target(self):
         before = self.snapshot()

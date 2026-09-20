@@ -462,8 +462,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 222
-    assert not any("/analysis/cards/{run_id}/translate" in row for row in rows)
+    assert len(rows) == 223
     assert ("PUT", "/news/settings") not in rows
     assert {row for row in rows if row[1].startswith("/news/")} == {
         ("GET", "/news/status"), ("PUT", "/news/settings/normalized-writes"),

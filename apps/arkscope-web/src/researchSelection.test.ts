@@ -46,7 +46,7 @@ function catalog(): ModelCatalog {
   const routes = {
     ai_research: route(),
     card_synthesis: { ...route(), task: "card_synthesis" as const },
-
+    card_translation: { ...route("anthropic", "claude-sonnet-5", "medium"), task: "card_translation" as const },
   };
   const openai = {
     executable: true,

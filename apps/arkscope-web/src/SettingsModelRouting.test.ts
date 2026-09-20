@@ -63,16 +63,16 @@ const providerBlock = (provider: "openai" | "anthropic", model: string) => ({
 });
 
 const routes = {
-
-  card_synthesis: taskRoute("card_synthesis", "anthropic", "claude-sonnet-5"),
+  card_synthesis: taskRoute("card_synthesis", "openai", "gpt-5.6-luna"),
+  card_translation: taskRoute("card_translation", "anthropic", "claude-sonnet-5"),
   ai_research: taskRoute("ai_research", "openai", "gpt-5.6-luna"),
 };
 
 const catalog: ModelCatalog = {
   providers: ["anthropic", "openai"],
   tasks: [
-
-    { id: "card_synthesis", label: "BACKEND TASK SYNTHESIS", description: "", default_provider: "anthropic", recommended_model: "claude-sonnet-5" },
+    { id: "card_synthesis", label: "生成", description: "", default_provider: "openai", recommended_model: "gpt-5.6-luna" },
+    { id: "card_translation", label: "翻譯", description: "", default_provider: "anthropic", recommended_model: "claude-sonnet-5" },
     { id: "ai_research", label: "研究", description: "", default_provider: "openai", recommended_model: "gpt-5.6-luna" },
   ],
   models: CURRENT_MODEL_IDS.map((id) => ({
@@ -128,7 +128,7 @@ const catalog: ModelCatalog = {
   },
 };
 
-function catalogWithOAuthSynthesis(): ModelCatalog {
+function catalogWithOAuthTranslation(): ModelCatalog {
   const modelId = "gpt-6-astra";
   const credential: ProviderCredential = {
     id: "local:7",
@@ -146,7 +146,7 @@ function catalogWithOAuthSynthesis(): ModelCatalog {
     can_test_models: true,
     notes: "",
   };
-  const synthesis = catalog.effective!.tasks.card_synthesis!;
+  const translation = catalog.effective!.tasks.card_translation!;
   return {
     ...catalog,
     current_model_ids: [...(catalog.current_model_ids ?? []), modelId],
@@ -167,10 +167,10 @@ function catalogWithOAuthSynthesis(): ModelCatalog {
       },
       tasks: {
         ...catalog.effective!.tasks,
-        card_synthesis: {
-          ...synthesis,
+        card_translation: {
+          ...translation,
           providers: {
-            ...synthesis.providers,
+            ...translation.providers,
             openai: {
               executable: true,
               reason_code: null,
@@ -316,12 +316,12 @@ async function click(element: HTMLElement) {
 
 describe("Settings model route save gate", () => {
   async function investigationDraft(onRuntimeChanged = vi.fn(async () => undefined)) {
-    const value = structuredClone(catalogWithOAuthSynthesis());
-    value.routes.card_synthesis = { ...taskRoute("card_synthesis", "openai", "gpt-6-astra"), effort: "xhigh" };
+    const value = structuredClone(catalogWithOAuthTranslation());
+    value.routes.card_translation = { ...taskRoute("card_translation", "openai", "gpt-6-astra"), effort: "xhigh" };
     value.tasks.push({ id: "lifecycle_investigation", label: "Lifecycle Investigation", description: "", default_provider: "anthropic", recommended_model: "claude-sonnet-5" });
     value.routes.lifecycle_investigation = { ...taskRoute("lifecycle_investigation", "anthropic", "claude-sonnet-5"), effort: "high", source: "default" };
     value.effective!.providers!.anthropic = { credential_id: "local:8", auth_mode: "claude_code_oauth", label: "Claude subscription" };
-    value.effective!.tasks.lifecycle_investigation = structuredClone(value.effective!.tasks.card_synthesis!);
+    value.effective!.tasks.lifecycle_investigation = structuredClone(value.effective!.tasks.card_translation!);
     controls.catalogOverride = value;
     host = document.createElement("div");
     document.body.append(host);
@@ -446,18 +446,18 @@ describe("Settings model route save gate", () => {
     expect(controls.saveModelRoutes).toHaveBeenCalledOnce();
   });
 
-  it("adopts newer untouched synthesis settings without sending them in the next investigation save", async () => {
+  it("adopts newer untouched translation settings without sending them in the next investigation save", async () => {
     const { value, effort, save } = await investigationDraft();
     controls.saveModelRoutes.mockImplementationOnce(async () => {
       const receipt = acknowledgeInvestigation(value);
-      value.routes.card_synthesis = { ...value.routes.card_synthesis, effort: "low" };
+      value.routes.card_translation = { ...value.routes.card_translation, effort: "low" };
       return receipt;
     });
     await click(save);
-    const synthesisEffort = host!.querySelector<HTMLSelectElement>(
-      '[aria-labelledby="model-route-card_synthesis-task-label model-route-card_synthesis-effort-label"]',
+    const translationEffort = host!.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-card_translation-task-label model-route-card_translation-effort-label"]',
     )!;
-    expect(synthesisEffort.value).toBe("low");
+    expect(translationEffort.value).toBe("low");
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(effort, "medium");
       effort.dispatchEvent(new Event("change", { bubbles: true }));
@@ -499,7 +499,7 @@ describe("Settings model route save gate", () => {
   });
 
   it("saves an exact discovered subscription route using its per-task effort facts", async () => {
-    controls.catalogOverride = catalogWithOAuthSynthesis();
+    controls.catalogOverride = catalogWithOAuthTranslation();
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -512,15 +512,15 @@ describe("Settings model route save gate", () => {
     });
     await flush();
 
-    const synthesis = host.querySelector('[data-testid="route-card_synthesis"]')!;
-    const openai = Array.from(synthesis.querySelectorAll<HTMLButtonElement>("button"))
+    const translation = host.querySelector('[data-testid="route-card_translation"]')!;
+    const openai = Array.from(translation.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "OpenAI")!;
     await click(openai);
-    const model = synthesis.querySelector<HTMLSelectElement>(
-      '[aria-labelledby="model-route-card_synthesis-task-label model-route-card_synthesis-model-label"]',
+    const model = translation.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-card_translation-task-label model-route-card_translation-model-label"]',
     )!;
-    const effort = synthesis.querySelector<HTMLSelectElement>(
-      '[aria-labelledby="model-route-card_synthesis-task-label model-route-card_synthesis-effort-label"]',
+    const effort = translation.querySelector<HTMLSelectElement>(
+      '[aria-labelledby="model-route-card_translation-task-label model-route-card_translation-effort-label"]',
     )!;
     const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
     await act(async () => {
@@ -539,7 +539,7 @@ describe("Settings model route save gate", () => {
     expect(save.disabled).toBe(false);
     await click(save);
     expect(controls.saveModelRoutes).toHaveBeenCalledWith(expect.objectContaining({
-      card_synthesis: {
+      card_translation: {
         provider: "openai",
         model: "gpt-6-astra",
         effort: "xhigh",
@@ -633,7 +633,7 @@ describe("Settings model route save gate", () => {
         ...catalog,
         routes: {
           ...catalog.routes,
-          card_synthesis: { ...catalog.routes.card_synthesis, provider: "openai", model: "gpt-5.6-luna", effort: legacyEffort },
+          card_synthesis: { ...catalog.routes.card_synthesis, effort: legacyEffort },
         },
         credentials: { ...catalog.credentials, openai: [credential] },
       };
@@ -912,8 +912,8 @@ describe("Settings model route save gate", () => {
         key_set: true,
         credentials: [],
       },
-
       card_synthesis: routes.card_synthesis,
+      card_translation: routes.card_translation,
       ai_research: routes.ai_research,
       research_runtime: {
         max_tool_calls: 60,
@@ -924,9 +924,15 @@ describe("Settings model route save gate", () => {
         warning: null,
       },
       fixed_task_runtime: {
-
         card_synthesis: {
           task: "card_synthesis",
+          model_timeout_s: 900,
+          source: "db",
+          db_saved: true,
+          warning: null,
+        },
+        card_translation: {
+          task: "card_translation",
           model_timeout_s: 900,
           source: "db",
           db_saved: true,
@@ -965,8 +971,8 @@ describe("Settings model route save gate", () => {
 
     expect(controls.saveFixedTaskRuntime).toHaveBeenCalledWith({
       tasks: {
-
         card_synthesis: { model_timeout_s: 1200 },
+        card_translation: { model_timeout_s: 900 },
       },
     });
     expect(onRuntimeChanged).toHaveBeenCalledOnce();
@@ -1332,7 +1338,7 @@ describe("Settings model route save gate", () => {
     const models = host.querySelector('[data-settings-anchor="models"]')!;
     expect(models.textContent).toContain("Task Model Routing");
     expect(models.textContent).toContain("AI Card Synthesis");
-    expect(models.textContent).not.toContain("Content Translation");
+    expect(models.textContent).toContain("Content Translation");
     expect(models.textContent).toContain("AI Research");
     expect(models.textContent).toContain("Generate source-grounded AI cards.");
     expect(models.textContent).not.toContain("Do not send effort;");
@@ -1495,7 +1501,7 @@ describe("Settings model route save gate", () => {
   });
 
   it("opens model discovery beside the route action and reopens it without another request", async () => {
-    controls.catalogOverride = catalogWithOAuthSynthesis();
+    controls.catalogOverride = catalogWithOAuthTranslation();
     controls.discoverModels.mockResolvedValue({
       provider: "openai",
       credential_id: "local:7",
@@ -1521,11 +1527,11 @@ describe("Settings model route save gate", () => {
     });
     await flush();
 
-    const synthesis = host.querySelector('[data-testid="route-card_synthesis"]')!;
-    const openai = Array.from(synthesis.querySelectorAll<HTMLButtonElement>("button"))
+    const translation = host.querySelector('[data-testid="route-card_translation"]')!;
+    const openai = Array.from(translation.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "OpenAI")!;
     await click(openai);
-    const verify = Array.from(synthesis.querySelectorAll<HTMLButtonElement>("button"))
+    const verify = Array.from(translation.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "重新驗證列表")!;
     verify.focus();
     await click(verify);
@@ -1539,7 +1545,7 @@ describe("Settings model route save gate", () => {
     expect(document.body.querySelector('.ui-drawer[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(verify);
 
-    const reopen = Array.from(synthesis.querySelectorAll<HTMLButtonElement>("button"))
+    const reopen = Array.from(translation.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "查看上次結果")!;
     await click(reopen);
     drawer = document.body.querySelector<HTMLElement>('.ui-drawer[role="dialog"]');
@@ -1548,7 +1554,7 @@ describe("Settings model route save gate", () => {
   });
 
   it("opens the same model discovery drawer from a credential row", async () => {
-    controls.catalogOverride = catalogWithOAuthSynthesis();
+    controls.catalogOverride = catalogWithOAuthTranslation();
     controls.discoverModels.mockResolvedValue({
       provider: "openai",
       credential_id: "local:7",
@@ -1613,8 +1619,8 @@ describe("Settings model route save gate", () => {
         key_set: true,
         credentials: [],
       },
-
       card_synthesis: routes.card_synthesis,
+      card_translation: routes.card_translation,
       ai_research: routes.ai_research,
       research_runtime: {
         max_tool_calls: 60,
@@ -1625,9 +1631,15 @@ describe("Settings model route save gate", () => {
         warning: "PLANTED RAW RESEARCH RUNTIME WARNING",
       },
       fixed_task_runtime: {
-
         card_synthesis: {
           task: "card_synthesis",
+          model_timeout_s: 900,
+          source: "db",
+          db_saved: true,
+          warning: "PLANTED RAW FIXED RUNTIME WARNING",
+        },
+        card_translation: {
+          task: "card_translation",
           model_timeout_s: 900,
           source: "db",
           db_saved: true,

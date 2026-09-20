@@ -214,7 +214,7 @@ def test_spark_execution_is_retired_for_every_former_context():
     }
     assert model_execution_admission_detail(
         "gpt-5.3-codex-spark",
-        task="card_synthesis",
+        task="card_translation",
         auth_mode="api_key",
         plan_type="pro",
     ) == {
@@ -224,7 +224,7 @@ def test_spark_execution_is_retired_for_every_former_context():
     for diagnostic_plan in ("pro", "prolite", "plus", None):
         assert model_execution_admission_detail(
             "gpt-5.3-codex-spark",
-            task="card_synthesis",
+            task="card_translation",
             auth_mode="chatgpt_oauth",
             plan_type=diagnostic_plan,
         ) == {"code": "model_retired", "field": "model"}
@@ -234,7 +234,7 @@ def test_unknown_plan_does_not_override_retirement():
     for plan_type in (None, "", "   ", "not a valid plan value"):
         assert model_execution_admission_detail(
             "gpt-5.3-codex-spark",
-            task="card_synthesis",
+            task="card_translation",
             auth_mode="chatgpt_oauth",
             plan_type=plan_type,
         ) == {"code": "model_retired", "field": "model"}
@@ -243,7 +243,7 @@ def test_unknown_plan_does_not_override_retirement():
 def test_future_provider_plan_does_not_override_retirement():
     assert model_execution_admission_detail(
         "gpt-5.3-codex-spark",
-        task="card_synthesis",
+        task="card_translation",
         auth_mode="chatgpt_oauth",
         plan_type="future-provider-plan-name",
     ) == {"code": "model_retired", "field": "model"}

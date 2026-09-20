@@ -864,6 +864,7 @@ export function SettingsView({
   async function saveFixedTaskLimits(body: {
     tasks: {
       card_synthesis: { model_timeout_s: number };
+      card_translation: { model_timeout_s: number };
     };
   }) {
     setSaving(true);
