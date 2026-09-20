@@ -184,3 +184,21 @@ def test_refresh_failure_never_falls_back_to_a_stored_sec_result(local):
     assert any(item["code"] == "sec_financials_acquisition_failed" for item in result.acquisition_gaps)
     sec.assert_called_once()
     http.assert_not_called()
+
+
+@pytest.mark.parametrize("report_date", [None, "", "not-a-period"])
+def test_legacy_empty_detailed_cache_is_not_a_successful_observation(local, monkeypatch, report_date):
+    from src.fundamentals.cache import detailed_financials_cache_key
+    from src.tools.schemas import ValuationPriceBasis
+    from tests.test_detailed_financials import _static_cache_payload
+
+    dal, http, sec = local
+    data = _static_cache_payload("AAPL")
+    data.update(report_date=report_date, static_metrics={}, tech_metrics={}, valuation_inputs={})
+    assert dal._backend.set_financial_cache(detailed_financials_cache_key("AAPL"), "AAPL", data)
+    monkeypatch.setattr("src.valuation_price.get_valuation_price_basis", lambda _: ValuationPriceBasis())
+    result = get_detailed_financials(dal, "AAPL", freshness="stored")
+    assert not result.source_observations
+    assert {"provider": "sec_edgar", "code": "financial_stored_data_unavailable"} in result.acquisition_gaps
+    http.assert_not_called()
+    sec.assert_not_called()

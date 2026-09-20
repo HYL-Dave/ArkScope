@@ -659,9 +659,20 @@ def get_detailed_financials(
         except Exception as exc:
             raise ReuseFailure("sec_financials_acquisition_failed") from exc
 
+    def validate_static(data):
+        valid = validate_detailed_financials_static_payload(data, ticker=ticker)
+        if valid is None:
+            return None
+        try:
+            if date.fromisoformat(valid["report_date"]).isoformat() != valid["report_date"]:
+                return None
+        except (TypeError, ValueError):
+            return None
+        return valid
+
     try:
         observation = cached_dataset(backend, cache_key, "sec_edgar", ticker, reuse_policy,
-            lambda data: validate_detailed_financials_static_payload(data, ticker=ticker), fetch_static)
+                                     validate_static, fetch_static)
         payload = observation.data
         observations.append(observation.describe("sec_edgar", "detailed_financials", reuse_policy,
             period="annual", report_periods=[payload.get("report_date")]))
