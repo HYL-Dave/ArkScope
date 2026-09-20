@@ -65,11 +65,15 @@ const BASELINE_SECTIONS: ReadonlyArray<{
   {
     id: "fixed_task_runtime",
     title: "固定 AI 任務執行限制",
-    description: "設定 AI 卡片生成的模型執行上界。",
+    description: "設定 AI 卡片生成與翻譯的模型執行上界。",
     keywords: [
       "timeout",
       "runtime",
       "卡片生成",
+      "內容翻譯",
+      "卡片翻譯",
+      "content translation",
+      "card translation",
       "fixed task",
     ],
   },
@@ -149,7 +153,7 @@ describe("Settings static copy authority", () => {
       "zh-Hant": [
         ["providers", "Provider 登入與憑證", "管理 AI provider 登入、訂閱與 API 憑證。"],
         ["models", "模型與任務路由", "依任務選擇模型、provider 與推理強度。"],
-        ["fixed_task_runtime", "固定 AI 任務執行限制", "設定 AI 卡片生成的模型執行上界。"],
+        ["fixed_task_runtime", "固定 AI 任務執行限制", "設定 AI 卡片生成與翻譯的模型執行上界。"],
         ["research_runtime", "AI 研究執行限制", "設定 AI 研究 session 與單次執行限制。"],
         ["investor_profile", "投資人設定", "管理投資人輪廓、風險意願與研究個人化。"],
         ["data_sources", "資料來源與排程", "查看資料來源健康度、排程與瀏覽器擴充同步狀態。"],
@@ -160,7 +164,7 @@ describe("Settings static copy authority", () => {
       en: [
         ["providers", "Provider Sign-in and Credentials", "Manage AI provider sign-ins, subscriptions, and API credentials."],
         ["models", "Model and Task Routing", "Choose the model, provider, and reasoning effort for each task."],
-        ["fixed_task_runtime", "Fixed AI Task Runtime Limits", "Set the model runtime limit for AI card synthesis."],
+        ["fixed_task_runtime", "Fixed AI Task Runtime Limits", "Set upper runtime limits for AI card synthesis and translation."],
         ["research_runtime", "AI Research Runtime Limits", "Set session and per-run limits for AI Research."],
         ["investor_profile", "Investor Profile", "Manage the investor profile, risk appetite, and research personalization."],
         ["data_sources", "Data Sources and Schedules", "Review data-source health, schedules, and browser extension sync."],
@@ -207,10 +211,10 @@ describe("Settings static copy authority", () => {
   });
 
   it("maps every model task without backend labels", () => {
-    const tasks: ModelTask[] = ["card_synthesis",  "ai_research", "lifecycle_investigation"];
+    const tasks: ModelTask[] = ["card_synthesis", "card_translation", "ai_research", "lifecycle_investigation"];
     const cases = [
-      { locale: "zh-Hant" as const, labels: ["AI 卡片生成", "AI 研究", "標的事件調查"] },
-      { locale: "en" as const, labels: ["AI Card Synthesis", "AI Research", "Lifecycle Investigation"] },
+      { locale: "zh-Hant" as const, labels: ["AI 卡片生成", "內容翻譯", "AI 研究", "標的事件調查"] },
+      { locale: "en" as const, labels: ["AI Card Synthesis", "Content Translation", "AI Research", "Lifecycle Investigation"] },
     ];
 
     for (const expected of cases) {

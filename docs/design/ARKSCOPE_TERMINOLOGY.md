@@ -131,6 +131,7 @@ printed in the interface.
 | Exact-model entitlement pending | This model is not yet confirmed for this sign-in. Verify the model list again. | 尚未確認此登入可用此模型；請重新驗證模型清單 | A usage bucket may prompt revalidation but never grants execution. |
 | Reviewed model/auth release block | Claude OAuth is not enabled; controlled live validation and a version update are required | Claude OAuth 尚未開放；需經受控 live 驗證與版本更新 | Used for Fable 5.1 OAuth policy; it is not a self-clearing discovery state. |
 | Subscription plan metadata | Provider-reported plan | Provider 回報方案 | Diagnostic display only; raw values such as `prolite` are not entitlement tiers. |
+| Fixed AI task | Content translation | 內容翻譯 | `card_translation` remains the durable identifier; former wording may remain only as an invisible search alias. |
 | Fixed-task runtime section | Fixed AI Task Runtime Limits | 固定 AI 任務執行限制 | Covers card synthesis and translation runtime bounds. |
 | Research runtime section | AI Research Runtime Limits | AI 研究執行限制 | Covers AI Research session and run bounds. |
 | Investor settings section | Investor Profile | 投資人設定 | Current profile, calibration, and personalization owner. |

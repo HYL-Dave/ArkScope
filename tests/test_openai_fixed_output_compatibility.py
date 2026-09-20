@@ -12,27 +12,33 @@ from src.evidence_packet import EvidencePacket
 
 MODELS = ("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-5.6")
 CUSTOM_MODELS = ("gpt-7-custom", "gpt-5.4-mini", "gpt-5.2")
+SCHEMA = {"type": "object", "additionalProperties": False,
+          "properties": {"translated_text": {"type": "string"}},
+          "required": ["translated_text"]}
 
 
 def payload(operation):
-    assert operation == "synthesis"
-    return {"conclusion": "Insufficient evidence.", "counter_thesis": [],
-            "confidence_level": "low", "claims": []}
+    if operation == "synthesis":
+        return {"conclusion": "Insufficient evidence.", "counter_thesis": [],
+                "confidence_level": "low", "claims": []}
+    return {"translated_text": "Revenue increased."}
 
 
 def invoke(operation, model, effort="low"):
-    assert operation == "synthesis"
-    return cs._synthesize_openai(
-        EvidencePacket(ticker="TEST", generated_at="2026-09-08T00:00:00Z", items=[]),
-        model, effort=effort, model_timeout_s=42,
-    )[0].model_dump()
+    if operation == "synthesis":
+        return cs._synthesize_openai(
+            EvidencePacket(ticker="TEST", generated_at="2026-09-08T00:00:00Z", items=[]),
+            model, effort=effort, model_timeout_s=42,
+        )[0].model_dump()
+    return cs._translate_openai(model, "Translate into English.", "Revenue rose.",
+                                SCHEMA, "English", effort=effort, model_timeout_s=42)
 
 
 def response(operation, model):
     return {"id": "resp_test", "object": "response", "created_at": 1,
             "model": model, "status": "completed", "error": None,
             "output": [{"type": "function_call", "id": "fc_test", "call_id": "call_test",
-                        "status": "completed", "name": "emit_result_card",
+                        "status": "completed", "name": "emit_result_card" if operation == "synthesis" else "emit_translation",
                         "arguments": json.dumps(payload(operation))}]}
 
 
@@ -46,7 +52,7 @@ def install(monkeypatch, handler):
 
 
 @pytest.mark.parametrize("model", MODELS)
-@pytest.mark.parametrize("operation", ["synthesis"])
+@pytest.mark.parametrize("operation", ["synthesis", "translation"])
 @pytest.mark.parametrize("effort", ["default", "none", "low", "medium", "high", "xhigh", "max"])
 def test_56_fixed_tasks_preserve_effort_and_use_responses(monkeypatch, model, operation, effort):
     requests = []
@@ -64,14 +70,14 @@ def test_56_fixed_tasks_preserve_effort_and_use_responses(monkeypatch, model, op
     assert body.get("reasoning") == (None if effort == "default" else {"effort": effort})
     assert body["store"] is False and body["parallel_tool_calls"] is False
     assert body["tools"][0]["strict"] is False
-    assert body["tools"][0]["parameters"] == cs._CARD_TOOL_SCHEMA
+    assert body["tools"][0]["parameters"] == (cs._CARD_TOOL_SCHEMA if operation == "synthesis" else SCHEMA)
     assert body["tool_choice"] == {"type": "function", "name": body["tools"][0]["name"]}
     assert not {"messages", "reasoning_effort", "temperature", "top_p"} & body.keys()
     assert all(result[key] == value for key, value in payload(operation).items())
 
 
 @pytest.mark.parametrize("model", MODELS)
-@pytest.mark.parametrize("operation", ["synthesis"])
+@pytest.mark.parametrize("operation", ["synthesis", "translation"])
 def test_56_provider_rejection_never_retries_or_changes_model_effort_or_credential(monkeypatch, model, operation):
     requests = []
 
@@ -89,7 +95,7 @@ def test_56_provider_rejection_never_retries_or_changes_model_effort_or_credenti
 
 
 @pytest.mark.parametrize("model", MODELS)
-@pytest.mark.parametrize("operation", ["synthesis"])
+@pytest.mark.parametrize("operation", ["synthesis", "translation"])
 def test_56_subscription_does_not_construct_api_key_client(monkeypatch, model, operation):
     calls = []
     monkeypatch.setattr("src.auth_drivers.live_resolver.resolve_live_auth",
@@ -113,17 +119,16 @@ def test_56_subscription_does_not_construct_api_key_client(monkeypatch, model, o
     ("gpt-5.6-luna-2026-09-08", "gpt-5.6-luna", False),
 ])
 def test_56_model_receipt_accepts_only_official_alias_and_allowed_snapshot(monkeypatch, requested, observed, accepted):
-    with install(monkeypatch, lambda _: httpx.Response(200, json=response("synthesis", observed))):
+    with install(monkeypatch, lambda _: httpx.Response(200, json=response("translation", observed))):
         if accepted:
-            result = invoke("synthesis", requested)
-            assert all(result[key] == value for key, value in payload("synthesis").items())
+            assert invoke("translation", requested) == payload("translation")
         else:
             with pytest.raises(RuntimeError, match="different model"):
-                invoke("synthesis", requested)
+                invoke("translation", requested)
 
 
 @pytest.mark.parametrize("model", CUSTOM_MODELS)
-@pytest.mark.parametrize("operation", ["synthesis"])
+@pytest.mark.parametrize("operation", ["synthesis", "translation"])
 @pytest.mark.parametrize("effort", ["default", "high"])
 def test_custom_fixed_tasks_use_responses_without_changing_contract(monkeypatch, model, operation, effort):
     requests = []
@@ -140,13 +145,13 @@ def test_custom_fixed_tasks_use_responses_without_changing_contract(monkeypatch,
     assert body["model"] == model
     assert body.get("reasoning") == (None if effort == "default" else {"effort": effort})
     assert body["store"] is False and body["parallel_tool_calls"] is False
-    assert body["max_output_tokens"] == 8192
+    assert body["max_output_tokens"] == (8192 if operation == "synthesis" else 4096)
     assert body["tools"][0]["strict"] is False
-    assert body["tools"][0]["parameters"] == cs._CARD_TOOL_SCHEMA
+    assert body["tools"][0]["parameters"] == (cs._CARD_TOOL_SCHEMA if operation == "synthesis" else SCHEMA)
     assert all(result[key] == value for key, value in payload(operation).items())
 
 
-@pytest.mark.parametrize("operation", ["synthesis"])
+@pytest.mark.parametrize("operation", ["synthesis", "translation"])
 @pytest.mark.parametrize("status", [400, 429, 500])
 def test_custom_fixed_task_rejection_never_falls_back(monkeypatch, operation, status):
     requests = []
@@ -163,7 +168,7 @@ def test_custom_fixed_task_rejection_never_falls_back(monkeypatch, operation, st
     assert json.loads(requests[0].content)["reasoning"] == {"effort": "high"}
 
 
-@pytest.mark.parametrize("operation", ["synthesis"])
+@pytest.mark.parametrize("operation", ["synthesis", "translation"])
 @pytest.mark.parametrize("fault", ["incomplete", "model", "refusal", "schema", "extra_call"])
 def test_custom_fixed_task_never_accepts_invalid_output(monkeypatch, operation, fault):
     raw = response(operation, "gpt-7-custom")

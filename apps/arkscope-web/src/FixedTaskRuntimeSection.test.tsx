@@ -45,9 +45,11 @@ function row(
 
 function settings(
   synthesis: Partial<FixedTaskRuntimeSettings> = {},
+  translation: Partial<FixedTaskRuntimeSettings> = {},
 ) {
   return {
     card_synthesis: row("card_synthesis", synthesis),
+    card_translation: row("card_translation", translation),
   };
 }
 
@@ -92,30 +94,34 @@ function button(text: string): HTMLButtonElement | undefined {
 }
 
 describe("FixedTaskRuntimeSection", () => {
-  it("renders the remaining synthesis value and source badge", () => {
+  it("renders independent values and source badges", () => {
     render(settings(
       { model_timeout_s: 1200, source: "env", db_saved: true },
+      { model_timeout_s: 600, source: "default", db_saved: false },
     ));
 
     expect(input("card_synthesis_model_timeout_s").value).toBe("1200");
-    expect(host!.querySelectorAll('input[type="number"]')).toHaveLength(1);
+    expect(input("card_translation_model_timeout_s").value).toBe("600");
     expect(host!.textContent).toContain("AI 卡片生成 - 模型執行上限（秒）");
-    expect(host!.textContent).not.toContain("內容翻譯 - 模型執行上限（秒）");
+    expect(host!.textContent).toContain("內容翻譯 - 模型執行上限（秒）");
     expect(host!.textContent).not.toContain("卡片翻譯 - 模型執行上限（秒）");
     expect(host!.textContent).toContain("env 覆蓋");
+    expect(host!.textContent).toContain("內建預設");
     expect(button("重設")).toBeTruthy();
   });
 
-  it("saves only the active task value", () => {
+  it("saves both task values atomically", () => {
     const { onSave } = render();
     act(() => {
       setInputValue(input("card_synthesis_model_timeout_s"), "1500");
+      setInputValue(input("card_translation_model_timeout_s"), "750");
     });
     act(() => button("儲存")!.click());
 
     expect(onSave).toHaveBeenCalledWith({
       tasks: {
         card_synthesis: { model_timeout_s: 1500 },
+        card_translation: { model_timeout_s: 750 },
       },
     });
   });
@@ -131,8 +137,8 @@ describe("FixedTaskRuntimeSection", () => {
     },
   );
 
-  it("hides reset when synthesis has no saved DB row", () => {
-    render(settings({ source: "default", db_saved: false }));
+  it("hides reset only when neither task has a saved DB row", () => {
+    render(settings({ source: "default", db_saved: false }, { source: "default", db_saved: false }));
     expect(button("重設")).toBeUndefined();
   });
 
@@ -178,12 +184,14 @@ describe("FixedTaskRuntimeSection", () => {
   it("renders English fixed-task limits without changing values or dirty state", async () => {
     const current = settings(
       { warning: "PLANTED SYNTHESIS RUNTIME WARNING" },
+      { warning: "PLANTED TRANSLATION RUNTIME WARNING" },
     );
     const onSave = vi.fn();
     const onReset = vi.fn();
     const onNavigationGuardChange = vi.fn();
     render(current, onSave, onReset, onNavigationGuardChange);
     const synthesis = input("card_synthesis_model_timeout_s");
+    const translation = input("card_translation_model_timeout_s");
     act(() => setInputValue(synthesis, "1200"));
     expect(onNavigationGuardChange.mock.calls.at(-1)?.[0].dirty).toBe(true);
     expect(host!.textContent).not.toContain("PLANTED SYNTHESIS RUNTIME WARNING");
@@ -192,12 +200,14 @@ describe("FixedTaskRuntimeSection", () => {
 
     expect(host!.textContent).toContain("Fixed AI Task Runtime Limits");
     expect(host!.textContent).toContain("AI Card Synthesis - model runtime limit (seconds)");
-    expect(host!.textContent).not.toContain("Content Translation - model runtime limit (seconds)");
+    expect(host!.textContent).toContain("Content Translation - model runtime limit (seconds)");
     expect(host!.textContent).toContain(
       "Higher-effort models may need more time. These limits only control the maximum wait; they do not change the model or effort.",
     );
     expect(input("card_synthesis_model_timeout_s")).toBe(synthesis);
+    expect(input("card_translation_model_timeout_s")).toBe(translation);
     expect(synthesis.value).toBe("1200");
+    expect(translation.value).toBe("900");
     expect(onNavigationGuardChange.mock.calls.at(-1)?.[0]).toEqual({
       dirty: true,
       busy: false,
@@ -216,6 +226,7 @@ describe("FixedTaskRuntimeSection", () => {
     });
     expect(host!.textContent).toContain("Developer diagnostics");
     expect(host!.textContent).toContain("PLANTED SYNTHESIS RUNTIME WARNING");
+    expect(host!.textContent).toContain("PLANTED TRANSLATION RUNTIME WARNING");
     const diagnostics = Array.from(host!.querySelectorAll('details[data-testid="developer-diagnostics"]'));
     expect(diagnostics.length).toBeGreaterThan(0);
     expect(diagnostics.every((details) => details.closest("label") === null)).toBe(true);

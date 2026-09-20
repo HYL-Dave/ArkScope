@@ -3,13 +3,14 @@ import type { ExecutionReceipt } from "./api";
 import { modelAuthModeLabel } from "./modelRoutingUx";
 
 export function ExecutionSource({ source, receipt }: {
-  source: "original" | "previous" | "next";
+  source: "original" | "translation" | "previous" | "next";
   receipt?: ExecutionReceipt | null;
 }) {
   const { t } = useTranslation("common");
   const unknown = t(($) => $.executionSource.unknown);
   const labels = {
     original: t(($) => $.executionSource.original),
+    translation: t(($) => $.executionSource.translation),
     previous: t(($) => $.executionSource.previous),
     next: t(($) => $.executionSource.next),
   };

@@ -61,13 +61,13 @@ const route = (over: Partial<TaskRoute>): TaskRoute => ({
   source: "db", custom: false, warning: null, ...over,
 });
 
-// ai_research = DB authority (resettable); card_synthesis = yaml fallback (NOT resettable)
+// ai_research = DB authority (resettable); card_translation = yaml fallback (NOT resettable)
 function catalog(): ModelCatalog {
   return {
     providers: ["anthropic", "openai"],
     tasks: [
       { id: "ai_research", label: "AI 研究", description: "", default_provider: "openai", recommended_model: "gpt-5.6-luna" },
-      { id: "card_synthesis", label: "翻譯", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5" },
+      { id: "card_translation", label: "翻譯", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5" },
     ],
     models: MODELS,
     effort_options: {
@@ -78,8 +78,8 @@ function catalog(): ModelCatalog {
     retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
     routes: {
       ai_research: route({ task: "ai_research", source: "db" }),
-      card_synthesis: route({ task: "card_synthesis", provider: "anthropic", model: "claude-opus-5", effort: "low", source: "profile" }),
-      lifecycle_investigation: route({ task: "lifecycle_investigation", source: "default" }),
+      card_translation: route({ task: "card_translation", provider: "anthropic", model: "claude-opus-5", effort: "low", source: "profile" }),
+      card_synthesis: route({ task: "card_synthesis", source: "default" }),
     },
     credentials: { anthropic: [], openai: [] },
     custom_allowed: true,
@@ -107,8 +107,8 @@ function render(
       catalog: cat,
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
-        card_synthesis: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
       modelsByProvider,
       testState: {},
@@ -169,12 +169,12 @@ function expectLocalizedControlName(
   const control = labelledControl(card, field);
   const name = resolvedLabelledByText(control);
   expect(name).toBe(expected);
-  expect(name).not.toMatch(/ai_research|lifecycle_investigation|card_synthesis/);
+  expect(name).not.toMatch(/ai_research|card_synthesis|card_translation/);
   return control;
 }
 
 function expectNoKnownTaskId(value: string | null | undefined) {
-  expect(value ?? "").not.toMatch(/ai_research|lifecycle_investigation|card_synthesis/);
+  expect(value ?? "").not.toMatch(/ai_research|card_synthesis|card_translation/);
 }
 
 function investigationCatalog(): ModelCatalog {
@@ -338,7 +338,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     const cat = catalog();
     cat.tasks = [
       ...cat.tasks,
-      { id: "lifecycle_investigation", label: "卡片合成", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5" },
+      { id: "card_synthesis", label: "卡片合成", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5" },
     ];
     cat.credentials = {
       openai: [cred("openai", "local:7", "chatgpt_oauth", "ChatGPT subscription")],
@@ -382,8 +382,8 @@ describe("ModelRoutingSection provider-first UX", () => {
       },
       tasks: {
         ai_research: taskBlock("openai"),
-        lifecycle_investigation: taskBlock("openai"),
-        card_synthesis: taskBlock("anthropic"),
+        card_synthesis: taskBlock("openai"),
+        card_translation: taskBlock("anthropic"),
       },
     };
     return cat;
@@ -393,8 +393,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     return host!.querySelector('[data-testid="route-ai_research"]')!;
   }
 
-  function synthesisCard() {
-    return host!.querySelector('[data-testid="route-card_synthesis"]')!;
+  function translationCard() {
+    return host!.querySelector('[data-testid="route-card_translation"]')!;
   }
 
   function retiredSparkCatalog(planType: string, savedRoute = true): ModelCatalog {
@@ -410,9 +410,9 @@ describe("ModelRoutingSection provider-first UX", () => {
       plan_type: planType,
     };
     if (!savedRoute) return cat;
-    const task = cat.effective!.tasks.card_synthesis!;
+    const task = cat.effective!.tasks.card_translation!;
     const openai = task.providers!.openai!;
-    cat.effective!.tasks.card_synthesis = {
+    cat.effective!.tasks.card_translation = {
       ...task,
       providers: {
         ...task.providers,
@@ -474,8 +474,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), catalogV2(), onDraft, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "high", custom: false },
-        card_synthesis: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     const model = labelledControl(researchCard(), "model") as HTMLSelectElement;
@@ -509,16 +509,16 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(card.querySelector(".field > p.field-help")).toBeNull();
     expect(Array.from(select.options).find((option) => option.value === "gpt-5.6-sol")?.textContent)
       .toContain("進階");
-    const synthesis = host!.querySelector('[data-testid="route-card_synthesis"]')!;
-    const synthesisSelect = expectLocalizedControlName(
-      synthesis,
+    const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
+    const translationSelect = expectLocalizedControlName(
+      translation,
       "model",
-      "AI 卡片生成 Model",
+      "內容翻譯 Model",
     ) as HTMLSelectElement;
-    expect(Array.from(synthesisSelect.options)
+    expect(Array.from(translationSelect.options)
       .find((option) => option.value === "claude-sonnet-5")?.textContent)
       .not.toContain("未驗證");
-    expect(Array.from(synthesisSelect.options)
+    expect(Array.from(translationSelect.options)
       .find((option) => option.value === "claude-opus-5")?.textContent)
       .toContain("進階");
   });
@@ -530,22 +530,22 @@ describe("ModelRoutingSection provider-first UX", () => {
       render(vi.fn(), cat, undefined, {
         draft: {
           ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
-          card_synthesis: { provider: "openai", model: "gpt-5.3-codex-spark", effort: "low", custom: false },
-          lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+          card_translation: { provider: "openai", model: "gpt-5.3-codex-spark", effort: "low", custom: false },
+          card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
         },
       });
 
-      const synthesis = synthesisCard();
-      const model = labelledControl(synthesis, "model") as HTMLSelectElement;
+      const translation = translationCard();
+      const model = labelledControl(translation, "model") as HTMLSelectElement;
       const spark = Array.from(model.options)
         .find((option) => option.value === "gpt-5.3-codex-spark")!;
       expect(spark.disabled).toBe(true);
       expect(spark.textContent).toContain("此模型已退出新執行");
-      expect(synthesis.textContent?.toLowerCase()).toContain(`方案：${plan}`);
-      expect(synthesis.textContent)
+      expect(translation.textContent?.toLowerCase()).toContain(`方案：${plan}`);
+      expect(translation.textContent)
         .not.toContain("已偵測到 Spark 額度");
-      expect(synthesis.textContent).toContain("不可選：");
-      expect(buttonByText(synthesis, "重新驗證列表")).toBeTruthy();
+      expect(translation.textContent).toContain("不可選：");
+      expect(buttonByText(translation, "重新驗證列表")).toBeTruthy();
     },
   );
 
@@ -554,20 +554,20 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
-        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "high", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "openai", model: "gpt-5.6-luna", effort: "high", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
 
-    const synthesis = synthesisCard();
-    const model = labelledControl(synthesis, "model") as HTMLSelectElement;
+    const translation = translationCard();
+    const model = labelledControl(translation, "model") as HTMLSelectElement;
     expect(Array.from(model.options)
       .map((option) => option.value)).not.toContain("gpt-5.3-codex-spark");
-    expect(synthesis.textContent).toContain("方案：prolite");
+    expect(translation.textContent).toContain("方案：prolite");
     expect(Array.from((labelledControl(researchCard(), "model") as HTMLSelectElement).options)
       .map((option) => option.value)).not.toContain("gpt-5.3-codex-spark");
-    const investigation = host!.querySelector('[data-testid="route-lifecycle_investigation"]')!;
-    expect(Array.from((labelledControl(investigation, "model") as HTMLSelectElement).options)
+    const synthesis = host!.querySelector('[data-testid="route-card_synthesis"]')!;
+    expect(Array.from((labelledControl(synthesis, "model") as HTMLSelectElement).options)
       .map((option) => option.value)).not.toContain("gpt-5.3-codex-spark");
   });
 
@@ -601,8 +601,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), catalogV2(), undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: true },
-        card_synthesis: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     const openAiCustom = researchCard();
@@ -628,8 +628,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), catalogV2(), undefined, {
       draft: {
         ai_research: { provider: "anthropic", model: "claude-custom", effort: "low", custom: true },
-        card_synthesis: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     expect((researchCard().querySelector("input") as HTMLInputElement).placeholder).toBe("claude-…");
@@ -671,8 +671,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "anthropic", model: "claude-sonnet-5", effort: "low", custom: false },
-        card_synthesis: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     const card = researchCard();
@@ -694,7 +694,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       auth_mode: "api_key",
       label: "Claude API",
     };
-    const block = cat.effective!.tasks.card_synthesis!.providers!.anthropic!;
+    const block = cat.effective!.tasks.card_translation!.providers!.anthropic!;
     block.cache_state = "ok";
     block.discovered_at = "2026-07-25T00:00:00Z";
     block.models = [
@@ -703,12 +703,12 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
-        card_synthesis: { provider: "anthropic", model: "claude-fable-5-1", effort: "high", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-fable-5-1", effort: "high", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
 
-    const option = Array.from((labelledControl(synthesisCard(), "model") as HTMLSelectElement).options)
+    const option = Array.from((labelledControl(translationCard(), "model") as HTMLSelectElement).options)
       .find((candidate) => candidate.value === "claude-fable-5-1")!;
     expect(option.disabled).toBe(false);
     expect(option.textContent).toContain("上次模型清單未包含");
@@ -717,7 +717,7 @@ describe("ModelRoutingSection provider-first UX", () => {
 
   it("states that Fable 5.1 OAuth is a controlled release policy", () => {
     const cat = catalogV2();
-    const block = cat.effective!.tasks.card_synthesis!.providers!.anthropic!;
+    const block = cat.effective!.tasks.card_translation!.providers!.anthropic!;
     block.models = [
       entry(
         "claude-fable-5-1",
@@ -731,16 +731,16 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
-        card_synthesis: { provider: "anthropic", model: "claude-fable-5-1", effort: "high", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-fable-5-1", effort: "high", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
 
-    const option = Array.from((labelledControl(synthesisCard(), "model") as HTMLSelectElement).options)
+    const option = Array.from((labelledControl(translationCard(), "model") as HTMLSelectElement).options)
       .find((candidate) => candidate.value === "claude-fable-5-1")!;
     expect(option.disabled).toBe(true);
     expect(option.textContent).toContain("Claude OAuth 尚未開放");
-    expect(synthesisCard().textContent).toContain("需經受控 live 驗證與版本更新");
+    expect(translationCard().textContent).toContain("需經受控 live 驗證與版本更新");
   });
 
   it("refreshes discovery for the selected provider credential", () => {
@@ -752,9 +752,9 @@ describe("ModelRoutingSection provider-first UX", () => {
 
   it("renders thinking behavior as read-only", () => {
     render(vi.fn(), catalogV2());
-    const synthesis = host!.querySelector('[data-testid="route-card_synthesis"]')!;
-    expect(synthesis.textContent).toContain("可選擇 adaptive thinking");
-    expect(synthesis.querySelector('[aria-label="Thinking card_synthesis"]')).toBeNull();
+    const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
+    expect(translation.textContent).toContain("可選擇 adaptive thinking");
+    expect(translation.querySelector('[aria-label="Thinking card_translation"]')).toBeNull();
   });
 
   it("projects a legacy effort as empty, without default or none task options", () => {
@@ -762,8 +762,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "default", custom: false },
-        card_synthesis: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     const effort = labelledControl(researchCard(), "effort") as HTMLSelectElement;
@@ -783,8 +783,8 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
-        card_synthesis: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
-        lifecycle_investigation: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     const model = labelledControl(researchCard(), "model") as HTMLSelectElement;
@@ -934,10 +934,10 @@ describe("ModelRoutingSection provider-first UX", () => {
       "The environment currently controls this route. You can save a DB value, but runtime continues to follow the environment override.",
     );
     expect(research.textContent).toContain("Uses subscription quota, not API billing.");
-    const synthesis = host!.querySelector('[data-testid="route-card_synthesis"]')!;
-    expect(synthesis.textContent).toContain("Adaptive thinking available");
+    const translation = host!.querySelector('[data-testid="route-card_translation"]')!;
+    expect(translation.textContent).toContain("Adaptive thinking available");
     const defaultRouteBadge = host!.querySelector(
-      '[data-testid="route-lifecycle_investigation"] .route-source',
+      '[data-testid="route-card_synthesis"] .route-source',
     )!;
     expect(defaultRouteBadge.getAttribute("aria-label")).toBe(
       "Route authority Built-in default",

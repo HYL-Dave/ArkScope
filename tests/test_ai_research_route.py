@@ -61,6 +61,7 @@ def test_fresh_install_task_routes_have_complete_explicit_efforts(clean_env, tmp
 
     expected = {
         "card_synthesis": ("anthropic", "claude-opus-5", "high"),
+        "card_translation": ("anthropic", "claude-sonnet-5", "medium"),
         "ai_research": ("openai", "gpt-5.6-luna", "xhigh"),
         "lifecycle_investigation": ("anthropic", "claude-sonnet-5", "high"),
     }

@@ -22,8 +22,8 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
-| **P1** | **SPARK / CARD-TRANSLATION RETIREMENT** | **CODE ACCEPTED; STOPPED-WRITER ACTIVATION PENDING.** All card translation tasks/UI/API/cache code are removed, superseding the earlier Spark-only scope. Original cards/receipts/Research and Chinese UI remain; shared lifecycle event guards retain their live owner. Frozen `033c4515`: complete backend **11266P/12S**, frontend **1830P/124files**, typecheck/build/i18n and eight desktop tests pass. Source/test fingerprints are unchanged. The separately prepared one-time disposal has ten in-memory tests but has not touched production. The user controls push; the running App still blocks local merge/disposal/activation. Evidence: `docs/superpowers/evidence/2026-09-19-card-translation-retirement/README.md`. | Remove the canceled feature without silently switching models, deleting original research or removing shared safety checks. |
-| **P0** | **REPORT FILE BOUNDARY** | **FIX VERIFIED, NOT YET ACTIVE IN THE RUNNING APP.** Canonical Markdown paths, pinned directory descriptors and no-follow/exclusive file operations reject traversal, absolute paths, links and non-regular files for report reading/listing/saving. Twenty-four adversarial tests pass and the complete regression above includes them. This does not implement external-tool authorization or fix quote freshness, earnings alignment or metric comparability. Evidence: `docs/superpowers/evidence/2026-09-20-report-file-boundary.md`. | Close the demonstrated file-read escape before further tool expansion. |
+| **P1** | **SPARK RETIREMENT; CARD TRANSLATION PRESERVED** | **SCOPE CORRECTED; FINAL REGRESSION PENDING.** The user did not authorize retiring card translation. Its UI, task, settings, API, cache/version schema and tests are restored; Spark execution/options remain retired. Only translation results may be cleared, including all such records as explicitly permitted, without changing originals, receipts, Research, schema or task settings. The earlier full-feature removal was an interpretation error and was never activated. Evidence: `docs/superpowers/evidence/2026-09-19-card-translation-retirement/README.md`. | Separate retiring a model and its outputs from removing the feature that used it. |
+| **P0** | **REPORT FILE BOUNDARY** | **FIX VERIFIED, NOT YET ACTIVE IN THE RUNNING APP.** Canonical Markdown paths, pinned directory descriptors and no-follow/exclusive file operations reject traversal, absolute paths, links and non-regular files for report reading/listing/saving. Twenty-four adversarial tests pass, including the current translation-preservation focused run. This does not implement external-tool authorization or fix quote freshness, earnings alignment or metric comparability. Evidence: `docs/superpowers/evidence/2026-09-20-report-file-boundary.md`. | Close the demonstrated file-read escape before further tool expansion. |
 | **P1** | **EARNINGS EVENT OBSERVATION** | **CAPABILITY RETAINED; REPAIR / SCHEDULING NOT IMPLEMENTED.** Earnings price reactions are not replaced by SEC financial reports. Fix announcement/session/window/freshness semantics before adding idempotent scheduled observations and delivery. Existing calendar scheduling is not an earnings-reaction monitor. Owner: `docs/superpowers/plans/2026-09-20-earnings-observation-followup.md`. | Preserve useful descriptive market research without scheduling known inaccurate estimates or advertising a predictive signal. |
 | **P0-E** | **Verified renames, financial freshness, SEC research access and macro result truth** | **N1/P2 CLOSED; COMPLETE LINUX REGRESSION GREEN.** Publication recovery and disabled scheduling remain complete. User-approved `e447d394`/`24c10280` replace blocking Anthropic child I/O and own successful/error response cleanup across repeated cancellation; captured auth/model/effort, completed SEC refs and SDK retry policy are retained. Scoped re-review has no new actionable findings. A missed async test fixture found by the first full run is repaired at `39b6587f`; second single full backend **11050P/12 unchangedS**, exact11062 IDs, source1160paths/runtime/runners unchanged. Frontend **1833P**, typecheck/build/i18n pass with unchanged UI source. Current census adds no candidates/uncertainties/reductions; existing cleanup queues remain. Evidence: `docs/superpowers/evidence/2026-09-14-anthropic-child-async/README.md`. Broader release checklist, actual activation, Windows/macOS, native Anthropic parent async conversion and wider cleanup remain separate. SQLite is still3.37.2; no production access, provider call, install, cleanup/reset, App restart, merge or push. | Complete useful research/data workflows while preserving membership removals, provenance and truthful execution status. |
 | **P1** | **PRE-RELEASE-ABANDONED-SURFACE-CLEANUP** | **C15 AND C20 CLOSED; CURRENT-ENGINE HAND TEST NEXT.** C20's final `MIGRATE_TABLES` entry is removed; old query reads are rejected and repeated current-store construction does not recreate the table. After the user closed the App, the unchanged one-time operation removed exactly two old rows and `agent_queries` without archive or content inspection. Other schema, six current report/memory/Research table counts and other sequence entries were unchanged; a fresh protected mode=ro connection confirmed absence. Execution: September15 06:49:29UTC, SQLite3.37.2. Receipt: `docs/superpowers/evidence/2026-09-15-c20-disposal/README.md`. Code acceptance is **297P per engine**; six in-memory disposal tests were freshly rerun. The previous checkpoint's full **11,245P/12S per engine**, frontend1835P/build, C15 review and census remain in `docs/superpowers/evidence/2026-09-15-prebuilt-transition-cleanup/README.md`, not a full rerun of the final small patch. C12/fourteen-day policy remains complete; C21 and broader static uncertainties stay deferred/review inputs. Old master can recreate an empty legacy table, so hand test the updated branch. No App restart, merge, push or runtime activation. | Apply the user's pre-release deletion policy without removing live capabilities, retained data, or hiding incomplete cleanup. |
@@ -654,22 +654,19 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
-- **2026-09-20 (FULL CARD TRANSLATION RETIREMENT; EARNINGS OBSERVATION RETAINED):**
-  The user broadened Spark retirement to the entire card translation feature,
-  authorizing its UI/task/API/cache-code removal while retaining original cards,
-  Research and interface localization. This supersedes the previous entry's
-  other-model-translation preservation, not its shared safety boundaries.
-  Generic auth/output tests remain on synthesis; dead-only tests leave with the
-  removed feature. Report file confinement independently closes the confirmed
-  path escape, including directory/leaf links and listing preview. No provider
-  call or automatic model replacement occurs. Earnings-event market observation
-  is retained as a capability to repair and schedule, not falsely replaced by
-  SEC fundamentals; its timestamp/window/freshness and delivery requirements are
-  in `docs/superpowers/plans/2026-09-20-earnings-observation-followup.md`.
-  Product tests and paused data-disposal scope are recorded in
+- **2026-09-20 (CORRECTION: PRESERVE CARD TRANSLATION, CLEAR RESULTS ONLY):**
+  The user explicitly clarified that only Spark and its results were retired,
+  not card translation. Permission to clear all translation records does not
+  extend to original cards or Research. The previous full-feature removal in
+  `4125026b` was our interpretation error, not a user product ruling; it stayed
+  on an unmerged branch and no production disposal ran. Restore the generic
+  feature and coverage from `544d8dfd`, retaining Spark rejection and the
+  independent report-path security repair. The explicit offline cleanup now
+  clears data only, preserving schema, task routes and runtime settings; no
+  paid replacement model is silently selected. Earnings observations remain
+  useful and retain their separate repair/scheduling plan. Final regression,
+  stopped-writer activation and manual push remain distinct gates. Evidence:
   `docs/superpowers/evidence/2026-09-19-card-translation-retirement/README.md`.
-  User controls push. Unaccepted fundamentals work is not silently merged or
-  discarded; production disposal/activation requires the running App to stop.
 
 - **2026-09-19 (SPARK PRODUCT RETIREMENT; TOOL-AUDIT DIFFERENCES RECHECKED):**
   The user authorized removing `gpt-5.3-codex-spark` and its dedicated translation

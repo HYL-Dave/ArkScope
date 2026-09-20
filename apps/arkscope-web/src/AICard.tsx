@@ -10,6 +10,8 @@
 
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
+import { RefreshCw } from "lucide-react";
+import { IconButton } from "./ui/Button";
 import { ExecutionSource } from "./ExecutionSource";
 
 import { getInvestorProfile, type AssistantStance, type InvestorProfileResponse, type PersonalizationTrace, type RuntimeConfig } from "./api";
@@ -26,6 +28,7 @@ import {
   getCard,
   getCards,
   saveCard,
+  translateCard,
   type CardSummary,
   type ExecutionReceipt,
   type EvidenceItem,
@@ -79,7 +82,7 @@ export function AICardTab({
   const [err, setErr] = useState<ExploreErrorState | null>(null);
   const [failedOpenRunId, setFailedOpenRunId] = useState<number | null>(null);
   const [failedSaveAttempt, setFailedSaveAttempt] = useState<CardSaveAttempt | null>(null);
-  // Track A: opt-in stance override for card synthesis + trace of the run card.
+  // Track A: opt-in stance override for card synthesis + trace of the run shown.
   const [investorProfile, setInvestorProfile] = useState<InvestorProfileResponse | null>(null);
   const [cardStance, setCardStance] = useState<AssistantStance>(recoveredDraft?.cardStance ?? "off");
   const [lastTrace, setLastTrace] = useState<PersonalizationTrace | null>(null);
@@ -364,9 +367,13 @@ export function AICardTab({
           key={runId ?? "none"}
           card={card}
           executionReceipt={executionReceipt}
+          runId={runId}
           evidencePacket={evidencePacket}
           saved={saved}
           saving={saving}
+          runtime={runtime}
+          developerMode={developerMode}
+          onNavigateTarget={onNavigateTarget}
           onSave={() => void save()}
           onBack={backToList}
         />
@@ -405,18 +412,26 @@ export function AICardTab({
 export function CardView({
   card,
   executionReceipt,
+  runId,
   evidencePacket,
   saved,
   saving,
+  runtime,
+  developerMode,
+  onNavigateTarget,
   onSave,
   onBack,
   backLabel,
 }: {
   card: ResultCard;
   executionReceipt?: ExecutionReceipt;
+  runId?: number | null;
   evidencePacket?: EvidencePacket | null;
   saved: boolean;
   saving?: boolean;
+  runtime?: RuntimeConfig | null;
+  developerMode: boolean;
+  onNavigateTarget: (target: NavigationTarget) => void;
   onSave: () => void;
   onBack?: () => void;
   backLabel?: string;
@@ -434,6 +449,46 @@ export function CardView({
       ? citedEvidenceIds.map((id) => evidenceById.get(id)).filter((x): x is EvidenceItem => Boolean(x))
       : (evidencePacket?.items ?? []);
 
+  // On-demand 繁中 translation (prose fields only; cached server-side). CardView
+  // is keyed by runId at the call sites, so this state resets per card.
+  const [lang, setLang] = useState<"en" | "zh">("en");
+  const [zh, setZh] = useState<ResultCard | null>(null);
+  const [translationReceipt, setTranslationReceipt] = useState<ExecutionReceipt | undefined>();
+  const [noOp, setNoOp] = useState(false);
+  const [refreshAttempt, setRefreshAttempt] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [tErr, setTErr] = useState<ExploreErrorState | null>(null);
+  const shown = lang === "zh" && zh ? zh : card;
+
+  async function toZh(refresh = false) {
+    if (translating) return;
+    if (!refresh && (zh || noOp)) {
+      setLang("zh");
+      return;
+    }
+    if (runId == null) return;
+    setTranslating(true);
+    setRefreshAttempt(refresh);
+    setTErr(null);
+    try {
+      const r = refresh
+        ? await translateCard(runId, "zh-Hant", runtime, { refresh: true })
+        : await translateCard(runId, "zh-Hant", runtime);
+      if (r.no_op) {
+        setNoOp(true);
+      } else {
+        setZh(r.card);
+        setTranslationReceipt(r.execution_receipt);
+        setNoOp(false);
+      }
+      setLang("zh");
+    } catch (e) {
+      setTErr(captureExploreError("card_translate", e));
+    } finally {
+      setTranslating(false);
+    }
+  }
+
   return (
     <div className="cardview">
       <div className="cardview-head">
@@ -441,6 +496,32 @@ export function CardView({
           <button className="btn-ghost" onClick={onBack}>
             {backLabel ?? t(($) => $.aiCard.backToCards)}
           </button>
+        )}
+        {runId != null && (
+          <span className="lang-toggle">
+            <button
+              className={`btn-ghost ${lang === "en" ? "on" : ""}`}
+              onClick={() => setLang("en")}
+              disabled={translating}
+            >
+              {t(($) => $.aiCard.english)}
+            </button>
+            <button
+              className={`btn-ghost ${lang === "zh" ? "on" : ""}`}
+              onClick={() => void toZh()}
+              disabled={translating}
+            >
+              {translating && !refreshAttempt
+                ? t(($) => $.aiCard.translating)
+                : t(($) => $.aiCard.traditionalChinese)}
+            </button>
+          </span>
+        )}
+        {runId != null && zh && lang === "zh" && (
+          <IconButton tone="ghost" size="compact"
+            label={translating && refreshAttempt ? t(($) => $.aiCard.retranslating) : t(($) => $.aiCard.retranslate)}
+            icon={<RefreshCw size={14} />} busy={translating}
+            onClick={() => void toZh(true)} />
         )}
         <span className="spacer" />
         <span className={`conf conf-${card.confidence_level}`}>
@@ -455,30 +536,42 @@ export function CardView({
         </button>
       </div>
       <ExecutionSource source="original" receipt={executionReceipt} />
-      {card.question && (
+      {lang === "zh" && zh && <ExecutionSource source="translation" receipt={translationReceipt} />}
+      {noOp && lang === "zh" && <p role="status" className="muted tiny">{t(($) => $.aiCard.translationNoOp)}</p>}
+      {tErr && (
+        <ExploreErrorNotice
+          state={tErr}
+          developerMode={developerMode}
+          retryLabel={t(($) => $.aiCard.retry)}
+          onRetry={() => void toZh(refreshAttempt)}
+          onNavigate={onNavigateTarget}
+        />
+      )}
+
+      {shown.question && (
         <p className="cardview-q muted tiny">
-          {t(($) => $.aiCard.questionPrefix)}{card.question}
+          {t(($) => $.aiCard.questionPrefix)}{shown.question}
         </p>
       )}
-      <p className="cardview-concl">{card.conclusion}</p>
-      {card.confidence_rationale && (
+      <p className="cardview-concl">{shown.conclusion}</p>
+      {shown.confidence_rationale && (
         <p className="muted tiny">
-          {t(($) => $.aiCard.confidenceExplanation)}{card.confidence_rationale}
+          {t(($) => $.aiCard.confidenceExplanation)}{shown.confidence_rationale}
         </p>
       )}
 
-      <Section title={t(($) => $.aiCard.primaryReasons)} items={card.primary_reasons} />
-      <Section title={t(($) => $.aiCard.counterReasons)} items={card.counter_thesis} counter />
-      <Section title={t(($) => $.aiCard.invalidationConditions)} items={card.invalidation_conditions} />
-      <Section title={t(($) => $.aiCard.triggers)} items={card.trigger_conditions} />
-      <Section title={t(($) => $.aiCard.keyAssumptions)} items={card.key_assumptions} />
-      <Section title={t(($) => $.aiCard.risks)} items={card.risks} />
-      <Section title={t(($) => $.aiCard.watchlist)} items={card.watch_list} />
-      {card.market_narrative && (
-        <Para title={t(($) => $.aiCard.marketNarrative)} text={card.market_narrative} />
+      <Section title={t(($) => $.aiCard.primaryReasons)} items={shown.primary_reasons} />
+      <Section title={t(($) => $.aiCard.counterReasons)} items={shown.counter_thesis} counter />
+      <Section title={t(($) => $.aiCard.invalidationConditions)} items={shown.invalidation_conditions} />
+      <Section title={t(($) => $.aiCard.triggers)} items={shown.trigger_conditions} />
+      <Section title={t(($) => $.aiCard.keyAssumptions)} items={shown.key_assumptions} />
+      <Section title={t(($) => $.aiCard.risks)} items={shown.risks} />
+      <Section title={t(($) => $.aiCard.watchlist)} items={shown.watch_list} />
+      {shown.market_narrative && (
+        <Para title={t(($) => $.aiCard.marketNarrative)} text={shown.market_narrative} />
       )}
-      {card.divergence && (
-        <Para title={t(($) => $.aiCard.consensusDivergence)} text={card.divergence} />
+      {shown.divergence && (
+        <Para title={t(($) => $.aiCard.consensusDivergence)} text={shown.divergence} />
       )}
 
       <details className="cardview-trace">
@@ -577,12 +670,14 @@ export function CardModal({
   runId,
   onClose,
   onChanged,
+  runtime,
   developerMode,
   onNavigateTarget,
 }: {
   runId: number;
   onClose: () => void;
   onChanged?: () => void;
+  runtime?: RuntimeConfig | null;
   developerMode: boolean;
   onNavigateTarget: (target: NavigationTarget) => void;
 }) {
@@ -695,9 +790,13 @@ export function CardModal({
             key={runId}
             card={card}
             executionReceipt={executionReceipt}
+            runId={runId}
             evidencePacket={evidencePacket}
             saved={saved}
             saving={saving}
+            runtime={runtime}
+            developerMode={developerMode}
+            onNavigateTarget={onNavigateTarget}
             onSave={() => void save()}
           />
         )}

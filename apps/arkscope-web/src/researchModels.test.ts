@@ -162,7 +162,7 @@ describe("effortOptionsForModel", () => {
       effective: {
         providers: {},
         tasks: {
-          card_synthesis: {
+          card_translation: {
             providers: {
               openai: {
                 models: [{ id: modelId, effort_options: ["low", "medium", "high", "xhigh"] }],
@@ -177,12 +177,12 @@ describe("effortOptionsForModel", () => {
       provider: "openai",
       model: modelId,
       effort: "xhigh",
-    }, "card_synthesis")).toBeNull();
+    }, "card_translation")).toBeNull();
     expect(taskRouteBlocker(taskOnlyCatalog, {
       provider: "openai",
       model: modelId,
       effort: "max",
-    }, "card_synthesis")).toBe("effort_required");
+    }, "card_translation")).toBe("effort_required");
   });
 });
 

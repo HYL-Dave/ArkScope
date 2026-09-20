@@ -89,6 +89,7 @@ const common = {
   },
   executionSource: {
     original: "原文請求",
+    translation: "翻譯請求",
     previous: "上次執行請求",
     next: "下次執行",
     effort: "推理強度",

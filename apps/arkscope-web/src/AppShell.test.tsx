@@ -71,7 +71,7 @@ const RUNTIME: RuntimeConfig = {
     credentials: [],
   },
   card_synthesis: ROUTE,
-
+  card_translation: { ...ROUTE, task: "card_translation" },
   ai_research: { ...ROUTE, task: "ai_research" },
   research_runtime: {
     max_tool_calls: 60,
@@ -662,6 +662,7 @@ describe("App shell integration", () => {
           "顯示本機診斷資訊",
           "Models in use",
           "card synthesis",
+          "內容翻譯",
           "anthropic (default / advanced)",
           "openai (default / advanced)",
           "API keys present",
@@ -685,6 +686,7 @@ describe("App shell integration", () => {
           "Show local diagnostic information",
           "Models in use",
           "card synthesis",
+          "Content translation",
           "anthropic (default / advanced)",
           "openai (default / advanced)",
           "API keys present",
@@ -698,8 +700,8 @@ describe("App shell integration", () => {
         ],
       },
     } as const;
-    expect(Object.values(expected["zh-Hant"]).flat()).toHaveLength(19);
-    expect(Object.values(expected.en).flat()).toHaveLength(19);
+    expect(Object.values(expected["zh-Hant"]).flat()).toHaveLength(20);
+    expect(Object.values(expected.en).flat()).toHaveLength(20);
 
     const host = await renderApp();
     await click(button("System / Health"));

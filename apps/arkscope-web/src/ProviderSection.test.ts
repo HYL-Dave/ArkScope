@@ -663,7 +663,7 @@ describe("ProviderSection OAuth lifecycle and account usage truth", () => {
         effort_options: ["low", "medium", "high", "xhigh"],
         default_effort: "high",
         input_modalities: ["text", "image"],
-        task_route_tasks: ["card_synthesis",  "ai_research", "lifecycle_investigation"],
+        task_route_tasks: ["card_synthesis", "card_translation", "ai_research", "lifecycle_investigation"],
       }],
     } as ModelDiscoveryResult, onUse);
 

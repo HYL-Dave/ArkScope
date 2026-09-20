@@ -139,6 +139,7 @@ export function App() {
       status={status}
       onNavigate={(next) => navigate({ kind: "view", view: next })}
       onOpenTicker={(ticker) => navigate({ kind: "ticker", ticker })}
+      runtime={runtime}
     />
   ) : view === "Watchlist" ? (
     <WatchlistView
