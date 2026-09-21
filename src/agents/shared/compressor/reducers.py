@@ -272,6 +272,9 @@ def get_reducer(tool_name: str, registry: Dict[str, ToolReducer] | None = None) 
     if tool_name.removeprefix("tool_") == "get_sa_company_data":
         from src.sa.company_data import company_result_reducer
         return company_result_reducer
+    if tool_name.removeprefix("tool_") == "compare_financial_sources":
+        from src.tools.financial_comparison_tools import comparison_result_reducer
+        return comparison_result_reducer
     reg = registry if registry is not None else _DEFAULT_REGISTRY
     return reg.get(tool_name, truncate_with_marker)
 

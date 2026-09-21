@@ -21,7 +21,8 @@ const secFormNameKeys = [
   "exchangeDelisting", "listingCertification", "nyseCertification", "correspondence", "secLetter", "noAction",
 ];
 const secResearchKeys = [
-  "title", "cik", "load", "refresh", "resume", "reread", "budget", "unit", "bytes", "gib",
+  "title", "symbol", "symbolExample", "load", "refresh", "resume", "reread", "budget", "unit", "bytes", "gib",
+  "administration", "identified", "issuerError", "issuerNotFound", "issuerAmbiguous", "directoryUnavailable", "updateDirectory",
   "save", "saved", "reloadConfig", "invalidBudget", "configError", "saveError", "readError", "confirmationMismatch",
   "refreshError", "unconfirmed", "errorDetail", "loading", "unknown", "ok", "empty", "partial",
   "unavailable", "objects", "reservations", "orphans", "charged", "remaining", "overBudget",
@@ -761,7 +762,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1145,
+      settings: 1153,
       research: 240,
       explore: 1178,
       portfolio: 374,
@@ -847,7 +848,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3080);
+      expect(total, `${locale}.total`).toBe(3088);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([

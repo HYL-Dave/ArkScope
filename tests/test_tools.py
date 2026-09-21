@@ -201,7 +201,7 @@ def registry():
 class TestRegistry:
     def test_register_all(self, registry):
         """All tools should be registered (incl. P1.2 macro_calendar)."""
-        assert len(registry.list_all()) == 57
+        assert len(registry.list_all()) == 58
 
     def test_tool_names(self, registry):
         """All expected tool names should exist."""
@@ -232,14 +232,14 @@ class TestRegistry:
         assert len(registry.list_by_category("options")) == 3
         assert len(registry.list_by_category("calculation")) == 5
         assert len(registry.list_by_category("signals")) == 0
-        assert len(registry.list_by_category("analysis")) == 18
+        assert len(registry.list_by_category("analysis")) == 19
         assert len(registry.list_by_category("portfolio")) == 7
         assert len(registry.list_by_category("execution")) == 0
 
     def test_openai_schema(self, registry):
         """OpenAI schema export should produce valid function definitions."""
         schema = registry.to_openai_schema()
-        assert len(schema) == 57
+        assert len(schema) == 58
         for tool in schema:
             assert tool["type"] == "function"
             assert "name" in tool["function"]
@@ -250,7 +250,7 @@ class TestRegistry:
     def test_anthropic_schema(self, registry):
         """Anthropic schema export should produce valid tool definitions."""
         schema = registry.to_anthropic_schema()
-        assert len(schema) == 57
+        assert len(schema) == 58
         for tool in schema:
             assert "name" in tool
             assert "description" in tool

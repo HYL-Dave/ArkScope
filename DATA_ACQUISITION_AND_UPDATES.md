@@ -190,6 +190,7 @@ is still follow-up work.
 | SA articles / comments | Signed-in browser extension captures into local storage; research reads retained captures | Body and comment outcomes are separate. A successful body does not prove comments loaded. |
 | SA company financial tables | Explicit current-tab capture in the extension; `get_sa_company_data` reads a saved observation | No automatic browser navigation, polling, schedule, paid fallback or claim that the displayed periods are the latest available. |
 | SA valuation, peers, annual estimates/revisions | Explicit current-tab capture with bounded section scrolling; local reads of a pinned observation | DOM readiness polling is not a recurring provider refresh. No hidden pagination, automatic paid fallback or live-quote claim. |
+| `compare_financial_sources` | Compare already retained SA/SEC/FD statement observations from selected sources | No acquisition or spending; compatible display-period comparisons are not exact accounting equivalence or a materiality judgment. |
 | FRED and Finnhub calendars | Local reads plus explicit jobs or opt-in source schedules | A release calendar is not evidence that a financial provider has processed the release. |
 | `get_current_quote` | `source=auto` tries an IBKR snapshot; `ibkr` requires that path; `local` reads stored bars | Snapshot, not streaming. Auto's local fallback is labeled historical, not live. |
 | `get_portfolio_holdings` | Reads the local profile snapshot only | Does not sync IBKR or establish current account value |
@@ -201,10 +202,10 @@ controls these implemented paths, using one policy catalog:
 
 | Dataset | Selectable sources | Runtime consumers |
 | --- | --- | --- |
-| `fundamentals_analysis` | SEC EDGAR, Financial Datasets | `get_fundamentals_analysis` on all four existing research channels |
+| `fundamentals_analysis` | SEC EDGAR, Financial Datasets | `get_fundamentals_analysis` and stored-only `compare_financial_sources` on all four existing research channels |
 | `detailed_financials` | SEC EDGAR | SEC calculation component of `get_detailed_financials` and existing callers |
 | `earnings_supplements` | Finnhub | History/upcoming component of `get_detailed_financials` |
-| `sa_company_financials` | Seeking Alpha | `get_sa_company_data` on all four research channels; explicit extension ingestion |
+| `sa_company_financials` | Seeking Alpha | `get_sa_company_data` and stored-only `compare_financial_sources` on all four research channels; explicit extension ingestion |
 | `sa_company_valuation` | Seeking Alpha | Same local reader with `dataset=valuation` or `peers`; explicit ingestion |
 | `sa_company_estimates` | Seeking Alpha | Same local reader with `dataset=estimates` or `revisions`; explicit ingestion |
 
@@ -234,6 +235,54 @@ through that tool; it does not delete retained observations. No saved setting
 preserves the default order in the table. Malformed or unreadable settings fail
 closed with a typed gap, not a network fallback. Changes take effect on subsequent
 invocations in the same App; they do not promise to cancel already-running work.
+
+### Comparing Retained Financial Sources
+
+`compare_financial_sources` is a **read-only**, source-separated operation. It
+does not call an API, launch a browser, promote a file cache, recalculate legacy
+ratios, grant paid permission or choose the authoritative provider. Its default
+provider set comes from the two applicable Settings routes above; explicit
+provider arguments cannot bypass disabled selections. A missing observation
+stays a named gap, not a request to buy it or silently switch sources.
+
+The reader compares recognized direct statement rows: six income measures
+(revenue, gross profit, operating income, net income, basic/diluted EPS), four
+balance measures (total/current assets and liabilities), and the three net cash
+flow categories. This is not all financial rows, derived ratios, valuation,
+forecasts or peer-selection judgments. Other SA rows remain available through
+the full company-data reader. Unknown/ambiguous row labels are not fuzzy-matched.
+
+- Default period selection is the latest common displayed month among sources
+  with available statements. `end_month=YYYY-MM` explicitly selects another
+  retained period; it never means a new acquisition or a claim of latest data.
+  Missing requested periods remain visible. TTM/last-report columns are not
+  substitutes for annual or quarterly columns.
+- Source values, labels, currency, unit note/scale, observation/content identity
+  and acquisition metadata remain separate. New SEC/FD statement projections
+  retain declared currency; old projections with no currency remain unknown.
+- SA month labels are **month alignment**, not proof of the exact fiscal end
+  day or duration. Two known conflicting exact end dates prohibit a delta.
+  Unknown/different currencies also prohibit it; no guessed USD or FX conversion.
+- Recognized SA millions/thousands are rescaled with decimal arithmetic; EPS
+  uses the per-share exception. API numbers retain their existing float
+  qualification. The difference is right minus the named left source; a relative
+  difference uses the absolute left value and is unavailable at zero.
+- Equal displayed values do not prove accounting equivalence. Differences within
+  half the displayed step are rounding-compatible, not proved rounding errors.
+  Larger differences remain unexplained unless there is actual supporting
+  evidence. The operation does not invent GAAP/restatement explanations, decide
+  an acceptable investment tolerance, or present a normalized blend as a fact.
+
+The default page contains three measures and can be enlarged within the model's
+output budget. Pin `comparison_id` on subsequent pages; changed content is a
+typed refusal, not mixed-version output. This content identity is not a saved
+report or an archival promise: SA can reopen immutable observations, while the
+old SEC/FD caches may overwrite previous responses. Budget reducers preserve the
+whole comparison or return a smaller-page request, never clipped numeric JSON.
+
+Owners: [comparison reader](src/tools/financial_comparison_tools.py),
+[comparison rules](src/fundamentals/source_comparison.py),
+[regression cases](tests/test_financial_source_comparison.py).
 
 ### SA Company Financial Tables
 
@@ -428,6 +477,26 @@ Owners: [reuse policy](src/fundamentals/reuse.py),
 [FD client](data_sources/financial_datasets_client.py).
 
 ### SEC Research, Quotes And Browser Captures
+
+The optional SEC Settings entry accepts a stock symbol such as `AAPL`; numeric
+CIKs remain an advanced exact identifier, not required user knowledge. GET
+`/sec-research/issuer/resolve?issuer=AAPL` uses only the existing stored official
+ticker map. It does not create a market store or acquire a missing map. An absent,
+failed, unmatched or ambiguous mapping has an explicit result and is never guessed.
+
+The separate **Update company directory** command, POST
+`/sec-research/issuer/refresh`, accepts a ticker and makes at most one governed
+official-map request after the existing write hook, configured SEC identity and
+capture-budget checks. It can install SEC storage, but does not acquire that
+company's filings/facts, enable a schedule or authorize later acquisition. The
+existing general permission hook is still audit-only, not a new interactive
+authorization engine. Company refresh/resume remains a separate explicit action.
+Storage/quota and schedule details are collapsed administration, not mandatory
+company-research input. Previously retained citation endpoints are unchanged.
+
+Owners: [SEC routes](src/api/routes/sec_research.py),
+[optional Settings entry](apps/arkscope-web/src/settings/SecResearchPanel.tsx),
+[issuer command/read tests](tests/test_sec_research_issuer_routes.py).
 
 SEC research's explicit `auto` mode uses a **24-hour** recency check for issuer
 mapping and full refresh receipts, and retries pending receipt coverage. This is

@@ -1,8 +1,8 @@
 # ArkScope Tool Catalog (canonical)
 
-**Updated**: 2026-09-20
+**Updated**: 2026-09-22
 **Status**: CANONICAL current registry authority
-**Live registry**: 57 tools; agent bridges add `delegate_to_subagent` for 58
+**Live registry**: 58 tools; agent bridges add `delegate_to_subagent` for 59
 
 This document describes the current `ToolRegistry`, not removed implementations
 or possible future products. Historical catalog versions remain recoverable from
@@ -31,7 +31,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 
 ## 1. Live registry
 
-### 1.1 All 57 tools
+### 1.1 All 58 tools
 
 | Tool | Category | Parameters | Current role |
 |---|---|---|---|
@@ -83,6 +83,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `get_sa_articles` | portfolio | ticker?, keyword?, article_type?, limit? | captured SA article index |
 | `get_sa_article_detail` | portfolio | article_id* | captured SA article detail |
 | `get_sa_company_data` | analysis | ticker*, dataset?, statement?, view?, currency?, table?, observation_id?, row_offset?, row_limit?, column_offset?, column_limit? | local-only SA financials, valuation, peers and annual estimates/revisions; raw display values, units, judgments, missing reasons and stable table/two-axis pagination; no refresh or paid fallback |
+| `compare_financial_sources` | analysis | ticker*, statement?, period?, sources?, end_month?, currency?, row_offset?, row_limit?, comparison_id? | source-separated stored SA/SEC/FD statement rows, units and qualified descriptive differences; no refresh, spending, FX, ratios or automatic source choice |
 | `save_report` | reports | title*, tickers*, report_type*, summary*, content*, conclusion?, confidence? | local report body and metadata write |
 | `list_reports` | reports | ticker?, days?, report_type?, limit? | report index read |
 | `get_report` | reports | report_id?, file_path? | report read |
@@ -102,6 +103,17 @@ cross-platform re-admission boundary is
 its portable Python-analysis level does not imply terminal or workspace access.
 
 ### 1.2 Evidence boundaries
+
+- Financial-source comparison is a stored-only reader on all four model
+  transports. It compares named statement rows, not the legacy derived ratios.
+  It distinguishes month-label alignment from exact period-end alignment;
+  conflicting exact dates or missing/different currencies prevent arithmetic.
+  SA display scale and per-share exceptions are explicit. A difference within
+  half the displayed step is rounding-compatible, not proved to be caused by
+  rounding; larger differences remain unexplained. Neither equality nor a
+  difference establishes accounting equivalence or investment materiality.
+  `comparison_id` rejects changed content between pages. SA observations can
+  reopen by ID; the old SEC/FD caches do not offer historical reopening.
 
 - Raw news tools expose title, source, timestamp, URL, excerpt, counts, and date
   ranges. They do not expose ArkScope legacy 1-5 score fields.

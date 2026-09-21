@@ -59,6 +59,12 @@ Owners: [issuer parsing](../../../src/sec_research/issuers.py),
    silently cause paid acquisition or a switch to SEC parsing. Audit the SA
    body/comment/holdings reads needed by this workflow instead of trusting the
    tool count. Do not expose all registry entries as supposedly read-only.
+   Cross-source acceptance must compare retained observations for a common
+   ticker/period with labels, scale, currency and date precision side by side.
+   Explain only evidenced differences; an unknown accounting/revision cause
+   remains unknown, not an invented reconciliation. The archived SEC
+   `compare_reports()` is a same-basis report comparator, not a current reusable
+   SA/SEC/FD component. Do not restore its archived report engine for this task.
 3. **SEC as optional verification.** Remove the raw CIK requirement and technical
    SEC browsing/administration from the normal company-research path. Any
    retained original-filing entry uses a familiar ticker/company choice, with
@@ -83,6 +89,25 @@ These packages form one user-facing workflow. Cross-platform, Python sandbox,
 SQLite replacement, external MCP hosting, a new notes product and a separate
 usage-monitoring product are not prerequisites and do not join this batch.
 Existing card translation and account-usage display are not retirement targets.
+
+## Progress At Each Handoff
+
+Report newly testable results, partial implementations and their limits, pending
+work, and operator-only gates at every handoff. Do not replace this with only a
+test count or an assertion that the whole company workflow is complete.
+
+| Package | Current implementation | Remaining work |
+| --- | --- | --- |
+| 1. Company inputs | Shared Chrome/Firefox code for three statement types and the bounded valuation/peers/annual-estimates/revisions scope; real Chrome captures retained | Installed, signed-in extension-to-host acceptance on both browsers; other pages/views are not advertised as captured |
+| 2. Research access | SA source switches, stored/pinned reader and now qualified SA/SEC/FD comparisons on all four transports | Direct article/comment/holdings channel audit and any bounded-reader repairs; full end-to-end operator research acceptance |
+| 3. Optional SEC | Stock-symbol resolution, explicit directory update, collapsed technical administration; existing citations preserved | Remaining normal-mode surface/consumer review, not wholesale SEC retirement |
+| 4. Analytics | Comparison excludes the legacy ratios and does not endorse them | D/E, comparable financial periods, earnings-event dates and complete trading-session windows |
+| 5. Retirement | No premature deletion of replacement-dependent capabilities or retained evidence | Remove superseded paths and consumers only after replacement acceptance; retention/inventory decisions remain separate |
+
+The September 22 comparison/entry implementation is under integrated acceptance;
+full frozen-revision results belong in its evidence receipt. Prior suite counts
+at `692b4311` do not certify these new changes. The two archived research branches
+remain archived, and master/production settings are not changed by this work.
 
 ## SA Quality And Operating Boundary
 

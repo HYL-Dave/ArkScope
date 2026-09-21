@@ -119,7 +119,10 @@ async function chooseForms(...values: string[]) {
   await key(menu, "Escape");
 }
 function formRequests() { return requests.filter(({ url }) => url.pathname.endsWith("/filing-forms")); }
-function input(name: string) { return host.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`)!; }
+function input(name: string) {
+  const label = name === "Stock symbol" ? i18n.t(($) => $.secResearch.symbol, { ns: "settings" }) : name;
+  return host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+}
 async function change(name: string, value: string) {
   await act(async () => {
     const element = input(name);
@@ -135,7 +138,7 @@ async function select(name: string, value: string) {
     el.dispatchEvent(new Event("change", { bubbles: true }));
   });
 }
-async function load(cik = "123") { await change("CIK", cik); await click("Load local"); }
+async function load(cik = "123") { await change("Stock symbol", cik); await click("Load local"); }
 async function settleFilters(milliseconds = 300) {
   await act(async () => { await vi.advanceTimersByTimeAsync(milliseconds); });
 }
@@ -149,12 +152,96 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+describe("Ticker-based optional SEC lookup", () => {
+  const resolved = (issuer = "AAPL", cik = "0000320193") => ({ issuer, cik, status: "ok", candidates: [cik],
+    observed_at: "2026-09-21T00:00:00Z", source: { url: "https://www.sec.gov/files/company_tickers.json", sha256: "a".repeat(64) }, gaps: [] });
+  const missing = (code = "issuer_map_unobserved") => ({ issuer: "AAPL", cik: null, status: "unavailable", candidates: [],
+    observed_at: null, source: null, gaps: [{ code }] });
+
+  it.each(["en", "zh-Hant"])("resolves a ticker on command without a CIK or provider request (%s)", async (locale) => {
+    handler = (url) => url.pathname.endsWith("/issuer/resolve") ? resolved() : fallback(url);
+    await render(locale);
+    expect(host.querySelector('input[aria-label="CIK"]')).toBeNull();
+    expect(host.querySelector<HTMLDetailsElement>(".sec-administration")?.open).toBe(false);
+    await change("Stock symbol", "aapl");
+    expect(requests.some(({ url }) => url.pathname.endsWith("/issuer/resolve"))).toBe(false);
+    await key(input("Stock symbol"), "Enter");
+    expect(recordRequests().at(-1)?.url.pathname).toBe("/sec-research/0000320193/filings");
+    expect(host.querySelector(".sec-issuer-resolution")?.textContent).toContain("AAPL");
+    expect(requests.every(({ init }) => (init.method ?? "GET") === "GET")).toBe(true);
+  });
+
+  it("missing map does not acquire anything; explicit directory update does not fetch company data", async () => {
+    handler = (url) => url.pathname.endsWith("/issuer/resolve") ? missing()
+      : url.pathname.endsWith("/issuer/refresh") ? resolved() : fallback(url);
+    await render(); await load("AAPL");
+    expect(host.textContent).toContain("Company directory unavailable");
+    expect(recordRequests()).toHaveLength(0);
+    expect(requests.every(({ init }) => (init.method ?? "GET") === "GET")).toBe(true);
+    await click("Update company directory");
+    const writes = requests.filter(({ init }) => init.method === "POST");
+    expect(writes.map(({ url }) => url.pathname)).toEqual(["/sec-research/issuer/refresh"]);
+    expect(JSON.parse(writes[0].init.body as string)).toEqual({ issuer: "AAPL" });
+    expect(recordRequests().at(-1)?.url.pathname).toBe("/sec-research/0000320193/filings");
+    expect(host.textContent).not.toContain("Refresh receipt");
+  });
+
+  it.each(["issuer_not_found", "issuer_ambiguous"])("does not guess an issuer when resolution returns %s", async (code) => {
+    handler = (url) => url.pathname.endsWith("/issuer/resolve") ? { ...missing(code), candidates: ["0000000001", "0000000002"] } : fallback(url);
+    await render(); await load("AAPL");
+    expect(recordRequests()).toHaveLength(0);
+    expect(button("Resume refresh").disabled).toBe(true);
+    expect(host.textContent).toContain(code === "issuer_ambiguous" ? "Multiple issuers match" : "Symbol not found");
+  });
+
+  it("changing a ticker while its lookup is pending cannot read or refresh the old company", async () => {
+    const pending = deferred<unknown>();
+    handler = (url) => url.pathname.endsWith("/issuer/resolve") ? pending.promise : fallback(url);
+    await render(); await change("Stock symbol", "AAPL"); await click("Refresh structured data");
+    await change("Stock symbol", "MSFT");
+    await act(async () => pending.resolve(resolved()));
+    expect(recordRequests()).toHaveLength(0);
+    expect(requests.some(({ init }) => init.method === "POST")).toBe(false);
+    expect(host.querySelector(".sec-issuer-resolution")).toBeNull();
+  });
+
+  it("rejects a successful lookup for a different symbol without fetching its records", async () => {
+    handler = (url) => url.pathname.endsWith("/issuer/resolve") ? resolved("MSFT", "0000789019") : fallback(url);
+    await render(); await load("AAPL");
+    expect(host.textContent).toContain("sec_issuer_resolution_mismatch");
+    expect(recordRequests()).toHaveLength(0);
+    expect(host.querySelector(".sec-issuer-resolution")).toBeNull();
+    expect(requests.some(({ init }) => init.method === "POST")).toBe(false);
+  });
+
+  it("a delayed directory update cannot attach old-company results to a new ticker", async () => {
+    const pending = deferred<unknown>();
+    handler = (url) => url.pathname.endsWith("/issuer/resolve") ? missing()
+      : url.pathname.endsWith("/issuer/refresh") ? pending.promise : fallback(url);
+    await render(); await load("AAPL"); await click("Update company directory");
+    await change("Stock symbol", "MSFT");
+    await act(async () => pending.resolve(resolved()));
+    expect(recordRequests()).toHaveLength(0);
+    expect(input("Stock symbol").value).toBe("MSFT");
+    expect(host.querySelector(".sec-issuer-resolution")).toBeNull();
+  });
+
+  it("directory failure preserves an honest error and sends no company-refresh request", async () => {
+    handler = (url) => url.pathname.endsWith("/issuer/resolve") ? missing()
+      : url.pathname.endsWith("/issuer/refresh") ? new Response(JSON.stringify({ detail: { code: "sec_identity_unconfigured" } }), { status: 503 }) : fallback(url);
+    await render(); await load("AAPL"); await click("Update company directory");
+    expect(host.textContent).toContain("sec_identity_unconfigured");
+    expect(recordRequests()).toHaveLength(0);
+    expect(requests.filter(({ init }) => init.method === "POST")).toHaveLength(1);
+  });
+});
+
 describe("SEC filing form selection", () => {
   it.each(["en", "zh-Hant"])("describes and groups the complete %s filing choices without changing query codes", async (locale) => {
     vi.useFakeTimers();
     const codes = ["144", "25", "3", "10-Q/A", "10-K", "10-Q", "DEF 14A", "SC 13G", "SCHEDULE 13G", "NEW-FORM"];
     handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("ok", codes) : fallback(url);
-    await render(locale); await change("CIK", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
+    await render(locale); await change("Stock symbol", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
     const menu = await openForms(locale === "en" ? "Forms" : "申報類型");
     const groups = [...menu.querySelectorAll('[role="group"]')];
     expect(groups.map((el) => el.getAttribute("aria-label"))).toEqual(locale === "en"
@@ -199,7 +286,7 @@ describe("SEC filing form selection", () => {
     const codes: string[] = fixture.options;
     expect(codes).toHaveLength(52);
     handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("ok", codes) : fallback(url);
-    await render(locale); await change("CIK", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
+    await render(locale); await change("Stock symbol", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
     const menu = await openForms(locale === "en" ? "Forms" : "申報類型");
     const options = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].slice(1);
     expect(options.map((el) => el.value).sort()).toEqual([...codes].sort());
@@ -240,7 +327,7 @@ describe("SEC filing form selection", () => {
     await render();
     expect(formRequests()).toHaveLength(0);
     expect(button("Forms").disabled).toBe(true);
-    await change("CIK", "123");
+    await change("Stock symbol", "123");
     expect(formRequests()).toHaveLength(0);
     await click("Load local");
     const menu = await openForms();
@@ -385,7 +472,7 @@ describe("SEC filing form selection", () => {
     await render(); await load(); await chooseForms("DEF 14A"); await settleFilters();
     handler = (url) => url.pathname.endsWith("/filing-forms") ? old.promise : fallback(url);
     await click("Load local"); await openForms();
-    await change("CIK", "456");
+    await change("Stock symbol", "456");
     expect(host.querySelector('[role="menu"]')).toBeNull();
     expect(button("Forms").disabled).toBe(true);
     expect(button("Forms").textContent).toBe("All");
@@ -546,7 +633,7 @@ describe("SEC filing form selection", () => {
 
   it.each(["en", "zh-Hant"])("keeps the %s dropdown bounded with localized All and status", async (locale) => {
     applyPanelStyles();
-    await render(locale); await change("CIK", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
+    await render(locale); await change("Stock symbol", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
     const menu = await openForms(locale === "en" ? "Forms" : "申報類型");
     expect(formOption(locale === "en" ? "All" : "全部").getAttribute("aria-checked")).toBe("true");
     expect(menu.querySelector('[role="status"]')?.textContent).toBe(locale === "en" ? "Available" : "可用");
@@ -734,10 +821,10 @@ describe("SEC structured storage", () => {
     expect(host.textContent).toBe("");
   });
 
-  it.each(["456", "invalid", ""])("cancels pending filtering when CIK changes to %s and waits for local load", async (cik) => {
+  it.each(["456", "invalid symbol", ""])("cancels pending filtering when CIK changes to %s and waits for local load", async (cik) => {
     vi.useFakeTimers();
     await render(); await load(); await chooseForms("10-Q");
-    await change("CIK", cik); await settleFilters(1000);
+    await change("Stock symbol", cik); await settleFilters(1000);
     expect(button("Forms").disabled).toBe(true);
     expect(recordRequests()).toHaveLength(1);
     expect(host.textContent).not.toContain("first.htm");
@@ -777,7 +864,7 @@ describe("SEC structured storage", () => {
 
   it.each(["en", "zh-Hant"])("offers only the official browser source link for filing documents in %s", async (locale) => {
     await render(locale);
-    await change("CIK", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
+    await change("Stock symbol", "123"); await click(locale === "en" ? "Load local" : "讀取本機");
     const row = host.querySelector(".sec-record-scroll tbody tr")!;
     const link = row.querySelector<HTMLAnchorElement>("a")!;
     expect(row.textContent).toContain("first.htm");
@@ -955,15 +1042,15 @@ describe("SEC structured storage", () => {
     expect(requests.map(({ url, init }) => [url.pathname, init.method ?? "GET"])).toEqual([
       ["/sec-research/config", "GET"], ["/sec-research/schedule-status", "GET"], ["/schedule", "GET"],
     ]);
-    expect(input("CIK").value).toBe("");
+    expect(input("Stock symbol").value).toBe("");
     expect(input("Capture budget").value).toBe("100");
     for (const [label, value] of [["Stored objects", "120"], ["Reservations", "30"], ["Orphans", "7"], ["Accounted usage", "157"]]) {
       const term = [...host.querySelectorAll("dt")].find((el) => el.textContent === label);
       expect(term?.nextElementSibling?.textContent).toContain(value);
     }
     expect(button("Load local").disabled).toBe(true);
-    await change("CIK", "AAPL");
-    expect(button("Load local").disabled).toBe(true);
+    await change("Stock symbol", "AAPL");
+    expect(button("Load local").disabled).toBe(false);
   });
 
   it("loads status and whole catalog rows only on command, then preserves exact fact strings", async () => {
@@ -1132,7 +1219,7 @@ describe("SEC structured storage", () => {
   it("rejects a delayed old issuer read after selection changes", async () => {
     const old = deferred<unknown>();
     handler = (url) => url.pathname === "/sec-research/0000000123/filings" ? old.promise : fallback(url);
-    await render(); await load(); await change("CIK", "456"); await click("Load local");
+    await render(); await load(); await change("Stock symbol", "456"); await click("Load local");
     await act(async () => old.resolve(envelope("ok", [filing("stale-issuer")])));
     expect(host.textContent).not.toContain("stale-issuer");
     expect(host.textContent).toContain("first.htm");
@@ -1146,7 +1233,7 @@ describe("SEC structured storage", () => {
     expect(button("Resume refresh").disabled).toBe(true);
     await click("Refresh structured data");
     expect(requests.filter(({ init }) => init.method === "POST")).toHaveLength(1);
-    await change("CIK", "456"); await click("Load local");
+    await change("Stock symbol", "456"); await click("Load local");
     expect(button("Load local").disabled).toBe(false);
     await act(async () => pending.resolve({ ...receipt, gaps: [{ code: "stale_refresh" }] }));
     expect(host.textContent).not.toContain("stale_refresh");
@@ -1278,7 +1365,7 @@ describe("SEC structured storage", () => {
 
   it("renders Traditional Chinese commands and state labels", async () => {
     await render("zh-Hant");
-    expect(host.textContent).toContain("SEC 結構化資料");
+    expect(host.textContent).toContain("SEC 原始來源（選用）");
     expect(host.textContent).toContain("已計入容量");
     expect(host.textContent).not.toContain("計費總容量");
     expect(button("讀取本機")).toBeDefined();

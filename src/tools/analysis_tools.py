@@ -55,6 +55,7 @@ def _sec_to_financial_statement(obj) -> FinancialStatement:
         report_period=obj.report_period,
         fiscal_period=getattr(obj, "fiscal_period", None),
         period_type=getattr(obj, "period", "quarterly"),
+        currency=getattr(obj, "currency", None),
         data=_dataclass_to_dict(obj),
     )
 

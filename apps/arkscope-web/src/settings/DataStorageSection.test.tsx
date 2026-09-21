@@ -281,8 +281,8 @@ describe("DataStorageSection lifecycle automation controls", () => {
   it("mounts the real SEC storage subsection without issuer acquisition", async () => {
     await renderSection("en");
     const section = host!.querySelector('[data-settings-location="sec_structured_storage"]');
-    expect(section?.textContent).toContain("SEC structured data");
-    expect(section?.querySelector('input[aria-label="CIK"]')).not.toBeNull();
+    expect(section?.textContent).toContain("SEC original sources (optional)");
+    expect(section?.querySelector('input[aria-label="Stock symbol"]')).not.toBeNull();
   });
   it.each([
     { language: "en" as const, summary: "48 cache entries (24 reusable · 24 refresh due)", timestamp: "latest cache timestamp" },

@@ -166,7 +166,7 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
 ):
     observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
 
-    assert len(observed["routes"]) == 227
+    assert len(observed["routes"]) == 229
     news_routes = {tuple(route.split("\t")[:2]) for route in observed["routes"]
                    if route.split("\t")[1].startswith("/news/")}
     assert ("PUT", "/news/settings") not in news_routes
@@ -198,6 +198,10 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
         "src.api.routes.market_data\tresume_price_repair",
         "GET\t/sec-research/{cik}\t"
         "src.api.routes.sec_research\tstored_status",
+        "GET\t/sec-research/issuer/resolve\t"
+        "src.api.routes.sec_research\tresolve_issuer",
+        "POST\t/sec-research/issuer/refresh\t"
+        "src.api.routes.sec_research\trefresh_issuer_directory",
         "POST\t/sec-research/{cik}/refresh\t"
         "src.api.routes.sec_research\trefresh",
         "GET\t/sec-research/config\t"
@@ -455,7 +459,7 @@ class TestHealth:
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "ok"
-        assert data["tools_registered"] == 57
+        assert data["tools_registered"] == 58
         assert data["data_sources"] == {
             "news_tickers": 2,
             "price_tickers": 2,

@@ -1236,6 +1236,21 @@ export function setSecResearchBudget(capture_budget_bytes: number): Promise<{ ca
 export function getSecResearchStatus(cik: string): Promise<SecResearchStoredStatus> {
   return getJSON(`/sec-research/${encodeURIComponent(cik)}`);
 }
+export interface SecIssuerResolution {
+  issuer: string;
+  status: "ok" | "unavailable";
+  cik: string | null;
+  candidates: string[];
+  observed_at: string | null;
+  source: { url: string; sha256: string | null } | null;
+  gaps: SecResearchGap[];
+}
+export function resolveSecResearchIssuer(issuer: string): Promise<SecIssuerResolution> {
+  return getJSON(`/sec-research/issuer/resolve?${new URLSearchParams({ issuer })}`);
+}
+export function refreshSecIssuerDirectory(issuer: string): Promise<SecIssuerResolution> {
+  return sendJSON("/sec-research/issuer/refresh", "POST", { issuer }, 600_000);
+}
 export function getSecResearchFilingForms(cik: string): Promise<SecResearchEnvelope<string[] | null>> {
   return getJSON(`/sec-research/${encodeURIComponent(cik)}/filing-forms`);
 }

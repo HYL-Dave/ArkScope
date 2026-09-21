@@ -14,9 +14,12 @@ from src.api.permissions import require_db_write
 from src.data_provider_config import PROVIDER_FIELDS, normalize_provider_config_value
 from src.sec_research import schema
 from src.sec_research.captures import CaptureStore
+from src.sec_research.capture_lock import research_operation
 from src.sec_research.citations import CitationError, decode_citation_query, read_sec_citation
 from src.sec_research.common import normalize_cik
 from src.sec_research.config import MAX_CAPTURE_BUDGET_BYTES, get_capture_budget_bytes, set_capture_budget_bytes
+from src.sec_research.issuer_store import IssuerStore
+from src.sec_research.issuers import parse_issuer
 from src.sec_research.paths import SecResearchPaths
 from src.sec_research.queries import StoredQueries, query_date, validate_query
 from src.sec_research.service import ResearchService
@@ -113,6 +116,66 @@ def schedule_status():
                 "next_cursor": None}
     except (ValueError, sqlite3.Error, OSError):
         return _unavailable("sec_schedule_store_unavailable")
+
+
+def _issuer(value):
+    try:
+        kind, normalized = parse_issuer(value)
+        return normalized if kind == "ticker" else "CIK:" + normalized
+    except ValueError:
+        raise HTTPException(422, detail={"code": "sec_issuer_invalid"}) from None
+
+
+def _issuer_unavailable(issuer, code):
+    return dict(issuer=issuer, status="unavailable", cik=None, candidates=[], observed_at=None,
+                source=None, gaps=[{"code": code}])
+
+
+@router.get("/sec-research/issuer/resolve")
+def resolve_issuer(issuer: str):
+    issuer = _issuer(issuer)
+    try:
+        result = IssuerStore(Store(SecResearchPaths.resolve())).resolve(issuer)
+        return {"issuer": issuer, **result}
+    except (ValueError, sqlite3.Error, OSError, TimeoutError):
+        return _issuer_unavailable(issuer, "sec_research_store_unavailable")
+
+
+class IssuerRefreshRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    issuer: str = Field(strict=True, min_length=1, max_length=32)
+
+
+@router.post("/sec-research/issuer/refresh")
+def refresh_issuer_directory(request: IssuerRefreshRequest):
+    issuer = _issuer(request.issuer)
+    if issuer.startswith("CIK:"):
+        raise HTTPException(422, detail={"code": "sec_issuer_directory_requires_ticker"})
+    require_db_write("sec_research_issuer_directory_refresh", {"issuer": issuer})
+    transport = None
+    try:
+        profile = get_profile_store()
+        budget = lambda: get_capture_budget_bytes(profile)
+        budget()
+        config = get_data_provider_store().get_all()
+        identity = config.get("sec_edgar", {}).get("user_agent", "")
+        identity = normalize_provider_config_value(PROVIDER_FIELDS["sec_edgar"][0], identity)
+        validate_sec_identity(identity)
+        store = Store(SecResearchPaths.resolve())
+        with research_operation(store.paths.capture_root):
+            store.install()
+            captures = CaptureStore(store, budget=budget)
+            transport = SecTransport(user_agent=identity, max_rate_limit_retries=0)
+            issuers = IssuerStore(store)
+            observation = issuers.refresh(transport, captures, clock=lambda: datetime.now(timezone.utc).isoformat(), check=None)
+            return {"issuer": issuer, **issuers.resolve(issuer, observation=observation)}
+    except SecTransportFailure:
+        raise HTTPException(503, detail={"code": "sec_identity_unconfigured"}) from None
+    except (ValueError, sqlite3.Error, OSError, TimeoutError):
+        raise HTTPException(503, detail={"code": "sec_issuer_directory_refresh_unavailable"}) from None
+    finally:
+        if transport is not None:
+            transport.close()
 
 
 @router.get("/sec-research/{cik}")

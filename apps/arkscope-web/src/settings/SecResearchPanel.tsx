@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Database, ExternalLink, Play
 import {
   ApiError, getSecResearchConfig, getSecResearchFacts, getSecResearchFilings, getSecResearchFilingForms,
   getSecResearchStatus, getSecResearchScheduleStatus, refreshSecResearch, setSecResearchBudget,
+  resolveSecResearchIssuer, refreshSecIssuerDirectory, type SecIssuerResolution,
   type SecResearchConfig, type SecResearchEnvelope, type SecResearchFact,
   type SecResearchFiling, type SecResearchReceipt, type SecResearchState,
   type SecResearchStoredStatus,
@@ -44,6 +45,11 @@ function budgetText(bytes: number, unit: Unit): string {
 function normalizeCik(text: string): string | null {
   const match = /^(?:CIK:)?([0-9]{1,10})$/i.exec(text.trim());
   return match && Number(match[1]) > 0 ? match[1].padStart(10, "0") : null;
+}
+
+function validIssuer(text: string): boolean {
+  const value = text.trim();
+  return normalizeCik(value) !== null || /^(?=.*[A-Za-z])[A-Za-z0-9][A-Za-z0-9.\-]{0,19}$/.test(value);
 }
 
 function stateLabel(status: SecResearchState | undefined, t: SettingsT) {
@@ -264,8 +270,13 @@ export function SecResearchPanel() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
-  const [cikInput, setCikInput] = useState("");
-  const cik = normalizeCik(cikInput);
+  const [issuerInput, setIssuerInput] = useState("");
+  const [resolution, setResolution] = useState<SecIssuerResolution | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [directoryBusy, setDirectoryBusy] = useState(false);
+  const directoryWrite = useRef(false);
+  const [issuerError, setIssuerError] = useState<unknown>(null);
+  const cik = normalizeCik(issuerInput) ?? (resolution?.status === "ok" ? resolution.cik : null);
   const [view, setView] = useState<View>("filings");
   const [forms, setForms] = useState<string[]>([]);
   const [formOptions, setFormOptions] = useState<FilingForms | null>(null);
@@ -324,14 +335,14 @@ export function SecResearchPanel() {
     }
   }
 
-  async function readFilingForms() {
-    if (!cik || !mounted.current) return;
+  async function readFilingForms(target = cik) {
+    if (!target || !mounted.current) return;
     const request = ++formsGeneration.current;
     const current = () => mounted.current && request === formsGeneration.current;
     formsRequested.current = true;
     setFormsLoading(true); setFormsError(null); setFormOptions(null);
     try {
-      const result = await getSecResearchFilingForms(cik);
+      const result = await getSecResearchFilingForms(target);
       if (current()) setFormOptions(result);
     } catch (error) { if (current()) setFormsError(error); }
     finally { if (current()) setFormsLoading(false); }
@@ -390,6 +401,7 @@ export function SecResearchPanel() {
     setPages([]); setPageIndex(0); setReading(false); setReadError(null);
     if (issuer) {
       issuerGeneration.current++; formsGeneration.current++; formsRequested.current = false;
+      setResolution(null); setIssuerError(null); setResolving(false);
       setForms([]); setFormOptions(null); setFormsLoading(false); setFormsError(null);
       setLoaded(false); setStored(null); setReceipt(null); setRefreshError(null); setUnconfirmed(false);
     }
@@ -415,17 +427,46 @@ export function SecResearchPanel() {
     });
   }
 
-  async function readLocal(kind = view, reloadForms = true) {
+  async function resolveCompany(updateDirectory = false): Promise<string | null> {
+    if (!validIssuer(issuerInput) || resolving || (updateDirectory && directoryWrite.current)) return null;
+    if (cik && !updateDirectory) return cik;
+    const request = issuerGeneration.current;
+    const current = () => mounted.current && request === issuerGeneration.current;
+    setResolving(true); setIssuerError(null);
+    if (updateDirectory) { directoryWrite.current = true; setDirectoryBusy(true); }
+    try {
+      const result = await (updateDirectory ? refreshSecIssuerDirectory(issuerInput.trim()) : resolveSecResearchIssuer(issuerInput.trim()));
+      if (!current()) return null;
+      if (result.issuer !== issuerInput.trim().toUpperCase()) throw new Error("sec_issuer_resolution_mismatch");
+      if (result.status === "ok" && (!result.cik || normalizeCik(result.cik) !== result.cik)) throw new Error("sec_issuer_resolution_invalid");
+      setResolution(result);
+      return result.status === "ok" ? result.cik : null;
+    } catch (error) { if (current()) setIssuerError(error); return null; }
+    finally {
+      if (current()) setResolving(false);
+      if (updateDirectory) {
+        directoryWrite.current = false;
+        if (mounted.current) { setDirectoryBusy(false); void loadConfig(); }
+      }
+    }
+  }
+
+  async function loadCompany(updateDirectory = false) {
+    const target = await resolveCompany(updateDirectory);
+    if (target) await readLocal(view, true, target);
+  }
+
+  async function readLocal(kind = view, reloadForms = true, target = cik) {
     clearFilterTimer();
-    if (!cik || !mounted.current) return;
-    if (reloadForms || !formsRequested.current) void readFilingForms();
+    if (!target || !mounted.current) return;
+    if (reloadForms || !formsRequested.current) void readFilingForms(target);
     const request = ++generation.current;
     const current = () => mounted.current && request === generation.current;
     setReading(true); setReadError(null); setPages([]); setPageIndex(0); setLoaded(true);
-    const statusRead = getSecResearchStatus(cik).then((result) => { if (current()) setStored(result); })
+    const statusRead = getSecResearchStatus(target).then((result) => { if (current()) setStored(result); })
       .catch((error: unknown) => { if (current()) { setStored(null); setReadError(error); } });
     try {
-      const result = await query(cik, kind);
+      const result = await query(target, kind);
       if (current()) setPages([result]);
     } catch (error) { if (current()) setReadError(error); }
     await statusRead;
@@ -447,13 +488,15 @@ export function SecResearchPanel() {
   }
 
   async function refresh(resume: boolean) {
-    if (!cik || acquisition.current) return;
+    if (acquisition.current || directoryWrite.current) return;
     acquisition.current = true;
     const request = issuerGeneration.current;
     generation.current++;
     setReading(false); setRefreshBusy(true); setRefreshError(null); setUnconfirmed(false);
     try {
-      const result = await refreshSecResearch(cik, resume);
+      const target = await resolveCompany();
+      if (!target || !mounted.current || request !== issuerGeneration.current) return;
+      const result = await refreshSecResearch(target, resume);
       if (!mounted.current || request !== issuerGeneration.current) return;
       setReceipt(result);
       void loadConfig();
@@ -473,7 +516,7 @@ export function SecResearchPanel() {
     <span>{label}</span><input aria-label={label} type={type} value={value} onChange={(event) => { update(event.target.value); filterChanged(); }} />
   </label>;
   const filters = view === "filings" ? <>
-    <FilingFormsFilter key={cikInput} value={forms} options={formOptions} loading={formsLoading} error={formsError}
+    <FilingFormsFilter key={issuerInput} value={forms} options={formOptions} loading={formsLoading} error={formsError}
       disabled={!cik || !loaded} t={t} onChange={(next) => { setForms(next); filterChanged(); }} />
     {field(t(($) => $.secResearch.filedFrom), filedFrom, setFiledFrom, "date")}
     {field(t(($) => $.secResearch.filedTo), filedTo, setFiledTo, "date")}
@@ -499,6 +542,7 @@ export function SecResearchPanel() {
 
   return <section className="sec-storage" aria-label={t(($) => $.secResearch.title)}>
     <h3>{t(($) => $.secResearch.title)}</h3>
+    <details className="sec-administration"><summary>{t(($) => $.secResearch.administration)}</summary>
     <ScheduleObservation value={scheduleStatus} source={source} t={t} />
     {scheduleError && <p role="alert">{t(($) => $.secResearch.schedule.unavailable)}</p>}
     <div className="sec-fields">
@@ -524,12 +568,24 @@ export function SecResearchPanel() {
       ] as const).map(([key, label]) => <div className="sec-capacity-pair" key={key}><dt>{label}</dt><dd>{config?.capacity ? t(($) => $.secResearch.byteCount, { value: String(config.capacity[key]) }) : t(($) => $.secResearch.unknown)}</dd></div>)}
     </dl>
     {config?.capacity?.over_budget && <p role="status">{t(($) => $.secResearch.overBudget)}</p>}
+    </details>
     <div className="sec-fields">
-      <label><span>{t(($) => $.secResearch.cik)}</span><input aria-label={t(($) => $.secResearch.cik)} value={cikInput} onChange={(event) => { setCikInput(event.target.value); invalidate(true); }} /></label>
-      <Button size="compact" icon={<Database size={16} />} disabled={!cik} busy={reading} onClick={() => void readLocal()}>{t(($) => $.secResearch.load)}</Button>
-      <IconButton size="compact" label={t(($) => $.secResearch.refresh)} icon={<RefreshCw size={16} />} disabled={!cik} busy={refreshBusy} onClick={() => void refresh(false)} />
+      <label><span>{t(($) => $.secResearch.symbol)}</span><input aria-label={t(($) => $.secResearch.symbol)} placeholder={t(($) => $.secResearch.symbolExample)} autoCapitalize="characters" spellCheck={false}
+        value={issuerInput} onChange={(event) => { setIssuerInput(event.target.value); invalidate(true); }}
+        onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); void loadCompany(); } }} /></label>
+      <Button size="compact" icon={<Database size={16} />} disabled={!validIssuer(issuerInput) || directoryBusy} busy={reading || resolving} onClick={() => void loadCompany()}>{t(($) => $.secResearch.load)}</Button>
+      <IconButton size="compact" label={t(($) => $.secResearch.refresh)} icon={<RefreshCw size={16} />} disabled={!validIssuer(issuerInput) || resolving || directoryBusy} busy={refreshBusy} onClick={() => void refresh(false)} />
       <Button size="compact" icon={<Play size={16} />} disabled={!cik || refreshBusy} onClick={() => void refresh(true)}>{t(($) => $.secResearch.resume)}</Button>
     </div>
+    {resolution?.status === "ok" && resolution.cik && <p className="sec-issuer-resolution">{t(($) => $.secResearch.identified, { symbol: issuerInput.trim().toUpperCase(), cik: resolution.cik })}</p>}
+    {issuerError != null && <p role="alert">{message(t(($) => $.secResearch.issuerError), issuerError)}</p>}
+    {resolution?.status === "unavailable" && <div className="sec-issuer-unavailable">
+      <p role="status">{resolution.gaps.some((gap) => gap.code === "issuer_ambiguous") ? t(($) => $.secResearch.issuerAmbiguous)
+        : resolution.gaps.some((gap) => gap.code === "issuer_not_found") ? t(($) => $.secResearch.issuerNotFound) : t(($) => $.secResearch.directoryUnavailable)}</p>
+      <Button size="compact" icon={<RefreshCw size={16} />} disabled={!validIssuer(issuerInput) || refreshBusy} busy={directoryBusy}
+        onClick={() => void loadCompany(true)}>{t(($) => $.secResearch.updateDirectory)}</Button>
+      <details><summary>{t(($) => $.secResearch.gaps)}</summary><ul>{resolution.gaps.map((gap, i) => <li key={i}><code>{gap.code}</code></li>)}</ul></details>
+    </div>}
     {unconfirmed && <p role="alert">{t(($) => $.secResearch.unconfirmed)}</p>}
     {refreshError != null && !unconfirmed && <p role="alert">{message(t(($) => $.secResearch.refreshError), refreshError)}</p>}
     {unconfirmed && <Button size="compact" icon={<Database size={16} />} disabled={!cik} busy={reading} onClick={() => void readLocal()}>{t(($) => $.secResearch.reread)}</Button>}

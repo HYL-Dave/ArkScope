@@ -183,6 +183,7 @@ class ToolRegistry:
 
     def _register_sa_company_tools(self) -> None:
         from .sa_company_tools import get_sa_company_data
+        from .financial_comparison_tools import compare_financial_sources
 
         self.register(ToolDefinition(
             name="get_sa_company_data", result_policy=PUBLIC_JSON,
@@ -191,7 +192,8 @@ class ToolRegistry:
                 "Local-only: no refresh or paid fallback. Provider display scale/rounding and missing reasons "
                 "are retained; snapshot time is not market time. Forecasts/ratings and peer selection "
                 "are not reported financial facts. Pin observation_id for pagination/reopening; "
-                "use available_tables IDs to select a section. Default dataset is financials."
+                "use available_tables IDs to select a section. Default dataset is financials. "
+                "Use compare_financial_sources for source-separated statement comparisons; do not silently mix values."
             ),
             function=get_sa_company_data, category="analysis",
             parameters=[
@@ -210,6 +212,32 @@ class ToolRegistry:
                 ToolParameter("dataset", "string", "Captured data category", required=False, default="financials",
                               enum=["financials", "valuation", "peers", "estimates", "revisions"]),
                 ToolParameter("table", "string", "Research table ID from available_tables; omit to read first table", required=False),
+            ],
+        ))
+
+        self.register(ToolDefinition(
+            name="compare_financial_sources", result_policy=PUBLIC_JSON, category="analysis",
+            function=compare_financial_sources,
+            description=("Compare already stored SA, SEC and/or Financial Datasets statement rows. "
+                         "No network, refresh, spending or authoritative-source selection. Default sources are "
+                         "those enabled in Settings. Retain labels/periods/currency/scale and show descriptive "
+                         "deltas only on compatible bases. Month alignment is not exact fiscal-date equivalence; "
+                         "unexplained differences are not assigned invented causes or materiality. No ratios or forecasts. "
+                         "Pin comparison_id for pagination; changed provider caches require a new comparison."),
+            parameters=[
+                ToolParameter("ticker", "string", "Company ticker, e.g. AMD"),
+                ToolParameter("statement", "string", "Statement to compare", required=False, default="income_statement",
+                              enum=["income_statement", "balance_sheet", "cash_flow_statement"]),
+                ToolParameter("period", "string", "Annual or quarterly; never mix with TTM", required=False,
+                              default="annual", enum=["annual", "quarterly"]),
+                ToolParameter("sources", "array", "At least two selected providers; omit for enabled providers", required=False,
+                              items={"type": "string", "enum": ["seeking_alpha", "sec_edgar", "financial_datasets"]}),
+                ToolParameter("end_month", "string", "YYYY-MM; omit for the latest common displayed month", required=False),
+                ToolParameter("currency", "string", "SA capture currency, default USD; never converts other providers", required=False,
+                              default="USD"),
+                ToolParameter("row_offset", "integer", "First metric row, default 0", required=False, default=0),
+                ToolParameter("row_limit", "integer", "Metric rows per page, default 3", required=False, default=3),
+                ToolParameter("comparison_id", "string", "Returned content identity; reject changed data between pages", required=False),
             ],
         ))
 

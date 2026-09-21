@@ -1031,8 +1031,9 @@ def test_lifecycle_tools_are_in_both_research_driver_allowlists():
     assert expected <= anthropic
     assert "get_sec_filings" not in openai
     assert "get_sec_filings" not in anthropic
-    assert len(openai) == 18
-    assert len(anthropic) == 18
+    assert "compare_financial_sources" in openai & anthropic
+    assert len(openai) == 19
+    assert len(anthropic) == 19
 
 
 def test_read_service_exposes_derived_final_check_date_in_list_and_detail(

@@ -149,6 +149,7 @@ class FinancialStatement(BaseModel):
     report_period: str = Field(description="Period end date YYYY-MM-DD")
     fiscal_period: Optional[str] = Field(None, description="e.g. 2025-Q3")
     period_type: str = Field(description="annual or quarterly")
+    currency: Optional[str] = Field(None, description="Provider-declared ISO currency; absent in legacy observations")
     data: Dict[str, Optional[float]] = Field(
         description="Metric name → value (e.g. revenue, net_income)"
     )

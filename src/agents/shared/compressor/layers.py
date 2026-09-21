@@ -105,7 +105,7 @@ def apply_layer_0(
 
     from src.sec_research.tool_results import SEC_TOOL_NAMES
     if (tool_name.removeprefix("tool_") in SEC_TOOL_NAMES
-            or tool_name.removeprefix("tool_") == "get_sa_company_data"):
+            or tool_name.removeprefix("tool_") in {"get_sa_company_data", "compare_financial_sources"}):
         summary, _meta = get_reducer(tool_name, registry)(payload, budget=budget_chars)
         if summary == payload:
             return payload, None

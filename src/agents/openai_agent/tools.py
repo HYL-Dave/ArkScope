@@ -66,7 +66,8 @@ def function_tool(fn):
             check_output_value(arguments)
             parsed = json.loads(arguments) if arguments else {}
             check_output_value(parsed)
-            if tool.name in {"tool_get_fundamentals_analysis", "tool_get_detailed_financials", "tool_get_sa_company_data"}:
+            if tool.name in {"tool_get_fundamentals_analysis", "tool_get_detailed_financials", "tool_get_sa_company_data",
+                             "tool_compare_financial_sources"}:
                 if not isinstance(parsed, dict) or set(parsed) - set(tool.params_json_schema["properties"]):
                     raise ValueError("financial_tool_arguments_invalid")
             return await invoke(context, arguments)
@@ -1209,6 +1210,29 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
                                      row_offset, row_limit, column_offset, column_limit, dataset, table)
         return _serialize_result(result, "get_sa_company_data")
 
+    @function_tool
+    def tool_compare_financial_sources(
+        ticker: str,
+        statement: Literal["income_statement", "balance_sheet", "cash_flow_statement"] = "income_statement",
+        period: Literal["annual", "quarterly"] = "annual",
+        sources: Optional[list[Literal["seeking_alpha", "sec_edgar", "financial_datasets"]]] = None,
+        end_month: Optional[str] = None, currency: str = "USD",
+        row_offset: Annotated[int, Field(strict=True)] = 0,
+        row_limit: Annotated[int, Field(strict=True)] = 3,
+        comparison_id: Optional[str] = None,
+    ) -> str:
+        """Compare stored statement rows across enabled providers, without fetching or spending.
+
+        Period/currency/scale and display rounding remain visible. A month match
+        is not exact fiscal-date equivalence; deltas do not prove GAAP agreement,
+        materiality or a cause. No mixed-source ratios. Pin comparison_id across
+        pages; the old provider caches cannot promise historical reopening.
+        """
+        from src.tools.financial_comparison_tools import compare_financial_sources
+        result = compare_financial_sources(dal, ticker, statement, period, sources, end_month,
+                                           currency, row_offset, row_limit, comparison_id)
+        return _serialize_result(result, "compare_financial_sources")
+
     tools = [
         tool_get_ticker_news,
         tool_search_news_by_keyword,
@@ -1261,6 +1285,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sa_article_detail,
         tool_get_sa_market_news,
         tool_get_sa_company_data,
+        tool_compare_financial_sources,
         tool_list_high_value_comments,
         tool_get_sa_comment_focus,
         tool_get_sa_feed,

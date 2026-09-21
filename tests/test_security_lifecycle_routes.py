@@ -462,9 +462,11 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 227
+    assert len(rows) == 229
     assert {
         ("GET", "/providers/data-catalog"),
+        ("GET", "/sec-research/issuer/resolve"),
+        ("POST", "/sec-research/issuer/refresh"),
         ("GET", "/providers/data-routes"),
         ("PUT", "/providers/data-routes/{dataset}"),
         ("PUT", "/providers/request-budgets/financial_datasets"),
@@ -476,6 +478,8 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
     }
     assert ("GET", "/sec/{ticker}") not in rows
     assert {row for row in rows if row[1].startswith("/sec-research/")} == {
+        ("GET", "/sec-research/issuer/resolve"),
+        ("POST", "/sec-research/issuer/refresh"),
         ("GET", "/sec-research/citation"),
         ("GET", "/sec-research/schedule-status"),
         ("GET", "/sec-research/{cik}"),

@@ -1761,6 +1761,8 @@ def execute_tool(
 
     from src.tools.sa_company_tools import get_sa_company_data
     tool_map["get_sa_company_data"] = lambda: get_sa_company_data(dal, **tool_input)
+    from src.tools.financial_comparison_tools import compare_financial_sources
+    tool_map["compare_financial_sources"] = lambda: compare_financial_sources(dal, **tool_input)
 
     if tool_name not in tool_map and tool_name not in SEC_TOOL_NAMES:
         return json.dumps({"error": "Unknown tool", "code": "invalid_value"})
