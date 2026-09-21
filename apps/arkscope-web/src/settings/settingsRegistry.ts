@@ -14,6 +14,7 @@ export type SettingsAnchorId =
   | "macro_storage";
 
 export type SettingsSubsectionId =
+  | "data_source_catalog"
   | "data_source_routes"
   | "provider_health"
   | "sa_extension_health"
@@ -99,6 +100,7 @@ export const SETTINGS_ANCHOR_IDS = SETTINGS_GROUPS.flatMap(
 ) as readonly SettingsAnchorId[];
 
 export const SETTINGS_SUBSECTIONS: readonly SettingsSubsectionDefinition[] = [
+  { id: "data_source_catalog", parent: "data_sources" },
   { id: "data_source_routes", parent: "data_sources" },
   { id: "provider_health", parent: "data_sources" },
   { id: "sa_extension_health", parent: "data_sources" },

@@ -50,6 +50,8 @@ import {
 } from "./dataScheduleControls";
 import type { SettingsReadCache, SettingsReadKey } from "./settingsReadCache";
 import { DataSourceRoutingSection } from "./DataSourceRoutingSection";
+import { DataSourceCatalogSection } from "./DataSourceCatalogSection";
+import type { SettingsLocationId } from "./settingsRegistry";
 
 function saChainPresentation(
   state: SAExtensionHealthResponse["chain_state"],
@@ -176,10 +178,12 @@ export function DataSourcesSection({
   onNavigationGuardChange,
   developerMode = false,
   settingsReadCache,
+  onNavigateSettings,
 }: {
   onNavigationGuardChange?: SettingsNavigationGuardReporter;
   developerMode?: boolean;
   settingsReadCache: SettingsReadCache;
+  onNavigateSettings?: (id: SettingsLocationId) => void;
 }) {
   const { t } = useTranslation("settings");
   const { t: commonT } = useTranslation("common");
@@ -586,6 +590,10 @@ export function DataSourcesSection({
         <div className="errorbox"><p className="muted">{outcomeMessage}</p></div>
       )}
       {developerMode ? <DeveloperDiagnostics diagnostics={diagnostics} t={t} /> : null}
+
+      <SettingsSubsectionAnchor id="data_source_catalog">
+        <DataSourceCatalogSection settingsReadCache={settingsReadCache} onNavigate={onNavigateSettings} />
+      </SettingsSubsectionAnchor>
 
       <SettingsSubsectionAnchor id="data_source_routes">
         <DataSourceRoutingSection

@@ -20,6 +20,8 @@ import {
 
 function settingsSubsectionLabel(id: SettingsSubsectionId, t: SettingsT): string {
   switch (id) {
+    case "data_source_catalog":
+      return t(($) => $.dataSources.catalog.title);
     case "data_source_routes":
       return t(($) => $.dataSources.routing.title);
     case "provider_health":

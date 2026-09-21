@@ -1210,6 +1210,7 @@ export function SettingsView({
           onNavigationGuardChange={setDataSourcesGuard}
           developerMode={developerMode}
           settingsReadCache={readCache}
+          onNavigateSettings={revealLocation}
         />
       );
     }

@@ -452,6 +452,7 @@ describe("local storage panels", () => {
     expect(Array.from(directory!.querySelectorAll("button")).map((button) => button.textContent?.trim()))
       .toEqual([
         "資料來源與排程",
+        "資料種類與來源",
         "財務資料來源",
         "Provider 健康",
         "SA Extension 健康",

@@ -72,6 +72,13 @@ class FinancialDatasetsBudgetUpdate(BaseModel):
         return value
 
 
+@router.get("/providers/data-catalog")
+def get_data_catalog():
+    from src.data_source_catalog import data_source_catalog
+
+    return data_source_catalog()
+
+
 @router.get("/providers/data-routes")
 def get_data_routes(store=Depends(get_data_provider_store), dal=Depends(get_dal)):
     from src.data_source_routing import DATASETS, FD_POLICY_KEY, ROUTE_PREFIX, fd_policy_view, route_view

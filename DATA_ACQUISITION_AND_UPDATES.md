@@ -37,15 +37,16 @@ working ArkScope adapter and access under the user's account are distinct.
 Candidate sources may be recorded before integration; they must not appear as
 working acquisition switches until their adapters and results are verified.
 
-The following is an initial integration map, not an exhaustive vendor catalog,
-current subscription recommendation or a new unified Settings implementation:
+The following is an initial integration map, also exposed in the Settings
+catalog below. It is not an exhaustive vendor catalog or a current subscription
+recommendation; it does not make every source selectable through one policy:
 
 | Data category | Existing ArkScope acquisition | Boundary / outstanding integration |
 | --- | --- | --- |
 | Company financial statements and facts | SEC EDGAR and Financial Datasets through existing on-demand financial tools | SA and Massive financial adapters are candidates, not implemented alternatives. Detailed financials has narrower coverage than fundamental analysis. |
 | Provider-supplied valuation, ratings and peer comparisons | No structured SA company-page adapter | The SA pages identified by the user belong here. Existing locally calculated metrics are not captures of those provider values. |
 | Current quotes | IBKR snapshots | Account/feed access and price time determine whether the result is live. This is not a persistent streaming service. |
-| Historical price bars | IBKR / Massive price workers | Existing price collection and repair own provider selection; the financial-source switches do not govern them. |
+| Historical price bars | IBKR / Massive price workers | The current recurring price job explicitly selects IBKR; Massive has worker support, not an independent recurring schedule. The financial-source switches do not govern either path. |
 | General news | Massive, Finnhub and IBKR collectors; SA market-news extension capture | API/Gateway jobs and browser capture have different prerequisites. Sources need not cover the same publishers, bodies or comments. |
 | Earnings and IPO events | Finnhub calendar jobs; separate earnings supplements in detailed financials | Implemented endpoints do not prove free-account coverage. Other providers can be evaluated without requiring a Finnhub upgrade. |
 | Macro observations and release events | FRED series/release jobs and Finnhub economic-calendar jobs | Series, release dates and economic events are distinct datasets, not interchangeable responses. |
@@ -54,7 +55,8 @@ current subscription recommendation or a new unified Settings implementation:
 | Account holdings and value | IBKR account capture, then local snapshot reads | A successful local holdings read does not initiate broker synchronization or prove current account value. |
 | Original filings and filing-backed evidence | SEC research capture, local reads and opt-in updates | A separate data capability, not a required first step for every financial question. |
 
-Current owners: [financial routing](src/data_source_routing.py),
+Current owners: [catalog metadata](src/data_source_catalog.py),
+[financial routing](src/data_source_routing.py),
 [quote reads](src/tools/current_quote.py), [price workers](src/prices_runtime.py),
 [source jobs](src/service/data_scheduler.py),
 [SA capture operations](src/sa/extension_run_protocol.py),
@@ -83,8 +85,40 @@ Adapter presence is not a health check or certification of analytical formulas.
   pages. No all-provider rollout, new subscription or external MCP is required.
 
 The current three financial route IDs below identify existing tool paths, not
-the final user-facing data taxonomy. Broader Settings grouping and
-collection controls remain follow-up work; this map does not activate them.
+the final user-facing data taxonomy. Category navigation is implemented;
+unified collection controls for the other categories remain follow-up work.
+
+### Settings Catalog
+
+Settings -> Data and Sync -> Data Sources and Schedules -> Data Types and Sources
+provides an eleven-category selector. Each provider row separates integration
+status, acquisition method, access/cost requirements and existing management
+entrypoints. **Integrated** means an adapter exists, not that the current account
+has access, the source is enabled, or its results are complete and current.
+
+GET `/providers/data-catalog` returns static capability metadata without opening
+a DAL/store, probing credentials or providers, starting jobs or saving settings.
+Financial source membership derives from the existing routing catalog rather
+than a second selection authority. The Settings read cache retains this metadata
+for 15 minutes before revalidation, with a 60-minute hard retention limit;
+these are UI metadata lifetimes, not freshness rules for financial/news data.
+
+Management buttons navigate to existing financial-source, schedule, connection,
+coverage, SEC-storage or SA-extension status sections. Navigation preserves
+unsaved Settings drafts; it neither enables a source nor runs a collection.
+Candidate financial/rating integrations have no acquisition buttons. A failed
+catalog reload keeps the previous definitions visible with an error, not a
+successful refresh indication.
+
+SA articles, comments, recommendation membership and market news use the
+existing Chrome extension capture/auto-sync. The catalog links to its status;
+capture controls remain in the extension, not a new sidecar API job. SA structured
+financial/rating pages remain unimplemented. Finnhub entries describe required
+endpoint access without presuming a paid subscription or certifying free access.
+
+Owners: [catalog](src/data_source_catalog.py),
+[metadata endpoint](src/api/routes/providers_config.py),
+[Settings catalog](apps/arkscope-web/src/settings/DataSourceCatalogSection.tsx).
 
 ## Which Clock Means What?
 

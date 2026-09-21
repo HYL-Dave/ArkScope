@@ -303,6 +303,7 @@ describe("Settings read cache", () => {
       "data_schedule",
       "provider_health",
       "provider_config",
+      "data_source_catalog",
       "sa_extension_health",
       "market_data_status",
       tradingDayCoverageKey(10),

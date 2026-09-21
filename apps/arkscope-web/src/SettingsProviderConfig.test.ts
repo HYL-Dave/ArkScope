@@ -8,6 +8,7 @@ import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  getDataSourceCatalog,
   getModelCatalog,
   getProvidersConfig,
   getProvidersHealth,
@@ -207,6 +208,7 @@ vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
+    getDataSourceCatalog: vi.fn(async () => ({ scope: "current_integrations_and_candidates", categories: [] })),
     getDataSourceRoutes: vi.fn(async () => ({
       routes: [],
       financial_datasets_budget: {
@@ -538,6 +540,7 @@ async function renderDataSources(
 }
 
 function clearDataSourceReadMocks() {
+  vi.mocked(getDataSourceCatalog).mockClear();
   vi.mocked(getModelCatalog).mockClear();
   vi.mocked(getSchedule).mockClear();
   vi.mocked(getProvidersHealth).mockClear();
@@ -1880,6 +1883,35 @@ describe("Settings provider config authority", () => {
       .toBe("partial");
   });
 
+  it.each([
+    ["source_schedules", "source_schedules"],
+    ["macro_schedules", "macro_storage"],
+  ] as const)("catalog navigation uses the real Settings owner for %s and retains drafts", async (control, target) => {
+    vi.mocked(getDataSourceCatalog).mockResolvedValueOnce({
+      scope: "current_integrations_and_candidates",
+      categories: [{ id: "news", sources: [{
+        provider: "finnhub", integration: "implemented", acquisition: "app_job",
+        access_requirement: "endpoint_entitlement_unverified", controls: [control],
+        schedule_sources: [], financial_routes: [],
+      }] }],
+    });
+    await renderDataSources();
+    const draft = host!.querySelector<HTMLInputElement>('input.ds-keyinput[type="password"]')!;
+    await act(async () => { setInputValue(draft, "unsaved-test-value"); });
+    const action = host!.querySelector<HTMLButtonElement>('[data-catalog-provider="finnhub"] button')!;
+    const location = host!.querySelector<HTMLElement>(`[data-settings-location="${target}"]`)!;
+    expect(location).not.toBeNull();
+    location.scrollIntoView = vi.fn();
+    expect(action.disabled).toBe(false);
+    await act(async () => { action.click(); });
+    await act(async () => { await Promise.resolve(); });
+    expect(location.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+    expect(document.activeElement).toBe(location);
+    expect(draft.value).toBe("unsaved-test-value");
+    expect(mocked.putCalls).toEqual([]);
+    expect(getDataSourceCatalog).toHaveBeenCalled();
+  });
+
   it("switches locale without resetting drafts polling cadence or progress", async () => {
     vi.useFakeTimers();
     mocked.scheduleRunning = true;
@@ -1903,6 +1935,7 @@ describe("Settings provider config authority", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
     await act(async () => { await i18n.changeLanguage("en"); });
     for (const read of [
+      getDataSourceCatalog,
       getModelCatalog,
       getSchedule,
       getProvidersHealth,
@@ -1931,6 +1964,7 @@ describe("Settings provider config authority", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
     await act(async () => { await i18n.changeLanguage("zh-Hant"); });
     for (const read of [
+      getDataSourceCatalog,
       getModelCatalog,
       getSchedule,
       getProvidersHealth,

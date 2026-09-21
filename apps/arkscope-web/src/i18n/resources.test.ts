@@ -761,7 +761,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1091,
+      settings: 1140,
       research: 240,
       explore: 1178,
       portfolio: 374,
@@ -847,7 +847,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3026);
+      expect(total, `${locale}.total`).toBe(3075);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([
@@ -1231,6 +1231,55 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      "dataSources.catalog.title",
+      "dataSources.catalog.seekingAlpha",
+      "dataSources.catalog.category",
+      "dataSources.catalog.provider",
+      "dataSources.catalog.integration",
+      "dataSources.catalog.acquisition",
+      "dataSources.catalog.access",
+      "dataSources.catalog.management",
+      "dataSources.catalog.implemented",
+      "dataSources.catalog.candidate",
+      "dataSources.catalog.reload",
+      "dataSources.catalog.empty",
+      "dataSources.catalog.loadFailed",
+      "dataSources.catalog.openControl",
+      "dataSources.catalog.categories.financial_statements",
+      "dataSources.catalog.categories.valuation_ratings",
+      "dataSources.catalog.categories.current_quotes",
+      "dataSources.catalog.categories.price_history",
+      "dataSources.catalog.categories.news",
+      "dataSources.catalog.categories.company_events",
+      "dataSources.catalog.categories.macro",
+      "dataSources.catalog.categories.recommendations",
+      "dataSources.catalog.categories.research_content",
+      "dataSources.catalog.categories.holdings",
+      "dataSources.catalog.categories.filings",
+      "dataSources.catalog.methods.on_demand_api",
+      "dataSources.catalog.methods.not_implemented",
+      "dataSources.catalog.methods.gateway_snapshot",
+      "dataSources.catalog.methods.app_job",
+      "dataSources.catalog.methods.price_worker",
+      "dataSources.catalog.methods.browser_extension",
+      "dataSources.catalog.methods.app_job_and_on_demand",
+      "dataSources.catalog.methods.account_capture",
+      "dataSources.catalog.methods.local_and_opt_in_update",
+      "dataSources.catalog.requirements.public_identity",
+      "dataSources.catalog.requirements.metered_requests",
+      "dataSources.catalog.requirements.endpoint_entitlement_unverified",
+      "dataSources.catalog.requirements.signed_in_browser_subscription",
+      "dataSources.catalog.requirements.gateway_market_access",
+      "dataSources.catalog.requirements.gateway_news_access",
+      "dataSources.catalog.requirements.gateway_account_access",
+      "dataSources.catalog.requirements.api_key",
+      "dataSources.catalog.controls.financial_sources",
+      "dataSources.catalog.controls.source_schedules",
+      "dataSources.catalog.controls.macro_schedules",
+      "dataSources.catalog.controls.sa_extension",
+      "dataSources.catalog.controls.connections",
+      "dataSources.catalog.controls.price_coverage",
+      "dataSources.catalog.controls.sec_research",
       "dataSources.routing.title",
       "dataSources.routing.dataset",
       "dataSources.routing.selectionOrder",

@@ -752,6 +752,7 @@ describe("Settings workspace", () => {
     expect(Array.from(directory.querySelectorAll(".settings-directory-links button"))
       .map((node) => node.textContent?.trim())).toEqual([
         "資料來源與排程",
+        "資料種類與來源",
         "財務資料來源",
         "Provider 健康",
         "SA Extension 健康",

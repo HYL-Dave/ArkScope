@@ -5397,6 +5397,38 @@ export function getProvidersConfig(): Promise<ProvidersConfigResponse> {
   return getJSON<ProvidersConfigResponse>("/providers/config", 8_000);
 }
 
+export type DataCategoryId =
+  | "financial_statements" | "valuation_ratings" | "current_quotes" | "price_history"
+  | "news" | "company_events" | "macro" | "recommendations" | "research_content"
+  | "holdings" | "filings";
+
+export type DataCatalogControl =
+  | "financial_sources" | "source_schedules" | "macro_schedules" | "sa_extension"
+  | "connections" | "price_coverage" | "sec_research";
+
+export interface DataSourceCapability {
+  provider: string;
+  integration: "implemented" | "candidate";
+  acquisition: "on_demand_api" | "not_implemented" | "gateway_snapshot" | "app_job"
+    | "price_worker" | "browser_extension" | "app_job_and_on_demand" | "account_capture"
+    | "local_and_opt_in_update";
+  access_requirement: "public_identity" | "metered_requests" | "endpoint_entitlement_unverified"
+    | "signed_in_browser_subscription" | "gateway_market_access" | "gateway_news_access"
+    | "gateway_account_access" | "api_key";
+  controls: DataCatalogControl[];
+  schedule_sources: string[];
+  financial_routes: DataSourceDataset[];
+}
+
+export interface DataSourceCatalog {
+  scope: "current_integrations_and_candidates";
+  categories: Array<{ id: DataCategoryId; sources: DataSourceCapability[] }>;
+}
+
+export function getDataSourceCatalog(): Promise<DataSourceCatalog> {
+  return getJSON("/providers/data-catalog", 8_000);
+}
+
 export type DataSourceDataset = "fundamentals_analysis" | "detailed_financials" | "earnings_supplements";
 
 export interface DataSourceRoute {
