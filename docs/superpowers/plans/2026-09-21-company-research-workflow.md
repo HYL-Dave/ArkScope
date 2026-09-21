@@ -217,7 +217,11 @@ coverage, not a claim that every SA tab/chart or the five packages are complete.
       peers. An observed `Semiannual` spelling was added with a regression case.
 - [x] Firefox dependency build includes the same extractor. Installed, logged-in
       Firefox is still an external acceptance gate, not inferred from build parity.
-- [ ] Frozen revision complete regression and saved evidence.
+- [x] Frozen `692b4311` regression: 12,178 backend passes / 12 unchanged skips;
+      1,911 frontend passes / 126 files; typecheck/build, 34 browser layouts and
+      8 desktop checks pass. Real snapshots also reopen all 41 tables / 2,026
+      cells through 160 paged reads. See the
+      [acceptance record](../evidence/2026-09-22-sa-company-research/README.md).
 - [ ] Operator extension reload and actual popup-to-host capture in each browser.
 
 These inputs do not yet replace the legacy ratio/event calculators. Remaining
