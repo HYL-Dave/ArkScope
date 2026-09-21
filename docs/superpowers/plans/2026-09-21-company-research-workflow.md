@@ -13,16 +13,19 @@ not a claim that the workflow below is already implemented. No subscription,
 production setting change, data purge or removal of retained evidence is
 authorized by this plan.
 
-## Reconciled Baseline Facts
+Current state: [Progress At Each Handoff](#progress-at-each-handoff).
+Latest accepted slice: [comparison and optional SEC entry](../evidence/2026-09-22-source-workflow/README.md).
 
-- The current SEC Settings panel requires a numeric CIK. The existing issuer
+## Reconciled Pre-Implementation Baseline (September 21)
+
+- The then-current SEC Settings panel required a numeric CIK. The existing issuer
   resolver supports exact ticker lookup, not company-name search; absent maps
   and ambiguous matches must be handled rather than asking users to know IDs.
 - FD is already explicitly selectable through financial routing, including as
   the sole source. Describing it as permanently SEC-only fallback is outdated.
 - SA has Chrome alarm-driven Alpha Picks and market-news acquisition. It is
   browser-dependent, not inherently manual/passive and not a headless service.
-- SA structured financial/rating capture is not implemented. Listing it in the
+- SA structured financial/rating capture was not implemented. Listing it in the
   catalog does not make it a replacement for an existing financial adapter.
 - Registry presence does not prove channel exposure. Both current subscription
   allowlists omit direct SA article detail, comment focus and holdings tools.
@@ -104,10 +107,23 @@ test count or an assertion that the whole company workflow is complete.
 | 4. Analytics | Comparison excludes the legacy ratios and does not endorse them | D/E, comparable financial periods, earnings-event dates and complete trading-session windows |
 | 5. Retirement | No premature deletion of replacement-dependent capabilities or retained evidence | Remove superseded paths and consumers only after replacement acceptance; retention/inventory decisions remain separate |
 
-The September 22 comparison/entry implementation is under integrated acceptance;
-full frozen-revision results belong in its evidence receipt. Prior suite counts
-at `692b4311` do not certify these new changes. The two archived research branches
-remain archived, and master/production settings are not changed by this work.
+The September 22 comparison/entry implementation at `e4d58842` passed its
+integrated acceptance: **12,225 backend / 12 unchanged skips**, **1,920 frontend /
+126 files**, typecheck/build, i18n, eight desktop checks and twelve isolated
+browser layouts. Retained AAPL balance/INTC cash-flow responses also pass the
+four-channel comparison replay, without new acquisition or spending. See the
+[scope and limits](../evidence/2026-09-22-source-workflow/README.md). This does not
+close the remaining workflow gates. The two archived research branches remain
+archived, and master/production settings are not changed by this work.
+
+Next integrated batch: make the retained article/body/comment/holdings reads
+usable across their intended channels with bounded results, source references,
+honest missingness and no implicit acquisition. Do not simply add allowlist
+entries: the current full article reader is unpaged and `PortfolioStore`
+construction ensures schema before its snapshot read. The latter is not an
+admissible strictly read-only external boundary merely because the tool does not
+contact IBKR. The legacy ratio/event repairs and replacement-dependent retirement
+remain separate acceptance obligations, not closed by these comparisons.
 
 ## SA Quality And Operating Boundary
 
