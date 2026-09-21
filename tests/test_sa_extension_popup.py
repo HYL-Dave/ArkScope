@@ -8,6 +8,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 EXTENSION = ROOT / "extensions" / "sa_alpha_picks"
@@ -271,6 +273,19 @@ def test_company_capture_failure_is_visible_and_does_not_offer_automatic_retries
     result = _run("capture_company", companyResult={"status": "error", "error_code": "sa_company_structure_changed"})
     assert "structure changed" in result["companyCaptureStatus"]
     assert "retained" in result["companyCaptureStatus"]
+    assert result["companyCaptureDisabled"] is False
+
+
+@pytest.mark.parametrize("dataset,label", [("valuation", "Valuation"), ("peers", "Peers"),
+                                         ("estimates", "Estimates"), ("revisions", "Revisions")])
+def test_company_research_receipt_identifies_the_actual_scope(dataset, label):
+    result = _run("capture_company", companyResult={
+        "status": "ok", "ticker": "AMD", "dataset": dataset, "statement": dataset,
+        "view": "snapshot", "currency": "DISPLAY", "coverage": {"table_count": 18, "row_count": 141},
+        "deduplicated": False,
+    })
+    assert f"AMD | {label} | snapshot | 18 tables | 141 rows" in result["companyCaptureStatus"]
+    assert "USD" not in result["companyCaptureStatus"] and "DISPLAY" not in result["companyCaptureStatus"]
     assert result["companyCaptureDisabled"] is False
 
 

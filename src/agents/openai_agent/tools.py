@@ -1184,25 +1184,29 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     @function_tool
     def tool_get_sa_company_data(
         ticker: str,
-        statement: Literal["income_statement", "balance_sheet", "cash_flow_statement"] = "income_statement",
-        view: Literal["annual", "quarterly"] = "annual",
-        currency: str = "USD",
+        statement: Optional[Literal["income_statement", "balance_sheet", "cash_flow_statement"]] = None,
+        view: Optional[Literal["annual", "quarterly", "snapshot"]] = None,
+        currency: Optional[str] = None,
         observation_id: Optional[str] = None,
         row_offset: Annotated[int, Field(strict=True)] = 0,
         row_limit: Annotated[int, Field(strict=True)] = 20,
         column_offset: Annotated[int, Field(strict=True)] = 0,
         column_limit: Annotated[int, Field(strict=True)] = 4,
+        dataset: Literal["financials", "valuation", "peers", "estimates", "revisions"] = "financials",
+        table: Optional[str] = None,
     ) -> str:
-        """Read captured SA financial tables, local-only with no paid fallback or derived ratios.
+        """Read captured SA financials, valuation, peers, annual estimates or revisions, local-only.
 
         Values retain provider display units and missing reasons; they are not
         rescaled. Month labels do not establish exact fiscal dates. Pin the
         returned observation_id for subsequent pages or historical reads.
-        Valuation and ratings are not covered.
+        Forecasts, ratings and displayed peer selection are not filing facts.
+        Snapshot time is not price time. statement/currency apply to financials
+        only; use table IDs from available_tables to read research sections.
         """
         from src.tools.sa_company_tools import get_sa_company_data
         result = get_sa_company_data(dal, ticker, statement, view, currency, observation_id,
-                                     row_offset, row_limit, column_offset, column_limit)
+                                     row_offset, row_limit, column_offset, column_limit, dataset, table)
         return _serialize_result(result, "get_sa_company_data")
 
     tools = [

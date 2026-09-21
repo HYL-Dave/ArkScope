@@ -1,4 +1,4 @@
-"""Bounded, content-addressed financial observations in the existing SA store."""
+"""Bounded, content-addressed company observations in the existing SA store."""
 
 from __future__ import annotations
 
@@ -67,6 +67,7 @@ def save_capture(payload, *, db_path=None):
             raise
         raise CompanyDataFailure("sa_company_observation_invalid") from exc
     return {"status": "ok", "observation_id": observation["observation_id"], "ticker": body["ticker"],
+            "dataset": body.get("dataset", "financials"),
             "statement": body["statement"], "view": body["view"], "currency": body["currency"],
             "deduplicated": previous is not None, "coverage": body["coverage"],
             "structure_sha256": body["structure_sha256"], "budget_bytes": budget}

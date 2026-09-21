@@ -60,6 +60,18 @@ save_market_news: saved=...
 
 ## Notes
 
+The shared **Capture Company Data** action also supports financial statements,
+valuation, peers and annual estimates/revisions. Open the desired signed-in
+company page first; the operation stays on that page and may scroll to load its
+tables. Unsupported pagination or incomplete tables stop capture without
+replacing earlier observations. Each category has an ArkScope source-selection
+switch; reading captured data never refreshes the browser.
+
+See [Data Acquisition And Updates](../../DATA_ACQUISITION_AND_UPDATES.md#sa-valuation-peers-and-forecasts)
+for exact scope, loading, freshness and retention. Rebuild/reload this Firefox
+artifact after source updates; a shared build does not certify a logged-in
+Firefox capture without testing it in that browser.
+
 Temporary Firefox add-ons are removed when Firefox restarts. For daily use,
 either keep the collector Firefox session open or package/sign this as an
 unlisted Firefox add-on later.

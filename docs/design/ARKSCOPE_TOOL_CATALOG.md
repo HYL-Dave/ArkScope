@@ -82,7 +82,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `refresh_sa_alpha_picks` | portfolio | none | read-only extension refresh status |
 | `get_sa_articles` | portfolio | ticker?, keyword?, article_type?, limit? | captured SA article index |
 | `get_sa_article_detail` | portfolio | article_id* | captured SA article detail |
-| `get_sa_company_data` | analysis | ticker*, statement?, view?, currency?, observation_id?, row_offset?, row_limit?, column_offset?, column_limit? | local-only SA financial table observations; raw display values, units, missing reasons and stable two-axis pagination; no valuation, refresh or paid fallback |
+| `get_sa_company_data` | analysis | ticker*, dataset?, statement?, view?, currency?, table?, observation_id?, row_offset?, row_limit?, column_offset?, column_limit? | local-only SA financials, valuation, peers and annual estimates/revisions; raw display values, units, judgments, missing reasons and stable table/two-axis pagination; no refresh or paid fallback |
 | `save_report` | reports | title*, tickers*, report_type*, summary*, content*, conclusion?, confidence? | local report body and metadata write |
 | `list_reports` | reports | ticker?, days?, report_type?, limit? | report index read |
 | `get_report` | reports | report_id?, file_path? | report read |

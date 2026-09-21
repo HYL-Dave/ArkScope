@@ -98,6 +98,10 @@ def clean_value(raw, *, currency=None):
 
 
 def normalize_capture(payload, *, now=None):
+    if type(payload) is dict and payload.get("schema_version") == 2:
+        from src.sa.company_research import normalize_research_capture
+
+        return normalize_research_capture(payload, now=now)
     require(type(payload) is dict and set(payload) == _CAPTURE_KEYS)
     require(type(payload["schema_version"]) is int and payload["schema_version"] == 1)
     require(payload["layout_id"] == LAYOUT_ID)

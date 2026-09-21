@@ -13,6 +13,6 @@ Object.defineProperty(dom.window.HTMLElement.prototype, "innerText", {
 });
 let result;
 for (const scriptPath of scriptPaths) {
-  result = vm.runInContext(fs.readFileSync(scriptPath, "utf8"), dom.getInternalVMContext());
+  result = await vm.runInContext(fs.readFileSync(scriptPath, "utf8"), dom.getInternalVMContext());
 }
 process.stdout.write(JSON.stringify(result));

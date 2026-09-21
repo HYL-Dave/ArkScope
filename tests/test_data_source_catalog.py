@@ -47,7 +47,8 @@ def test_catalog_inspection_never_opens_stores_or_providers(catalog_client):
     before_env = dict(os.environ)
     result = catalog(client)
     assert result["scope"] == "current_integrations_and_candidates"
-    assert len(result["categories"]) == 11
+    assert len(result["categories"]) == 12
+    assert "earnings_estimates" in {row["id"] for row in result["categories"]}
     assert not list(root.iterdir())
     assert dict(os.environ) == before_env
     forbidden.assert_not_called()
@@ -63,12 +64,12 @@ def test_financial_sources_follow_the_existing_routing_authority(catalog_client)
         if row["integration"] == "implemented":
             assert row["access_requirement"] == SOURCE_ACCESS[row["provider"]]
             assert row["controls"] == (["financial_sources", "sa_extension"] if row["provider"] == "seeking_alpha" else ["financial_sources"])
-            assert row["financial_routes"] == [
+            assert row["financial_routes"] == (["sa_company_financials"] if row["provider"] == "seeking_alpha" else [
                 name for name, route in DATASETS.items() if row["provider"] in route.providers
-            ]
+            ])
 
 
-@pytest.mark.parametrize("category", ["financial_statements", "valuation_ratings"])
+@pytest.mark.parametrize("category", ["financial_statements"])
 def test_unimplemented_sources_have_no_acquisition_controls(catalog_client, category):
     rows = by_category(catalog_client[0])[category]
     candidates = [row for row in rows if row["integration"] == "candidate"]
@@ -93,7 +94,7 @@ def test_sa_existing_capture_is_not_confused_with_financial_pages(catalog_client
     assert financial["acquisition"] == "browser_page_capture"
     assert financial["financial_routes"] == ["sa_company_financials"]
     assert financial["schedule_sources"] == []
-    assert rows["valuation_ratings"][0]["integration"] == "candidate"
+    assert rows["valuation_ratings"][0]["integration"] == "implemented"
 
 
 def test_every_app_schedule_is_accounted_for_without_inventing_sa_jobs(catalog_client):
@@ -111,7 +112,7 @@ def test_every_app_schedule_is_accounted_for_without_inventing_sa_jobs(catalog_c
 
 def test_catalog_is_a_description_not_an_account_probe(catalog_client):
     rows = by_category(catalog_client[0])
-    assert len(rows) == 11
+    assert len(rows) == 12
     for entries in rows.values():
         assert len({row["provider"] for row in entries}) == len(entries)
         for row in entries:
@@ -123,6 +124,16 @@ def test_catalog_is_a_description_not_an_account_probe(catalog_client):
     assert rows["company_events"][0]["access_requirement"] == "endpoint_entitlement_unverified"
     assert rows["current_quotes"][0]["acquisition"] == "gateway_snapshot"
     assert rows["holdings"][0]["acquisition"] == "account_capture"
+
+
+@pytest.mark.parametrize("category,route", [("valuation_ratings", "sa_company_valuation"),
+                                           ("earnings_estimates", "sa_company_estimates")])
+def test_research_inputs_have_separate_selection_without_invented_schedules(catalog_client, category, route):
+    row, = by_category(catalog_client[0])[category]
+    assert row["integration"] == "implemented" and row["acquisition"] == "browser_page_capture"
+    assert row["financial_routes"] == [route]
+    assert row["schedule_sources"] == []
+    assert row["controls"] == ["financial_sources", "sa_extension"]
 
 
 def test_massive_price_worker_does_not_claim_an_independent_schedule(catalog_client):

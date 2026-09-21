@@ -37,6 +37,7 @@ function categoryLabel(id: DataCategoryId, t: SettingsT): string {
   switch (id) {
     case "financial_statements": return t(($) => $.dataSources.catalog.categories.financial_statements);
     case "valuation_ratings": return t(($) => $.dataSources.catalog.categories.valuation_ratings);
+    case "earnings_estimates": return t(($) => $.dataSources.catalog.categories.earnings_estimates);
     case "current_quotes": return t(($) => $.dataSources.catalog.categories.current_quotes);
     case "price_history": return t(($) => $.dataSources.catalog.categories.price_history);
     case "news": return t(($) => $.dataSources.catalog.categories.news);

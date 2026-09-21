@@ -42,6 +42,7 @@ def test_get_is_provider_free_and_does_not_persist_defaults(settings_client, loc
     result = response.json()
     assert {row["dataset"] for row in result["routes"]} == {
         "fundamentals_analysis", "detailed_financials", "earnings_supplements", "sa_company_financials",
+        "sa_company_valuation", "sa_company_estimates",
     }
     assert all(row["setting_source"] == "default" for row in result["routes"])
     assert result["financial_datasets_budget"]["state"] == "unconfigured"

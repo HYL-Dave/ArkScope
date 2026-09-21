@@ -5398,7 +5398,7 @@ export function getProvidersConfig(): Promise<ProvidersConfigResponse> {
 }
 
 export type DataCategoryId =
-  | "financial_statements" | "valuation_ratings" | "current_quotes" | "price_history"
+  | "financial_statements" | "valuation_ratings" | "earnings_estimates" | "current_quotes" | "price_history"
   | "news" | "company_events" | "macro" | "recommendations" | "research_content"
   | "holdings" | "filings";
 
@@ -5429,7 +5429,8 @@ export function getDataSourceCatalog(): Promise<DataSourceCatalog> {
   return getJSON("/providers/data-catalog", 8_000);
 }
 
-export type DataSourceDataset = "fundamentals_analysis" | "detailed_financials" | "earnings_supplements" | "sa_company_financials";
+export type DataSourceDataset = "fundamentals_analysis" | "detailed_financials" | "earnings_supplements" | "sa_company_financials"
+  | "sa_company_valuation" | "sa_company_estimates";
 
 export interface DataSourceRoute {
   dataset: DataSourceDataset;

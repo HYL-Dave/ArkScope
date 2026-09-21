@@ -761,7 +761,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1142,
+      settings: 1145,
       research: 240,
       explore: 1178,
       portfolio: 374,
@@ -847,7 +847,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3077);
+      expect(total, `${locale}.total`).toBe(3080);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([
@@ -1233,6 +1233,8 @@ describe("bundled i18n resources", () => {
     const postSliceSettingsPaths = [
       "dataSources.catalog.methods.browser_page_capture",
       "dataSources.routing.datasets.saCompany",
+      "dataSources.routing.datasets.saValuation",
+      "dataSources.routing.datasets.saEstimates",
       "dataSources.catalog.title",
       "dataSources.catalog.seekingAlpha",
       "dataSources.catalog.category",
@@ -1249,6 +1251,7 @@ describe("bundled i18n resources", () => {
       "dataSources.catalog.openControl",
       "dataSources.catalog.categories.financial_statements",
       "dataSources.catalog.categories.valuation_ratings",
+      "dataSources.catalog.categories.earnings_estimates",
       "dataSources.catalog.categories.current_quotes",
       "dataSources.catalog.categories.price_history",
       "dataSources.catalog.categories.news",

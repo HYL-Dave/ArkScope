@@ -42,7 +42,11 @@ function fixture(): DataSourceCatalog {
         source("massive", { integration: "candidate", acquisition: "not_implemented", controls: [] }),
       ] },
       { id: "valuation_ratings", sources: [source("seeking_alpha", {
-        integration: "candidate", acquisition: "not_implemented", controls: [],
+        acquisition: "browser_page_capture", controls: ["financial_sources", "sa_extension"],
+        access_requirement: "signed_in_browser_subscription",
+      })] },
+      { id: "earnings_estimates", sources: [source("seeking_alpha", {
+        acquisition: "browser_page_capture", controls: ["financial_sources", "sa_extension"],
         access_requirement: "signed_in_browser_subscription",
       })] },
       { id: "news", sources: [
@@ -121,14 +125,15 @@ describe("DataSourceCatalogSection", () => {
     expect(testProvider).not.toHaveBeenCalled();
   });
 
-  it("separates manual financial capture, extension news alarms and unimplemented valuation", async () => {
+  it("separates explicit company research capture from extension news alarms", async () => {
     await render();
-    expect(provider("seeking_alpha").textContent).toContain("Explicit capture of the displayed financial table");
+    expect(provider("seeking_alpha").textContent).toContain("Explicit company-page capture");
     await select("valuation_ratings");
-    expect(provider("seeking_alpha").textContent).toContain("Not integrated");
-    expect(provider("seeking_alpha").querySelector("button")).toBeNull();
+    expect(provider("seeking_alpha").textContent).toContain("Explicit company-page capture");
+    await select("earnings_estimates");
+    expect(provider("seeking_alpha").textContent).toContain("Explicit company-page capture");
     await select("news");
-    expect(provider("seeking_alpha").textContent).toContain("Chrome capture / extension auto-sync");
+    expect(provider("seeking_alpha").textContent).toContain("Browser extension capture / auto-sync");
     expect(provider("finnhub").textContent).toContain("endpoint access unverified");
     await click(provider("seeking_alpha").querySelector("button")!);
     expect(navigate).toHaveBeenCalledExactlyOnceWith("sa_extension_health");

@@ -52,6 +52,11 @@ function fixture(): DataSourceRoutesResponse {
         options: [{ provider: "seeking_alpha", access: "signed_in_browser_subscription" }],
         setting_source: "default", consumers: ["get_sa_company_data"], unimplemented: [], error_code: null,
       },
+      ...(["sa_company_valuation", "sa_company_estimates"] as const).map((dataset) => ({
+        dataset, providers: ["seeking_alpha"],
+        options: [{ provider: "seeking_alpha", access: "signed_in_browser_subscription" as const }],
+        setting_source: "default" as const, consumers: ["get_sa_company_data"], unimplemented: [], error_code: null,
+      })),
     ],
     financial_datasets_budget: {
       enabled: true, daily_request_limit: null, requests_per_minute: null,
@@ -149,12 +154,15 @@ describe("DataSourceRoutingSection", () => {
     expect(guard).toHaveBeenLastCalledWith({ dirty: false, busy: false, reason: null });
   });
 
-  it("controls captured SA financials independently without enabling paid fallback", async () => {
+  it.each([
+    ["sa_company_financials", "Captured SA financial tables"],
+    ["sa_company_valuation", "Captured SA valuations and peers"],
+    ["sa_company_estimates", "Captured SA estimates and revisions"],
+  ] as const)("controls %s independently without enabling paid fallback", async (dataset, label) => {
     await render();
-    const label = "Captured SA financial tables";
     await click(source(`${label}: Seeking Alpha`));
     await click(button(`Save sources: ${label}`));
-    expect(putDataSourceRoute).toHaveBeenCalledExactlyOnceWith("sa_company_financials", []);
+    expect(putDataSourceRoute).toHaveBeenCalledExactlyOnceWith(dataset, []);
     expect(putFinancialDatasetsBudget).not.toHaveBeenCalled();
     expect(source(`${FUNDAMENTALS}: SEC EDGAR`).checked).toBe(true);
   });

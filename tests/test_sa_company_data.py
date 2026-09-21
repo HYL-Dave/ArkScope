@@ -423,6 +423,7 @@ def test_background_capture_never_navigates_and_reports_native_failure(scenario,
       };
       sendNativeMessage2 = async function (request) {
         calls.push({kind: "native", action: request.action});
+        if (request.action === "get_company_capture_admission") return {status:"ok",dataset:"financials"};
         if (scenario === "native_failed") return {status:"error", error_code:"sa_company_budget_exceeded"};
         if (scenario === "bad_receipt") return {status:"ok"};
         return {status:"ok", observation_id:"a".repeat(64), ticker: "AMD", statement:"income_statement", view:"annual", currency:"USD",
@@ -439,7 +440,7 @@ def test_background_capture_never_navigates_and_reports_native_failure(scenario,
     assert derive_run_result(inputs)["derived_outcome"] == expected
     assert len(probe["diagnostics"]["entries"]) == (0 if expected == "complete" else 1)
     if scenario in {"changed", "locked"}:
-        assert not any(call["kind"] == "native" for call in probe["calls"])
+        assert not any(call.get("action") == "save_company_data" for call in probe["calls"])
     assert probe["stored"]["status"] == ("ok" if expected == "complete" else "error")
     assert "rows" not in probe["stored"] and "capture" not in probe["stored"]
 

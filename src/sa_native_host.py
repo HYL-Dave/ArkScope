@@ -96,14 +96,24 @@ def handle_message(msg):
         return _handle_record_extension_job(None, msg)
     if action in _MARKET_NEWS_RECOVERY_PATHS:
         return _handle_market_news_recovery_action(action, msg)
-    if action == "save_company_data":
+    if action in {"get_company_capture_admission", "save_company_data"}:
         from src.data_source_routing import DataSourcePolicyFailure, load_route
         from src.sa.company_data import CompanyDataFailure
+        from src.sa.company_research import ROUTES
         from src.sa.company_store import save_capture
 
         try:
-            load_route("sa_company_financials").candidates("seeking_alpha")
-            return save_capture(msg.get("capture"))
+            if action == "get_company_capture_admission":
+                dataset = msg.get("dataset")
+                if type(dataset) is not str or dataset not in {"financials", *ROUTES}:
+                    return {"status": "error", "error_code": "sa_company_dataset_invalid"}
+                load_route(ROUTES.get(dataset, "sa_company_financials")).candidates("seeking_alpha")
+                return {"status": "ok", "dataset": dataset}
+            capture = msg.get("capture")
+            dataset = capture.get("dataset") if type(capture) is dict else None
+            route = ROUTES.get(dataset) if type(dataset) is str else None
+            load_route(route or "sa_company_financials").candidates("seeking_alpha")
+            return save_capture(capture)
         except (CompanyDataFailure, DataSourcePolicyFailure) as exc:
             return {"status": "error", "error_code": exc.code}
 

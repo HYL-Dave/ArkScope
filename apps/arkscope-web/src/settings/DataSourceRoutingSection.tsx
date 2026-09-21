@@ -22,6 +22,8 @@ function datasetLabel(dataset: DataSourceDataset, t: SettingsT) {
     case "detailed_financials": return t(($) => $.dataSources.routing.datasets.detailed);
     case "earnings_supplements": return t(($) => $.dataSources.routing.datasets.earnings);
     case "sa_company_financials": return t(($) => $.dataSources.routing.datasets.saCompany);
+    case "sa_company_valuation": return t(($) => $.dataSources.routing.datasets.saValuation);
+    case "sa_company_estimates": return t(($) => $.dataSources.routing.datasets.saEstimates);
   }
 }
 

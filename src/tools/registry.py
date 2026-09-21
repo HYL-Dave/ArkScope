@@ -187,26 +187,29 @@ class ToolRegistry:
         self.register(ToolDefinition(
             name="get_sa_company_data", result_policy=PUBLIC_JSON,
             description=(
-                "Read source-labeled SA financial tables captured by the browser extension. "
-                "Local-only: no refresh, paid fallback or derived ratios. Raw display values, "
-                "units, period labels and missing-value reasons are retained. Numbers are not "
-                "rescaled; exact fiscal end dates may be unknown. Reuse observation_id for "
-                "stable pagination and reopening. Valuation/ratings are not covered."
+                "Read browser-captured SA financials, valuation, peers, annual estimates or revisions. "
+                "Local-only: no refresh or paid fallback. Provider display scale/rounding and missing reasons "
+                "are retained; snapshot time is not market time. Forecasts/ratings and peer selection "
+                "are not reported financial facts. Pin observation_id for pagination/reopening; "
+                "use available_tables IDs to select a section. Default dataset is financials."
             ),
             function=get_sa_company_data, category="analysis",
             parameters=[
                 ToolParameter("ticker", "string", "Company ticker, e.g. AMD"),
-                ToolParameter("statement", "string", "Financial statement", required=False, default="income_statement",
+                ToolParameter("statement", "string", "Financials only; default income_statement", required=False,
                               enum=["income_statement", "balance_sheet", "cash_flow_statement"]),
-                ToolParameter("view", "string", "Captured period view", required=False, default="annual",
-                              enum=["annual", "quarterly"]),
-                ToolParameter("currency", "string", "Captured ISO currency, default USD", required=False, default="USD"),
+                ToolParameter("view", "string", "Default annual for financials/forecasts; snapshot for valuation/peers", required=False,
+                              enum=["annual", "quarterly", "snapshot"]),
+                ToolParameter("currency", "string", "Financials only: ISO currency, default USD. Omit for research tables.", required=False),
                 ToolParameter("observation_id", "string", "Pin the returned observation ID for later pages or history",
                               required=False),
                 ToolParameter("row_offset", "integer", "First row, default 0", required=False, default=0),
                 ToolParameter("row_limit", "integer", "Rows per page, default 20", required=False, default=20),
-                ToolParameter("column_offset", "integer", "First period column, default 0", required=False, default=0),
-                ToolParameter("column_limit", "integer", "Period columns per page, default 4", required=False, default=4),
+                ToolParameter("column_offset", "integer", "First data column, default 0", required=False, default=0),
+                ToolParameter("column_limit", "integer", "Data columns per page, default 4", required=False, default=4),
+                ToolParameter("dataset", "string", "Captured data category", required=False, default="financials",
+                              enum=["financials", "valuation", "peers", "estimates", "revisions"]),
+                ToolParameter("table", "string", "Research table ID from available_tables; omit to read first table", required=False),
             ],
         ))
 

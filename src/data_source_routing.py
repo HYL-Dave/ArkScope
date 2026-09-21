@@ -35,6 +35,8 @@ DATASETS = {
     "detailed_financials": SourceDataset(("sec_edgar",), ("get_detailed_financials",)),
     "earnings_supplements": SourceDataset(("finnhub",), ("get_detailed_financials",)),
     "sa_company_financials": SourceDataset(("seeking_alpha",), ("get_sa_company_data",)),
+    "sa_company_valuation": SourceDataset(("seeking_alpha",), ("get_sa_company_data",)),
+    "sa_company_estimates": SourceDataset(("seeking_alpha",), ("get_sa_company_data",)),
 }
 SOURCE_ACCESS = {
     "sec_edgar": "public_identity",

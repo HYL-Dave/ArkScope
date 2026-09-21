@@ -157,7 +157,8 @@ It does not depend on a new subscription, an external MCP server, a headless
 browser or replacing SEC first. The three statement types are supported in
 Annual/Quarterly Absolute views. Standalone TTM views are not accepted; the
 distinct TTM column in an annual income/cash-flow table is preserved as trailing,
-not relabeled as annual. Growth and valuation/rating pages are not implemented.
+not relabeled as annual. At that revision, growth and valuation/rating pages
+were not implemented; the research-table expansion is recorded below.
 
 Live page acceptance covered AMD's three annual statements and quarterly
 income/balance views, AAPL's annual balance sheet and INTC's annual cash flow.
@@ -195,6 +196,35 @@ estimates, worth evaluating without buying a subscription; no AV App connector
 was added. Keep acquisition, cleaning, source-separated storage, readable
 outputs and installed Chrome/Firefox acceptance in the same workflow package.
 Do not silently spend on FD or switch sources after an SA loading failure.
+
+### Research Table Expansion Status
+
+The September 22 expansion connects valuation measures, all 18 recognized peer
+tables, annual EPS/revenue estimates and annual revisions through the shared
+Chrome/Firefox capture command, existing SA observation store, independent source
+switches and the same four-channel local reader. It is company-data workflow
+coverage, not a claim that every SA tab/chart or the five packages are complete.
+
+- [x] Recognized current-page sections are scrolled and checked before admission;
+      labels-only loading, unknown pagination, navigation and operator input stop
+      the attempt. No auto-retry, navigation or paid fallback is introduced.
+- [x] Source selection is checked before potential browser acquisition and again
+      at persistence; financials, valuation/peers and forecasts have separate routes.
+- [x] Values retain display scale, missingness and forecast/grade/peer-selection
+      semantics. Native validation, immutable storage and four-channel section
+      pagination have focused regression coverage.
+- [x] Real Chrome captures: AMD valuation, peers, estimates and revisions; AAPL
+      peers. An observed `Semiannual` spelling was added with a regression case.
+- [x] Firefox dependency build includes the same extractor. Installed, logged-in
+      Firefox is still an external acceptance gate, not inferred from build parity.
+- [ ] Frozen revision complete regression and saved evidence.
+- [ ] Operator extension reload and actual popup-to-host capture in each browser.
+
+These inputs do not yet replace the legacy ratio/event calculators. Remaining
+workflow work is the normal company/SEC entrypoint, article/comment/holdings
+channel review, period/debt/event semantics, and retirement of superseded callers
+after replacement evidence. Those items are not silently closed by this input
+expansion. No production data, subscriptions or schedules are changed.
 
 Use focused tests during implementation, then one complete regression on the
 final integrated revision. A changed product revision invalidates affected

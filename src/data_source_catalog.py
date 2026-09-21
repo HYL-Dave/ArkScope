@@ -3,7 +3,7 @@
 from src.data_source_routing import DATASETS, SOURCE_ACCESS
 
 
-def _source(provider, acquisition, access_requirement, *, controls=(), schedules=()):
+def _source(provider, acquisition, access_requirement, *, controls=(), schedules=(), routes=None):
     return {
         "provider": provider,
         "integration": "candidate" if acquisition == "not_implemented" else "implemented",
@@ -11,7 +11,7 @@ def _source(provider, acquisition, access_requirement, *, controls=(), schedules
         "access_requirement": access_requirement,
         "controls": list(controls),
         "schedule_sources": list(schedules),
-        "financial_routes": [
+        "financial_routes": list(routes) if routes is not None else [
             name for name, route in DATASETS.items()
             if "financial_sources" in controls and provider in route.providers
         ],
@@ -26,7 +26,7 @@ def _financial_sources():
     ]
     browser_sources = DATASETS["sa_company_financials"].providers
     sources.extend(_source(provider, "browser_page_capture", SOURCE_ACCESS[provider],
-                           controls=("financial_sources", "sa_extension")) for provider in browser_sources)
+                           controls=("financial_sources", "sa_extension"), routes=("sa_company_financials",)) for provider in browser_sources)
     for provider in definition.unimplemented:
         if provider in browser_sources:
             continue
@@ -46,7 +46,12 @@ def data_source_catalog():
         "categories": [
             {"id": "financial_statements", "sources": _financial_sources()},
             {"id": "valuation_ratings", "sources": [
-                _source("seeking_alpha", "not_implemented", "signed_in_browser_subscription"),
+                _source("seeking_alpha", "browser_page_capture", "signed_in_browser_subscription",
+                        controls=("financial_sources", "sa_extension"), routes=("sa_company_valuation",)),
+            ]},
+            {"id": "earnings_estimates", "sources": [
+                _source("seeking_alpha", "browser_page_capture", "signed_in_browser_subscription",
+                        controls=("financial_sources", "sa_extension"), routes=("sa_company_estimates",)),
             ]},
             {"id": "current_quotes", "sources": [
                 _source("ibkr", "gateway_snapshot", "gateway_market_access", controls=("connections",)),

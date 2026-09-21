@@ -107,42 +107,48 @@ function renderCompanyCapture(result) {
   if (!companyCaptureStatusEl) return;
   companyCaptureStatusEl.className = result && result.status === "ok" ? "success" : result ? "error" : "empty";
   if (!result) {
-    companyCaptureStatusEl.textContent = "No financial table captured.";
+    companyCaptureStatusEl.textContent = "No company data captured.";
     return;
   }
   if (result.status === "ok") {
-    var names = { income_statement: "Income statement", balance_sheet: "Balance sheet", cash_flow_statement: "Cash flow" };
-    companyCaptureStatusEl.textContent = result.ticker + " | " + (names[result.statement] || "Financial table")
-      + " | " + result.view + " | " + result.currency
+    var names = { income_statement: "Income statement", balance_sheet: "Balance sheet", cash_flow_statement: "Cash flow",
+      valuation: "Valuation", peers: "Peers", estimates: "Estimates", revisions: "Revisions" };
+    companyCaptureStatusEl.textContent = result.ticker + " | " + (names[result.statement] || "Company data")
+      + " | " + result.view + (result.currency === "DISPLAY" ? "" : " | " + result.currency)
+      + (result.coverage && result.coverage.table_count ? " | " + result.coverage.table_count + " tables" : "")
       + " | " + (result.coverage ? result.coverage.row_count : 0) + " rows"
       + (result.deduplicated ? " | Unchanged capture retained" : " | Saved");
     return;
   }
   var errors = {
-    sa_company_page_unsupported: "The current page is not a supported company financial statement.",
+    sa_company_page_unsupported: "The current company page or URL options are not supported.",
     sa_company_page_changed: "The selected page changed before capture completed. Nothing was saved.",
-    sa_company_view_unsupported: "This financial view is not supported. Only Absolute values are accepted.",
-    sa_company_dom_not_ready: "The financial table has not finished loading.",
+    sa_company_view_unsupported: "This view is not supported. Financials require Absolute; forecasts require Annual.",
+    sa_company_dom_not_ready: "The company tables did not finish loading. Nothing was saved.",
+    sa_company_capture_interrupted: "Capture stopped after a page interaction. Nothing was saved.",
+    sa_company_pagination_unverified: "Unrecognized table pagination. Nothing was saved.",
     sa_company_human_verification_required: "Seeking Alpha requires human verification.",
-    sa_company_access_restricted: "The financial table is restricted by sign-in or subscription access.",
-    sa_company_layout_unrecognized: "The financial table structure is not recognized. Nothing was saved.",
-    sa_company_structure_changed: "The financial structure changed. Existing observations were retained; extractor review is required.",
+    sa_company_access_restricted: "The company table is restricted by sign-in or subscription access.",
+    sa_company_layout_unrecognized: "The company table structure is not recognized. Nothing was saved.",
+    sa_company_structure_changed: "The company structure changed. Existing observations were retained; extractor review is required.",
     sa_company_receipt_invalid: "The save receipt could not be verified. Capture status is unknown.",
     sa_company_identity_mismatch: "The company identity did not match the page. Nothing was saved.",
     sa_company_units_unrecognized: "Financial currency or units were not recognized. Nothing was saved.",
     sa_company_value_unrecognized: "A financial value could not be interpreted. Nothing was saved.",
+    sa_company_estimate_range_inconsistent: "An estimate falls outside its displayed range. Nothing was saved.",
     sa_company_values_unavailable: "The displayed financial table has no available numeric values.",
     sa_company_budget_exceeded: "Company-data storage is full. Existing observations were retained.",
-    data_source_not_selected: "SA company financials are disabled in ArkScope source settings.",
-    data_source_route_disabled: "SA company financials are disabled in ArkScope source settings.",
+    sa_company_admission_unavailable: "Capture permission could not be confirmed with ArkScope. Nothing was captured.",
+    data_source_not_selected: "This SA data category is disabled in ArkScope source settings.",
+    data_source_route_disabled: "This SA data category is disabled in ArkScope source settings.",
     sa_company_store_unavailable: "The company-data store is unavailable. The capture was not saved.",
   };
-  companyCaptureStatusEl.textContent = errors[result.error_code] || "The financial capture was not completed.";
+  companyCaptureStatusEl.textContent = errors[result.error_code] || "The company capture was not completed.";
 }
 
 if (companyCaptureBtn) companyCaptureBtn.addEventListener("click", function () {
   companyCaptureBtn.disabled = true;
-  companyCaptureStatusEl.textContent = "Capturing current financial table...";
+  companyCaptureStatusEl.textContent = "Loading and capturing company tables...";
   chrome.runtime.sendMessage({ action: "capture_company_data" }, function (result) {
     companyCaptureBtn.disabled = false;
     renderCompanyCapture(chrome.runtime.lastError ? { status: "error" } : result || { status: "error" });

@@ -580,7 +580,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "capture_company_data") {
     chrome.tabs.query({ active: true, currentWindow: true }).then(function (tabs) {
       var target = tabs.length === 1 ? { id: tabs[0].id, url: tabs[0].url } : null;
-      return enqueueSaSyncJob({ displayName: "Company financials", operation: "company_financial_capture", mode: "current_tab" },
+      return enqueueSaSyncJob({ displayName: "Company research", operation: "company_financial_capture", mode: "current_tab" },
         function (diagnostics) { return captureCompanyData(target, diagnostics); });
     }).then(sendResponse).catch(function () {
       sendResponse({ status: "error", error_code: "sa_company_capture_failed" });
@@ -681,23 +681,39 @@ async function captureCompanyData(target, diagnostics) {
   var result;
   var failurePhase = "extraction";
   try {
-    if (!target || !Number.isInteger(target.id)
-        || !/^https:\/\/seekingalpha\.com\/symbol\/[A-Z][A-Z0-9.-]{0,19}\/(income-statement|balance-sheet|cash-flow-statement)\/?(?:[?#].*)?$/.test(target.url || "")) {
+    var selectedUrl;
+    try { selectedUrl = new URL(target && target.url); } catch (_) { throw new Error("sa_company_page_unsupported"); }
+    var pagePath = /^\/symbol\/[A-Z][A-Z0-9.-]{0,19}\/(income-statement|balance-sheet|cash-flow-statement|valuation\/metrics|peers\/comparison|earnings\/(?:estimates|revisions))\/?$/.exec(selectedUrl.pathname);
+    if (!target || !Number.isInteger(target.id) || selectedUrl.origin !== "https://seekingalpha.com"
+        || selectedUrl.username || selectedUrl.password || !pagePath) {
       throw new Error("sa_company_page_unsupported");
     }
     var tab = await chrome.tabs.get(target.id);
     if (tab.url !== target.url) throw new Error("sa_company_page_changed");
-    var extracted = await chrome.scripting.executeScript({ target: { tabId: target.id }, files: ["scrape_company.js"] });
+    var dataset = { "valuation/metrics": "valuation", "peers/comparison": "peers", "earnings/estimates": "estimates",
+      "earnings/revisions": "revisions" }[pagePath[1]] || "financials";
+    var researchPage = dataset !== "financials";
+    var admission = await sendNativeMessage2({ action: "get_company_capture_admission", dataset: dataset });
+    if (!admission || admission.status !== "ok" || admission.dataset !== dataset) {
+      throw new Error(admission && admission.error_code || "sa_company_admission_unavailable");
+    }
+    tab = await chrome.tabs.get(target.id);
+    if (tab.url !== target.url) throw new Error("sa_company_page_changed");
+    var extracted = researchPage
+      ? await chrome.scripting.executeScript({ target: { tabId: target.id }, files: ["scrape_company_research.js"] })
+      : await chrome.scripting.executeScript({ target: { tabId: target.id }, files: ["scrape_company.js"] });
     if (extracted.length !== 1 || !extracted[0].result) throw new Error("sa_company_capture_failed");
     var value = extracted[0].result;
     if (value.status !== "ok") throw new Error(value.error_code || "sa_company_capture_failed");
+    if (researchPage && (!value.capture || value.capture.dataset !== dataset)) throw new Error("sa_company_identity_mismatch");
     tab = await chrome.tabs.get(target.id);
     if (tab.url !== target.url) throw new Error("sa_company_page_changed");
     failurePhase = "persistence";
     result = await sendNativeMessage2({ action: "save_company_data", capture: value.capture });
     if (!result || result.status !== "ok") throw new Error(result && result.error_code || "sa_company_store_unavailable");
     if (!/^[a-f0-9]{64}$/.test(result.observation_id || "") || result.ticker !== value.capture.ticker
-        || !result.coverage || result.coverage.scope !== "displayed_table" || typeof result.deduplicated !== "boolean") {
+        || !result.coverage || result.coverage.scope !== (researchPage ? "recognized_page_tables" : "displayed_table")
+        || (researchPage && result.dataset !== value.capture.dataset) || typeof result.deduplicated !== "boolean") {
       throw new Error("sa_company_receipt_invalid");
     }
   } catch (error) {
