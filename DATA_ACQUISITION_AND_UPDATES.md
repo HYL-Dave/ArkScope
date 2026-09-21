@@ -28,6 +28,33 @@ source-specific specifications still own their detailed protocols.
 - An acquisition failure must not become a fresh empty result. Partial coverage
   must not be presented as complete. Reuse eligibility is not a deletion policy.
 
+## Product Workflow And Delivery Scope
+
+The next delivery unit is a complete company-research workflow: company choice,
+selected-source acquisition/reuse, usable research inputs and optional source
+verification. The eleven-category catalog is supporting inventory, not the
+finished capability or a requirement for the user to redesign all preferences.
+The [workflow plan](docs/superpowers/plans/2026-09-21-company-research-workflow.md)
+owns implementation and acceptance; its pending items are not current behavior.
+
+Original SEC analysis is an optional verification path, not a mandatory step for
+ordinary company research. Retire redundant user-facing technical surfaces and
+superseded calculations together with a working replacement. Do not confuse
+this direction with permission to delete retained citations, disable distinct
+security-identity data, or silently replace a free source with paid acquisition.
+No normal research path should require the user to know a CIK.
+
+SA's existing extension has alarm-driven acquisition. Browser availability,
+login and successful page loading remain prerequisites; it is neither purely
+passive nor a headless collector. Its financial/rating adapters still need to be
+implemented and verified before source selection can use them.
+
+Freshness is task- and source-dependent, not a compulsory choice among four
+global ages. Financial publication/provider readiness, news collection cadence,
+browser capture availability and live quote/account requests keep separate
+rules. Unknown access requires scoped evidence, not a subscription assumption;
+one successful endpoint request cannot certify an entire provider plan.
+
 ## Data Categories Before Provider Integrations
 
 The catalog starts with **what data or intelligence is needed**, then lists
