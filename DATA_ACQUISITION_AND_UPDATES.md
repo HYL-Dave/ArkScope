@@ -51,6 +51,15 @@ current-page capture and local research reads. Ratings/valuation remain a
 separate, unimplemented adapter; neither financial capture nor existing SA
 alarms establish headless company-data availability.
 
+Source coverage and extraction readiness are separate acceptance questions.
+The [company-data comparison](docs/data/2026-09-21-company-data-coverage.md)
+records observed high-value SA coverage, FD/free-API alternatives, costs and
+field-specific failures. These experimental observations do not enable new
+adapters or change selected sources. For additional browser tables, acceptance
+must include lazy-loaded sections and complete column alignment; labels alone
+are not a completed capture. API pagination and period semantics need equivalent
+checks. A paid response is not automatically more complete or more reliable.
+
 Freshness is task- and source-dependent, not a compulsory choice among four
 global ages. Financial publication/provider readiness, news collection cadence,
 browser capture availability and live quote/account requests keep separate

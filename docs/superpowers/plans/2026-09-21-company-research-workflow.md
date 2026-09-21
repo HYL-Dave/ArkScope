@@ -180,6 +180,22 @@ required article/comment/holdings channel review still need their own evidence.
 Existing backups/news retention is not changed by this slice. The maintained
 root policy documents the capture trigger, clocks, storage cap and failure path.
 
+### Source Coverage Evaluation
+
+The user's follow-up separates acquisition feasibility from high-value research
+sufficiency. The [September21 comparison](../../data/2026-09-21-company-data-coverage.md)
+supports prioritizing SA valuation/peers and estimates/revisions alongside the
+existing financial input, not requiring a copy of every original filing field.
+It is experiment evidence, not shipped adapters or unrestricted SA capture.
+
+FD's explicit selected-source financial path remains useful, but the newly
+tested KPI/derived-signal defects prevent treating all of its enriched endpoints
+as an admitted replacement. AV's existing unpaid access returned useful forward
+estimates, worth evaluating without buying a subscription; no AV App connector
+was added. Keep acquisition, cleaning, source-separated storage, readable
+outputs and installed Chrome/Firefox acceptance in the same workflow package.
+Do not silently spend on FD or switch sources after an SA loading failure.
+
 Use focused tests during implementation, then one complete regression on the
 final integrated revision. A changed product revision invalidates affected
 results; do not waive security, citation or cancellation checks to increase pace.
