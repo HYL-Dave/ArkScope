@@ -167,6 +167,12 @@ Its cause is not established. Four captured real tables also passed Native
 Messaging framing/process persistence and 16 local tool calls across the four
 channels, without opening a market DB or calling a model/provider API.
 
+The input implementation at `e99e417f` passes a single complete backend run:
+12,086 passed / 12 unchanged skips. Complete frontend is 1,909 passed / 126 files;
+typecheck/build, i18n, eight desktop checks and thirteen isolated browser layouts
+pass. Product/test/config files remain unchanged through full acceptance.
+Evidence: [SA company input](../evidence/2026-09-21-sa-company-data/README.md).
+
 This is input-path acceptance, not completion of all five workflow packages.
 Installing/reloading the new extension for an operator session, broader source
 coverage, company selection/CIK removal, legacy calculation retirement and
