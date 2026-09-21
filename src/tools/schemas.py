@@ -166,6 +166,7 @@ class FundamentalsResult(BaseModel):
         default_factory=list,
         description="Per-statement provider, retrieval mode, original acquisition time and allowed age; not a latest-filing guarantee",
     )
+    source_routes: List[dict] = Field(default_factory=list)
     # Key metrics (derived from IBKR snapshot or SEC)
     market_cap: Optional[float] = None
     pe_ratio: Optional[float] = None
@@ -252,6 +253,7 @@ class DetailedFinancials(BaseModel):
     data_source: str = Field(default="sec_edgar")
     acquisition_gaps: List[Dict[str, str]] = Field(default_factory=list)
     source_observations: List[dict] = Field(default_factory=list)
+    source_routes: List[dict] = Field(default_factory=list)
     valuation_price_basis: ValuationPriceBasis = Field(
         default_factory=ValuationPriceBasis
     )

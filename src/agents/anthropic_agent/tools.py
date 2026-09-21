@@ -501,6 +501,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "name": "get_fundamentals_analysis",
             "description": (
                 "Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker. "
+                "Source auto follows Settings choices; explicit source never switches providers. "
                 "Auto reuses dated local SEC/FD observations within the configured financial window. "
                 "Financial Datasets acquisition may incur charges and requires an "
                 "operator-configured request budget and account rate limit. "
@@ -512,6 +513,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "properties": {
                     "ticker": {"type": "string", "description": "Stock ticker symbol"},
                     "period": {"type": "string", "enum": ["annual", "quarterly"], "default": "annual"},
+                    "source": {
+                        "type": "string", "enum": ["auto", "sec_edgar", "financial_datasets"], "default": "auto",
+                        "description": "Provider must be selected in Settings; auto prefers eligible local observations."
+                    },
                     "freshness": {
                         "type": "string", "enum": ["auto", "stored", "refresh"], "default": "auto",
                         "description": "Auto local reuse, stored only, or explicit refresh."
@@ -1561,6 +1566,7 @@ def execute_tool(
             period=tool_input.get("period", "annual"),
             freshness=tool_input.get("freshness", "auto"),
             max_age_seconds=tool_input.get("max_age_seconds"),
+            source=tool_input.get("source", "auto"),
         ),
         "get_detailed_financials": lambda: get_detailed_financials(
             dal,

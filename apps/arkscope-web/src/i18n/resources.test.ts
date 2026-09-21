@@ -761,7 +761,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 37,
-      settings: 1056,
+      settings: 1091,
       research: 240,
       explore: 1178,
       portfolio: 374,
@@ -847,7 +847,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(2991);
+      expect(total, `${locale}.total`).toBe(3026);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([
@@ -1231,6 +1231,41 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      "dataSources.routing.title",
+      "dataSources.routing.dataset",
+      "dataSources.routing.selectionOrder",
+      "dataSources.routing.datasets.fundamentals",
+      "dataSources.routing.datasets.detailed",
+      "dataSources.routing.datasets.earnings",
+      "dataSources.routing.choose",
+      "dataSources.routing.moveUp",
+      "dataSources.routing.moveDown",
+      "dataSources.routing.save",
+      "dataSources.routing.undo",
+      "dataSources.routing.noSources",
+      "dataSources.routing.defaultSelection",
+      "dataSources.routing.savedSelection",
+      "dataSources.routing.invalid",
+      "dataSources.routing.publicSource",
+      "dataSources.routing.metered",
+      "dataSources.routing.entitlementUnknown",
+      "dataSources.routing.notImplemented",
+      "dataSources.routing.loadFailed",
+      "dataSources.routing.saveFailed",
+      "dataSources.routing.budget.title",
+      "dataSources.routing.budget.allowPaid",
+      "dataSources.routing.budget.daily",
+      "dataSources.routing.budget.minute",
+      "dataSources.routing.budget.save",
+      "dataSources.routing.budget.undo",
+      "dataSources.routing.budget.enabled",
+      "dataSources.routing.budget.disabled",
+      "dataSources.routing.budget.unconfigured",
+      "dataSources.routing.budget.invalidLimits",
+      "dataSources.routing.budget.confirmTitle",
+      "dataSources.routing.budget.confirmLimits",
+      "dataSources.routing.budget.notDollarCap",
+      "dataSources.routing.budget.confirm",
       "dataSources.schedule.controls.schedule",
       "dataSources.schedule.controls.interval",
       "dataSources.schedule.controls.apply",

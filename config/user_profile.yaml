@@ -183,9 +183,7 @@ data_preferences:
 
   # 基本面數據來源
   fundamentals_sources:
-    primary: "local_ibkr"          # 本地 IBKR JSON
-    secondary: "sec_edgar"         # SEC 官方 (免費)
-    tertiary: "financial_datasets" # 付費 fallback (有快取)
+    # Source selection/order is managed by Settings in profile_state.db.
     refresh_days: 7                # Auto financial reuse window, not latest-period verification
     earnings_refresh_seconds: 3600 # Shorter window for earnings history/calendar
 

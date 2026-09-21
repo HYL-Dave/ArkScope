@@ -207,6 +207,13 @@ vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
+    getDataSourceRoutes: vi.fn(async () => ({
+      routes: [],
+      financial_datasets_budget: {
+        enabled: false, daily_request_limit: null, requests_per_minute: null,
+        setting_source: "default", state: "disabled", error_code: null,
+      },
+    })),
     getModelCatalog: vi.fn(async () => emptyCatalog),
     getSchedule: vi.fn(async () => ({
       sources: {

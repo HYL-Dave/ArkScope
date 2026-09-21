@@ -583,6 +583,7 @@ class ToolRegistry:
             description=(
                 "Get fundamental analysis (P/E, ROE, margins, financial statements) for a ticker. "
                 "Use period='quarterly' for recent quarterly trends (QoQ/YoY growth). "
+                "Source auto follows the selected Settings sources; an explicit source never falls back to another provider. "
                 "Default auto reuses dated local SEC/Financial Datasets observations within the configured financial window. "
                 "Stored never fetches or writes; refresh requests acquisition. max_age_seconds optionally overrides the window. "
                 "FD acquisition may incur charges and requires an operator-configured request budget and rate limit. "
@@ -595,6 +596,8 @@ class ToolRegistry:
                 ToolParameter("period", "string", "Report period type",
                               required=False, default="annual",
                               enum=["annual", "quarterly"]),
+                ToolParameter("source", "string", "Selected provider, or auto local-first routing within Settings choices",
+                              required=False, default="auto", enum=["auto", "sec_edgar", "financial_datasets"]),
                 ToolParameter("freshness", "string", "Reuse local observations by default, read stored only, or request refresh",
                               required=False, default="auto", enum=["auto", "stored", "refresh"]),
                 ToolParameter("max_age_seconds", "integer", "Optional acquisition-age override for auto/stored; omit for refresh",

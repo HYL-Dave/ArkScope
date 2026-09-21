@@ -258,6 +258,12 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
         snapshot_date="2025-12-31",
         data_source="sec_edgar",
         roe=0.44,
+        source_routes=[{
+            "dataset": "fundamentals_analysis", "requested": "auto",
+            "configured_sources": ["sec_edgar", "financial_datasets"],
+            "selected_source": "sec_edgar", "setting_source": "default",
+            "selection_policy": "local_first_ordered",
+        }],
     ).model_dump(exclude={"source_observations"})
     assert cached.source_observations[0]["retrieval"] == "stored"
     assert cached_dal.legacy_calls == []
@@ -328,24 +334,25 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
             self.config = _kwargs.get("request_policy")
             self.observations = []
 
-        def _admit(self, kwargs):
+        def _admit(self, kwargs, dataset):
             from data_sources.financial_datasets_governance import FinancialDatasetsFailure, FinancialDatasetsPolicy
             if kwargs.get("freshness") == "stored":
                 raise FinancialDatasetsFailure("financial_datasets_cache_miss")
             FinancialDatasetsPolicy.from_config(self.config)
+            self.observations.append({"provider": "financial_datasets", "dataset": dataset, "retrieval": "refreshed"})
 
         def get_income_statements(self, *_args, **_kwargs):
-            self._admit(_kwargs)
+            self._admit(_kwargs, "income_statements")
             events.append("fd:income")
             return [object()]
 
         def get_balance_sheets(self, *_args, **_kwargs):
-            self._admit(_kwargs)
+            self._admit(_kwargs, "balance_sheets")
             events.append("fd:balance")
             return []
 
         def get_cash_flow_statements(self, *_args, **_kwargs):
-            self._admit(_kwargs)
+            self._admit(_kwargs, "cash_flow_statements")
             events.append("fd:cashflow")
             return []
 

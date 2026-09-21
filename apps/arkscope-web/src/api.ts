@@ -5397,6 +5397,51 @@ export function getProvidersConfig(): Promise<ProvidersConfigResponse> {
   return getJSON<ProvidersConfigResponse>("/providers/config", 8_000);
 }
 
+export type DataSourceDataset = "fundamentals_analysis" | "detailed_financials" | "earnings_supplements";
+
+export interface DataSourceRoute {
+  dataset: DataSourceDataset;
+  providers: string[] | null;
+  setting_source: "default" | "profile";
+  consumers: string[];
+  options: Array<{ provider: string; access: "public_identity" | "metered_requests" | "endpoint_entitlement_unverified" }>;
+  unimplemented: string[];
+  error_code: string | null;
+}
+
+export interface FinancialDatasetsBudget {
+  enabled: boolean | null;
+  daily_request_limit: string | null;
+  requests_per_minute: string | null;
+  setting_source: "default" | "profile";
+  state: "enabled" | "disabled" | "unconfigured" | "invalid";
+  error_code: string | null;
+}
+
+export interface FinancialDatasetsBudgetUpdate {
+  enabled: boolean;
+  daily_request_limit: string | null;
+  requests_per_minute: string | null;
+  confirm_paid: boolean;
+}
+
+export interface DataSourceRoutesResponse {
+  routes: DataSourceRoute[];
+  financial_datasets_budget: FinancialDatasetsBudget;
+}
+
+export function getDataSourceRoutes(): Promise<DataSourceRoutesResponse> {
+  return getJSON("/providers/data-routes", 8_000);
+}
+
+export function putDataSourceRoute(dataset: DataSourceDataset, providers: string[]): Promise<DataSourceRoute> {
+  return sendJSON(`/providers/data-routes/${dataset}`, "PUT", { providers }, 8_000);
+}
+
+export function putFinancialDatasetsBudget(body: FinancialDatasetsBudgetUpdate): Promise<FinancialDatasetsBudget> {
+  return sendJSON("/providers/request-budgets/financial_datasets", "PUT", body, 8_000);
+}
+
 export function putProviderConfig(
   provider: string,
   fields: Record<string, string | null>,

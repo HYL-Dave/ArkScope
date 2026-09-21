@@ -507,6 +507,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     def tool_get_fundamentals_analysis(
         ticker: str, period: str = "annual", freshness: str = "auto",
         max_age_seconds: Annotated[Optional[int], Field(strict=True)] = None,
+        source: str = "auto",
     ) -> str:
         """Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker.
 
@@ -515,10 +516,12 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         requires an operator-configured request budget and account rate limit.
         Acquisition refusals appear in acquisition_gaps, not as proof of absent data.
         Stored never fetches or writes. Refresh bypasses old observations.
+        Source auto follows Settings choices; explicit source never switches providers.
 
         Args:
             ticker: Stock ticker symbol
             period: annual or quarterly
+            source: auto, sec_edgar or financial_datasets; must be selected in Settings
             freshness: Auto local reuse (default), stored only or refresh
             max_age_seconds: Optional acquisition-age override for auto/stored;
                 omit for refresh
@@ -526,7 +529,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         Returns market_cap, pe_ratio, roe, profit_margin, etc.
         """
         result = get_fundamentals_analysis(dal, ticker, period=period,
-                                          freshness=freshness, max_age_seconds=max_age_seconds)
+                                          freshness=freshness, max_age_seconds=max_age_seconds, source=source)
         return _serialize_result(result, "get_fundamentals_analysis")
 
     @function_tool

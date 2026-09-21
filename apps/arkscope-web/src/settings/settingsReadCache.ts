@@ -7,6 +7,7 @@ type FixedSettingsReadKey =
   | "data_schedule"
   | "provider_health"
   | "provider_config"
+  | "data_source_routes"
   | "sa_extension_health"
   | "market_data_status"
   | "security_lifecycle"
@@ -76,6 +77,7 @@ const FIXED_POLICIES: Readonly<Record<FixedSettingsReadKey, SettingsReadPolicy>>
   data_schedule: { freshMs: 30 * SECOND, hardRetentionMs: 5 * MINUTE, idle: true },
   provider_health: { freshMs: 30 * SECOND, hardRetentionMs: 15 * MINUTE, idle: true },
   provider_config: { freshMs: 60 * SECOND, hardRetentionMs: 15 * MINUTE, idle: true },
+  data_source_routes: { freshMs: 60 * SECOND, hardRetentionMs: 15 * MINUTE, idle: false },
   sa_extension_health: { freshMs: 5 * MINUTE, hardRetentionMs: 30 * MINUTE, idle: false },
   market_data_status: { freshMs: 60 * SECOND, hardRetentionMs: 15 * MINUTE, idle: true },
   security_lifecycle: { freshMs: 5 * MINUTE, hardRetentionMs: 30 * MINUTE, idle: true },
@@ -88,6 +90,7 @@ const DATA_SYNC_FIXED_KEYS: readonly FixedSettingsReadKey[] = [
   "data_schedule",
   "provider_health",
   "provider_config",
+  "data_source_routes",
   "sa_extension_health",
   "market_data_status",
   "security_lifecycle",

@@ -198,6 +198,7 @@ def get_fundamentals_analysis(
     period: str = "annual",
     freshness: str = "auto",
     max_age_seconds: Optional[int] = None,
+    source: str = "auto",
 ) -> FundamentalsResult:
     """Reuse dated local SEC/FD statements before acquiring a provider response.
 
@@ -209,6 +210,7 @@ def get_fundamentals_analysis(
         fundamentals_analysis_cache_key,
         validate_positive_annual_sec_payload,
     )
+    from src.data_source_routing import DataSourcePolicyFailure, load_route
 
     ticker = ticker.strip().upper()
     result = FundamentalsResult(ticker=ticker)
@@ -216,7 +218,10 @@ def get_fundamentals_analysis(
         reuse_policy = _financial_policy(dal, freshness, max_age_seconds)
         if period not in ("annual", "quarterly"):
             raise ReuseFailure("financial_period_invalid")
-    except ReuseFailure as exc:
+        route = load_route("fundamentals_analysis", dal)
+        result.source_routes = [route.describe(source)]
+        sources = route.candidates(source)
+    except (ReuseFailure, DataSourcePolicyFailure) as exc:
         result.acquisition_gaps = [{"provider": "financials", "code": exc.code}]
         return result
 
@@ -233,20 +238,30 @@ def get_fundamentals_analysis(
             period=period, report_periods=[answer.snapshot_date])]
         return answer
 
+    def finish(answer):
+        answer.source_routes = [route.describe(source, answer.data_source if answer.data_source != "none" else None)]
+        return answer
+
+    local_gaps, partial = [], None
     if freshness != "refresh":
-        saved = read_entry(backend, key, "sec_edgar", ticker, validate, reuse_policy.max_age_seconds)
-        if saved is not None:
-            return sec_result(saved)
-        # An available paid-source observation does not require an enabled key,
-        # and should not first trigger a free but unnecessary SEC download.
-        stored_fd = _fd_financials(dal, ticker, period, reuse_policy, local_only=True)
-        if stored_fd.source_observations:
-            if freshness == "stored" or not stored_fd.acquisition_gaps:
-                return stored_fd
-            return _fd_financials(dal, ticker, period, reuse_policy)
+        for provider in sources:
+            if provider == "sec_edgar":
+                saved = read_entry(backend, key, provider, ticker, validate, reuse_policy.max_age_seconds)
+                if saved is not None:
+                    return finish(sec_result(saved))
+                local_gaps.append({"provider": provider, "code": "financial_stored_data_unavailable"})
+            else:
+                saved_fd = _fd_financials(dal, ticker, period, reuse_policy, local_only=True)
+                if saved_fd.source_observations:
+                    if not saved_fd.acquisition_gaps:
+                        return finish(saved_fd)
+                    partial = saved_fd
+                local_gaps.extend(saved_fd.acquisition_gaps)
+        if partial is not None:
+            return finish(partial if freshness == "stored" else _fd_financials(dal, ticker, period, reuse_policy))
         if freshness == "stored":
-            stored_fd.acquisition_gaps.insert(0, {"provider": "sec_edgar", "code": "financial_stored_data_unavailable"})
-            return stored_fd
+            result.acquisition_gaps = local_gaps
+            return finish(result)
 
     def fetch_sec():
         try:
@@ -264,14 +279,23 @@ def get_fundamentals_analysis(
         except Exception as exc:
             raise ReuseFailure("sec_financials_acquisition_failed") from exc
 
-    try:
-        # Preserve legacy storage metadata; read eligibility comes from reuse_policy.
-        return sec_result(cached_dataset(backend, key, "sec_edgar", ticker, reuse_policy, validate, fetch_sec,
-                                         ttl_days=30 if period == "quarterly" else 90))
-    except ReuseFailure as exc:
-        result = _fd_financials(dal, ticker, period, reuse_policy)
-        result.acquisition_gaps.insert(0, {"provider": "sec_edgar", "code": exc.code})
-    return result
+    acquisition_gaps = []
+    for provider in sources:
+        if provider == "financial_datasets":
+            answer = _fd_financials(dal, ticker, period, reuse_policy)
+        else:
+            try:
+                answer = sec_result(cached_dataset(backend, key, provider, ticker, reuse_policy, validate, fetch_sec,
+                                                    ttl_days=30 if period == "quarterly" else 90))
+            except ReuseFailure as exc:
+                acquisition_gaps.append({"provider": provider, "code": exc.code})
+                continue
+        if answer.source_observations:
+            answer.acquisition_gaps = acquisition_gaps + answer.acquisition_gaps
+            return finish(answer)
+        acquisition_gaps.extend(answer.acquisition_gaps)
+    result.acquisition_gaps = acquisition_gaps
+    return finish(result)
 
 
 def _financial_profile(dal):
@@ -290,11 +314,14 @@ def _financial_policy(dal, freshness, maximum, *, earnings=False):
 def _fd_financials(dal, ticker, period, reuse_policy, *, local_only=False):
     from data_sources.financial_datasets_client import FinancialDatasetsClient
     from data_sources.financial_datasets_governance import FinancialDatasetsFailure
+    from src.data_source_routing import DataSourcePolicyFailure, FD_POLICY_KEY, fd_policy_from_settings, read_setting
 
-    profile = _financial_profile(dal)
-    preferences = profile.get("data_preferences")
-    paid = preferences.get("paid_sources") if isinstance(preferences, dict) else preferences
-    config = paid.get("financial_datasets") if isinstance(paid, dict) else paid
+    config, policy_failure = None, None
+    if not local_only and reuse_policy.mode != "stored":
+        try:
+            config = fd_policy_from_settings(read_setting(FD_POLICY_KEY, dal), _financial_profile(dal))
+        except DataSourcePolicyFailure as exc:
+            policy_failure = exc.code
     fd = FinancialDatasetsClient(cache_days=_get_fd_cache_days(dal), cache_backend=getattr(dal, "_backend", None),
                                 request_policy=config)
     n = 4 if period == "quarterly" else 2
@@ -318,6 +345,8 @@ def _fd_financials(dal, ticker, period, reuse_policy, *, local_only=False):
                 gaps[dataset] = "financial_datasets_not_attempted_after_refusal"
                 continue
             try:
+                if policy_failure is not None:
+                    raise FinancialDatasetsFailure(policy_failure)
                 statements[dataset] = read(ticker, period=period, limit=limit, freshness=reuse_policy.mode,
                                            max_age_seconds=reuse_policy.max_age_seconds)
                 gaps.pop(dataset, None)
@@ -626,12 +655,13 @@ def get_detailed_financials(
         validate_detailed_financials_static_payload,
     )
     from src.valuation_price import get_valuation_price_basis
+    from src.data_source_routing import DataSourcePolicyFailure, load_route
 
     ticker = ticker.strip().upper()
     years_for_growth = 2
     cache_key = detailed_financials_cache_key(ticker)
     backend = getattr(dal, "_backend", None)
-    observations, gaps = [], []
+    observations, gaps, routes = [], [], []
     try:
         reuse_policy = _financial_policy(dal, freshness, max_age_seconds)
         earnings_policy = _financial_policy(dal, freshness, max_age_seconds, earnings=True)
@@ -671,12 +701,16 @@ def get_detailed_financials(
         return valid
 
     try:
+        static_route = load_route("detailed_financials", dal)
+        routes.append(static_route.describe())
+        static_route.candidates()
         observation = cached_dataset(backend, cache_key, "sec_edgar", ticker, reuse_policy,
                                      validate_static, fetch_static)
         payload = observation.data
         observations.append(observation.describe("sec_edgar", "detailed_financials", reuse_policy,
             period="annual", report_periods=[payload.get("report_date")]))
-    except ReuseFailure as exc:
+        routes[-1] = static_route.describe(selected="sec_edgar")
+    except (ReuseFailure, DataSourcePolicyFailure) as exc:
         gaps.append({"provider": "sec_edgar", "code": exc.code})
         payload = None
 
@@ -701,14 +735,24 @@ def get_detailed_financials(
         for product_field, calculator_field in _DETAILED_VALUATION_FIELD_MAP.items()
     }
 
-    earnings, earnings_observations, earnings_gaps = _detailed_earnings(backend, ticker, earnings_policy)
+    try:
+        earnings_route = load_route("earnings_supplements", dal)
+        routes.append(earnings_route.describe())
+        earnings_route.candidates()
+        earnings, earnings_observations, earnings_gaps = _detailed_earnings(backend, ticker, earnings_policy)
+        if earnings_observations:
+            routes[-1] = earnings_route.describe(selected="finnhub")
+    except DataSourcePolicyFailure as exc:
+        earnings, earnings_observations = {}, []
+        earnings_gaps = [{"provider": "finnhub", "code": exc.code}]
 
     return DetailedFinancials(
         ticker=ticker,
         report_date=payload.get("report_date"),
-        data_source="sec_edgar",
+        data_source="sec_edgar" if observations else "none",
         valuation_price_basis=price_basis,
         source_observations=observations + earnings_observations,
+        source_routes=routes,
         acquisition_gaps=gaps + earnings_gaps,
         **detailed_valuation,
         # Profitability

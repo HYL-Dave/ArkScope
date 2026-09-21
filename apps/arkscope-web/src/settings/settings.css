@@ -266,3 +266,157 @@
 .settings-workspace[data-settings-overlay="true"] .settings-directory-trigger {
   display: inline-flex;
 }
+
+.data-source-routing {
+  min-width: 0;
+  padding-block: var(--space-4);
+  container: financial-source-policy / inline-size;
+}
+
+.data-source-routing h3,
+.data-source-routing h4 {
+  margin: 0;
+}
+
+.data-route-head,
+.data-route-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(200px, 2fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  min-width: 0;
+}
+
+.data-route-head {
+  padding-block: var(--space-2);
+}
+
+.data-route-row {
+  padding-block: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.data-route-label {
+  display: grid;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+.data-route-options {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.data-route-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-2);
+  align-items: center;
+  min-height: 38px;
+}
+
+.data-route-option label,
+.data-route-budget-toggle {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.data-route-option input,
+.data-route-budget-toggle input {
+  flex: 0 0 auto;
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+.data-route-access {
+  grid-column: 1;
+  padding-inline-start: calc(14px + var(--space-2));
+  overflow-wrap: anywhere;
+}
+
+.data-route-option > .data-route-actions {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.data-route-actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.data-route-unimplemented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+.data-route-budget {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.data-route-budget-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: end;
+  margin-top: var(--space-3);
+  max-width: 640px;
+}
+
+.data-route-budget-fields > label {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.data-route-budget-fields input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.data-route-budget-fields input:disabled {
+  color: var(--muted);
+}
+
+.data-source-routing input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@container financial-source-policy (max-width: 600px) {
+  .data-route-head {
+    display: none;
+  }
+
+  .data-route-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .data-route-options {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .data-route-row > .data-route-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .data-route-budget-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

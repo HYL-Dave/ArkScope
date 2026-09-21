@@ -11,12 +11,13 @@ free API call; SEC EDGAR = key-less reachability; paid FD = no live call).
 
 from __future__ import annotations
 
+import json
 import os
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator
 
-from src.api.dependencies import get_data_provider_store
+from src.api.dependencies import get_dal, get_data_provider_store
 from src.api.permissions import require_profile_state_write
 from src.data_provider_config import (
     MASSIVE_CONFIG_PROVIDER,
@@ -45,6 +46,82 @@ router = APIRouter(tags=["providers"])
 # EODHD live validation is reserved for the separately bounded lifecycle census.
 _TESTABLE = {"ibkr", MASSIVE_CONFIG_PROVIDER, "finnhub", "fred", "sec_edgar"}
 _CENSUS_ONLY = frozenset(("eodhd",))
+
+
+class DataSourceRouteUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    providers: list[StrictStr]
+
+
+class FinancialDatasetsBudgetUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: StrictBool
+    daily_request_limit: StrictInt | StrictStr | None
+    requests_per_minute: StrictInt | StrictStr | None
+    confirm_paid: StrictBool = False
+
+    @field_validator("daily_request_limit", "requests_per_minute", mode="before")
+    @classmethod
+    def parse_exact_limit(cls, value):
+        # Decimal strings keep the governor's int64 range exact in the browser.
+        if isinstance(value, str):
+            if (not value.isascii() or not value.isdecimal() or value.startswith("0")
+                    or len(value) > 19):
+                raise ValueError("financial_datasets_policy_invalid")
+            return int(value)
+        return value
+
+
+@router.get("/providers/data-routes")
+def get_data_routes(store=Depends(get_data_provider_store), dal=Depends(get_dal)):
+    from src.data_source_routing import DATASETS, FD_POLICY_KEY, ROUTE_PREFIX, fd_policy_view, route_view
+
+    try:
+        profile = dal.get_user_profile()
+        return {
+            "routes": [route_view(name, store.get_setting(ROUTE_PREFIX + name)) for name in DATASETS],
+            "financial_datasets_budget": fd_policy_view(store.get_setting(FD_POLICY_KEY), profile),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail={"code": "data_source_settings_unavailable"}) from exc
+
+
+@router.put("/providers/data-routes/{dataset}")
+def put_data_route(dataset: str, body: DataSourceRouteUpdate, store=Depends(get_data_provider_store)):
+    from src.data_source_routing import DataSourcePolicyFailure, ROUTE_PREFIX, route_view, validate_sources
+
+    try:
+        validate_sources(dataset, body.providers)
+    except DataSourcePolicyFailure as exc:
+        raise HTTPException(status_code=404 if exc.code == "data_source_dataset_unknown" else 422,
+                            detail={"code": exc.code}) from exc
+    require_profile_state_write("set_data_source_route", {"dataset": dataset, "providers": body.providers})
+    raw = json.dumps(body.providers, separators=(",", ":"))
+    try:
+        store.set_setting(ROUTE_PREFIX + dataset, raw)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail={"code": "data_source_settings_unavailable"}) from exc
+    return route_view(dataset, raw)
+
+
+@router.put("/providers/request-budgets/financial_datasets")
+def put_financial_datasets_budget(body: FinancialDatasetsBudgetUpdate, store=Depends(get_data_provider_store)):
+    from src.data_source_routing import DataSourcePolicyFailure, FD_POLICY_KEY, fd_policy_view, validate_fd_policy
+
+    values = body.model_dump(exclude={"confirm_paid"})
+    try:
+        validate_fd_policy(values)
+    except DataSourcePolicyFailure as exc:
+        raise HTTPException(status_code=422, detail={"code": exc.code}) from exc
+    if body.enabled and not body.confirm_paid:
+        raise HTTPException(status_code=409, detail={"code": "financial_datasets_paid_confirmation_required"})
+    require_profile_state_write("set_financial_datasets_request_budget", values)
+    raw = json.dumps(values, separators=(",", ":"))
+    try:
+        store.set_setting(FD_POLICY_KEY, raw)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail={"code": "data_source_settings_unavailable"}) from exc
+    return fd_policy_view(raw, {})
 
 
 def get_data_provider_store_lenient() -> DataProviderConfigStore | None:

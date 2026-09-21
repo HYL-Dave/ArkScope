@@ -14,6 +14,10 @@ source-specific specifications still own their detailed protocols.
   Local-first does not mean that every dataset can tolerate the same age.
 - Keep provider, dataset, requested scope and observation time visible. A local
   copy from one provider is not proof that another provider has equivalent data.
+- Provider capability, selected source, account entitlement, permission to spend
+  and data age are separate facts. A configured key does not prove a paid plan.
+  The current user has no paid Finnhub subscription; neither financial reuse nor
+  its future event-aware policy may require purchasing one.
 - A successful request, a recent download and a new financial period are three
   different facts. None alone proves that all requested data is current.
 - Users must be able to choose local-only reads, automatic acquisition when
@@ -47,14 +51,68 @@ is still follow-up work.
 
 | Data / entrypoint | Trigger and reuse today | Important limit |
 | --- | --- | --- |
-| Legacy financial analysis and detailed financials | On-demand `auto` reuses eligible local observations; otherwise acquire within source permissions. Financial Datasets is a separately governed fallback in fundamental analysis. | Age-based reuse, not a latest-period check. No explicit fiscal-period/version selector on these tools. |
-| Earnings supplements in detailed financials | Separate shorter reuse window for Finnhub history/upcoming responses | Not the earnings-calendar scheduler interval, and not an earnings-reaction monitor |
-| SEC research: `list_sec_filings`, `get_sec_financial_facts`, `read_sec_filing` | Default `stored`; explicit `auto` / `refresh` can download and persist with acquisition permission | Separate from the legacy SEC financial-analysis path above |
+| Legacy financial analysis and detailed financials | On-demand `auto` reuses eligible local observations from selected sources; otherwise acquire in the configured order within paid admission limits. | Age-based reuse, not a latest-period check. No explicit fiscal-period/version selector on these tools. |
+| Earnings supplements in detailed financials | Independently selected Finnhub history/upcoming responses, with a shorter reuse window | Not the earnings-calendar scheduler interval, and not an earnings-reaction monitor |
+| SEC research: `list_sec_filings`, `get_sec_financial_facts`, `read_sec_filing` | Default `stored`; explicit `auto` / `refresh` can download and persist through identity, path and transport guards | Separate from legacy financial tools; the general permission hook is audit-only, not an interactive authorization engine |
 | General news | Opt-in source schedules, Run now, or the scoped `daily_update` wrapper; source-specific incremental collection | No universal query-triggered catch-up or interval-completeness guarantee |
 | SA articles / comments | Signed-in browser extension captures into local storage; research reads retained captures | Body and comment outcomes are separate. A successful body does not prove comments loaded. |
 | FRED and Finnhub calendars | Local reads plus explicit jobs or opt-in source schedules | A release calendar is not evidence that a financial provider has processed the release. |
 | `get_current_quote` | `source=auto` tries an IBKR snapshot; `ibkr` requires that path; `local` reads stored bars | Snapshot, not streaming. Auto's local fallback is labeled historical, not live. |
 | `get_portfolio_holdings` | Reads the local profile snapshot only | Does not sync IBKR or establish current account value |
+
+### Selected Financial Sources
+
+Settings -> Data and Sync -> Data Sources and Schedules -> Financial Data Sources
+controls these implemented paths, using one policy catalog:
+
+| Dataset | Selectable sources | Runtime consumers |
+| --- | --- | --- |
+| `fundamentals_analysis` | SEC EDGAR, Financial Datasets | `get_fundamentals_analysis` on all four existing research channels |
+| `detailed_financials` | SEC EDGAR | SEC calculation component of `get_detailed_financials` and existing callers |
+| `earnings_supplements` | Finnhub | History/upcoming component of `get_detailed_financials` |
+
+The ordered selection is an eligible set, not a command to fetch all sources.
+Automatic fundamental analysis first tries acceptable local observations in that
+order, then permitted acquisitions. Thus an eligible second source's complete
+local result may avoid a first source's network request. A missing or partial
+result remains visible as acquisition gaps; values from different providers are
+not silently combined to fill a financial statement.
+
+If no complete local result is available but selected FD statements are partly
+retained, `stored` returns that partial result. `auto` keeps that provider and
+attempts only its missing statements within the budget. It does not restart the
+statement set at another provider or repurchase the already eligible statements.
+
+`get_fundamentals_analysis(source="sec_edgar"|"financial_datasets")` selects one
+provider inside that eligible set and never silently falls back to another.
+`source="auto"` is the default. Comparing sources requires separate explicit
+reads; existing cache records remain provider-separated. `source_routes` records
+the dataset, requested source, configured order, effective source, selection
+policy and whether Settings or defaults supplied the selection. Model choice
+does not bypass the operator's selection or the FD governor.
+
+Selections are saved in `profile_settings` as
+`data_sources.route.<dataset>`. An empty list disables the path, including reuse
+through that tool; it does not delete retained observations. No saved setting
+preserves the default order in the table. Malformed or unreadable settings fail
+closed with a typed gap, not a network fallback. Changes take effect on subsequent
+invocations in the same App; they do not promise to cancel already-running work.
+
+The route surface does **not** select a provider for every dataset or globally
+disable that provider. News, quotes, calendars, SA captures and other Finnhub
+tools keep their existing owners. Disabling Finnhub earnings supplements does
+not disable a calendar schedule, or vice versa. Calendar hints may eventually
+come from another selected source; missing Finnhub coverage cannot establish a
+financial refresh deadline. Detailed financials cannot use FD as a replacement
+until its own adapter is implemented. SA/Massive financial adapters are visibly
+unavailable rather than presented as working merely because a key or subscription
+exists. No external MCP server or subscription upgrade is implied by this slice.
+
+Owners: [source policy](src/data_source_routing.py),
+[Settings API](src/api/routes/providers_config.py),
+[Settings controls](apps/arkscope-web/src/settings/DataSourceRoutingSection.tsx).
+GET `/providers/data-routes` and PUT `/providers/data-routes/{dataset}` inspect
+or save policy only; neither contacts a data provider.
 
 ### Financial Read Controls
 
@@ -243,17 +301,33 @@ subscription or live latest-period probe in this policy.
 ## Cost, Access And Retention
 
 Financial Datasets HTTP requires an enabled policy with positive
-`daily_request_limit` and `requests_per_minute`, under
-`data_preferences.paid_sources.financial_datasets`. Missing limits refuse new
-requests; they do not prevent eligible local reads. The installation/key-scoped
+`daily_request_limit` and `requests_per_minute`. Settings owns the optional
+`data_sources.financial_datasets.request_policy` override in `profile_settings`;
+`data_preferences.paid_sources.financial_datasets` in the profile YAML is only
+the default when no override exists. An invalid saved policy does not fall back
+to an enabled YAML policy. Missing limits refuse new requests; disabled paid
+acquisition does not prevent eligible local reads from a selected source.
+
+PUT `/providers/request-budgets/financial_datasets` requires explicit
+`confirm_paid=true` to enable paid acquisition. The UI shows the attempt limits
+and their consequences before saving. Source selection alone cannot activate
+spending. Saving does not fetch data, buy a subscription or discover a plan's
+entitlements. Limits retain the governor's signed-int64 range; the Settings API
+returns decimal strings and accepts exact decimal strings/integers to avoid
+JavaScript rounding. There is no newly imposed product-tier cap.
+
+The installation/key-scoped
 [governor](data_sources/financial_datasets_governance.py) reserves attempts before
 dispatch and does not refund failed/uncertain attempts. It enforces request counts,
 not a verified dollar cap or the account's remaining credit balance. The legacy
 `daily_budget_usd` preference is not an enforced spending limit. Separate machines
-are not coordinated by this local ledger.
+are not coordinated by this local ledger. One fundamental-analysis call can
+require up to three statement requests; a tool invocation is not a billing unit.
 
-SEC research acquisition requires the configured identity, additive-write
-permission and the shared [transport governor](data_sources/sec_transport.py). This protection
+SEC research acquisition requires the configured identity and shared
+[transport governor](data_sources/sec_transport.py). Its additive-write
+[permission hook](src/api/permissions.py) currently logs intent; interactive
+permission enforcement is not implemented. This protection
 must not be attributed to every other provider: for example, Finnhub calendar
 client spacing is per client, not a shared cross-process request governor.
 Future external tools need independent operation/cost authorization; internal
@@ -279,6 +353,9 @@ Current regression owners include
 [local reuse](tests/test_financial_local_reuse.py),
 [same-query concurrency](tests/test_financial_reuse_concurrency.py),
 [paid admission](tests/test_financial_datasets_governance.py),
+[selected-source dispatch](tests/test_data_source_routing.py),
+[Settings-to-runtime policy](tests/test_data_source_settings.py),
+[Settings controls](apps/arkscope-web/src/settings/DataSourceRoutingSection.test.tsx),
 [calendar evidence](tests/test_calendar_refresh_evidence.py),
 [macro outcomes](tests/test_macro_scheduler_outcomes.py),
 [scheduler behavior](tests/test_data_scheduler.py),

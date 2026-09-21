@@ -103,6 +103,15 @@ describe("Settings workspace CSS contract", () => {
     expect(tabList).toMatch(/overflow-y:\s*hidden/);
   });
 
+  it("fits_financial_source_controls_to_the_local_container_not_the_viewport", () => {
+    expect(ruleBody(".data-source-routing")).toContain("container: financial-source-policy / inline-size");
+    const narrow = balancedBlock(settingsCss, "@container financial-source-policy (max-width: 600px)");
+    expect(ruleBodyFrom(narrow, ".data-route-row")).toContain("grid-template-columns: minmax(0, 1fr) auto");
+    expect(ruleBodyFrom(narrow, ".data-route-options")).toContain("grid-column: 1 / -1");
+    expect(ruleBodyFrom(narrow, ".data-route-budget-fields")).toContain("grid-template-columns: minmax(0, 1fr)");
+    expect(ruleBody(".data-source-routing")).not.toMatch(/background|border-radius/);
+  });
+
   it("shares_one_sticky_offset_with_directory_and_section_anchors", () => {
     const directoryRail = ruleBody(".settings-directory-rail");
     const sectionAnchor = ruleBody(".settings-section-anchor");

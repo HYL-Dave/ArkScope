@@ -166,7 +166,7 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
 ):
     observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
 
-    assert len(observed["routes"]) == 223
+    assert len(observed["routes"]) == 226
     news_routes = {tuple(route.split("\t")[:2]) for route in observed["routes"]
                    if route.split("\t")[1].startswith("/news/")}
     assert ("PUT", "/news/settings") not in news_routes
@@ -176,6 +176,12 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
     }
     assert not any(route.startswith("GET\t/sec/{ticker}\t") for route in observed["routes"])
     assert {
+        "GET\t/providers/data-routes\t"
+        "src.api.routes.providers_config\tget_data_routes",
+        "PUT\t/providers/data-routes/{dataset}\t"
+        "src.api.routes.providers_config\tput_data_route",
+        "PUT\t/providers/request-budgets/financial_datasets\t"
+        "src.api.routes.providers_config\tput_financial_datasets_budget",
         "GET\t/security-lifecycle/automation\t"
         "src.api.routes.security_lifecycle\tget_automation_config",
         "PUT\t/security-lifecycle/automation\t"

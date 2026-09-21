@@ -49,6 +49,7 @@ import {
   useSharedDataScheduleControls,
 } from "./dataScheduleControls";
 import type { SettingsReadCache, SettingsReadKey } from "./settingsReadCache";
+import { DataSourceRoutingSection } from "./DataSourceRoutingSection";
 
 function saChainPresentation(
   state: SAExtensionHealthResponse["chain_state"],
@@ -201,6 +202,7 @@ export function DataSourcesSection({
   );
   const [outcome, setOutcome] = useState<DataSourcesOutcome | null>(null);
   const [busy, setBusy] = useState<string>("");
+  const [routingGuard, setRoutingGuard] = useState(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({}); // "provider.field"
   const [testResults, setTestResults] = useState<Record<string, ProviderTestState>>({});
   const [pendingGuardedEdit, setPendingGuardedEdit] = useState<{
@@ -211,10 +213,11 @@ export function DataSourcesSection({
   } | null>(null);
   const guardedEditTriggerRef = useRef<HTMLButtonElement>(null);
   const dataSourcesMountedRef = useRef(true);
-  const combinedBusy = scheduleController.busy || busy;
+  const combinedBusy = scheduleController.busy || busy || (routingGuard.busy ? "data-source-routing" : "");
   const dirty = scheduleController.hasDrafts
     || Object.values(keyDrafts).some((value) => value !== "")
-    || pendingGuardedEdit !== null;
+    || pendingGuardedEdit !== null
+    || routingGuard.dirty;
   const navigationBusy = combinedBusy !== "";
 
   useEffect(() => {
@@ -583,6 +586,14 @@ export function DataSourcesSection({
         <div className="errorbox"><p className="muted">{outcomeMessage}</p></div>
       )}
       {developerMode ? <DeveloperDiagnostics diagnostics={diagnostics} t={t} /> : null}
+
+      <SettingsSubsectionAnchor id="data_source_routes">
+        <DataSourceRoutingSection
+          settingsReadCache={settingsReadCache}
+          onNavigationGuardChange={setRoutingGuard}
+          disabled={Boolean(busy || scheduleController.busy)}
+        />
+      </SettingsSubsectionAnchor>
 
       <SettingsSubsectionAnchor id="provider_health">
         <div className="settings-panel">

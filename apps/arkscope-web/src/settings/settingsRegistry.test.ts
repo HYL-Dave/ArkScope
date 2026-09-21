@@ -147,6 +147,7 @@ describe("settings workspace registry", () => {
 
   it("maps_each_data_sync_subsection_to_one_stable_parent", () => {
     expect(SETTINGS_SUBSECTIONS).toEqual([
+      { id: "data_source_routes", parent: "data_sources" },
       { id: "provider_health", parent: "data_sources" },
       { id: "sa_extension_health", parent: "data_sources" },
       { id: "provider_connections", parent: "data_sources" },
@@ -156,6 +157,7 @@ describe("settings workspace registry", () => {
       { id: "sec_structured_storage", parent: "data_storage" },
     ]);
     expect(settingsSubsectionsFor("data_sources").map((item) => item.id)).toEqual([
+      "data_source_routes",
       "provider_health",
       "sa_extension_health",
       "provider_connections",

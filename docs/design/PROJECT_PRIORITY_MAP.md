@@ -22,6 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
+| **P1** | **SELECTED DATA SOURCES** | **IN PROGRESS: FINANCIAL ROUTING FIRST.** Settings and actual fundamental/detailed-financial/earnings-supplement dispatch must share source policy. Explicit provider choice cannot bypass selection or paid admission; no mixed-source values. FD request limits become operator-configurable. News, quotes, macro and browser financial adapters remain separately scoped. Owner: `docs/superpowers/plans/2026-09-21-data-source-routing.md`. | The user has no paid Finnhub subscription and requires per-dataset provider choice. Calendar-specific expiry work must not entrench a compulsory supplier or precede working routing. |
 | **P1** | **CALENDAR EVIDENCE AND EVENT-AWARE REFRESH** | **CALENDAR REPAIR VERIFIED AND MERGED; FINANCIAL EVENT INTEGRATION NOT YET IMPLEMENTED.** Frozen `30682b51`: **11,911 backend / 12 unchanged skips**, **1,867 frontend / 124 files**, typecheck/build, i18n and **8 desktop** checks. Main-tree `86937e34`: **758 related checks**; this slice's worktree and branch are removed. Genuine empty responses stay distinct from malformed/rejected data; request scope and typed failures survive persistence; corrected earnings dates retain as-of history. A future event cannot by itself extend an incomplete financial cache. Owner: `docs/superpowers/plans/2026-09-21-calendar-refresh-evidence.md`; evidence: `docs/superpowers/evidence/2026-09-21-calendar-refresh-evidence/README.md`. | The user requires update decisions based on data type and provider availability, not a restartable uniform TTL. Calendar integrity is a prerequisite, not proof of statement readiness. |
 | **P1** | **LOCAL FINANCIAL REUSE CORRECTION** | **OFFLINE VERIFIED AND MERGED.** Frozen `a400a52b`: **11,843 backend / 12 unchanged skips**, **1,867 frontend / 124 files**, typecheck/build, i18n and **8 desktop** checks. Main-tree `5089ccec`: **867 related tests / 2 existing live skips**; product/test/config bytes match the frozen revision. Financial reads default to configurable local reuse; identical-scope acquisitions coalesce without implicit retry after failure. Four-channel fundamentals and the existing native-only detailed-financials surface preserve strict controls. The constant latest-period flag is removed; stored age is not latest-period proof. This slice's two test worktrees and branch are removed; no push or paid activation. Plan: `docs/superpowers/plans/2026-09-21-local-data-reuse.md`; evidence: `docs/superpowers/evidence/2026-09-21-local-data-reuse/README.md`. | Efficiency and controllability were the user requirement, not opt-in cache reuse. Paid admission, live quotes, portfolio freshness and scheduler/service lifecycle remain separate. |
 | **P1** | **QUOTE AND EXPLICIT FINANCIAL FRESHNESS** | **QUOTE OFFLINE VERIFIED; FINANCIAL DEFAULT SUPERSEDED ABOVE.** Frozen `bd316536`: **11,796 backend / 12 unchanged skips**, **1,867 frontend / 124 files** with four workers, typecheck/build, **8 desktop**, i18n checks; merged-tree related check **323 / 1 existing live skip**. The default-worker frontend timing limitation remains documented. Quote basis/feed/trade time stay separate; previous close cannot claim freshness, unknown remains `stale=null`. September 21 corrects the FD default without weakening paid admission or strict age validation. Live Gateway acceptance remains separate. Evidence: `docs/superpowers/evidence/2026-09-20-quote-financial-freshness/README.md`. | Fiscal period and storage TTL do not establish current data; neither does that justify bypassing usable local observations by default. |
@@ -660,6 +661,16 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-21 (SOURCE SELECTION BEFORE EVENT EXPIRY):** The user confirms no paid
+  Finnhub subscription. Source availability must not be inferred from a key or
+  made dependent on buying that provider. Implement per-dataset Settings policy
+  and actual routing first, starting with the existing financial tools and their
+  optional Finnhub supplements. Model-selected providers remain inside operator
+  policy and paid admission; separate provider observations remain separate.
+  FD limits need a usable Settings owner. No new source, subscription or external
+  MCP exposure is implied. Scope and acceptance:
+  `docs/superpowers/plans/2026-09-21-data-source-routing.md`.
 
 - **2026-09-21 (DURABLE ACQUISITION POLICY):** The user requires update triggers,
   timing and freshness to remain discoverable beside the project README, not
