@@ -661,6 +661,20 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
+- **2026-09-21 (DURABLE ACQUISITION POLICY):** The user requires update triggers,
+  timing and freshness to remain discoverable beside the project README, not
+  only in implementation diaries. [Data Acquisition And Updates](../../DATA_ACQUISITION_AND_UPDATES.md)
+  is the maintained cross-source contract, linked from README and the current
+  context index. It records current read modes, schedule/reuse clocks, source
+  limits and the event-anchored direction separately. Zero inserts do not alone
+  prove a failed collection; a future earnings date cannot justify reusing a
+  missing released period. Event-aware financial integration remains open.
+  This documentation change does not activate schedules, provider calls or
+  retention/deletion, and does not change runtime behavior. Verification:
+  724 related regressions pass; 30 local links/anchors, four policy backlinks
+  and all ten documented schedule defaults match their owners. The complete
+  backend/frontend suite was not rerun for this documentation-only change.
+
 - **2026-09-21 (CALENDAR EVIDENCE ACCEPTED):** Frozen `30682b51` passes
   11,911 backend cases with the same 12 skips, 1,867 frontend cases, build,
   i18n and eight desktop checks. The 68 additional backend cases remove no

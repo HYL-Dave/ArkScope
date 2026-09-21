@@ -20,6 +20,9 @@ Read these in order:
 5. `docs/design/REFACTOR_PROTECTION_SMOKE_GATES.md`
    - Current data collection and browser-extension paths that must survive
      refactors.
+6. [Data Acquisition And Updates](../../DATA_ACQUISITION_AND_UPDATES.md)
+   - Maintained acquisition, trigger and freshness contract; distinguishes
+     current defaults from the event-aware update design still to implement.
 
 If these disagree, the newest applicable entry in the priority map wins. The
 design index at `docs/design/README.md` supplies document titles and maturity.

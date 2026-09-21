@@ -1,5 +1,10 @@
 # Calendar Evidence and Refresh Decisions
 
+Durable cross-source policy:
+[Data Acquisition And Updates](../../../DATA_ACQUISITION_AND_UPDATES.md).
+This dated plan owns the bounded implementation and acceptance evidence, not a
+separate version of the ongoing trigger/freshness contract.
+
 ## Decision
 
 The financial seven-day reuse window is a fallback, not the final refresh model.

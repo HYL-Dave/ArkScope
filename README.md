@@ -29,6 +29,7 @@ Canonical project information:
 - **Product contract** → `docs/design/ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`
 - **Architecture and storage contract** → `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`
 - **Current priorities and decision log** → `docs/design/PROJECT_PRIORITY_MAP.md`
+- **Data acquisition, update triggers, and freshness** → [Data Acquisition And Updates](DATA_ACQUISITION_AND_UPDATES.md)
 - **Design-document status index** → `docs/design/README.md`
 
 ## Run locally

@@ -1,5 +1,10 @@
 # Local Data Reuse
 
+Durable cross-source policy:
+[Data Acquisition And Updates](../../../DATA_ACQUISITION_AND_UPDATES.md).
+This plan records the completed reuse correction; later trigger/freshness
+changes must also update the root-level policy.
+
 ## Decision
 
 The September 21 user clarification supersedes the FD refresh-by-default policy.
