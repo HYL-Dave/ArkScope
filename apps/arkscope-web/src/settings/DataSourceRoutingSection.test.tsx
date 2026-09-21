@@ -245,6 +245,22 @@ describe("DataSourceRoutingSection", () => {
     expect(host.textContent).toContain("Paid requests disabled");
   });
 
+  it.each(["unconfigured", "invalid"] as const)("can explicitly disable an %s policy without inventing limits", async (stateName) => {
+    state.financial_datasets_budget.state = stateName;
+    if (stateName === "invalid") state.financial_datasets_budget.enabled = null;
+    await render();
+    expect(guard).toHaveBeenLastCalledWith({ dirty: false, busy: false, reason: null });
+    expect(paid().checked).toBe(false);
+    expect(button(SAVE_BUDGET).disabled).toBe(false);
+    await click(button(SAVE_BUDGET));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(putFinancialDatasetsBudget).toHaveBeenCalledExactlyOnceWith({
+      enabled: false, daily_request_limit: null, requests_per_minute: null, confirm_paid: false,
+    });
+    expect(host.textContent).toContain("Paid requests disabled");
+    expect(button(SAVE_BUDGET).disabled).toBe(true);
+  });
+
   it.each(["0", "-1", "1.5", "9223372036854775808"])("rejects invalid request limit %s before confirmation", async (value) => {
     await render();
     await click(paid());

@@ -70,14 +70,20 @@ switch or claim all 56 tools have migrated.
 - [x] RED-first source exclusion, explicit routing, invalid policy and stored-only tests (21 initial failures).
 - [x] Shared policy, API and live-read runtime wiring (621 related checks pass; two existing live skips).
 - [x] Four-channel source argument and provenance checks; existing allowlists unchanged.
-- [x] Settings source selection and paid-budget controls, with save/failure/navigation tests (16 focused UI checks).
+- [x] Settings source selection and paid-budget controls, with save/failure/navigation tests (18 focused UI checks).
 - [x] Browser checks across desktop/mobile and a narrow desktop container on isolated state; no external requests.
 - [ ] Related and standalone full regression, frontend/typecheck/build, main-tree verification.
 - [ ] Update the root acquisition contract; commit/merge/owned-branch cleanup, no push.
 
-Pre-freeze checks: frontend 1,884 tests / 125 files; typecheck/build, localized
+Pre-freeze checks: frontend 1,886 tests / 125 files; typecheck/build, localized
 literal scanner and eight desktop checks pass. The root acquisition contract is
 updated. Standalone full backend acceptance and main-tree verification remain.
+
+The first full backend run at `bb688e0f` was intentionally interrupted before a
+UI correction, not accepted as a completed regression. Unconfigured or invalid
+paid policies can now be explicitly saved as disabled without inventing limits;
+the two added UI cases and isolated browser check pass. A new frozen revision
+must run the full backend again.
 
 No production-store mutation, provider calls, subscription activation, purchases,
 App restart, SA scraping, formula repair or event-aware financial expiry is

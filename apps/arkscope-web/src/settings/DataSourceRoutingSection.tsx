@@ -150,6 +150,8 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
   }
 
   const budgetState = data?.financial_datasets_budget.state;
+  const canSaveBudget = budgetDirty || Boolean(currentBudget && !currentBudget.enabled
+    && (budgetState === "invalid" || budgetState === "unconfigured"));
   const budgetStateLabel = budgetState === "enabled" ? t(($) => $.dataSources.routing.budget.enabled)
     : budgetState === "disabled" ? t(($) => $.dataSources.routing.budget.disabled)
       : budgetState === "unconfigured" ? t(($) => $.dataSources.routing.budget.unconfigured)
@@ -251,7 +253,7 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
             </label>
             <div className="data-route-actions">
               <IconButton ref={budgetSaveRef} label={t(($) => $.dataSources.routing.budget.save)}
-                icon={<Save size={16} />} busy={busy === "budget"} disabled={blocked || !budgetDirty} onClick={prepareBudget} />
+                icon={<Save size={16} />} busy={busy === "budget"} disabled={blocked || !canSaveBudget} onClick={prepareBudget} />
               <IconButton label={t(($) => $.dataSources.routing.budget.undo)} icon={<Undo2 size={16} />}
                 disabled={blocked || !budgetDirty} onClick={() => { setBudgetEdit(null); setInvalidBudget(false); }} />
             </div>
