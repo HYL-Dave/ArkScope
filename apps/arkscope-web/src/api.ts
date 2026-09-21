@@ -5411,7 +5411,7 @@ export interface DataSourceCapability {
   integration: "implemented" | "candidate";
   acquisition: "on_demand_api" | "not_implemented" | "gateway_snapshot" | "app_job"
     | "price_worker" | "browser_extension" | "app_job_and_on_demand" | "account_capture"
-    | "local_and_opt_in_update";
+    | "local_and_opt_in_update" | "browser_page_capture";
   access_requirement: "public_identity" | "metered_requests" | "endpoint_entitlement_unverified"
     | "signed_in_browser_subscription" | "gateway_market_access" | "gateway_news_access"
     | "gateway_account_access" | "api_key";
@@ -5429,14 +5429,14 @@ export function getDataSourceCatalog(): Promise<DataSourceCatalog> {
   return getJSON("/providers/data-catalog", 8_000);
 }
 
-export type DataSourceDataset = "fundamentals_analysis" | "detailed_financials" | "earnings_supplements";
+export type DataSourceDataset = "fundamentals_analysis" | "detailed_financials" | "earnings_supplements" | "sa_company_financials";
 
 export interface DataSourceRoute {
   dataset: DataSourceDataset;
   providers: string[] | null;
   setting_source: "default" | "profile";
   consumers: string[];
-  options: Array<{ provider: string; access: "public_identity" | "metered_requests" | "endpoint_entitlement_unverified" }>;
+  options: Array<{ provider: string; access: "public_identity" | "metered_requests" | "endpoint_entitlement_unverified" | "signed_in_browser_subscription" }>;
   unimplemented: string[];
   error_code: string | null;
 }

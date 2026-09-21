@@ -3,6 +3,8 @@
 var statusEl = document.getElementById("status");
 var marketNewsStatusEl = document.getElementById("marketNewsStatus");
 var lastRunStatusEl = document.getElementById("lastRunStatus");
+var companyCaptureBtn = document.getElementById("companyCaptureBtn");
+var companyCaptureStatusEl = document.getElementById("companyCaptureStatus");
 var quickBtn = document.getElementById("quickBtn");
 var fullBtn = document.getElementById("fullBtn");
 var backfillBtn = document.getElementById("backfillBtn");
@@ -70,6 +72,7 @@ renderActionCatalog({ status: "loading", limits: {} });
 chrome.storage.local.get([
   "lastRefresh",
   "lastMarketNewsRefresh",
+  "lastCompanyCapture",
   "manualDraft",
   "alphaPicksAutoSyncEnabled",
   "alphaPicksAutoSyncIntervalMinutes",
@@ -90,12 +93,59 @@ chrome.storage.local.get([
   renderStatus(data.lastRefresh);
   renderMarketNewsStatus(data.lastMarketNewsRefresh);
   renderStructuredLastRun(data[EXTENSION_LAST_RUN_STORAGE_KEY]);
+  renderCompanyCapture(data.lastCompanyCapture);
   initializePopupActionsAndRecovery();
   loadReconciliationQueue();
   chrome.runtime.sendMessage({ action: "ensure_auto_sync_alarms" }, function () {
     if (chrome.runtime.lastError) {
       return;
     }
+  });
+});
+
+function renderCompanyCapture(result) {
+  if (!companyCaptureStatusEl) return;
+  companyCaptureStatusEl.className = result && result.status === "ok" ? "success" : result ? "error" : "empty";
+  if (!result) {
+    companyCaptureStatusEl.textContent = "No financial table captured.";
+    return;
+  }
+  if (result.status === "ok") {
+    var names = { income_statement: "Income statement", balance_sheet: "Balance sheet", cash_flow_statement: "Cash flow" };
+    companyCaptureStatusEl.textContent = result.ticker + " | " + (names[result.statement] || "Financial table")
+      + " | " + result.view + " | " + result.currency
+      + " | " + (result.coverage ? result.coverage.row_count : 0) + " rows"
+      + (result.deduplicated ? " | Unchanged capture retained" : " | Saved");
+    return;
+  }
+  var errors = {
+    sa_company_page_unsupported: "The current page is not a supported company financial statement.",
+    sa_company_page_changed: "The selected page changed before capture completed. Nothing was saved.",
+    sa_company_view_unsupported: "This financial view is not supported. Only Absolute values are accepted.",
+    sa_company_dom_not_ready: "The financial table has not finished loading.",
+    sa_company_human_verification_required: "Seeking Alpha requires human verification.",
+    sa_company_access_restricted: "The financial table is restricted by sign-in or subscription access.",
+    sa_company_layout_unrecognized: "The financial table structure is not recognized. Nothing was saved.",
+    sa_company_structure_changed: "The financial structure changed. Existing observations were retained; extractor review is required.",
+    sa_company_receipt_invalid: "The save receipt could not be verified. Capture status is unknown.",
+    sa_company_identity_mismatch: "The company identity did not match the page. Nothing was saved.",
+    sa_company_units_unrecognized: "Financial currency or units were not recognized. Nothing was saved.",
+    sa_company_value_unrecognized: "A financial value could not be interpreted. Nothing was saved.",
+    sa_company_values_unavailable: "The displayed financial table has no available numeric values.",
+    sa_company_budget_exceeded: "Company-data storage is full. Existing observations were retained.",
+    data_source_not_selected: "SA company financials are disabled in ArkScope source settings.",
+    data_source_route_disabled: "SA company financials are disabled in ArkScope source settings.",
+    sa_company_store_unavailable: "The company-data store is unavailable. The capture was not saved.",
+  };
+  companyCaptureStatusEl.textContent = errors[result.error_code] || "The financial capture was not completed.";
+}
+
+if (companyCaptureBtn) companyCaptureBtn.addEventListener("click", function () {
+  companyCaptureBtn.disabled = true;
+  companyCaptureStatusEl.textContent = "Capturing current financial table...";
+  chrome.runtime.sendMessage({ action: "capture_company_data" }, function (result) {
+    companyCaptureBtn.disabled = false;
+    renderCompanyCapture(chrome.runtime.lastError ? { status: "error" } : result || { status: "error" });
   });
 });
 

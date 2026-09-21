@@ -66,7 +66,7 @@ def function_tool(fn):
             check_output_value(arguments)
             parsed = json.loads(arguments) if arguments else {}
             check_output_value(parsed)
-            if tool.name in {"tool_get_fundamentals_analysis", "tool_get_detailed_financials"}:
+            if tool.name in {"tool_get_fundamentals_analysis", "tool_get_detailed_financials", "tool_get_sa_company_data"}:
                 if not isinstance(parsed, dict) or set(parsed) - set(tool.params_json_schema["properties"]):
                     raise ValueError("financial_tool_arguments_invalid")
             return await invoke(context, arguments)
@@ -1181,6 +1181,30 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "get_security_lifecycle_review")
 
     # Return all tools as a list
+    @function_tool
+    def tool_get_sa_company_data(
+        ticker: str,
+        statement: Literal["income_statement", "balance_sheet", "cash_flow_statement"] = "income_statement",
+        view: Literal["annual", "quarterly"] = "annual",
+        currency: str = "USD",
+        observation_id: Optional[str] = None,
+        row_offset: Annotated[int, Field(strict=True)] = 0,
+        row_limit: Annotated[int, Field(strict=True)] = 20,
+        column_offset: Annotated[int, Field(strict=True)] = 0,
+        column_limit: Annotated[int, Field(strict=True)] = 4,
+    ) -> str:
+        """Read captured SA financial tables, local-only with no paid fallback or derived ratios.
+
+        Values retain provider display units and missing reasons; they are not
+        rescaled. Month labels do not establish exact fiscal dates. Pin the
+        returned observation_id for subsequent pages or historical reads.
+        Valuation and ratings are not covered.
+        """
+        from src.tools.sa_company_tools import get_sa_company_data
+        result = get_sa_company_data(dal, ticker, statement, view, currency, observation_id,
+                                     row_offset, row_limit, column_offset, column_limit)
+        return _serialize_result(result, "get_sa_company_data")
+
     tools = [
         tool_get_ticker_news,
         tool_search_news_by_keyword,
@@ -1232,6 +1256,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tool_get_sa_articles,
         tool_get_sa_article_detail,
         tool_get_sa_market_news,
+        tool_get_sa_company_data,
         tool_list_high_value_comments,
         tool_get_sa_comment_focus,
         tool_get_sa_feed,

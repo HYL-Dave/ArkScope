@@ -11,6 +11,7 @@ function clone(value) {
 }
 
 function responseFor(message) {
+  if (message.action === "capture_company_data") return clone(fixture.companyResult || {status: "error", error_code: "sa_company_page_unsupported"});
   if (message.action === "ensure_auto_sync_alarms") return {status: "ok"};
   if (message.action === "get_extension_action_limits") {
     return clone(fixture.actionLimits || {status: "error", error_code: "not_configured"});
@@ -278,6 +279,8 @@ function snapshot(document, sent) {
     recoveryStatus: text(recoveryStatus),
     recoveryStatusRole: recoveryStatus?.getAttribute("role") || null,
     lastRunStatus: text(document.getElementById("lastRunStatus")),
+    companyCaptureStatus: text(document.getElementById("companyCaptureStatus")),
+    companyCaptureDisabled: document.getElementById("companyCaptureBtn")?.disabled,
     advancedPreview: text(advancedPreview),
     reviewScope: reviewScope
       ? {hidden: reviewScope.hidden, text: text(reviewScope)}
@@ -330,7 +333,10 @@ async function runPopup() {
     }
     await settle();
 
-    if (scenario === "click_retry") {
+    if (scenario === "capture_company") {
+      dom.window.document.getElementById("companyCaptureBtn")?.click();
+      await settle();
+    } else if (scenario === "click_retry") {
       dom.window.document.getElementById("retryRecordedFailuresBtn")?.click();
       await settle();
     } else if (scenario === "click_incident") {

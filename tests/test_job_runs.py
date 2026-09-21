@@ -167,7 +167,7 @@ def test_sa_store_activity_job_names_cover_all_current_authorities():
     expected = extension_names | service_names | {REPAIR_JOB_NAME}
 
     assert SA_STORE_ACTIVITY_JOB_NAMES == expected
-    assert len(SA_STORE_ACTIVITY_JOB_NAMES) == 7
+    assert len(SA_STORE_ACTIVITY_JOB_NAMES) == 8
 
 
 _SA_RUN_OUTCOMES = (

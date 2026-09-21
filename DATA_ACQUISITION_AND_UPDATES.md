@@ -46,8 +46,10 @@ No normal research path should require the user to know a CIK.
 
 SA's existing extension has alarm-driven acquisition. Browser availability,
 login and successful page loading remain prerequisites; it is neither purely
-passive nor a headless collector. Its financial/rating adapters still need to be
-implemented and verified before source selection can use them.
+passive nor a headless collector. The financial-table adapter below adds explicit
+current-page capture and local research reads. Ratings/valuation remain a
+separate, unimplemented adapter; neither financial capture nor existing SA
+alarms establish headless company-data availability.
 
 Freshness is task- and source-dependent, not a compulsory choice among four
 global ages. Financial publication/provider readiness, news collection cadence,
@@ -70,7 +72,7 @@ recommendation; it does not make every source selectable through one policy:
 
 | Data category | Existing ArkScope acquisition | Boundary / outstanding integration |
 | --- | --- | --- |
-| Company financial statements and facts | SEC EDGAR and Financial Datasets through existing on-demand financial tools | SA and Massive financial adapters are candidates, not implemented alternatives. Detailed financials has narrower coverage than fundamental analysis. |
+| Company financial statements and facts | SEC EDGAR and Financial Datasets through existing financial tools; explicit SA statement-table capture and local reads | SA displayed tables are source observations, not a replacement for every old calculated metric. Massive financials remain a candidate. Detailed financials has narrower coverage than fundamental analysis. |
 | Provider-supplied valuation, ratings and peer comparisons | No structured SA company-page adapter | The SA pages identified by the user belong here. Existing locally calculated metrics are not captures of those provider values. |
 | Current quotes | IBKR snapshots | Account/feed access and price time determine whether the result is live. This is not a persistent streaming service. |
 | Historical price bars | IBKR / Massive price workers | The current recurring price job explicitly selects IBKR; Massive has worker support, not an independent recurring schedule. The financial-source switches do not govern either path. |
@@ -108,10 +110,11 @@ Adapter presence is not a health check or certification of analytical formulas.
   browser extension, explicit capture or local computation. Do not advertise a
   browser-only source as available to a headless server merely by adding a row.
 - Add and verify adapters incrementally. SA's existing articles, comments, picks
-  and news must remain represented independently of its unimplemented financial
-  pages. No all-provider rollout, new subscription or external MCP is required.
+  and news remain independent of explicit financial-table capture and the still
+  unimplemented valuation/rating pages. No all-provider rollout, new subscription
+  or external MCP is required.
 
-The current three financial route IDs below identify existing tool paths, not
+The current four financial route IDs below identify existing tool paths, not
 the final user-facing data taxonomy. Category navigation is implemented;
 unified collection controls for the other categories remain follow-up work.
 
@@ -140,7 +143,8 @@ successful refresh indication.
 SA articles, comments, recommendation membership and market news use the
 existing Chrome extension capture/auto-sync. The catalog links to its status;
 capture controls remain in the extension, not a new sidecar API job. SA structured
-financial/rating pages remain unimplemented. Finnhub entries describe required
+financial tables have their own manual-capture entry and eligibility switch;
+rating/valuation pages remain unimplemented. Finnhub entries describe required
 endpoint access without presuming a paid subscription or certifying free access.
 
 Owners: [catalog](src/data_source_catalog.py),
@@ -175,6 +179,7 @@ is still follow-up work.
 | SEC research: `list_sec_filings`, `get_sec_financial_facts`, `read_sec_filing` | Default `stored`; explicit `auto` / `refresh` can download and persist through identity, path and transport guards | Separate from legacy financial tools; the general permission hook is audit-only, not an interactive authorization engine |
 | General news | Opt-in source schedules, Run now, or the scoped `daily_update` wrapper; source-specific incremental collection | No universal query-triggered catch-up or interval-completeness guarantee |
 | SA articles / comments | Signed-in browser extension captures into local storage; research reads retained captures | Body and comment outcomes are separate. A successful body does not prove comments loaded. |
+| SA company financial tables | Explicit current-tab capture in the extension; `get_sa_company_data` reads a saved observation | No automatic browser navigation, polling, schedule, paid fallback or claim that the displayed periods are the latest available. |
 | FRED and Finnhub calendars | Local reads plus explicit jobs or opt-in source schedules | A release calendar is not evidence that a financial provider has processed the release. |
 | `get_current_quote` | `source=auto` tries an IBKR snapshot; `ibkr` requires that path; `local` reads stored bars | Snapshot, not streaming. Auto's local fallback is labeled historical, not live. |
 | `get_portfolio_holdings` | Reads the local profile snapshot only | Does not sync IBKR or establish current account value |
@@ -189,6 +194,7 @@ controls these implemented paths, using one policy catalog:
 | `fundamentals_analysis` | SEC EDGAR, Financial Datasets | `get_fundamentals_analysis` on all four existing research channels |
 | `detailed_financials` | SEC EDGAR | SEC calculation component of `get_detailed_financials` and existing callers |
 | `earnings_supplements` | Finnhub | History/upcoming component of `get_detailed_financials` |
+| `sa_company_financials` | Seeking Alpha | `get_sa_company_data` on all four research channels; explicit extension ingestion |
 
 The ordered selection is an eligible set, not a command to fetch all sources.
 Automatic fundamental analysis first tries acceptable local observations in that
@@ -216,6 +222,76 @@ through that tool; it does not delete retained observations. No saved setting
 preserves the default order in the table. Malformed or unreadable settings fail
 closed with a typed gap, not a network fallback. Changes take effect on subsequent
 invocations in the same App; they do not promise to cancel already-running work.
+
+### SA Company Financial Tables
+
+**Trigger and scope.** On a signed-in SA company income statement, balance sheet
+or cash-flow statement page, use the extension's **Capture Financial Table**
+command. Supported views are Annual and Quarterly, with Absolute values; an
+annual table's distinct TTM/Last Report column is retained, not relabeled as an
+annual period. Standalone TTM views, growth views and hidden history are not
+admitted. It captures the displayed supported period/currency view only. It does
+not navigate to other companies, expand history, fetch private endpoints, solve
+verification challenges, or inherit the Alpha Picks/news auto-sync alarms.
+Chrome, page loading and the account's actual entitlement remain prerequisites.
+The selected tab is fixed before joining the existing extension job queue;
+navigation before completion rejects the capture instead of saving another page.
+
+**Admission and cleaning.** The extractor and native validator check a versioned
+semantic contract: URL/title/company agreement, selected Absolute view,
+currency/unit note, header identities and ordering, section roles, required
+statement anchors and exact row/column alignment. Loading skeletons, restricted
+cells, unknown shapes or values fail with typed reasons. Raw display strings and
+decimal strings coexist; zero, absent and not-meaningful values are distinct.
+Do not multiply every row by the table's millions/thousands scale: per-share
+and other row-specific exceptions remain in the source labels. Values are
+`provider_display_rounded`, not SEC-exact facts; no derived ratios are added.
+Month labels yield `end_month`, never an invented exact `period_end` date.
+
+The capture records a structural digest independent of cosmetic CSS and actual
+financial values. A changed semantic structure within a previously accepted
+company/statement/view/currency scope is rejected under the same extractor
+revision, even when all new numbers look plausible. Existing observations stay
+intact. A legitimate source redesign requires an extractor/fixture review; it
+does not silently rebaseline itself. A digest is drift evidence, not proof that
+SA's figures match every provider or original filing.
+
+**Persistence and reuse.** Schema v4 of the existing `sa_capture.db` adds
+`sa_company_observations`. Accepted content is addressed by a SHA-256 observation
+ID. Identical content updates only its last successful capture time, while a
+new value set gets a separate observation. Failed captures do not replace the
+last accepted table. Company ingestion does not construct the market DAL or
+write the market database. The read path opens SA/profile stores read-only and
+does not create or migrate an absent/old database.
+
+`get_sa_company_data(ticker, statement, view, currency, observation_id, ...pages)`
+returns stored data, capture times, source URL, units, coverage and missing-value
+reasons. Default pages contain at most 20 rows and 4 period columns; these are
+page defaults, not dataset truncation. Pin the returned `observation_id` for later
+pages or historical reads. Rows and columns have separate next offsets. If a
+model channel cannot carry a page intact, it receives a typed smaller-page
+request, never truncated numeric JSON. `last_captured_at` does not certify latest
+publication or provider readiness; there is no hidden freshness timer or paid
+refresh on this reader. An explicit capture is the update mechanism.
+
+**Selection, capacity and operating boundary.** The independent
+`sa_company_financials` switch controls this reader and ingestion; disabling it
+does not erase captures, modify SA news/Alpha Picks, or enable FD spending. FD is
+an independently selected/admitted financial alternative, not an automatic retry
+when SA fails. Ratings/valuation are not implemented by this capture.
+
+Unchanged content is deduplicated. New company-observation JSON has a default
+256 MiB logical storage budget, configurable for the native host with
+`ARKSCOPE_SA_COMPANY_BUDGET_BYTES`. This budget counts this table's payloads,
+not all SA data or SQLite file/index overhead. At capacity, new content is
+rejected explicitly; nothing is evicted and unchanged captures still work.
+It is not a retention rule for SA articles/comments or existing news. General
+retention, backup removal, full company refresh scheduling and a headless
+service remain separate decisions/work, not features implied by this adapter.
+
+Owners: [extractor](extensions/sa_alpha_picks/scrape_company.js),
+[validation](src/sa/company_data.py), [storage](src/sa/company_store.py),
+[reader](src/tools/sa_company_tools.py), [native entry](src/sa_native_host.py).
 
 The route surface does **not** select a provider for every dataset or globally
 disable that provider. News, quotes, calendars, SA captures and other Finnhub

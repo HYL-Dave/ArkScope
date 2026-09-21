@@ -561,6 +561,13 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
     structured = buildAlphaPicksManualProtocolResult(result);
   } else if (operation === "market_news_sync") {
     structured = buildMarketNewsProtocolResult(mode, result);
+  } else if (operation === "company_financial_capture") {
+    structured = SAExtensionRunProtocol.deriveRunResult({
+      schema_version: 1, operation: operation, mode: mode, item_outcomes: [],
+      phases: result.status === "ok"
+        ? { extraction: extensionPhase("complete", null), persistence: extensionPhase("complete", null) }
+        : failedProtocolPhases(operation, result.failure_phase || "extraction", result.reason_code || "company_capture_rejected"),
+    });
   } else {
     throw new Error("unsupported extension operation");
   }
@@ -570,6 +577,16 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
 // --- Message listener (from popup) ---
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === "capture_company_data") {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(function (tabs) {
+      var target = tabs.length === 1 ? { id: tabs[0].id, url: tabs[0].url } : null;
+      return enqueueSaSyncJob({ displayName: "Company financials", operation: "company_financial_capture", mode: "current_tab" },
+        function (diagnostics) { return captureCompanyData(target, diagnostics); });
+    }).then(sendResponse).catch(function () {
+      sendResponse({ status: "error", error_code: "sa_company_capture_failed" });
+    });
+    return true;
+  }
   if (msg.action === "refresh") {
     var mode = msg.mode || "quick";
     enqueueSaSyncJob({
@@ -659,6 +676,42 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 });
+
+async function captureCompanyData(target, diagnostics) {
+  var result;
+  var failurePhase = "extraction";
+  try {
+    if (!target || !Number.isInteger(target.id)
+        || !/^https:\/\/seekingalpha\.com\/symbol\/[A-Z][A-Z0-9.-]{0,19}\/(income-statement|balance-sheet|cash-flow-statement)\/?(?:[?#].*)?$/.test(target.url || "")) {
+      throw new Error("sa_company_page_unsupported");
+    }
+    var tab = await chrome.tabs.get(target.id);
+    if (tab.url !== target.url) throw new Error("sa_company_page_changed");
+    var extracted = await chrome.scripting.executeScript({ target: { tabId: target.id }, files: ["scrape_company.js"] });
+    if (extracted.length !== 1 || !extracted[0].result) throw new Error("sa_company_capture_failed");
+    var value = extracted[0].result;
+    if (value.status !== "ok") throw new Error(value.error_code || "sa_company_capture_failed");
+    tab = await chrome.tabs.get(target.id);
+    if (tab.url !== target.url) throw new Error("sa_company_page_changed");
+    failurePhase = "persistence";
+    result = await sendNativeMessage2({ action: "save_company_data", capture: value.capture });
+    if (!result || result.status !== "ok") throw new Error(result && result.error_code || "sa_company_store_unavailable");
+    if (!/^[a-f0-9]{64}$/.test(result.observation_id || "") || result.ticker !== value.capture.ticker
+        || !result.coverage || result.coverage.scope !== "displayed_table" || typeof result.deduplicated !== "boolean") {
+      throw new Error("sa_company_receipt_invalid");
+    }
+  } catch (error) {
+    var code = error && /^(sa_company_|data_source_)[a-z_]+$/.test(error.message)
+      ? error.message : "sa_company_capture_failed";
+    var reason = /layout|structure|identity|units|value_unrecognized/.test(code)
+      ? "company_layout_unrecognized" : "company_capture_rejected";
+    result = { status: "error", error_code: code, failure_phase: failurePhase, reason_code: reason };
+    recordExtensionFailure(diagnostics, { stage: failurePhase === "extraction" ? "content_parse" : "local_persistence",
+      reason_code: reason, target_kind: "phase", retryable: false, attempt_count: 1 });
+  }
+  await chrome.storage.local.set({ lastCompanyCapture: Object.assign({ finished_at: new Date().toISOString() }, result) });
+  return result;
+}
 
 chrome.runtime.onInstalled.addListener(function () {
   cleanupCollectorTabs({ maxAgeMs: COLLECTOR_TAB_STALE_MS });

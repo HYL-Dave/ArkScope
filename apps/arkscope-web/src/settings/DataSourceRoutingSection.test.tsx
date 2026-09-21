@@ -47,6 +47,11 @@ function fixture(): DataSourceRoutesResponse {
         options: [{ provider: "finnhub", access: "endpoint_entitlement_unverified" }],
         setting_source: "default", consumers: ["get_detailed_financials"], unimplemented: [], error_code: null,
       },
+      {
+        dataset: "sa_company_financials", providers: ["seeking_alpha"],
+        options: [{ provider: "seeking_alpha", access: "signed_in_browser_subscription" }],
+        setting_source: "default", consumers: ["get_sa_company_data"], unimplemented: [], error_code: null,
+      },
     ],
     financial_datasets_budget: {
       enabled: true, daily_request_limit: null, requests_per_minute: null,
@@ -125,9 +130,10 @@ describe("DataSourceRoutingSection", () => {
   it("shows actual adapter scope and unverified Finnhub access without activating paid requests", async () => {
     await render();
     expect(host.textContent).toContain("Endpoint access unverified");
-    expect(host.textContent).toContain("Financial adapter not implemented");
+    expect(host.textContent).toContain("Not connected to this analysis tool");
     expect(host.textContent).toContain("Request limits not configured");
-    expect(Array.from(host.querySelectorAll("input[aria-label]")).some((item) => /Massive|Seeking Alpha/.test(item.getAttribute("aria-label")!))).toBe(false);
+    expect(Array.from(host.querySelectorAll("input[aria-label]")).some((item) =>
+      item.getAttribute("aria-label")?.startsWith(FUNDAMENTALS) && /Massive|Seeking Alpha/.test(item.getAttribute("aria-label")!))).toBe(false);
     expect(paid().checked).toBe(false);
     expect(putDataSourceRoute).not.toHaveBeenCalled();
     expect(putFinancialDatasetsBudget).not.toHaveBeenCalled();
@@ -141,6 +147,16 @@ describe("DataSourceRoutingSection", () => {
     expect(putDataSourceRoute).toHaveBeenCalledExactlyOnceWith("fundamentals_analysis", ["financial_datasets"]);
     expect(putFinancialDatasetsBudget).not.toHaveBeenCalled();
     expect(guard).toHaveBeenLastCalledWith({ dirty: false, busy: false, reason: null });
+  });
+
+  it("controls captured SA financials independently without enabling paid fallback", async () => {
+    await render();
+    const label = "Captured SA financial tables";
+    await click(source(`${label}: Seeking Alpha`));
+    await click(button(`Save sources: ${label}`));
+    expect(putDataSourceRoute).toHaveBeenCalledExactlyOnceWith("sa_company_financials", []);
+    expect(putFinancialDatasetsBudget).not.toHaveBeenCalled();
+    expect(source(`${FUNDAMENTALS}: SEC EDGAR`).checked).toBe(true);
   });
 
   it("changes the ordered fallback route with stable move controls", async () => {

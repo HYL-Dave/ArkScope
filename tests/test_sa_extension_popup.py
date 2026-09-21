@@ -256,6 +256,24 @@ def test_popup_groups_exactly_five_normal_actions_as_three_plus_two():
     assert "Quick Refresh" not in firefox_guide
 
 
+def test_explicit_company_capture_shows_scope_and_keeps_existing_sync_actions():
+    result = _run("capture_company", companyResult={
+        "status": "ok", "ticker": "AMD", "statement": "balance_sheet", "view": "quarterly", "currency": "USD",
+        "coverage": {"scope": "displayed_table", "row_count": 54}, "deduplicated": True,
+    })
+    assert "AMD | Balance sheet | quarterly | USD | 54 rows" in result["companyCaptureStatus"]
+    assert "Unchanged capture retained" in result["companyCaptureStatus"]
+    assert result["companyCaptureDisabled"] is False
+    assert len(result["actions"]) == 5
+
+
+def test_company_capture_failure_is_visible_and_does_not_offer_automatic_retries():
+    result = _run("capture_company", companyResult={"status": "error", "error_code": "sa_company_structure_changed"})
+    assert "structure changed" in result["companyCaptureStatus"]
+    assert "retained" in result["companyCaptureStatus"]
+    assert result["companyCaptureDisabled"] is False
+
+
 def test_each_normal_action_has_one_hover_focus_and_aria_description_owner():
     result = _run("focus_descriptions")
     description_ids = [action["descriptionId"] for action in result["actions"]]

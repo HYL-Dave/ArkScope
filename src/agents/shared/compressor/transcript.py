@@ -114,7 +114,7 @@ def format_messages_as_transcript(messages: Iterable[ProjectedMessage]) -> str:
         elif role == "tool_result":
             tool = str(msg.get("tool_name") or "?")
             from src.sec_research.tool_results import SEC_TOOL_NAMES
-            if tool.removeprefix("tool_") in SEC_TOOL_NAMES:
+            if tool.removeprefix("tool_") in SEC_TOOL_NAMES or tool.removeprefix("tool_") == "get_sa_company_data":
                 from .reducers import get_reducer
                 from .summary_prompt import LAYER_5_CHAR_CAP
                 content, _meta = get_reducer(tool)(content, budget=LAYER_5_CHAR_CAP)

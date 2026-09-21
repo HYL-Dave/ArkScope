@@ -57,12 +57,12 @@ def test_catalog_inspection_never_opens_stores_or_providers(catalog_client):
 def test_financial_sources_follow_the_existing_routing_authority(catalog_client):
     rows = by_category(catalog_client[0])["financial_statements"]
     definition = DATASETS["fundamentals_analysis"]
-    assert [row["provider"] for row in rows if row["integration"] == "implemented"] == list(definition.providers)
-    assert [row["provider"] for row in rows if row["integration"] == "candidate"] == list(definition.unimplemented)
+    assert [row["provider"] for row in rows if row["integration"] == "implemented"] == [*definition.providers, "seeking_alpha"]
+    assert [row["provider"] for row in rows if row["integration"] == "candidate"] == ["massive"]
     for row in rows:
         if row["integration"] == "implemented":
             assert row["access_requirement"] == SOURCE_ACCESS[row["provider"]]
-            assert row["controls"] == ["financial_sources"]
+            assert row["controls"] == (["financial_sources", "sa_extension"] if row["provider"] == "seeking_alpha" else ["financial_sources"])
             assert row["financial_routes"] == [
                 name for name, route in DATASETS.items() if row["provider"] in route.providers
             ]
@@ -89,8 +89,11 @@ def test_sa_existing_capture_is_not_confused_with_financial_pages(catalog_client
     assert sa["access_requirement"] == "signed_in_browser_subscription"
     assert sa["controls"] == ["sa_extension"]
     assert sa["schedule_sources"] == []
-    assert next(row for row in rows["financial_statements"]
-                if row["provider"] == "seeking_alpha")["integration"] == "candidate"
+    financial = next(row for row in rows["financial_statements"] if row["provider"] == "seeking_alpha")
+    assert financial["acquisition"] == "browser_page_capture"
+    assert financial["financial_routes"] == ["sa_company_financials"]
+    assert financial["schedule_sources"] == []
+    assert rows["valuation_ratings"][0]["integration"] == "candidate"
 
 
 def test_every_app_schedule_is_accounted_for_without_inventing_sa_jobs(catalog_client):

@@ -104,12 +104,13 @@ def apply_layer_0(
             return "", None
 
     from src.sec_research.tool_results import SEC_TOOL_NAMES
-    if tool_name.removeprefix("tool_") in SEC_TOOL_NAMES:
+    if (tool_name.removeprefix("tool_") in SEC_TOOL_NAMES
+            or tool_name.removeprefix("tool_") == "get_sa_company_data"):
         summary, _meta = get_reducer(tool_name, registry)(payload, budget=budget_chars)
         if summary == payload:
             return payload, None
         # Retain the complete input as evidence; a storage failure must not
-        # re-admit malformed/oversized SEC JSON into the model context.
+        # re-admit malformed/oversized financial JSON into the model context.
         try:
             record = overflow_store.write(tool_name, args or {}, payload)
         except Exception:

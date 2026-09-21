@@ -36,10 +36,15 @@ function fixture(): DataSourceCatalog {
       { id: "financial_statements", sources: [
         source("sec_edgar"), source("financial_datasets", { access_requirement: "metered_requests" }),
         source("seeking_alpha", {
-          integration: "candidate", acquisition: "not_implemented", controls: [],
+          acquisition: "browser_page_capture", controls: ["financial_sources", "sa_extension"],
           access_requirement: "signed_in_browser_subscription",
         }),
+        source("massive", { integration: "candidate", acquisition: "not_implemented", controls: [] }),
       ] },
+      { id: "valuation_ratings", sources: [source("seeking_alpha", {
+        integration: "candidate", acquisition: "not_implemented", controls: [],
+        access_requirement: "signed_in_browser_subscription",
+      })] },
       { id: "news", sources: [
         source("finnhub", { acquisition: "app_job", access_requirement: "endpoint_entitlement_unverified", controls: ["source_schedules"] }),
         source("seeking_alpha", {
@@ -107,7 +112,8 @@ describe("DataSourceCatalogSection", () => {
     await render();
     expect(provider("sec_edgar").textContent).toContain("Integrated");
     expect(provider("financial_datasets").textContent).toContain("authorized request budget required");
-    expect(provider("seeking_alpha").textContent).toContain("Not integrated");
+    expect(provider("seeking_alpha").textContent).toContain("Integrated");
+    expect(provider("massive").textContent).toContain("Not integrated");
     expect(provider("seeking_alpha").querySelector('.data-catalog-provider')?.textContent).toBe("Seeking Alpha");
     expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
     expect(putDataSourceRoute).not.toHaveBeenCalled();
@@ -115,8 +121,11 @@ describe("DataSourceCatalogSection", () => {
     expect(testProvider).not.toHaveBeenCalled();
   });
 
-  it("keeps SA browser capture separate from its unimplemented financial pages", async () => {
+  it("separates manual financial capture, extension news alarms and unimplemented valuation", async () => {
     await render();
+    expect(provider("seeking_alpha").textContent).toContain("Explicit capture of the displayed financial table");
+    await select("valuation_ratings");
+    expect(provider("seeking_alpha").textContent).toContain("Not integrated");
     expect(provider("seeking_alpha").querySelector("button")).toBeNull();
     await select("news");
     expect(provider("seeking_alpha").textContent).toContain("Chrome capture / extension auto-sync");

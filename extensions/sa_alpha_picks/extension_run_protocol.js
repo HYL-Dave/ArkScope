@@ -38,6 +38,8 @@
     "metadata_save_failed",
     "detail_queue_failed",
     "capture_readback_failed",
+    "company_layout_unrecognized",
+    "company_capture_rejected",
   ]);
 
   var SKIPPED_REASONS = Object.freeze(["not_due", "already_pending", "operator_cancelled"]);
@@ -88,6 +90,13 @@
   });
 
   var OPERATION_CONTRACTS = Object.freeze({
+    company_financial_capture: Object.freeze({
+      modes: Object.freeze(["current_tab"]),
+      job_name: "sa_company_financial_capture",
+      phases: Object.freeze(["extraction", "persistence"]),
+      fatal_phases: Object.freeze(["extraction", "persistence"]),
+      allows_items: false,
+    }),
     alpha_picks_sync: Object.freeze({
       modes: Object.freeze(["quick", "full", "backfill"]),
       job_name: "sa_alpha_picks_refresh",

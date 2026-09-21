@@ -24,7 +24,12 @@ def _financial_sources():
         _source(provider, "on_demand_api", SOURCE_ACCESS[provider], controls=("financial_sources",))
         for provider in definition.providers
     ]
+    browser_sources = DATASETS["sa_company_financials"].providers
+    sources.extend(_source(provider, "browser_page_capture", SOURCE_ACCESS[provider],
+                           controls=("financial_sources", "sa_extension")) for provider in browser_sources)
     for provider in definition.unimplemented:
+        if provider in browser_sources:
+            continue
         requirement = "signed_in_browser_subscription" if provider == "seeking_alpha" else "endpoint_entitlement_unverified"
         sources.append(_source(provider, "not_implemented", requirement))
     return sources

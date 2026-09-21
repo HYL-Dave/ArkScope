@@ -2,7 +2,7 @@
 
 **Updated**: 2026-09-20
 **Status**: CANONICAL current registry authority
-**Live registry**: 56 tools; agent bridges add `delegate_to_subagent` for 57
+**Live registry**: 57 tools; agent bridges add `delegate_to_subagent` for 58
 
 This document describes the current `ToolRegistry`, not removed implementations
 or possible future products. Historical catalog versions remain recoverable from
@@ -31,7 +31,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 
 ## 1. Live registry
 
-### 1.1 All 56 tools
+### 1.1 All 57 tools
 
 | Tool | Category | Parameters | Current role |
 |---|---|---|---|
@@ -82,6 +82,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `refresh_sa_alpha_picks` | portfolio | none | read-only extension refresh status |
 | `get_sa_articles` | portfolio | ticker?, keyword?, article_type?, limit? | captured SA article index |
 | `get_sa_article_detail` | portfolio | article_id* | captured SA article detail |
+| `get_sa_company_data` | analysis | ticker*, statement?, view?, currency?, observation_id?, row_offset?, row_limit?, column_offset?, column_limit? | local-only SA financial table observations; raw display values, units, missing reasons and stable two-axis pagination; no valuation, refresh or paid fallback |
 | `save_report` | reports | title*, tickers*, report_type*, summary*, content*, conclusion?, confidence? | local report body and metadata write |
 | `list_reports` | reports | ticker?, days?, report_type?, limit? | report index read |
 | `get_report` | reports | report_id?, file_path? | report read |

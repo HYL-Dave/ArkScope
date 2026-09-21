@@ -178,7 +178,37 @@ class ToolRegistry:
         self._register_monitor_tools()
         self._register_freshness_tools()
         self._register_sa_tools()
+        self._register_sa_company_tools()
         self._register_macro_calendar_tools()
+
+    def _register_sa_company_tools(self) -> None:
+        from .sa_company_tools import get_sa_company_data
+
+        self.register(ToolDefinition(
+            name="get_sa_company_data", result_policy=PUBLIC_JSON,
+            description=(
+                "Read source-labeled SA financial tables captured by the browser extension. "
+                "Local-only: no refresh, paid fallback or derived ratios. Raw display values, "
+                "units, period labels and missing-value reasons are retained. Numbers are not "
+                "rescaled; exact fiscal end dates may be unknown. Reuse observation_id for "
+                "stable pagination and reopening. Valuation/ratings are not covered."
+            ),
+            function=get_sa_company_data, category="analysis",
+            parameters=[
+                ToolParameter("ticker", "string", "Company ticker, e.g. AMD"),
+                ToolParameter("statement", "string", "Financial statement", required=False, default="income_statement",
+                              enum=["income_statement", "balance_sheet", "cash_flow_statement"]),
+                ToolParameter("view", "string", "Captured period view", required=False, default="annual",
+                              enum=["annual", "quarterly"]),
+                ToolParameter("currency", "string", "Captured ISO currency, default USD", required=False, default="USD"),
+                ToolParameter("observation_id", "string", "Pin the returned observation ID for later pages or history",
+                              required=False),
+                ToolParameter("row_offset", "integer", "First row, default 0", required=False, default=0),
+                ToolParameter("row_limit", "integer", "Rows per page, default 20", required=False, default=20),
+                ToolParameter("column_offset", "integer", "First period column, default 0", required=False, default=0),
+                ToolParameter("column_limit", "integer", "Period columns per page, default 4", required=False, default=4),
+            ],
+        ))
 
     def _register_news_tools(self) -> None:
         from .news_tools import (

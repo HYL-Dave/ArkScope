@@ -116,13 +116,14 @@ _STABLE_REASON_RE = re.compile(r"^[a-z0-9_]{1,64}$")
 _MCP_SERVER_NAME = "ark"
 _MCP_PREFIX = "mcp__ark__"
 
-# §3 Tier-1 allowlist (15 read-only tools). Hardcoded frozenset — NOT derived
+# §3 Tier-1 allowlist. Hardcoded frozenset — NOT derived
 # from the registry `category` field (which is free-text, not a safety boundary).
 _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
     {
         "get_sa_feed",
         "get_sa_digest",
         "get_sa_alpha_picks",
+        "get_sa_company_data",
         "get_ticker_news",
         "get_news_brief",
         "search_news_advanced",

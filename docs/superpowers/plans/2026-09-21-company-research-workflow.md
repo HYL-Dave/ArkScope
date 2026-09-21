@@ -13,7 +13,7 @@ not a claim that the workflow below is already implemented. No subscription,
 production setting change, data purge or removal of retained evidence is
 authorized by this plan.
 
-## Reconciled Facts
+## Reconciled Baseline Facts
 
 - The current SEC Settings panel requires a numeric CIK. The existing issuer
   resolver supports exact ticker lookup, not company-name search; absent maps
@@ -41,12 +41,17 @@ Owners: [issuer parsing](../../../src/sec_research/issuers.py),
 ## Cohesive Work Packages
 
 1. **Usable company-data input.** Prioritize a bounded SA company-data capture
-   through the already-authorized signed-in browser/extension approach. Start
-   with a supported financial statement and valuation scope, verified against
-   observed pages, rather than advertising all company tabs as implemented.
+   through the already-authorized signed-in browser/extension approach.
+   Financial statements and valuation/ratings are separate acceptance tracks;
+   success of either does not certify the other. Verify against observed pages
+   rather than advertising all company tabs as implemented.
    Retain ticker, provider, page URL, capture time, period, units/currency, table
    headers and completeness. Missing/locked/not-loaded sections remain typed
    gaps. No anti-bot bypass or unsupported assumptions about Premium access.
+   FD's existing selected-source path is an independent financial alternative,
+   not an automatic paid fallback on SA failure. Replacement decisions use the
+   coverage of the selected, admitted providers; they do not wait indefinitely
+   for SA, and they do not imply that FD supplies ratings or every old metric.
 2. **Capture to actual research.** Connect successful observations to local
    persistence, query tools and per-dataset source selection in the same batch.
    Propagate selected-source provenance through applicable native and OAuth
@@ -79,6 +84,39 @@ SQLite replacement, external MCP hosting, a new notes product and a separate
 usage-monitoring product are not prerequisites and do not join this batch.
 Existing card translation and account-usage display are not retirement targets.
 
+## SA Quality And Operating Boundary
+
+The extension owns page extraction, the native host validates the input before
+the capture store accepts it, and the research tool owns bounded local reads.
+Both sides use a versioned semantic layout contract: company identity, selected
+view, currency/unit context, column roles and row-to-column alignment. Record a
+structural fingerprint with observations, but do not treat a hash as proof of
+numerical truth or hash cosmetic classes/advertisements. An unknown semantic
+shape fails closed; do not silently accept it as a new baseline. Existing valid
+captures survive a rejected update. Fixtures must mutate plausible-but-wrong
+layouts, not only remove the entire table.
+
+Retain displayed values alongside deterministic decimal cleaning. Missing,
+not-meaningful, not-applicable and zero are different. Do not infer an exact
+period-end day from a month label, mix TTM with annual values, relabel liabilities
+as debt, or invent normalized currency amounts from an ambiguous unit context.
+Layout recognition and financial coverage are distinct acceptance results.
+
+SA is an optional browser-assisted input, not the mandatory primary source for
+all company data. The initial company-page capture is explicit; reading it does
+not launch Chrome, subscribe, synchronize or spend. Existing SA alarms still
+need Chrome/login/page availability. A headless unattended workflow must use
+eligible API sources or report the browser dependency, not claim equivalent
+availability. Unattended service lifetime remains an open workstream.
+
+No duplicate full-page archives, automatic company-page schedule or unlimited
+retry history is introduced merely to test extraction. New observation storage
+must deduplicate unchanged content and report storage limits before ingestion
+expands. Existing data/backup retention needs its own inventory and approval;
+neither quoted directory sizes nor old timestamps authorize deletion. A blocked
+integration remains explicitly unavailable in the catalog until a deliberate
+retirement decision, rather than being hidden as though the data were unwanted.
+
 ## Freshness By Use
 
 - Financial observations: keep period/version and provider processing separate
@@ -98,13 +136,43 @@ questions or one fixed freshness setting for every use of each category.
 ## Acceptance And External Gates
 
 - [x] Reconcile the reported CIK issue, existing routing and SA alarm ownership.
-- [ ] Signed-in page observations and extraction fixtures for the bounded SA scope.
-- [ ] Capture, persistence, source selection and research reads work together.
+- [x] Signed-in page observations and extraction fixtures for the bounded SA scope.
+- [x] Semantic-layout mutations fail without replacing accepted observations.
+- [x] Financial and valuation acceptance are recorded independently; selected FD
+      remains usable without SA and without an implicit paid retry.
+- [x] Capture, persistence, source selection and research reads work together for
+      the new SA financial-table reader. Other legacy analytic consumers remain.
 - [ ] Normal research requires no CIK and no compulsory original-filing workflow.
 - [ ] Required reads work across their admitted channels, including honest gaps.
 - [ ] Redundant paths are removed only after replacement and reference checks.
 - [ ] Final frozen revision passes full backend/frontend regression and build.
 - [ ] Real-source workflow acceptance, including restart and retained provenance.
+
+### Financial Table Implementation Status
+
+The first integrated implementation adds the extension command, semantic
+validation, bounded/deduplicated SA-store persistence, independent Settings
+selection and a local-only reader on the two API-key and two OAuth channels.
+It does not depend on a new subscription, an external MCP server, a headless
+browser or replacing SEC first. The three statement types are supported in
+Annual/Quarterly Absolute views. Standalone TTM views are not accepted; the
+distinct TTM column in an annual income/cash-flow table is preserved as trailing,
+not relabeled as annual. Growth and valuation/rating pages are not implemented.
+
+Live page acceptance covered AMD's three annual statements and quarterly
+income/balance views, AAPL's annual balance sheet and INTC's annual cash flow.
+A site verification challenge interrupted broader navigation; requests stopped,
+the operator completed verification, and remaining checks resumed individually.
+Its cause is not established. Four captured real tables also passed Native
+Messaging framing/process persistence and 16 local tool calls across the four
+channels, without opening a market DB or calling a model/provider API.
+
+This is input-path acceptance, not completion of all five workflow packages.
+Installing/reloading the new extension for an operator session, broader source
+coverage, company selection/CIK removal, legacy calculation retirement and
+required article/comment/holdings channel review still need their own evidence.
+Existing backups/news retention is not changed by this slice. The maintained
+root policy documents the capture trigger, clocks, storage cap and failure path.
 
 Use focused tests during implementation, then one complete regression on the
 final integrated revision. A changed product revision invalidates affected

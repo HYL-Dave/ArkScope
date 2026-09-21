@@ -156,6 +156,7 @@ def test_declared_counts_must_equal_derived_phase_and_item_counts():
 def test_operation_mode_and_job_name_contracts_are_closed():
     protocol = _protocol()
     expected = {
+        "company_financial_capture": ({"current_tab"}, "sa_company_financial_capture"),
         "alpha_picks_sync": ({"quick", "full", "backfill"}, "sa_alpha_picks_refresh"),
         "alpha_picks_manual_fetch": ({"manual"}, "sa_extension:manual_fetch"),
         "market_news_sync": ({"quick", "full", "catchup"}, "sa_market_news_refresh"),

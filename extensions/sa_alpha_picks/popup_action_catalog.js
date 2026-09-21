@@ -124,6 +124,8 @@
     extension_dependency_missing: "An extension runtime file is missing",
     interrupted: "The operation was interrupted and can be retried",
     unknown_failure: "The operation needs attention",
+    company_layout_unrecognized: "The financial table structure needs review",
+    company_capture_rejected: "The financial capture was not accepted",
   });
   var auditLabels = Object.freeze({
     persisted: "Audit recorded",

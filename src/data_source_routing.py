@@ -34,11 +34,13 @@ DATASETS = {
     ),
     "detailed_financials": SourceDataset(("sec_edgar",), ("get_detailed_financials",)),
     "earnings_supplements": SourceDataset(("finnhub",), ("get_detailed_financials",)),
+    "sa_company_financials": SourceDataset(("seeking_alpha",), ("get_sa_company_data",)),
 }
 SOURCE_ACCESS = {
     "sec_edgar": "public_identity",
     "financial_datasets": "metered_requests",
     "finnhub": "endpoint_entitlement_unverified",
+    "seeking_alpha": "signed_in_browser_subscription",
 }
 
 

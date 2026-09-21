@@ -39,7 +39,7 @@ JSON_TOOLS = (
     "get_iv_skew_analysis", "get_morning_brief", "get_news_brief", "get_option_chain",
     "get_peer_comparison", "get_portfolio_analysis", "get_portfolio_holdings",
     "get_price_change", "get_report", "get_sa_alpha_picks", "get_sa_article_detail",
-    "get_sa_articles", "get_sa_comment_focus", "get_sa_digest", "get_sa_feed",
+    "get_sa_articles", "get_sa_comment_focus", "get_sa_company_data", "get_sa_digest", "get_sa_feed",
     "get_sa_market_news", "get_sa_pick_detail", "get_sector_performance",
     "get_security_lifecycle_review", "get_ticker_data_coverage", "get_ticker_news",
     "get_ticker_prices", "get_watchlist_overview", "list_high_value_comments",
@@ -121,9 +121,9 @@ def test_new_registration_has_explicit_none_default_and_is_not_admitted():
     reject(api, {"value": 1}, policy=tool.result_policy)
 
 
-def test_registry_matches_the_complete_56_tool_source_inventory():
+def test_registry_matches_the_complete_57_tool_source_inventory():
     registry = create_default_registry()
-    assert len(registry.list_all()) == 56
+    assert len(registry.list_all()) == 57
     assert set(registry.list_names()) == set(JSON_TOOLS) | set(TEXT_TOOLS) | set(SEC_TOOLS)
     assert registry.get("delegate_to_subagent") is None
 

@@ -301,6 +301,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "get_ticker_prices",
             "get_price_change",
             "get_fundamentals_analysis",
+            "get_sa_company_data",
             "calculate_compound_growth",
             "calculate_dcf",
             "calculate_implied_valuation",
@@ -328,6 +329,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "detect_news_volume_anomaly",
             "detect_event_chains",
             "get_fundamentals_analysis",
+            "get_sa_company_data",
             "list_sec_filings",
             "get_sec_financial_facts",
             "read_sec_filing",
@@ -354,6 +356,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "get_watchlist_overview",
             "get_morning_brief",
             "get_fundamentals_analysis",
+            "get_sa_company_data",
         ],
         max_turns=6,
         anthropic_thinking=True,  # adaptive — model decides when to think

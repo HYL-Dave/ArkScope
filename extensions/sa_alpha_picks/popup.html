@@ -239,6 +239,7 @@
     #status,
     #marketNewsStatus,
     #lastRunStatus,
+    #companyCaptureStatus,
     #marketNewsRecoveryStatus {
       box-sizing: border-box;
       margin: 6px 0;
@@ -251,12 +252,14 @@
     }
     #marketNewsStatus.success,
     #lastRunStatus.success,
+    #companyCaptureStatus.success,
     #marketNewsRecoveryStatus.success { border-left-color: #2e7d32; }
     #marketNewsStatus.partial,
     #lastRunStatus.partial,
     #marketNewsRecoveryStatus.partial { border-left-color: #ef6c00; }
     #marketNewsStatus.error,
     #lastRunStatus.error,
+    #companyCaptureStatus.error,
     #marketNewsRecoveryStatus.error { border-left-color: #c62828; }
     .action-group {
       border-top: 1px solid #e4e4e4;
@@ -377,6 +380,13 @@
   <div id="status" class="empty" role="status">No data yet. Click a button below.</div>
   <div id="marketNewsStatus" class="empty" role="status">Market News: not synced yet.</div>
   <div id="lastRunStatus" class="empty" role="status">No audited extension run yet.</div>
+
+  <section class="action-group" data-action-group="company-financials">
+    <h3>Company Financials</h3>
+    <button id="companyCaptureBtn" class="action-button" type="button"
+      title="Capture the displayed income statement, balance sheet or cash flow in Absolute view">Capture Financial Table</button>
+    <div id="companyCaptureStatus" role="status">No financial table captured.</div>
+  </section>
 
   <section class="action-group" data-action-group="alpha-picks">
     <h3>Alpha Picks</h3>

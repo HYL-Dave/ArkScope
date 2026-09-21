@@ -43,6 +43,7 @@ _SA_EXTENSION_DIAGNOSTIC_JOB_NAMES = frozenset(
         "sa_market_news_refresh",
         "sa_market_news_retry_recorded",
         "sa_market_news_incident_recovery",
+        "sa_company_financial_capture",
     }
 )
 

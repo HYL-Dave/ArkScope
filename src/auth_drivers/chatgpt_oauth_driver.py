@@ -54,6 +54,7 @@ _RESEARCH_READONLY_TOOLS: frozenset[str] = frozenset(
         "get_sa_feed",
         "get_sa_digest",
         "get_sa_alpha_picks",
+        "get_sa_company_data",
         "get_ticker_news",
         "get_news_brief",
         "search_news_advanced",

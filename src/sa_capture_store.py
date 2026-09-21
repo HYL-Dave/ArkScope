@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 _SCHEMA_VERSION_V2 = 2
-SCHEMA_VERSION = 3
+_SCHEMA_VERSION_V3 = 3
+SCHEMA_VERSION = 4
 USE_LOCAL_SA_KEY = "use_local_sa"  # profile_settings key for the persisted flip toggle
 
 
@@ -402,6 +403,24 @@ _V3_SYMBOL_IDENTITY_TRIGGER_STATEMENTS: tuple[str, ...] = (
 )
 _SCHEMA += ";\n".join(_V3_SYMBOL_IDENTITY_TRIGGER_STATEMENTS) + ";\n"
 
+_V4_COMPANY_STATEMENTS = (
+    """CREATE TABLE IF NOT EXISTS sa_company_observations (
+        observation_id TEXT PRIMARY KEY,
+        ticker TEXT NOT NULL,
+        statement TEXT NOT NULL,
+        period_view TEXT NOT NULL,
+        currency TEXT NOT NULL,
+        captured_at TEXT NOT NULL,
+        last_captured_at TEXT NOT NULL,
+        received_at TEXT NOT NULL,
+        body_json TEXT NOT NULL CHECK(json_valid(body_json)),
+        byte_count INTEGER NOT NULL CHECK(byte_count > 0)
+    )""",
+    """CREATE INDEX IF NOT EXISTS idx_sa_company_scope
+       ON sa_company_observations(ticker, statement, period_view, currency, last_captured_at DESC)""",
+)
+_SCHEMA += ";\n".join(_V4_COMPANY_STATEMENTS) + ";\n"
+
 
 _V1_TO_V2_STATEMENTS: tuple[str, ...] = (
     """
@@ -616,7 +635,7 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     try:
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-        if version in {_SCHEMA_VERSION_V2, SCHEMA_VERSION}:
+        if version in {_SCHEMA_VERSION_V2, _SCHEMA_VERSION_V3, SCHEMA_VERSION}:
             conn.commit()
             return
         if version != 1:
@@ -679,7 +698,7 @@ def _migrate_v2_to_v3(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     try:
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-        if version == SCHEMA_VERSION:
+        if version in {_SCHEMA_VERSION_V3, SCHEMA_VERSION}:
             conn.commit()
             return
         if version != _SCHEMA_VERSION_V2:
@@ -741,8 +760,28 @@ def _migrate_v2_to_v3(conn: sqlite3.Connection) -> None:
 
         conn.execute(
             "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
-            (SCHEMA_VERSION, now_ts()),
+            (_SCHEMA_VERSION_V3, now_ts()),
         )
+        conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION_V3}")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def _migrate_v3_to_v4(conn: sqlite3.Connection) -> None:
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if version == SCHEMA_VERSION:
+            conn.commit()
+            return
+        if version != _SCHEMA_VERSION_V3:
+            raise RuntimeError(f"unsupported sa_capture schema version: {version}")
+        for statement in _V4_COMPANY_STATEMENTS:
+            conn.execute(statement)
+        conn.execute("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                     (SCHEMA_VERSION, now_ts()))
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         conn.commit()
     except Exception:
@@ -766,9 +805,14 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     if version == 1:
         _migrate_v1_to_v2(conn)
         _migrate_v2_to_v3(conn)
+        _migrate_v3_to_v4(conn)
         return
     if version == _SCHEMA_VERSION_V2:
         _migrate_v2_to_v3(conn)
+        _migrate_v3_to_v4(conn)
+        return
+    if version == _SCHEMA_VERSION_V3:
+        _migrate_v3_to_v4(conn)
         return
     if version != 0:
         raise RuntimeError(f"unsupported sa_capture schema version: {version}")
@@ -779,7 +823,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         if version == SCHEMA_VERSION:
             conn.commit()
             return
-        if version in {1, _SCHEMA_VERSION_V2}:
+        if version in {1, _SCHEMA_VERSION_V2, _SCHEMA_VERSION_V3}:
             conn.commit()
             ensure_schema(conn)
             return

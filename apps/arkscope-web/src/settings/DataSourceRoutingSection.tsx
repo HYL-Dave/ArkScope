@@ -21,6 +21,7 @@ function datasetLabel(dataset: DataSourceDataset, t: SettingsT) {
     case "fundamentals_analysis": return t(($) => $.dataSources.routing.datasets.fundamentals);
     case "detailed_financials": return t(($) => $.dataSources.routing.datasets.detailed);
     case "earnings_supplements": return t(($) => $.dataSources.routing.datasets.earnings);
+    case "sa_company_financials": return t(($) => $.dataSources.routing.datasets.saCompany);
   }
 }
 
@@ -191,7 +192,7 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
               {ordered.map((provider) => {
                 const index = selected.indexOf(provider);
                 const access = row.options.find((item) => item.provider === provider)?.access;
-                const name = providerName(provider, t);
+                const name = provider === "seeking_alpha" ? t(($) => $.dataSources.catalog.seekingAlpha) : providerName(provider, t);
                 const move = (offset: number) => {
                   const next = [...selected];
                   [next[index], next[index + offset]] = [next[index + offset], next[index]];
@@ -208,6 +209,7 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
                   <span className="muted tiny data-route-access">
                     {access === "metered_requests" ? t(($) => $.dataSources.routing.metered)
                       : access === "endpoint_entitlement_unverified" ? t(($) => $.dataSources.routing.entitlementUnknown)
+                        : access === "signed_in_browser_subscription" ? t(($) => $.dataSources.catalog.requirements.signed_in_browser_subscription)
                         : t(($) => $.dataSources.routing.publicSource)}
                   </span>
                   {row.options.length > 1 ? <div className="data-route-actions">
@@ -219,7 +221,7 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
                 </div>;
               })}
               {row.unimplemented.map((provider) => <div className="data-route-unimplemented muted tiny" key={provider}>
-                <span>{providerName(provider, t)}</span><span>{t(($) => $.dataSources.routing.notImplemented)}</span>
+                <span>{provider === "seeking_alpha" ? t(($) => $.dataSources.catalog.seekingAlpha) : providerName(provider, t)}</span><span>{t(($) => $.dataSources.routing.notImplemented)}</span>
               </div>)}
             </fieldset>
             <div className="data-route-actions">

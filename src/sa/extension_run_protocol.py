@@ -44,6 +44,8 @@ REASON_CODES = frozenset(
         "metadata_save_failed",
         "detail_queue_failed",
         "capture_readback_failed",
+        "company_layout_unrecognized",
+        "company_capture_rejected",
     }
 )
 
@@ -93,6 +95,13 @@ _EVIDENCE_BY_UNAVAILABLE_REASON = {
 }
 
 OPERATION_CONTRACTS = {
+    "company_financial_capture": {
+        "modes": ("current_tab",),
+        "job_name": "sa_company_financial_capture",
+        "phases": ("extraction", "persistence"),
+        "fatal_phases": ("extraction", "persistence"),
+        "allows_items": False,
+    },
     "alpha_picks_sync": {
         "modes": ("quick", "full", "backfill"),
         "job_name": "sa_alpha_picks_refresh",

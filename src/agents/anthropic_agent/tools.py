@@ -1288,6 +1288,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
     from src.tools.registry import ToolRegistry
     sec = ToolRegistry()
     sec._register_sec_research_tools()
+    sec._register_sa_company_tools()
     tools.extend(sec.to_anthropic_schema())
     return tools
 
@@ -1757,6 +1758,9 @@ def execute_tool(
         "get_economic_calendar": lambda: _macro_get_economic_calendar(dal, tool_input),
         "get_macro_value": lambda: _macro_get_macro_value(dal, tool_input),
     }
+
+    from src.tools.sa_company_tools import get_sa_company_data
+    tool_map["get_sa_company_data"] = lambda: get_sa_company_data(dal, **tool_input)
 
     if tool_name not in tool_map and tool_name not in SEC_TOOL_NAMES:
         return json.dumps({"error": "Unknown tool", "code": "invalid_value"})

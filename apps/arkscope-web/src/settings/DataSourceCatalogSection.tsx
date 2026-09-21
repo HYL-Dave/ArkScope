@@ -57,6 +57,7 @@ function methodLabel(method: DataSourceCapability["acquisition"], t: SettingsT):
     case "app_job": return t(($) => $.dataSources.catalog.methods.app_job);
     case "price_worker": return t(($) => $.dataSources.catalog.methods.price_worker);
     case "browser_extension": return t(($) => $.dataSources.catalog.methods.browser_extension);
+    case "browser_page_capture": return t(($) => $.dataSources.catalog.methods.browser_page_capture);
     case "app_job_and_on_demand": return t(($) => $.dataSources.catalog.methods.app_job_and_on_demand);
     case "account_capture": return t(($) => $.dataSources.catalog.methods.account_capture);
     case "local_and_opt_in_update": return t(($) => $.dataSources.catalog.methods.local_and_opt_in_update);
