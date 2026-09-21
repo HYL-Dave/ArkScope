@@ -72,18 +72,27 @@ switch or claim all 56 tools have migrated.
 - [x] Four-channel source argument and provenance checks; existing allowlists unchanged.
 - [x] Settings source selection and paid-budget controls, with save/failure/navigation tests (18 focused UI checks).
 - [x] Browser checks across desktop/mobile and a narrow desktop container on isolated state; no external requests.
-- [ ] Related and standalone full regression, frontend/typecheck/build, main-tree verification.
-- [ ] Update the root acquisition contract; commit/merge/owned-branch cleanup, no push.
+- [x] Related and standalone full regression, frontend/typecheck/build, main-tree verification.
+- [x] Update the root acquisition contract; commit/merge/owned-branch cleanup, no push.
 
-Pre-freeze checks: frontend 1,886 tests / 125 files; typecheck/build, localized
-literal scanner and eight desktop checks pass. The root acquisition contract is
-updated. Standalone full backend acceptance and main-tree verification remain.
+Frozen `fad51d98339aee25887e4eb393f9e73e7772f31d` passes the standalone full
+backend in an isolated worktree: **11,971 passed / 12 unchanged skips**, 32:39.
+There are 60 additional cases, no removed cases and no changed prior outcomes.
+Master fast-forwarded to that revision and passed **621 related checks / 2
+existing live skips**, **1,886 frontend tests / 125 files**, typecheck/build,
+the localized literal scanner and eight desktop tests. The merged-tree browser
+check also passes against an isolated Settings database. The owned acceptance
+worktree and `feat/data-source-routing` branch are removed; unrelated worktrees
+and the two pre-existing untracked documentation items are untouched. No push.
 
 The first full backend run at `bb688e0f` was intentionally interrupted before a
 UI correction, not accepted as a completed regression. Unconfigured or invalid
 paid policies can now be explicitly saved as disabled without inventing limits;
-the two added UI cases and isolated browser check pass. A new frozen revision
-must run the full backend again.
+the two added UI cases and isolated browser check pass. The next main-tree run
+at `fad51d98` was also stopped, to move full acceptance into an isolated worktree
+with explicit temporary storage paths. Only the subsequent completed run counts
+as full acceptance. See the [acceptance receipt](../evidence/2026-09-21-data-source-routing/README.md)
+for artifacts, isolation limits and remaining scope.
 
 No production-store mutation, provider calls, subscription activation, purchases,
 App restart, SA scraping, formula repair or event-aware financial expiry is
