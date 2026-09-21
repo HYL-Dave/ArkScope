@@ -37,6 +37,15 @@ current quotes, macro jobs and other Finnhub tools retain their own owners and
 are not governed by these three rows. Do not label this a provider-wide kill
 switch or claim all 56 tools have migrated.
 
+The subsequent user clarification makes data/intelligence categories the catalog
+axis, not provider brands or existing tool names. Listing a possible provider is
+not a requirement to implement it now. SA's existing picks, articles, comments
+and market-news capture must be distinguished from its unimplemented financial
+pages; its browser-owned auto-sync is not an API-sidecar schedule. The root
+[category map and expansion contract](../../../DATA_ACQUISITION_AND_UPDATES.md#data-categories-before-provider-integrations)
+owns this follow-up direction. This completed three-route slice does not claim
+to deliver that broader Settings catalog or change the existing SA controls.
+
 ## Implementation Contract
 
 - One policy catalog and strict parser own source eligibility and order. Persist

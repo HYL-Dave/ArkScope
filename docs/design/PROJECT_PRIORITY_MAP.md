@@ -662,6 +662,18 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
+- **2026-09-21 (DATA CATEGORIES BEFORE ADAPTER EXPANSION):** The user confirms
+  that the catalog should group data/intelligence first, then record possible
+  providers and let the operator choose acquisition. Not every listed provider
+  must be integrated immediately. Keep capability evidence, implementation,
+  account access/cost, acquisition permission and collection triggers separate.
+  SA picks/articles/comments/news already have browser capture and extension
+  auto-sync; structured financial pages do not. Unifying Settings must not
+  duplicate that collector or turn an unavailable adapter into an enabled
+  switch. The root [category map](../../DATA_ACQUISITION_AND_UPDATES.md#data-categories-before-provider-integrations)
+  records current owners and the expansion contract. Financial routing remains
+  the only completed unified source-selection slice; no new capture is started.
+
 - **2026-09-21 (FINANCIAL SOURCE ROUTING ACCEPTED):** Settings now governs the
   actual fundamental-analysis, detailed-financial and optional earnings paths,
   including local reuse. Four-channel explicit source selection stays inside

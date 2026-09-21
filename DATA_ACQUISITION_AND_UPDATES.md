@@ -28,6 +28,64 @@ source-specific specifications still own their detailed protocols.
 - An acquisition failure must not become a fresh empty result. Partial coverage
   must not be presented as complete. Reuse eligibility is not a deletion policy.
 
+## Data Categories Before Provider Integrations
+
+The catalog starts with **what data or intelligence is needed**, then lists
+providers for that category. It does not require implementing every listed
+provider before the category is useful. A provider's advertised capability, a
+working ArkScope adapter and access under the user's account are distinct.
+Candidate sources may be recorded before integration; they must not appear as
+working acquisition switches until their adapters and results are verified.
+
+The following is an initial integration map, not an exhaustive vendor catalog,
+current subscription recommendation or a new unified Settings implementation:
+
+| Data category | Existing ArkScope acquisition | Boundary / outstanding integration |
+| --- | --- | --- |
+| Company financial statements and facts | SEC EDGAR and Financial Datasets through existing on-demand financial tools | SA and Massive financial adapters are candidates, not implemented alternatives. Detailed financials has narrower coverage than fundamental analysis. |
+| Provider-supplied valuation, ratings and peer comparisons | No structured SA company-page adapter | The SA pages identified by the user belong here. Existing locally calculated metrics are not captures of those provider values. |
+| Current quotes | IBKR snapshots | Account/feed access and price time determine whether the result is live. This is not a persistent streaming service. |
+| Historical price bars | IBKR / Massive price workers | Existing price collection and repair own provider selection; the financial-source switches do not govern them. |
+| General news | Massive, Finnhub and IBKR collectors; SA market-news extension capture | API/Gateway jobs and browser capture have different prerequisites. Sources need not cover the same publishers, bodies or comments. |
+| Earnings and IPO events | Finnhub calendar jobs; separate earnings supplements in detailed financials | Implemented endpoints do not prove free-account coverage. Other providers can be evaluated without requiring a Finnhub upgrade. |
+| Macro observations and release events | FRED series/release jobs and Finnhub economic-calendar jobs | Series, release dates and economic events are distinct datasets, not interchangeable responses. |
+| Recommendation membership | SA Alpha Picks extension capture | Current and closed membership have separate coverage; a captured list does not prove article completeness. |
+| Research articles and discussion | SA article-body and comment extension capture | Body and comment outcomes remain separate. This does not include structured company financial pages. |
+| Account holdings and value | IBKR account capture, then local snapshot reads | A successful local holdings read does not initiate broker synchronization or prove current account value. |
+| Original filings and filing-backed evidence | SEC research capture, local reads and opt-in updates | A separate data capability, not a required first step for every financial question. |
+
+Current owners: [financial routing](src/data_source_routing.py),
+[quote reads](src/tools/current_quote.py), [price workers](src/prices_runtime.py),
+[source jobs](src/service/data_scheduler.py),
+[SA capture operations](src/sa/extension_run_protocol.py),
+[SA extension](extensions/sa_alpha_picks/background.js),
+[account capture](src/portfolio_capture_ibkr.py) and
+[SEC research](src/sec_research/tool_service.py).
+Adapter presence is not a health check or certification of analytical formulas.
+
+### Catalog And Settings Expansion Contract
+
+- Record content/scope, capability evidence, adapter status, account access and
+  cost separately for each category/provider pair. Unverified availability is
+  unknown, not proof of missing entitlement or a reason to buy a subscription.
+- Select acquisition per category and provider, not one global supplier. Multiple
+  sources may be selected without mixing their retained observations or fetching
+  every source on every read. A listing alone authorizes no network request.
+- Distinguish acquisition permission, recurring schedule enablement and eligible
+  local reads. Stopping a schedule is not a deletion or a prohibition on reading
+  saved data. The existing financial route controls read eligibility as well as
+  acquisition through those tools; it is not a universal acquisition switch.
+- Record the actual execution owner and supported triggers: API/Gateway job,
+  browser extension, explicit capture or local computation. Do not advertise a
+  browser-only source as available to a headless server merely by adding a row.
+- Add and verify adapters incrementally. SA's existing articles, comments, picks
+  and news must remain represented independently of its unimplemented financial
+  pages. No all-provider rollout, new subscription or external MCP is required.
+
+The current three financial route IDs below identify existing tool paths, not
+the final user-facing data taxonomy. Broader Settings grouping and
+collection controls remain follow-up work; this map does not activate them.
+
 ## Which Clock Means What?
 
 | Concept | Meaning | Does not establish |
@@ -178,6 +236,14 @@ do not admit a low-latency trading service. Owners:
 SA capture requires a usable signed-in browser and the relevant access. Article
 body success with comment failure remains incomplete for a comments request.
 There is no universal synchronous "refresh SA now" contract on research reads.
+The existing `refresh_sa_alpha_picks` tool returns local state and an extension
+refresh hint; it does not start browser capture. The extension already owns
+manual operations and opt-in Chrome alarms for Alpha Picks and market news,
+using separate `alphaPicksAutoSyncEnabled` / `marketNewsAutoSyncEnabled` settings.
+These are not entries in the ten-source API scheduler below. Future unified
+Settings must respect that owner rather than start a second competing collector.
+Browser/session and native-host availability remain prerequisites, and an alarm
+does not establish successful capture or uninterrupted unattended service.
 Larger scrolling budgets do not prove date coverage or list exhaustion. See the
 [recent collection and Alpha Picks policy](docs/design/RUNTIME_AND_RECENT_COLLECTION_POLICY.md#alpha-picks-open-positions-first)
 for the Open-position-first direction and its remaining implementation limits.
