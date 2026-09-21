@@ -23,7 +23,7 @@ catalog is a bounded current-integration map, not an exhaustive vendor survey.
 - [x] RED-first catalog contract and side-effect tests (13 expected failures).
 - [x] Metadata endpoint and Settings category navigation.
 - [x] Focused backend, full frontend/build and isolated browser acceptance.
-- [ ] Root contract, verification record and commit/merge cleanup; no push.
+- [x] Root contract, verification record and commit/merge cleanup; no push.
 
 ## Acceptance
 
@@ -39,3 +39,13 @@ catalog is a bounded current-integration map, not an exhaustive vendor survey.
 - New routes appear by full identity in both exact route-inventory assertions.
 
 Durable owner: [Data Acquisition And Updates](../../../DATA_ACQUISITION_AND_UPDATES.md).
+
+## Result
+
+Implementation `5ab98bdb` is fast-forwarded into master; the owned feature branch
+is removed. No additional worktree was created. Related backend: 421 passed;
+complete frontend: 1,908 passed / 126 files; typecheck/build, i18n, eight desktop
+checks and the post-merge browser replay pass. The complete backend suite was
+not rerun for this read-only metadata and Settings slice.
+
+Evidence: [acceptance receipt](../evidence/2026-09-21-data-capability-catalog/README.md).
