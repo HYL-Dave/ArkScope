@@ -243,7 +243,7 @@ describe("DataSourceCatalogSection", () => {
     expect(host.textContent).toContain(locale === "en" ? "Data Types and Sources" : "資料種類與來源");
     expect(host.textContent).not.toMatch(/dataSources\.catalog|financial_statements|public_identity/);
     await select("news");
-    expect(provider("seeking_alpha").textContent).toContain(locale === "en" ? "Chrome capture" : "Chrome 擷取");
+    expect(provider("seeking_alpha").textContent).toContain(locale === "en" ? "Browser extension capture" : "瀏覽器擴充套件擷取");
   });
 
   it("stacks rows by container width while keeping text wrap-capable", () => {
