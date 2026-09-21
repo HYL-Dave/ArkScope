@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+import re
 from typing import Any, Callable, Dict, List, Optional
 
+from data_sources.finnhub_calendar_client import FINNHUB_FAILURE_CODES
 from src.macro_calendar.write_lock import (
     MacroCalendarWriterLease,
     _claim_writer_lease,
@@ -26,6 +28,50 @@ MACRO_JOB_NAMES = frozenset(
 
 def is_macro_job(job_name: str) -> bool:
     return job_name in MACRO_JOB_NAMES
+
+
+def _calendar_request_receipts(job, raw):
+    dataset = {
+        "fetch_economic_calendar_recent": "economic", "fetch_economic_calendar_backfill": "economic",
+        "fetch_earnings_calendar": "earnings", "fetch_ipo_calendar": "ipo",
+    }.get(job)
+    if dataset is None:
+        return []
+    requests = raw["requests"]
+    if not isinstance(requests, list):
+        raise ValueError("invalid requests")
+    receipts = []
+    for item in requests:
+        if not isinstance(item, dict) or item.get("dataset") != dataset:
+            raise ValueError("invalid dataset")
+        symbol = item.get("symbol")
+        if symbol is not None and (dataset != "earnings" or not isinstance(symbol, str)
+                                  or not re.fullmatch(r"[A-Z0-9][A-Z0-9.^_:/=-]{0,63}", symbol)):
+            raise ValueError("invalid symbol")
+        start, end = date.fromisoformat(item["from_date"]), date.fromisoformat(item["to_date"])
+        checked = datetime.fromisoformat(item["checked_at"])
+        if start > end or checked.tzinfo is None or checked.utcoffset() is None:
+            raise ValueError("invalid time")
+        received, accepted, rejected = (item[key] for key in ("rows_received", "rows_accepted", "rows_rejected"))
+        state, code = item["response_state"], item["error_code"]
+        if state == "failed":
+            if (any(value is not None for value in (received, accepted, rejected))
+                    or not isinstance(code, str) or code not in FINNHUB_FAILURE_CODES):
+                raise ValueError("invalid failed response")
+        else:
+            if (any(type(value) is not int or value < 0 for value in (received, accepted, rejected))
+                    or accepted + rejected != received):
+                raise ValueError("invalid counts")
+            expected = ("partial" if accepted else "rejected") if rejected else ("data" if accepted else "empty")
+            if state != expected or code != ("finnhub_calendar_rows_rejected" if rejected else None):
+                raise ValueError("invalid response state")
+        receipts.append({
+            "dataset": dataset, "symbol": symbol,
+            "from_date": start.isoformat(), "to_date": end.isoformat(), "checked_at": checked.isoformat(),
+            "rows_received": received, "rows_accepted": accepted, "rows_rejected": rejected,
+            "response_state": state, "error_code": code,
+        })
+    return receipts
 
 
 def normalize_macro_collection_result(job: str, raw: Any) -> Dict[str, Any]:
@@ -60,6 +106,13 @@ def normalize_macro_collection_result(job: str, raw: Any) -> Dict[str, Any]:
             or not isinstance(errors, list)
             or any(not isinstance(error, str) for error in errors)):
         return invalid
+    try:
+        receipts = _calendar_request_receipts(job, raw)
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return invalid
+    if (any(item["error_code"] is not None for item in receipts) and not errors
+            or sum(item["rows_rejected"] or 0 for item in receipts) > counters.get("events_skipped", 0)):
+        return invalid
     # Empty provider responses and unchanged rows are legitimate completed runs.
     completed = sum(counters[key] for key in completed_keys)
     status = "succeeded" if not errors else ("partial" if completed else "failed")
@@ -69,6 +122,8 @@ def normalize_macro_collection_result(job: str, raw: Any) -> Dict[str, Any]:
         "error_count": len(errors),
         "errors": ["macro_collection_error"] * len(errors),
     }
+    if "requests" in raw:
+        result["requests"] = receipts
     if errors:
         result["error_code"] = (
             "macro_collection_partial" if status == "partial" else "macro_collection_failed"

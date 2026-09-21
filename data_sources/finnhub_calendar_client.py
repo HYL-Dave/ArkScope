@@ -33,7 +33,7 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, Generic, Optional, TypeVar
 
 import requests
 
@@ -42,6 +42,11 @@ logger = logging.getLogger(__name__)
 FINNHUB_BASE = "https://finnhub.io/api/v1"
 DEFAULT_TIMEOUT_S = 30
 INTER_CALL_DELAY_S = 1.1  # 60 req/min → ~1 req/s; +0.1 s for clock slack
+FINNHUB_FAILURE_CODES = frozenset({
+    "finnhub_request_failed", "finnhub_transport_failed", "finnhub_http_failed",
+    "finnhub_unauthorized", "finnhub_forbidden", "finnhub_rate_limited",
+    "finnhub_calendar_response_invalid",
+})
 
 
 def _load_env_file_once() -> None:
@@ -126,6 +131,32 @@ class FinnhubIPOEvent:
 # ---------------------------------------------------------------------------
 # Parser helpers
 # ---------------------------------------------------------------------------
+
+
+_Event = TypeVar("_Event")
+
+
+@dataclass(frozen=True)
+class FinnhubCalendarResult(Generic[_Event]):
+    events: tuple[_Event, ...]
+    rows_received: int
+    rows_rejected: int
+
+
+def _calendar_result(body: Any, envelope: str, parse: Callable[[dict], Optional[_Event]]) -> FinnhubCalendarResult[_Event]:
+    if (not isinstance(body, dict) or "error" in body
+            or not isinstance(body.get(envelope), list)):
+        raise FinnhubError("finnhub_calendar_response_invalid", code="finnhub_calendar_response_invalid")
+    rows = body[envelope]
+    events = []
+    for row in rows:
+        try:
+            event = parse(row) if isinstance(row, dict) else None
+        except (TypeError, ValueError, OverflowError):
+            event = None
+        if event is not None:
+            events.append(event)
+    return FinnhubCalendarResult(tuple(events), len(rows), len(rows) - len(events))
 
 
 _FINNHUB_TIME_FMT = "%Y-%m-%d %H:%M:%S"
@@ -213,16 +244,12 @@ def _economic_from_json(row: Dict[str, Any]) -> Optional[FinnhubEconomicEvent]:
 def _earnings_from_json(row: Dict[str, Any]) -> Optional[FinnhubEarningsEvent]:
     symbol = str(row.get("symbol") or "").strip().upper()
     report_date = _parse_iso_date(row.get("date"))
-    year_raw = row.get("year")
-    quarter_raw = row.get("quarter")
-    if not symbol or report_date is None or year_raw is None or quarter_raw is None:
+    # Period identity must not accept bools or truncate fractional JSON numbers.
+    year = _parse_period_int(row.get("year"))
+    quarter = _parse_period_int(row.get("quarter"))
+    if not symbol or report_date is None or year is None or quarter is None:
         return None
-    try:
-        year = int(year_raw)
-        quarter = int(quarter_raw)
-    except (TypeError, ValueError):
-        return None
-    if not (1 <= quarter <= 4):
+    if not (1 <= year <= 9999 and 1 <= quarter <= 4):
         return None
     return FinnhubEarningsEvent(
         symbol=symbol,
@@ -235,6 +262,14 @@ def _earnings_from_json(row: Dict[str, Any]) -> Optional[FinnhubEarningsEvent]:
         revenue_estimate=_parse_opt_float(row.get("revenueEstimate")),
         revenue_actual=_parse_opt_float(row.get("revenueActual")),
     )
+
+
+def _parse_period_int(raw: Any) -> Optional[int]:
+    if type(raw) is int:
+        return raw
+    if isinstance(raw, str) and raw.isascii() and raw.isdecimal():
+        return int(raw)
+    return None
 
 
 def _ipo_from_json(row: Dict[str, Any]) -> Optional[FinnhubIPOEvent]:
@@ -301,39 +336,40 @@ class FinnhubCalendarClient:
             resp = self._session.get(url, params=merged, timeout=self._timeout)
             self._last_call_ts = time.monotonic()
         except requests.RequestException as exc:
-            raise FinnhubError(f"GET {path} failed: {exc}") from exc
+            raise FinnhubError(f"GET {path} failed: {exc}", code="finnhub_transport_failed") from exc
         if resp.status_code == 401:
             raise FinnhubError(
-                f"Finnhub 401 Unauthorized on {path} — check FINNHUB_API_KEY"
+                f"Finnhub 401 Unauthorized on {path} — check FINNHUB_API_KEY", code="finnhub_unauthorized"
             )
+        if resp.status_code == 403:
+            raise FinnhubError(f"Finnhub HTTP 403 on {path}", code="finnhub_forbidden")
         if resp.status_code == 429:
-            raise FinnhubError(f"Finnhub rate limit hit on {path}")
+            raise FinnhubError(f"Finnhub rate limit hit on {path}", code="finnhub_rate_limited")
         if resp.status_code >= 400:
             raise FinnhubError(
-                f"Finnhub HTTP {resp.status_code} on {path}: {resp.text[:200]}"
+                f"Finnhub HTTP {resp.status_code} on {path}: {resp.text[:200]}", code="finnhub_http_failed"
             )
         try:
             return resp.json()
         except ValueError as exc:
-            raise FinnhubError(f"Finnhub non-JSON body on {path}: {exc}") from exc
+            raise FinnhubError(f"Finnhub non-JSON body on {path}: {exc}", code="finnhub_calendar_response_invalid") from exc
 
     def get_economic_events(
         self,
         date_from: date,
         date_to: date,
-    ) -> List[FinnhubEconomicEvent]:
+    ) -> FinnhubCalendarResult[FinnhubEconomicEvent]:
         """Return economic calendar events for [date_from, date_to].
 
         Both historical (actual populated) and upcoming (actual=null)
         events are returned on the free tier — smoke §5.2 confirmed.
-        Rows missing country / event / time are silently skipped.
+        Invalid rows are counted separately; an invalid envelope is an error.
         """
         body = self._get(
             "/calendar/economic",
             {"from": date_from.isoformat(), "to": date_to.isoformat()},
         )
-        rows = (body or {}).get("economicCalendar") or []
-        return [e for r in rows if (e := _economic_from_json(r)) is not None]
+        return _calendar_result(body, "economicCalendar", _economic_from_json)
 
     def get_earnings_events(
         self,
@@ -341,7 +377,7 @@ class FinnhubCalendarClient:
         date_to: date,
         *,
         symbol: Optional[str] = None,
-    ) -> List[FinnhubEarningsEvent]:
+    ) -> FinnhubCalendarResult[FinnhubEarningsEvent]:
         """Return earnings calendar events for [date_from, date_to].
 
         Pass ``symbol=`` for per-symbol precision. An unfiltered query
@@ -355,25 +391,27 @@ class FinnhubCalendarClient:
         if symbol:
             params["symbol"] = symbol.upper()
         body = self._get("/calendar/earnings", params)
-        rows = (body or {}).get("earningsCalendar") or []
-        return [e for r in rows if (e := _earnings_from_json(r)) is not None]
+        return _calendar_result(body, "earningsCalendar", _earnings_from_json)
 
     def get_ipo_events(
         self,
         date_from: date,
         date_to: date,
-    ) -> List[FinnhubIPOEvent]:
+    ) -> FinnhubCalendarResult[FinnhubIPOEvent]:
         """Return IPO pipeline events for [date_from, date_to].
 
-        Rows with missing name / date or unrecognised status are skipped.
+        Rows with missing name / date or unrecognised status are counted as rejected.
         """
         body = self._get(
             "/calendar/ipo",
             {"from": date_from.isoformat(), "to": date_to.isoformat()},
         )
-        rows = (body or {}).get("ipoCalendar") or []
-        return [e for r in rows if (e := _ipo_from_json(r)) is not None]
+        return _calendar_result(body, "ipoCalendar", _ipo_from_json)
 
 
 class FinnhubError(RuntimeError):
     """Raised when the Finnhub API returns an unrecoverable error."""
+
+    def __init__(self, message: str, *, code: str = "finnhub_request_failed"):
+        super().__init__(message)
+        self.code = code

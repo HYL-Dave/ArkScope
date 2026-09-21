@@ -26,6 +26,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 ECONOMIC_TRACKED_FIELDS: Tuple[str, ...] = ("actual", "estimate", "prev")
 EARNINGS_TRACKED_FIELDS: Tuple[str, ...] = (
+    "report_date",
     "eps_estimate",
     "eps_actual",
     "revenue_estimate",
@@ -127,6 +128,23 @@ def _clamp_limit(limit: Any, *, hi: int, lo: int = 1) -> int:
 logger = logging.getLogger(__name__)
 
 _OPEN_VINTAGE = "9999-12-31"  # macro_observations.realtime_end sentinel (open window)
+
+
+class EarningsRevisionDateUnavailable(ValueError):
+    def __init__(self):
+        super().__init__("earnings_revision_date_unavailable")
+
+
+def _earnings_revision_date(source_payload: str) -> str:
+    try:
+        payload = json.loads(source_payload)
+        value = payload.get("date") if isinstance(payload, dict) else None
+        if isinstance(value, str) and date.fromisoformat(value).isoformat() == value:
+            return value
+    except (TypeError, ValueError):
+        pass
+    raise EarningsRevisionDateUnavailable()
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS cal_economic_events (
@@ -403,6 +421,12 @@ class MacroCalendarLocalStore:
 
     def upsert_earnings_event(self, payload: Dict[str, Any], *, source_payload: Dict[str, Any],
                               observed_at: Optional[datetime] = None) -> Tuple[Optional[int], str]:
+        report_date = date.fromisoformat(_iso(payload["report_date"])).isoformat()
+        if "date" in source_payload and source_payload["date"] != report_date:
+            raise ValueError("earnings_revision_date_mismatch")
+        # The existing normalized provider payload owns the date of each revision.
+        source_payload = {**source_payload, "date": report_date}
+        payload = {**payload, "report_date": report_date}
         fp = earnings_event_fingerprint(payload["symbol"], payload["year"], payload["quarter"])
         obs = _iso(observed_at) if observed_at else _now_observed()
         return self._upsert_calendar_event(
@@ -414,10 +438,10 @@ class MacroCalendarLocalStore:
             insert_canonical_params=(payload["symbol"], _iso(payload["report_date"]), payload["year"],
                 payload["quarter"], payload.get("hour", ""), payload.get("eps_estimate"),
                 payload.get("eps_actual"), payload.get("revenue_estimate"), payload.get("revenue_actual"), fp),
-            update_canonical_sql="UPDATE cal_earnings_events SET hour=?,eps_estimate=?,eps_actual=?,"
+            update_canonical_sql="UPDATE cal_earnings_events SET report_date=?,hour=?,eps_estimate=?,eps_actual=?,"
                 "revenue_estimate=?,revenue_actual=?,updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') "
                 "WHERE earnings_id=?",
-            update_canonical_params=lambda eid: (payload.get("hour", ""), payload.get("eps_estimate"),
+            update_canonical_params=lambda eid: (report_date, payload.get("hour", ""), payload.get("eps_estimate"),
                 payload.get("eps_actual"), payload.get("revenue_estimate"), payload.get("revenue_actual"), eid),
             insert_revision_sql="INSERT INTO cal_earnings_event_revisions (earnings_id,observed_at,hour,"
                 "eps_estimate,eps_actual,revenue_estimate,revenue_actual,source_payload) "
@@ -429,11 +453,14 @@ class MacroCalendarLocalStore:
         )
 
     def read_earnings_event_as_of(self, earnings_id: int, as_of: datetime) -> Optional[Dict[str, Any]]:
-        return self._read_revision_as_of(
+        row = self._read_revision_as_of(
             sql="SELECT observed_at,hour,eps_estimate,eps_actual,revenue_estimate,revenue_actual,"
                 "source_payload FROM cal_earnings_event_revisions WHERE earnings_id=? AND observed_at<=? "
                 "ORDER BY observed_at DESC LIMIT 1",
             params=(earnings_id, _iso(as_of)))
+        if row is not None:
+            row["report_date"] = _earnings_revision_date(row["source_payload"])
+        return row
 
     # --- IPO events -----------------------------------------------------------------
 
@@ -626,16 +653,25 @@ class MacroCalendarLocalStore:
                 cs, ps = _in_clause("symbol", s_arr)
                 sql += cs + " ORDER BY report_date ASC, symbol ASC LIMIT ?"; params += ps + [lim]
             else:
-                sql = ("SELECT e.earnings_id,e.symbol,e.report_date,e.year,e.quarter,rev.hour,"
+                sql = ("SELECT e.earnings_id,e.symbol,e.year,e.quarter,rev.hour,rev.source_payload,"
                        "rev.eps_estimate,rev.eps_actual,rev.revenue_estimate,rev.revenue_actual,"
                        "rev.observed_at AS as_of_observed_at FROM cal_earnings_events e "
                        "JOIN cal_earnings_event_revisions rev ON rev.earnings_id=e.earnings_id "
                        "AND rev.observed_at=(SELECT MAX(observed_at) FROM cal_earnings_event_revisions "
-                       "WHERE earnings_id=e.earnings_id AND observed_at<=?) "
-                       "WHERE e.report_date>=? AND e.report_date<=?")
-                params = [_iso(as_of), _iso(date_from), _iso(date_to)]
+                       "WHERE earnings_id=e.earnings_id AND observed_at<=?) WHERE 1=1")
+                params = [_iso(as_of)]
                 cs, ps = _in_clause("e.symbol", s_arr)
-                sql += cs + " ORDER BY e.report_date ASC, e.symbol ASC LIMIT ?"; params += ps + [lim]
+                sql += cs
+                params += ps
+                # Filtering/limiting on the current date would leak later reschedules.
+                # Validate all selected revision dates before declaring a window empty.
+                rows = []
+                for record in conn.execute(sql, params):
+                    row = dict(record)
+                    row["report_date"] = _earnings_revision_date(row.pop("source_payload"))
+                    if _iso(date_from) <= row["report_date"] <= _iso(date_to):
+                        rows.append(row)
+                return sorted(rows, key=lambda row: (row["report_date"], row["symbol"], row["earnings_id"]))[:lim]
             return self._list_query(conn, sql, params)
         finally:
             conn.close()

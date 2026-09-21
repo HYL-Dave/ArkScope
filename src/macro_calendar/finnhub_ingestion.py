@@ -31,6 +31,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from data_sources.finnhub_calendar_client import (
+    FINNHUB_FAILURE_CODES,
     FinnhubCalendarClient,
     FinnhubError,
 )
@@ -48,6 +49,7 @@ class FinnhubIngestionStats:
     events_unchanged: int = 0
     events_skipped: int = 0
     errors: List[str] = field(default_factory=list)
+    requests: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -56,7 +58,39 @@ class FinnhubIngestionStats:
             "events_unchanged": self.events_unchanged,
             "events_skipped": self.events_skipped,
             "errors": list(self.errors),
+            "requests": list(self.requests),
         }
+
+
+def _request_events(stats, dataset, date_from, date_to, read, *, symbol=None):
+    receipt = {
+        "dataset": dataset, "symbol": symbol,
+        "from_date": date_from.isoformat(), "to_date": date_to.isoformat(),
+        "response_state": "failed", "rows_received": None,
+        "rows_accepted": None, "rows_rejected": None, "error_code": None,
+    }
+    try:
+        response = read()
+    except FinnhubError as exc:
+        stats.errors.append(f"get_{dataset}_events({symbol}): {exc}")
+        receipt["error_code"] = exc.code if exc.code in FINNHUB_FAILURE_CODES else "finnhub_request_failed"
+        return ()
+    else:
+        rejected = response.rows_rejected
+        accepted = len(response.events)
+        receipt.update(
+            rows_received=response.rows_received, rows_accepted=accepted, rows_rejected=rejected,
+            response_state=("partial" if accepted else "rejected") if rejected else ("data" if accepted else "empty"),
+        )
+        if rejected:
+            stats.events_skipped += rejected
+            stats.errors.append("finnhub_calendar_rows_rejected")
+            receipt["error_code"] = "finnhub_calendar_rows_rejected"
+        return response.events
+    finally:
+        # This is response observation time, not data change or persistence time.
+        receipt["checked_at"] = datetime.now(timezone.utc).isoformat()
+        stats.requests.append(receipt)
 
 
 def _record_action(stats: FinnhubIngestionStats, action: str) -> None:
@@ -94,11 +128,8 @@ def fetch_finnhub_economic_events(
         return stats
 
     fh = client or FinnhubCalendarClient()
-    try:
-        events = fh.get_economic_events(date_from, date_to)
-    except FinnhubError as exc:
-        stats.errors.append(f"get_economic_events failed: {exc}")
-        return stats
+    events = _request_events(stats, "economic", date_from, date_to,
+                             lambda: fh.get_economic_events(date_from, date_to))
 
     for ev in events:
         try:
@@ -150,9 +181,10 @@ def fetch_finnhub_earnings_events(
 ) -> FinnhubIngestionStats:
     """Refresh cal_earnings_events for [date_from, date_to].
 
-    When ``symbols`` is provided, one API call per symbol guarantees
-    complete watchlist coverage (smoke §5.5: unfiltered query omitted
+    When ``symbols`` is provided, one API call per symbol requests each
+    watchlist member explicitly (smoke §5.5: unfiltered query omitted
     AAPL from the same window that a symbol-filtered call returned it).
+    This does not establish the completeness of the provider's calendar.
     Without symbols, a single unfiltered call is issued — acceptable for
     a "what's coming up broadly" view but unreliable for specific tickers.
 
@@ -172,11 +204,8 @@ def fetch_finnhub_earnings_events(
 
     seen: Set[Tuple[str, int, int]] = set()
     for sym in symbol_list:
-        try:
-            events = fh.get_earnings_events(date_from, date_to, symbol=sym)
-        except FinnhubError as exc:
-            stats.errors.append(f"get_earnings_events({sym}): {exc}")
-            continue
+        events = _request_events(stats, "earnings", date_from, date_to,
+                                 lambda: fh.get_earnings_events(date_from, date_to, symbol=sym), symbol=sym)
         for ev in events:
             dedup_key = (ev.symbol, ev.year, ev.quarter)
             if dedup_key in seen:
@@ -240,11 +269,8 @@ def fetch_finnhub_ipo_events(
         return stats
 
     fh = client or FinnhubCalendarClient()
-    try:
-        events = fh.get_ipo_events(date_from, date_to)
-    except FinnhubError as exc:
-        stats.errors.append(f"get_ipo_events failed: {exc}")
-        return stats
+    events = _request_events(stats, "ipo", date_from, date_to,
+                             lambda: fh.get_ipo_events(date_from, date_to))
 
     for ev in events:
         try:

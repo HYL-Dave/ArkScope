@@ -287,6 +287,23 @@ class TestEconomicCalendarRoute:
 
 
 class TestEarningsAndIpoRoutes:
+    def test_unknown_historical_earnings_date_is_503_not_an_empty_success(self, monkeypatch):
+        from src.macro_calendar.local_store import EarningsRevisionDateUnavailable
+
+        undo = _enable_macro()
+        try:
+            monkeypatch.setattr(
+                "src.macro_calendar.local_store.MacroCalendarLocalStore.list_earnings_events",
+                MagicMock(side_effect=EarningsRevisionDateUnavailable()),
+            )
+            with pytest.raises(HTTPException) as failure:
+                earnings_calendar(symbol="AAPL", from_date=None, to_date=None,
+                                  as_of="2026-09-20", limit=100, dal=object())
+            assert failure.value.status_code == 503
+            assert failure.value.detail == "earnings_revision_date_unavailable"
+        finally:
+            undo()
+
     def test_earnings_threads_symbols_csv(self, monkeypatch):
         undo = _enable_macro()
         try:

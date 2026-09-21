@@ -38,6 +38,14 @@ CANARY = "synthetic-only-provider-secret"
 RAW_ERROR = f"GET https://provider.invalid/?api_key={CANARY}&token={CANARY} failed"
 
 
+def _request_receipt(**changes):
+    return {
+        "dataset": "earnings", "symbol": "AAPL", "from_date": "2026-10-01", "to_date": "2026-10-31",
+        "checked_at": "2026-09-21T01:00:00+00:00", "rows_received": 0, "rows_accepted": 0,
+        "rows_rejected": 0, "response_state": "empty", "error_code": None, **changes,
+    }
+
+
 def _stats(source, **updates):
     stats = (
         IngestionStats().to_dict() if source.startswith("fred_")
@@ -45,6 +53,39 @@ def _stats(source, **updates):
     )
     stats.update(updates)
     return stats
+
+
+@pytest.mark.parametrize("changes", [
+    {"dataset": "ipo"}, {"symbol": RAW_ERROR}, {"from_date": "not-a-date"},
+    {"to_date": "2026-09-01"}, {"checked_at": "2026-09-21T01:00:00"},
+    {"rows_received": True}, {"rows_received": 1}, {"response_state": "data"},
+    {"error_code": RAW_ERROR}, {"response_state": "failed"},
+])
+def test_invalid_request_receipt_cannot_become_refresh_evidence(changes):
+    from src.macro_calendar.execution import normalize_macro_collection_result
+
+    raw = _stats("finnhub_earnings_calendar", requests=[_request_receipt(**changes)])
+    assert normalize_macro_collection_result("fetch_earnings_calendar", raw) == {
+        "status": "failed", "error_code": "macro_result_invalid",
+    }
+
+
+def test_request_failure_cannot_be_normalized_to_success_without_errors():
+    from src.macro_calendar.execution import normalize_macro_collection_result
+
+    receipt = _request_receipt(response_state="failed", error_code="finnhub_request_failed",
+                               rows_received=None, rows_accepted=None, rows_rejected=None)
+    raw = _stats("finnhub_earnings_calendar", requests=[receipt])
+    assert normalize_macro_collection_result("fetch_earnings_calendar", raw)["error_code"] == "macro_result_invalid"
+
+
+def test_scope_receipt_survives_scheduler_and_job_history_without_raw_provider_text(runtime):
+    source = "finnhub_earnings_calendar"
+    raw = _stats(source, requests=[_request_receipt(provider_url=RAW_ERROR, payload={"secret": CANARY})])
+    result = runtime.run(source, raw)
+    _assert_outcome(runtime, source, result, "succeeded")
+    assert result["collect"]["requests"] == [_request_receipt()]
+    assert CANARY not in json.dumps(result)
 
 
 @pytest.fixture

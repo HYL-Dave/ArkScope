@@ -35,6 +35,7 @@ from src.macro_calendar import (
     get_macro_calendar_store,
 )
 from src.macro_calendar.local_store import (
+    EarningsRevisionDateUnavailable,
     read_macro_snapshot,
     read_macro_table_stats,
     resolve_macro_calendar_db_path,
@@ -288,13 +289,16 @@ def earnings_calendar(
     dt = _parse_iso_date(to_date, "to_date") or (today + timedelta(days=30))
     _validate_window(df, dt)
 
-    rows = get_macro_calendar_store(dal).list_earnings_events(
-        date_from=df,
-        date_to=dt,
-        symbols=_split_csv(symbol),
-        as_of=_parse_iso_datetime_end(as_of, "as_of"),
-        limit=limit,
-    )
+    try:
+        rows = get_macro_calendar_store(dal).list_earnings_events(
+            date_from=df,
+            date_to=dt,
+            symbols=_split_csv(symbol),
+            as_of=_parse_iso_datetime_end(as_of, "as_of"),
+            limit=limit,
+        )
+    except EarningsRevisionDateUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {
         "count": len(rows),
         "date_from": df.isoformat(),

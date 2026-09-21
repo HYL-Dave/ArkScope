@@ -23,6 +23,7 @@ sys.path.insert(0, str(project_root))
 
 from data_sources.finnhub_calendar_client import (
     FinnhubCalendarClient,
+    FinnhubCalendarResult,
     FinnhubEarningsEvent,
     FinnhubEconomicEvent,
     FinnhubError,
@@ -299,14 +300,14 @@ class TestClientHttpShape:
                 "prev": 4.75,
             }],
         }))
-        rows = client.get_economic_events(date(2024, 12, 17), date(2024, 12, 19))
+        rows = client.get_economic_events(date(2024, 12, 17), date(2024, 12, 19)).events
         assert len(rows) == 1
         assert isinstance(rows[0], FinnhubEconomicEvent)
         assert rows[0].country == "US"
         assert rows[0].event_time == datetime(2024, 12, 18, 19, 0, tzinfo=timezone.utc)
 
     def test_economic_events_skips_bad_rows(self):
-        """Rows without required fields are silently dropped; valid rows kept."""
+        """Rows without required fields are reported; valid rows are kept."""
         client = self._make_client(_mock_response({
             "economicCalendar": [
                 {"country": "", "event": "x", "time": "2024-01-01 00:00:00"},  # no country
@@ -314,7 +315,10 @@ class TestClientHttpShape:
                  "impact": "high", "unit": "%", "actual": None, "estimate": 3.1, "prev": 3.4},
             ],
         }))
-        rows = client.get_economic_events(date(2024, 1, 1), date(2024, 1, 31))
+        response = client.get_economic_events(date(2024, 1, 1), date(2024, 1, 31))
+        assert response.rows_received == 2
+        assert response.rows_rejected == 1
+        rows = response.events
         assert len(rows) == 1
         assert rows[0].event == "CPI"
 
@@ -343,7 +347,7 @@ class TestClientHttpShape:
                 "totalSharesValue": 60000000.0,
             }],
         }))
-        rows = client.get_ipo_events(date(2026, 6, 1), date(2026, 6, 30))
+        rows = client.get_ipo_events(date(2026, 6, 1), date(2026, 6, 30)).events
         assert len(rows) == 1
         assert rows[0].status == "expected"
         assert rows[0].exchange is None
@@ -403,19 +407,19 @@ class _FakeCalendarStore:
 
 def _client_with_economic(*events):
     client = MagicMock(spec=FinnhubCalendarClient)
-    client.get_economic_events.return_value = list(events)
+    client.get_economic_events.return_value = FinnhubCalendarResult(events, len(events), 0)
     return client
 
 
 def _client_with_earnings(*events):
     client = MagicMock(spec=FinnhubCalendarClient)
-    client.get_earnings_events.return_value = list(events)
+    client.get_earnings_events.return_value = FinnhubCalendarResult(events, len(events), 0)
     return client
 
 
 def _client_with_ipo(*events):
     client = MagicMock(spec=FinnhubCalendarClient)
-    client.get_ipo_events.return_value = list(events)
+    client.get_ipo_events.return_value = FinnhubCalendarResult(events, len(events), 0)
     return client
 
 
@@ -580,7 +584,7 @@ class TestEarningsIngestion:
         store = _FakeCalendarStore()
         _patch_store(store, monkeypatch)
         client = MagicMock(spec=FinnhubCalendarClient)
-        client.get_earnings_events.return_value = []
+        client.get_earnings_events.return_value = FinnhubCalendarResult((), 0, 0)
 
         fetch_finnhub_earnings_events(
             dal=MagicMock(),
@@ -600,7 +604,7 @@ class TestEarningsIngestion:
         store = _FakeCalendarStore()
         _patch_store(store, monkeypatch)
         client = MagicMock(spec=FinnhubCalendarClient)
-        client.get_earnings_events.return_value = []
+        client.get_earnings_events.return_value = FinnhubCalendarResult((), 0, 0)
 
         fetch_finnhub_earnings_events(
             dal=MagicMock(),
@@ -620,7 +624,7 @@ class TestEarningsIngestion:
         _patch_store(store, monkeypatch)
         client = MagicMock(spec=FinnhubCalendarClient)
         # Both calls return the same AAPL Q2 row.
-        client.get_earnings_events.return_value = [_AAPL_EARNINGS]
+        client.get_earnings_events.return_value = FinnhubCalendarResult((_AAPL_EARNINGS,), 1, 0)
 
         stats = fetch_finnhub_earnings_events(
             dal=MagicMock(),
