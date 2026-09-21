@@ -52,11 +52,14 @@ Offline reproductions did prove two defects:
 - [x] Persist sanitized per-request scope and response receipts through job normalization.
 - [x] Track corrected earnings dates; as-of filtering uses the observed revision date.
 - [x] Related regression (698 passed) and one standalone complete backend run (11,911 passed / 12 unchanged skips).
-- [ ] Commit, merge and remove only this slice's temporary branch/worktree after verification.
+- [x] Commit, merge and remove only this slice's temporary branch/worktree after verification.
 
 Frozen implementation: `30682b5199e4f13e8f91215f6bc037ee6a30b34c`. Frontend:
 1,867 passed / 124 files; typecheck/build, i18n and eight desktop tests pass.
 Evidence: `docs/superpowers/evidence/2026-09-21-calendar-refresh-evidence/README.md`.
+Master fast-forwarded to `86937e34` and passed 758 related/document-contract
+checks. Product, configuration and test bytes match the frozen revision. This
+slice's detached worktree and branch are removed; no push was performed.
 
 Keep the existing schema: the earnings revision's structured `source_payload`
 already stores the provider's `date`. Ensure new writes include a consistent date;
