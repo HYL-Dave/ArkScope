@@ -11,6 +11,7 @@ import json
 import math
 import sqlite3
 from collections.abc import Collection
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -870,6 +871,39 @@ class PortfolioStore:
         included_only: bool = False,
     ) -> PortfolioSnapshot:
         accounts = self.list_accounts()
+        positions = self.list_positions(include_closed=include_closed)
+        return self._snapshot_from_rows(accounts, positions, account_id=account_id, included_only=included_only)
+
+    @classmethod
+    def read_snapshot(
+        cls, path: str | Path, *, account_id: int | None = None,
+        include_closed: bool = False, included_only: bool = False,
+    ) -> PortfolioSnapshot:
+        """One read transaction, without schema installation or a synthetic account."""
+        path = Path(path)
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=5)) as conn:
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA query_only=ON")
+            conn.execute("BEGIN")
+            accounts = [cls._account_from_row(row) for row in conn.execute(
+                "SELECT * FROM portfolio_accounts WHERE archived_at IS NULL "
+                "ORDER BY CASE WHEN broker='manual' THEN 0 ELSE 1 END, label, id"
+            )]
+            where = "" if include_closed else "WHERE p.closed_at IS NULL"
+            positions = [cls._position_from_row(row) for row in conn.execute(
+                "SELECT p.*, n.notes, n.thesis, n.tags_json, n.strategy_bucket, n.target_allocation "
+                "FROM portfolio_positions p LEFT JOIN portfolio_position_notes n ON n.position_id=p.id "
+                f"{where} ORDER BY p.symbol, p.id"
+            )]
+            return cls._snapshot_from_rows(accounts, positions, account_id=account_id, included_only=included_only)
+
+    @staticmethod
+    def _snapshot_from_rows(
+        accounts: list[PortfolioAccount], positions: list[PortfolioPosition], *,
+        account_id: int | None, included_only: bool,
+    ) -> PortfolioSnapshot:
         if account_id is not None:
             accounts = [account for account in accounts if account.id == account_id]
             if not accounts:
@@ -880,7 +914,7 @@ class PortfolioStore:
         selected_ids = {account.id for account in accounts}
         positions = [
             position
-            for position in self.list_positions(include_closed=include_closed)
+            for position in positions
             if position.account_id in selected_ids
         ]
         # Closed rows are display-only: they may appear in ``positions`` under

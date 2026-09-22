@@ -193,7 +193,7 @@ is still follow-up work.
 | `compare_financial_sources` | Compare already retained SA/SEC/FD statement observations from selected sources | No acquisition or spending; compatible display-period comparisons are not exact accounting equivalence or a materiality judgment. |
 | FRED and Finnhub calendars | Local reads plus explicit jobs or opt-in source schedules | A release calendar is not evidence that a financial provider has processed the release. |
 | `get_current_quote` | `source=auto` tries an IBKR snapshot; `ibkr` requires that path; `local` reads stored bars | Snapshot, not streaming. Auto's local fallback is labeled historical, not live. |
-| `get_portfolio_holdings` | Reads the local profile snapshot only | Does not sync IBKR or establish current account value |
+| `get_portfolio_holdings` | Pages an existing local profile snapshot in one read transaction | Does not install schema, create accounts, sync IBKR or establish current account value; missing storage is unavailable, not an empty portfolio |
 
 ### Selected Financial Sources
 
@@ -273,6 +273,12 @@ the full company-data reader. Unknown/ambiguous row labels are not fuzzy-matched
   evidence. The operation does not invent GAAP/restatement explanations, decide
   an acceptable investment tolerance, or present a normalized blend as a fact.
 
+Misidentified fields, units, currencies or periods are correctness defects.
+Ordinary provider-definition or rounding differences are not automatically
+defects or blockers for using a source. A qualified descriptive difference is
+input to the research question; its significance depends on the decision being
+made, not a universal percentage chosen by this application.
+
 The default page contains three measures and can be enlarged within the model's
 output budget. Pin `comparison_id` on subsequent pages; changed content is a
 typed refusal, not mixed-version output. This content identity is not a saved
@@ -283,6 +289,68 @@ whole comparison or return a smaller-page request, never clipped numeric JSON.
 Owners: [comparison reader](src/tools/financial_comparison_tools.py),
 [comparison rules](src/fundamentals/source_comparison.py),
 [regression cases](tests/test_financial_source_comparison.py).
+
+### Retained Articles, Comments And Holdings
+
+These are local research reads, admitted to both native API adapters and both
+internal OAuth research adapters. They are not a new external MCP service or
+permission to acquire data. The registry remains 58 tools; each OAuth research
+allowlist now admits 22. `get_sa_feed` supplies article IDs; the relevant
+research/summarizer subagents can follow them to `get_sa_article_detail` and
+`get_sa_comment_focus`. Holdings are the user's local account positions, not the
+Alpha Picks recommendation membership.
+
+**Acquisition and time.** Reading does not start an extension, reload a page,
+extract comment signals, poll a provider, call IBKR, update configuration or
+spend. Article body/comment capture times are distinct, and holdings retain
+their stored per-position synchronization times. Neither a read time nor a
+summary-generation time is a fresh market observation. Update remains an
+explicit extension/sync operation with its existing requirements. A missing or
+incompatible store is unavailable; it is not silently created or migrated.
+
+**Article pages.** Defaults are 4,000 Markdown characters and two comments,
+with 500 characters per comment. These are page defaults, not retention or
+total-content caps. `body_limit=0` or `comment_limit=0` omits that section. Follow
+`next_body_offset` / `next_comment_offset`; a long comment uses `comment_id` plus
+its `next_text_offset`. Text offsets count Unicode code points. Comments are a
+flat list with original parent IDs, not a claimed complete nested tree. Parents
+outside the page can be read by ID; missing retained parents are flagged.
+
+Every nonzero continuation offset requires the first response's `snapshot_id`.
+The article and comments are read in one SQLite read transaction. Identity
+covers the served metadata and all stored body/comment content, including edits
+and upvotes, so concurrent acquisition cannot silently join different versions.
+The result preserves article URL/title/author/date, article/comment IDs, text
+hashes and separate body/comment coverage. Observed counts or a completed scan
+do not prove that the website's entire discussion was exhausted; no `complete`
+claim is inferred from them. Body success cannot hide pending or failed comment
+recovery. Comment focus is deterministic scoring, not verified sentiment; a
+scoring backlog is exposed, not repaired by the read.
+The returned next action names the existing `extract_sa_comment_signals` local
+job; running it is an explicit derived-data update, not a provider acquisition.
+
+**Holdings pages.** Defaults to ten positions, with explicit account/closed-row
+filters and the same content-change guard. It does not construct the writable
+`PortfolioStore`, create a manual account or alter an existing schema. Totals
+cover all selected open positions, not only the current page. Values are stored,
+not live; valuation counts expose missing prices/P&L. Cross-account broker-base
+totals require one known base currency, otherwise they are withheld. Closed
+positions remain outside totals; raw broker account IDs are not emitted.
+
+**Limits and persistence.** Model/channel budgets are still enforced. Oversized
+results return an actionable smaller-page result with their content identity,
+not sliced JSON that loses a source, a gap or a total's scope. These snapshot IDs
+detect changed mutable local data; they are **not** immutable historical archives.
+Unchanged retained data can reopen across process restart, but an overwritten
+old article/comment/holding version cannot be reconstructed by its hash. This
+is distinct from immutable SA company-table observations and SEC citations.
+No retained content is deleted by this change, and no news retention policy is
+introduced here. Existing complete UI/native-host readers remain unchanged.
+
+Owners: [article reader](src/sa/article_reader.py),
+[holdings reader](src/tools/portfolio_holdings_tools.py),
+[whole-page budget handling](src/tools/retained_read_results.py),
+[channel and read-only regression](tests/test_retained_research_reads.py).
 
 ### SA Company Financial Tables
 

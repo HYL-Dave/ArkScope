@@ -266,6 +266,9 @@ _DEFAULT_REGISTRY: Dict[str, ToolReducer] = {
 
 def get_reducer(tool_name: str, registry: Dict[str, ToolReducer] | None = None) -> ToolReducer:
     """Return the reducer registered for ``tool_name``, or the default."""
+    from src.tools.retained_read_results import RETAINED_READ_TOOLS, retained_read_reducer
+    if tool_name.removeprefix("tool_") in RETAINED_READ_TOOLS:
+        return retained_read_reducer(tool_name)
     from src.sec_research.tool_results import SEC_TOOL_NAMES, sec_result_reducer
     if tool_name.removeprefix("tool_") in SEC_TOOL_NAMES:
         return sec_result_reducer

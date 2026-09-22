@@ -102,7 +102,7 @@ test count or an assertion that the whole company workflow is complete.
 | Package | Current implementation | Remaining work |
 | --- | --- | --- |
 | 1. Company inputs | Shared Chrome/Firefox code for three statement types and the bounded valuation/peers/annual-estimates/revisions scope; real Chrome captures retained | Installed, signed-in extension-to-host acceptance on both browsers; other pages/views are not advertised as captured |
-| 2. Research access | SA source switches, stored/pinned reader and now qualified SA/SEC/FD comparisons on all four transports | Direct article/comment/holdings channel audit and any bounded-reader repairs; full end-to-end operator research acceptance |
+| 2. Research access | SA source switches, stored/pinned company reader and qualified SA/SEC/FD comparisons; article/comment/holdings read-only paging and four-channel admission now implemented, with real retained-data replay | Frozen full-backend acceptance for the new readers; full end-to-end operator research acceptance and explicit production comment-signal backlog processing |
 | 3. Optional SEC | Stock-symbol resolution, explicit directory update, collapsed technical administration; existing citations preserved | Remaining normal-mode surface/consumer review, not wholesale SEC retirement |
 | 4. Analytics | Comparison excludes the legacy ratios and does not endorse them | D/E, comparable financial periods, earnings-event dates and complete trading-session windows |
 | 5. Retirement | No premature deletion of replacement-dependent capabilities or retained evidence | Remove superseded paths and consumers only after replacement acceptance; retention/inventory decisions remain separate |
@@ -116,14 +116,31 @@ four-channel comparison replay, without new acquisition or spending. See the
 close the remaining workflow gates. The two archived research branches remain
 archived, and master/production settings are not changed by this work.
 
-Next integrated batch: make the retained article/body/comment/holdings reads
-usable across their intended channels with bounded results, source references,
-honest missingness and no implicit acquisition. Do not simply add allowlist
-entries: the current full article reader is unpaged and `PortfolioStore`
-construction ensures schema before its snapshot read. The latter is not an
-admissible strictly read-only external boundary merely because the tool does not
-contact IBKR. The legacy ratio/event repairs and replacement-dependent retirement
-remain separate acceptance obligations, not closed by these comparisons.
+The next integrated batch is implemented and undergoing acceptance: retained
+article/body/comment/holdings reads are bounded, source-aware and admitted to all
+four transports. The article reader is now separate from the unpaged UI/native
+host read, and holdings use a single read-only transaction without constructing
+the schema-initializing store. Long comments can be fully continued; parents and
+capture gaps stay visible. Both readers reject changed content between pages,
+without claiming immutable historical archives. Holdings totals also qualify
+valuation gaps and withhold mixed/unknown broker-base currencies. These changes
+are documented in the root acquisition policy, not only this execution log.
+
+The next product package after reader acceptance is legacy ratio/event repair,
+followed by replacement-dependent retirement. Cross-provider comparisons are
+not blockers merely because numbers differ: field/unit/period correctness is a
+separate obligation from the research significance of a qualified difference.
+Installed Chrome/Firefox operator acceptance remains open; this read-only batch
+does not silently certify the extension's live capture workflow.
+
+Retained-copy acceptance covered three real article bodies, first/last comment
+pages, a fully reassembled 51,727-character comment and ten real holdings across
+all four transports, plus fresh-process reopening. Production was opened only as
+a read-only SQLite backup source; model/provider/network requests were blocked.
+The disposable copy also verified the existing explicit extraction job: 7,523
+pending comment signals were processed and all four focus readers returned 981
+qualifying comments in the 90-day test window. Production backlog processing is
+still pending; a read never starts that job itself. Copies were removed.
 
 ## SA Quality And Operating Boundary
 

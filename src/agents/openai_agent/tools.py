@@ -67,7 +67,8 @@ def function_tool(fn):
             parsed = json.loads(arguments) if arguments else {}
             check_output_value(parsed)
             if tool.name in {"tool_get_fundamentals_analysis", "tool_get_detailed_financials", "tool_get_sa_company_data",
-                             "tool_compare_financial_sources"}:
+                             "tool_compare_financial_sources", "tool_get_sa_article_detail", "tool_get_portfolio_holdings",
+                             "tool_get_sa_comment_focus"}:
                 if not isinstance(parsed, dict) or set(parsed) - set(tool.params_json_schema["properties"]):
                     raise ValueError("financial_tool_arguments_invalid")
             return await invoke(context, arguments)
@@ -656,13 +657,21 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
 
     @function_tool
     def tool_get_portfolio_holdings(
-        account_id: Optional[int] = None,
-        include_closed: bool = False,
+        account_id: Annotated[Optional[int], Field(strict=True)] = None,
+        include_closed: Annotated[bool, Field(strict=True)] = False,
+        row_offset: Annotated[int, Field(strict=True)] = 0,
+        row_limit: Annotated[int, Field(strict=True)] = 10,
+        snapshot_id: Optional[str] = None,
     ) -> str:
-        """Read local portfolio holdings from profile_state.db. Does not sync or call IBKR."""
+        """Read stored holdings, not live values. Totals cover all selected open positions.
+
+        No sync/schema initialization. Continue with snapshot_id and row_offset;
+        changed snapshots must be read again. row_limit defaults to 10.
+        """
         result = _get_portfolio_holdings(
             account_id=account_id,
             include_closed=include_closed,
+            row_offset=row_offset, row_limit=row_limit, snapshot_id=snapshot_id,
         )
         return _serialize_result(result, "get_portfolio_holdings")
 
@@ -986,9 +995,28 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "get_sa_articles")
 
     @function_tool
-    def tool_get_sa_article_detail(article_id: str) -> str:
-        """Get full SA article content + comments by article ID."""
-        result = _get_sa_article_detail(dal, article_id)
+    def tool_get_sa_article_detail(
+        article_id: str, body_offset: Annotated[int, Field(strict=True)] = 0,
+        body_limit: Annotated[int, Field(strict=True)] = 4000,
+        comment_offset: Annotated[int, Field(strict=True)] = 0,
+        comment_limit: Annotated[int, Field(strict=True)] = 2,
+        comment_id: Optional[str] = None, comment_text_offset: Annotated[int, Field(strict=True)] = 0,
+        comment_text_limit: Annotated[int, Field(strict=True)] = 500, snapshot_id: Optional[str] = None,
+    ) -> str:
+        """Read stored article Markdown and flat comments with parent IDs. Never acquire.
+
+        article_id comes from get_sa_feed article items. Continue with snapshot_id
+        and returned offsets. Body/comment text offsets are Unicode characters;
+        comment_offset counts rows. Set body_limit/comment_limit=0 to omit that
+        section. For long comments use comment_id and comment_text_offset.
+        Body/comment coverage is separate; snapshot changes require a fresh read.
+        """
+        result = _get_sa_article_detail(
+            dal, article_id, body_offset=body_offset, body_limit=body_limit,
+            comment_offset=comment_offset, comment_limit=comment_limit,
+            comment_id=comment_id, comment_text_offset=comment_text_offset,
+            comment_text_limit=comment_text_limit, snapshot_id=snapshot_id,
+        )
         return _serialize_result(result, "get_sa_article_detail")
 
     @function_tool

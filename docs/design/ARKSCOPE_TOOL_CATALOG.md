@@ -44,7 +44,7 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `get_sa_market_news` | news | ticker?, keyword?, limit? | captured SA market news |
 | `get_sa_digest` | news | ticker*, days?, max_articles?, max_news?, max_comments?, min_comment_score? | source-labelled SA evidence digest |
 | `list_high_value_comments` | news | window_days?, ticker?, min_score?, limit? | rule-based SA comment ranking |
-| `get_sa_comment_focus` | news | window_days?, min_score?, limit? | rule-based SA comment focus |
+| `get_sa_comment_focus` | news | window_days?, min_score?, limit? | local rule-based discussion focus with traceable samples, extraction gaps and whole-result budget handling |
 | `get_sa_feed` | news | q?, ticker?, item_type?, days?, limit?, offset? | unified SA evidence feed |
 | `get_current_quote` | prices | ticker*, source?, max_age_seconds? | quote price basis, observed feed mode and trade age; historical local fallback |
 | `get_ticker_prices` | prices | ticker*, interval?, days? | local market-data bars |
@@ -76,12 +76,12 @@ python -c "from src.tools.registry import create_default_registry; r=create_defa
 | `list_security_lifecycle_reviews` | analysis | ticker?, view?, limit?, offset? | current tracking exceptions or history, collection state and source checks |
 | `get_security_lifecycle_review` | analysis | review_id* | the operator's current review, including stored Web findings, exact quotations and model/auth provenance; reading never dispatches or grants action consent |
 | `get_portfolio_analysis` | portfolio | tickers?, holdings? | deterministic beta/correlation/P&L analysis |
-| `get_portfolio_holdings` | portfolio | account_id?, include_closed? | local holdings snapshot |
+| `get_portfolio_holdings` | portfolio | account_id?, include_closed?, row_offset?, row_limit?, snapshot_id? | paged existing local holdings, no schema/account creation or sync; qualified whole-scope stored totals |
 | `get_sa_alpha_picks` | portfolio | status?, sector? | captured Alpha Picks portfolio |
 | `get_sa_pick_detail` | portfolio | symbol*, picked_date? | captured Alpha Pick detail |
 | `refresh_sa_alpha_picks` | portfolio | none | read-only extension refresh status |
 | `get_sa_articles` | portfolio | ticker?, keyword?, article_type?, limit? | captured SA article index |
-| `get_sa_article_detail` | portfolio | article_id* | captured SA article detail |
+| `get_sa_article_detail` | portfolio | article_id*, body_offset?, body_limit?, comment_offset?, comment_limit?, comment_id?, comment_text_offset?, comment_text_limit?, snapshot_id? | stored Markdown/comment pages, parent IDs, independent coverage and changed-content guard; no acquisition |
 | `get_sa_company_data` | analysis | ticker*, dataset?, statement?, view?, currency?, table?, observation_id?, row_offset?, row_limit?, column_offset?, column_limit? | local-only SA financials, valuation, peers and annual estimates/revisions; raw display values, units, judgments, missing reasons and stable table/two-axis pagination; no refresh or paid fallback |
 | `compare_financial_sources` | analysis | ticker*, statement?, period?, sources?, end_month?, currency?, row_offset?, row_limit?, comparison_id? | source-separated stored SA/SEC/FD statement rows, units and qualified descriptive differences; no refresh, spending, FX, ratios or automatic source choice |
 | `save_report` | reports | title*, tickers*, report_type*, summary*, content*, conclusion?, confidence? | local report body and metadata write |
@@ -103,6 +103,16 @@ cross-platform re-admission boundary is
 its portable Python-analysis level does not imply terminal or workspace access.
 
 ### 1.2 Evidence boundaries
+
+- Article detail, comment focus and holdings now join both internal OAuth
+  research allowlists (22 each), in addition to native API adapters. The two
+  research/summarizer subagents can discover articles via `get_sa_feed` and
+  follow full text/comment continuations. This is not external MCP hosting.
+  Retained pages are whole JSON or actionable budget failures. Article and
+  holdings IDs detect content changes but do not archive overwritten versions.
+  A stored holdings value is not live; whole-scope totals disclose valuation
+  coverage and withhold mixed/unknown broker-base currency aggregates.
+  See [the root acquisition contract](../../DATA_ACQUISITION_AND_UPDATES.md#retained-articles-comments-and-holdings).
 
 - Financial-source comparison is a stored-only reader on all four model
   transports. It compares named statement rows, not the legacy derived ratios.

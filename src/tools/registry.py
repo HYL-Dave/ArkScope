@@ -884,7 +884,9 @@ class ToolRegistry:
             result_policy=PUBLIC_JSON,
             description=(
                 "Read the user's local portfolio holdings from profile_state.db. "
-                "This is a local read-only snapshot; it never calls IBKR and never syncs."
+                "Paged stored snapshot, not live account value; never syncs or initializes schema. "
+                "Totals cover all selected OPEN positions, not just the page. "
+                "Continue with snapshot_id; a changed snapshot must be read again."
             ),
             function=get_portfolio_holdings,
             category="portfolio",
@@ -892,6 +894,9 @@ class ToolRegistry:
             parameters=[
                 ToolParameter("account_id", "integer", "Optional portfolio account id", required=False),
                 ToolParameter("include_closed", "boolean", "Include closed/archived positions", required=False),
+                ToolParameter("row_offset", "integer", "Position offset; requires snapshot_id when nonzero", required=False, default=0),
+                ToolParameter("row_limit", "integer", "Positions per page (default 10)", required=False, default=10),
+                ToolParameter("snapshot_id", "string", "ID returned by the first page; detects changes, not a historical archive", required=False),
             ],
         ))
 
@@ -1208,15 +1213,25 @@ class ToolRegistry:
             name="get_sa_article_detail",
             result_policy=PUBLIC_JSON,
             description=(
-                "Get full SA Alpha Picks article content + comments. "
-                "Returns body as Markdown + nested comment tree."
+                "Read stored SA article Markdown and flat comments with parent IDs, never acquire. "
+                "Use an article item id from get_sa_feed. Body/comment capture coverage is independent. "
+                "Continue pages using snapshot_id and the returned offsets; for a long comment "
+                "pass comment_id and comment_text_offset. Snapshot changes require a fresh read."
             ),
             function=get_sa_article_detail,
             category="portfolio",
             requires_dal=True,
             parameters=[
                 ToolParameter("article_id", "string",
-                              "Article ID (from get_sa_articles results)"),
+                              "Article id from get_sa_feed article items or get_sa_articles"),
+                ToolParameter("body_offset", "integer", "Markdown Unicode character offset", required=False, default=0),
+                ToolParameter("body_limit", "integer", "Markdown characters (0 omits body)", required=False, default=4000),
+                ToolParameter("comment_offset", "integer", "Stored comment row offset", required=False, default=0),
+                ToolParameter("comment_limit", "integer", "Comment rows (0 omits comments)", required=False, default=2),
+                ToolParameter("comment_id", "string", "Read one specific comment, including an off-page parent", required=False),
+                ToolParameter("comment_text_offset", "integer", "Text offset for comment_id only", required=False, default=0),
+                ToolParameter("comment_text_limit", "integer", "Unicode characters per comment", required=False, default=500),
+                ToolParameter("snapshot_id", "string", "First page ID; required with nonzero offsets, detects changed captures", required=False),
             ],
         ))
 

@@ -46,7 +46,8 @@ def test_get_portfolio_holdings_redacts_raw_broker_account_id(tmp_path, monkeypa
     out = get_portfolio_holdings()
 
     labels = {row["label"] for row in out["accounts"]}
-    assert labels == {"Manual", f"IBKR · {account.broker_account_id_hash[:8]}"}
+    # Reading must not create the formerly implicit manual account.
+    assert labels == {f"IBKR · {account.broker_account_id_hash[:8]}"}
     assert all("broker_account_id" not in row for row in out["accounts"])
     assert "U7654321" not in str(out)
 

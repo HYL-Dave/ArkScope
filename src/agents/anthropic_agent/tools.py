@@ -675,7 +675,9 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "name": "get_portfolio_holdings",
             "description": (
                 "Read the user's local portfolio holdings from profile_state.db. "
-                "This is a local read-only snapshot; it never syncs and never calls IBKR."
+                "Paged stored values, not live account value. Never syncs or initializes schema. "
+                "Totals cover all selected open positions, not just the page. "
+                "Continue with snapshot_id and row_offset; changed snapshots require a fresh read."
             ),
             "input_schema": {
                 "type": "object",
@@ -687,7 +689,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "include_closed": {
                         "type": "boolean",
                         "description": "Include closed/archived positions"
-                    }
+                    },
+                    "row_offset": {"type": "integer", "description": "Position offset; requires snapshot_id when nonzero", "default": 0},
+                    "row_limit": {"type": "integer", "description": "Positions per page", "default": 10},
+                    "snapshot_id": {"type": "string", "description": "First-page snapshot ID; detects changes, not a historical archive"},
                 },
                 "required": []
             }
@@ -1036,13 +1041,23 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         {
             "name": "get_sa_article_detail",
             "description": (
-                "Get full SA Alpha Picks article content + comments. "
-                "Returns body as Markdown + nested comment tree."
+                "Read stored SA article Markdown and flat comments with parent IDs, never acquire. "
+                "Article ids come from get_sa_feed article items. Capture coverage is separate for body/comments. "
+                "Continue with snapshot_id and returned offsets; long comments use comment_id and "
+                "comment_text_offset. Changed snapshots require a fresh read."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
                     "article_id": {"type": "string", "description": "Article ID (from get_sa_articles)"},
+                    "body_offset": {"type": "integer", "description": "Markdown Unicode character offset", "default": 0},
+                    "body_limit": {"type": "integer", "description": "Markdown characters; 0 omits body", "default": 4000},
+                    "comment_offset": {"type": "integer", "description": "Stored comment row offset", "default": 0},
+                    "comment_limit": {"type": "integer", "description": "Comment rows; 0 omits comments", "default": 2},
+                    "comment_id": {"type": "string", "description": "Read one comment, including an off-page parent"},
+                    "comment_text_offset": {"type": "integer", "description": "Unicode character offset for comment_id only", "default": 0},
+                    "comment_text_limit": {"type": "integer", "description": "Unicode characters per comment", "default": 500},
+                    "snapshot_id": {"type": "string", "description": "First page ID; required for nonzero offsets, detects changed captures"},
                 },
                 "required": ["article_id"],
             },
@@ -1607,6 +1622,8 @@ def execute_tool(
         "get_portfolio_holdings": lambda: get_portfolio_holdings(
             account_id=tool_input.get("account_id"),
             include_closed=tool_input.get("include_closed", False),
+            row_offset=tool_input.get("row_offset", 0), row_limit=tool_input.get("row_limit", 10),
+            snapshot_id=tool_input.get("snapshot_id"),
         ),
         # Earnings Impact (Batch 3c)
         "get_earnings_impact": lambda: get_earnings_impact(
@@ -1715,7 +1732,11 @@ def execute_tool(
             limit=tool_input.get("limit", 10),
         ),
         "get_sa_article_detail": lambda: get_sa_article_detail(
-            dal, tool_input["article_id"]
+            dal, tool_input["article_id"],
+            body_offset=tool_input.get("body_offset", 0), body_limit=tool_input.get("body_limit", 4000),
+            comment_offset=tool_input.get("comment_offset", 0), comment_limit=tool_input.get("comment_limit", 2),
+            comment_id=tool_input.get("comment_id"), comment_text_offset=tool_input.get("comment_text_offset", 0),
+            comment_text_limit=tool_input.get("comment_text_limit", 500), snapshot_id=tool_input.get("snapshot_id"),
         ),
         "get_sa_market_news": lambda: get_sa_market_news(
             dal,
@@ -1776,7 +1797,8 @@ def execute_tool(
         return json.dumps({"error": exc.code})
 
     try:
-        if tool_name in {"get_fundamentals_analysis", "get_detailed_financials"}:
+        if tool_name in {"get_fundamentals_analysis", "get_detailed_financials", "get_sa_article_detail",
+                         "get_portfolio_holdings", "get_sa_comment_focus"}:
             allowed = next(item["input_schema"]["properties"] for item in get_anthropic_tools()
                            if item["name"] == tool_name)
             if not isinstance(tool_input, dict) or set(tool_input) - set(allowed):

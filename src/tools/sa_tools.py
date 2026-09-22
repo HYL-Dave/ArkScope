@@ -196,22 +196,32 @@ def get_sa_articles(
         return {"error": str(e)}
 
 
-def get_sa_article_detail(dal: Any, article_id: str) -> Dict:
-    """Get full SA article content + comments.
+def get_sa_article_detail(
+    dal: Any, article_id: str, body_offset: int = 0, body_limit: int = 4000,
+    comment_offset: int = 0, comment_limit: int = 2,
+    comment_id: Optional[str] = None, comment_text_offset: int = 0,
+    comment_text_limit: int = 500, snapshot_id: Optional[str] = None,
+) -> Dict:
+    """Read stored Markdown and flat comments with parent IDs, never acquire.
 
-    Returns body_markdown + comment tree for a specific article.
+    Return snapshot_id on every page; continuation offsets require that ID.
+    Long comments have their own text continuation, addressed by comment_id.
+    Body and comment capture coverage are independent, not completeness claims.
     """
-    if not _is_sa_enabled():
-        return {"message": _DISABLED_MSG}
+    from src.sa.article_reader import article_unavailable, read_article
 
-    try:
-        result = dal.get_sa_article_detail(article_id)
-        if not result:
-            return {"error": f"Article {article_id} not found"}
-        return result
-    except Exception as e:
-        logger.error("get_sa_article_detail error: %s", e)
-        return {"error": str(e)}
+    if not _is_sa_enabled():
+        return article_unavailable("sa_disabled")
+
+    path = getattr(getattr(dal, "_backend", None), "_sa_db", None)
+    if not isinstance(path, (str, Path)):
+        return article_unavailable("sa_article_backend_unavailable")
+    return read_article(
+        path, article_id, body_offset=body_offset, body_limit=body_limit,
+        comment_offset=comment_offset, comment_limit=comment_limit,
+        comment_id=comment_id, comment_text_offset=comment_text_offset,
+        comment_text_limit=comment_text_limit, snapshot_id=snapshot_id,
+    )
 
 
 def get_sa_market_news(
@@ -424,6 +434,8 @@ _FOCUS_BROAD_COMMENT_TICKERS = 8
 def _empty_focus(window_days, min_score, *, error=None, rule_set_version=None,
                  empty_reason=None):
     out = {
+        "status": "unavailable" if error else "ok",
+        "provider": "seeking_alpha", "retrieval": "stored",
         "window_days": window_days,
         "min_score": min_score,
         "rule_set_version": rule_set_version,
@@ -438,6 +450,7 @@ def _empty_focus(window_days, min_score, *, error=None, rule_set_version=None,
     }
     if error:
         out["error"] = error
+        out["error_code"] = "sa_comment_focus_" + (empty_reason or "unavailable")
     return out
 
 
@@ -472,7 +485,8 @@ def get_sa_comment_focus(
         radar-style multi-ticker round-up comments that can skew the ranking.
     """
     if not _is_sa_enabled():
-        return {"message": _DISABLED_MSG}
+        return {**_empty_focus(window_days, min_score, error="SA is disabled", empty_reason="disabled"),
+                "message": _DISABLED_MSG}
 
     try:
         from src.sa.comment_signals import RULE_SET_VERSION as ver
@@ -500,11 +514,17 @@ def get_sa_comment_focus(
 
         from src import sa_capture_store as store
 
+        if not Path(sa_db).is_file():
+            return _empty_focus(window_days, min_score, rule_set_version=ver,
+                                empty_reason="store_missing", error="Stored comment signals are unavailable")
         data = _focus_local(
             sa_db, window_days=window_days, min_score=min_score,
             rule_set_version=ver, limit=limit,
         )
-        return {
+        from src.tools.retained_read_results import bounded_result
+
+        return bounded_result("get_sa_comment_focus", {
+            "status": "ok", "provider": "seeking_alpha", "retrieval": "stored",
             "window_days": window_days,
             "min_score": min_score,
             "rule_set_version": ver,
@@ -516,10 +536,12 @@ def get_sa_comment_focus(
             "candidate_watch": data["candidate_watch"],
             "data_quality": data["data_quality"],
             "empty_reason": data["empty_reason"],
-        }
+            "required_action": "run_extract_sa_comment_signals_explicitly"
+            if data["data_quality"]["pending_extraction_in_window"] else None,
+        })
     except Exception as e:
         logger.error("get_sa_comment_focus error: %s", e)
-        return _empty_focus(window_days, min_score, empty_reason="error", error=str(e))
+        return _empty_focus(window_days, min_score, empty_reason="store_unavailable", error="Stored comment signals are unavailable")
 
 
 def _focus_local(
@@ -543,8 +565,9 @@ def _focus_local(
              "AND s.rule_set_version = ?")
     wp = (cutoff, min_score, rule_set_version)
 
-    conn = store.connect(sa_db, read_only=True)
+    conn = _open_sa_feed_read_only(sa_db)
     try:
+        conn.execute("BEGIN")
         comment_count = conn.execute(
             f"SELECT COUNT(*) FROM sa_comment_signals s "
             f"JOIN sa_article_comments c ON c.id = s.comment_row_id WHERE {where}",

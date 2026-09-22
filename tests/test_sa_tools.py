@@ -1389,28 +1389,34 @@ class TestArticleTools:
             assert result["count"] == 1
             assert result["articles"][0]["ticker"] == "NVDA"
 
-    def test_get_sa_article_detail_returns_content(self):
-        """get_sa_article_detail returns article + comments."""
+    def test_get_sa_article_detail_returns_content(self, tmp_path):
+        """The tool delegates to the bounded reader, not the UI's full reader."""
         from src.tools.sa_tools import get_sa_article_detail
         dal = MagicMock()
-        dal.get_sa_article_detail.return_value = {
+        dal._backend._sa_db = str(tmp_path / "sa.db")
+        page = {
+            "status": "ok",
             "article_id": "123",
             "body_markdown": "# Test\nContent",
             "comments": [{"comment_id": "c1", "comment_text": "Great!"}],
         }
-        with patch("src.tools.sa_tools._is_sa_enabled", return_value=True):
+        with patch("src.tools.sa_tools._is_sa_enabled", return_value=True), patch(
+            "src.sa.article_reader.read_article", return_value=page
+        ) as reader:
             result = get_sa_article_detail(dal, "123")
             assert result["body_markdown"] == "# Test\nContent"
             assert len(result["comments"]) == 1
+            assert reader.call_args.kwargs["body_limit"] == 4000
+            dal.get_sa_article_detail.assert_not_called()
 
-    def test_get_sa_article_detail_not_found(self):
+    def test_get_sa_article_detail_not_found(self, tmp_path):
         """get_sa_article_detail returns error for missing article."""
         from src.tools.sa_tools import get_sa_article_detail
         dal = MagicMock()
-        dal.get_sa_article_detail.return_value = None
+        dal._backend._sa_db = str(tmp_path / "absent.db")
         with patch("src.tools.sa_tools._is_sa_enabled", return_value=True):
             result = get_sa_article_detail(dal, "999")
-            assert "error" in result
+            assert result["error_code"] == "sa_article_capture_missing"
 
 
 class TestDataAccessArticleMeta:
