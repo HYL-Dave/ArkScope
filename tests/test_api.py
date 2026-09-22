@@ -597,8 +597,10 @@ class TestFundamentalsEndpoints:
         assert data["ticker"] == "NVDA"
         assert data["data_source"] == "sec_edgar"
         assert data["snapshot_date"] == "2025-12-31"
-        assert data["roe"] == 0.31
-        assert data["revenue_growth"] == 0.25
+        assert data["roe"] is None
+        assert data["revenue_growth"] is None
+        assert data["metric_gaps"]["roe"] == "income_unavailable"
+        assert data["metric_gaps"]["revenue_growth"] == "comparable_previous_period_unavailable"
         assert data["market_cap"] is None
         assert data["pe_ratio"] is None
 
@@ -699,7 +701,9 @@ def test_fundamentals_stored_mode_reads_local_cache_without_provider_fetch(monke
     assert calls == {"analysis": 0, "dal": 0}
     assert out["data_source"] == "sec_edgar"
     assert out["snapshot_date"] == "2025-12-31"
-    assert out["roe"] == 0.22
+    assert out["roe"] is None
+    assert out["metric_gaps"]["roe"] == "income_unavailable"
+    assert dal._backend.rows["fundamentals_analysis:sec_edgar:AAPL:annual:v1"]["roe"] == 0.22
     assert out["source_path"] == "local_cache"
 
     out2 = fr.fundamentals("AAPL", stored=False, dal=dal)
