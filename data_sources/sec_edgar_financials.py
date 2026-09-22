@@ -34,7 +34,8 @@ Convenience functions:
 """
 
 import logging
-from datetime import datetime
+import math
+from datetime import date, datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 import pandas as pd
@@ -42,6 +43,7 @@ import pandas as pd
 from .sec_edgar_source import SECEdgarDataSource
 from .sec_transport import SecTransport
 from .sec_user_agent import get_sec_user_agent
+from src.fundamentals.metric_basis import SEC_STATEMENT_BASIS_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +77,7 @@ class IncomeStatement:
     dividends_per_common_share: Optional[float] = None
     weighted_average_shares: Optional[float] = None
     weighted_average_shares_diluted: Optional[float] = None
+    input_basis_version: Optional[str] = None
 
 
 @dataclass
@@ -108,6 +111,7 @@ class BalanceSheet:
     accumulated_other_comprehensive_income: Optional[float] = None
     outstanding_shares: Optional[float] = None
     total_debt: Optional[float] = None
+    input_basis_version: Optional[str] = None
 
 
 @dataclass
@@ -140,6 +144,7 @@ class CashFlowStatement:
     ending_cash_balance: Optional[float] = None
     # Calculated
     free_cash_flow: Optional[float] = None
+    input_basis_version: Optional[str] = None
 
 
 # SEC EDGAR concept mappings
@@ -295,12 +300,8 @@ BALANCE_SHEET_MAPPING = {
     ],
     'total_liabilities': ['Liabilities'],
     'current_liabilities': ['LiabilitiesCurrent'],
-    'current_debt': [
-        'ShortTermBorrowings',
-        'DebtCurrent',
-        'LongTermDebtCurrent',
-        'CommercialPaper',  # Added: AAPL uses this for short-term borrowings ($7.98B)
-    ],
+    # Components can overlap or omit borrowings; do not sum them as a total.
+    'current_debt': ['DebtCurrent'],
     'trade_and_non_trade_payables': [
         'AccountsPayableCurrent',
         'AccountsPayableAndAccruedLiabilitiesCurrent',
@@ -310,10 +311,7 @@ BALANCE_SHEET_MAPPING = {
         'ContractWithCustomerLiabilityCurrent',
     ],
     'non_current_liabilities': ['LiabilitiesNoncurrent'],
-    'non_current_debt': [
-        'LongTermDebtNoncurrent',
-        'LongTermDebt',
-    ],
+    'non_current_debt': ['LongTermDebtNoncurrent'],
     'shareholders_equity': [
         'StockholdersEquity',
         'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest',
@@ -326,7 +324,7 @@ BALANCE_SHEET_MAPPING = {
         'CommonStockSharesOutstanding',
         'CommonStockSharesIssued',
     ],
-    'total_debt': ['LongTermDebt', 'DebtAndCapitalLeaseObligations'],
+    'total_debt': ['DebtAndCapitalLeaseObligations'],
 }
 
 
@@ -360,7 +358,7 @@ class SECEdgarFinancials:
             s = date.fromisoformat(start)
             e = date.fromisoformat(end)
             duration = (e - s).days
-            return duration <= 105  # single quarter ≈ 90 days, allow margin
+            return 70 <= duration <= 110
         except (ValueError, TypeError):
             return False
 
@@ -371,12 +369,13 @@ class SECEdgarFinancials:
         fiscal_year: int,
         form: str = '10-K',
         period_type: str = 'FY',
+        *, report_end: Optional[str] = None, instant: bool = False, unit: str = 'USD',
     ) -> Optional[float]:
         """
         Extract a value from SEC EDGAR facts for a specific fiscal year.
 
-        For quarterly data (Q1-Q4), prefers single-quarter entries over
-        cumulative YTD entries when both exist in the XBRL data.
+        Requires the shared report end, declared unit and matching flow duration
+        or instant basis. Cumulative/missing-duration quarters are not substitutes.
 
         Args:
             facts: Company facts from SEC EDGAR
@@ -392,7 +391,24 @@ class SECEdgarFinancials:
             return None
 
         gaap = facts['facts'].get('us-gaap', {})
-        is_quarterly = period_type in ('Q1', 'Q2', 'Q3', 'Q4')
+        report_end = report_end or self._get_report_end_date(facts, fiscal_year, form, period_type)
+        if report_end is None:
+            return None
+
+        def eligible(entry):
+            if (entry.get('form') != form or entry.get('fp') != period_type
+                    or entry.get('fy') != fiscal_year or entry.get('end') != report_end):
+                return False
+            value = entry.get('val')
+            try:
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                    return False
+                if instant:
+                    return not entry.get('start')
+                duration = (date.fromisoformat(report_end) - date.fromisoformat(entry.get('start'))).days
+                return 350 <= duration <= 380 if period_type == 'FY' else 70 <= duration <= 110
+            except (TypeError, ValueError, OverflowError):
+                return False
 
         for concept in concept_names:
             if concept not in gaap:
@@ -402,25 +418,9 @@ class SECEdgarFinancials:
             if 'units' not in concept_data:
                 continue
 
-            # Try different unit types (USD, USD/shares, shares, etc.)
-            for unit_type, entries in concept_data['units'].items():
-                # Filter for the right form and period
-                matching = [
-                    e for e in entries
-                    if e.get('form') == form and e.get('fp') == period_type and e.get('fy') == fiscal_year
-                ]
-
-                if not matching:
-                    continue
-
-                if is_quarterly and len(matching) > 1:
-                    # Prefer single-quarter entries over cumulative YTD
-                    single_q = [e for e in matching if self._is_single_quarter(e)]
-                    if single_q:
-                        matching = single_q
-
-                # Pick the one with the latest end date
-                best = max(matching, key=lambda x: x.get('end', ''))
+            matching = [entry for entry in concept_data['units'].get(unit, []) if eligible(entry)]
+            if matching:
+                best = max(matching, key=lambda entry: (entry.get('filed', ''), entry.get('accn', '')))
                 return best.get('val')
 
         return None
@@ -526,7 +526,8 @@ class SECEdgarFinancials:
 
         gaap = facts['facts'].get('us-gaap', {})
 
-        # Scan concepts to find the end date (different companies use different names)
+        # One report end across concepts; a comparative fact must not date the row.
+        ends = []
         for concept, concept_data in gaap.items():
             if 'units' not in concept_data:
                 continue
@@ -538,10 +539,14 @@ class SECEdgarFinancials:
                     and e.get('fy') == fiscal_year
                 ]
                 if matching:
-                    best = max(matching, key=lambda x: x.get('end', ''))
-                    return best.get('end')
-
-        return None
+                    for entry in matching:
+                        try:
+                            value = entry.get('end')
+                            if date.fromisoformat(value).isoformat() == value:
+                                ends.append(value)
+                        except (TypeError, ValueError):
+                            pass
+        return max(ends) if ends else None
 
     def get_income_statement(
         self,
@@ -575,6 +580,8 @@ class SECEdgarFinancials:
         statements = []
         for fy, fp in periods:
             end_date = self._get_report_end_date(facts, fy, form, fp)
+            if end_date is None:
+                continue
             # For Q4 from 10-K, use 10-K form for extraction
             extract_form = form
             extract_fp = fp
@@ -585,10 +592,14 @@ class SECEdgarFinancials:
                 fiscal_period=f"{fy}-{fp}",
                 period=period,
                 currency='USD',
+                input_basis_version=SEC_STATEMENT_BASIS_VERSION,
             )
 
             for field, concepts in INCOME_STATEMENT_MAPPING.items():
-                value = self._extract_concept_value(facts, concepts, fy, extract_form, extract_fp)
+                unit = ('shares' if field.startswith('weighted_average_shares') else 'USD/shares'
+                        if field in {'earnings_per_share', 'earnings_per_share_diluted', 'dividends_per_common_share'} else 'USD')
+                value = self._extract_concept_value(facts, concepts, fy, extract_form, extract_fp,
+                                                    report_end=end_date, unit=unit)
                 setattr(stmt, field, value)
 
             statements.append(stmt)
@@ -627,6 +638,8 @@ class SECEdgarFinancials:
         sheets = []
         for fy, fp in periods:
             end_date = self._get_report_end_date(facts, fy, form, fp)
+            if end_date is None:
+                continue
             extract_form = form
             extract_fp = fp
 
@@ -636,18 +649,12 @@ class SECEdgarFinancials:
                 fiscal_period=f"{fy}-{fp}",
                 period=period,
                 currency='USD',
+                input_basis_version=SEC_STATEMENT_BASIS_VERSION,
             )
 
             for field, concepts in BALANCE_SHEET_MAPPING.items():
-                if field == 'current_debt':
-                    total = 0
-                    for concept in concepts:
-                        val = self._extract_concept_value(facts, [concept], fy, extract_form, extract_fp)
-                        if val:
-                            total += val
-                    value = total if total > 0 else None
-                else:
-                    value = self._extract_concept_value(facts, concepts, fy, extract_form, extract_fp)
+                value = self._extract_concept_value(facts, concepts, fy, extract_form, extract_fp,
+                    report_end=end_date, instant=True, unit='shares' if field == 'outstanding_shares' else 'USD')
                 setattr(sheet, field, value)
 
             sheets.append(sheet)
@@ -686,6 +693,8 @@ class SECEdgarFinancials:
         statements = []
         for fy, fp in periods:
             end_date = self._get_report_end_date(facts, fy, form, fp)
+            if end_date is None:
+                continue
             extract_form = form
             extract_fp = fp
 
@@ -695,10 +704,12 @@ class SECEdgarFinancials:
                 fiscal_period=f"{fy}-{fp}",
                 period=period,
                 currency='USD',
+                input_basis_version=SEC_STATEMENT_BASIS_VERSION,
             )
 
             for field, concepts in CASH_FLOW_MAPPING.items():
-                value = self._extract_concept_value(facts, concepts, fy, extract_form, extract_fp)
+                value = self._extract_concept_value(facts, concepts, fy, extract_form, extract_fp,
+                    report_end=end_date, instant=field == 'ending_cash_balance')
                 setattr(stmt, field, value)
 
             # Apply sign conventions to match Financial Datasets format
@@ -719,9 +730,6 @@ class SECEdgarFinancials:
                 if stmt.net_cash_flow_from_operations is not None and stmt.capital_expenditure is not None:
                     # CapEx is already negative, so we add it (subtracting the outflow)
                     stmt.free_cash_flow = stmt.net_cash_flow_from_operations + stmt.capital_expenditure
-                elif stmt.net_cash_flow_from_operations is not None:
-                    # If no CapEx found, use operating cash flow as approximation
-                    stmt.free_cash_flow = stmt.net_cash_flow_from_operations
 
             statements.append(stmt)
 

@@ -18,6 +18,39 @@ TOOL_NAMES = {
 }
 
 
+@pytest.fixture(autouse=True)
+def offline_calculators(monkeypatch):
+    attempts = []
+
+    def forbidden(*args, **kwargs):
+        attempts.append("external access")
+        raise AssertionError("pure calculators must not access DAL, providers, or storage")
+
+    from src.agents import config
+
+    monkeypatch.setattr(config, "_load_user_profile", forbidden)
+    monkeypatch.setattr(config, "get_agent_config", lambda: config.AgentConfig())
+    for target in (
+        "socket.socket.connect",
+        "socket.socket.connect_ex",
+        "socket.create_connection",
+        "sqlite3.connect",
+        "sqlite3.dbapi2.connect",
+        "subprocess.Popen.__init__",
+        "requests.sessions.Session.request",
+        "httpx.Client.send",
+        "httpx.AsyncClient.send",
+        "src.tools.data_access.DataAccessLayer.__init__",
+        "src.tools.data_access.DataAccessLayer.get_user_profile",
+        "src.auth_drivers.chatgpt_oauth_driver._execution_client",
+        "src.auth_drivers.claude_code_sdk_driver.query",
+    ):
+        monkeypatch.setattr(target, forbidden)
+
+    yield
+    assert attempts == []
+
+
 def _unwrap(result: str) -> str:
     match = re.search(r"<tool_output[^>]*>\n(.*)\n</tool_output>", result, re.DOTALL)
     return match.group(1) if match else result
@@ -162,6 +195,8 @@ def test_invalid_financial_inputs_fail_loudly(function_name, kwargs):
 def test_all_agent_surfaces_expose_the_same_financial_calculators():
     from src.agents.anthropic_agent.tools import get_anthropic_tools
     from src.agents.openai_agent.tools import create_openai_tools
+    from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
+    from src.auth_drivers.claude_code_sdk_driver import build_ark_mcp_server
     from src.tools.registry import create_default_registry
 
     registry = create_default_registry()
@@ -171,6 +206,58 @@ def test_all_agent_surfaces_expose_the_same_financial_calculators():
     assert {f"tool_{name}" for name in TOOL_NAMES} <= {
         tool.name for tool in create_openai_tools(MagicMock())
     }
+    assert TOOL_NAMES <= {
+        tool["name"] for tool in OpenAIChatGPTOAuthDriver(registry=registry)._build_tools()
+    }
+    _, sdk_tools = build_ark_mcp_server(registry=registry, dal=None, token=None)
+    assert TOOL_NAMES <= {tool.name for tool in sdk_tools}
+
+
+@pytest.mark.parametrize("channel", [
+    "registry_openai", "registry_anthropic", "openai", "anthropic", "chatgpt", "claude",
+])
+def test_calculator_array_item_schemas_survive_every_exporter(channel):
+    from src.tools.registry import create_default_registry
+
+    registry = create_default_registry()
+    if channel == "registry_openai":
+        schemas = {t["function"]["name"]: t["function"]["parameters"]
+                   for t in registry.to_openai_schema()}
+    elif channel == "registry_anthropic":
+        schemas = {t["name"]: t["input_schema"] for t in registry.to_anthropic_schema()}
+    elif channel == "openai":
+        from src.agents.openai_agent.tools import create_openai_tools
+
+        schemas = {t.name.removeprefix("tool_"): t.params_json_schema
+                   for t in create_openai_tools(object())}
+    elif channel == "anthropic":
+        from src.agents.anthropic_agent.tools import get_anthropic_tools
+
+        schemas = {t["name"]: t["input_schema"] for t in get_anthropic_tools()}
+    elif channel == "chatgpt":
+        from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
+
+        schemas = {t["name"]: t["parameters"]
+                   for t in OpenAIChatGPTOAuthDriver(registry=registry)._build_tools()}
+    else:
+        from src.auth_drivers.claude_code_sdk_driver import build_ark_mcp_server
+
+        _, sdk_tools = build_ark_mcp_server(registry=registry, dal=None, token=None)
+        schemas = {t.name: t.input_schema for t in sdk_tools}
+
+    for name, fields in (
+        ("calculate_dcf", {"free_cash_flows": "number"}),
+        ("calculate_peer_statistics", {"values": "number"}),
+        ("calculate_implied_valuation", {"multiples": "number"}),
+        ("calculate_weighted_scenarios", {
+            "values": "number", "weights": "number", "labels": "string",
+        }),
+    ):
+        assert name in schemas, f"{channel} is missing {name}"
+        for field, item_type in fields.items():
+            prop = schemas[name]["properties"][field]
+            array = next(p for p in prop.get("anyOf", [prop]) if p.get("type") == "array")
+            assert array.get("items") == {"type": item_type}, (channel, name, field)
 
 
 def test_anthropic_dispatch_crosses_the_real_calculator_boundary():

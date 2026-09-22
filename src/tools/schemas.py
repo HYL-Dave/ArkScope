@@ -150,6 +150,7 @@ class FinancialStatement(BaseModel):
     fiscal_period: Optional[str] = Field(None, description="e.g. 2025-Q3")
     period_type: str = Field(description="annual or quarterly")
     currency: Optional[str] = Field(None, description="Provider-declared ISO currency; absent in legacy observations")
+    input_basis_version: Optional[str] = Field(None, description="SEC period/unit/debt selection contract; not accounting or revision equivalence")
     data: Dict[str, Optional[float]] = Field(
         description="Metric name → value (e.g. revenue, net_income)"
     )
@@ -168,6 +169,8 @@ class FundamentalsResult(BaseModel):
         description="Per-statement provider, retrieval mode, original acquisition time and allowed age; not a latest-filing guarantee",
     )
     source_routes: List[dict] = Field(default_factory=list)
+    metric_basis: Dict[str, dict] = Field(default_factory=dict)
+    metric_gaps: Dict[str, str] = Field(default_factory=dict)
     # Key metrics (derived from IBKR snapshot or SEC)
     market_cap: Optional[float] = None
     pe_ratio: Optional[float] = None
@@ -255,6 +258,8 @@ class DetailedFinancials(BaseModel):
     acquisition_gaps: List[Dict[str, str]] = Field(default_factory=list)
     source_observations: List[dict] = Field(default_factory=list)
     source_routes: List[dict] = Field(default_factory=list)
+    metric_basis: Dict[str, dict] = Field(default_factory=dict)
+    metric_gaps: Dict[str, str] = Field(default_factory=dict)
     valuation_price_basis: ValuationPriceBasis = Field(
         default_factory=ValuationPriceBasis
     )

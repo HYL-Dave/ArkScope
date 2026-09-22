@@ -684,11 +684,14 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         ticker: str,
         quarters: int = 4,
     ) -> str:
-        """Analyze historical earnings price reactions: earnings-day moves, directional bias, surprise correlation, expected move, and pre/post drift.
+        """Describe retained release reactions using the local Finnhub calendar and exact US trading sessions.
+
+        Five-session drift requires complete daily windows. Returns gaps and sample sizes,
+        not a forecast; does not fetch or update data.
 
         Args:
             ticker: Stock ticker symbol
-            quarters: Past quarters to analyze (default: 4)
+            quarters: Retained quarters to examine (default: 4; 1-999, calendar read limit)
         """
         result = _get_earnings_impact(dal, ticker=ticker, quarters=quarters)
         return _serialize_result(result, "get_earnings_impact")

@@ -495,7 +495,7 @@ def test_all_exporters_admit_only_the_intended_new_tools_and_publish_paging():
     from src.tools.registry import create_default_registry
 
     required = {"get_sa_article_detail", "get_sa_comment_focus", "get_portfolio_holdings"}
-    assert chatgpt == claude and len(chatgpt) == 22 and required <= chatgpt
+    assert chatgpt == claude and len(chatgpt) == 27 and required <= chatgpt
     assert not {"save_report", "save_memory", "web_browse", "get_detailed_financials"} & chatgpt
     for name in ("deep_researcher", "data_summarizer"):
         assert required | {"get_sa_feed"} <= set(SUBAGENT_REGISTRY[name].tool_names)

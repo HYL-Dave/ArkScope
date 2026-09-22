@@ -291,7 +291,8 @@ class TestBuildResult:
         assert result.ticker == "AAPL"
         assert result.gross_margin == 0.5  # 200/400
         assert result.roe is not None
-        assert result.debt_to_equity is not None
+        assert result.debt_to_equity is None
+        assert result.metric_gaps["debt_to_equity"] == "debt_unavailable"
 
     def test_empty_statements_returns_minimal(self):
         """Empty statements should still produce a result."""

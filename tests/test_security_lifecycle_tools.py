@@ -1032,13 +1032,15 @@ def test_lifecycle_tools_are_in_both_research_driver_allowlists():
         "search_news_advanced", "get_ticker_prices", "get_current_quote",
         "get_price_change", "get_ticker_data_coverage", "get_fundamentals_analysis",
         "get_economic_calendar",
+        "calculate_compound_growth", "calculate_dcf", "calculate_peer_statistics",
+        "calculate_implied_valuation", "calculate_weighted_scenarios",
     }
     assert expected == openai
     assert expected == anthropic
     assert "get_sec_filings" not in openai
     assert "get_sec_filings" not in anthropic
-    assert len(openai) == 22
-    assert len(anthropic) == 22
+    assert len(openai) == 27
+    assert len(anthropic) == 27
 
 
 def test_read_service_exposes_derived_final_check_date_in_list_and_detail(

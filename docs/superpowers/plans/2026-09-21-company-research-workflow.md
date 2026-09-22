@@ -40,6 +40,9 @@ active-universe tests plus installed offline Firefox/Chromium alarm checks.
 The private Firefox artifact now contains that implementation; its two-company
 signed-in gate is documented in the
 [watchlist collector acceptance](../evidence/2026-09-23-sa-watchlist-collector/README.md).
+The later private-host readiness correction now exercises the installed wrapper
+and explicitly permits its watchlist/collector-control actions. It is not a new
+signed-in browser acceptance result.
 Full backend and remaining operator acceptance are still open. The full run was stopped after the live UI
 defect was reported, and must not be presented as completed acceptance.
 The user explicitly prioritized this addition on September 22. It does not
@@ -146,7 +149,7 @@ test count or an assertion that the whole company workflow is complete.
 | 1. Company inputs | Shared Chrome/Firefox code for three statement types and the bounded valuation/peers/annual-estimates/revisions scope; real Chrome captures retained; isolated signed-in Firefox AMD annual manual and quarterly scheduled income captures verified | Broader installed extension-to-host acceptance, including Chrome operator testing and other statement scopes; other pages/views are not advertised as captured |
 | 2. Research access | SA source switches, stored/pinned company reader and qualified SA/SEC/FD comparisons; article/comment/holdings read-only paging and four-channel admission verified at `e0bce862`, including full regression and real retained-data replay | Full end-to-end operator research acceptance and explicit production comment-signal backlog processing |
 | 3. Optional SEC | Stock-symbol resolution, explicit directory update, collapsed technical administration; existing citations preserved | Remaining normal-mode surface/consumer review, not wholesale SEC retirement |
-| 4. Analytics | Comparison excludes the legacy ratios and does not endorse them | D/E, comparable financial periods, earnings-event dates and complete trading-session windows |
+| 4. Analytics | Shared debt/return/growth and warm-cache guards; basis-qualified peer statistics; retained release-date/session-window analysis; five existing calculators admitted to both OAuth channels | Independent review/full regression for this repair batch, real-provider coverage, remaining legacy concept/TTM quality and scheduled event observation; see the current evidence |
 | 5. Retirement | No premature deletion of replacement-dependent capabilities or retained evidence | Remove superseded paths and consumers only after replacement acceptance; retention/inventory decisions remain separate |
 
 The September 22 comparison/entry implementation at `e4d58842` passed its
@@ -175,8 +178,9 @@ without claiming immutable historical archives. Holdings totals also qualify
 valuation gaps and withhold mixed/unknown broker-base currencies. These changes
 are documented in the root acquisition policy, not only this execution log.
 
-The next package within this company-workflow lane is legacy ratio/event repair,
-followed by replacement-dependent retirement. It is not a prerequisite for the
+The current [ratio/event and tool-admission batch](../evidence/2026-09-23-research-tool-repairs/README.md)
+implements the bounded legacy repair and is in review/regression, followed by
+replacement-dependent retirement. It is not a prerequisite for the
 independent retention and service workstreams. Cross-provider comparisons are
 not blockers merely because numbers differ: field/unit/period correctness is a
 separate obligation from the research significance of a qualified difference.

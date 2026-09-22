@@ -1,6 +1,6 @@
 # Data Acquisition And Updates
 
-Maintained policy and implementation map. Last reconciled with source: 2026-09-22.
+Maintained policy and implementation map. Last reconciled with source: 2026-09-23.
 
 This document owns the cross-source acquisition, update-trigger, freshness and retention
 contract. It distinguishes current behavior from approved follow-up work; dated
@@ -193,6 +193,7 @@ is still follow-up work.
 | --- | --- | --- |
 | Legacy financial analysis and detailed financials | On-demand `auto` reuses eligible local observations from selected sources; otherwise acquire in the configured order within paid admission limits. | Age-based reuse, not a latest-period check. No explicit fiscal-period/version selector on these tools. |
 | Earnings supplements in detailed financials | Independently selected Finnhub history/upcoming responses, with a shorter reuse window | Not the earnings-calendar scheduler interval, and not an earnings-reaction monitor |
+| `get_earnings_impact` | Reads retained release-calendar revisions and local daily prices; no acquisition or calendar schema installation | US exchange-session analysis, not a real-time monitor. Missing release timing, actuals or exact reaction-session prices are explicit gaps. |
 | SEC research: `list_sec_filings`, `get_sec_financial_facts`, `read_sec_filing` | Default `stored`; explicit `auto` / `refresh` can download and persist through identity, path and transport guards | Separate from legacy financial tools; the general permission hook is audit-only, not an interactive authorization engine |
 | General news | Opt-in source schedules, Run now, or the scoped `daily_update` wrapper; source-specific incremental collection | No universal query-triggered catch-up or interval-completeness guarantee |
 | SA articles / comments | Signed-in browser extension captures into local storage; research reads retained captures | Body and comment outcomes are separate. A successful body does not prove comments loaded. |
@@ -202,6 +203,59 @@ is still follow-up work.
 | FRED and Finnhub calendars | Local reads plus explicit jobs or opt-in source schedules | A release calendar is not evidence that a financial provider has processed the release. |
 | `get_current_quote` | `source=auto` tries an IBKR snapshot; `ibkr` requires that path; `local` reads stored bars | Snapshot, not streaming. Auto's local fallback is labeled historical, not live. |
 | `get_portfolio_holdings` | Pages an existing local profile snapshot in one read transaction | Does not install schema, create accounts, sync IBKR or establish current account value; missing storage is unavailable, not an empty portfolio |
+
+### Analytical Basis And Research Access
+
+Acquisition freshness does not validate a calculation. Basic and detailed
+financial reads share debt/return/growth guards: debt is not total liabilities;
+missing debt is not zero; annual ROE/ROA require matching statement end, period
+type and currency. The denominator is disclosed as period-end equity/assets,
+not an average, and quarterly income is not multiplied by four. Growth requires
+an adjacent fiscal label and a plausible period-end separation (350-380 days for
+annual, 70-110 days for quarterly). Quarterly growth is explicitly QoQ, not YoY.
+Nonstandard/stub periods remain unavailable rather than silently comparable.
+
+`metric_basis` and `metric_gaps` explain available and withheld outputs. Numeric
+provider inputs are not promoted to exact filing evidence. SEC statement inputs
+must carry the current period/debt extraction contract. It checks one report
+end across concepts, expected units and flow duration versus instant facts;
+cumulative-only quarters and comparative-year figures cannot substitute.
+Overlapping current-debt components are not added together, and operating cash
+flow without known CapEx is not called free cash flow. These guards do not
+certify every legacy SEC concept mapping or the optional legacy TTM algorithm.
+The estimated ROIC using an assumed 21% tax rate is withheld. Basic derived
+values in old caches are recomputed only from qualified retained statements;
+unversioned rows remain visible but cannot publish derived ratios. An invalid
+latest row does not silently select an older year. Missing average-balance
+inputs are not assumed zero or replaced by an end balance. Detailed caches
+without the current calculation contract and without retained inputs keep their
+acquisition receipt but withhold old ratios, tech calculations and valuation
+operands. This repair does not itself trigger acquisition or spending.
+
+Peer comparison keeps each raw value, provider and basis visible. Statistics and
+rankings require matching known metric bases; market-dependent ratios also need
+the same price-source/interval/date/time basis. A refused comparison includes
+the affected tickers and reason. Caller-supplied/configured sector membership is
+a selection judgment, and numerical ordering is not investment quality.
+Matching metadata is not proof of equivalent accounting concepts or revisions.
+
+Earnings reactions use the retained calendar's release day and before/after/
+during-market bucket, never the fiscal period end or nearest available bar.
+Calendar actual EPS or revenue must exist; a scheduled date alone is insufficient.
+After-close releases map to the next exchange session. A five-session drift
+requires six valid session closes; incomplete windows return no five-session
+number. Holidays and early closes use the existing exchange calendar. Results
+include sample counts and gaps, not `expected_move` or `surprise_predictive`.
+Exact release timestamps, underlying daily-bar completeness and adjustment basis
+remain unverified and visible. No recurring event observer, notification or live
+intraday signal is implied. The current retained calendar adapter is Finnhub;
+no paid Finnhub plan is assumed or newly required.
+
+The five explicit-input calculators (compound growth, DCF, peer statistics,
+implied valuation and weighted scenarios) are available through both API-key and
+both OAuth research adapters. They do not select providers, fetch data or open
+stores. Their assumptions and input provenance remain the caller's responsibility.
+This is internal tool admission, not permission for an external MCP client.
 
 ### Selected Financial Sources
 
@@ -303,7 +357,7 @@ Owners: [comparison reader](src/tools/financial_comparison_tools.py),
 These are local research reads, admitted to both native API adapters and both
 internal OAuth research adapters. They are not a new external MCP service or
 permission to acquire data. The registry remains 58 tools; each OAuth research
-allowlist now admits 22. `get_sa_feed` supplies article IDs; the relevant
+allowlist now admits 27, including five pure calculators. `get_sa_feed` supplies article IDs; the relevant
 research/summarizer subagents can follow them to `get_sa_article_detail` and
 `get_sa_comment_focus`. Holdings are the user's local account positions, not the
 Alpha Picks recommendation membership.

@@ -32,12 +32,16 @@ Data Sources:
 import logging
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from data_sources.sec_edgar_financials import SECEdgarFinancials
 from src.fundamentals.cache import CALCULATOR_DYNAMIC_FIELDS
+from src.fundamentals.metric_basis import (
+    CALCULATION_VERSION, derive_metrics, previous_period, ratio, same_period,
+    total_debt as statement_total_debt, verified_sec_statements,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +122,10 @@ class FinancialMetrics:
 
     ticker: str
     report_date: str  # Date of the most recent fiscal year end
+    calculation_version: str = CALCULATION_VERSION
+    metric_basis: dict = field(default_factory=dict)
+    metric_gaps: dict = field(default_factory=dict)
+    valuation_basis: dict = field(default_factory=dict)
 
     # === Valuation Metrics (9) ===
     market_cap: Optional[float] = None
@@ -223,21 +231,21 @@ class FinancialMetricsCalculator:
         if self._income_statements is None:
             statements = self.sec.get_income_statement(self.ticker, years=years)
             self._income_statements = [asdict(s) for s in statements]
-        return self._income_statements
+        return verified_sec_statements(self._income_statements)
 
     def _load_balance_sheets(self, years: int = 3) -> List[Dict]:
         """Load balance sheets from SEC EDGAR."""
         if self._balance_sheets is None:
             statements = self.sec.get_balance_sheet(self.ticker, years=years)
             self._balance_sheets = [asdict(s) for s in statements]
-        return self._balance_sheets
+        return verified_sec_statements(self._balance_sheets)
 
     def _load_cash_flow_statements(self, years: int = 3) -> List[Dict]:
         """Load cash flow statements from SEC EDGAR."""
         if self._cash_flow_statements is None:
             statements = self.sec.get_cash_flow_statement(self.ticker, years=years)
             self._cash_flow_statements = [asdict(s) for s in statements]
-        return self._cash_flow_statements
+        return verified_sec_statements(self._cash_flow_statements)
 
     # =========================================================================
     # Helper Methods
@@ -257,9 +265,9 @@ class FinancialMetricsCalculator:
 
     def _get_latest_and_previous(self, statements: List[Dict], field: str) -> tuple:
         """Get current and previous year values for a field."""
-        if len(statements) < 2:
-            return (statements[0].get(field) if statements else None, None)
-        return statements[0].get(field), statements[1].get(field)
+        prior = previous_period(statements)
+        return (statements[0].get(field) if statements else None,
+                prior.get(field) if prior else None)
 
     # =========================================================================
     # Profitability Metrics (6)
@@ -280,39 +288,26 @@ class FinancialMetricsCalculator:
         income = self._load_income_statements(years=1)
         balance = self._load_balance_sheets(years=1)
 
-        if not income or not balance:
+        if not income:
             return {}
 
         inc = income[0]
-        bal = balance[0]
 
         revenue = inc.get('revenue')
         gross_profit = inc.get('gross_profit')
         operating_income = inc.get('operating_income')
         net_income = inc.get('net_income')
 
-        total_assets = bal.get('total_assets')
-        total_equity = bal.get('shareholders_equity')
-        total_liabilities = bal.get('total_liabilities')
-        current_debt = bal.get('current_debt') or 0
-        non_current_debt = bal.get('non_current_debt') or 0
-        total_debt = current_debt + non_current_debt
-
-        # ROIC calculation: NOPAT / Invested Capital
-        # NOPAT = Operating Income * (1 - Tax Rate)
-        # Invested Capital = Total Equity + Total Debt - Cash
-        cash = bal.get('cash_and_equivalents') or 0
-        tax_rate = 0.21  # Approximate corporate tax rate
-        nopat = operating_income * (1 - tax_rate) if operating_income else None
-        invested_capital = (total_equity or 0) + total_debt - cash
-        roic = self._safe_divide(nopat, invested_capital) if invested_capital > 0 else None
+        # An assumed statutory rate is not an observed company tax rate.
+        roic = None
+        common = derive_metrics(income, balance, [], source="sec_edgar")
 
         return {
             'gross_margin': self._safe_divide(gross_profit, revenue),
             'operating_margin': self._safe_divide(operating_income, revenue),
             'net_margin': self._safe_divide(net_income, revenue),
-            'return_on_equity': self._safe_divide(net_income, total_equity),
-            'return_on_assets': self._safe_divide(net_income, total_assets),
+            'return_on_equity': common['roe'],
+            'return_on_assets': common['roa'],
             'return_on_invested_capital': roic,
         }
 
@@ -355,7 +350,9 @@ class FinancialMetricsCalculator:
 
         inc = income[0]
         bal = balance[0]
-        bal_prev = balance[1] if len(balance) > 1 else balance[0]
+        bal_prev = previous_period(balance)
+        if inc.get('period') != 'annual' or not same_period(inc, bal) or bal_prev is None:
+            return {}
 
         revenue = inc.get('revenue')
         cogs = inc.get('cost_of_revenue')
@@ -363,22 +360,22 @@ class FinancialMetricsCalculator:
         # Assets
         total_assets = bal.get('total_assets')
         total_assets_prev = bal_prev.get('total_assets')
-        avg_assets = (total_assets + total_assets_prev) / 2 if total_assets_prev else total_assets
+        avg_assets = (total_assets + total_assets_prev) / 2 if total_assets is not None and total_assets_prev is not None else None
 
         # Inventory
-        inventory = bal.get('inventory') or 0
-        inventory_prev = bal_prev.get('inventory') or 0
-        avg_inventory = (inventory + inventory_prev) / 2 if inventory_prev else inventory
+        inventory = bal.get('inventory')
+        inventory_prev = bal_prev.get('inventory')
+        avg_inventory = (inventory + inventory_prev) / 2 if inventory is not None and inventory_prev is not None else None
 
         # Receivables - note: trade_and_non_trade_receivables includes Non-trade
-        receivables = bal.get('trade_and_non_trade_receivables') or 0
-        receivables_prev = bal_prev.get('trade_and_non_trade_receivables') or 0
-        avg_receivables = (receivables + receivables_prev) / 2 if receivables_prev else receivables
+        receivables = bal.get('trade_and_non_trade_receivables')
+        receivables_prev = bal_prev.get('trade_and_non_trade_receivables')
+        avg_receivables = (receivables + receivables_prev) / 2 if receivables is not None and receivables_prev is not None else None
 
         # Working Capital
-        current_assets = bal.get('current_assets') or 0
-        current_liabilities = bal.get('current_liabilities') or 0
-        working_capital = current_assets - current_liabilities
+        current_assets = bal.get('current_assets')
+        current_liabilities = bal.get('current_liabilities')
+        working_capital = current_assets - current_liabilities if current_assets is not None and current_liabilities is not None else None
 
         if method == 'all':
             # Return all calculation methods for comparison
@@ -393,13 +390,13 @@ class FinancialMetricsCalculator:
         if method == 'fd_style':
             # FD-style: Revenue/End Inventory, uses Total Receivables
             asset_turnover = self._safe_divide(revenue, avg_assets)  # FD uses ~avg
-            inventory_turnover = self._safe_divide(revenue, inventory) if inventory > 0 else None
-            receivables_turnover = self._safe_divide(revenue, receivables) if receivables > 0 else None
+            inventory_turnover = ratio(revenue, inventory)
+            receivables_turnover = ratio(revenue, receivables)
         else:
             # Standard: COGS/Avg Inventory
             asset_turnover = self._safe_divide(revenue, total_assets)
-            inventory_turnover = self._safe_divide(cogs, avg_inventory) if avg_inventory > 0 else None
-            receivables_turnover = self._safe_divide(revenue, avg_receivables) if avg_receivables > 0 else None
+            inventory_turnover = ratio(cogs, avg_inventory)
+            receivables_turnover = ratio(revenue, avg_receivables)
 
         # Days calculations
         days_inventory = self._safe_divide(365, inventory_turnover) if inventory_turnover else None
@@ -441,14 +438,14 @@ class FinancialMetricsCalculator:
         at_avg = self._safe_divide(revenue, avg_assets)
 
         # Inventory Turnover variants
-        it_cogs_avg = self._safe_divide(cogs, avg_inventory) if avg_inventory > 0 else None
-        it_cogs_end = self._safe_divide(cogs, inventory) if inventory > 0 else None
-        it_rev_avg = self._safe_divide(revenue, avg_inventory) if avg_inventory > 0 else None
-        it_rev_end = self._safe_divide(revenue, inventory) if inventory > 0 else None
+        it_cogs_avg = ratio(cogs, avg_inventory)
+        it_cogs_end = ratio(cogs, inventory)
+        it_rev_avg = ratio(revenue, avg_inventory)
+        it_rev_end = ratio(revenue, inventory)
 
         # Receivables Turnover variants
-        rt_avg = self._safe_divide(revenue, avg_receivables) if avg_receivables > 0 else None
-        rt_end = self._safe_divide(revenue, receivables) if receivables > 0 else None
+        rt_avg = ratio(revenue, avg_receivables)
+        rt_end = ratio(revenue, receivables)
 
         # Days calculations (using standard inventory turnover)
         days_inv_std = self._safe_divide(365, it_cogs_avg) if it_cogs_avg else None
@@ -456,7 +453,8 @@ class FinancialMetricsCalculator:
 
         # Working Capital Turnover
         wc_standard = self._safe_divide(revenue, working_capital) if working_capital != 0 else None
-        wc_abs = self._safe_divide(revenue, abs(working_capital)) if working_capital != 0 else None
+        wc_abs = self._safe_divide(revenue, abs(working_capital)) if working_capital is not None else None
+        negative_wc = working_capital < 0 if working_capital is not None else None
 
         return {
             # Standard method results
@@ -475,7 +473,7 @@ class FinancialMetricsCalculator:
                 'receivables_turnover': rt_end,  # Revenue / End Total Receivables
                 'days_sales_outstanding': self._safe_divide(365, rt_end) if rt_end else None,
                 'operating_cycle': None,  # Not reliable with FD method
-                'working_capital_turnover': wc_abs if working_capital < 0 else wc_standard,
+                'working_capital_turnover': wc_abs if negative_wc else wc_standard,
             },
             # All individual methods for detailed analysis
             'methods': {
@@ -497,7 +495,7 @@ class FinancialMetricsCalculator:
                     'revenue_div_wc': wc_standard,
                     'revenue_div_abs_wc': wc_abs,
                     'working_capital_value': working_capital,
-                    'is_negative_wc': working_capital < 0,
+                    'is_negative_wc': negative_wc,
                 },
             },
         }
@@ -523,7 +521,7 @@ class FinancialMetricsCalculator:
             return {}
 
         bal = balance[0]
-        cf = cashflow[0] if cashflow else {}
+        cf = cashflow[0] if cashflow and same_period(bal, cashflow[0]) else {}
 
         current_assets = bal.get('current_assets')
         current_liabilities = bal.get('current_liabilities')
@@ -563,9 +561,7 @@ class FinancialMetricsCalculator:
         bal = balance[0]
         inc = income[0] if income else {}
 
-        current_debt = bal.get('current_debt') or 0
-        non_current_debt = bal.get('non_current_debt') or 0
-        total_debt = current_debt + non_current_debt
+        total_debt = statement_total_debt(bal)
 
         total_equity = bal.get('shareholders_equity')
         total_assets = bal.get('total_assets')
@@ -574,8 +570,8 @@ class FinancialMetricsCalculator:
         interest_expense = inc.get('interest_expense')
 
         return {
-            'debt_to_equity': self._safe_divide(total_debt, total_equity),
-            'debt_to_assets': self._safe_divide(total_debt, total_assets),
+            'debt_to_equity': ratio(total_debt, total_equity),
+            'debt_to_assets': ratio(total_debt, total_assets),
             'interest_coverage': self._safe_divide(operating_income, interest_expense) if interest_expense else None,
         }
 
@@ -790,11 +786,14 @@ class FinancialMetricsCalculator:
         fcf_curr, fcf_prev = self._get_latest_and_previous(cashflow, 'free_cash_flow')
 
         # EBITDA calculation: Operating Income + D&A
-        da_curr = cashflow[0].get('depreciation_and_amortization') if cashflow else None
-        da_prev = cashflow[1].get('depreciation_and_amortization') if len(cashflow) > 1 else None
+        prior_income = previous_period(income)
+        current_cf = next((row for row in cashflow if same_period(row, income[0])), {})
+        prior_cf = next((row for row in cashflow if prior_income and same_period(row, prior_income)), {})
+        da_curr = current_cf.get('depreciation_and_amortization')
+        da_prev = prior_cf.get('depreciation_and_amortization')
 
-        ebitda_curr = (operating_income_curr + da_curr) if operating_income_curr and da_curr else None
-        ebitda_prev = (operating_income_prev + da_prev) if operating_income_prev and da_prev else None
+        ebitda_curr = (operating_income_curr + da_curr) if operating_income_curr is not None and da_curr is not None else None
+        ebitda_prev = (operating_income_prev + da_prev) if operating_income_prev is not None and da_prev is not None else None
 
         return {
             'revenue_growth': self._calculate_growth(revenue_curr, revenue_prev),
@@ -931,7 +930,7 @@ class FinancialMetricsCalculator:
         Calculate per-share metrics.
 
         Metrics:
-            - earnings_per_share: Net Income / Shares Outstanding
+            - earnings_per_share: Provider-reported EPS (not point-in-time shares)
             - book_value_per_share: Shareholders' Equity / Shares Outstanding
             - free_cash_flow_per_share: Free Cash Flow / Shares Outstanding
             - payout_ratio: Dividends / Net Income
@@ -945,7 +944,7 @@ class FinancialMetricsCalculator:
 
         inc = income[0]
         bal = balance[0]
-        cf = cashflow[0] if cashflow else {}
+        cf = cashflow[0] if cashflow and same_period(bal, cashflow[0]) else {}
 
         net_income = inc.get('net_income')
         shares_outstanding = bal.get('outstanding_shares')
@@ -958,10 +957,10 @@ class FinancialMetricsCalculator:
             dividends = abs(dividends)
 
         return {
-            'earnings_per_share': self._safe_divide(net_income, shares_outstanding),
+            'earnings_per_share': inc.get('earnings_per_share'),
             'book_value_per_share': self._safe_divide(shareholders_equity, shares_outstanding),
             'free_cash_flow_per_share': self._safe_divide(free_cash_flow, shares_outstanding),
-            'payout_ratio': self._safe_divide(dividends, net_income),
+            'payout_ratio': self._safe_divide(dividends, net_income) if same_period(inc, cf) else None,
         }
 
     # =========================================================================
@@ -976,14 +975,10 @@ class FinancialMetricsCalculator:
 
         inc = income[0] if income else {}
         bal = balance[0] if balance else {}
-        cf = cashflow[0] if cashflow else {}
-
-        total_debt = bal.get("total_debt")
-        if total_debt is None:
-            current_debt = bal.get("current_debt")
-            non_current_debt = bal.get("non_current_debt")
-            if current_debt is not None or non_current_debt is not None:
-                total_debt = (current_debt or 0) + (non_current_debt or 0)
+        if not same_period(inc, bal):
+            return {}
+        cf = cashflow[0] if cashflow and same_period(inc, cashflow[0]) else {}
+        total_debt = statement_total_debt(bal)
 
         operating_income = inc.get("operating_income")
         depreciation = cf.get("depreciation_and_amortization")
@@ -1048,9 +1043,10 @@ class FinancialMetricsCalculator:
         }
 
         revenue = income[0].get("revenue") if income else None
-        sbc = cashflow[0].get("share_based_compensation") if cashflow else None
+        matching_cf = cashflow[0] if income and cashflow and same_period(income[0], cashflow[0]) else {}
+        sbc = matching_cf.get("share_based_compensation")
         rd = income[0].get("research_and_development") if income else None
-        fcf = cashflow[0].get("free_cash_flow") if cashflow else None
+        fcf = matching_cf.get("free_cash_flow")
 
         if revenue and revenue > 0:
             if sbc is not None:
@@ -1094,6 +1090,27 @@ class FinancialMetricsCalculator:
         static_metrics.update(self.get_leverage_metrics())
         static_metrics.update(self.get_growth_metrics())
         static_metrics.update(self.get_per_share_metrics())
+        common = derive_metrics(self._income_statements, self._balance_sheets, self._cash_flow_statements, source="sec_edgar")
+        static_metrics.update({key: common[key] for key in ("calculation_version", "metric_basis", "metric_gaps")})
+        static_metrics["metric_gaps"]["roic"] = "company_tax_basis_unavailable"
+        verified_income, verified_balance = self._load_income_statements(), self._load_balance_sheets()
+        inc = verified_income[0] if verified_income else {}
+        bal = verified_balance[0] if verified_balance else {}
+        static_metrics["valuation_basis"] = {key: inc.get(key) for key in ("report_period", "period", "currency")} if same_period(inc, bal) else {}
+        tech = self.get_tech_metrics()
+        for key, formula in (("rd_to_revenue", "research_and_development / revenue"),
+                             ("sbc_to_revenue", "share_based_compensation / revenue"),
+                             ("rule_of_40", "100 * (revenue_growth + free_cash_flow / revenue)")):
+            if tech.get(key) is not None:
+                basis = {field: inc.get(field) for field in ("report_period", "period", "currency")}
+                basis.update(precision="provider_numeric", formula=formula)
+                if key == "rule_of_40":
+                    basis["previous_report_period"] = previous_period(verified_income)["report_period"]
+                static_metrics["metric_basis"][key] = basis
+        if not same_period(inc, bal):
+            static_metrics["metric_gaps"]["valuation"] = "statement_basis_mismatch"
+        if not same_period(inc, bal) or previous_period(self._balance_sheets) is None:
+            static_metrics["metric_gaps"]["efficiency"] = "comparable_balance_periods_unavailable"
         return static_metrics
 
     def get_all_metrics(self, *, price: Optional[float] = None) -> FinancialMetrics:

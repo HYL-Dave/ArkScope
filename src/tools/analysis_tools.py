@@ -46,7 +46,7 @@ def _dataclass_to_dict(obj) -> dict:
     from dataclasses import asdict
     return {k: v for k, v in asdict(obj).items()
             if v is not None and k not in ("ticker", "report_period", "fiscal_period",
-                                            "period", "currency")}
+                                            "period", "currency", "input_basis_version")}
 
 
 def _sec_to_financial_statement(obj) -> FinancialStatement:
@@ -56,77 +56,17 @@ def _sec_to_financial_statement(obj) -> FinancialStatement:
         fiscal_period=getattr(obj, "fiscal_period", None),
         period_type=getattr(obj, "period", "quarterly"),
         currency=getattr(obj, "currency", None),
+        input_basis_version=getattr(obj, "input_basis_version", None),
         data=_dataclass_to_dict(obj),
     )
 
 
 def _derive_metrics_from_sec(
-    income_stmts, balance_sheets, cashflow_stmts,
+    income_stmts, balance_sheets, cashflow_stmts, *, source=None,
 ) -> dict:
-    """Calculate key financial ratios from SEC EDGAR statements."""
-    metrics: dict = {}
-
-    if income_stmts:
-        latest = income_stmts[0]
-        rev = latest.revenue
-        if rev and rev > 0:
-            if latest.gross_profit is not None:
-                metrics["gross_margin"] = round(latest.gross_profit / rev, 4)
-            if latest.operating_income is not None:
-                metrics["operating_margin"] = round(latest.operating_income / rev, 4)
-            if latest.net_income is not None:
-                metrics["net_margin"] = round(latest.net_income / rev, 4)
-
-        # Revenue growth (YoY)
-        if len(income_stmts) >= 2:
-            prev = income_stmts[1]
-            if prev.revenue and prev.revenue > 0 and rev:
-                metrics["revenue_growth"] = round(
-                    (rev - prev.revenue) / abs(prev.revenue), 4
-                )
-        # Earnings growth
-        if len(income_stmts) >= 2:
-            curr_ni = latest.net_income
-            prev_ni = income_stmts[1].net_income
-            if curr_ni is not None and prev_ni is not None and prev_ni != 0:
-                metrics["earnings_growth"] = round(
-                    (curr_ni - prev_ni) / abs(prev_ni), 4
-                )
-
-    if balance_sheets:
-        bs = balance_sheets[0]
-        metrics["cash_and_equivalents"] = bs.cash_and_equivalents
-        metrics["total_debt"] = bs.total_debt
-        # Current ratio
-        if bs.current_assets and bs.current_liabilities and bs.current_liabilities > 0:
-            metrics["current_ratio"] = round(
-                bs.current_assets / bs.current_liabilities, 2
-            )
-        # Debt to equity
-        if bs.total_liabilities and bs.shareholders_equity and bs.shareholders_equity > 0:
-            metrics["debt_to_equity"] = round(
-                bs.total_liabilities / bs.shareholders_equity, 2
-            )
-        # ROE (annualized from latest quarter)
-        if income_stmts and bs.shareholders_equity and bs.shareholders_equity > 0:
-            ni = income_stmts[0].net_income
-            period = income_stmts[0].period
-            if ni is not None:
-                annualized = ni * 4 if period == "quarterly" else ni
-                metrics["roe"] = round(annualized / bs.shareholders_equity, 4)
-        # ROA
-        if income_stmts and bs.total_assets and bs.total_assets > 0:
-            ni = income_stmts[0].net_income
-            period = income_stmts[0].period
-            if ni is not None:
-                annualized = ni * 4 if period == "quarterly" else ni
-                metrics["roa"] = round(annualized / bs.total_assets, 4)
-
-    if cashflow_stmts:
-        cf = cashflow_stmts[0]
-        metrics["free_cash_flow"] = cf.free_cash_flow
-
-    return metrics
+    """Use the same period/debt contract for SEC and FD statement inputs."""
+    from src.fundamentals.metric_basis import derive_metrics
+    return derive_metrics(income_stmts, balance_sheets, cashflow_stmts, source=source)
 
 
 def _is_fd_enabled(dal: DataAccessLayer) -> bool:
@@ -169,12 +109,14 @@ def _build_result_from_statements(
         balance_sheets[0].report_period if balance_sheets else (
             cashflow_stmts[0].report_period if cashflow_stmts else None)
     )
-    metrics = _derive_metrics_from_sec(income_stmts, balance_sheets, cashflow_stmts)
+    metrics = _derive_metrics_from_sec(income_stmts, balance_sheets, cashflow_stmts, source=data_source)
 
     return FundamentalsResult(
         ticker=ticker.upper(),
         snapshot_date=snapshot_date,
         data_source=data_source,
+        metric_basis=metrics["metric_basis"],
+        metric_gaps=metrics["metric_gaps"],
         roe=metrics.get("roe"),
         roa=metrics.get("roa"),
         debt_to_equity=metrics.get("debt_to_equity"),
@@ -735,6 +677,12 @@ def get_detailed_financials(
         product_field: valuation[calculator_field]
         for product_field, calculator_field in _DETAILED_VALUATION_FIELD_MAP.items()
     }
+    metric_basis = dict(metrics.get("metric_basis", {}))
+    if metrics.get("valuation_basis"):
+        for field, value in detailed_valuation.items():
+            if value is not None:
+                metric_basis[field] = {**metrics["valuation_basis"], "precision": "market_approximate",
+                                       "calculation": _DETAILED_VALUATION_FIELD_MAP[field]}
 
     try:
         earnings_route = load_route("earnings_supplements", dal)
@@ -755,6 +703,8 @@ def get_detailed_financials(
         source_observations=observations + earnings_observations,
         source_routes=routes,
         acquisition_gaps=gaps + earnings_gaps,
+        metric_basis=metric_basis,
+        metric_gaps=metrics.get("metric_gaps", {}),
         **detailed_valuation,
         # Profitability
         gross_margin=metrics.get("gross_margin"),
@@ -847,7 +797,7 @@ _COMPARISON_METRICS = [
     ("roe", "ROE", True),
     ("roic", "ROIC", True),
     ("revenue_growth", "Rev Growth", True),
-    ("earnings_growth", "EPS Growth", True),
+    ("earnings_growth", "Net Income Growth", True),
     ("debt_to_equity", "D/E", False),
     ("current_ratio", "Current Ratio", True),
     ("rule_of_40", "Rule of 40", True),
@@ -862,6 +812,30 @@ def _percentile_rank(value: float, values: List[float]) -> float:
     below = sum(1 for v in values if v < value)
     equal = sum(1 for v in values if v == value)
     return round((below + equal * 0.5) / len(values) * 100, 1)
+
+
+def _peer_metric_gap(financials, tickers, field):
+    bases = [financials[ticker].metric_basis.get(field) for ticker in tickers]
+    if any(not isinstance(basis, dict) or not all(basis.get(key) for key in
+               ("report_period", "period", "currency")) for basis in bases):
+        return "metric_basis_unavailable"
+    if any(basis != bases[0] for basis in bases[1:]):
+        return "metric_basis_mismatch"
+    if len({financials[ticker].data_source for ticker in tickers}) != 1:
+        return "provider_basis_mismatch"
+    if field in _DETAILED_VALUATION_FIELD_MAP:
+        prices = [financials[ticker].valuation_price_basis for ticker in tickers]
+        if any(not price.available for price in prices):
+            return "market_basis_unavailable"
+        keys = ("source", "interval", "market_date", "timestamp")
+        signatures = [tuple(getattr(price, key) for key in keys) for price in prices]
+        if any(not all(signature) for signature in signatures):
+            return "market_basis_unavailable"
+        if len(set(signatures)) != 1:
+            return "market_basis_mismatch"
+    if len(tickers) < 2:
+        return "insufficient_comparable_peers"
+    return None
 
 
 def get_peer_comparison(
@@ -953,13 +927,13 @@ def get_peer_comparison(
         comparison_matrix[t] = row
 
     # ── Step 4: Compute sector statistics ──────────────────
-    sector_stats = {}
+    sector_stats, comparison_gaps = {}, {}
     for field, display, _ in _COMPARISON_METRICS:
-        values = [
-            comparison_matrix[t][field]
-            for t in comparison_matrix
-            if comparison_matrix[t][field] is not None
-        ]
+        candidates = [t for t in comparison_matrix if comparison_matrix[t][field] is not None]
+        gap = _peer_metric_gap(financials, candidates, field) if candidates else "metric_values_unavailable"
+        if gap:
+            comparison_gaps[field] = {"code": gap, "tickers": candidates}
+        values = [comparison_matrix[t][field] for t in candidates] if not gap else []
         if values:
             sector_stats[field] = {
                 "median": round(median(values), 4),
@@ -974,6 +948,8 @@ def get_peer_comparison(
     if target and target in comparison_matrix:
         rankings = {}
         for field, _, higher_is_better in _COMPARISON_METRICS:
+            if field in comparison_gaps:
+                continue
             target_val = comparison_matrix[target][field]
             if target_val is None:
                 continue
@@ -985,13 +961,13 @@ def get_peer_comparison(
             if not values:
                 continue
 
-            # Rank (1 = best)
+            # Numerical ordering is a convention, not an investment recommendation.
             if higher_is_better is True:
                 sorted_vals = sorted(values, reverse=True)
-                direction = "higher_better"
+                direction = "higher_first"
             elif higher_is_better is False:
                 sorted_vals = sorted(values)
-                direction = "lower_better"
+                direction = "lower_first"
             else:
                 sorted_vals = sorted(values)
                 direction = "neutral"
@@ -1026,6 +1002,12 @@ def get_peer_comparison(
         "sector": resolved_sector,
         "peer_count": len(financials),
         "comparison_matrix": comparison_matrix,
+        "comparison_basis": {t: {"source": fin.data_source, "metric_basis": fin.metric_basis,
+                                 "valuation_price_basis": fin.valuation_price_basis.model_dump()} for t, fin in financials.items()},
+        "comparison_gaps": comparison_gaps,
+        "peer_selection": {"basis": "caller_supplied" if tickers else "configured_sector_membership",
+                           "tickers": peer_list, "is_fact": False},
+        "limitations": ["reported_basis_match_not_accounting_equivalence", "rank_is_not_investment_quality"],
         "rankings": rankings,
         "sector_stats": sector_stats,
         "data_quality": {

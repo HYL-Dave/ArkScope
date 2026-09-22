@@ -53,7 +53,8 @@ def test_read_cached_sec_fundamentals_uses_local_market_store():
     assert result is not None
     assert result.ticker == "AAPL"
     assert result.data_source == "sec_edgar"
-    assert result.roe == 0.21
+    assert result.roe is None
+    assert result.metric_gaps["roe"] == "income_unavailable"
     assert backend._market.calls == [key]
 
 

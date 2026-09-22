@@ -313,15 +313,20 @@ def resolve_macro_calendar_db_path(db_path: str | Path | None = None) -> str:
 class MacroCalendarLocalStore:
     """Macro-calendar store over ``macro_calendar.db``."""
 
-    def __init__(self, db_path: str | Path | None = None):
+    def __init__(self, db_path: str | Path | None = None, *, read_only: bool = False):
         self._db_path = resolve_macro_calendar_db_path(db_path)
-        self._ensure_schema()
+        self._read_only = read_only
+        if not read_only:
+            self._ensure_schema()
 
     def is_available(self) -> bool:
         return True
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self._db_path, timeout=10.0)
+        if self._read_only:
+            conn = sqlite3.connect(Path(self._db_path).resolve().as_uri() + "?mode=ro", uri=True, timeout=10.0)
+        else:
+            conn = sqlite3.connect(self._db_path, timeout=10.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout = 10000")
         conn.execute("PRAGMA foreign_keys = ON")  # honor the revision-log FK CASCADE

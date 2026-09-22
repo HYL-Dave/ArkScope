@@ -37,6 +37,7 @@ _CALCULATOR_DYNAMIC_FIELDS = (
 )
 
 _STATIC_METRICS = {
+    "calculation_version": "statement-basis-v1",
     "report_date": "2025-12-31",
     "gross_margin": 0.40,
     "operating_margin": 0.20,
@@ -245,9 +246,12 @@ class TestTechMetrics:
         calc.ticker = "TEST"
         calc.sec = MagicMock()
         calc.years_for_growth = 2
-        calc._income_statements = income_data
+        def with_basis(rows):
+            return [{"report_period": f"{2025 - i}-12-31", "fiscal_period": f"{2025 - i}-FY",
+                     "period": "annual", "currency": "USD", "input_basis_version":"sec-period-debt-v1", **row} for i, row in enumerate(rows)]
+        calc._income_statements = with_basis(income_data)
         calc._balance_sheets = None
-        calc._cash_flow_statements = cashflow_data
+        calc._cash_flow_statements = with_basis(cashflow_data)
         return calc
 
     def test_sbc_to_revenue(self):
@@ -392,6 +396,27 @@ class TestFinancialCache:
 
 class TestGetDetailedFinancials:
     """Test the tool function integration."""
+
+    @pytest.mark.parametrize("freshness", ["auto", "stored"])
+    def test_legacy_warm_result_is_withheld_without_static_reacquisition(self, monkeypatch, freshness):
+        from src.tools.analysis_tools import get_detailed_financials
+        payload = _static_cache_payload()
+        payload["static_metrics"].pop("calculation_version")
+        backend = _RecordingCacheBackend({"detailed_financials:v2:sec_edgar:TEST:annual:y2": payload})
+        original = copy.deepcopy(backend.rows)
+        monkeypatch.setattr("data_sources.financial_metrics_calculator.FinancialMetricsCalculator", _ForbiddenCalculator)
+        monkeypatch.setattr("src.valuation_price.get_valuation_price_basis", lambda *_: _price_basis())
+        # This independently selected supplement is outside the static-cache repair.
+        monkeypatch.setattr("src.tools.analysis_tools._detailed_earnings", lambda *_: ({}, [], []))
+        def forbidden(*args, **kwargs):
+            raise AssertionError("legacy-derived repair may not write or acquire")
+        monkeypatch.setattr(backend, "set_financial_cache", forbidden)
+        monkeypatch.setattr("requests.sessions.Session.request", forbidden)
+        result = get_detailed_financials(_detailed_dal(backend), "TEST", freshness=freshness)
+        assert result.roe is None and result.debt_to_equity is None and result.pe_ratio is None
+        assert result.metric_gaps["legacy_calculation"] == "retained_inputs_unavailable"
+        assert result.source_observations[0]["retrieval"] == "stored"
+        assert backend.rows == original
 
     def test_returns_detailed_financials_type(self):
         """Should return DetailedFinancials even with all mocked/empty data."""

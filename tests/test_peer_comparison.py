@@ -19,6 +19,8 @@ def _mock_financials(ticker, **overrides):
 
     defaults = {
         "ticker": ticker,
+        "data_source": "sec_edgar",
+        "report_date": "2025-12-31",
         "valuation_price_basis": {
             "available": True,
             "source": "local_market_db",
@@ -48,8 +50,34 @@ def _mock_financials(ticker, **overrides):
         "rule_of_40": 45.0,
         "rd_to_revenue": 0.10,
     }
+    from src.tools.analysis_tools import _COMPARISON_METRICS
+    defaults["metric_basis"] = {field: {"report_period": "2025-12-31", "period": "annual", "currency": "USD"}
+                               for field, _, _ in _COMPARISON_METRICS}
     defaults.update(overrides)
     return DetailedFinancials(**defaults)
+
+
+def test_real_calculator_emits_tech_bases_accepted_by_peer_statistics(monkeypatch):
+    from tests.test_sec_metric_input_basis import entry, extractor, results
+    from src.tools.analysis_tools import get_peer_comparison
+    from src.tools.schemas import DetailedFinancials
+
+    _, _, calc = results(extractor({
+        "Assets": [entry(200), entry(180,end="2024-12-31",fy=2024)],
+        "Revenues": [entry(120,start="2025-01-01"), entry(100,start="2024-01-01",end="2024-12-31",fy=2024)],
+        "ResearchAndDevelopmentExpense": [entry(12,start="2025-01-01")],
+        "NetCashProvidedByUsedInOperatingActivities": [entry(30,start="2025-01-01")],
+        "PaymentsToAcquirePropertyPlantAndEquipment": [entry(0,start="2025-01-01")],
+    }))
+    metrics, tech = calc.get_static_metrics_dict(), calc.get_tech_metrics()
+    assert tech["rd_to_revenue"] == 0.1 and tech["rule_of_40"] == 45
+    def financials(dal, ticker):
+        return DetailedFinancials(ticker=ticker, data_source="sec_edgar", metric_basis=metrics["metric_basis"],
+                                  rd_to_revenue=tech["rd_to_revenue"], rule_of_40=tech["rule_of_40"])
+    monkeypatch.setattr("src.tools.analysis_tools.get_detailed_financials", financials)
+    result = get_peer_comparison(object(), tickers=["A","B"])
+    assert result["sector_stats"]["rd_to_revenue"]["count"] == 2
+    assert result["sector_stats"]["rule_of_40"]["count"] == 2
 
 
 # ============================================================
@@ -153,6 +181,29 @@ class TestComparisonMatrix:
         result = self._run_comparison(data)
         assert result["sector_stats"]["peg_ratio"]["count"] == 0
 
+    @pytest.mark.parametrize("change", [{"report_period": "2024-12-31"}, {"currency": "EUR"},
+                                       {"period": "quarterly"}])
+    def test_mismatched_metric_basis_keeps_raw_values_but_not_statistics(self, change):
+        a, b = _mock_financials("A"), _mock_financials("B")
+        b.metric_basis["debt_to_equity"].update(change)
+        result = self._run_comparison({"A": a, "B": b})
+        assert result["comparison_matrix"]["A"]["debt_to_equity"] == 0.5
+        assert result["sector_stats"]["debt_to_equity"]["count"] == 0
+        assert result["comparison_gaps"]["debt_to_equity"]["code"] == "metric_basis_mismatch"
+
+    def test_unknown_basis_is_not_permission_to_rank(self):
+        result = self._run_comparison({"A": _mock_financials("A", metric_basis={}), "B": _mock_financials("B")})
+        assert result["sector_stats"]["roe"]["count"] == 0
+        assert result["comparison_gaps"]["roe"]["code"] == "metric_basis_unavailable"
+
+    def test_different_market_dates_cannot_be_ranked_together(self):
+        a, b = _mock_financials("A"), _mock_financials("B")
+        b.valuation_price_basis.market_date = "2026-07-30"
+        result = self._run_comparison({"A": a, "B": b})
+        assert result["sector_stats"]["pe_ratio"]["count"] == 0
+        assert result["comparison_gaps"]["pe_ratio"]["code"] == "market_basis_mismatch"
+        assert result["sector_stats"]["roe"]["count"] == 2
+
 
 # ============================================================
 # Rankings
@@ -186,11 +237,11 @@ class TestPercentileRanking:
 
         # A has lowest PE (10.0) — rank 1 for lower-is-better
         assert rankings["pe_ratio"]["rank"] == 1
-        assert rankings["pe_ratio"]["direction"] == "lower_better"
+        assert rankings["pe_ratio"]["direction"] == "lower_first"
 
         # A has highest gross margin (0.80) — rank 1 for higher-is-better
         assert rankings["gross_margin"]["rank"] == 1
-        assert rankings["gross_margin"]["direction"] == "higher_better"
+        assert rankings["gross_margin"]["direction"] == "higher_first"
 
     def test_no_rankings_without_target(self):
         from src.tools.analysis_tools import get_peer_comparison

@@ -701,10 +701,9 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         {
             "name": "get_earnings_impact",
             "description": (
-                "Analyze historical earnings price reactions: earnings-day moves, "
-                "average absolute move, directional bias, surprise correlation, "
-                "expected move estimation, and pre/post earnings drift. "
-                "Combines Finnhub earnings history with price data."
+                "Describe retained earnings release reactions using the local Finnhub release calendar "
+                "and exact US trading sessions. Five-session drift requires complete daily windows. "
+                "Reports missing inputs and sample sizes, not a forecast. Does not fetch or update data."
             ),
             "input_schema": {
                 "type": "object",
@@ -715,7 +714,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     },
                     "quarters": {
                         "type": "integer",
-                        "description": "Past quarters to analyze (default: 4)"
+                        "description": "Retained quarters to examine (default: 4; 1-999, calendar read limit)"
                     }
                 },
                 "required": ["ticker"]

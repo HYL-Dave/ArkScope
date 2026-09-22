@@ -1,6 +1,7 @@
 # Earnings Event Observation
 
-Status: scoped follow-up, not implemented or enabled by this retirement.
+Status: stored historical analysis repaired in the September 23 research-tool
+batch; scheduled event observation and live delivery are not implemented.
 Owner: market-data / research tools. Required before any earnings monitor is
 advertised as an unattended opportunity alert.
 
@@ -53,6 +54,11 @@ SEC fundamentals replace it, or schedule the current approximation unchanged.
   delivery tests. No duplicate paid fetch or automatic model/provider fallback.
 - Separately approved live checks for the selected calendar and market sources.
 
-The existing `get_current_quote` freshness defect and the current
-`get_earnings_impact` alignment/window defects remain open. This document does
-not certify either implementation or start any collection.
+The current quote freshness repair has separate deterministic acceptance; its
+live Gateway check remains open. `get_earnings_impact` now uses retained calendar
+release-day/session buckets and exact exchange sessions, with complete drift
+windows and no predictive labels. This is a narrower contract than the scheduled
+observer above: exact announcement timestamps, certified price coverage and
+live delivery remain open. See the
+[September 23 evidence](../evidence/2026-09-23-research-tool-repairs/README.md).
+No collection is started by this document or by the stored analysis tool.

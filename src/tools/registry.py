@@ -508,7 +508,8 @@ class ToolRegistry:
             category="calculation",
             requires_dal=False,
             parameters=[
-                ToolParameter("free_cash_flows", "array", "Ordered projected FCF values"),
+                ToolParameter("free_cash_flows", "array", "Ordered projected FCF values",
+                              items={"type": "number"}),
                 ToolParameter("discount_rate", "number", "Decimal discount rate, e.g. 0.10"),
                 ToolParameter("terminal_growth_rate", "number", "Decimal terminal growth rate below the discount rate"),
                 ToolParameter("cash", "number", "Cash in the same units as FCF", required=False, default=0.0),
@@ -528,7 +529,8 @@ class ToolRegistry:
             category="calculation",
             requires_dal=False,
             parameters=[
-                ToolParameter("values", "array", "Finite comparable peer metric values"),
+                ToolParameter("values", "array", "Finite comparable peer metric values",
+                              items={"type": "number"}),
                 ToolParameter("target_value", "number", "Optional target metric for premium to median", required=False),
             ],
         ))
@@ -544,7 +546,8 @@ class ToolRegistry:
             requires_dal=False,
             parameters=[
                 ToolParameter("target_metric", "number", "Positive target financial metric"),
-                ToolParameter("multiples", "array", "Positive valuation multiples"),
+                ToolParameter("multiples", "array", "Positive valuation multiples",
+                              items={"type": "number"}),
                 ToolParameter(
                     "value_basis",
                     "string",
@@ -568,9 +571,11 @@ class ToolRegistry:
             category="calculation",
             requires_dal=False,
             parameters=[
-                ToolParameter("values", "array", "Scenario values"),
-                ToolParameter("weights", "array", "Nonnegative probabilities summing to 1"),
-                ToolParameter("labels", "array", "Optional labels matching the values", required=False),
+                ToolParameter("values", "array", "Scenario values", items={"type": "number"}),
+                ToolParameter("weights", "array", "Nonnegative probabilities summing to 1",
+                              items={"type": "number"}),
+                ToolParameter("labels", "array", "Optional labels matching the values",
+                              required=False, items={"type": "string"}),
                 ToolParameter("current_price", "number", "Positive current price for upside/downside", required=False),
             ],
         ))
@@ -761,10 +766,9 @@ class ToolRegistry:
             name="get_earnings_impact",
             result_policy=PUBLIC_JSON,
             description=(
-                "Analyze historical earnings price reactions: earnings-day moves, "
-                "average absolute move, directional bias, surprise correlation, "
-                "expected move estimation, and pre/post earnings drift. "
-                "Combines Finnhub earnings history with price data."
+                "Describe retained earnings release reactions using the local Finnhub release calendar "
+                "and exact US trading sessions. Five-session drift requires complete daily windows. "
+                "Reports missing inputs and sample sizes, not a forecast. Does not fetch or update data."
             ),
             function=get_earnings_impact,
             category="analysis",
@@ -772,7 +776,7 @@ class ToolRegistry:
             parameters=[
                 ToolParameter("ticker", "string", "Stock ticker symbol"),
                 ToolParameter("quarters", "integer",
-                              "Past quarters to analyze (default: 4, max: 4 on free tier)",
+                              "Retained quarters to examine (default: 4; 1-999, calendar read limit)",
                               required=False),
             ],
         ))

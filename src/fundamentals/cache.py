@@ -104,7 +104,13 @@ def validate_detailed_financials_static_payload(
     if _contains_forbidden_static_key(payload):
         return None
     try:
-        return copy.deepcopy(payload)
+        result = copy.deepcopy(payload)
+        from src.fundamentals.metric_basis import CALCULATION_VERSION
+        if result["static_metrics"].get("calculation_version") != CALCULATION_VERSION:
+            result["static_metrics"] = {"metric_gaps": {"legacy_calculation": "retained_inputs_unavailable"}}
+            result["tech_metrics"] = {}
+            result["valuation_inputs"] = {}
+        return result
     except Exception:
         return None
 
@@ -132,6 +138,10 @@ def validate_positive_annual_sec_payload(
         or not result.snapshot_date
     ):
         return None
+    from src.fundamentals.metric_basis import derive_metrics, METRIC_FIELDS
+    derived = derive_metrics(result.income_statements or [], result.balance_sheet or [], result.cash_flow_statements or [], source="sec_edgar")
+    for field in (*METRIC_FIELDS, "metric_basis", "metric_gaps"):
+        setattr(result, field, derived[field])
     return result
 
 

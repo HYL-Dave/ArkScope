@@ -169,3 +169,30 @@ proof that a research channel can invoke it. This slice preserves those gates.
 
 No research history, articles, notes, translations, backups or provider source
 is retired by this table. No subscription is purchased or enabled.
+
+## September 23 Repair Reconciliation
+
+The archived call counts remain historical evidence, not today's tool roster.
+Current branch work repairs financial numerator/period/cache guards and stored
+earnings-release/session alignment. Five existing explicit-input calculators
+now have actual dispatch coverage in both OAuth adapters as well as the API-key
+adapters; they were implemented but not usable from those research channels.
+Both OAuth inventories contain 27 tools. Article/comment/holdings access was
+already repaired by the preceding slice; it was not an outstanding new feature.
+
+The audit still identifies distinct work, not solved by adding an allowlist entry:
+
+- Analyst/insider retrieval must distinguish denied, rate-limited, unavailable,
+  partial and genuinely empty results, including source-level skipped filings.
+- Alpha Picks portfolio list pagination is absent; article/comment paging does
+  not repair that separate whole-list output.
+- A bounded session-aware intraday summary is absent. Reuse stored OHLCV and
+  exchange/coverage contracts; do not restore arbitrary Python execution or
+  claim exact VWAP from OHLCV alone. Scope needs its own executable contract.
+- Correct historical earnings analysis is not a scheduled release observer or
+  timely opportunity alert. Calendar coverage and broker live checks remain
+  separate real-provider acceptance.
+
+See [the current batch](../superpowers/evidence/2026-09-23-research-tool-repairs/README.md)
+for verification and remaining boundaries. This inventory does not certify all
+58 registered tools or claim an external MCP server exists.

@@ -14,7 +14,14 @@ import pytest
 from datetime import datetime, timedelta, timezone
 
 import src.tools.analysis_tools as at
-from src.tools.schemas import FundamentalsResult
+from src.tools.schemas import FinancialStatement, FundamentalsResult
+
+
+def _retained_result(ticker, roe, source="sec_edgar"):
+    basis = dict(report_period="2025-12-31", fiscal_period="2025-FY", period_type="annual", currency="USD", input_basis_version="sec-period-debt-v1")
+    return FundamentalsResult(ticker=ticker.upper(), data_source=source, snapshot_date="2025-12-31", roe=roe,
+        income_statements=[FinancialStatement(**basis, data={"net_income": roe * 100})],
+        balance_sheet=[FinancialStatement(**basis, data={"shareholders_equity": 100})])
 
 
 class _FakeBackend:
@@ -98,8 +105,7 @@ def test_sec_cache_miss_then_hit_round_trips_result(monkeypatch):
     income = [type("S", (), {"report_period": "2025-12-31"})()]
     _sec_returns(monkeypatch, income=income)
     monkeypatch.setattr(at, "_build_result_from_statements",
-                        lambda t, src, i, b, c: FundamentalsResult(ticker=t.upper(), data_source=src,
-                                                                  snapshot_date="2025-12-31", roe=0.21))
+                        lambda t, src, i, b, c: _retained_result(t, 0.21, src))
     r1 = at.get_fundamentals_analysis(dal, "DELL")
     r2 = at.get_fundamentals_analysis(dal, "DELL")        # served from cache
     assert r1.roe == r2.roe == 0.21 and r2.data_source == "sec_edgar"
@@ -116,12 +122,7 @@ def test_sec_cache_hit_uses_local_market_backend(monkeypatch):
             self.calls.append(cache_key)
             now = datetime.now(timezone.utc)
             return {"source": "sec_edgar", "ticker": "AAPL", "fetched_at": now.isoformat(),
-                    "expires_at": (now + timedelta(days=90)).isoformat(), "data": FundamentalsResult(
-                ticker="AAPL",
-                data_source="sec_edgar",
-                snapshot_date="2025-12-31",
-                roe=0.33,
-            ).model_dump()}
+                    "expires_at": (now + timedelta(days=90)).isoformat(), "data": _retained_result("AAPL", 0.33).model_dump()}
 
     class _LocalMarketLike:
         def __init__(self):
@@ -197,12 +198,7 @@ def test_sec_cache_miss_writes_with_shared_cache_key(monkeypatch):
     monkeypatch.setattr(
         at,
         "_build_result_from_statements",
-        lambda t, src, i, b, c: FundamentalsResult(
-            ticker=t.upper(),
-            data_source=src,
-            snapshot_date="2025-12-31",
-            roe=0.44,
-        ),
+        lambda t, src, i, b, c: _retained_result(t, 0.44, src),
     )
 
     dal = _DAL()
@@ -236,12 +232,7 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
     # Positive local SEC cache must win without consulting any retired or live source.
     cached_backend = _FakeBackend()
     cached_backend.store[fundamentals_analysis_cache_key(ticker, "annual")] = (
-        FundamentalsResult(
-            ticker=ticker,
-            snapshot_date="2025-12-31",
-            data_source="sec_edgar",
-            roe=0.44,
-        ).model_dump()
+        _retained_result(ticker, 0.44).model_dump()
     )
     cached_dal = _FakeDAL(cached_backend, legacy_result=legacy)
 
@@ -253,18 +244,14 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
 
     cached = at.get_fundamentals_analysis(cached_dal, ticker)
 
-    assert cached.model_dump(exclude={"source_observations"}) == FundamentalsResult(
-        ticker=ticker,
-        snapshot_date="2025-12-31",
-        data_source="sec_edgar",
-        roe=0.44,
-        source_routes=[{
+    assert cached.roe == 0.44
+    assert cached.metric_basis["roe"]["denominator_basis"] == "period_end"
+    assert cached.source_routes == [{
             "dataset": "fundamentals_analysis", "requested": "auto",
             "configured_sources": ["sec_edgar", "financial_datasets"],
             "selected_source": "sec_edgar", "setting_source": "default",
             "selection_policy": "local_first_ordered",
-        }],
-    ).model_dump(exclude={"source_observations"})
+        }]
     assert cached.source_observations[0]["retrieval"] == "stored"
     assert cached_dal.legacy_calls == []
 
@@ -289,12 +276,7 @@ def test_annual_analysis_ignores_legacy_snapshot_and_preserves_sec_fd_order(
 
     def _build_result(ticker_value, source, *_statements):
         events.append(f"build:{source}")
-        return FundamentalsResult(
-            ticker=ticker_value.upper(),
-            snapshot_date="2025-12-31",
-            data_source=source,
-            roe=0.31 if source == "sec_edgar" else 0.52,
-        )
+        return _retained_result(ticker_value, 0.31 if source == "sec_edgar" else 0.52, source)
 
     def _unexpected_fd_gate(_dal):
         events.append("fd:gate")

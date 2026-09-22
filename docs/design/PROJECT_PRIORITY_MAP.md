@@ -22,6 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
+| **P1 update, 2026-09-23** | **RESEARCH TOOL REPAIR AND COLLECTOR READINESS** | Financial basis/warm-cache guards, retained earnings release/session analysis and five existing OAuth calculators implemented; review/full regression pending. The private Firefox host now allows watchlist/control and its eight-action native-protocol preflight passes; signed-in two-company acceptance is still pending. Current record: `docs/superpowers/evidence/2026-09-23-research-tool-repairs/README.md`. | Advance audited research correctness and usable tool admission without waiting for live browser acceptance. This updates the company-workflow row below, not the independent service/MCP obligations. |
 | **P1** | **PERSISTENT LOCAL SERVICE AND FAILURE DELIVERY** | **REQUIRED; NOT IMPLEMENTED.** Separate API/scheduler ownership from Desktop window lifetime; one supervised owner per profile, authenticated discovery, detach/reattach, explicit stop and observable failure delivery. Review the same cross-workstream design, then verify actual process lifetime and single-owner behavior. Does not wait for SA acceptance, SEC retirement or SQLite replacement. | Unattended collection and the research workbench are complementary requirements. Closing the UI must not silently terminate scheduled work. |
 | **P1** | **EXTERNAL READ / ANALYSIS MCP** | **REQUIRED; NO LONGER DEFERRED.** A thin external adapter forwards to the persistent service; it does not own a DAL or collectors. First admission is stored reads and pure calculations under a distinct server-enforced external policy. Implementation can proceed against the agreed service contract; live acceptance requires that service authority. Internal SDK bridges and OAuth allowlists are not external authorization. Owner: the September 22 cross-workstream design. | External agents must be able to use retained research data without implicit writes, refreshes or spending. This does not require a new notes product. |
 | **P1** | **COMPLETE COMPANY RESEARCH WORKFLOW** | **RETAINED ARTICLE/COMMENT/HOLDINGS READS VERIFIED; WHOLE WORKFLOW PARTIAL.** Frozen `e0bce862`: **12,306 backend / 12 unchanged skips**, **934 related backend**, **1,920 frontend / 126 files**, typecheck/build, i18n and eight desktop checks. Four-channel reads preserve bounded text, source/capture gaps, snapshot consistency and qualified whole-scope holdings totals without acquisition or schema initialization. Private-copy replay covers three real bodies, long-comment continuation, ten holdings and fresh-process reopening; explicit copy-only comment extraction also works. Table inputs, source comparison and optional ticker-based SEC entry were accepted in the preceding slice. Installed signed-in Chrome/Firefox and operator research acceptance remain open, as does production comment-backlog processing. Next: legacy ratio/event repair, including warm derived caches, then replacement-dependent retirement. Owner: `docs/superpowers/plans/2026-09-21-company-research-workflow.md`; evidence: `docs/superpowers/evidence/2026-09-22-retained-research-reads/README.md`; root policy: `DATA_ACQUISITION_AND_UPDATES.md`. | The user explicitly requests broader, faster product outcomes rather than another isolated control, cache adjustment or prerequisite questionnaire. |
@@ -668,6 +669,18 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-23 (COLLECTOR PREFLIGHT AND RESEARCH TOOL REPAIR):** The operator
+  requested that the stale private-host gate be corrected while the accepted
+  legacy analytical repair and missing usable research capabilities proceed.
+  The private native wrapper now permits watchlist/control and its real framed
+  preflight probes all eight required actions. Financial formula/basis/cache
+  guards and local earnings release/session semantics are implemented; five
+  existing pure calculators are newly usable through both OAuth adapters.
+  Independent review/full regression remain pending in the current evidence.
+  Do not equate these changes with all-tool reliability, an external MCP server,
+  an intraday observer, or signed-in Chrome/Firefox bulk acceptance. Production
+  activation, settings and data remain unchanged. No automatic paid recovery.
 
 - **2026-09-22 (NEWS SEARCH VALUE, NOT PERMANENT ARCHIVAL):** The user clarifies
   that old ordinary news need not be preserved for its own sake. The objective

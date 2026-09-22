@@ -428,8 +428,9 @@ class TestAnalysisTools:
         assert result.ticker == "NVDA"
         assert result.data_source == "sec_edgar"
         assert result.snapshot_date == "2025-12-31"
-        assert result.roe == 0.31
-        assert result.revenue_growth == 0.25
+        assert result.roe is None
+        assert result.revenue_growth is None
+        assert result.metric_gaps["roe"] == "income_unavailable"
         assert result.market_cap is None
         assert result.pe_ratio is None
 

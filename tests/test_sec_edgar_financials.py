@@ -5,6 +5,7 @@ Uses mock XBRL JSON to avoid real SEC API calls.
 """
 
 from unittest.mock import MagicMock, patch
+from datetime import date, timedelta
 
 import pytest
 
@@ -68,6 +69,9 @@ def _build_mock_facts():
         _make_entry(2023, "Q2", "10-Q", "2023-04-01", 332160000000),
         _make_entry(2023, "Q3", "10-Q", "2023-07-01", 335040000000),
     ]
+
+    for row in revenue_entries + net_income_entries:
+        row["start"] = (date.fromisoformat(row["end"]) - timedelta(days=364 if row["fp"] == "FY" else 89)).isoformat()
 
     return {
         "cik": 320193,
