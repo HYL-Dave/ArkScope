@@ -22,6 +22,9 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
+| **P1** | **ARCHIVE-FIRST DATA RETENTION** | **REQUIRED; OBSOLETE-BACKUP CLEANUP EXECUTED, NEWS PRUNING NOT IMPLEMENTED.** September 22 removed twelve named June/July rollback snapshots and sixteen sidecars, freeing 13.32 GB; current DB rows and newer backups remain. Market-news age inventory is complete. Next: review the archive-first design, then deliver protected preview/archive/restore and removal across ordinary-news owners. No SA login or subscription prerequisite. Owner: `docs/superpowers/specs/2026-09-22-retention-service-and-external-tools-design.md`; receipt: `docs/superpowers/evidence/2026-09-22-retention-delivery-reset/README.md`. | The user explicitly permits useless-backup removal and one retained archive before removal of old news. Age does not override citations, investigations or active recovery dependencies. |
+| **P1** | **PERSISTENT LOCAL SERVICE AND FAILURE DELIVERY** | **REQUIRED; NOT IMPLEMENTED.** Separate API/scheduler ownership from Desktop window lifetime; one supervised owner per profile, authenticated discovery, detach/reattach, explicit stop and observable failure delivery. Review the same cross-workstream design, then verify actual process lifetime and single-owner behavior. Does not wait for SA acceptance, SEC retirement or SQLite replacement. | Unattended collection and the research workbench are complementary requirements. Closing the UI must not silently terminate scheduled work. |
+| **P1** | **EXTERNAL READ / ANALYSIS MCP** | **REQUIRED; NO LONGER DEFERRED.** A thin external adapter forwards to the persistent service; it does not own a DAL or collectors. First admission is stored reads and pure calculations under a distinct server-enforced external policy. Implementation can proceed against the agreed service contract; live acceptance requires that service authority. Internal SDK bridges and OAuth allowlists are not external authorization. Owner: the September 22 cross-workstream design. | External agents must be able to use retained research data without implicit writes, refreshes or spending. This does not require a new notes product. |
 | **P1** | **COMPLETE COMPANY RESEARCH WORKFLOW** | **RETAINED ARTICLE/COMMENT/HOLDINGS READS VERIFIED; WHOLE WORKFLOW PARTIAL.** Frozen `e0bce862`: **12,306 backend / 12 unchanged skips**, **934 related backend**, **1,920 frontend / 126 files**, typecheck/build, i18n and eight desktop checks. Four-channel reads preserve bounded text, source/capture gaps, snapshot consistency and qualified whole-scope holdings totals without acquisition or schema initialization. Private-copy replay covers three real bodies, long-comment continuation, ten holdings and fresh-process reopening; explicit copy-only comment extraction also works. Table inputs, source comparison and optional ticker-based SEC entry were accepted in the preceding slice. Installed signed-in Chrome/Firefox and operator research acceptance remain open, as does production comment-backlog processing. Next: legacy ratio/event repair, including warm derived caches, then replacement-dependent retirement. Owner: `docs/superpowers/plans/2026-09-21-company-research-workflow.md`; evidence: `docs/superpowers/evidence/2026-09-22-retained-research-reads/README.md`; root policy: `DATA_ACQUISITION_AND_UPDATES.md`. | The user explicitly requests broader, faster product outcomes rather than another isolated control, cache adjustment or prerequisite questionnaire. |
 | **P1** | **SELECTED DATA SOURCES** | **FINANCIAL ROUTING AND CATEGORY CATALOG MERGED; BROADER ROUTING OPEN.** Catalog `5ab98bdb`: eleven categories distinguish integration, acquisition and access/cost prerequisites, with navigation to existing controls; **421 related backend**, **1,908 frontend / 126 files**, typecheck/build, i18n, **8 desktop** and post-merge isolated browser checks pass. No full backend rerun for the metadata slice; the prior financial-routing full acceptance remains `fad51d98` (**11,971 / 12 skips**). Financial selection and FD admission keep their existing authorities. Broader collection controls, SA/Massive financial adapters and event-aware expiry remain separate work. The owned catalog branch is removed; no push. Owner/evidence: `docs/superpowers/plans/2026-09-21-data-capability-catalog.md`, `docs/superpowers/evidence/2026-09-21-data-capability-catalog/README.md`; prior routing: `docs/superpowers/evidence/2026-09-21-data-source-routing/README.md`. | The user has no paid Finnhub subscription and requires per-dataset provider choice. Categories must distinguish available integrations from candidates without inventing acquisition permissions or schedules. |
 | **P1** | **CALENDAR EVIDENCE AND EVENT-AWARE REFRESH** | **CALENDAR REPAIR VERIFIED AND MERGED; FINANCIAL EVENT INTEGRATION NOT YET IMPLEMENTED.** Frozen `30682b51`: **11,911 backend / 12 unchanged skips**, **1,867 frontend / 124 files**, typecheck/build, i18n and **8 desktop** checks. Main-tree `86937e34`: **758 related checks**; this slice's worktree and branch are removed. Genuine empty responses stay distinct from malformed/rejected data; request scope and typed failures survive persistence; corrected earnings dates retain as-of history. A future event cannot by itself extend an incomplete financial cache. Owner: `docs/superpowers/plans/2026-09-21-calendar-refresh-evidence.md`; evidence: `docs/superpowers/evidence/2026-09-21-calendar-refresh-evidence/README.md`. | The user requires update decisions based on data type and provider availability, not a restartable uniform TTL. Calendar integrity is a prerequisite, not proof of statement readiness. |
@@ -52,7 +55,7 @@ foundation work. The active resolver for "what next?" is now:
 | **P1** | **Publication / backup hygiene** | Publication review remains its own gated thread. Retired implementations and the completed census documents now exist in remote history, so rewriting history requires separate approval. | Operational risk reduction, not product scope. |
 | **Gated** | **IV S-D/S-E / paid options data** | Blocked until written hypothesis + OOS plan + kill criteria + cost-vs-value. | Research subscription rule applies; no consumer and no hypothesis today. |
 | **Gated** | **Unified Runner Phase C** | Still paused. Resume only after workbench v1 ships, two weeks stable, and one verified cross-machine migration. | Internal infra win; premature before storage/profile/UI shape settles. |
-| **Deferred** | RL productionization, Reddit/StockTwits/X paid, MCP integration | No active work. | Prior pause/defer decisions still stand. |
+| **Deferred** | RL productionization, Reddit/StockTwits/X paid | No active work. External read/analysis MCP is explicitly promoted above, not part of this deferral. | Other prior pause/defer decisions still stand. |
 
 **SEC continuation (2026-09-12):**
 `docs/superpowers/plans/2026-09-12-sec-document-reading.md` implements selected
@@ -534,7 +537,10 @@ second model roster in these standing premises.
 - **Status**: not approved. Noise-to-signal ratio + scraping governance cost too high without a clear use case.
 
 ### P3.4 MCP integration
-- **Status**: not needed near-term. HTTP API more direct for OpenClaw / external clients.
+- **Historical status superseded 2026-09-22:** external read/analysis MCP is a
+  required P1 workstream in the current operating map. A thin client and
+  service-owned authorization are proposed; the internal SDK bridge is not an
+  already shipped external server.
 
 ---
 
@@ -662,6 +668,24 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-22 (PARALLEL PRODUCT DELIVERY; RETENTION AUTHORIZATION):** The user
+  reconfirms data retention, unattended operation and external MCP alongside the
+  research workbench. They are not optional follow-ups or contingent on SA
+  operator acceptance. Promote three independent P1 lanes; the company workflow
+  continues with analytics repairs and replacement-dependent retirement, but no
+  longer owns the entire queue. The proposed cross-workstream design is
+  `docs/superpowers/specs/2026-09-22-retention-service-and-external-tools-design.md`;
+  implementation boundaries remain subject to its review, not silently shipped.
+  The user authorizes useless-backup deletion and one archive before old-news
+  removal. Named June/July rollback cleanup removes 28 files / 12 snapshots /
+  13,324,185,600 allocated bytes; active market/profile/macro file hashes are
+  unchanged and newer backups remain. The live SA DB changed independently during
+  inventory, so no unchanged-SA assertion is made. No news rows were deleted.
+  Keep archive/restore, references, FTS/projections and retry/frontier state in
+  the retention contract. Current README/root policy now reflect this decision;
+  new notebooks/token-monitoring products stay out, existing translation/usage
+  display stay. Evidence: `docs/superpowers/evidence/2026-09-22-retention-delivery-reset/README.md`.
 
 - **2026-09-21 (SA FINANCIAL INPUT CONNECTED; SOURCE LIMITS RETAINED):** The
   financial-statement and valuation tracks have separate gates. An explicit

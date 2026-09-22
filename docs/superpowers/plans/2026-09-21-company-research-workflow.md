@@ -16,6 +16,14 @@ authorized by this plan.
 Current state: [Progress At Each Handoff](#progress-at-each-handoff).
 Latest accepted slice: [retained article, comment and holdings reads](../evidence/2026-09-22-retained-research-reads/README.md).
 
+September 22 sequencing correction: this is one delivery lane, not the complete
+product backlog. Retention, persistent service/failure delivery and external
+read/analysis MCP remain required and do not wait for this lane's signed-in
+browser acceptance. See the [cross-workstream design](../specs/2026-09-22-retention-service-and-external-tools-design.md)
+and current priority map. The user separately authorized obsolete-backup cleanup
+and archive-first ordinary-news retention; the named cleanup receipt does not
+mean an automatic news purge or service deployment has occurred.
+
 ## Reconciled Pre-Implementation Baseline (September 21)
 
 - The then-current SEC Settings panel required a numeric CIK. The existing issuer
@@ -137,8 +145,9 @@ without claiming immutable historical archives. Holdings totals also qualify
 valuation gaps and withhold mixed/unknown broker-base currencies. These changes
 are documented in the root acquisition policy, not only this execution log.
 
-The next product package is legacy ratio/event repair, followed by
-replacement-dependent retirement. Cross-provider comparisons are
+The next package within this company-workflow lane is legacy ratio/event repair,
+followed by replacement-dependent retirement. It is not a prerequisite for the
+independent retention and service workstreams. Cross-provider comparisons are
 not blockers merely because numbers differ: field/unit/period correctness is a
 separate obligation from the research significance of a qualified difference.
 Installed Chrome/Firefox operator acceptance remains open; this read-only batch
@@ -183,8 +192,9 @@ availability. Unattended service lifetime remains an open workstream.
 No duplicate full-page archives, automatic company-page schedule or unlimited
 retry history is introduced merely to test extraction. New observation storage
 must deduplicate unchanged content and report storage limits before ingestion
-expands. Existing data/backup retention needs its own inventory and approval;
-neither quoted directory sizes nor old timestamps authorize deletion. A blocked
+expands. September 22 authorizes obsolete-backup cleanup and archive-first old
+news handling; protected references and verified archive/restore still gate
+payload removal. Neither quoted directory sizes nor age alone proves eligibility. A blocked
 integration remains explicitly unavailable in the catalog until a deliberate
 retirement decision, rather than being hidden as though the data were unwanted.
 

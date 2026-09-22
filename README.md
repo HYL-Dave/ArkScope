@@ -19,9 +19,11 @@ System, and Settings. AI Research owns persisted threads and model runs; Setting
 owns provider configuration, model credentials and routing, collection schedules,
 storage status, and investor-profile calibration.
 
-Alerts and Notes remain planned product surfaces. They are not yet shipped and
-therefore are intentionally absent from the current navigation rather than shown
-as disabled placeholders.
+Unattended operation, collection-failure delivery and external read/analysis
+access remain planned capabilities. New research-notebook and token-monitoring
+products are not planned; existing AI Research, card translation and account-usage
+display remain. See the [delivery design](docs/superpowers/specs/2026-09-22-retention-service-and-external-tools-design.md)
+for the proposed boundaries and remaining work, not shipped behavior.
 
 Canonical project information:
 
@@ -29,7 +31,7 @@ Canonical project information:
 - **Product contract** → `docs/design/ARKSCOPE_WORKBENCH_PRODUCT_SPEC.md`
 - **Architecture and storage contract** → `docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md`
 - **Current priorities and decision log** → `docs/design/PROJECT_PRIORITY_MAP.md`
-- **Data acquisition, update triggers, and freshness** → [Data Acquisition And Updates](DATA_ACQUISITION_AND_UPDATES.md)
+- **Data acquisition, update triggers, freshness, and retention** → [Data Acquisition And Updates](DATA_ACQUISITION_AND_UPDATES.md)
 - **Design-document status index** → `docs/design/README.md`
 
 ## Run locally

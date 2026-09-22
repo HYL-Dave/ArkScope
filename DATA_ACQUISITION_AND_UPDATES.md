@@ -2,7 +2,7 @@
 
 Maintained policy and implementation map. Last reconciled with source: 2026-09-22.
 
-This document owns the cross-source acquisition, update-trigger and freshness
+This document owns the cross-source acquisition, update-trigger, freshness and retention
 contract. It distinguishes current behavior from approved follow-up work; dated
 plans and test receipts are evidence, not the only place to discover the policy.
 The [priority map](docs/design/PROJECT_PRIORITY_MAP.md) owns work sequencing;
@@ -30,12 +30,20 @@ source-specific specifications still own their detailed protocols.
 
 ## Product Workflow And Delivery Scope
 
-The next delivery unit is a complete company-research workflow: company choice,
+One active delivery unit is a complete company-research workflow: company choice,
 selected-source acquisition/reuse, usable research inputs and optional source
 verification. The data-category catalog is supporting inventory, not the
 finished capability or a requirement for the user to redesign all preferences.
 The [workflow plan](docs/superpowers/plans/2026-09-21-company-research-workflow.md)
 owns implementation and acceptance; its pending items are not current behavior.
+
+Data retention, unattended service lifetime/failure delivery and external
+read/analysis MCP are also required workstreams. They do not wait for SA browser
+acceptance or SEC retirement. The September 22
+[cross-workstream design](docs/superpowers/specs/2026-09-22-retention-service-and-external-tools-design.md)
+records proposed implementation boundaries and independent acceptance gates;
+these capabilities are not yet delivered. ArkScope remains a research workbench,
+not only a collection pipeline.
 
 Original SEC analysis is an optional verification path, not a mandatory step for
 ordinary company research. Retire redundant user-facing technical surfaces and
@@ -754,11 +762,37 @@ switch or repeated billable probe is implicit in a refresh request.
 
 Acquisition lookback, read reuse and retention are separate policies. The
 14-day news bootstrap and seven-day financial reuse window authorize no deletion.
-The user's approximately 90-day general-news retention preference still requires
-inventory, protected-reference handling and a delete/export decision; there is
-no general periodic purge implemented here. SA analysis/comments do not inherit
-a general-news cutoff. Existing captures, citations and operational recovery
-procedures retain their own protection requirements.
+The user has now authorized removing obsolete backups and archiving old ordinary
+news once before removing it from active storage. The approximately 90-day news
+window remains a candidate-selection preference, not an unconditional SQL delete.
+No general periodic purge is implemented. SA analysis/comments do not inherit a
+general-news cutoff. Existing citations, investigation evidence and operational
+recovery state retain their own protection requirements.
+
+### Retention Delivery Status (September 22)
+
+- **Executed:** twelve obsolete June/July market/profile rollback snapshots and
+  sixteen associated empty-WAL/SHM files were removed after identity/open-handle
+  checks. Removed allocation: 13,324,185,600 bytes. Newer recovery backups, current
+  DBs, news rows and existing archives were not deletion targets. See the
+  [exact receipt](docs/superpowers/evidence/2026-09-22-retention-delivery-reset/backup-cleanup.json).
+  This is a named one-time cleanup, not an age-only backup purge policy.
+- **Inventoried:** 389,545 normalized market-news articles; 294,445 precede the
+  candidate cutoff `2026-06-24T00:00:00Z`. These are age-only counts before
+  protection checks, not approved deletions or counts to add to the legacy view.
+  Timezone-aware parsing is required: SQLite alone does not parse the legacy
+  `+0000` timestamp representation. SA ordinary-news eligibility still needs its
+  own inventory. [Inventory](docs/superpowers/evidence/2026-09-22-retention-delivery-reset/news-inventory.json).
+- **Proposed, not implemented:** a single deduplicated archive for old bodies,
+  retained small identity/source metadata and local reopening, verified restore
+  before active payload removal, explicit protection and retry/frontier handling,
+  and opt-in periodic maintenance. Full-text search must declare its active
+  window. Physical SQLite compaction is a separate stopped-writer operation;
+  deleting rows alone is not proof of disk-space reclamation.
+- **Still pending:** ordinary-news archive/restore code and Settings controls,
+  reference protection, SA ordinary-news adapter, job-history policy, supervised
+  service lifetime, failure delivery and external-tool admission. Neither the
+  cleanup nor the inventory completes these features.
 
 ## Maintenance And Verification
 
