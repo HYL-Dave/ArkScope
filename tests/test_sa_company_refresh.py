@@ -264,6 +264,49 @@ def test_rate_backoff_caps_at_seven_days_and_success_resets_it():
     assert result["afterSuccess"] == 6
 
 
+@pytest.mark.parametrize("code", ["sa_company_rate_limited", "sa_company_human_verification_required"])
+@pytest.mark.parametrize("phase", ["prepare", "capture"])
+def test_restriction_is_persisted_before_tab_cleanup_finishes(code, phase):
+    result = probe("""
+      const code = CODE;
+      const phase = PHASE;
+      let cleanupStarted, release;
+      const cleanup = new Promise(resolve => { cleanupStarted=resolve; });
+      const gate = new Promise(resolve => { release=resolve; });
+      chrome.tabs.create=async options=>({id:1,url:options.url});
+      chrome.tabs.get=async()=>({id:1,url:'https://seekingalpha.com/symbol/AMD/income-statement'});
+      safeRemoveTab=async()=>{};
+      registerCollectorTab=async()=>{};
+      unregisterCollectorTab=async()=>{};
+      waitForTabLoad=async()=>{};
+      sleep=async()=>{cleanupStarted();await gate;};
+      sendNativeMessage2=async()=>({status:'ok',dataset:'financials'});
+      chrome.scripting.executeScript=async()=>[{result:phase==='prepare'
+        ? {status:'error',error_code:code} : {status:'ok'}}];
+      captureCompanyData=async()=>({status:'error',error_code:code});
+      deps.runScope=(scope,_mode,admitted,observeFailure)=>refreshCompanyFinancialScope(
+        scope,SAExtensionDiagnostics.createCollector(),admitted,observeFailure);
+      const pending=api.run(true);
+      await cleanup;
+      const during=await api.status();
+      let extraAttempts=0;
+      deps.runScope=async()=>{extraAttempts++;return {status:'ok',currency:'USD',observation_id:'b'.repeat(64)};};
+      const restarted=SACompanyRefresh.create(deps);
+      await restarted.configure({...config,tickers:['AAPL']});
+      await restarted.run(false);
+      release();await pending;
+      return {during,extraAttempts,state:saved.companyFinancialRefresh};
+    """.replace("CODE", json.dumps(code)).replace("PHASE", json.dumps(phase)))
+    assert result["extraAttempts"] == 0
+    assert result["during"]["scopes"][0]["last_error"] == code
+    assert result["state"]["records"]["AMD/income_statement/annual"]["failures"] == 1
+    if code == "sa_company_rate_limited":
+        assert result["during"]["rate_limited"] is True
+        assert result["state"]["rate_limit_failures"] == 1
+    else:
+        assert result["during"]["paused_reason"] == code
+
+
 def test_duplicate_triggers_join_and_disabling_queued_work_prevents_navigation():
     result = probe("""
       let release;
@@ -427,6 +470,9 @@ def test_popup_explains_shared_rate_cooldown_deadline():
     ("login", "sa_company_login_required"),
     ("rate_title", "sa_company_rate_limited"),
     ("rate_heading", "sa_company_rate_limited"),
+    ("multiline_rate", "sa_company_rate_limited"),
+    ("rate_and_challenge_title", "sa_company_human_verification_required"),
+    ("rate_and_challenge_frame", "sa_company_human_verification_required"),
 ])
 def test_prepare_waits_for_the_requested_period_table_not_just_the_dropdown(scenario, expected):
     source = _run_background_probe("return prepareCompanyFinancialView.toString();")
@@ -445,6 +491,18 @@ def test_prepare_waits_for_the_requested_period_table_not_just_the_dropdown(scen
       if (scenario === 'rate_heading') {
         const h = w.document.createElement('h1'); h.textContent='Too many requests';
         w.document.querySelector('main').prepend(h);
+      }
+      if (scenario === 'multiline_rate') {
+        const h = w.document.createElement('h1'); h.innerHTML='Too many<br>\nrequests';
+        w.document.querySelector('main').prepend(h);
+      }
+      if (scenario === 'rate_and_challenge_title') {
+        w.document.title='Verify you are human';
+        w.document.querySelector('main').insertAdjacentHTML('afterbegin','<h1>Too many requests</h1>');
+      }
+      if (scenario === 'rate_and_challenge_frame') {
+        w.document.title='429 Too Many Requests';
+        w.document.body.insertAdjacentHTML('beforeend','<iframe title="Human verification challenge"></iframe>');
       }
       let clock = 0;
       w.Date.now = () => clock;

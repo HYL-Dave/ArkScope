@@ -23,15 +23,15 @@
     var url = new URL(location.href);
     var match = /^\/symbol\/([A-Z][A-Z0-9.-]{0,19})\/(income-statement|balance-sheet|cash-flow-statement)\/?$/.exec(url.pathname);
     if (url.origin !== "https://seekingalpha.com" || !match) fail("sa_company_page_unsupported");
-    var rateLimitMessage = /too many requests|rate limit exceeded/i;
-    if (rateLimitMessage.test(document.title)
-        || Array.from(document.querySelectorAll('h1')).some(function (node) {
-          return visible(node) && rateLimitMessage.test(text(node));
-        })) fail("sa_company_rate_limited");
     if (/access denied|access to this page has been denied|verify you are human|just a moment/i.test(document.title)
         || Array.from(document.querySelectorAll('iframe[title="Human verification challenge"]')).some(visible)) {
       fail("sa_company_human_verification_required");
     }
+    var rateLimitMessage = /too\s+many\s+requests|rate\s+limit\s+exceeded/i;
+    if (rateLimitMessage.test(document.title)
+        || Array.from(document.querySelectorAll('h1')).some(function (node) {
+          return visible(node) && rateLimitMessage.test(text(node));
+        })) fail("sa_company_rate_limited");
     var main = one(document, "main");
     var heading = text(one(main, "h1"));
     if (!heading.startsWith(match[1] + " - ") || !document.title.includes("(" + match[1] + ")")) {

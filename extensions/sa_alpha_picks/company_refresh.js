@@ -104,7 +104,7 @@
       return updated;
     }
     async function perform(force) {
-      // Refresh overrides source-age policy, never a provider-wide cooldown.
+      // Refresh overrides source-age policy, never the financial-batch cooldown.
       if (rateLimitDeadline(await read()) > now()) return status();
       if (force) await mutate(function (state) { state.paused_reason = null; });
       var state = await read();
@@ -133,9 +133,28 @@
             last_attempt_at:attemptAt, last_error:"sa_company_refresh_interrupted",
             retry_after:new Date(now() + 6 * 3600000).toISOString()});
         });
+        var failureWrite = null;
+        var observeFailure = function (errorCode) {
+          if (failureWrite) return failureWrite;
+          failureWrite = mutate(function (current) {
+            var record = current.records[key(scope)] || {};
+            var failures = Math.min((record.failures || 0) + 1, 6);
+            var code = /^sa_company_[a-z_]+$|^data_source_[a-z_]+$/.test(errorCode || "")
+              ? errorCode : "sa_company_refresh_failed";
+            current.records[key(scope)] = Object.assign({}, record, {failures:failures, last_error:code,
+              retry_after:new Date(now() + retryDelay(failures)).toISOString()});
+            if (code === "sa_company_rate_limited") {
+              current.rate_limit_failures = Math.min((current.rate_limit_failures || 0) + 1, 6);
+              current.rate_limit_until = new Date(now() + retryDelay(current.rate_limit_failures)).toISOString();
+            }
+            if (paused(code)) current.paused_reason = code;
+          });
+          return failureWrite;
+        };
         var result;
-        try { result = await deps.runScope(scope, force ? "manual" : "scheduled", admitted); }
+        try { result = await deps.runScope(scope, force ? "manual" : "scheduled", admitted, observeFailure); }
         catch (_) { result = {status:"error", error_code:"sa_company_refresh_failed"}; }
+        if (failureWrite) await failureWrite;
         if (result.status === "cancelled") {
           await mutate(function (current) {
             var record = current.records[key(scope)] || {};
@@ -145,27 +164,13 @@
           });
           break;
         }
-        if (result.status === "ok") {
+        if (result.status === "ok" && !failureWrite) {
           await noteSuccess(scope, result);
           await mutate(function (current) {
             current.rate_limit_until = null;
             current.rate_limit_failures = 0;
           });
-        } else {
-          await mutate(function (current) {
-            var record = current.records[key(scope)] || {};
-            var failures = Math.min((record.failures || 0) + 1, 6);
-            var code = /^sa_company_[a-z_]+$|^data_source_[a-z_]+$/.test(result.error_code || "")
-              ? result.error_code : "sa_company_refresh_failed";
-            current.records[key(scope)] = Object.assign({}, record, {failures:failures, last_error:code,
-              retry_after:new Date(now() + retryDelay(failures)).toISOString()});
-            if (code === "sa_company_rate_limited") {
-              current.rate_limit_failures = Math.min((current.rate_limit_failures || 0) + 1, 6);
-              current.rate_limit_until = new Date(now() + retryDelay(current.rate_limit_failures)).toISOString();
-            }
-            if (paused(code)) current.paused_reason = code;
-          });
-        }
+        } else if (!failureWrite) await observeFailure(result.error_code);
       }
       return status();
     }

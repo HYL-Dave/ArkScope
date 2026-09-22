@@ -591,10 +591,10 @@ async function forwardReconciliationNative(payload, sender) {
 const companyFinancialRefresh = SACompanyRefresh.create({
   storage: chrome.storage.local,
   alarms: chrome.alarms,
-  runScope: function (scope, mode, admitted) {
+  runScope: function (scope, mode, admitted, observeFailure) {
     return enqueueSaSyncJob({displayName: scope.ticker + " " + scope.view + " financials",
       operation: "company_financial_capture", mode: mode}, function (diagnostics) {
-      return refreshCompanyFinancialScope(scope, diagnostics, admitted);
+      return refreshCompanyFinancialScope(scope, diagnostics, admitted, observeFailure);
     });
   },
 });
@@ -787,7 +787,7 @@ async function captureCompanyData(target, diagnostics, expectedScope) {
   return result;
 }
 
-async function refreshCompanyFinancialScope(scope, diagnostics, admitted) {
+async function refreshCompanyFinancialScope(scope, diagnostics, admitted, observeFailure) {
   var tabId = null;
   try {
     if (!await admitted()) return {status:"cancelled"};
@@ -817,12 +817,16 @@ async function refreshCompanyFinancialScope(scope, diagnostics, admitted) {
       throw new Error("sa_company_page_changed");
     }
     if (!await admitted()) return {status:"cancelled"};
-    return await captureCompanyData({id:tabId, url:target.url}, diagnostics, scope);
+    var result = await captureCompanyData({id:tabId, url:target.url}, diagnostics, scope);
+    if (result.status === "error" && observeFailure) await observeFailure(result.error_code);
+    return result;
   } catch (error) {
     var code = /^(sa_company_|data_source_)[a-z_]+$/.test(error.message || "")
       ? error.message : "sa_company_dom_not_ready";
     recordExtensionFailure(diagnostics, {stage:"content_parse",reason_code:"company_capture_rejected",
       target_kind:"phase",retryable:false,attempt_count:1});
+    // Persist restrictions before tab cleanup/pacing: reload must not erase them.
+    if (observeFailure) await observeFailure(code);
     return {status:"error",error_code:code,reason_code:"company_capture_rejected",failure_phase:"extraction"};
   } finally {
     if (tabId !== null) {
@@ -854,16 +858,16 @@ async function prepareCompanyFinancialView(view, pathname) {
   var steady = 0;
   var start = Date.now();
   while (Date.now() - start < 45000) {
-    var rateLimitMessage = /too many requests|rate limit exceeded/i;
+    if (/verify you are human|access denied|access to this page has been denied|just a moment/i.test(document.title)
+        || Array.from(document.querySelectorAll('iframe[title="Human verification challenge"]')).some(visible)) {
+      return {status:"error",error_code:"sa_company_human_verification_required"};
+    }
+    var rateLimitMessage = /too\s+many\s+requests|rate\s+limit\s+exceeded/i;
     if (rateLimitMessage.test(document.title)
         || Array.from(document.querySelectorAll('h1')).some(function (node) {
           return visible(node) && rateLimitMessage.test(label(node));
         })) {
       return {status:"error",error_code:"sa_company_rate_limited"};
-    }
-    if (/verify you are human|access denied|access to this page has been denied|just a moment/i.test(document.title)
-        || Array.from(document.querySelectorAll('iframe[title="Human verification challenge"]')).some(visible)) {
-      return {status:"error",error_code:"sa_company_human_verification_required"};
     }
     if (/\/login|\/sign_in/.test(location.pathname)) return {status:"error",error_code:"sa_company_login_required"};
     if (location.origin !== "https://seekingalpha.com" || location.pathname !== pathname) {

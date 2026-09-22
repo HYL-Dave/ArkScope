@@ -534,3 +534,15 @@ def test_hidden_rate_banner_and_a_429_financial_value_are_not_a_visible_limit(tm
     result = extract_dom(tmp_path, markup)
     assert result["status"] == "ok"
     assert any("429.0" in row["values"] for row in result["capture"]["rows"])
+
+
+@pytest.mark.parametrize("challenge", ["title", "frame"])
+def test_verification_takes_priority_over_a_timed_rate_cooldown(tmp_path, challenge):
+    markup = financial_html(capture()).replace('<main>', '<main><h1>Too many requests</h1>')
+    if challenge == "title":
+        markup = markup.replace('Example Company (AMD) Income Statement', 'Verify you are human')
+    else:
+        markup = markup.replace('</body>', '<iframe title="Human verification challenge"></iframe></body>')
+    assert extract_dom(tmp_path, markup) == {
+        "status": "error", "error_code": "sa_company_human_verification_required",
+    }
