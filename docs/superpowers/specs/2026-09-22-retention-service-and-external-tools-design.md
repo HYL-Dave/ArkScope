@@ -1,8 +1,10 @@
 # Retention, Persistent Service And External Research Tools
 
 Status: proposed design for user review, not implemented behavior. The user
-reconfirmed all three capabilities on September 22. They are independent active
-workstreams, not conditional on completion of the company/SA workflow.
+reconfirmed all three capabilities on September 22. A subsequent clarification
+prioritizes useful, efficient recent-news search over storage savings or permanent
+archives. News retention is P2; service/access and correctness repairs proceed
+first, independently of company/SA operator acceptance.
 The separately authorized obsolete-backup cleanup is already executed; its
 [receipt](../evidence/2026-09-22-retention-delivery-reset/README.md) does not
 authorize a general production-news purge or service installation.
@@ -14,8 +16,8 @@ external-agent access. It is not being reduced to a collection pipeline. New
 research-notebook and token-monitoring products are out; existing research
 threads, card translation, account-usage display and useful tools stay.
 
-Use three independently verifiable delivery lanes. Retention and service
-lifetime can proceed independently. The external adapter can be developed
+Keep separate acceptance boundaries without treating all three as equally urgent.
+Retention must not delay service lifetime or access. The adapter can be developed
 against the agreed service contract while the service is implemented, but live
 external admission requires that contract and its authorization tests to pass.
 SA browser acceptance blocks only claims about that browser integration and
@@ -51,96 +53,76 @@ Owners: [Desktop](../../../apps/arkscope-desktop/main.js),
 [investigation readers](../../../src/lifecycle_investigation/news.py),
 [SA store](../../../src/sa_capture_store.py).
 
-## A. One News Archive, Bounded Active Storage
+## A. Recent News Search And Selective Retention (P2)
 
-### Recommendation And Alternatives
+### Corrected Objective
 
-Use archive-first tiering: retain one deduplicated local archive of old content,
-remove eligible old payloads and full-text search material from active storage,
-and retain small source/identity/title/date/URL metadata and archive locators.
-This preserves deduplication, old links and investigation identities without
-keeping a duplicate full market database each time maintenance runs.
+The user clarified that the goal is relevant, efficient recent-news search, not
+disk savings or a permanent historical corpus. This supersedes the earlier
+mandatory archive-first tiering/reopening proposal. Old, unreferenced ordinary
+news need not retain its body, title or archive locator forever.
 
-Deleting complete article rows immediately would require rewriting legacy
-migration/projection relationships and proving every historic reference. It is
-not the first release. Limiting FTS alone is simpler but leaves all active body
-payloads and does not meet the requested archive-then-remove behavior.
+Recommend selective retention: protect explicitly retained/cited/investigation
+evidence, then allow eligible old ordinary news and its search entries to be
+removed. A one-time export may be offered as an operational precaution, but a
+permanent archive service or transparent cold-storage reader is not required.
 
-### Scope And Eligibility
+### Search Before Storage Engineering
 
-- Default candidate window: approximately 90 days, configurable by the operator.
-  Freeze an explicit UTC cutoff per preview. Publication time determines age;
-  fetch/retry time must not reset it. Parse timezone-aware values, including
-  legacy `+0000`, rather than relying on SQLite `julianday()` alone. Unknown or
-  naive dates are retained and counted, not guessed or dropped.
-- Cover ordinary market news and SA market news through separate store-owned
-  adapters. Exclude Alpha Picks analysis, article comments, recommendation
-  lineages, holdings, prices, SEC citations and research conversations.
-- Keep manually retained/cited/investigation evidence and unresolved or active
-  retry/repair dependencies in active storage. Introduce an explicit retention
-  hold/reference owner where missing. Unknown protection cannot mean unreferenced.
-  Historical references without a complete index remain readable through the
-  archive locator; archive-only reads must be proven before clearing payloads.
-- Inventory old `data/news` ingest files separately. A file's age or the presence
-  of similar DB rows is not proof that its unique contents were archived.
-- Job history needs a separate rule: terminal diagnostics can be aged only after
-  durable scheduler frontiers and outstanding repair references are preserved.
-  Do not apply an unconditional 90-day `DELETE` to `job_runs`.
+Existing market-news search filters publication dates while matching
+`news_fts`; it does not maintain a recent-only physical index. SA market-news
+search has a different contract. Audit the actual
+[market-news](../../../src/tools/backends/sqlite_backend.py) and
+[SA](../../../src/tools/backends/sa_capture_backend.py) readers, not only the size
+of the normalized `news_articles_fts` storage.
 
-### Archive And Read Contract
+Result relevance and latency are separate outcomes. Measure representative
+queries, plans and latency, including counts/facets and ticker/source filters,
+before choosing index-windowing, query changes or pruning. A date filter or
+smaller DB is not a measured speedup. Approximately 90 days remains a configurable
+candidate window, not a default already applied to all readers or proof that
+every older article has no value. Search must disclose its coverage.
 
-One logical private news archive is the authority for moved content. Store
-provider identity, original IDs, content version/hash, bodies/variants, source
-metadata and the relationships needed for exact reopening. A unique content
-receipt prevents repeated maintenance from making duplicate archives. Historical
-content is not overwritten by a later provider revision. A manifest records each
-completed batch; it is not another copy of the payload.
+### Safe Removal When This Work Is Scheduled
 
-The normal result reports active versus archived storage without pretending an
-archived body is unavailable from the provider. Exact article/citation reads may
-read the archive locally; they do not download, spend, or silently restore the
-entire active dataset. Ordinary full-text search covers its declared active
-window. Historical metadata discovery remains possible; do not promise historical
-full-text search without implementing a separate archive index.
+- Scope ordinary market and SA market news through their store owners. Alpha
+  Picks analysis/comments, recommendation lineages, prices, holdings, SEC
+  citations and research conversations do not inherit this cutoff.
+- Preserve manually retained/cited/investigation evidence and active retry/repair
+  dependencies. Missing reference indexes are not proof of non-use. Resolve
+  ambiguous protection before deleting affected rows; do not preserve all
+  ordinary news forever as a substitute for that work.
+- Preview eligible/protected counts against a frozen UTC cutoff. Parse aware
+  dates, including legacy `+0000`; retain unknown/naive dates pending
+  classification. Publication time, not repeated fetch time, determines age.
+- Coordinate reference publication and owner-managed removal across legacy and
+  normalized rows, projections and FTS. Never prune shadow indexes independently
+  or disable foreign-key checks to bypass relationships.
+- Preserve synchronization frontiers and only the operational state needed to
+  prevent re-fetching deliberately removed history. This is not a permanent
+  user-facing title/URL index. Do not turn removed bodies into fake retry work.
+- Revalidate candidates under store writer discipline and use bounded,
+  restart-safe transactions. If an export is selected, verify it first.
+  Unresolved protection or failed prerequisites leave affected data intact.
+  Ordinary reads never prune; any eventual automatic policy is separately enabled.
+- Inventory old `data/news` ingest files separately. Job history needs its own
+  policy preserving active repairs/checkpoints, not an unconditional age delete.
 
-Never overload the existing `archived_at` field without updating its consumers:
-current investigation readers filter it out. Do not turn moved bodies into
-`pending`, `failed`, or `expired` acquisition work. Retain identity/frontier and
-archival state so an overlapping collection does not repeatedly rehydrate old
-content. A genuinely changed source version may be admitted under an explicit
-policy while preserving the previous archived version.
+Physical SQLite compaction is not the objective and is not bundled into search
+improvement. No current news deletion or index change is authorized by this
+design clarification alone.
 
-### Mutation And Recovery Contract
+### Acceptance And Priority
 
-Preview counts, protections, storage estimate and archive location first. Export
-and verify hashes/counts, then prove restore/reopen on an isolated store before
-clearing any active payload. Recheck versions/protections under the existing
-store writer discipline immediately before bounded transactional removal.
-Coordinate publication of new evidence and pruning; do not let a concurrent
-reference become unprotected between preview and commit.
+Measure search latency and recent-result coverage before/after the chosen change.
+Prove protected references reopen, expired unprotected content follows policy,
+FTS/projections agree, repeated/interrupted cleanup is safe, and collection does
+not recreate removed history. Cover unknown dates, concurrent citations,
+multi-ticker/cross-provider relationships and active recovery.
 
-Canonical-row changes own FTS updates. Never delete FTS shadow tables directly.
-Archive failure, corruption, unavailable protection stores or changed candidates
-must leave the corresponding active data intact. Journal progress separately for
-each DB; no pretend cross-database atomicity. Re-running after any crash must not
-duplicate content or lose the only copy. Restores preserve original provenance
-and timestamps and reject identity/version conflicts rather than overwrite newer
-observations.
-
-Automatic retention is opt-in after a successful attended run. Ordinary reads
-never trigger deletion. SQLite freed pages are reusable space, not automatically
-returned filesystem bytes. Any physical compaction is a separate, stopped-writer
-operation with sufficient temporary disk space; never promise the preview's
-payload estimate as bytes already reclaimed.
-
-### Acceptance
-
-Archive/restore and old-link reopening; corrupted/missing archives; repeated and
-interrupted runs; concurrent new citations; multi-ticker and cross-provider
-projection collisions; unknown dates; protected and pending evidence; unchanged
-Alpha Picks/comments; ingest frontiers and retries; all affected FTS owners;
-preserved publication/fetch times. Validate both ordinary-news stores, not just
-a synthetic single-table fixture.
+Do not promise that every deleted article remains readable or certify search
+performance from freed-byte counts. This P2 work follows service/external-access
+and correctness delivery unless an observed search incident changes its priority.
 
 ## B. Persistent Local Service And Failure Delivery
 
@@ -222,7 +204,7 @@ article/comment continuation and source citations survive the external transport
 | Workstream | State now | Next independently testable result |
 | --- | --- | --- |
 | Obsolete rollback snapshots | Completed: 12 snapshots and 16 sidecars removed, 13.32 GB; newer recovery material retained | No recurring age-only backup deletion |
-| News retention | Inventory complete; archive/restore/protection/tiering absent | Attended preview, verified single archive and safe removal/reopen across both news stores |
+| News search / selective retention (P2) | Market age inventory complete; no index change or news purge | Measure actual search paths, then recent-search policy and protected cleanup; no mandatory permanent archive |
 | Unattended service / alerts | API-bound schedulers exist; UI owns lifetime; new delivery absent | One supervised profile owner, UI detach/reattach, persisted and delivered failures |
 | External MCP | Internal bridges only | Thin external adapter plus server-enforced stored-read/calculation authority |
 | SA/company workflow | Structured capture/read/comparison and four-channel retained readers implemented | Installed Chrome and Firefox acceptance, real research use and explicit comment-backlog processing |

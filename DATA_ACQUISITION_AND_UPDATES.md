@@ -762,12 +762,18 @@ switch or repeated billable probe is implicit in a refresh request.
 
 Acquisition lookback, read reuse and retention are separate policies. The
 14-day news bootstrap and seven-day financial reuse window authorize no deletion.
-The user has now authorized removing obsolete backups and archiving old ordinary
-news once before removing it from active storage. The approximately 90-day news
-window remains a candidate-selection preference, not an unconditional SQL delete.
-No general periodic purge is implemented. SA analysis/comments do not inherit a
-general-news cutoff. Existing citations, investigation evidence and operational
-recovery state retain their own protection requirements.
+The obsolete-backup cleanup is complete. The user's subsequent clarification is
+that ordinary-news retention serves search usefulness and performance, not disk
+capacity or permanent archival. Eligible old, unreferenced news need not retain
+its body or metadata forever. A one-time export is optional, not a required
+permanent archive/reopening service. This is lower-priority P2 work and must not
+delay unattended service, external access or correctness repairs.
+
+The approximately 90-day window remains a candidate-selection preference, not an
+unconditional SQL delete or a default applied to every search. No general purge
+or recent-only index policy is implemented. SA analysis/comments do not inherit
+this ordinary-news cutoff. Manual holds, citations, investigation evidence and
+active recovery dependencies retain their own protection requirements.
 
 ### Retention Delivery Status (September 22)
 
@@ -783,16 +789,17 @@ recovery state retain their own protection requirements.
   Timezone-aware parsing is required: SQLite alone does not parse the legacy
   `+0000` timestamp representation. SA ordinary-news eligibility still needs its
   own inventory. [Inventory](docs/superpowers/evidence/2026-09-22-retention-delivery-reset/news-inventory.json).
-- **Proposed, not implemented:** a single deduplicated archive for old bodies,
-  retained small identity/source metadata and local reopening, verified restore
-  before active payload removal, explicit protection and retry/frontier handling,
-  and opt-in periodic maintenance. Full-text search must declare its active
-  window. Physical SQLite compaction is a separate stopped-writer operation;
-  deleting rows alone is not proof of disk-space reclamation.
-- **Still pending:** ordinary-news archive/restore code and Settings controls,
-  reference protection, SA ordinary-news adapter, job-history policy, supervised
-  service lifetime, failure delivery and external-tool admission. Neither the
-  cleanup nor the inventory completes these features.
+- **Revised proposal, not implemented:** selective protection and eventual removal
+  of old ordinary news, without a mandatory archive service or permanent title
+  index. Assess actual search paths and measure relevance/latency before choosing
+  index-windowing, query changes or pruning. Market search already has date
+  predicates over `news_fts`; filtering results is not the same as maintaining a
+  smaller index or proving faster searches. Full-text search must state its scope.
+- **Still pending, lower priority:** search measurements, reference protection,
+  coordinated cleanup/Settings policy across ordinary-news owners, and separate
+  job-history handling. Supervised service lifetime, failure delivery and external
+  admission remain higher-priority independent work. No current data/index change
+  follows from this policy revision, and compaction is not its objective.
 
 ## Maintenance And Verification
 

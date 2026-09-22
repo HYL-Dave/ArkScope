@@ -20,9 +20,10 @@ September 22 sequencing correction: this is one delivery lane, not the complete
 product backlog. Retention, persistent service/failure delivery and external
 read/analysis MCP remain required and do not wait for this lane's signed-in
 browser acceptance. See the [cross-workstream design](../specs/2026-09-22-retention-service-and-external-tools-design.md)
-and current priority map. The user separately authorized obsolete-backup cleanup
-and archive-first ordinary-news retention; the named cleanup receipt does not
-mean an automatic news purge or service deployment has occurred.
+and current priority map. Obsolete-backup cleanup is complete. The later user
+clarification places ordinary-news search/retention at P2: improve useful recent
+search, without requiring a permanent archive of every old article. No automatic
+news purge or service deployment has occurred.
 
 ## Reconciled Pre-Implementation Baseline (September 21)
 
@@ -192,9 +193,10 @@ availability. Unattended service lifetime remains an open workstream.
 No duplicate full-page archives, automatic company-page schedule or unlimited
 retry history is introduced merely to test extraction. New observation storage
 must deduplicate unchanged content and report storage limits before ingestion
-expands. September 22 authorizes obsolete-backup cleanup and archive-first old
-news handling; protected references and verified archive/restore still gate
-payload removal. Neither quoted directory sizes nor age alone proves eligibility. A blocked
+expands. September 22 clarifies that ordinary-news cleanup is lower-priority
+search/retention work, not a mandatory permanent archive product. Protected
+references and safe owner-managed removal still matter; age or storage size
+alone does not prove eligibility. A blocked
 integration remains explicitly unavailable in the catalog until a deliberate
 retirement decision, rather than being hidden as though the data were unwanted.
 
