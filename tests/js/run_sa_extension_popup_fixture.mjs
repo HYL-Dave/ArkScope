@@ -276,6 +276,10 @@ function snapshot(document, sent) {
   return {
     actions,
     disclosure,
+    layout: {
+      bodyMinWidth: document.defaultView.getComputedStyle(document.body).minWidth,
+      bodyWidth: document.defaultView.getComputedStyle(document.body).width,
+    },
     bodyText: text(document.body),
     bodyHtml: document.body.innerHTML,
     advanced: advanced ? {open: advanced.open, hidden: advanced.hidden} : null,

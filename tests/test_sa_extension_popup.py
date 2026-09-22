@@ -192,6 +192,13 @@ def _run(scenario: str = "snapshot", **fixture):
     return json.loads(completed.stdout)
 
 
+def test_popup_has_an_intrinsic_width_floor_before_firefox_autosizes_it():
+    layout = _run()["layout"]
+    assert re.fullmatch(r"\d+px", layout["bodyMinWidth"]), layout
+    assert 320 <= int(layout["bodyMinWidth"].removesuffix("px")) <= 360
+    assert layout["bodyWidth"] == "360px"
+
+
 def _run_background_probe(body: str):
     completed = subprocess.run(
         [
