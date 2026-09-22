@@ -190,8 +190,12 @@ need Chrome/login/page availability. A headless unattended workflow must use
 eligible API sources or report the browser dependency, not claim equivalent
 availability. Unattended service lifetime remains an open workstream.
 
-No duplicate full-page archives, automatic company-page schedule or unlimited
-retry history is introduced merely to test extraction. New observation storage
+No duplicate full-page archives or unlimited retry history is introduced merely
+to test extraction. September 22's separately approved bounded financial-refresh
+extension adds opt-in per-scope scheduling; see the root acquisition policy's
+[current contract](../../../DATA_ACQUISITION_AND_UPDATES.md#sa-financial-refresh-scheduling).
+It does not certify signed-in Chrome/Firefox operation or complete the persistent
+service workstream. New observation storage
 must deduplicate unchanged content and report storage limits before ingestion
 expands. September 22 clarifies that ordinary-news cleanup is lower-priority
 search/retention work, not a mandatory permanent archive product. Protected

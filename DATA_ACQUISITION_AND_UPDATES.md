@@ -196,7 +196,7 @@ is still follow-up work.
 | SEC research: `list_sec_filings`, `get_sec_financial_facts`, `read_sec_filing` | Default `stored`; explicit `auto` / `refresh` can download and persist through identity, path and transport guards | Separate from legacy financial tools; the general permission hook is audit-only, not an interactive authorization engine |
 | General news | Opt-in source schedules, Run now, or the scoped `daily_update` wrapper; source-specific incremental collection | No universal query-triggered catch-up or interval-completeness guarantee |
 | SA articles / comments | Signed-in browser extension captures into local storage; research reads retained captures | Body and comment outcomes are separate. A successful body does not prove comments loaded. |
-| SA company financial tables | Explicit current-tab capture in the extension; `get_sa_company_data` reads a saved observation | No automatic browser navigation, polling, schedule, paid fallback or claim that the displayed periods are the latest available. |
+| SA company financial tables | Explicit current-tab capture, or opt-in extension financial refresh; `get_sa_company_data` reads saved observations | Per-ticker/statement/view checks, initially every 7 days; no paid fallback or claim that displayed periods are the latest publication. Requires the browser and installed extension. |
 | SA valuation, peers, annual estimates/revisions | Explicit current-tab capture with bounded section scrolling; local reads of a pinned observation | DOM readiness polling is not a recurring provider refresh. No hidden pagination, automatic paid fallback or live-quote claim. |
 | `compare_financial_sources` | Compare already retained SA/SEC/FD statement observations from selected sources | No acquisition or spending; compatible display-period comparisons are not exact accounting equivalence or a materiality judgment. |
 | FRED and Finnhub calendars | Local reads plus explicit jobs or opt-in source schedules | A release calendar is not evidence that a financial provider has processed the release. |
@@ -372,7 +372,7 @@ annual period. Standalone TTM views, growth views and hidden history are not
 admitted. It captures the displayed supported period/currency view only. It does
 not navigate to other companies, expand history, fetch private endpoints, solve
 verification challenges, or inherit the Alpha Picks/news auto-sync alarms.
-Chrome, page loading and the account's actual entitlement remain prerequisites.
+Chrome or Firefox, page loading and the account's actual entitlement remain prerequisites.
 The selected tab is fixed before joining the existing extension job queue;
 navigation before completion rejects the capture instead of saving another page.
 
@@ -411,7 +411,8 @@ pages or historical reads. Rows and columns have separate next offsets. If a
 model channel cannot carry a page intact, it receives a typed smaller-page
 request, never truncated numeric JSON. `last_captured_at` does not certify latest
 publication or provider readiness; there is no hidden freshness timer or paid
-refresh on this reader. An explicit capture is the update mechanism.
+refresh on this reader. Updates come from explicit capture or the separately
+enabled financial refresh below, never from a stored-data query.
 
 **Selection, capacity and operating boundary.** The independent
 `sa_company_financials` switch controls this reader and ingestion; disabling it
@@ -425,12 +426,64 @@ Unchanged content is deduplicated. New company-observation JSON has a default
 not all SA data or SQLite file/index overhead. At capacity, new content is
 rejected explicitly; nothing is evicted and unchanged captures still work.
 It is not a retention rule for SA articles/comments or existing news. General
-retention, backup removal, full company refresh scheduling and a headless
-service remain separate decisions/work, not features implied by this adapter.
+retention, backup removal and a headless service remain separate work.
 
 Owners: [extractor](extensions/sa_alpha_picks/scrape_company.js),
 [validation](src/sa/company_data.py), [storage](src/sa/company_store.py),
 [reader](src/tools/sa_company_tools.py), [native entry](src/sa_native_host.py).
+
+### SA Financial Refresh Scheduling
+
+**State:** the shared Chrome/Firefox implementation is opt-in and off by default.
+Signed-in installed-extension acceptance is a separate gate; building the Firefox
+artifact does not establish live SA loading reliability. No production schedule
+is enabled by a code upgrade.
+
+In the extension's **Financial statement updates**, choose tickers, statements
+(income, balance sheet, cash flow), Annual/Quarterly views and an interval of
+1-365 days (initially 7). Scheduled scopes use **USD / Absolute** tables.
+The interval is a repeat-check policy, not a claim that financial publications
+expire after seven days. **Update now** explicitly requests a new capture even
+inside the interval. Valuation, estimates, news and Alpha Picks do not inherit
+this schedule or interval.
+
+Each ticker/statement/view has its own last-success time, observation ID, attempt,
+failure and next eligibility time. Reading data or saving unchanged settings does
+not move the deadline. Only an accepted capture does; unchanged content advances
+the successful check without duplicating observations. Matching manual current-page
+captures can satisfy a scheduled USD scope. Failure preserves old data and the last
+success. Retry starts at six hours and backs off to seven days, not a new freshness
+window. Verification, login/access and recognized structural/identity failures
+pause the batch until explicit manual retry after correction.
+
+The existing extension queue serializes work. Repeated refresh requests join the
+pending batch. A queued automatic scope is checked again before navigation and
+capture; a newly successful matching capture or removed/disabled scope prevents
+unnecessary acquisition. Each alarm handles at most one overdue scope, with at
+least one minute between overdue alarm runs. Manual batches visit scopes
+sequentially with ten-second pacing. A recurring recovery alarm and persisted
+interrupted-attempt state avoid treating a killed worker as success. These controls
+are per browser installation, not a global cross-browser acquisition lock.
+
+Only collector-owned tabs are opened/closed, without requesting focus. View and
+currency must match. Changed selectors must produce changed, stable table values;
+changed periods must also produce changed headers. A label changing before its
+table finishes loading is not accepted. If a legitimate switch produces identical
+values, this conservative check reports not-ready instead of guessing. Native
+identity, unit, row/column and layout validation remains
+mandatory. Source admission is checked before opening a page and before persistence.
+No fallback API, subscription purchase, private endpoint or anti-bot bypass is added.
+
+A closed browser cannot run alarms. Restart/reload restores the schedule and catches
+up gradually, not all missed intervals. Expired login and blocked pages are failures.
+Firefox temporary add-ons disappear on restart; unattended daily use needs a
+persistently installed signed add-on. This is not the independent always-on service,
+and Settings cannot yet observe browser liveness while the browser is closed.
+
+Owners: [refresh state](extensions/sa_alpha_picks/company_refresh.js),
+[browser integration](extensions/sa_alpha_picks/background.js),
+[popup](extensions/sa_alpha_picks/popup_company_refresh.js),
+[regression](tests/test_sa_company_refresh.py).
 
 ### SA Valuation, Peers And Forecasts
 
@@ -802,6 +855,24 @@ active recovery dependencies retain their own protection requirements.
   follows from this policy revision, and compaction is not its objective.
 
 ## Maintenance And Verification
+
+### News Full-Text Index Maintenance
+
+Archiving alone does not remove live search entries. Owner-managed deletion or
+index-windowing must remove the intended search documents after protection checks.
+Legacy, normalized and SA news indexes already have insert/update/delete triggers;
+correctly maintained deletion does not require a full rebuild after every batch.
+
+FTS5 `optimize` merges index segments; bounded `merge` spreads this work across
+maintenance windows. FTS5 `rebuild` reconstructs the index from its content table,
+useful for repair, not a mandatory cleanup timer. SQL `REINDEX` is not FTS5 rebuild.
+`VACUUM` compacts database files, which is not the primary search-quality goal.
+See [official FTS5 maintenance](https://www.sqlite.org/fts5.html).
+
+No new production optimize/rebuild/purge timer is installed here. Measure actual
+ticker/keyword/date/facet queries and correctness before and after controlled
+cleanup; index size alone does not prove speed. Use commands supported by the
+deployed SQLite version. This remains lower-priority than service and research work.
 
 Changes to triggers, defaults, scope matching, reuse eligibility, retry rules or
 reported coverage must update this document in the same change. Keep current

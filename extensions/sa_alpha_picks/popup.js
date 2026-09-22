@@ -117,7 +117,8 @@ function renderCompanyCapture(result) {
       + " | " + result.view + (result.currency === "DISPLAY" ? "" : " | " + result.currency)
       + (result.coverage && result.coverage.table_count ? " | " + result.coverage.table_count + " tables" : "")
       + " | " + (result.coverage ? result.coverage.row_count : 0) + " rows"
-      + (result.deduplicated ? " | Unchanged capture retained" : " | Saved");
+      + (result.deduplicated ? " | Unchanged capture retained" : " | Saved")
+      + (result.schedule_warning ? " | Refresh schedule unavailable" : "");
     return;
   }
   var errors = {

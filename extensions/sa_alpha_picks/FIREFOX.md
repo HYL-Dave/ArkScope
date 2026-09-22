@@ -75,3 +75,23 @@ Firefox capture without testing it in that browser.
 Temporary Firefox add-ons are removed when Firefox restarts. For daily use,
 either keep the collector Firefox session open or package/sign this as an
 unlisted Firefox add-on later.
+
+## Financial Statement Refresh
+
+The popup's **Financial statement updates** selects tickers, statements and
+Annual/Quarterly views for USD/Absolute tables. Save the interval (initially seven
+days) and enable **Scheduled**, or use **Update now** for an explicit new capture.
+Reads stay local. Only successful scopes advance their check time; failures show
+their previous successful time and retry reason. Verification or access/structure
+problems pause automatic work until corrected and manually retried.
+
+This is shared with Chrome, but each browser installation has its own schedule.
+Do not enable the same scope in both browsers merely to test portability. A closed
+browser or removed temporary add-on cannot run the schedule. Installed, signed-in
+Firefox capture and restart/reload acceptance remain required before calling this
+an operational unattended collector.
+
+For a first controlled test, select one ticker, Income, Annual, leave Scheduled
+off and run Update now. Check the saved ticker/period/currency and receipt before
+adding Quarterly or more statements. Use an isolated native-host/database target
+for pre-release acceptance, not an unverified production registration.

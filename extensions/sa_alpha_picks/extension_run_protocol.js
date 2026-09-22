@@ -91,7 +91,7 @@
 
   var OPERATION_CONTRACTS = Object.freeze({
     company_financial_capture: Object.freeze({
-      modes: Object.freeze(["current_tab"]),
+      modes: Object.freeze(["current_tab", "manual", "scheduled"]),
       job_name: "sa_company_financial_capture",
       phases: Object.freeze(["extraction", "persistence"]),
       fatal_phases: Object.freeze(["extraction", "persistence"]),

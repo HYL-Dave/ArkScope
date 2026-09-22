@@ -19,6 +19,7 @@
       "extension_run_protocol.js",
       "extension_diagnostics.js",
       "extension_telemetry.js",
+      "company_refresh.js",
       "background.js"
     ]
   },

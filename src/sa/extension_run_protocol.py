@@ -96,7 +96,7 @@ _EVIDENCE_BY_UNAVAILABLE_REASON = {
 
 OPERATION_CONTRACTS = {
     "company_financial_capture": {
-        "modes": ("current_tab",),
+        "modes": ("current_tab", "manual", "scheduled"),
         "job_name": "sa_company_financial_capture",
         "phases": ("extraction", "persistence"),
         "fatal_phases": ("extraction", "persistence"),

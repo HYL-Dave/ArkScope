@@ -11,6 +11,11 @@ function clone(value) {
 }
 
 function responseFor(message) {
+  if (message.action === "get_company_refresh" || message.action === "configure_company_refresh" || message.action === "run_company_refresh") {
+    return clone(fixture.companyRefresh || {status:"ok",config:message.config || {
+      enabled:false,tickers:[],statements:['income_statement'],views:['annual'],interval_days:7
+    },scopes:[],running:false,paused_reason:null});
+  }
   if (message.action === "capture_company_data") return clone(fixture.companyResult || {status: "error", error_code: "sa_company_page_unsupported"});
   if (message.action === "ensure_auto_sync_alarms") return {status: "ok"};
   if (message.action === "get_extension_action_limits") {
@@ -281,6 +286,7 @@ function snapshot(document, sent) {
     lastRunStatus: text(document.getElementById("lastRunStatus")),
     companyCaptureStatus: text(document.getElementById("companyCaptureStatus")),
     companyCaptureDisabled: document.getElementById("companyCaptureBtn")?.disabled,
+    companyRefreshStatus: text(document.getElementById("companyRefreshStatus")),
     advancedPreview: text(advancedPreview),
     reviewScope: reviewScope
       ? {hidden: reviewScope.hidden, text: text(reviewScope)}
@@ -317,11 +323,7 @@ async function runPopup() {
     throw new Error("window.confirm is forbidden");
   };
 
-  const scripts = [
-    "popup_action_catalog.js",
-    "reconciliation_ui.js",
-    "popup.js",
-  ];
+  const scripts = Array.from(dom.window.document.querySelectorAll("script[src]"), node => node.getAttribute("src"));
   try {
     for (const name of scripts) {
       const scriptPath = path.join(extensionDir, name);
@@ -333,7 +335,19 @@ async function runPopup() {
     }
     await settle();
 
-    if (scenario === "capture_company") {
+    if (scenario === "configure_company_refresh") {
+      const doc = dom.window.document;
+      const ticker = doc.getElementById("companyRefreshTickers");
+      if (ticker) ticker.value = "amd, aapl AMD";
+      const interval = doc.getElementById("companyRefreshDays");
+      if (interval) interval.value = "14";
+      const enabled = doc.getElementById("companyRefreshEnabled");
+      if (enabled) enabled.checked = true;
+      const quarterly = doc.querySelector('[name="companyRefreshView"][value="quarterly"]');
+      if (quarterly) quarterly.checked = true;
+      doc.getElementById("companyRefreshForm")?.dispatchEvent(new dom.window.Event("submit", {bubbles:true,cancelable:true}));
+      await settle();
+    } else if (scenario === "capture_company") {
       dom.window.document.getElementById("companyCaptureBtn")?.click();
       await settle();
     } else if (scenario === "click_retry") {

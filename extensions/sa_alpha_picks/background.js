@@ -12,6 +12,9 @@ if (typeof SAExtensionDiagnostics === "undefined" && typeof importScripts === "f
 if (typeof SAExtensionTelemetry === "undefined" && typeof importScripts === "function") {
   importScripts("extension_telemetry.js");
 }
+if (typeof SACompanyRefresh === "undefined" && typeof importScripts === "function") {
+  importScripts("company_refresh.js");
+}
 
 const SA_CURRENT_URL = "https://seekingalpha.com/alpha-picks/picks/current";
 const SA_CLOSED_URL = "https://seekingalpha.com/alpha-picks/picks/removed";
@@ -576,7 +579,28 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
 
 // --- Message listener (from popup) ---
 
+const companyFinancialRefresh = SACompanyRefresh.create({
+  storage: chrome.storage.local,
+  alarms: chrome.alarms,
+  runScope: function (scope, mode, admitted) {
+    return enqueueSaSyncJob({displayName: scope.ticker + " " + scope.view + " financials",
+      operation: "company_financial_capture", mode: mode}, function (diagnostics) {
+      return refreshCompanyFinancialScope(scope, diagnostics, admitted);
+    });
+  },
+});
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (["get_company_refresh", "configure_company_refresh", "run_company_refresh"].includes(msg.action)) {
+    var task = msg.action === "get_company_refresh" ? companyFinancialRefresh.status()
+      : msg.action === "configure_company_refresh" ? companyFinancialRefresh.configure(msg.config)
+        : companyFinancialRefresh.run(true);
+    task.then(sendResponse).catch(function (error) {
+      sendResponse({status:"error", error_code:error.message === "sa_company_schedule_invalid"
+        ? error.message : "sa_company_schedule_unavailable"});
+    });
+    return true;
+  }
   if (msg.action === "capture_company_data") {
     chrome.tabs.query({ active: true, currentWindow: true }).then(function (tabs) {
       var target = tabs.length === 1 ? { id: tabs[0].id, url: tabs[0].url } : null;
@@ -677,7 +701,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
-async function captureCompanyData(target, diagnostics) {
+async function captureCompanyData(target, diagnostics, expectedScope) {
   var result;
   var failurePhase = "extraction";
   try {
@@ -705,6 +729,13 @@ async function captureCompanyData(target, diagnostics) {
     if (extracted.length !== 1 || !extracted[0].result) throw new Error("sa_company_capture_failed");
     var value = extracted[0].result;
     if (value.status !== "ok") throw new Error(value.error_code || "sa_company_capture_failed");
+    if (expectedScope && (researchPage || !value.capture || value.capture.ticker !== expectedScope.ticker
+        || !value.capture.controls || typeof value.capture.controls.period !== "string"
+        || value.capture.controls.period.toLowerCase() !== expectedScope.view
+        || value.capture.controls.currency !== "United States Dollar (USD)"
+        || pagePath[1].replaceAll("-", "_") !== expectedScope.statement)) {
+      throw new Error("sa_company_scope_mismatch");
+    }
     if (researchPage && (!value.capture || value.capture.dataset !== dataset)) throw new Error("sa_company_identity_mismatch");
     tab = await chrome.tabs.get(target.id);
     if (tab.url !== target.url) throw new Error("sa_company_page_changed");
@@ -715,6 +746,18 @@ async function captureCompanyData(target, diagnostics) {
         || !result.coverage || result.coverage.scope !== (researchPage ? "recognized_page_tables" : "displayed_table")
         || (researchPage && result.dataset !== value.capture.dataset) || typeof result.deduplicated !== "boolean") {
       throw new Error("sa_company_receipt_invalid");
+    }
+    if (expectedScope && (result.statement !== expectedScope.statement || result.view !== expectedScope.view || result.currency !== "USD")) {
+      throw new Error("sa_company_receipt_invalid");
+    }
+    if (!researchPage && !expectedScope) {
+      try {
+        if (await companyFinancialRefresh.noteSuccess({ticker:result.ticker, statement:result.statement, view:result.view}, result)) {
+          await companyFinancialRefresh.syncAlarm();
+        }
+      } catch (_) {
+        result.schedule_warning = "sa_company_schedule_unavailable";
+      }
     }
   } catch (error) {
     var code = error && /^(sa_company_|data_source_)[a-z_]+$/.test(error.message)
@@ -727,6 +770,124 @@ async function captureCompanyData(target, diagnostics) {
   }
   await chrome.storage.local.set({ lastCompanyCapture: Object.assign({ finished_at: new Date().toISOString() }, result) });
   return result;
+}
+
+async function refreshCompanyFinancialScope(scope, diagnostics, admitted) {
+  var tabId = null;
+  try {
+    if (!await admitted()) return {status:"cancelled"};
+    var admission = await sendNativeMessage2({action:"get_company_capture_admission", dataset:"financials"});
+    if (!admission || admission.status !== "ok" || admission.dataset !== "financials") {
+      throw new Error(admission && admission.error_code || "sa_company_admission_unavailable");
+    }
+    if (!await admitted()) return {status:"cancelled"};
+    var pathname = "/symbol/" + scope.ticker + "/" + scope.statement.replaceAll("_", "-");
+    var url = "https://seekingalpha.com" + pathname;
+    // Only collector-owned tabs are navigated or closed. No focus activation is requested.
+    var tab = await chrome.tabs.create({url:url, active:false});
+    tabId = tab.id;
+    await registerCollectorTab(tabId, "company_financials");
+    await waitForTabLoad(tabId, 60000);
+    if (!await admitted()) return {status:"cancelled"};
+    var prepared = await chrome.scripting.executeScript({target:{tabId:tabId},
+      func:prepareCompanyFinancialView, args:[scope.view, pathname]});
+    if (!prepared[0] || prepared[0].result.status !== "ok") {
+      throw new Error(prepared[0] && prepared[0].result.error_code || "sa_company_dom_not_ready");
+    }
+    var target = await chrome.tabs.get(tabId);
+    if (new URL(target.url).origin !== "https://seekingalpha.com" || new URL(target.url).pathname !== pathname) {
+      throw new Error("sa_company_page_changed");
+    }
+    if (!await admitted()) return {status:"cancelled"};
+    return await captureCompanyData({id:tabId, url:target.url}, diagnostics, scope);
+  } catch (error) {
+    var code = /^(sa_company_|data_source_)[a-z_]+$/.test(error.message || "")
+      ? error.message : "sa_company_dom_not_ready";
+    recordExtensionFailure(diagnostics, {stage:"content_parse",reason_code:"company_capture_rejected",
+      target_kind:"phase",retryable:false,attempt_count:1});
+    return {status:"error",error_code:code,reason_code:"company_capture_rejected",failure_phase:"extraction"};
+  } finally {
+    if (tabId !== null) {
+      await safeRemoveTab(tabId);
+      await unregisterCollectorTab(tabId);
+      // Pace successive manual targets too; timers do not imply source freshness.
+      await sleep(10000);
+    }
+  }
+}
+
+async function prepareCompanyFinancialView(view, pathname) {
+  function visible(node) {
+    if (!node) return false;
+    for (var item = node; item; item = item.parentElement) {
+      if (item.hidden || item.getAttribute("aria-hidden") === "true" || getComputedStyle(item).display === "none"
+          || getComputedStyle(item).visibility === "hidden") return false;
+    }
+    return true;
+  }
+  function label(node) { return (node.innerText || node.textContent || "").trim(); }
+  function control(name) {
+    var nodes = Array.from(document.querySelectorAll('main [role="combobox"][aria-labelledby="financials-filter-' + name + '"]')).filter(visible);
+    return nodes.length === 1 ? nodes[0] : null;
+  }
+  var wanted = {period:view === "annual" ? "Annual" : "Quarterly", view:"Absolute", currency:"United States Dollar (USD)"};
+  var transition = null;
+  var stable = null;
+  var steady = 0;
+  var start = Date.now();
+  while (Date.now() - start < 45000) {
+    if (/verify you are human|access denied|access to this page has been denied|just a moment/i.test(document.title)
+        || Array.from(document.querySelectorAll('iframe[title="Human verification challenge"]')).some(visible)) {
+      return {status:"error",error_code:"sa_company_human_verification_required"};
+    }
+    if (/\/login|\/sign_in/.test(location.pathname)) return {status:"error",error_code:"sa_company_login_required"};
+    if (location.origin !== "https://seekingalpha.com" || location.pathname !== pathname) {
+      return {status:"error",error_code:"sa_company_page_changed"};
+    }
+    var tables = Array.from(document.querySelectorAll('main table[data-test-id="table"]')).filter(visible);
+    var table = tables.length === 1 ? tables[0] : null;
+    var loaded = table && table.querySelector("tbody > tr") && table.querySelector("thead")
+      && !table.closest('[aria-busy="true"]') && !table.querySelector('[aria-busy="true"], [data-test-id="skeleton"]');
+    var ready = loaded;
+    if (!transition && loaded) {
+      for (var name of ["period", "view", "currency"]) {
+        var box = control(name);
+        if (!box) { ready = false; break; }
+        if (label(box) !== wanted[name]) {
+          transition = {name:name, headers:label(table.querySelector("thead")), body:label(table.querySelector("tbody"))};
+          box.click();
+          ready = false;
+          break;
+        }
+      }
+    }
+    if (transition) {
+      var selected = control(transition.name);
+      if (!selected || label(selected) !== wanted[transition.name]) {
+        var options = Array.from(document.querySelectorAll('[role="listbox"] [role="option"]'))
+          .filter(function (node) { return visible(node) && label(node) === wanted[transition.name]; });
+        if (options.length === 1) options[0].click();
+        ready = false;
+      } else {
+        // A changed control/units label alone is not evidence that numerical cells loaded.
+        ready = loaded && label(table.querySelector("tbody")) !== transition.body
+          && (transition.name !== "period" || label(table.querySelector("thead")) !== transition.headers);
+      }
+    }
+    if (ready) {
+      var signature = table.textContent;
+      steady = signature === stable ? steady + 1 : 0;
+      stable = signature;
+      if (steady >= 2) {
+        if (!transition) return {status:"ok"};
+        transition = null;
+        stable = null;
+        steady = 0;
+      }
+    } else { stable = null; steady = 0; }
+    await new Promise(function (resolve) { setTimeout(resolve, 1000); });
+  }
+  return {status:"error",error_code:"sa_company_dom_not_ready"};
 }
 
 chrome.runtime.onInstalled.addListener(function () {
@@ -742,6 +903,10 @@ chrome.runtime.onStartup.addListener(function () {
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm) return;
+  if (alarm.name === SACompanyRefresh.alarm) {
+    companyFinancialRefresh.run(false).catch(function () {});
+    return;
+  }
   if (!saSyncJobInFlight && !marketNewsRefreshInFlight) {
     cleanupCollectorTabs({ maxAgeMs: COLLECTOR_TAB_STALE_MS });
   }
@@ -1615,6 +1780,7 @@ async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
 async function syncAllAutoSyncAlarms() {
   await syncAlphaPicksAutoSyncAlarm();
   await syncMarketNewsAutoSyncAlarm();
+  await companyFinancialRefresh.syncAlarm();
 }
 
 async function ensureAutoSyncAlarms() {
@@ -1639,6 +1805,7 @@ async function ensureAutoSyncAlarms() {
     await syncMarketNewsAutoSyncAlarm();
     repaired.push(MARKET_NEWS_AUTO_SYNC_ALARM);
   }
+  if (!names[SACompanyRefresh.alarm]) await companyFinancialRefresh.syncAlarm();
   return {
     status: "ok",
     repaired: repaired,
