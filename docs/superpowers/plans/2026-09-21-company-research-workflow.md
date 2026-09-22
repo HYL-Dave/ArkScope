@@ -18,8 +18,14 @@ Latest accepted slice: [retained article, comment and holdings reads](../evidenc
 
 Current bounded addition: [SA financial refresh](../evidence/2026-09-22-sa-financial-refresh/README.md)
 at `fd1c7d08`, with the operator-reported Firefox popup sizing corrected at
-`3c8bc6e8`. Shared browser scheduling is implemented; full backend and signed-in
-operator acceptance are still open. The full run was stopped after the live UI
+`3c8bc6e8`. Shared browser scheduling is implemented. Explicit manual portal
+consent unlocked the first signed-in Firefox AMD annual save, recorded at
+`34c2c9aa`; this is not blanket browser/schedule acceptance. The September 23
+follow-up at `fa041081` adds persistent financial-batch cooldown after visible
+rate limiting, hardened after review at `14027634`; all-watchlist and
+cross-browser governance remain open. See the
+[cooldown and installed-alarm acceptance](../evidence/2026-09-23-sa-financial-rate-cooldown/README.md).
+Full backend and remaining operator acceptance are still open. The full run was stopped after the live UI
 defect was reported, and must not be presented as completed acceptance.
 The user explicitly prioritized this addition on September 22. It does not
 replace the remaining workflow packages or the independent service/MCP lanes.

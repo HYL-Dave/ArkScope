@@ -121,3 +121,18 @@ by a real browser-to-host ping; command-line host execution alone is insufficien
 Do not grant a wildcard, overwrite other applications' entries, or claim that
 manual authorization repairs the desktop prompt. In the isolated acceptance run,
 this unlocked the first AMD annual capture while prompt recovery remained unproven.
+
+## Financial Refresh Rate Limits
+
+Financial updates stop the batch on a recognized visible rate-limit page and keep
+a shared cooldown in extension storage. Changing tickers, reloading or pressing
+Update now cannot bypass that cooldown. It starts at six hours and doubles on
+consecutive rate-limit failures, up to seven days. A successful acquisition resets
+the counter; already stored observations are never deleted by a failed refresh.
+
+This guard covers this extension installation's financial batch only. It is not
+an account-wide governor for another browser or the Alpha Picks/news collectors,
+and the existing pacing is not a promise that SA will accept a particular rate.
+Keep financial acquisition in one browser during acceptance. All-watchlist
+integration and cross-browser coordination remain separate work, not a reason to
+bulk-test the subscribed account.

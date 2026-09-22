@@ -444,7 +444,8 @@ In the extension's **Financial statement updates**, choose tickers, statements
 1-365 days (initially 7). Scheduled scopes use **USD / Absolute** tables.
 The interval is a repeat-check policy, not a claim that financial publications
 expire after seven days. **Update now** explicitly requests a new capture even
-inside the interval. Valuation, estimates, news and Alpha Picks do not inherit
+inside the interval, but cannot override a rate-limit cooldown. Valuation,
+estimates, news and Alpha Picks do not inherit
 this schedule or interval.
 
 Each ticker/statement/view has its own last-success time, observation ID, attempt,
@@ -464,6 +465,25 @@ least one minute between overdue alarm runs. Manual batches visit scopes
 sequentially with ten-second pacing. A recurring recovery alarm and persisted
 interrupted-attempt state avoid treating a killed worker as success. These controls
 are per browser installation, not a global cross-browser acquisition lock.
+
+A recognized visible rate-limit error (a page title or visible heading containing
+`Too many requests` or `Rate limit exceeded`) stops the financial batch. A shared
+financial-refresh cooldown survives reloads, settings changes and ticker changes;
+neither an alarm nor **Update now** can bypass it. Consecutive rate-limit responses
+back off from six hours, doubling to a maximum seven days. A successful new
+acquisition resets that counter; saving an already loaded page does not clear the
+acquisition cooldown. Old observations and successful timestamps are retained.
+The popup shows the cooldown deadline, and automatic alarms respect it.
+Restrictions are persisted before tab cleanup or pacing, not only when the batch
+returns. Verification challenges take priority over simultaneous rate-limit
+messages: a timer expiring must not resume an unresolved human-verification gate.
+
+These are local safety policies, not published SA request allowances. Visible-page
+detection is not a complete HTTP 429 / `Retry-After` monitor. Financial cooldowns
+do not yet govern Alpha Picks/news or a second Chrome/Firefox installation.
+Before all-watchlist rollout, settle one acquisition owner or shared cross-browser
+coordination, spread newly added scopes over time and verify bounded real-site
+behavior. No bulk watchlist refresh is enabled by this change.
 
 Only collector-owned tabs are opened/closed, without requesting focus. View and
 currency must match. Changed selectors must produce changed, stable table values;
