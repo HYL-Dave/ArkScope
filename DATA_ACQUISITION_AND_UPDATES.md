@@ -496,6 +496,9 @@ Owners: [extractor](extensions/sa_alpha_picks/scrape_company.js),
 Signed-in installed-extension acceptance is a separate gate; building the Firefox
 artifact does not establish live SA loading reliability. No production schedule
 is enabled by a code upgrade.
+The [bounded Firefox watchlist acceptance](docs/superpowers/evidence/2026-09-23-sa-watchlist-collector/README.md#signed-in-firefox-result)
+verifies the operator's two-company manual queue and saved-table readback.
+It is not Google Chrome acceptance or authorization to start the production list.
 
 In the extension's **Financial statement updates**, choose selected tickers or
 **App watchlist**, statements

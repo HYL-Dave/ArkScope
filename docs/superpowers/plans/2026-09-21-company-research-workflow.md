@@ -37,12 +37,15 @@ App-list resolution, shared local owner/admission/cooldown and resumable paced
 queues. Production rollout and signed-in bulk acceptance remain off/pending.
 Implementation/review fixes at `590e67c8` and `0fe50879` passed 1,022 SA and
 active-universe tests plus installed offline Firefox/Chromium alarm checks.
-The private Firefox artifact now contains that implementation; its two-company
+The private Firefox artifact contains that implementation; its two-company
 signed-in gate is documented in the
 [watchlist collector acceptance](../evidence/2026-09-23-sa-watchlist-collector/README.md).
 The later private-host readiness correction now exercises the installed wrapper
-and explicitly permits its watchlist/collector-control actions. It is not a new
-signed-in browser acceptance result.
+and explicitly permits its watchlist/collector-control actions. Subsequently,
+the operator confirmed both companies succeeded. Private receipts 11/12 and full
+pinned readback verify AAPL/AMD annual income tables (440/484 cell positions),
+with 69.508 seconds between completion and the next start. This closes the
+bounded Firefox manual-queue gate, not Chrome or production bulk acceptance.
 The earlier interrupted full run is not completed acceptance. Current complete
 regression is tracked with the
 [research-tool repair](../evidence/2026-09-23-research-tool-repairs/README.md);
@@ -148,7 +151,7 @@ test count or an assertion that the whole company workflow is complete.
 
 | Package | Current implementation | Remaining work |
 | --- | --- | --- |
-| 1. Company inputs | Shared Chrome/Firefox code for three statement types and the bounded valuation/peers/annual-estimates/revisions scope; real Chrome captures retained; isolated signed-in Firefox AMD annual manual and quarterly scheduled income captures verified | Broader installed extension-to-host acceptance, including Chrome operator testing and other statement scopes; other pages/views are not advertised as captured |
+| 1. Company inputs | Shared Chrome/Firefox code for three statement types and the bounded valuation/peers/annual-estimates/revisions scope; real Chrome captures retained; isolated signed-in Firefox AMD annual manual and quarterly scheduled income captures verified; AAPL/AMD App-watchlist annual manual queue now confirmed by the operator and persisted receipts/pinned readback | Broader installed extension-to-host acceptance, including Chrome operator testing, other statement scopes and gradual production rollout; other pages/views are not advertised as captured |
 | 2. Research access | SA source switches, stored/pinned company reader and qualified SA/SEC/FD comparisons; article/comment/holdings read-only paging and four-channel admission verified at `e0bce862`, including full regression and real retained-data replay | Full end-to-end operator research acceptance and explicit production comment-signal backlog processing |
 | 3. Optional SEC | Stock-symbol resolution, explicit directory update, collapsed technical administration; existing citations preserved | Remaining normal-mode surface/consumer review, not wholesale SEC retirement |
 | 4. Analytics | Shared debt/return/growth and warm-cache guards; qualified SEC input selection and cross-source/peer comparison; retained release-date/session-window analysis; five existing calculators admitted to both OAuth channels. Frozen `e91075cc` passes 12,568 backend / 12 unchanged skips, 1,920 frontend / 126 files, build and ancillary gates | Real-provider coverage, remaining legacy concept/TTM quality, analyst/insider failure semantics, portfolio-list paging, a bounded intraday summary and scheduled event observation remain open |
