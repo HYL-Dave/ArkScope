@@ -565,9 +565,13 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
   } else if (operation === "market_news_sync") {
     structured = buildMarketNewsProtocolResult(mode, result);
   } else if (operation === "company_financial_capture") {
+    var skipReason = result.acquisition_outcome === "reused" ? "not_due"
+      : result.status === "cancelled" ? "operator_cancelled"
+      : result.status === "deferred" && (result.error_code === "sa_company_pacing" || result.deferral_kind === "scope") ? "not_due"
+      : result.status === "deferred" && /sa_company_collector_(busy|other_browser|unselected)/.test(result.error_code || "") ? "already_pending" : null;
     structured = SAExtensionRunProtocol.deriveRunResult({
       schema_version: 1, operation: operation, mode: mode, item_outcomes: [],
-      phases: result.status === "ok"
+      phases: skipReason ? {extraction:extensionPhase("skipped",skipReason), persistence:extensionPhase("skipped",skipReason)} : result.status === "ok"
         ? { extraction: extensionPhase("complete", null), persistence: extensionPhase("complete", null) }
         : failedProtocolPhases(operation, result.failure_phase || "extraction", result.reason_code || "company_capture_rejected"),
     });
@@ -603,10 +607,18 @@ async function companyCollectorControl(operation, extra) {
   }));
 }
 
-async function runCoordinatedCompanyScope(scope, mode, admitted, observeFailure, intervalDays, diagnostics) {
+async function runCoordinatedCompanyScope(scope, mode, admitted, observeFailure, intervalDays, diagnostics, requestedAt) {
   if (!await admitted()) return {status:"cancelled"};
-  var permit = await companyCollectorControl("begin", {scope:scope, force:mode === "manual", interval_days:intervalDays});
-  if (permit.status === "reused") return Object.assign({}, permit, {status:"ok"});
+  var permit = await companyCollectorControl("begin", {scope:scope, force:mode === "manual", interval_days:intervalDays, requested_at:requestedAt || null});
+  if (permit.status === "reused") {
+    var capturedAt = typeof permit.last_success_at === "string" ? Date.parse(permit.last_success_at) : NaN;
+    if (!/^[a-f0-9]{64}$/.test(permit.observation_id || "") || permit.currency !== "USD"
+        || permit.ticker !== scope.ticker || permit.statement !== scope.statement || permit.view !== scope.view
+        || !Number.isFinite(capturedAt) || capturedAt <= 0 || capturedAt > Date.now()) {
+      return {status:"error",error_code:"sa_company_receipt_unverified"};
+    }
+    return Object.assign({}, permit, {status:"ok",acquisition_outcome:"reused"});
+  }
   if (permit.status !== "ok" || !/^[a-f0-9]{32}$/.test(permit.token || "")) {
     return Object.assign({}, permit, {status:"deferred", error_code:permit.error_code || "sa_company_collector_unavailable"});
   }
@@ -641,10 +653,10 @@ const companyFinancialRefresh = SACompanyRefresh.create({
   alarms: chrome.alarms,
   control:companyCollectorControl,
   resolveWatchlist:function () { return sendNativeMessage2({action:"get_company_watchlist"}); },
-  runScope: function (scope, mode, admitted, observeFailure, intervalDays) {
+  runScope: function (scope, mode, admitted, observeFailure, intervalDays, requestedAt) {
     return enqueueSaSyncJob({displayName: scope.ticker + " " + scope.view + " financials",
       operation: "company_financial_capture", mode: mode}, function (diagnostics) {
-      return runCoordinatedCompanyScope(scope, mode, admitted, observeFailure, intervalDays, diagnostics);
+      return runCoordinatedCompanyScope(scope, mode, admitted, observeFailure, intervalDays, diagnostics, requestedAt);
     });
   },
 });

@@ -491,13 +491,18 @@ pending batch. A queued automatic scope is checked again before navigation and
 capture; a newly successful matching capture or removed/disabled scope prevents
 unnecessary acquisition. Each alarm handles at most one overdue scope, with at
 least one minute between overdue alarm runs. All financial page starts also have
-a shared one-minute minimum gap. Small manual batches remain sequential; when
-admission asks them to wait, remaining scopes persist for a later alarm. A manual
+a shared one-minute minimum gap, conservatively retained through completion
+before another start is admitted. Every manual batch is persisted before its
+first acquisition. Small manual batches remain sequential; when admission asks
+them to wait, remaining scopes persist for a later alarm. A manual
 App-watchlist update immediately queues all selected scopes and processes one per
 alarm, even if the periodic **Scheduled** toggle is off. **Cancel queued update**
 clears that one-time queue; uncheck **Scheduled** separately to stop periodic work.
 The popup reports the remaining scope count. Closing the popup does not discard
-the queue; restarting the background restores it. A browser crash during an active
+the queue; restarting the background restores it. Saving changed settings cancels
+old manual intent; a late admission response cannot restore it. Missing watchlist
+sources leave the pending count/cancel control visible and retry after an hour.
+Per-scope backoff affects that scope only, not other eligible targets. A browser crash during an active
 reservation requires the explicit recovery above. Source/host admission failures
 are visible and delayed instead of becoming silent one-minute retry loops.
 
@@ -507,6 +512,12 @@ navigation. Switching browsers does not turn a recent successful capture into
 must match a persisted observation captured during that reservation; a fabricated
 or older receipt cannot certify success. Manual saves from an already open page
 remain distinct from navigated acquisition and do not reset acquisition cooldown.
+Manual requests retain their original request time: an observation acquired since
+that request already satisfies it after recovery, even when the browser died
+before recording completion. A later deliberate Update now creates new intent.
+Reused receipts are checked for scope, observation ID, currency and capture time;
+they cannot set a future freshness checkpoint. Telemetry marks reuse, pacing and
+cancellation as skipped acquisition, not completed extraction or failed fetching.
 
 A recognized visible rate-limit error (a page title or visible heading containing
 `Too many requests` or `Rate limit exceeded`) stops the financial batch. A shared

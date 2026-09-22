@@ -167,6 +167,7 @@ class CompanyCollector:
             require(msg.get("confirm_stopped") is True, "sa_company_recovery_confirmation_required")
             if state["active"]:
                 self._failure(state, "sa_company_refresh_interrupted", now)
+                state["next_navigation_at"] = _iso(max(_seconds(state["next_navigation_at"]), now + PAGE_START_GAP_SECONDS))
             state["active"] = None
             return {}
         if operation in {"report_failure", "finish"}:
@@ -189,6 +190,8 @@ class CompanyCollector:
                 self._failure(state, result.get("error_code"), now)
             if operation == "finish":
                 state["active"] = None
+                # The browser may have suspended after reservation but before navigation.
+                state["next_navigation_at"] = _iso(max(_seconds(state["next_navigation_at"]), now + PAGE_START_GAP_SECONDS))
             return {}
         self._owner(state, client)
         if operation == "resume":
@@ -201,14 +204,20 @@ class CompanyCollector:
         require(_seconds(state["rate_limit_until"]) <= now, "sa_company_rate_limited")
         require(not state["paused_reason"], state["paused_reason"] or "sa_company_collector_paused")
         require(state["active"] is None, "sa_company_collector_busy")
-        if not msg["force"]:
-            stored = company_store.read_capture(scope["ticker"], scope["statement"], scope["view"], "USD")
-            if stored and 0 <= now - _seconds(stored["last_captured_at"]) < days * 86400:
-                return {"status": "reused", "observation_id": stored["observation_id"], "currency": "USD",
+        requested_at = msg.get("requested_at")
+        if requested_at is not None:
+            require(type(requested_at) is str and 0 < _seconds(requested_at) <= now, "sa_company_schedule_invalid")
+        stored = company_store.read_capture(scope["ticker"], scope["statement"], scope["view"], "USD")
+        if stored and _seconds(stored["last_captured_at"]) <= now:
+            captured = _seconds(stored["last_captured_at"])
+            if (not msg["force"] and now - captured < days * 86400
+                    or requested_at is not None and captured >= _seconds(requested_at)):
+                return {"status": "reused", "observation_id": stored["observation_id"], "currency": "USD", **scope,
                         "last_success_at": stored["last_captured_at"]}
+        if not msg["force"]:
             failure = state["failures"].get("/".join(scope.values()), {})
             if _seconds(failure.get("retry_after")) > now:
-                return {"status": "deferred", "error_code": failure["error_code"], "retry_after": failure["retry_after"]}
+                return {"status": "deferred", "deferral_kind": "scope", "error_code": failure["error_code"], "retry_after": failure["retry_after"]}
         if _seconds(state["next_navigation_at"]) > now:
             return {"status": "deferred", "error_code": "sa_company_pacing", "retry_after": state["next_navigation_at"]}
         token = uuid4().hex

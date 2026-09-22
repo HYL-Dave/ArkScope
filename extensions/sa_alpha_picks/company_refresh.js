@@ -94,7 +94,8 @@
       var resolved = await targets(state);
       var control = await readCollector();
       var ids = new Set(resolved.scopes.map(key));
-      var queue = (state.pending_scopes || []).filter(function (id) { return ids.has(id); });
+      var queue = resolved.info && resolved.info.status !== "ok" ? (state.pending_scopes || [])
+        : (state.pending_scopes || []).filter(function (id) { return ids.has(id); });
       return {status:"ok", config:state.config, paused_reason:state.paused_reason, running:!!pending,
         collector:control, target_info:resolved.info, pending_count:queue.length,
         blocked_reason:state.blocked_reason || null, deferred_until:state.deferred_until || null,
@@ -116,6 +117,10 @@
         return;
       }
       var resolved = await targets(state);
+      if (resolved.info && resolved.info.status !== "ok") {
+        await deps.alarms.create(ALARM, {when:now() + 3600000, periodInMinutes:60});
+        return;
+      }
       var times = resolved.scopes.map(function (scope) {
         return Math.max(deadline(state.records[key(scope)] || {}, state.config.interval_days), rateLimitDeadline(state));
       });
@@ -127,14 +132,26 @@
     async function configure(value) {
       var config = normalize(value);
       await mutate(function (state) {
-        if ((state.config.target_mode || "manual") !== config.target_mode) state.pending_scopes = [];
+        if (JSON.stringify(state.config) !== JSON.stringify(config)) {
+          state.intent_revision = (state.intent_revision || 0) + 1;
+          state.pending_scopes = [];
+          state.pending_requested_at = null;
+          state.deferred_until = null;
+          state.blocked_reason = null;
+        }
         state.config = config;
       });
       await syncAlarm();
       return status();
     }
     async function cancelQueue() {
-      await mutate(function (state) { state.pending_scopes = []; });
+      await mutate(function (state) {
+        state.intent_revision = (state.intent_revision || 0) + 1;
+        state.pending_scopes = [];
+        state.pending_requested_at = null;
+        state.deferred_until = null;
+        state.blocked_reason = null;
+      });
       await syncAlarm();
       return status();
     }
@@ -163,15 +180,23 @@
       if (rateLimitDeadline(await read()) > now()) return status();
       if (force) await mutate(function (state) { state.paused_reason = null; });
       var state = await read();
+      var intentRevision = state.intent_revision || 0;
       var resolved = await targets(state);
       if (resolved.info && resolved.info.status !== "ok") return status();
-      if (state.config.target_mode === "watchlist" || (state.pending_scopes || []).length) {
+      if (((await read()).intent_revision || 0) !== intentRevision) return status();
+      if (force || (state.pending_scopes || []).length) {
         var ids = new Set(resolved.scopes.map(key));
+        var configRevision = state.intent_revision || 0;
         await mutate(function (current) {
+          if ((current.intent_revision || 0) !== configRevision) return;
           current.pending_scopes = (current.pending_scopes || []).filter(function (id) { return ids.has(id); });
-          if (force && current.config.target_mode === "watchlist" && !current.pending_scopes.length) current.pending_scopes = resolved.scopes.map(key);
+          if (force && !current.pending_scopes.length) {
+            current.pending_scopes = resolved.scopes.map(key);
+            current.pending_requested_at = new Date(now()).toISOString();
+          }
         });
         state = await read();
+        if ((state.intent_revision || 0) !== intentRevision) return status();
       }
       var queued = (state.pending_scopes || []).length > 0;
       if ((!force && !queued && !state.config.enabled) || state.paused_reason) return status();
@@ -189,7 +214,7 @@
           var latest = await read();
           var latestTargets = await targets(latest);
           var latestSuccess = (latest.records[key(scope)] || {}).last_success_at;
-          return !latest.paused_reason && rateLimitDeadline(latest) <= now()
+          return (latest.intent_revision || 0) === intentRevision && !latest.paused_reason && rateLimitDeadline(latest) <= now()
             && (queued ? (latest.pending_scopes || []).includes(key(scope)) : force || latest.config.enabled)
             && latestTargets.scopes.some(function (item) { return key(item) === key(scope); })
             && (force || queued || (latestSuccess === successBeforeQueue
@@ -221,23 +246,26 @@
           return failureWrite;
         };
         var result;
-        try { result = await deps.runScope(scope, force || queued ? "manual" : "scheduled", admitted, observeFailure, state.config.interval_days); }
+        try { result = await deps.runScope(scope, force || queued ? "manual" : "scheduled", admitted, observeFailure,
+          state.config.interval_days, queued ? state.pending_requested_at : null); }
         catch (_) { result = {status:"error", error_code:"sa_company_refresh_failed"}; }
         if (failureWrite) await failureWrite;
         if (result.status === "cancelled" || result.status === "deferred") {
           await mutate(function (current) {
+            if ((current.intent_revision || 0) !== intentRevision) return;
             var record = current.records[key(scope)] || {};
             if (record.last_attempt_at === attemptAt && record.last_error === "sa_company_refresh_interrupted") {
               current.records[key(scope)] = beforeQueue;
             }
-            if (result.status === "deferred") {
+            if (result.status === "deferred" && result.deferral_kind === "scope") {
+              current.records[key(scope)] = Object.assign({}, current.records[key(scope)] || {}, {
+                last_error:result.error_code, retry_after:result.retry_after,
+              });
+            } else if (result.status === "deferred") {
               current.blocked_reason = result.error_code || "sa_company_collector_unavailable";
               current.deferred_until = new Date(Math.max(now() + 60000,
                 Date.parse(result.retry_after || "") || now() + 3600000)).toISOString();
             }
-          });
-          if (result.status === "deferred" && force && !queued) await mutate(function (current) {
-            current.pending_scopes = selected.slice(selected.indexOf(scope)).map(key);
           });
           break;
         }
@@ -251,8 +279,10 @@
           });
         } else if (!failureWrite) await observeFailure(result.error_code);
         if (queued) await mutate(function (current) {
+          if ((current.intent_revision || 0) !== intentRevision) return;
           if (!current.paused_reason && rateLimitDeadline(current) <= now()) {
             current.pending_scopes = (current.pending_scopes || []).filter(function (id) { return id !== key(scope); });
+            if (!current.pending_scopes.length) current.pending_requested_at = null;
           }
         });
       }

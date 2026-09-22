@@ -211,3 +211,33 @@ def test_real_persisted_receipt_and_page_pacing(control, monkeypatch, tmp_path):
     assert permit["status"] == "ok"
     # An old but real receipt cannot certify this second acquisition.
     assert call(obj, "finish", token=permit["token"], result=receipt)["error_code"] == "sa_company_receipt_unverified"
+
+
+def test_manual_request_already_satisfied_before_crash_is_not_reacquired(control, monkeypatch):
+    obj, clock = control
+    request_at = datetime.fromtimestamp(clock[0] - 10, timezone.utc).isoformat()
+    observation = {"observation_id": "b" * 64, "last_captured_at": datetime.fromtimestamp(clock[0] - 5, timezone.utc).isoformat()}
+    monkeypatch.setattr("src.sa.company_store.read_capture", lambda *a, **k: observation)
+    call(obj, "select")
+    result = call(obj, "begin", scope=SCOPE, interval_days=7, force=True, requested_at=request_at)
+    assert result["status"] == "reused"
+    assert result["last_success_at"] == observation["last_captured_at"]
+    assert call(obj, "status")["active"] is None
+
+
+@pytest.mark.parametrize("completion", ["finish", "recover"])
+def test_delayed_navigation_keeps_a_gap_after_completion(control, monkeypatch, completion):
+    obj, clock = control
+    call(obj, "select")
+    permit = begin(obj)
+    # The worker suspended between reservation and page navigation.
+    clock[0] += 3600
+    observation = {"observation_id": "b" * 64, "last_captured_at": datetime.fromtimestamp(clock[0], timezone.utc).isoformat()}
+    monkeypatch.setattr("src.sa.company_store.read_capture", lambda *a, **k: observation)
+    if completion == "finish":
+        call(obj, "finish", token=permit["token"], result={"status": "ok", "observation_id": observation["observation_id"]})
+    else:
+        call(obj, "recover", confirm_stopped=True)
+    clock[0] += 20
+    result = call(obj, "begin", scope=SCOPE, interval_days=7, force=True)
+    assert result["status"] == "deferred" and result["error_code"] == "sa_company_pacing"

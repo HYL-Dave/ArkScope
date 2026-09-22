@@ -174,7 +174,7 @@ def test_native_reuse_skips_navigation_and_keeps_saved_capture_time():
     result = _run_background_probe("""
       let navigated = 0;
       refreshCompanyFinancialScope = async () => { navigated++; };
-      companyCollectorControl = async () => ({status:'reused',observation_id:'b'.repeat(64),currency:'USD',last_success_at:'2026-09-20T00:00:00Z'});
+      companyCollectorControl = async () => ({status:'reused',ticker:'AMD',statement:'income_statement',view:'annual',observation_id:'b'.repeat(64),currency:'USD',last_success_at:'2026-09-20T00:00:00Z'});
       const result = await runCoordinatedCompanyScope({ticker:'AMD',statement:'income_statement',view:'annual'},
         'scheduled',async()=>true,async()=>{},7,SAExtensionDiagnostics.createCollector());
       return {result,navigated};
@@ -240,6 +240,119 @@ def test_183_ticker_watchlist_has_all_six_scopes_without_a_hidden_limit():
     assert len(result["status"]["scopes"]) == 1098
     assert result["status"]["pending_count"] == 1097
     assert len(result["calls"]) == 1
+
+
+def test_stale_deferral_cannot_restore_intent_after_a_target_mode_change():
+    result = probe("""
+      deps.resolveWatchlist = async () => ({status:'ok',tickers:['AMD'],unsupported:[],total_count:1});
+      deps.runScope = async () => {
+        await api.configure({...config,target_mode:'watchlist',tickers:[],enabled:false});
+        return {status:'deferred',error_code:'sa_company_pacing'};
+      };
+      await api.run(true);
+      return {state:saved.companyFinancialRefresh,status:await api.status()};
+    """)
+    assert result["status"]["pending_count"] == 0
+    assert not result["state"].get("pending_scopes")
+
+
+def test_cancel_during_watchlist_resolution_cannot_create_a_new_queue():
+    result = probe(WATCHLIST + """
+      let entered, release, intercept = true;
+      const waiting = new Promise(resolve=>entered=resolve);
+      const gate = new Promise(resolve=>release=resolve);
+      deps.resolveWatchlist = async () => {
+        if (intercept) { intercept=false;entered();await gate; }
+        return {status:'ok',tickers:members,total_count:members.length,unsupported:[]};
+      };
+      const pending = api.run(true);
+      await waiting;
+      await api.cancelQueue();
+      release();await pending;
+      return {calls,status:await api.status()};
+    """)
+    assert result["calls"] == []
+    assert result["status"]["pending_count"] == 0
+
+
+def test_manual_selected_ticker_intent_is_persisted_before_the_first_request():
+    result = probe("""
+      await api.configure({...config,enabled:false});
+      let entered;
+      const started = new Promise(resolve=>entered=resolve);
+      deps.runScope = async () => { entered(); return new Promise(()=>{}); };
+      api.run(true);
+      await started;
+      const durable = structuredClone(saved.companyFinancialRefresh);
+      deps.runScope = async scope => { calls.push(scope.view);return {status:'ok',currency:'USD',observation_id:'a'.repeat(64)}; };
+      const restarted = SACompanyRefresh.create(deps);
+      await restarted.run(false);
+      return {durable,calls,status:await restarted.status()};
+    """)
+    assert len(result["durable"].get("pending_scopes", [])) == 2
+    assert result["calls"] == ["annual"]
+    assert result["status"]["pending_count"] == 1
+
+
+def test_shared_scope_backoff_does_not_delay_other_scopes_after_browser_switch():
+    result = probe("""
+      deps.runScope = async scope => {
+        if (scope.view === 'annual') return {status:'deferred',deferral_kind:'scope',error_code:'sa_company_dom_not_ready',
+          retry_after:new Date(clock+6*3600000).toISOString()};
+        calls.push(scope.view);
+        return {status:'ok',currency:'USD',observation_id:'a'.repeat(64)};
+      };
+      await api.run(false);
+      const first = await api.status();
+      const when = alarms.at(-1).when;
+      await api.run(false);
+      return {first,when,clock,calls};
+    """)
+    assert result["when"] == result["clock"] + 60000
+    assert result["calls"] == ["quarterly"]
+    assert result["first"]["scopes"][0]["last_error"] == "sa_company_dom_not_ready"
+
+
+def test_missing_watchlist_keeps_pending_intent_cancellable_and_backs_off():
+    result = probe(WATCHLIST + """
+      await api.run(true);
+      deps.resolveWatchlist = async () => ({status:'error',error_code:'active_universe_unavailable'});
+      await api.run(false);
+      const before = await api.status();
+      const when = alarms.at(-1).when;
+      await api.cancelQueue();
+      return {before,when,clock,after:await api.status()};
+    """)
+    assert result["before"]["pending_count"] == 3
+    assert result["when"] >= result["clock"] + 3600000
+    assert result["after"]["pending_count"] == 0
+
+
+@pytest.mark.parametrize("patch", [
+    {"observation_id": "not-an-observation"}, {"last_success_at": "2099-01-01T00:00:00Z"},
+    {"ticker": "WRONG"}, {"currency": "EUR"}, {"last_success_at": "not-a-time"},
+])
+def test_malformed_native_reuse_is_not_a_successful_capture(patch):
+    result = _run_background_probe("""
+      const scope = {ticker:'AMD',statement:'income_statement',view:'annual'};
+      companyCollectorControl = async () => ({status:'reused',...scope,
+        observation_id:'b'.repeat(64),currency:'USD',last_success_at:'2026-09-20T00:00:00Z',...PATCH});
+      return runCoordinatedCompanyScope(scope,'scheduled',async()=>true,async()=>{},7,SAExtensionDiagnostics.createCollector());
+    """.replace("PATCH", json.dumps(patch)))
+    assert result["status"] == "error"
+    assert result["error_code"] == "sa_company_receipt_unverified"
+
+
+@pytest.mark.parametrize("result", [
+    {"status": "ok", "acquisition_outcome": "reused"},
+    {"status": "deferred", "error_code": "sa_company_pacing"},
+    {"status": "cancelled"},
+])
+def test_company_telemetry_skips_acquisition_when_it_did_not_happen(result):
+    actual = _run_background_probe("return attachExtensionRunProtocol('company_financial_capture','scheduled',"
+                                   + json.dumps(result) + ");")
+    assert actual["extension_run"]["derived_outcome"] == "skipped"
+    assert all(phase["state"] == "skipped" for phase in actual["extension_run"]["phases"].values())
 
 
 def test_due_updates_are_scoped_and_reads_do_not_extend_the_deadline():
