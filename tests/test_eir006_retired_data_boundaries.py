@@ -83,6 +83,7 @@ _TEST_FIXTURES = {
     "tests/test_market_data_admin.py",
     "tests/test_market_data_direct.py",
     "tests/test_provider_health.py",
+    "tests/test_security_lifecycle_tools.py",
     "tests/test_sqlite_backend.py",
     "tests/test_stored_sec_projection.py",
     "tests/test_tool_output_policy.py",
