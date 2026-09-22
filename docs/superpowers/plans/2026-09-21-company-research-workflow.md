@@ -16,6 +16,14 @@ authorized by this plan.
 Current state: [Progress At Each Handoff](#progress-at-each-handoff).
 Latest accepted slice: [retained article, comment and holdings reads](../evidence/2026-09-22-retained-research-reads/README.md).
 
+Current bounded addition: [SA financial refresh](../evidence/2026-09-22-sa-financial-refresh/README.md)
+at `fd1c7d08`, with the operator-reported Firefox popup sizing corrected at
+`3c8bc6e8`. Shared browser scheduling is implemented; full backend and signed-in
+operator acceptance are still open. The full run was stopped after the live UI
+defect was reported, and must not be presented as completed acceptance.
+The user explicitly prioritized this addition on September 22. It does not
+replace the remaining workflow packages or the independent service/MCP lanes.
+
 September 22 sequencing correction: this is one delivery lane, not the complete
 product backlog. Retention, persistent service/failure delivery and external
 read/analysis MCP remain required and do not wait for this lane's signed-in
