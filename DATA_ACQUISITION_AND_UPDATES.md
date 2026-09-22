@@ -488,6 +488,15 @@ capture time. Snap Firefox can also have a remembered desktop-portal denial for
 the host; changing it requires the user's consent, not an automatic grant or a
 browser-sandbox bypass. See [Firefox's native-messaging portal documentation](https://firefox-source-docs.mozilla.org/toolkit/components/extensions/webextensions/native-messaging-portal-design.html).
 
+Firefox native-host requests are serialized by host with an extension-origin
+[Web Lock](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API), including
+the time spent waiting for desktop consent. A caller timeout does not release a
+still-pending native request. Popup reconciliation requests are owned by the
+background, with an exact popup sender and existing-action allowlist, so closing
+the popup does not make it the owner of an in-progress consent request. Portal
+dialog contention can record a denial without an intentional user refusal;
+resetting that record still requires consent and does not itself grant access.
+
 Owners: [refresh state](extensions/sa_alpha_picks/company_refresh.js),
 [browser integration](extensions/sa_alpha_picks/background.js),
 [popup](extensions/sa_alpha_picks/popup_company_refresh.js),

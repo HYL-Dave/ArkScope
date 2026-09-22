@@ -31,7 +31,6 @@ var reconciliationErrorEl = document.getElementById("reconciliationError");
 var manualConfirmationEl = document.getElementById("manualConfirmation");
 var manualInput = document.getElementById("manualInput");
 var manualBtn = document.getElementById("manualBtn");
-var RECONCILIATION_NATIVE_HOST = "com.mindfulrl.sa_alpha_picks";
 var lastReconciliationQueue = null;
 var ALPHA_PICKS_AUTO_SYNC_DEFAULT_INTERVAL = "30";
 var MARKET_NEWS_AUTO_SYNC_DEFAULT_INTERVAL = "60";
@@ -876,15 +875,8 @@ setInterval(function () {
 }, 60000);
 
 function sendReconciliationNative(payload) {
-  return new Promise(function (resolve) {
-    chrome.runtime.sendNativeMessage(RECONCILIATION_NATIVE_HOST, payload, function (result) {
-      if (chrome.runtime.lastError) {
-        resolve({ status: "error", error_code: "native_host_unavailable" });
-        return;
-      }
-      resolve(result || { status: "error", error_code: "empty_native_response" });
-    });
-  });
+  // Keep native consent in the background when the action popup loses focus.
+  return sendRuntimeMessage({action:"reconciliation_native_request", payload:payload});
 }
 
 function renderReconciliationQueue(queue) {

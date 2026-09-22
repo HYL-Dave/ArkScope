@@ -95,3 +95,20 @@ For a first controlled test, select one ticker, Income, Annual, leave Scheduled
 off and run Update now. Check the saved ticker/period/currency and receipt before
 adding Quarterly or more statements. Use an isolated native-host/database target
 for pre-release acceptance, not an unverified production registration.
+
+## Native Connection And Desktop Consent
+
+On Snap Firefox, desktop-portal permission is separate from the add-on permission
+and host-manifest registration. A command-line host ping does not test this gate.
+`Local app connection unavailable` means the refresh stopped before opening SA;
+it is not evidence that the SA financial table failed to load.
+
+The Firefox shim serializes native requests per host, including pending consent.
+The background owns popup reconciliation requests as well, so losing popup focus
+does not own the lifetime of the native call. The bridge accepts only the popup
+sender and the three existing reconciliation actions, not arbitrary native calls.
+
+When the portal records dialog contention, do not repeatedly reload or automatically
+grant access. Inspect the exact host-specific permission and reset it only with
+the user's consent, then allow the user to respond to the new system prompt.
+Never change another host's permission or disable browser confinement as a workaround.

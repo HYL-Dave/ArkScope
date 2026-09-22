@@ -579,6 +579,15 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
 
 // --- Message listener (from popup) ---
 
+async function forwardReconciliationNative(payload, sender) {
+  if (!sender || sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("popup.html")
+      || !payload || typeof payload !== "object" || Array.isArray(payload)
+      || !["get_reconciliation_queue", "accept_reconciliation_link", "reject_reconciliation_candidate"].includes(payload.action)) {
+    return {status:"error", error_code:"extension_request_rejected"};
+  }
+  return sendNativeMessage2(payload);
+}
+
 const companyFinancialRefresh = SACompanyRefresh.create({
   storage: chrome.storage.local,
   alarms: chrome.alarms,
@@ -591,6 +600,12 @@ const companyFinancialRefresh = SACompanyRefresh.create({
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === "reconciliation_native_request") {
+    forwardReconciliationNative(msg.payload, sender).then(sendResponse).catch(function () {
+      sendResponse({status:"error", error_code:"native_host_unavailable"});
+    });
+    return true;
+  }
   if (["get_company_refresh", "configure_company_refresh", "run_company_refresh"].includes(msg.action)) {
     var task = msg.action === "get_company_refresh" ? companyFinancialRefresh.status()
       : msg.action === "configure_company_refresh" ? companyFinancialRefresh.configure(msg.config)

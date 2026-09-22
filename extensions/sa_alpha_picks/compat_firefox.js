@@ -122,6 +122,19 @@
   if (!chromeCompat.runtime) {
     chromeCompat.runtime = {};
   }
+  if (browser.runtime && typeof browser.runtime.sendNativeMessage === "function") {
+    chromeCompat.runtime.sendNativeMessage = wrapFunction(function () {
+      var args = Array.prototype.slice.call(arguments);
+      if (!globalThis.navigator || !navigator.locks || typeof navigator.locks.request !== "function") {
+        return Promise.reject(new Error("native_messaging_lock_unavailable"));
+      }
+      // Popup and background share this origin lock. Pending desktop consent
+      // must finish before another native launch can request a second dialog.
+      return navigator.locks.request("arkscope-native-messaging:" + args[0], function () {
+        return browser.runtime.sendNativeMessage.apply(browser.runtime, args);
+      });
+    }, browser.runtime);
+  }
   Object.defineProperty(chromeCompat.runtime, "lastError", {
     configurable: true,
     enumerable: true,
