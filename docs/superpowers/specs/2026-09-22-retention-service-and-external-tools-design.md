@@ -208,7 +208,7 @@ article/comment continuation and source citations survive the external transport
 | Unattended service / alerts | API-bound schedulers exist; UI owns lifetime; new delivery absent | One supervised profile owner, UI detach/reattach, persisted and delivered failures |
 | External MCP | Internal bridges only | Thin external adapter plus server-enforced stored-read/calculation authority |
 | SA/company workflow | Structured capture/read/comparison and four-channel retained readers implemented | Installed Chrome and Firefox acceptance, real research use and explicit comment-backlog processing |
-| Analytical corrections | Legacy defects remain; comparator excludes old ratios | Consistent debt/period calculations including warm caches; actual earnings-release dates and complete trading windows |
+| Analytical corrections | September 23 repair implements input/debt/period/cache guards and stored earnings release/session windows; [current evidence](../evidence/2026-09-23-research-tool-repairs/README.md) owns final regression | Real-provider coverage, remaining concept/TTM quality and scheduled event observation; no blanket all-tool certification |
 | Broader source routing / freshness | Financial selection and category catalog exist | Dataset-specific source controls and evidence-based event refresh, without requiring a paid Finnhub plan |
 | Earnings observation automation | Capability retained; not implemented | Schedule accurate event reactions after the repair, with deduplication and useful delivery |
 | Research continuity | Atomic completion repaired | Native-session reuse remains separate; do not revive research notebooks |
