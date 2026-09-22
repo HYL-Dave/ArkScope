@@ -35,6 +35,11 @@ browser, with Chrome and Firefox implemented together and Firefox used first.
 The [watchlist collector plan](2026-09-23-sa-watchlist-collector.md) adds complete
 App-list resolution, shared local owner/admission/cooldown and resumable paced
 queues. Production rollout and signed-in bulk acceptance remain off/pending.
+Implementation/review fixes at `590e67c8` and `0fe50879` passed 1,022 SA and
+active-universe tests plus installed offline Firefox/Chromium alarm checks.
+The private Firefox artifact now contains that implementation; its two-company
+signed-in gate is documented in the
+[watchlist collector acceptance](../evidence/2026-09-23-sa-watchlist-collector/README.md).
 Full backend and remaining operator acceptance are still open. The full run was stopped after the live UI
 defect was reported, and must not be presented as completed acceptance.
 The user explicitly prioritized this addition on September 22. It does not
