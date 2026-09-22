@@ -291,6 +291,11 @@ function snapshot(document, sent) {
     companyCaptureStatus: text(document.getElementById("companyCaptureStatus")),
     companyCaptureDisabled: document.getElementById("companyCaptureBtn")?.disabled,
     companyRefreshStatus: text(document.getElementById("companyRefreshStatus")),
+    companyCollectorStatus: text(document.getElementById("companyCollectorStatus")),
+    companyRefreshTargets: text(document.getElementById("companyRefreshTargets")),
+    companyRefreshTargetMode: document.getElementById("companyRefreshTargetMode")?.value,
+    companyRefreshTickerRequired: document.getElementById("companyRefreshTickers")?.required,
+    companyRefreshNowDisabled: document.getElementById("companyRefreshNow")?.disabled,
     advancedPreview: text(advancedPreview),
     reviewScope: reviewScope
       ? {hidden: reviewScope.hidden, text: text(reviewScope)}
@@ -339,7 +344,15 @@ async function runPopup() {
     }
     await settle();
 
-    if (scenario === "configure_company_refresh") {
+    if (scenario === "configure_company_watchlist") {
+      const select = dom.window.document.getElementById("companyRefreshTargetMode");
+      if (select) { select.value="watchlist"; select.dispatchEvent(new dom.window.Event("change", {bubbles:true})); }
+      dom.window.document.getElementById("companyRefreshForm")?.dispatchEvent(new dom.window.Event("submit", {bubbles:true,cancelable:true}));
+      await settle();
+    } else if (scenario === "select_company_collector") {
+      dom.window.document.getElementById("companyCollectorSelect")?.click();
+      await settle();
+    } else if (scenario === "configure_company_refresh") {
       const doc = dom.window.document;
       const ticker = doc.getElementById("companyRefreshTickers");
       if (ticker) ticker.value = "amd, aapl AMD";
@@ -350,6 +363,9 @@ async function runPopup() {
       const quarterly = doc.querySelector('[name="companyRefreshView"][value="quarterly"]');
       if (quarterly) quarterly.checked = true;
       doc.getElementById("companyRefreshForm")?.dispatchEvent(new dom.window.Event("submit", {bubbles:true,cancelable:true}));
+      await settle();
+    } else if (scenario === "company_capture_storage_update") {
+      await mocks.chrome.storage.local.set({lastCompanyCapture: fixture.companyResult});
       await settle();
     } else if (scenario === "capture_company") {
       dom.window.document.getElementById("companyCaptureBtn")?.click();

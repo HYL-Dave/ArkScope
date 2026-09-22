@@ -1,4 +1,4 @@
-// Browser-local refresh state. Publication dates and provider readiness are not inferred.
+// Browser-local intent; native admission coordinates collectors. No publication-date inference.
 (function (root) {
   "use strict";
   var KEY = "companyFinancialRefresh";
@@ -17,8 +17,10 @@
       })) fail();
       return Array.from(new Set(items));
     }
-    var tickers = list(value.tickers, function (item) { return /^[A-Z][A-Z0-9.-]{0,19}$/.test(item); });
-    return { enabled: value.enabled, interval_days: value.interval_days, tickers: tickers,
+    var targetMode = value.target_mode || "manual";
+    if (!["manual", "watchlist"].includes(targetMode)) fail();
+    var tickers = targetMode === "watchlist" ? [] : list(value.tickers, function (item) { return /^[A-Z][A-Z0-9.-]{0,19}$/.test(item); });
+    return { enabled: value.enabled, target_mode: targetMode, interval_days: value.interval_days, tickers: tickers,
       statements: list(value.statements, function (item) { return STATEMENTS.includes(item); }),
       views: list(value.views, function (item) { return VIEWS.includes(item); }) };
   }
@@ -48,8 +50,9 @@
     var now = deps.now || Date.now;
     var pending = null;
     var writes = Promise.resolve();
+    var collector = null;
     function empty() {
-      return {config: {enabled:false, tickers:[], statements:["income_statement"], views:["annual"], interval_days:7},
+      return {config: {enabled:false, target_mode:"manual", tickers:[], statements:["income_statement"], views:["annual"], interval_days:7},
         records:{}, paused_reason:null, rate_limit_until:null, rate_limit_failures:0};
     }
     async function read() {
@@ -65,11 +68,38 @@
       writes = work.catch(function () {});
       return work;
     }
+    async function targets(state) {
+      if (state.config.target_mode !== "watchlist") return {scopes:scopes(state.config), info:null};
+      var info;
+      try { info = await deps.resolveWatchlist(); }
+      catch (_) { info = {status:"error",error_code:"sa_company_watchlist_unavailable"}; }
+      if (!info || info.status !== "ok" || !Array.isArray(info.tickers)
+          || info.tickers.some(function (ticker) { return typeof ticker !== "string" || !/^[A-Z][A-Z0-9.-]{0,19}$/.test(ticker); })) {
+        return {scopes:[],info:info && info.status === "error" ? info : {status:"error",error_code:"sa_company_watchlist_unavailable"}};
+      }
+      return {scopes:scopes(Object.assign({}, state.config, {tickers:Array.from(new Set(info.tickers))})), info:info};
+    }
+    async function readCollector() {
+      if (!deps.control) return null;
+      try { collector = await deps.control("status"); }
+      catch (_) { collector = null; }
+      if (!collector || collector.status !== "ok") collector = {status:"error",error_code:"sa_company_collector_unavailable"};
+      return collector;
+    }
+    function blocked(control) {
+      return control && (control.status !== "ok" || !control.is_owner || control.rate_limited || control.paused_reason || control.active);
+    }
     async function status() {
       var state = await read();
+      var resolved = await targets(state);
+      var control = await readCollector();
+      var ids = new Set(resolved.scopes.map(key));
+      var queue = (state.pending_scopes || []).filter(function (id) { return ids.has(id); });
       return {status:"ok", config:state.config, paused_reason:state.paused_reason, running:!!pending,
+        collector:control, target_info:resolved.info, pending_count:queue.length,
+        blocked_reason:state.blocked_reason || null, deferred_until:state.deferred_until || null,
         rate_limited:rateLimitDeadline(state) > now(), rate_limit_until:state.rate_limit_until || null,
-        scopes:scopes(state.config).map(function (scope) {
+        scopes:resolved.scopes.map(function (scope) {
           var record = state.records[key(scope)] || {};
           var due = Math.max(deadline(record, state.config.interval_days), rateLimitDeadline(state));
           return Object.assign({}, scope, {last_success_at:null, last_attempt_at:null, last_error:null}, record,
@@ -79,51 +109,90 @@
     async function syncAlarm() {
       var state = await read();
       await deps.alarms.clear(ALARM);
-      if (!state.config.enabled || state.paused_reason || !state.config.tickers.length) return;
-      var times = scopes(state.config).map(function (scope) {
+      if ((!state.config.enabled && !(state.pending_scopes || []).length) || state.paused_reason) return;
+      // Repair/retry local connectivity even when the complete App list is unavailable.
+      if (blocked(collector)) {
+        await deps.alarms.create(ALARM, {when:Math.max(now() + 3600000, Date.parse(collector.rate_limit_until || "") || 0), periodInMinutes:60});
+        return;
+      }
+      var resolved = await targets(state);
+      var times = resolved.scopes.map(function (scope) {
         return Math.max(deadline(state.records[key(scope)] || {}, state.config.interval_days), rateLimitDeadline(state));
       });
-      await deps.alarms.create(ALARM, {when:Math.max(now() + 60000, Math.min.apply(null, times)), periodInMinutes:60});
+      if ((state.pending_scopes || []).length) times.push(rateLimitDeadline(state));
+      if (!times.length) times.push(now() + 3600000);
+      await deps.alarms.create(ALARM, {when:Math.max(now() + 60000, Math.min.apply(null, times),
+        Date.parse(state.deferred_until || "") || 0), periodInMinutes:60});
     }
     async function configure(value) {
       var config = normalize(value);
-      await mutate(function (state) { state.config = config; });
+      await mutate(function (state) {
+        if ((state.config.target_mode || "manual") !== config.target_mode) state.pending_scopes = [];
+        state.config = config;
+      });
+      await syncAlarm();
+      return status();
+    }
+    async function cancelQueue() {
+      await mutate(function (state) { state.pending_scopes = []; });
       await syncAlarm();
       return status();
     }
     async function noteSuccess(scope, receipt) {
       if (!scope || !STATEMENTS.includes(scope.statement) || !VIEWS.includes(scope.view) || receipt.currency !== "USD") return;
-      if (!scopes((await read()).config).some(function (item) { return key(item) === key(scope); })) return false;
+      var current = await read();
+      var resolved = await targets(current);
+      if (!resolved.scopes.some(function (item) { return key(item) === key(scope); })) return false;
       var updated = false;
       await mutate(function (state) {
-        if (!scopes(state.config).some(function (item) { return key(item) === key(scope); })) return;
+        if (JSON.stringify(state.config) !== JSON.stringify(current.config)) return;
         updated = true;
-        state.records[key(scope)] = {last_success_at:new Date(now()).toISOString(), last_attempt_at:new Date(now()).toISOString(),
+        state.records[key(scope)] = {last_success_at:receipt.last_success_at || new Date(now()).toISOString(), last_attempt_at:new Date(now()).toISOString(),
           last_error:null, failures:0, retry_after:null, observation_id:receipt.observation_id};
       });
       return updated;
     }
     async function perform(force) {
+      var control = await readCollector();
+      if (force && control && control.status === "ok" && control.is_owner && control.paused_reason && !control.active) {
+        await deps.control("resume");
+        control = await readCollector();
+      }
+      if (blocked(control)) return status();
       // Refresh overrides source-age policy, never the financial-batch cooldown.
       if (rateLimitDeadline(await read()) > now()) return status();
       if (force) await mutate(function (state) { state.paused_reason = null; });
       var state = await read();
-      if ((!force && !state.config.enabled) || state.paused_reason) return status();
-      var targets = scopes(state.config).filter(function (scope) {
+      var resolved = await targets(state);
+      if (resolved.info && resolved.info.status !== "ok") return status();
+      if (state.config.target_mode === "watchlist" || (state.pending_scopes || []).length) {
+        var ids = new Set(resolved.scopes.map(key));
+        await mutate(function (current) {
+          current.pending_scopes = (current.pending_scopes || []).filter(function (id) { return ids.has(id); });
+          if (force && current.config.target_mode === "watchlist" && !current.pending_scopes.length) current.pending_scopes = resolved.scopes.map(key);
+        });
+        state = await read();
+      }
+      var queued = (state.pending_scopes || []).length > 0;
+      if ((!force && !queued && !state.config.enabled) || state.paused_reason) return status();
+      var selected = resolved.scopes.filter(function (scope) {
+        if (queued) return state.pending_scopes.includes(key(scope));
         return force || deadline(state.records[key(scope)] || {}, state.config.interval_days) <= now();
       });
       // One overdue scope per alarm. Missed browser sessions never produce a catch-up burst.
-      if (!force) targets = targets.slice(0, 1);
-      for (var scope of targets) {
+      if (!force || state.config.target_mode === "watchlist") selected = selected.slice(0, 1);
+      for (var scope of selected) {
         var beforeQueue = (await read()).records[key(scope)] || {};
         var successBeforeQueue = beforeQueue.last_success_at;
         var attemptAt = new Date(now()).toISOString();
         var admitted = async function () {
           var latest = await read();
+          var latestTargets = await targets(latest);
           var latestSuccess = (latest.records[key(scope)] || {}).last_success_at;
-          return !latest.paused_reason && rateLimitDeadline(latest) <= now() && (force || latest.config.enabled)
-            && scopes(latest.config).some(function (item) { return key(item) === key(scope); })
-            && (force || (latestSuccess === successBeforeQueue
+          return !latest.paused_reason && rateLimitDeadline(latest) <= now()
+            && (queued ? (latest.pending_scopes || []).includes(key(scope)) : force || latest.config.enabled)
+            && latestTargets.scopes.some(function (item) { return key(item) === key(scope); })
+            && (force || queued || (latestSuccess === successBeforeQueue
               && (!latestSuccess || Date.parse(latestSuccess) + latest.config.interval_days * DAY <= now())));
         };
         if (!await admitted()) break;
@@ -152,15 +221,23 @@
           return failureWrite;
         };
         var result;
-        try { result = await deps.runScope(scope, force ? "manual" : "scheduled", admitted, observeFailure); }
+        try { result = await deps.runScope(scope, force || queued ? "manual" : "scheduled", admitted, observeFailure, state.config.interval_days); }
         catch (_) { result = {status:"error", error_code:"sa_company_refresh_failed"}; }
         if (failureWrite) await failureWrite;
-        if (result.status === "cancelled") {
+        if (result.status === "cancelled" || result.status === "deferred") {
           await mutate(function (current) {
             var record = current.records[key(scope)] || {};
             if (record.last_attempt_at === attemptAt && record.last_error === "sa_company_refresh_interrupted") {
               current.records[key(scope)] = beforeQueue;
             }
+            if (result.status === "deferred") {
+              current.blocked_reason = result.error_code || "sa_company_collector_unavailable";
+              current.deferred_until = new Date(Math.max(now() + 60000,
+                Date.parse(result.retry_after || "") || now() + 3600000)).toISOString();
+            }
+          });
+          if (result.status === "deferred" && force && !queued) await mutate(function (current) {
+            current.pending_scopes = selected.slice(selected.indexOf(scope)).map(key);
           });
           break;
         }
@@ -169,8 +246,15 @@
           await mutate(function (current) {
             current.rate_limit_until = null;
             current.rate_limit_failures = 0;
+            current.blocked_reason = null;
+            current.deferred_until = null;
           });
         } else if (!failureWrite) await observeFailure(result.error_code);
+        if (queued) await mutate(function (current) {
+          if (!current.paused_reason && rateLimitDeadline(current) <= now()) {
+            current.pending_scopes = (current.pending_scopes || []).filter(function (id) { return id !== key(scope); });
+          }
+        });
       }
       return status();
     }
@@ -189,7 +273,7 @@
       });
       return pending;
     }
-    return {configure:configure, status:status, run:run, syncAlarm:syncAlarm, noteSuccess:noteSuccess};
+    return {configure:configure, status:status, run:run, syncAlarm:syncAlarm, noteSuccess:noteSuccess, cancelQueue:cancelQueue};
   }
   root.SACompanyRefresh = {create:create, alarm:ALARM};
 })(globalThis);

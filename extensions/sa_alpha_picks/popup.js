@@ -1024,6 +1024,9 @@ chrome.runtime.onMessage.addListener(function (msg) {
 
 chrome.storage.onChanged.addListener(function (changes, areaName) {
   if (areaName !== "local") return;
+  if (changes.lastCompanyCapture) {
+    renderCompanyCapture(changes.lastCompanyCapture.newValue);
+  }
   if (changes.lastRefresh) {
     renderStatus(changes.lastRefresh.newValue);
     loadReconciliationQueue();

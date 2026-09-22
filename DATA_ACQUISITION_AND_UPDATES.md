@@ -439,14 +439,43 @@ Signed-in installed-extension acceptance is a separate gate; building the Firefo
 artifact does not establish live SA loading reliability. No production schedule
 is enabled by a code upgrade.
 
-In the extension's **Financial statement updates**, choose tickers, statements
+In the extension's **Financial statement updates**, choose selected tickers or
+**App watchlist**, statements
 (income, balance sheet, cash flow), Annual/Quarterly views and an interval of
 1-365 days (initially 7). Scheduled scopes use **USD / Absolute** tables.
 The interval is a repeat-check policy, not a claim that financial publications
 expire after seven days. **Update now** explicitly requests a new capture even
 inside the interval, but cannot override a rate-limit cooldown. Valuation,
 estimates, news and Alpha Picks do not inherit
-this schedule or interval.
+this schedule or interval. App watchlist targets come from the same complete,
+read-only active-universe authority as the App, not a manually copied list.
+The preview includes membership sources, stale-source warnings and unsupported
+symbols. Unmapped provider symbols are not guessed or counted as captured.
+Retained former Alpha Picks remain targets when still members of the App list.
+Each acquisition rechecks membership; unavailable source databases stop work
+instead of falling back to a partial list. There is no 183-ticker hard limit.
+
+**One collector, both browser builds.** Click **Use this browser** explicitly
+in the chosen browser installation. Initial operator rollout uses Firefox;
+Chrome already contains the same implementation. Opening either browser,
+reading status or saving a schedule does not select it. The selection applies
+to an installation UUID, not every profile bearing the same browser name.
+Both native hosts must point at the same SA database to share this authority.
+Another installation can read saved data and status but cannot navigate financial
+acquisition pages. Switching requires an explicit selection while no capture is
+active. The previous browser's local schedule is not copied or automatically
+enabled in the new browser.
+
+`sa_company_refresh.db`, beside the selected `sa_capture.db`, owns selection,
+active reservation, shared financial cooldown, challenge pause and admission
+failures. Native-host processes serialize mutations with SQLite transactions.
+An active reservation cannot be stolen or expire into competing work. If a
+browser crashes or an acknowledgement/cleanup is uncertain, stop that collector
+and its acquisition tabs, then explicitly **Recover stopped capture**. Recovery
+is logged and revokes the old reservation; it does not select another browser
+or forgive cooldown/challenge state. Do not confirm recovery while the old
+collector is still running. Missing/corrupt control state never grants admission.
+Status/watchlist reads do not install a database or construct a writable DAL.
 
 Each ticker/statement/view has its own last-success time, observation ID, attempt,
 failure and next eligibility time. Reading data or saving unchanged settings does
@@ -461,10 +490,23 @@ The existing extension queue serializes work. Repeated refresh requests join the
 pending batch. A queued automatic scope is checked again before navigation and
 capture; a newly successful matching capture or removed/disabled scope prevents
 unnecessary acquisition. Each alarm handles at most one overdue scope, with at
-least one minute between overdue alarm runs. Manual batches visit scopes
-sequentially with ten-second pacing. A recurring recovery alarm and persisted
-interrupted-attempt state avoid treating a killed worker as success. These controls
-are per browser installation, not a global cross-browser acquisition lock.
+least one minute between overdue alarm runs. All financial page starts also have
+a shared one-minute minimum gap. Small manual batches remain sequential; when
+admission asks them to wait, remaining scopes persist for a later alarm. A manual
+App-watchlist update immediately queues all selected scopes and processes one per
+alarm, even if the periodic **Scheduled** toggle is off. **Cancel queued update**
+clears that one-time queue; uncheck **Scheduled** separately to stop periodic work.
+The popup reports the remaining scope count. Closing the popup does not discard
+the queue; restarting the background restores it. A browser crash during an active
+reservation requires the explicit recovery above. Source/host admission failures
+are visible and delayed instead of becoming silent one-minute retry loops.
+
+Admission reads the saved SA observation's capture timestamp before scheduled
+navigation. Switching browsers does not turn a recent successful capture into
+"never captured", and reusing it does not advance its deadline. A success receipt
+must match a persisted observation captured during that reservation; a fabricated
+or older receipt cannot certify success. Manual saves from an already open page
+remain distinct from navigated acquisition and do not reset acquisition cooldown.
 
 A recognized visible rate-limit error (a page title or visible heading containing
 `Too many requests` or `Rate limit exceeded`) stops the financial batch. A shared
@@ -480,10 +522,11 @@ messages: a timer expiring must not resume an unresolved human-verification gate
 
 These are local safety policies, not published SA request allowances. Visible-page
 detection is not a complete HTTP 429 / `Retry-After` monitor. Financial cooldowns
-do not yet govern Alpha Picks/news or a second Chrome/Firefox installation.
-Before all-watchlist rollout, settle one acquisition owner or shared cross-browser
-coordination, spread newly added scopes over time and verify bounded real-site
-behavior. No bulk watchlist refresh is enabled by this change.
+are now shared across Chrome/Firefox installations using the same local SA store;
+they do not govern Alpha Picks/news, manually opened pages, other hosts or the
+entire site's subrequests. One page can make several provider requests, so this
+is not a guaranteed account/IP request rate. Before bulk rollout, verify bounded
+real-site behavior. No production/all-watchlist schedule is enabled by this change.
 
 Only collector-owned tabs are opened/closed, without requesting focus. View and
 currency must match. Changed selectors must produce changed, stable table values;

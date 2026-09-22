@@ -23,13 +23,18 @@ consent unlocked the first signed-in Firefox AMD annual save, recorded at
 `34c2c9aa`; this is not blanket browser/schedule acceptance. The September 23
 follow-up at `fa041081` adds persistent financial-batch cooldown after visible
 rate limiting, hardened after review at `14027634`; all-watchlist and
-cross-browser governance remain open. See the
+cross-browser governance were still open at that revision. See the
 [cooldown and installed-alarm acceptance](../evidence/2026-09-23-sa-financial-rate-cooldown/README.md).
 The operator subsequently enabled the test schedule: private receipt 8 confirms
 the first real Firefox AMD quarterly income capture was scheduled and persisted,
 while the still-fresh annual capture was unchanged. Both observations passed
 complete pinned local paging (484 annual / 473 quarterly cell positions).
 This closes that bounded live alarm case, not Chrome/all-watchlist acceptance.
+September 23 follow-up: the user approved one explicitly designated acquisition
+browser, with Chrome and Firefox implemented together and Firefox used first.
+The [watchlist collector plan](2026-09-23-sa-watchlist-collector.md) adds complete
+App-list resolution, shared local owner/admission/cooldown and resumable paced
+queues. Production rollout and signed-in bulk acceptance remain off/pending.
 Full backend and remaining operator acceptance are still open. The full run was stopped after the live UI
 defect was reported, and must not be presented as completed acceptance.
 The user explicitly prioritized this addition on September 22. It does not

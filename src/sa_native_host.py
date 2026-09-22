@@ -96,6 +96,20 @@ def handle_message(msg):
         return _handle_record_extension_job(None, msg)
     if action in _MARKET_NEWS_RECOVERY_PATHS:
         return _handle_market_news_recovery_action(action, msg)
+    if action == "get_company_watchlist":
+        from src.sa.company_collector import watchlist_targets
+
+        return watchlist_targets()
+    if action == "company_refresh_control":
+        from src.sa.company_collector import CompanyCollector
+        from src.data_source_routing import DataSourcePolicyFailure, load_route
+
+        if msg.get("operation") == "begin":
+            try:
+                load_route("sa_company_financials").candidates("seeking_alpha")
+            except DataSourcePolicyFailure as exc:
+                return {"status": "error", "error_code": exc.code}
+        return CompanyCollector().handle(msg)
     if action in {"get_company_capture_admission", "save_company_data"}:
         from src.data_source_routing import DataSourcePolicyFailure, load_route
         from src.sa.company_data import CompanyDataFailure

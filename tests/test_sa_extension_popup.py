@@ -20,6 +20,39 @@ POPUP_JS = EXTENSION / "popup.js"
 CATALOG = EXTENSION / "popup_action_catalog.js"
 
 
+def test_watchlist_form_does_not_require_manual_tickers_or_start_capture():
+    result = _run("configure_company_watchlist")
+    configured = [msg for msg in result["sent"] if msg["action"] == "configure_company_refresh"]
+    assert len(configured) == 1
+    assert configured[0]["config"]["target_mode"] == "watchlist"
+    assert configured[0]["config"]["enabled"] is False
+    assert configured[0]["config"]["tickers"] == []
+    assert result["companyRefreshTickerRequired"] is False
+    assert not any(msg["action"] == "run_company_refresh" for msg in result["sent"])
+
+
+def test_popup_exposes_other_collector_and_unsupported_watchlist_symbols():
+    result = _run(companyRefresh={
+        "status": "ok", "config": {"target_mode": "watchlist", "tickers": [], "statements": ["income_statement"],
+                                     "views": ["annual"], "enabled": False, "interval_days": 7},
+        "collector": {"status": "ok", "owner": {"browser": "firefox"}, "is_owner": False},
+        "target_info": {"status": "ok", "total_count": 184, "tickers": [f"T{i}" for i in range(183)],
+                        "unsupported": [{"ticker": "BRK B", "reason": "sa_company_symbol_unmapped"}]},
+        "scopes": [], "pending_count": 0,
+    })
+    assert "firefox" in result["companyCollectorStatus"].lower()
+    assert "183" in result["companyRefreshTargets"]
+    assert "184" in result["companyRefreshTargets"]
+    assert "BRK B" in result["companyRefreshTargets"]
+    assert result["companyRefreshNowDisabled"] is True
+
+
+def test_collector_is_only_selected_by_an_explicit_button():
+    result = _run("select_company_collector")
+    assert [msg for msg in result["sent"] if msg["action"] == "select_company_collector"] == [{"action": "select_company_collector"}]
+    assert not any(msg["action"] in {"configure_company_refresh", "run_company_refresh"} for msg in result["sent"])
+
+
 _BACKGROUND_PROBE = r"""
 const fs = require("node:fs");
 const path = require("node:path");
@@ -280,6 +313,30 @@ def test_company_capture_failure_is_visible_and_does_not_offer_automatic_retries
     result = _run("capture_company", companyResult={"status": "error", "error_code": "sa_company_structure_changed"})
     assert "structure changed" in result["companyCaptureStatus"]
     assert "retained" in result["companyCaptureStatus"]
+    assert result["companyCaptureDisabled"] is False
+
+
+def test_open_popup_shows_the_scheduled_company_capture_without_reopening():
+    result = _run("company_capture_storage_update", storage={"lastCompanyCapture": {
+        "status": "ok", "ticker": "AMD", "statement": "income_statement", "view": "annual", "currency": "USD",
+        "coverage": {"scope": "displayed_table", "row_count": 44}, "deduplicated": False,
+    }}, companyResult={
+        "status": "ok", "ticker": "AMD", "statement": "income_statement", "view": "quarterly", "currency": "USD",
+        "coverage": {"scope": "displayed_table", "row_count": 43}, "deduplicated": False,
+    })
+    assert "AMD | Income statement | quarterly | USD | 43 rows" in result["companyCaptureStatus"]
+    assert "annual" not in result["companyCaptureStatus"]
+    assert not any(message["action"] in {"capture_company_data", "run_company_refresh"} for message in result["sent"])
+
+
+def test_open_popup_replaces_old_company_success_when_background_capture_fails():
+    result = _run("company_capture_storage_update", storage={"lastCompanyCapture": {
+        "status": "ok", "ticker": "AMD", "statement": "income_statement", "view": "annual", "currency": "USD",
+        "coverage": {"scope": "displayed_table", "row_count": 44}, "deduplicated": False,
+    }}, companyResult={"status": "error", "error_code": "sa_company_structure_changed"})
+    assert "structure changed" in result["companyCaptureStatus"]
+    assert "retained" in result["companyCaptureStatus"]
+    assert "Saved" not in result["companyCaptureStatus"]
     assert result["companyCaptureDisabled"] is False
 
 

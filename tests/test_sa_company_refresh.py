@@ -41,6 +41,207 @@ def probe(body):
     )
 
 
+WATCHLIST = """
+let members = ['AMD','AAPL'];
+deps.resolveWatchlist = async () => ({status:'ok',tickers:members,total_count:members.length,unsupported:[],sources_by_ticker:{}});
+await api.configure({...config,target_mode:'watchlist',tickers:[],enabled:false});
+"""
+
+
+def test_watchlist_manual_queue_runs_one_scope_per_alarm_and_survives_restart():
+    result = probe(WATCHLIST + """
+      await api.run(true);
+      const first = await api.status();
+      const restarted = SACompanyRefresh.create(deps);
+      await restarted.run(false);
+      return {calls,first,second:await restarted.status(),alarms};
+    """)
+    assert len(result["calls"]) == 2
+    assert result["first"]["pending_count"] == 3
+    assert result["second"]["pending_count"] == 2
+    assert result["second"]["config"]["enabled"] is False
+    assert result["calls"][0]["mode"] == result["calls"][1]["mode"] == "manual"
+    assert result["alarms"][-1]["when"] > 0
+
+
+def test_watchlist_removal_and_queue_cancellation_prevent_later_navigation():
+    result = probe(WATCHLIST + """
+      await api.run(true);
+      members = ['AAPL'];
+      await api.run(false);
+      const middle = await api.status();
+      await api.cancelQueue();
+      await api.run(false);
+      return {calls,middle,last:await api.status()};
+    """)
+    assert [c["scope"]["ticker"] for c in result["calls"]] == ["AMD", "AAPL"]
+    assert result["middle"]["pending_count"] == 1
+    assert result["last"]["pending_count"] == 0
+
+
+def test_watchlist_unavailable_never_falls_back_to_saved_manual_tickers():
+    result = probe(WATCHLIST + """
+      deps.resolveWatchlist = async () => ({status:'error',error_code:'active_universe_unavailable'});
+      await api.run(true);
+      return {calls,status:await api.status()};
+    """)
+    assert result["calls"] == []
+    assert result["status"]["target_info"]["error_code"] == "active_universe_unavailable"
+
+
+def test_unselected_collector_and_other_browser_never_mark_attempts():
+    result = probe("""
+      deps.control = async () => ({status:'ok',owner:null,is_owner:false});
+      await api.run(true);
+      const first = await api.status();
+      deps.control = async () => ({status:'ok',owner:{browser:'chrome'},is_owner:false});
+      await api.run(true);
+      return {calls,first,last:await api.status(),records:saved.companyFinancialRefresh.records};
+    """)
+    assert result["calls"] == []
+    assert result["records"] == {}
+    assert result["last"]["collector"]["owner"]["browser"] == "chrome"
+
+
+def test_shared_reused_capture_keeps_original_time_and_does_not_refetch():
+    result = probe("""
+      const original = new Date(clock - 86400000).toISOString();
+      deps.runScope = async () => ({status:'ok',currency:'USD',observation_id:'a'.repeat(64),last_success_at:original});
+      await api.run(false);
+      return {original,status:await api.status()};
+    """)
+    assert result["status"]["scopes"][0]["last_success_at"] == result["original"]
+
+
+def test_pacing_deferral_keeps_manual_queue_and_does_not_create_a_failure():
+    result = probe(WATCHLIST + """
+      deps.runScope = async () => ({status:'deferred',error_code:'sa_company_pacing',retry_after:new Date(clock+60000).toISOString()});
+      await api.run(true);
+      return {status:await api.status(),records:saved.companyFinancialRefresh.records};
+    """)
+    assert result["status"]["pending_count"] == 4
+    assert all(not record.get("last_error") for record in result["records"].values())
+
+
+def test_manual_watchlist_queue_rechecks_membership_while_waiting():
+    result = probe(WATCHLIST + """
+      let permitted;
+      deps.runScope = async (_scope,_mode,admitted) => {
+        members = [];
+        permitted = await admitted();
+        return {status:'cancelled'};
+      };
+      await api.run(true);
+      return {permitted,status:await api.status()};
+    """)
+    assert result["permitted"] is False
+    assert result["status"]["scopes"] == []
+
+
+def test_shared_owner_refusal_stops_before_financial_navigation():
+    result = _run_background_probe("""
+      let navigated = 0;
+      refreshCompanyFinancialScope = async () => { navigated++; return {status:'ok'}; };
+      companyCollectorControl = async () => ({status:'error',error_code:'sa_company_collector_other_browser'});
+      const result = await runCoordinatedCompanyScope({ticker:'AMD',statement:'income_statement',view:'annual'},
+        'manual',async()=>true,async()=>{},7,SAExtensionDiagnostics.createCollector());
+      return {result,navigated};
+    """)
+    assert result["navigated"] == 0
+    assert result["result"]["status"] == "deferred"
+
+
+def test_shared_failure_is_reported_before_local_failure_and_finished_after_cleanup():
+    result = _run_background_probe("""
+      const sequence = [];
+      companyCollectorControl = async (operation) => {
+        sequence.push(operation);
+        return {status:'ok',token:'a'.repeat(32)};
+      };
+      refreshCompanyFinancialScope = async (_scope,_diagnostics,_admitted,failed) => {
+        await failed('sa_company_rate_limited');
+        sequence.push('cleanup');
+        return {status:'error',error_code:'sa_company_rate_limited'};
+      };
+      const result = await runCoordinatedCompanyScope({ticker:'AMD',statement:'income_statement',view:'annual'},
+        'scheduled',async()=>true,async()=>{sequence.push('local_failure');},7,SAExtensionDiagnostics.createCollector());
+      return {result,sequence};
+    """)
+    assert result["sequence"] == ["begin", "report_failure", "local_failure", "cleanup", "finish"]
+
+
+def test_native_reuse_skips_navigation_and_keeps_saved_capture_time():
+    result = _run_background_probe("""
+      let navigated = 0;
+      refreshCompanyFinancialScope = async () => { navigated++; };
+      companyCollectorControl = async () => ({status:'reused',observation_id:'b'.repeat(64),currency:'USD',last_success_at:'2026-09-20T00:00:00Z'});
+      const result = await runCoordinatedCompanyScope({ticker:'AMD',statement:'income_statement',view:'annual'},
+        'scheduled',async()=>true,async()=>{},7,SAExtensionDiagnostics.createCollector());
+      return {result,navigated};
+    """)
+    assert result["navigated"] == 0
+    assert result["result"]["status"] == "ok"
+    assert result["result"]["last_success_at"] == "2026-09-20T00:00:00Z"
+
+
+def test_manual_small_list_pacing_continues_remaining_scopes_on_alarm():
+    result = probe("""
+      let deferred = false;
+      deps.runScope = async scope => {
+        if (scope.view === 'quarterly' && !deferred) {
+          deferred = true;
+          return {status:'deferred',error_code:'sa_company_pacing'};
+        }
+        calls.push(scope.view);
+        return {status:'ok',currency:'USD',observation_id:'a'.repeat(64)};
+      };
+      await api.configure({...config,enabled:false});
+      await api.run(true);
+      const first = await api.status();
+      await SACompanyRefresh.create(deps).run(false);
+      return {calls,first,last:await api.status()};
+    """)
+    assert result["first"]["pending_count"] == 1
+    assert result["calls"] == ["annual", "quarterly"]
+    assert result["last"]["pending_count"] == 0
+
+
+def test_changing_target_mode_discards_old_manual_queue():
+    result = probe(WATCHLIST + """
+      await api.run(true);
+      await api.configure({...config,enabled:false});
+      const before = calls.length;
+      await api.run(false);
+      return {extra:calls.length-before,status:await api.status()};
+    """)
+    assert result["extra"] == 0
+    assert result["status"]["pending_count"] == 0
+
+
+def test_admission_denial_is_visible_and_retried_without_busy_loop_or_false_failure():
+    result = probe(WATCHLIST + """
+      deps.runScope = async () => ({status:'deferred',error_code:'data_source_not_selected'});
+      await api.run(true);
+      return {status:await api.status(),alarms,clock};
+    """)
+    assert result["status"]["blocked_reason"] == "data_source_not_selected"
+    assert result["status"]["pending_count"] == 4
+    assert result["alarms"][-1]["when"] >= result["clock"] + 3600000
+
+
+def test_183_ticker_watchlist_has_all_six_scopes_without_a_hidden_limit():
+    result = probe(WATCHLIST + """
+      members = Array.from({length:183},(_,i)=>'T'+i);
+      await api.configure({...config,target_mode:'watchlist',tickers:[],enabled:false,
+        statements:['income_statement','balance_sheet','cash_flow_statement']});
+      await api.run(true);
+      return {calls,status:await api.status()};
+    """)
+    assert len(result["status"]["scopes"]) == 1098
+    assert result["status"]["pending_count"] == 1097
+    assert len(result["calls"]) == 1
+
+
 def test_due_updates_are_scoped_and_reads_do_not_extend_the_deadline():
     result = probe("""
       await api.run(false);
@@ -401,6 +602,7 @@ def test_popup_saves_selected_tickers_views_and_interval_without_starting_refres
     messages = [message for message in result["sent"] if message["action"] == "configure_company_refresh"]
     assert len(messages) == 1
     assert messages[0]["config"] == {
+        "target_mode": "manual",
         "enabled": True, "tickers": ["AMD", "AAPL"], "interval_days": 14,
         "statements": ["income_statement"], "views": ["annual", "quarterly"],
     }

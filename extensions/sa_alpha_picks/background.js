@@ -588,13 +588,63 @@ async function forwardReconciliationNative(payload, sender) {
   return sendNativeMessage2(payload);
 }
 
+var companyCollectorIdentity = null;
+async function companyCollectorControl(operation, extra) {
+  if (!companyCollectorIdentity) companyCollectorIdentity = (async function () {
+    var existing = (await chrome.storage.local.get("companyCollectorIdentity")).companyCollectorIdentity;
+    if (existing) return existing;
+    var client = {client_id:crypto.randomUUID(), browser:
+      typeof navigator !== "undefined" && /Firefox\//.test(navigator.userAgent) ? "firefox" : "chrome"};
+    await chrome.storage.local.set({companyCollectorIdentity:client});
+    return client;
+  })();
+  return sendNativeMessage2(Object.assign({}, extra || {}, {
+    action:"company_refresh_control", operation:operation, client:await companyCollectorIdentity,
+  }));
+}
+
+async function runCoordinatedCompanyScope(scope, mode, admitted, observeFailure, intervalDays, diagnostics) {
+  if (!await admitted()) return {status:"cancelled"};
+  var permit = await companyCollectorControl("begin", {scope:scope, force:mode === "manual", interval_days:intervalDays});
+  if (permit.status === "reused") return Object.assign({}, permit, {status:"ok"});
+  if (permit.status !== "ok" || !/^[a-f0-9]{32}$/.test(permit.token || "")) {
+    return Object.assign({}, permit, {status:"deferred", error_code:permit.error_code || "sa_company_collector_unavailable"});
+  }
+  var restrictionSaved = false;
+  var reportFailure = async function (code) {
+    var persisted = await companyCollectorControl("report_failure", {
+      token:permit.token, result:{status:"error",error_code:code},
+    });
+    restrictionSaved = persisted.status === "ok";
+    if (observeFailure) await observeFailure(code);
+    if (!restrictionSaved) throw new Error("sa_company_collector_unavailable");
+  };
+  var result;
+  try {
+    var stillAdmitted = async function () {
+      if (!await admitted()) return false;
+      return (await companyCollectorControl("validate", {token:permit.token})).status === "ok";
+    };
+    result = await refreshCompanyFinancialScope(scope, diagnostics, stillAdmitted, reportFailure, true);
+  } catch (_) {
+    // Keep the reservation when cleanup/native acknowledgement is uncertain.
+    return {status:"error",error_code:"sa_company_collector_unavailable"};
+  }
+  if (result.status === "error" && !restrictionSaved) await reportFailure(result.error_code);
+  var finished = await companyCollectorControl("finish", {token:permit.token,result:result});
+  if (finished.status !== "ok") return {status:"error",error_code:finished.error_code || "sa_company_collector_unavailable"};
+  return result;
+}
+
 const companyFinancialRefresh = SACompanyRefresh.create({
   storage: chrome.storage.local,
   alarms: chrome.alarms,
-  runScope: function (scope, mode, admitted, observeFailure) {
+  control:companyCollectorControl,
+  resolveWatchlist:function () { return sendNativeMessage2({action:"get_company_watchlist"}); },
+  runScope: function (scope, mode, admitted, observeFailure, intervalDays) {
     return enqueueSaSyncJob({displayName: scope.ticker + " " + scope.view + " financials",
       operation: "company_financial_capture", mode: mode}, function (diagnostics) {
-      return refreshCompanyFinancialScope(scope, diagnostics, admitted, observeFailure);
+      return runCoordinatedCompanyScope(scope, mode, admitted, observeFailure, intervalDays, diagnostics);
     });
   },
 });
@@ -606,10 +656,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
     return true;
   }
-  if (["get_company_refresh", "configure_company_refresh", "run_company_refresh"].includes(msg.action)) {
+  if (["select_company_collector", "recover_company_collector"].includes(msg.action)) {
+    if (!sender || sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("popup.html")) {
+      sendResponse({status:"error",error_code:"extension_request_rejected"});
+      return false;
+    }
+    var operation = msg.action === "select_company_collector" ? "select" : "recover";
+    companyCollectorControl(operation, {confirm_stopped:msg.confirm_stopped === true}).then(async function (result) {
+      if (result.status !== "ok") return result;
+      await companyFinancialRefresh.syncAlarm();
+      return companyFinancialRefresh.status();
+    }).then(sendResponse).catch(function () { sendResponse({status:"error",error_code:"sa_company_collector_unavailable"}); });
+    return true;
+  }
+  if (["get_company_refresh", "configure_company_refresh", "run_company_refresh", "cancel_company_refresh"].includes(msg.action)) {
     var task = msg.action === "get_company_refresh" ? companyFinancialRefresh.status()
       : msg.action === "configure_company_refresh" ? companyFinancialRefresh.configure(msg.config)
-        : companyFinancialRefresh.run(true);
+        : msg.action === "cancel_company_refresh" ? companyFinancialRefresh.cancelQueue() : companyFinancialRefresh.run(true);
     task.then(sendResponse).catch(function (error) {
       sendResponse({status:"error", error_code:error.message === "sa_company_schedule_invalid"
         ? error.message : "sa_company_schedule_unavailable"});
@@ -787,7 +850,7 @@ async function captureCompanyData(target, diagnostics, expectedScope) {
   return result;
 }
 
-async function refreshCompanyFinancialScope(scope, diagnostics, admitted, observeFailure) {
+async function refreshCompanyFinancialScope(scope, diagnostics, admitted, observeFailure, confirmCleanup) {
   var tabId = null;
   try {
     if (!await admitted()) return {status:"cancelled"};
@@ -830,7 +893,13 @@ async function refreshCompanyFinancialScope(scope, diagnostics, admitted, observ
     return {status:"error",error_code:code,reason_code:"company_capture_rejected",failure_phase:"extraction"};
   } finally {
     if (tabId !== null) {
-      await safeRemoveTab(tabId);
+      var removed = await safeRemoveTab(tabId);
+      if (confirmCleanup && !removed) {
+        var closed = false;
+        try { await chrome.tabs.get(tabId); }
+        catch (error) { closed = /No tab with id|Invalid tab ID/i.test(error.message || ""); }
+        if (!closed) throw new Error("sa_company_collector_cleanup_uncertain");
+      }
       await unregisterCollectorTab(tabId);
       // Pace successive manual targets too; timers do not imply source freshness.
       await sleep(10000);

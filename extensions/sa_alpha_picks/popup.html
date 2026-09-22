@@ -385,6 +385,9 @@
     #companyRefreshDays { width: 64px; padding: 4px; }
     #companyRefreshStatus { max-height: 220px; overflow: auto; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; }
     #companyRefreshStatus p { margin: 6px 0; }
+    #companyCollectorStatus, #companyRefreshTargets { font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+    #companyRefreshTargets details { max-height: 120px; overflow: auto; }
+    #companyRefreshTargetMode { width: 100%; padding: 6px; box-sizing: border-box; }
   </style>
 </head>
 <body>
@@ -400,7 +403,16 @@
     <div id="companyCaptureStatus" role="status">No company data captured.</div>
     <details id="companyRefreshOptions">
       <summary>Financial statement updates</summary>
+      <div id="companyCollectorStatus" role="status"></div>
+      <div class="action-buttons">
+        <button class="action-button" id="companyCollectorSelect" type="button">Use this browser</button>
+        <button class="action-button" id="companyCollectorRecover" type="button" hidden>Recover stopped capture</button>
+      </div>
       <form id="companyRefreshForm">
+        <label>Targets <select id="companyRefreshTargetMode">
+          <option value="manual">Selected tickers</option>
+          <option value="watchlist">App watchlist</option>
+        </select></label>
         <label>Tickers <input id="companyRefreshTickers" type="text" placeholder="AMD, AAPL" required autocomplete="off"></label>
         <fieldset><legend>Statements (USD)</legend>
           <label><input type="checkbox" name="companyRefreshStatement" value="income_statement" checked>Income</label>
@@ -417,8 +429,10 @@
         <div class="btn-row">
           <button class="action-button" type="submit">Save schedule</button>
           <button class="action-button" id="companyRefreshNow" type="button">Update now</button>
+          <button class="action-button" id="companyRefreshCancel" type="button" hidden>Cancel queued update</button>
         </div>
       </form>
+      <div id="companyRefreshTargets"></div>
       <div id="companyRefreshStatus" role="status"></div>
     </details>
   </section>
