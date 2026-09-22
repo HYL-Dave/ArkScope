@@ -480,6 +480,14 @@ Firefox temporary add-ons disappear on restart; unattended daily use needs a
 persistently installed signed add-on. This is not the independent always-on service,
 and Settings cannot yet observe browser liveness while the browser is closed.
 
+Native-host launch is a separate prerequisite from a successful command-line host
+probe. A connection failure stops before SA navigation and is reported as
+`sa_company_native_host_unavailable`, not as a page-loading failure. The popup
+shows **Local app connection unavailable** and does not advance the successful
+capture time. Snap Firefox can also have a remembered desktop-portal denial for
+the host; changing it requires the user's consent, not an automatic grant or a
+browser-sandbox bypass. See [Firefox's native-messaging portal documentation](https://firefox-source-docs.mozilla.org/toolkit/components/extensions/webextensions/native-messaging-portal-design.html).
+
 Owners: [refresh state](extensions/sa_alpha_picks/company_refresh.js),
 [browser integration](extensions/sa_alpha_picks/background.js),
 [popup](extensions/sa_alpha_picks/popup_company_refresh.js),

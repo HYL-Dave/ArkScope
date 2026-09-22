@@ -33,8 +33,12 @@
     }
     button.disabled = updating || result.running;
     button.textContent = result.running ? "Updating..." : result.paused_reason ? "Resume / update now" : "Update now";
+    var hostUnavailable = (result.scopes || []).some(function (scope) {
+      return scope.last_error === "sa_company_native_host_unavailable";
+    });
     paragraph(result.paused_reason ? "Paused: " + result.paused_reason
-      : result.running ? "Updating" : result.config.enabled ? "Scheduled" : "Schedule off");
+      : result.running ? "Updating" : hostUnavailable ? "Local app connection unavailable"
+        : result.config.enabled ? "Scheduled" : "Schedule off");
     (result.scopes || []).forEach(function (scope) {
       var name = {income_statement:"Income",balance_sheet:"Balance",cash_flow_statement:"Cash flow"}[scope.statement];
       paragraph(scope.ticker + " / " + name + " / " + scope.view + " / USD"

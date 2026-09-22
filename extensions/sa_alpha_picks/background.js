@@ -778,6 +778,9 @@ async function refreshCompanyFinancialScope(scope, diagnostics, admitted) {
     if (!await admitted()) return {status:"cancelled"};
     var admission = await sendNativeMessage2({action:"get_company_capture_admission", dataset:"financials"});
     if (!admission || admission.status !== "ok" || admission.dataset !== "financials") {
+      if (admission && admission.error_code === "native_host_unavailable") {
+        throw new Error("sa_company_native_host_unavailable");
+      }
       throw new Error(admission && admission.error_code || "sa_company_admission_unavailable");
     }
     if (!await admitted()) return {status:"cancelled"};

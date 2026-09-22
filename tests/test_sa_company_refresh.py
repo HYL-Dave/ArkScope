@@ -265,6 +265,37 @@ def test_popup_shows_failed_scope_without_claiming_the_previous_capture_is_new()
     assert "human_verification" in result["companyRefreshStatus"]
 
 
+def test_native_host_failure_stops_before_navigation_and_is_not_a_dom_failure():
+    result = _run_background_probe("""
+      let navigations = 0;
+      chrome.tabs.create = async () => { navigations += 1; throw new Error('must not navigate'); };
+      chrome.runtime.sendNativeMessage = (_host, _message, callback) => {
+        chrome.runtime.lastError = {message:'An unexpected error occurred'};
+        callback();
+        chrome.runtime.lastError = null;
+      };
+      const result = await refreshCompanyFinancialScope(
+        {ticker:'AMD', statement:'income_statement', view:'annual'},
+        SAExtensionDiagnostics.createCollector(), async () => true);
+      return {result, navigations};
+    """)
+    assert result["navigations"] == 0
+    assert result["result"]["error_code"] == "sa_company_native_host_unavailable"
+
+
+def test_popup_prominently_reports_a_failed_local_app_connection():
+    result = _run(companyRefresh={
+        "status": "ok", "config": {"enabled": False, "tickers": ["AMD"], "interval_days": 7,
+                                    "statements": ["income_statement"], "views": ["annual"]},
+        "paused_reason": None, "running": False,
+        "scopes": [{"ticker": "AMD", "statement": "income_statement", "view": "annual",
+                    "last_success_at": None, "next_due_at": "2026-09-23T00:00:00Z",
+                    "last_error": "sa_company_native_host_unavailable"}],
+    })
+    assert result["companyRefreshStatus"].startswith("Local app connection unavailable")
+    assert "sa_company_native_host_unavailable" in result["companyRefreshStatus"]
+
+
 @pytest.mark.parametrize("scenario,expected", [
     ("loaded", "ok"), ("old_table", "sa_company_dom_not_ready"),
     ("old_currency", "sa_company_dom_not_ready"), ("old_view", "sa_company_dom_not_ready"),
