@@ -36,7 +36,8 @@
     var hostUnavailable = (result.scopes || []).some(function (scope) {
       return scope.last_error === "sa_company_native_host_unavailable";
     });
-    paragraph(result.paused_reason ? "Paused: " + result.paused_reason
+    paragraph(result.rate_limited ? "Rate limit cooldown until " + result.rate_limit_until
+      : result.paused_reason ? "Paused: " + result.paused_reason
       : result.running ? "Updating" : hostUnavailable ? "Local app connection unavailable"
         : result.config.enabled ? "Scheduled" : "Schedule off");
     (result.scopes || []).forEach(function (scope) {

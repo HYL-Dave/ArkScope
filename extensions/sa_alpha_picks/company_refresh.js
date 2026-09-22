@@ -35,6 +35,12 @@
     return Math.max(record.retry_after ? Date.parse(record.retry_after) : 0,
       record.last_success_at ? Date.parse(record.last_success_at) + days * DAY : 0);
   }
+  function rateLimitDeadline(state) {
+    return state.rate_limit_until ? Date.parse(state.rate_limit_until) : 0;
+  }
+  function retryDelay(failures) {
+    return Math.min(6 * 3600000 * Math.pow(2, failures - 1), 7 * DAY);
+  }
   function paused(code) {
     return /human_verification|access_restricted|login_required|layout_unrecognized|structure_changed|identity_mismatch|units_unrecognized|value_unrecognized/.test(code);
   }
@@ -44,7 +50,7 @@
     var writes = Promise.resolve();
     function empty() {
       return {config: {enabled:false, tickers:[], statements:["income_statement"], views:["annual"], interval_days:7},
-        records:{}, paused_reason:null};
+        records:{}, paused_reason:null, rate_limit_until:null, rate_limit_failures:0};
     }
     async function read() {
       await writes;
@@ -62,9 +68,10 @@
     async function status() {
       var state = await read();
       return {status:"ok", config:state.config, paused_reason:state.paused_reason, running:!!pending,
+        rate_limited:rateLimitDeadline(state) > now(), rate_limit_until:state.rate_limit_until || null,
         scopes:scopes(state.config).map(function (scope) {
           var record = state.records[key(scope)] || {};
-          var due = deadline(record, state.config.interval_days);
+          var due = Math.max(deadline(record, state.config.interval_days), rateLimitDeadline(state));
           return Object.assign({}, scope, {last_success_at:null, last_attempt_at:null, last_error:null}, record,
             {next_due_at:due ? new Date(due).toISOString() : null, due:due <= now()});
         })};
@@ -74,7 +81,7 @@
       await deps.alarms.clear(ALARM);
       if (!state.config.enabled || state.paused_reason || !state.config.tickers.length) return;
       var times = scopes(state.config).map(function (scope) {
-        return deadline(state.records[key(scope)] || {}, state.config.interval_days);
+        return Math.max(deadline(state.records[key(scope)] || {}, state.config.interval_days), rateLimitDeadline(state));
       });
       await deps.alarms.create(ALARM, {when:Math.max(now() + 60000, Math.min.apply(null, times)), periodInMinutes:60});
     }
@@ -97,6 +104,8 @@
       return updated;
     }
     async function perform(force) {
+      // Refresh overrides source-age policy, never a provider-wide cooldown.
+      if (rateLimitDeadline(await read()) > now()) return status();
       if (force) await mutate(function (state) { state.paused_reason = null; });
       var state = await read();
       if ((!force && !state.config.enabled) || state.paused_reason) return status();
@@ -112,7 +121,7 @@
         var admitted = async function () {
           var latest = await read();
           var latestSuccess = (latest.records[key(scope)] || {}).last_success_at;
-          return !latest.paused_reason && (force || latest.config.enabled)
+          return !latest.paused_reason && rateLimitDeadline(latest) <= now() && (force || latest.config.enabled)
             && scopes(latest.config).some(function (item) { return key(item) === key(scope); })
             && (force || (latestSuccess === successBeforeQueue
               && (!latestSuccess || Date.parse(latestSuccess) + latest.config.interval_days * DAY <= now())));
@@ -138,6 +147,10 @@
         }
         if (result.status === "ok") {
           await noteSuccess(scope, result);
+          await mutate(function (current) {
+            current.rate_limit_until = null;
+            current.rate_limit_failures = 0;
+          });
         } else {
           await mutate(function (current) {
             var record = current.records[key(scope)] || {};
@@ -145,7 +158,11 @@
             var code = /^sa_company_[a-z_]+$|^data_source_[a-z_]+$/.test(result.error_code || "")
               ? result.error_code : "sa_company_refresh_failed";
             current.records[key(scope)] = Object.assign({}, record, {failures:failures, last_error:code,
-              retry_after:new Date(now() + Math.min(6 * 3600000 * Math.pow(2, failures - 1), 7 * DAY)).toISOString()});
+              retry_after:new Date(now() + retryDelay(failures)).toISOString()});
+            if (code === "sa_company_rate_limited") {
+              current.rate_limit_failures = Math.min((current.rate_limit_failures || 0) + 1, 6);
+              current.rate_limit_until = new Date(now() + retryDelay(current.rate_limit_failures)).toISOString();
+            }
             if (paused(code)) current.paused_reason = code;
           });
         }

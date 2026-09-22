@@ -519,7 +519,18 @@ def test_actual_extractor_native_store_and_tool_contract_end_to_end(local, tmp_p
     ('In Millions of United States Dollar (USD) except per share items', 'In unknown units', "units_unrecognized"),
     ('Example Company (AMD) Income Statement', 'Verify you are human', "human_verification_required"),
     ('Example Company (AMD) Income Statement', 'Access to this page has been denied', "human_verification_required"),
+    ('Example Company (AMD) Income Statement', '429 Too Many Requests', "rate_limited"),
+    ('<main>', '<main><h1>Rate limit exceeded</h1>', "rate_limited"),
 ])
 def test_dom_changes_and_loading_states_refuse_numbers(tmp_path, before, after, code):
     markup = financial_html(capture()).replace(before, after)
     assert extract_dom(tmp_path, markup) == {"status": "error", "error_code": "sa_company_" + code}
+
+
+def test_hidden_rate_banner_and_a_429_financial_value_are_not_a_visible_limit(tmp_path):
+    markup = financial_html(capture()).replace(
+        '<main>', '<main><h1 hidden>Too many requests</h1>'
+    ).replace('1,234.50', '429.0')
+    result = extract_dom(tmp_path, markup)
+    assert result["status"] == "ok"
+    assert any("429.0" in row["values"] for row in result["capture"]["rows"])

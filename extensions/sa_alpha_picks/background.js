@@ -854,6 +854,13 @@ async function prepareCompanyFinancialView(view, pathname) {
   var steady = 0;
   var start = Date.now();
   while (Date.now() - start < 45000) {
+    var rateLimitMessage = /too many requests|rate limit exceeded/i;
+    if (rateLimitMessage.test(document.title)
+        || Array.from(document.querySelectorAll('h1')).some(function (node) {
+          return visible(node) && rateLimitMessage.test(label(node));
+        })) {
+      return {status:"error",error_code:"sa_company_rate_limited"};
+    }
     if (/verify you are human|access denied|access to this page has been denied|just a moment/i.test(document.title)
         || Array.from(document.querySelectorAll('iframe[title="Human verification challenge"]')).some(visible)) {
       return {status:"error",error_code:"sa_company_human_verification_required"};

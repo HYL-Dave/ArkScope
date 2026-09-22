@@ -151,6 +151,119 @@ def test_challenge_stops_the_whole_batch_until_explicit_manual_retry():
     assert all(scope["last_success_at"] is None for scope in result["paused"]["scopes"])
 
 
+def test_rate_limit_stops_the_batch_and_manual_retry_cannot_bypass_cooldown():
+    result = probe("""
+      await api.run(false);
+      const oldSuccess = (await api.status()).scopes[0].last_success_at;
+      let attempted = 0;
+      deps.runScope = async () => {
+        attempted++;
+        return {status:'error',error_code:'sa_company_rate_limited'};
+      };
+      await api.run(true);
+      const limited = await api.status();
+      const restarted = SACompanyRefresh.create(deps);
+      await restarted.configure({...config,tickers:['AAPL']});
+      await restarted.run(true);
+      await restarted.run(false);
+      return {attempted,oldSuccess,limited,after:await restarted.status(),alarms};
+    """)
+    assert result["attempted"] == 1
+    assert result["limited"]["rate_limited"] is True
+    assert result["limited"]["rate_limit_until"] == "2026-09-22T06:00:00.000Z"
+    assert result["limited"]["scopes"][0]["last_success_at"] == result["oldSuccess"]
+    assert result["after"]["scopes"][0]["last_success_at"] is None
+    assert result["after"]["scopes"][0]["next_due_at"] == "2026-09-22T06:00:00.000Z"
+    assert result["alarms"][-1]["when"] == 1790056800000
+
+
+def test_repeated_rate_limits_back_off_across_symbols_then_recover_one_scope():
+    result = probe("""
+      const attempted = [];
+      deps.runScope = async (scope) => {
+        attempted.push(scope.ticker);
+        return {status:'error',error_code:'sa_company_rate_limited'};
+      };
+      await api.run(false);
+      clock += 6 * 3600000;
+      await api.configure({...config,tickers:['AAPL']});
+      await api.run(false);
+      const second = await api.status();
+      clock += 12 * 3600000 - 1;
+      await api.run(true);
+      const beforeDeadline = attempted.length;
+      clock += 1;
+      deps.runScope = async (scope) => {
+        attempted.push(scope.ticker);
+        return {status:'ok',currency:'USD',observation_id:'b'.repeat(64)};
+      };
+      await api.run(false);
+      return {attempted,beforeDeadline,second,recovered:await api.status()};
+    """)
+    assert result["second"]["rate_limit_until"] == "2026-09-22T18:00:00.000Z"
+    assert result["beforeDeadline"] == 2
+    assert result["attempted"] == ["AMD", "AAPL", "AAPL"]
+    assert result["recovered"]["rate_limited"] is False
+    assert result["recovered"]["scopes"][0]["last_success_at"] == "2026-09-22T18:00:00.000Z"
+    assert result["recovered"]["scopes"][1]["last_success_at"] is None
+
+
+def test_cooldown_is_rechecked_before_an_already_queued_navigation():
+    result = probe("""
+      let permitted;
+      deps.runScope = async (_scope, _mode, admitted) => {
+        saved.companyFinancialRefresh.rate_limit_until = '2026-09-22T06:00:00.000Z';
+        permitted = await admitted();
+        return {status:'cancelled'};
+      };
+      await api.run(true);
+      return {permitted,status:await api.status()};
+    """)
+    assert result["permitted"] is False
+    assert result["status"]["rate_limited"] is True
+    assert all(scope["last_attempt_at"] is None for scope in result["status"]["scopes"])
+
+
+def test_capturing_an_already_loaded_page_does_not_clear_acquisition_cooldown():
+    result = probe("""
+      let attempted = 0;
+      deps.runScope = async () => {
+        attempted++;
+        return {status:'error',error_code:'sa_company_rate_limited'};
+      };
+      await api.run(false);
+      const before = await api.status();
+      await api.noteSuccess({ticker:'AMD',statement:'income_statement',view:'annual'},
+        {currency:'USD',observation_id:'b'.repeat(64)});
+      await api.run(true);
+      return {before,after:await api.status(),attempted};
+    """)
+    assert result["attempted"] == 1
+    assert result["after"]["rate_limit_until"] == result["before"]["rate_limit_until"]
+    assert result["after"]["scopes"][0]["observation_id"] == "b" * 64
+
+
+def test_rate_backoff_caps_at_seven_days_and_success_resets_it():
+    result = probe("""
+      await api.configure({...config,views:['annual']});
+      deps.runScope = async () => ({status:'error',error_code:'sa_company_rate_limited'});
+      const waits = [];
+      for (let index=0; index<8; index++) {
+        await api.run(true);
+        const status = await api.status();
+        waits.push((Date.parse(status.rate_limit_until)-clock)/3600000);
+        clock = Date.parse(status.rate_limit_until);
+      }
+      deps.runScope = async () => ({status:'ok',currency:'USD',observation_id:'b'.repeat(64)});
+      await api.run(true);
+      deps.runScope = async () => ({status:'error',error_code:'sa_company_rate_limited'});
+      await api.run(true);
+      return {waits,afterSuccess:(Date.parse((await api.status()).rate_limit_until)-clock)/3600000};
+    """)
+    assert result["waits"] == [6, 12, 24, 48, 96, 168, 168, 168]
+    assert result["afterSuccess"] == 6
+
+
 def test_duplicate_triggers_join_and_disabling_queued_work_prevents_navigation():
     result = probe("""
       let release;
@@ -296,11 +409,24 @@ def test_popup_prominently_reports_a_failed_local_app_connection():
     assert "sa_company_native_host_unavailable" in result["companyRefreshStatus"]
 
 
+def test_popup_explains_shared_rate_cooldown_deadline():
+    result = _run(companyRefresh={
+        "status": "ok", "config": {"enabled": True, "tickers": ["AMD"], "interval_days": 7,
+                                    "statements": ["income_statement"], "views": ["annual"]},
+        "paused_reason": None, "running": False, "rate_limited": True,
+        "rate_limit_until": "2026-09-22T06:00:00Z", "scopes": [],
+    })
+    assert "2026-09-22T06:00:00Z" in result["companyRefreshStatus"]
+    assert "cooldown" in result["companyRefreshStatus"].lower()
+
+
 @pytest.mark.parametrize("scenario,expected", [
     ("loaded", "ok"), ("old_table", "sa_company_dom_not_ready"),
     ("old_currency", "sa_company_dom_not_ready"), ("old_view", "sa_company_dom_not_ready"),
     ("challenge", "sa_company_human_verification_required"),
     ("login", "sa_company_login_required"),
+    ("rate_title", "sa_company_rate_limited"),
+    ("rate_heading", "sa_company_rate_limited"),
 ])
 def test_prepare_waits_for_the_requested_period_table_not_just_the_dropdown(scenario, expected):
     source = _run_background_probe("return prepareCompanyFinancialView.toString();")
@@ -315,6 +441,11 @@ def test_prepare_waits_for_the_requested_period_table_not_just_the_dropdown(scen
       <table data-test-id="table"><thead><tr><th>Dec 2025</th></tr></thead><tbody><tr><td>100</td></tr></tbody></table></main></body></html>`,
       {url,runScripts:'outside-only'});
       const w = dom.window;
+      if (scenario === 'rate_title') w.document.title='429 Too Many Requests';
+      if (scenario === 'rate_heading') {
+        const h = w.document.createElement('h1'); h.textContent='Too many requests';
+        w.document.querySelector('main').prepend(h);
+      }
       let clock = 0;
       w.Date.now = () => clock;
       w.setTimeout = callback => { clock += 1000; queueMicrotask(callback); };
