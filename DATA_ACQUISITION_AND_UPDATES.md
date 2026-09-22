@@ -319,6 +319,10 @@ the full company-data reader. Unknown/ambiguous row labels are not fuzzy-matched
   retained period; it never means a new acquisition or a claim of latest data.
   Missing requested periods remain visible. TTM/last-report columns are not
   substitutes for annual or quarterly columns.
+- SEC rows without the current input-selection contract cannot publish values
+  or deltas in this comparison. Their provider, period and acquisition receipt
+  remain visible with `statement_basis_unverified`; this does not authorize a
+  refresh, delete the source cache or silently substitute another period.
 - Source values, labels, currency, unit note/scale, observation/content identity
   and acquisition metadata remain separate. New SEC/FD statement projections
   retain declared currency; old projections with no currency remain unknown.

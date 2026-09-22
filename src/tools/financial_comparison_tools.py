@@ -81,7 +81,8 @@ def _read_source(dal, provider, ticker, statement, period, currency):
                     continue
                 declared_currency = item.currency if isinstance(item.currency, str) and re.fullmatch(r"[A-Z]{3}", item.currency) else None
                 records.append(dict(end_month=item.report_period[:7], period_end=item.report_period,
-                                    currency=declared_currency, data=item.data))
+                                    currency=declared_currency, data=item.data,
+                                    input_basis_version=item.input_basis_version))
         source.update(status="ok", records=records, available_months=sorted({r["end_month"] for r in records}, reverse=True))
     except (CompanyDataFailure, DataSourcePolicyFailure) as exc:
         source["error_code"] = exc.code

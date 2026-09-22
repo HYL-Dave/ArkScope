@@ -4,6 +4,8 @@ from decimal import Decimal, InvalidOperation, localcontext
 from itertools import combinations
 import re
 
+from src.fundamentals.metric_basis import SEC_STATEMENT_BASIS_VERSION
+
 
 # Only named statement rows, never ratios, estimated EBITDA or liabilities-as-debt.
 # Similar-looking provider labels outside this map remain unavailable.
@@ -62,6 +64,9 @@ def source_value(source, metric, label, kind, month):
         return result
     record = matched[0]
     result.update(currency=record["currency"], period_end=record["period_end"])
+    if provider == "sec_edgar" and record.get("input_basis_version") != SEC_STATEMENT_BASIS_VERSION:
+        result["status"] = "statement_basis_unverified"
+        return result
     result["unit"] = (record["currency"] or "currency_unknown") + ("/share" if kind == "per_share" else "")
     if provider == "seeking_alpha":
         rows = [row for row in record["rows"] if row["label"] == label]

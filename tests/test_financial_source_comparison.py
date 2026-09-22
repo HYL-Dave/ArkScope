@@ -10,6 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from src.fundamentals.cache import fundamentals_analysis_cache_key
+from src.fundamentals.metric_basis import SEC_STATEMENT_BASIS_VERSION
 from src.sa.company_store import save_capture
 from src.tools.financial_comparison_tools import compare_financial_sources
 from src.tools.schemas import FinancialStatement, FundamentalsResult
@@ -32,9 +33,11 @@ def sources(local, tmp_path, monkeypatch):
     return dal, http, sec
 
 
-def save_sec(dal, *, currency="USD", end="2025-12-27", revenue=123_440_000, period="annual"):
+def save_sec(dal, *, currency="USD", end="2025-12-27", revenue=123_440_000, period="annual",
+             input_basis_version=SEC_STATEMENT_BASIS_VERSION):
     fetched = datetime.now(timezone.utc) - timedelta(days=2)
     statement = FinancialStatement(report_period=end, fiscal_period="2025-FY", period_type=period,
+                                   input_basis_version=input_basis_version,
                                    currency=currency, data={"revenue": revenue, "net_income": 10_000_000,
                                                             "earnings_per_share": 2.5})
     result = FundamentalsResult(ticker="AAPL", data_source="sec_edgar", snapshot_date=end,
@@ -91,6 +94,27 @@ def test_larger_difference_is_not_explained_by_invented_restatement_or_gaap(sour
     assert pair["status"] == "difference_unexplained"
     assert pair["difference_right_minus_left"] == "16600000"
     assert pair["cause"] is None and pair["materiality_assessment"] is None
+
+
+@pytest.mark.parametrize("version", [None, "obsolete-selection-v0"])
+def test_old_sec_input_contract_cannot_publish_a_cross_source_difference(sources, monkeypatch, version):
+    dal, http, sec = sources
+    save_sec(dal, input_basis_version=version)
+    forbidden = Mock(side_effect=AssertionError("unverified input is not refresh authority"))
+    monkeypatch.setattr(dal._backend, "set_financial_cache", forbidden)
+    result = compare(dal)
+    row = metric(result, "revenue")
+    assert result["status"] == "partial"
+    assert row["values"][0]["normalized_value"] == "123400000"
+    assert row["values"][1]["status"] == "statement_basis_unverified"
+    assert row["values"][1]["normalized_value"] is None
+    assert row["comparisons"][0]["status"] == "not_comparable"
+    assert row["comparisons"][0]["difference_right_minus_left"] is None
+    assert row["comparisons"][0]["reasons"] == ["right_statement_basis_unverified"]
+    assert result["sources"][1]["source_observations"]
+    http.assert_not_called()
+    sec.assert_not_called()
+    forbidden.assert_not_called()
 
 
 @pytest.mark.parametrize("currency,reason", [(None, "currency_unknown"), ("EUR", "currency_mismatch")])
