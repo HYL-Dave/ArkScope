@@ -1026,14 +1026,19 @@ def test_lifecycle_tools_are_in_both_research_driver_allowlists():
     expected = {
         "list_security_lifecycle_reviews", "get_security_lifecycle_review",
         "list_sec_filings", "get_sec_financial_facts", "read_sec_filing",
+        "get_sa_feed", "get_sa_digest", "get_sa_alpha_picks", "get_sa_company_data",
+        "get_sa_article_detail", "get_sa_comment_focus", "get_portfolio_holdings",
+        "compare_financial_sources", "get_ticker_news", "get_news_brief",
+        "search_news_advanced", "get_ticker_prices", "get_current_quote",
+        "get_price_change", "get_ticker_data_coverage", "get_fundamentals_analysis",
+        "get_economic_calendar",
     }
-    assert expected <= openai
-    assert expected <= anthropic
+    assert expected == openai
+    assert expected == anthropic
     assert "get_sec_filings" not in openai
     assert "get_sec_filings" not in anthropic
-    assert "compare_financial_sources" in openai & anthropic
-    assert len(openai) == 19
-    assert len(anthropic) == 19
+    assert len(openai) == 22
+    assert len(anthropic) == 22
 
 
 def test_read_service_exposes_derived_final_check_date_in_list_and_detail(
