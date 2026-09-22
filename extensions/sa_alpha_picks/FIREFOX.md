@@ -112,3 +112,12 @@ When the portal records dialog contention, do not repeatedly reload or automatic
 grant access. Inspect the exact host-specific permission and reset it only with
 the user's consent, then allow the user to respond to the new system prompt.
 Never change another host's permission or disable browser confinement as a workaround.
+
+If the prompt remains unavailable, an explicit user-chosen manual authorization
+is a separate alternative, not an automatic repair. Use the permission store's
+`SetPermission` for only the verified native-host name and browser application ID,
+then read it back with `GetPermission`. A remembered `yes` must still be followed
+by a real browser-to-host ping; command-line host execution alone is insufficient.
+Do not grant a wildcard, overwrite other applications' entries, or claim that
+manual authorization repairs the desktop prompt. In the isolated acceptance run,
+this unlocked the first AMD annual capture while prompt recovery remained unproven.

@@ -496,6 +496,12 @@ background, with an exact popup sender and existing-action allowlist, so closing
 the popup does not make it the owner of an in-progress consent request. Portal
 dialog contention can record a denial without an intentional user refusal;
 resetting that record still requires consent and does not itself grant access.
+If the system prompt remains unavailable, the user can explicitly choose a
+host-specific manual authorization. Read the exact host/browser permission back
+and verify a real browser-to-host request before resuming capture; the App must
+not grant permission automatically. Manual authorization does not prove that
+desktop-dialog presentation is fixed. See the
+[installed-browser acceptance record](docs/superpowers/evidence/2026-09-22-sa-financial-refresh/README.md#explicit-manual-consent-and-first-saved-capture).
 
 Owners: [refresh state](extensions/sa_alpha_picks/company_refresh.js),
 [browser integration](extensions/sa_alpha_picks/background.js),
