@@ -335,7 +335,9 @@ filters and the same content-change guard. It does not construct the writable
 cover all selected open positions, not only the current page. Values are stored,
 not live; valuation counts expose missing prices/P&L. Cross-account broker-base
 totals require one known base currency, otherwise they are withheld. Closed
-positions remain outside totals; raw broker account IDs are not emitted.
+positions remain outside totals. The raw broker-ID field is omitted and matching
+legacy account labels are masked. User notes remain stored text; this is not a
+claim of arbitrary free-text redaction.
 
 **Limits and persistence.** Model/channel budgets are still enforced. Oversized
 results return an actionable smaller-page result with their content identity,

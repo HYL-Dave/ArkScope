@@ -14,7 +14,7 @@ production setting change, data purge or removal of retained evidence is
 authorized by this plan.
 
 Current state: [Progress At Each Handoff](#progress-at-each-handoff).
-Latest accepted slice: [comparison and optional SEC entry](../evidence/2026-09-22-source-workflow/README.md).
+Latest accepted slice: [retained article, comment and holdings reads](../evidence/2026-09-22-retained-research-reads/README.md).
 
 ## Reconciled Pre-Implementation Baseline (September 21)
 
@@ -81,6 +81,10 @@ Owners: [issuer parsing](../../../src/sec_research/issuers.py),
    fiscal periods, actual release dates versus fiscal period end, and complete
    trading-session windows. Preserve earnings-reaction capability; do not adopt
    the archived SEC-report implementation as an automatic replacement.
+   Exercise populated legacy caches as well as cold requests. A repaired formula
+   must be recomputed from retained inputs or explicitly withheld, never bypassed
+   by a cached legacy derived result. This must not implicitly trigger paid
+   acquisition merely to replace an old calculation.
 5. **Retire superseded paths together.** After replacement coverage is demonstrated,
    remove redundant normal-mode SEC surfaces and superseded legacy calculation
    paths with their callers, schemas, channel declarations, copy and tests.
@@ -102,7 +106,7 @@ test count or an assertion that the whole company workflow is complete.
 | Package | Current implementation | Remaining work |
 | --- | --- | --- |
 | 1. Company inputs | Shared Chrome/Firefox code for three statement types and the bounded valuation/peers/annual-estimates/revisions scope; real Chrome captures retained | Installed, signed-in extension-to-host acceptance on both browsers; other pages/views are not advertised as captured |
-| 2. Research access | SA source switches, stored/pinned company reader and qualified SA/SEC/FD comparisons; article/comment/holdings read-only paging and four-channel admission now implemented, with real retained-data replay | Frozen full-backend acceptance for the new readers; full end-to-end operator research acceptance and explicit production comment-signal backlog processing |
+| 2. Research access | SA source switches, stored/pinned company reader and qualified SA/SEC/FD comparisons; article/comment/holdings read-only paging and four-channel admission verified at `e0bce862`, including full regression and real retained-data replay | Full end-to-end operator research acceptance and explicit production comment-signal backlog processing |
 | 3. Optional SEC | Stock-symbol resolution, explicit directory update, collapsed technical administration; existing citations preserved | Remaining normal-mode surface/consumer review, not wholesale SEC retirement |
 | 4. Analytics | Comparison excludes the legacy ratios and does not endorse them | D/E, comparable financial periods, earnings-event dates and complete trading-session windows |
 | 5. Retirement | No premature deletion of replacement-dependent capabilities or retained evidence | Remove superseded paths and consumers only after replacement acceptance; retention/inventory decisions remain separate |
@@ -116,18 +120,25 @@ four-channel comparison replay, without new acquisition or spending. See the
 close the remaining workflow gates. The two archived research branches remain
 archived, and master/production settings are not changed by this work.
 
-The next integrated batch is implemented and undergoing acceptance: retained
-article/body/comment/holdings reads are bounded, source-aware and admitted to all
-four transports. The article reader is now separate from the unpaged UI/native
-host read, and holdings use a single read-only transaction without constructing
-the schema-initializing store. Long comments can be fully continued; parents and
+The September 22 retained-reader batch at `e0bce862` passed integrated acceptance:
+**12,306 backend / 12 unchanged skips**, **934 related backend**, **1,920 frontend /
+126 files**, typecheck/build, i18n and eight desktop checks. The first full run
+caught an old OAuth count assertion; expanding its exact roster also required
+classifying that test reference in the existing consumer census. Both guards
+remain enforced, and the final frozen full run has no failure. See the
+[verification record](../evidence/2026-09-22-retained-research-reads/README.md).
+
+Retained article/body/comment/holdings reads are bounded, source-aware and
+admitted to all four transports. The article reader is now separate from the
+unpaged UI/native host read, and holdings use a single read-only transaction
+without constructing the schema-initializing store. Long comments can be fully continued; parents and
 capture gaps stay visible. Both readers reject changed content between pages,
 without claiming immutable historical archives. Holdings totals also qualify
 valuation gaps and withhold mixed/unknown broker-base currencies. These changes
 are documented in the root acquisition policy, not only this execution log.
 
-The next product package after reader acceptance is legacy ratio/event repair,
-followed by replacement-dependent retirement. Cross-provider comparisons are
+The next product package is legacy ratio/event repair, followed by
+replacement-dependent retirement. Cross-provider comparisons are
 not blockers merely because numbers differ: field/unit/period correctness is a
 separate obligation from the research significance of a qualified difference.
 Installed Chrome/Firefox operator acceptance remains open; this read-only batch
@@ -135,12 +146,14 @@ does not silently certify the extension's live capture workflow.
 
 Retained-copy acceptance covered three real article bodies, first/last comment
 pages, a fully reassembled 51,727-character comment and ten real holdings across
-all four transports, plus fresh-process reopening. Production was opened only as
-a read-only SQLite backup source; model/provider/network requests were blocked.
+all four transports, plus fresh-process reopening. This replay opened production
+databases only as read-only SQLite backup sources; tool calls used private copies
+and socket connections were blocked. No model/provider request was made.
 The disposable copy also verified the existing explicit extraction job: 7,523
-pending comment signals were processed and all four focus readers returned 981
-qualifying comments in the 90-day test window. Production backlog processing is
-still pending; a read never starts that job itself. Copies were removed.
+pending comment signals were processed and all four focus readers returned 979
+qualifying comments in the latest replay's moving 90-day window (01:40 UTC).
+Production backlog processing is still pending; a read never starts that job
+itself. Copies were removed.
 
 ## SA Quality And Operating Boundary
 
@@ -201,9 +214,11 @@ questions or one fixed freshness setting for every use of each category.
 - [x] Capture, persistence, source selection and research reads work together for
       the new SA financial-table reader. Other legacy analytic consumers remain.
 - [ ] Normal research requires no CIK and no compulsory original-filing workflow.
-- [ ] Required reads work across their admitted channels, including honest gaps.
+- [x] Required reads work across their admitted internal channels, including
+      honest gaps; real model/operator acceptance remains separate below.
 - [ ] Redundant paths are removed only after replacement and reference checks.
-- [ ] Final frozen revision passes full backend/frontend regression and build.
+- [ ] Workflow-final revision, after all packages, passes full backend/frontend
+      regression and build. The retained-reader slice has passed at `e0bce862`.
 - [ ] Real-source workflow acceptance, including restart and retained provenance.
 
 ### Financial Table Implementation Status
