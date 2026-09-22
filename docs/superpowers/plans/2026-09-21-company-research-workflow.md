@@ -25,6 +25,11 @@ follow-up at `fa041081` adds persistent financial-batch cooldown after visible
 rate limiting, hardened after review at `14027634`; all-watchlist and
 cross-browser governance remain open. See the
 [cooldown and installed-alarm acceptance](../evidence/2026-09-23-sa-financial-rate-cooldown/README.md).
+The operator subsequently enabled the test schedule: private receipt 8 confirms
+the first real Firefox AMD quarterly income capture was scheduled and persisted,
+while the still-fresh annual capture was unchanged. Both observations passed
+complete pinned local paging (484 annual / 473 quarterly cell positions).
+This closes that bounded live alarm case, not Chrome/all-watchlist acceptance.
 Full backend and remaining operator acceptance are still open. The full run was stopped after the live UI
 defect was reported, and must not be presented as completed acceptance.
 The user explicitly prioritized this addition on September 22. It does not
@@ -128,7 +133,7 @@ test count or an assertion that the whole company workflow is complete.
 
 | Package | Current implementation | Remaining work |
 | --- | --- | --- |
-| 1. Company inputs | Shared Chrome/Firefox code for three statement types and the bounded valuation/peers/annual-estimates/revisions scope; real Chrome captures retained | Installed, signed-in extension-to-host acceptance on both browsers; other pages/views are not advertised as captured |
+| 1. Company inputs | Shared Chrome/Firefox code for three statement types and the bounded valuation/peers/annual-estimates/revisions scope; real Chrome captures retained; isolated signed-in Firefox AMD annual manual and quarterly scheduled income captures verified | Broader installed extension-to-host acceptance, including Chrome operator testing and other statement scopes; other pages/views are not advertised as captured |
 | 2. Research access | SA source switches, stored/pinned company reader and qualified SA/SEC/FD comparisons; article/comment/holdings read-only paging and four-channel admission verified at `e0bce862`, including full regression and real retained-data replay | Full end-to-end operator research acceptance and explicit production comment-signal backlog processing |
 | 3. Optional SEC | Stock-symbol resolution, explicit directory update, collapsed technical administration; existing citations preserved | Remaining normal-mode surface/consumer review, not wholesale SEC retirement |
 | 4. Analytics | Comparison excludes the legacy ratios and does not endorse them | D/E, comparable financial periods, earnings-event dates and complete trading-session windows |
