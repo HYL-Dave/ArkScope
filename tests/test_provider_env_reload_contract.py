@@ -25,6 +25,7 @@ def test_unapply_env_crosses_the_real_fallback_reload_guard(
     env_var: str,
     should_reload: bool,
 ):
+    monkeypatch.delenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", raising=False)
     env_file = tmp_path / ".env"
     env_file.write_text(f"{env_var}=file-secret\n", encoding="utf-8")
     monkeypatch.setattr(env_keys, "env_file_path", lambda: env_file)

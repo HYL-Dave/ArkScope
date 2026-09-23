@@ -569,6 +569,7 @@ def test_unapply_strict_unsets_app_value(store, monkeypatch):
 
 
 def test_unapply_explicit_fallback_reloads_file_value(store, monkeypatch):
+    monkeypatch.delenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", raising=False)
     calls = []
 
     def _reload(name):
@@ -1057,9 +1058,10 @@ def test_strict_view_peeks_config_file_for_import_without_effective_source(
     assert "SEC_CONTACT_EMAIL" not in os.environ
 
 
-def test_provider_env_fallback_route_sets_profile_setting(store):
+def test_provider_env_fallback_route_sets_profile_setting(store, monkeypatch):
     from src.api.routes import providers_config as pc
 
+    monkeypatch.delenv("ARKSCOPE_PROVIDER_ENV_FALLBACK", raising=False)
     out = pc.put_provider_env_fallback(
         pc.ProviderEnvFallbackUpdate(enabled=True),
         store=store,
