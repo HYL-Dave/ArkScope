@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import shutil
 import sys
@@ -34,6 +35,20 @@ def _copy_fixture(tmp_path: Path) -> Path:
     source = tmp_path / "source"
     shutil.copytree(FIXTURE_DIR, source)
     return source
+
+
+def test_both_builds_include_acquisition_modules_before_registration(tmp_path):
+    builder = _load_builder()
+    graph = builder.discover_dependency_graph(EXT_DIR)
+    assert {"acquisition_queue.js", "acquisition_client.js"} <= set(graph.files)
+    output = tmp_path / "firefox"
+    builder.build_firefox(EXT_DIR, output)
+    scripts = json.loads((output / "manifest.json").read_text())["background"]["scripts"]
+    for name in ("acquisition_queue.js", "acquisition_client.js"):
+        assert scripts.index(name) < scripts.index("background.js")
+        assert (output / name).read_bytes() == (EXT_DIR / name).read_bytes()
+    background = (EXT_DIR / "background.js").read_text()
+    assert background.index('"acquisition_client.js"') < background.index("chrome.runtime.onMessage.addListener")
 
 
 def _tree_bytes(path: Path) -> dict[str, bytes]:

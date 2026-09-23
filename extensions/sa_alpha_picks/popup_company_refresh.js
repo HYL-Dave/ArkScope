@@ -110,6 +110,9 @@
         var membership=document.createElement("details"), label=document.createElement("summary");
         label.textContent="Targets and membership";membership.appendChild(label);
         info.tickers.forEach(function(symbol){line(membership,symbol+" | "+((info.sources_by_ticker || {})[symbol] || []).join(", "));});
+        Object.entries(info.source_status || {}).forEach(function(entry){
+          (entry[1].warnings || []).forEach(function(value){line(targets,entry[0]+": "+value);});
+        });
         targets.appendChild(membership);
       }
     }

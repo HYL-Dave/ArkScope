@@ -117,3 +117,47 @@ def test_native_site_pause_cannot_be_resumed_by_force_refresh():
     """)
     assert result["calls"] == []
     assert "resume" not in result["operations"]
+
+
+@pytest.mark.parametrize("waiting", ["pacing", "active"])
+def test_manual_request_during_shared_wait_is_saved_and_resumes_without_another_click(waiting):
+    result = probe(WATCHLIST + """
+      const deadline=new Date(clock+15000).toISOString();
+      let state={status:'ok',is_owner:true,policy:{},next_financial_at:WAIT === 'pacing' ? deadline : null,
+        active:WAIT === 'active' ? {operation:'market_news_sync'} : null};
+      deps.control=async()=>state;
+      await api.run({force:true});
+      const queued=await api.status();
+      const before=calls.length;
+      clock+=15000;state={...state,active:null,next_financial_at:null};
+      const restarted=SACompanyRefresh.create(deps);
+      await restarted.run({scheduled:true});
+      return {queued,before,calls,after:await restarted.status()};
+    """.replace("WAIT", repr(waiting)))
+    assert result["queued"]["pending_count"] == 4
+    assert result["before"] == 0
+    assert len(result["calls"]) == 1
+    assert result["after"]["pending_count"] == 3
+
+
+def test_cancel_during_initial_native_read_cannot_be_undone_by_its_late_reply():
+    result = probe(WATCHLIST + """
+      let release,entered;const enteredGate=new Promise(r=>entered=r);
+      const gate=new Promise(r=>release=r);let reads=0;
+      deps.control=async()=>{if(++reads===1){entered();await gate;}return {status:'ok',is_owner:true,policy:{}};};
+      const running=api.run({force:true});await enteredGate;
+      await api.cancelQueue();release();await running;
+      return {calls,status:await api.status()};
+    """)
+    assert result["calls"] == []
+    assert result["status"]["pending_count"] == 0
+
+
+def test_authority_upgrade_requirement_remains_visible_without_reinitializing():
+    result = probe("""
+      const operations=[];
+      deps.control=async operation=>{operations.push(operation);return {status:'error',error_code:'sa_acquisition_upgrade_required'};};
+      return {status:await api.status(),operations};
+    """)
+    assert result["status"]["collector"]["error_code"] == "sa_acquisition_upgrade_required"
+    assert result["operations"] == ["status"]

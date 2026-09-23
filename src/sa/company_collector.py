@@ -168,6 +168,9 @@ class CompanyCollector:
                         and msg.get("confirm_stopped") is True and not self.marker.exists(), "sa_acquisition_upgrade_required")
                 old = json.loads(conn.execute("SELECT payload FROM company_collector WHERE id=1").fetchone()[0])
                 require(old.get("active") is None, "sa_company_collector_busy")
+                require(type(msg.get("expected_generation")) is int and msg["expected_generation"] == 0,
+                        "sa_acquisition_generation_stale")
+                require(now >= old["last_seen"], "sa_company_clock_regressed")
                 ledger_id = uuid4().hex
                 backup = self.path.with_name(self.path.name + ".pre-coordination-" + ledger_id + ".bak")
                 with closing(sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True)) as source:
@@ -315,7 +318,11 @@ class CompanyCollector:
         if operation in {"configure", "select", "recover", "resume"}:
             self._generation(state, msg, "expected_generation")
         if operation == "configure":
-            if state["owner"] is not None:
+            # A stopped legacy installation may be upgraded from its replacement browser.
+            # Ownership is preserved until the separate, explicitly confirmed selection.
+            upgrading = (state["generation"] == 0 and state["policy_revision"] == 0
+                         and msg.get("upgrade") is True and msg.get("confirm_stopped") is True)
+            if state["owner"] is not None and not upgrading:
                 self._owner(state, client)
             state["policy"] = validate_policy(msg["policy"])
             state["policy_revision"] += 1

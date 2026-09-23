@@ -229,6 +229,17 @@ def test_due_update_preserves_existing_enabled_schedule_without_resaving():
     assert result["companyRefreshNowDisabled"] is False
 
 
+def test_watchlist_source_warning_survives_the_compact_scope_preview():
+    result = _run(companyRefresh={
+        "status": "ok", "config": {"enabled": False, "target_mode": "watchlist", "tickers": [],
+            "statements": ["income_statement"], "views": ["annual"], "interval_days": 7},
+        "collector": {"status": "ok", "generation": 0}, "scopes": [],
+        "target_info": {"status": "ok", "total_count": 1, "tickers": ["AMD"], "unsupported": [],
+            "source_status": {"alpha_picks": {"available": True, "warnings": ["stale_snapshot"]}}},
+    })
+    assert "alpha_picks: stale_snapshot" in result["companyRefreshTargets"]
+
+
 def _run(scenario: str = "snapshot", **fixture):
     fixture.setdefault("actionLimits", ACTION_LIMITS)
     fixture.setdefault(

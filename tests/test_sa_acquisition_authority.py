@@ -168,7 +168,8 @@ def test_paywall_pauses_only_the_affected_capability(authority):
                 intent_revision=0, build="test", protocol_version=2)["status"] == "ok"
 
 
-def test_legacy_upgrade_requires_stopped_ack_and_makes_one_backup(tmp_path):
+@pytest.mark.parametrize("client", [FIREFOX, CHROME])
+def test_legacy_upgrade_requires_stopped_ack_and_makes_one_backup(tmp_path, client):
     clock = [100000.]
     obj = CompanyCollector(tmp_path / "legacy.db", clock=lambda: clock[0])
     old = dict(owner=FIREFOX, active=None, paused_reason="login_required", rate_limit_until=None,
@@ -181,16 +182,39 @@ def test_legacy_upgrade_requires_stopped_ack_and_makes_one_backup(tmp_path):
     assert call(obj, "status")["error_code"] == "sa_acquisition_upgrade_required"
     args = dict(policy=POLICY, financial_gap_seconds=60, confirm_activation=True, expected_generation=0)
     assert call(obj, "configure", **args)["error_code"] == "sa_acquisition_upgrade_required"
-    upgraded = call(obj, "configure", upgrade=True, confirm_stopped=True, **args)
+    upgraded = call(obj, "configure", client, upgrade=True, confirm_stopped=True, **args)
     assert upgraded["status"] == "ok", upgraded
     assert upgraded["paused_reason"] == "login_required"
     assert upgraded["owner"] == FIREFOX
+    selected = call(obj, "select", client, expected_generation=0, confirm_schedules=True)
+    assert selected["is_owner"] is True and selected["generation"] == 1
+    assert selected["paused_reason"] == "login_required"
     backups = list(tmp_path.glob("*.bak"))
     assert len(backups) == 1
     with sqlite3.connect(backups[0]) as conn:
         assert json.loads(conn.execute("SELECT payload FROM company_collector").fetchone()[0]) == old
-    call(obj, "configure", **args)
+    call(obj, "configure", client, **{**args, "expected_generation": 1})
     assert len(list(tmp_path.glob("*.bak"))) == 1
+
+
+@pytest.mark.parametrize("invalid", ["generation", "clock"])
+def test_refused_legacy_upgrade_does_not_leave_a_poisoned_marker(tmp_path, invalid):
+    obj = CompanyCollector(tmp_path / "legacy.db", clock=lambda: 100000.)
+    old = dict(owner=FIREFOX, active=None, paused_reason=None, rate_limit_until=None,
+               rate_limit_failures=0, next_navigation_at=None, last_seen=99999., failures={})
+    if invalid == "clock":
+        old["last_seen"] = 100001.
+    with sqlite3.connect(obj.path) as conn:
+        conn.execute("CREATE TABLE company_collector (id INTEGER PRIMARY KEY, payload TEXT)")
+        conn.execute("CREATE TABLE company_collector_actions (at TEXT, operation TEXT, client_id TEXT, previous_owner TEXT)")
+        conn.execute("INSERT INTO company_collector VALUES (1, ?)", (json.dumps(old),))
+        conn.execute("PRAGMA user_version=1")
+    result = call(obj, "configure", policy=POLICY, financial_gap_seconds=60, confirm_activation=True,
+                  expected_generation=1 if invalid == "generation" else 0, upgrade=True, confirm_stopped=True)
+    assert result["status"] == "error"
+    assert not obj.marker.exists()
+    assert not list(tmp_path.glob("*.bak"))
+    assert call(obj, "status")["error_code"] == "sa_acquisition_upgrade_required"
 
 
 def test_replaying_begin_cannot_reenter_completed_work(authority):

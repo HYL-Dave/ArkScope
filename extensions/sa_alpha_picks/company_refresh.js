@@ -64,7 +64,7 @@
     var pending = null;
     var writes = Promise.resolve();
     var collector = null;
-    var timer = null, timerRevision = 0;
+    var timer = null, timerRevision = 0, cancellationEpoch = 0;
     function empty() {
       return {config: {enabled:false, target_mode:"manual", tickers:[], statements:["income_statement"], views:["annual"], interval_days:7},
         records:{}, paused_reason:null, rate_limit_until:null, rate_limit_failures:0};
@@ -100,7 +100,9 @@
       if (!deps.control) return null;
       try { collector = await deps.control("status"); }
       catch (_) { collector = null; }
-      if (!collector || collector.status !== "ok") collector = {status:"error",error_code:"sa_company_collector_unavailable"};
+      if (!collector || (collector.status !== "ok" && !(collector.status === "error" && typeof collector.error_code === "string"))) {
+        collector = {status:"error",error_code:"sa_company_collector_unavailable"};
+      }
       return collector;
     }
     function blocked(control) {
@@ -194,6 +196,7 @@
       var config = normalize(value);
       await mutate(function (state) {
         if (JSON.stringify(state.config) !== JSON.stringify(config)) {
+          cancellationEpoch++;
           state.intent_revision = (state.intent_revision || 0) + 1;
           state.pending_scopes = [];
           state.pending_requested_at = null;
@@ -206,6 +209,7 @@
       return status();
     }
     async function cancelQueue() {
+      cancellationEpoch++;
       await mutate(function (state) {
         state.intent_revision = (state.intent_revision || 0) + 1;
         state.pending_scopes = [];
@@ -233,24 +237,23 @@
       });
       return updated;
     }
-    async function perform(request) {
+    async function perform(request, startedEpoch) {
       var force = request.force === true, manual = request.scheduled !== true;
       var control = await readCollector();
-      if (blocked(control)) return status();
+      if (blocked(control && Object.assign({},control,{active:null}))) return status();
       if (deps.shouldPause && await deps.shouldPause()) return status();
-      if (control && Date.parse(control.next_financial_at || "") > now()) return status();
       // Refresh overrides source-age policy, never the financial-batch cooldown.
       if (rateLimitDeadline(await read()) > now()) return status();
       var state = await read();
       var intentRevision = state.intent_revision || 0;
       var resolved = await targets(state);
       if (resolved.info && resolved.info.status !== "ok") return status();
-      if (((await read()).intent_revision || 0) !== intentRevision) return status();
+      if (((await read()).intent_revision || 0) !== intentRevision || startedEpoch !== cancellationEpoch) return status();
       if (manual || (state.pending_scopes || []).length) {
         var ids = new Set(resolved.scopes.map(key));
         var configRevision = state.intent_revision || 0;
         await mutate(function (current) {
-          if ((current.intent_revision || 0) !== configRevision) return;
+          if ((current.intent_revision || 0) !== configRevision || startedEpoch !== cancellationEpoch) return;
           current.pending_scopes = (current.pending_scopes || []).filter(function (id) { return ids.has(id); });
           if (manual && !current.pending_scopes.length) {
             current.pending_scopes = resolved.scopes.filter(function(scope) {
@@ -261,9 +264,11 @@
           }
         });
         state = await read();
-        if ((state.intent_revision || 0) !== intentRevision) return status();
+        if ((state.intent_revision || 0) !== intentRevision || startedEpoch !== cancellationEpoch) return status();
       }
       var queued = (state.pending_scopes || []).length > 0;
+      // Persist manual intent before transient capacity/pacing waits, including after a browser switch.
+      if (control && (control.active || Date.parse(control.next_financial_at || "") > now())) return status();
       if ((!manual && !queued && !state.config.enabled) || state.paused_reason) return status();
       force = queued ? state.pending_force === true : force;
       var selected = resolved.scopes.filter(function (scope) {
@@ -359,7 +364,7 @@
       if (pending) return pending;
       // Boolean calls are internal legacy callers; popup commands use explicit intent.
       request = typeof request === "boolean" ? {force:request,scheduled:!request,legacy_force:request} : request || {force:false};
-      pending = perform(request).then(async function () {
+      pending = perform(request,cancellationEpoch).then(async function () {
         pending = null;
         await mutate(function (state) { state.status_revision = (state.status_revision || 0) + 1; });
         await syncAlarm();
