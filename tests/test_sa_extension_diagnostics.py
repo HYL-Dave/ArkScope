@@ -383,7 +383,9 @@ def test_extension_record_route_passes_only_admitted_or_marker_projection_to_sto
         "result",
         "duration_ms",
         "extension_diagnostics",
+        "acquisition",
     }
+    assert admitted["acquisition"] is None
     assert admitted["extension_diagnostics"]["status"] == "recorded"
 
     jobs_route.record_extension_job(

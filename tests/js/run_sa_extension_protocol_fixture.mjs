@@ -38,7 +38,10 @@ function backgroundFixtureResults() {
           addListener() {
             dependenciesBeforeMessageRegistration = !!context.SAExtensionRunProtocol
               && !!context.SAExtensionDiagnostics
-              && !!context.SAExtensionTelemetry;
+              && !!context.SAExtensionTelemetry
+              && !!context.SACompanyRefresh
+              && !!context.SAQueue
+              && !!context.SAAcquisition;
           },
         },
         onInstalled: {addListener() {}},

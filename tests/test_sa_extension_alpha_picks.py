@@ -60,6 +60,8 @@ def test_background_loads_required_runtime_dependencies_before_registering_jobs(
         "extension_diagnostics.js",
         "extension_telemetry.js",
         "company_refresh.js",
+        "acquisition_queue.js",
+        "acquisition_client.js",
     ]
     assert result["dependencies_before_message_registration"] is True
     assert manifest["background"]["scripts"] == [
@@ -68,6 +70,8 @@ def test_background_loads_required_runtime_dependencies_before_registering_jobs(
         "extension_diagnostics.js",
         "extension_telemetry.js",
         "company_refresh.js",
+        "acquisition_queue.js",
+        "acquisition_client.js",
         "background.js",
     ]
 
