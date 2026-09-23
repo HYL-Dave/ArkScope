@@ -59,8 +59,11 @@ whole-watchlist UI with configurable pacing including 15 seconds. The
 [coordination design](../specs/2026-09-23-sa-automation-coordination-design.md)
 selects routine-first priority over equal-turn interleaving, preserving existing
 extractors while adding common admission, navigation budgets and identity
-receipts. This written design awaits review; no implementation, production
-cutover or automatic quota selection has occurred.
+receipts. The written design is now approved, with Firefox an initial preference
+rather than a fixed browser dependency. The
+[implementation plan](2026-09-23-sa-automation-coordination.md) also owns the
+reproduced queued-disable and login-stop defects. No coordination implementation,
+production cutover or automatic quota selection has occurred.
 
 September 22 sequencing correction: this is one delivery lane, not the complete
 product backlog. Retention, persistent service/failure delivery and external

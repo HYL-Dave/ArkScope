@@ -490,6 +490,28 @@ Owners: [extractor](extensions/sa_alpha_picks/scrape_company.js),
 [validation](src/sa/company_data.py), [storage](src/sa/company_store.py),
 [reader](src/tools/sa_company_tools.py), [native entry](src/sa_native_host.py).
 
+### SA Routine Acquisition Cadence
+
+Current Chrome and Firefox sources share the same news/Alpha Picks scheduling
+code. The values below are code defaults and allowed settings, not a readback
+of the currently enabled browser preferences.
+
+| Flow | Eligibility | Coverage limit |
+|---|---|---|
+| News | Fixed 5/15/60 minutes, default 60; optional `auto` checks a custom ET time-window table every 5 minutes | A heartbeat can skip without opening a page. `auto` is not an exchange-session calendar. |
+| Alpha Picks | Quick Update every selected 15/30/60 minutes, default 30 | Scans recent article-list content; does not imply a full historical scan. |
+| Comments | Included with new article bodies; revisit scanned articles when an observed count changes or a first positive count appears | No independent comment timer; an unchanged count does not prove unchanged text. |
+| Additional comment recovery | In Full/Deep scans only: default seven-day age eligibility, with configured additional batches defaulting to 10/50 | The age rule does not itself schedule these scans. Old unscanned articles can remain outside Quick Update coverage. |
+
+Keep existing selected intervals while shared coordination is implemented. Do
+not enable frequent full/deep scans merely to compensate for missing coverage.
+Future frequency changes should use actual navigation attempts, new-item yield,
+retry/backlog age and restriction observations, not raw job receipt counts.
+The [September 23 scheduling review](docs/superpowers/evidence/2026-09-23-sa-scheduling-review/README.md)
+records current behavior and two reproduced defects: queued Alpha Picks can
+execute after disabling auto-sync, and a known login failure does not stop its
+next portfolio navigation. These are planned repairs, not fixed behavior yet.
+
 ### SA Financial Refresh Scheduling
 
 **State:** the shared Chrome/Firefox implementation is opt-in and off by default.
@@ -504,8 +526,12 @@ It is not Google Chrome acceptance or authorization to start the production list
 browser for all SA automation and configurable pacing including 15 seconds.
 The [SA Automation Coordination And Controls design](docs/superpowers/specs/2026-09-23-sa-automation-coordination-design.md)
 defines routine-first execution, background financial work, shared navigation
-budgets/restrictions and installation-aware receipts. Its written design is
-awaiting review; the financial-only controls below remain the implemented policy.
+budgets/restrictions and installation-aware receipts. The design is approved;
+its [implementation plan](docs/superpowers/plans/2026-09-23-sa-automation-coordination.md)
+is written, not executed. Either browser can be the selected collector; Firefox
+is the operator's current preference only. Stored-data deduplication does not
+prevent repeated network acquisition. The financial-only controls below remain
+the implemented policy.
 No production browser selection or schedule is changed by this document.
 
 In the extension's **Financial statement updates**, choose selected tickers or

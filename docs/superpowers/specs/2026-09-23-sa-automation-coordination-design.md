@@ -1,11 +1,16 @@
 # SA Automation Coordination And Controls
 
-Status: written design for review, not implemented behavior. On September 23
+Status: design approved on September 23; implementation plan written, not
+implemented behavior. On September 23
 the operator approved extending the explicitly selected collector to all SA
 automation, initially Firefox, while developing Chrome and Firefox together.
 They also require a simpler whole-watchlist workflow and configurable pacing,
 including 15 seconds. Existing production collectors/settings are unchanged.
 Accepting this direction does not authorize production activation or migration.
+Execution owner: [implementation plan](../plans/2026-09-23-sa-automation-coordination.md).
+The operator clarified that Firefox is their preferred collector because Chrome
+is their everyday browser, not a permanent product dependency. Either browser
+can be explicitly selected; only one installation acquires at a time.
 
 ## Outcome And Scope
 
@@ -42,6 +47,12 @@ do not introduce a second scheduler service or rewrite working extractors.
   `started_at`: news has 814 receipts, **190 complete and 624 skipped**; Alpha
   Picks has 38, **36 complete and two degraded**. None contains browser identity.
   No credentials, article bodies or raw research payloads were exported.
+- The [follow-up scheduling review](../evidence/2026-09-23-sa-scheduling-review/README.md)
+  reproduces an Alpha Picks job executing after its queued auto-sync was disabled,
+  and navigation to the next portfolio page after a known login failure. Repair
+  these admission/stop defects in this delivery, without increasing cadence.
+  The review also distinguishes count-change-driven quick comment updates from
+  seven-day recovery eligibility, which currently runs only in Full/Deep scans.
 
 These are job outcomes, not page counts or HTTP request counts. One job may
 navigate many pages, and one page may issue many requests. The theoretical
@@ -87,12 +98,24 @@ routine work is waiting; parallel workers would weaken tab/admission control.
   completion guarantee. Report prolonged delay; do not silently boost financial
   priority or bypass a budget. Routine priority is not a real-time SLA.
 
+Keep existing selected routine intervals in this delivery; do not infer a safer
+or better interval from job counts. Repair queued-disable/re-enable intent and
+stop-on-known-login failure. Show the distinction between Quick Update's observed
+comment-count changes and Full/Deep recovery eligibility. No new automatic deep
+scan is implicitly enabled. Measure navigation attempts and useful acquisition
+yield before changing cadence or adding bounded comment-maintenance scheduling.
+
 ## One Acquisition Owner
 
 Extend the selected browser-installation identity and generation to all managed
 SA acquisition through one local authority beside the selected SA store. Each
 admitted action must belong to that generation. A browser family name is not
 enough: two Chrome profiles or two registered extensions are separate clients.
+
+Saved-content deduplication remains necessary but is not acquisition control:
+duplicate requests, simultaneous page actions and site restrictions can occur
+before any database write. Browser-neutral ownership therefore gates acquisition
+before navigation/script work, not merely before saving a result.
 
 An explicit activation selects Firefox initially. The other installations can
 read local data/status but cannot start managed SA acquisition. Selection is
