@@ -1,5 +1,19 @@
 // Translation authority: docs/design/ARKSCOPE_TERMINOLOGY.md
 const shell = {
+  saAcquisition: {
+    title: "Seeking Alpha 擷取",
+    login: "登入已失效，擷取已暫停。請在負責擷取的瀏覽器登入 Seeking Alpha，再從擴充套件明確恢復。",
+    verification: "需要完成驗證，擷取已暫停。完成網頁驗證後，請從擴充套件明確恢復。",
+    access: "無法存取訂閱內容：{{capabilities}}，相關更新已暫停。Premium 與 Alpha Picks 需要各自的存取權限；登入本身不代表已確認訂閱。",
+    cooldown: "Seeking Alpha 冷卻中，擷取將維持停止，直到已記錄的冷卻期限結束。",
+    paused: "擷取已暫停，請先檢查負責擷取的擴充套件，再恢復執行。",
+    unavailable: "無法取得狀態，目前不能確認擷取是否正常。",
+    financials: "財務報表",
+    alphaPicks: "Alpha Picks",
+    news: "新聞",
+    otherContent: "其他內容",
+    openSettings: "開啟資料來源設定",
+  },
   navigation: {
     primaryLabel: "主要導覽",
     drawerTitle: "導覽",

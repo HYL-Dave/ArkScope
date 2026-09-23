@@ -20,9 +20,25 @@ POPUP_JS = EXTENSION / "popup.js"
 CATALOG = EXTENSION / "popup_action_catalog.js"
 
 
+def test_scope_preview_does_not_select_or_start_collector():
+    result = _run("preview_company_scope")
+    actions = [message["action"] for message in result["sent"]]
+    assert "preview_company_refresh" in actions
+    assert "enable_sa_updates_here" not in actions
+    assert "run_company_refresh" not in actions
+    assert "1080" in result["companyScopePreview"]
+    assert "15" in result["companyScopePreview"]
+
+
+def test_failed_activation_keeps_schedule_disabled():
+    result = _run("enable_sa_updates_here", activationError="collector_busy")
+    assert result["companyRefreshEnabled"] is False
+    assert "collector_busy" in result["companyRefreshStatus"]
+
+
 def test_watchlist_form_does_not_require_manual_tickers_or_start_capture():
     result = _run("configure_company_watchlist")
-    configured = [msg for msg in result["sent"] if msg["action"] == "configure_company_refresh"]
+    configured = [msg for msg in result["sent"] if msg["action"] == "save_company_refresh"]
     assert len(configured) == 1
     assert configured[0]["config"]["target_mode"] == "watchlist"
     assert configured[0]["config"]["enabled"] is False
@@ -48,9 +64,11 @@ def test_popup_exposes_other_collector_and_unsupported_watchlist_symbols():
 
 
 def test_collector_is_only_selected_by_an_explicit_button():
-    result = _run("select_company_collector")
-    assert [msg for msg in result["sent"] if msg["action"] == "select_company_collector"] == [{"action": "select_company_collector"}]
-    assert not any(msg["action"] in {"configure_company_refresh", "run_company_refresh"} for msg in result["sent"])
+    result = _run("enable_sa_updates_here")
+    activation = [msg for msg in result["sent"] if msg["action"] == "enable_sa_updates_here"]
+    assert len(activation) == 1
+    assert activation[0]["confirm_schedules"] is True
+    assert not any(msg["action"] == "run_company_refresh" for msg in result["sent"])
 
 
 _BACKGROUND_PROBE = r"""
@@ -196,6 +214,19 @@ def _preview(kind: str, *, targets: int, can_start: bool = True):
             "stable_rounds": 5,
         },
     }
+
+
+def test_due_update_preserves_existing_enabled_schedule_without_resaving():
+    result = _run("update_company_due", companyRefresh={
+        "status": "ok", "config": {"enabled": True, "target_mode": "manual", "tickers": ["AMD"],
+            "statements": ["income_statement"], "views": ["annual"], "interval_days": 7},
+        "collector": {"status": "ok", "generation": 1, "owner": {"browser": "firefox"}, "is_owner": True},
+        "scopes": [], "running": False,
+    })
+    actions = [message["action"] for message in result["sent"]]
+    assert "run_company_refresh" in actions
+    assert "save_company_refresh" not in actions
+    assert result["companyRefreshNowDisabled"] is False
 
 
 def _run(scenario: str = "snapshot", **fixture):

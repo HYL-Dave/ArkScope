@@ -382,7 +382,16 @@
     #companyRefreshForm fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
     #companyRefreshForm legend { margin-bottom: 4px; color: #555; }
     #companyRefreshForm input[type="text"] { box-sizing: border-box; width: 100%; padding: 6px; }
-    #companyRefreshDays { width: 64px; padding: 4px; }
+    #companyRefreshForm input[type="number"] { width: 76px; padding: 4px; box-sizing: border-box; }
+    .company-periods, .company-budget { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .company-periods label, .company-budget label { display: grid; gap: 4px; }
+    #companyAdvanced > label { display: block; margin-top: 8px; }
+    #companyScopePreview { padding: 8px 0; border-top: 1px solid #d1d7dc; border-bottom: 1px solid #d1d7dc; line-height: 1.5; }
+    #companyCollectorSelect { background: #215e89; color: white; }
+    #companyAdvanced { padding-top: 4px; }
+    #companyAdvanced > * { margin-bottom: 8px; }
+    #saAcquisitionWarning { color: #8d2633; border-left: 3px solid #b22f43; padding: 8px; margin: 8px 0; font-size: 12px; line-height: 1.5; }
+    #companyEnvironment, #companyRequirements { font-size: 11px; line-height: 1.5; margin: 6px 0; color: #555; }
     #companyRefreshStatus { max-height: 220px; overflow: auto; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; }
     #companyRefreshStatus p { margin: 6px 0; }
     #companyCollectorStatus, #companyRefreshTargets { font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
@@ -392,6 +401,8 @@
 </head>
 <body>
   <h2>SA Alpha Picks</h2>
+  <div id="saAcquisitionWarning" role="alert" hidden></div>
+  <button class="action-button" id="saAcquisitionResume" type="button" hidden>Resume after sign-in / access check</button>
   <div id="status" class="empty" role="status">No data yet. Click a button below.</div>
   <div id="marketNewsStatus" class="empty" role="status">Market News: not synced yet.</div>
   <div id="lastRunStatus" class="empty" role="status">No audited extension run yet.</div>
@@ -401,17 +412,15 @@
     <button id="companyCaptureBtn" class="action-button" type="button"
       title="Capture financials, valuation, peers or annual estimates/revisions from the current page; scrolls to load tables">Capture Company Data</button>
     <div id="companyCaptureStatus" role="status">No company data captured.</div>
-    <details id="companyRefreshOptions">
+    <details id="companyRefreshOptions" open>
       <summary>Financial statement updates</summary>
+      <div id="companyEnvironment"></div>
+      <div id="companyRequirements">Company financials: SA Premium. Alpha Picks: separate subscription. Sign-in does not confirm subscription access.</div>
       <div id="companyCollectorStatus" role="status"></div>
-      <div class="action-buttons">
-        <button class="action-button" id="companyCollectorSelect" type="button">Use this browser</button>
-        <button class="action-button" id="companyCollectorRecover" type="button" hidden>Recover stopped capture</button>
-      </div>
       <form id="companyRefreshForm">
         <label>Targets <select id="companyRefreshTargetMode">
           <option value="manual">Selected tickers</option>
-          <option value="watchlist">App watchlist</option>
+          <option value="watchlist" selected>All App watchlist targets</option>
         </select></label>
         <label>Tickers <input id="companyRefreshTickers" type="text" placeholder="AMD, AAPL" required autocomplete="off"></label>
         <fieldset><legend>Statements (USD)</legend>
@@ -423,14 +432,36 @@
           <label><input type="checkbox" name="companyRefreshView" value="annual" checked>Annual</label>
           <label><input type="checkbox" name="companyRefreshView" value="quarterly">Quarterly</label>
         </fieldset>
-        <div><label><input id="companyRefreshEnabled" type="checkbox">Scheduled</label>
-          <label>Every <input id="companyRefreshDays" type="number" min="1" max="365" step="1" value="7" required> days</label>
+        <div class="company-periods">
+          <label>Annual + TTM check (days)<input id="companyRefreshDays" type="number" min="1" max="365" step="1" value="7" required></label>
+          <label>Quarterly check (days)<input id="companyRefreshQuarterlyDays" type="number" min="1" max="365" step="1" value="7" required></label>
         </div>
+        <label><input id="companyRefreshEnabled" type="checkbox">Scheduled financial updates</label>
+        <div id="companyScopePreview" role="status"></div>
+        <details id="companyAdvanced">
+          <summary>Acquisition limits and recovery</summary>
+          <label>Financial gap (seconds) <input id="companyFinancialGap" type="number" min="0.001" max="2147483" step="any" value="60" list="companyGapChoices"></label>
+          <datalist id="companyGapChoices"><option value="15"><option value="30"><option value="60"></datalist>
+          <div class="company-budget">
+            <label>Total pages / hour<input type="number" name="hour_limit" min="1" step="1"></label>
+            <label>Total pages / day<input type="number" name="day_limit" min="1" step="1"></label>
+            <label>Routine reserve / hour<input type="number" name="hour_reserve" min="0" step="1"></label>
+            <label>Routine reserve / day<input type="number" name="day_reserve" min="0" step="1"></label>
+          </div>
+          <div id="companyRoutineIntent"></div>
+          <label><input id="companyActivationConfirmed" type="checkbox">Other automated installations stopped or updated; accept these local limits.</label>
+          <label><input id="companyRecoveryConfirmed" type="checkbox">Previous capture stopped; its acquisition tabs are closed.</label>
+          <button class="action-button" id="companyCollectorRecover" type="button" hidden>Recover stopped capture</button>
+          <label><input id="companyForceConfirmed" type="checkbox">Recheck all selected scopes, including reusable data.</label>
+          <button class="action-button" id="companyRefreshForce" type="button">Force refresh</button>
+        </details>
+        <button class="action-button" id="companyCollectorSelect" type="button">Use these settings here</button>
         <div class="btn-row">
-          <button class="action-button" type="submit">Save schedule</button>
-          <button class="action-button" id="companyRefreshNow" type="button">Update now</button>
+          <button class="action-button" type="submit">Save only</button>
+          <button class="action-button" id="companyRefreshNow" type="button">Update missing / due</button>
           <button class="action-button" id="companyRefreshCancel" type="button" hidden>Cancel queued update</button>
         </div>
+        <button class="action-button" id="companyReloadSettings" type="button" hidden>Reload changed settings</button>
       </form>
       <div id="companyRefreshTargets"></div>
       <div id="companyRefreshStatus" role="status"></div>

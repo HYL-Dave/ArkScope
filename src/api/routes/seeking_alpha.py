@@ -233,6 +233,13 @@ def sa_extension_health(dal=Depends(get_dal)):
         ) from exc
 
 
+@router.get("/acquisition-status")
+def sa_acquisition_status():
+    """Read local acquisition restrictions without DAL installation or website I/O."""
+    from src.sa.company_collector import CompanyCollector
+    return CompanyCollector().public_status()
+
+
 @router.post("/market-news-recovery/preview")
 def market_news_recovery_preview(
     request: MarketNewsRecoveryPreviewRequest,

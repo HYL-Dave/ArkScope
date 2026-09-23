@@ -782,6 +782,93 @@ const companyFinancialRefresh = SACompanyRefresh.create({
   },
 });
 
+var saActivationChain = Promise.resolve();
+function activateSaUpdates(request) {
+  var work = saActivationChain.then(async function () {
+    var step = "confirmation", disabled = false;
+    try {
+      if (!request || request.confirm_activation !== true || request.confirm_schedules !== true) throw new Error("sa_acquisition_confirmation_required");
+      var config = SACompanyRefresh.normalize(request.config);
+      var policy = request.policy;
+      if (!policy || ["hour_limit","day_limit","hour_reserve","day_reserve"].some(function(key) {return !Number.isSafeInteger(policy[key]);})
+          || policy.hour_limit<=0 || policy.day_limit<=0 || policy.hour_reserve<0 || policy.day_reserve<0
+          || policy.hour_reserve>policy.hour_limit || policy.day_reserve>policy.day_limit) throw new Error("sa_acquisition_policy_invalid");
+      step = "status";
+      var state = await companyCollectorControl("status");
+      var upgrade = state && state.error_code === "sa_acquisition_upgrade_required" && request.confirm_stopped === true;
+      if (!upgrade && (!state || state.status !== "ok")) throw new Error(state && state.error_code || "sa_company_collector_unavailable");
+      if (!upgrade && state.generation !== request.expected_generation) throw new Error("sa_acquisition_generation_stale");
+      if (!upgrade && state.active) throw new Error("sa_company_collector_busy");
+      var routine = await chrome.storage.local.get(["alphaPicksAutoSyncEnabled","alphaPicksAutoSyncIntervalMinutes","marketNewsAutoSyncEnabled","marketNewsAutoSyncIntervalMinutes"]);
+      step = "disable";
+      disabled = true;
+      await setAlphaPicksAutoSyncEnabled(false,routine.alphaPicksAutoSyncIntervalMinutes);
+      await setMarketNewsAutoSyncEnabled(false,routine.marketNewsAutoSyncIntervalMinutes);
+      await companyFinancialRefresh.configure(Object.assign({},config,{enabled:false}));
+      if (!upgrade && state.policy && !state.is_owner) {
+        step = "select";
+        state = await companyCollectorControl("select",{expected_generation:request.expected_generation,confirm_schedules:true});
+        if (!state || state.status !== "ok" || !state.is_owner) throw new Error(state && state.error_code || "sa_company_collector_unavailable");
+      }
+      step = "configure";
+      state = await companyCollectorControl("configure",{policy:policy,financial_gap_seconds:config.financial_gap_seconds,
+        expected_generation:upgrade ? 0 : state.generation,confirm_activation:true,require_idle:true,
+        upgrade:upgrade,confirm_stopped:request.confirm_stopped === true});
+      if (!state || state.status !== "ok") throw new Error(state && state.error_code || "sa_company_collector_unavailable");
+      if (!state.is_owner || state.generation === 0) {
+        step = "select";
+        state = await companyCollectorControl("select",{expected_generation:state.generation,confirm_schedules:true});
+        if (!state || state.status !== "ok" || !state.is_owner) throw new Error(state && state.error_code || "sa_company_collector_unavailable");
+      }
+      step = "persist";
+      await chrome.storage.local.set({saAcquisitionLedger:state.ledger_id,saAcquisitionStatus:state});
+      step = "enable";
+      await companyFinancialRefresh.configure(config);
+      await setAlphaPicksAutoSyncEnabled(routine.alphaPicksAutoSyncEnabled === true,routine.alphaPicksAutoSyncIntervalMinutes);
+      await setMarketNewsAutoSyncEnabled(routine.marketNewsAutoSyncEnabled === true,routine.marketNewsAutoSyncIntervalMinutes);
+      await syncAcquisitionBadge(state);
+      return companyFinancialRefresh.status();
+    } catch (error) {
+      if (disabled) {
+        await setAlphaPicksAutoSyncEnabled(false).catch(function () {});
+        await setMarketNewsAutoSyncEnabled(false).catch(function () {});
+        if (config) await companyFinancialRefresh.configure(Object.assign({},config,{enabled:false})).catch(function () {});
+      }
+      return {status:"error",error_code:error.message || "sa_acquisition_activation_failed",activation_step:step};
+    }
+  });
+  saActivationChain = work.catch(function () {});
+  return work;
+}
+
+async function handleAcquisitionControl(msg) {
+  if (msg.action === "enable_sa_updates_here") return activateSaUpdates(msg);
+  if (msg.action === "get_company_refresh") {
+    var status = await companyFinancialRefresh.status();
+    var saved = await chrome.storage.local.get("saAcquisitionPending");
+    return Object.assign({},status,{acquisition_pending:!!saved.saAcquisitionPending,queue:saAcquisitionQueue.status()});
+  }
+  if (msg.action === "preview_company_refresh") return companyFinancialRefresh.preview(msg.config);
+  if (msg.action === "save_company_refresh") return companyFinancialRefresh.configure(Object.assign({},msg.config,{enabled:false}));
+  if (msg.action === "cancel_company_refresh") return companyFinancialRefresh.cancelQueue();
+  if (msg.action === "run_company_refresh") {
+    if (msg.force === true && msg.confirm_force !== true) return {status:"error",error_code:"sa_acquisition_confirmation_required"};
+    return companyFinancialRefresh.run({force:msg.force === true});
+  }
+  var operation = msg.action === "recover_sa_acquisition" ? "recover" : "resume";
+  var state = await companyCollectorControl(operation,{expected_generation:msg.expected_generation,
+    confirm_stopped:msg.confirm_stopped === true,confirm_handled:msg.confirm_handled === true,capability:msg.capability});
+  if (state.status !== "ok") return state;
+  if (operation === "recover") await chrome.storage.local.set({saAcquisitionPending:null});
+  else {
+    await chrome.storage.local.set({saAcquisitionRestriction:null});
+    await companyFinancialRefresh.resume();
+  }
+  await syncAcquisitionBadge(state);
+  await syncAllAutoSyncAlarms();
+  return companyFinancialRefresh.status();
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "reconciliation_native_request") {
     forwardReconciliationNative(msg.payload, sender).then(sendResponse).catch(function () {
@@ -789,24 +876,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
     return true;
   }
-  if (["select_company_collector", "recover_company_collector"].includes(msg.action)) {
+  if (["get_company_refresh","preview_company_refresh","save_company_refresh","enable_sa_updates_here",
+      "run_company_refresh","cancel_company_refresh","recover_sa_acquisition","resume_sa_acquisition"].includes(msg.action)) {
     if (!sender || sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("popup.html")) {
       sendResponse({status:"error",error_code:"extension_request_rejected"});
       return false;
     }
-    var operation = msg.action === "select_company_collector" ? "select" : "recover";
-    companyCollectorControl(operation, {confirm_stopped:msg.confirm_stopped === true}).then(async function (result) {
-      if (result.status !== "ok") return result;
-      await companyFinancialRefresh.syncAlarm();
-      return companyFinancialRefresh.status();
-    }).then(sendResponse).catch(function () { sendResponse({status:"error",error_code:"sa_company_collector_unavailable"}); });
-    return true;
-  }
-  if (["get_company_refresh", "configure_company_refresh", "run_company_refresh", "cancel_company_refresh"].includes(msg.action)) {
-    var task = msg.action === "get_company_refresh" ? companyFinancialRefresh.status()
-      : msg.action === "configure_company_refresh" ? companyFinancialRefresh.configure(msg.config)
-        : msg.action === "cancel_company_refresh" ? companyFinancialRefresh.cancelQueue() : companyFinancialRefresh.run(true);
-    task.then(sendResponse).catch(function (error) {
+    handleAcquisitionControl(msg).then(sendResponse).catch(function (error) {
       sendResponse({status:"error", error_code:error.message === "sa_company_schedule_invalid"
         ? error.message : "sa_company_schedule_unavailable"});
     });

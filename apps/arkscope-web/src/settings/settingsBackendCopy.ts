@@ -414,6 +414,8 @@ export function saSegmentLabel(key: string, t: SettingsT): string {
       return t(($) => $.dataSources.extension.segments.telemetryLast);
     case "capture_readback":
       return t(($) => $.dataSources.extension.segments.captureReadback);
+    case "acquisition":
+      return t(($) => $.dataSources.extension.segments.acquisition);
     default:
       return key;
   }

@@ -15,6 +15,7 @@ import { WatchlistView } from "./Watchlist";
 import { ShellNavigation } from "./shell/ShellNavigation";
 import { ShellTopBar } from "./shell/ShellTopBar";
 import { BackgroundWorkIndicator } from "./shell/BackgroundWorkIndicator";
+import { SAAcquisitionNotice } from "./shell/SAAcquisitionNotice";
 import { useResearchWorkRegistry } from "./shell/researchWork";
 import { readDeveloperMode, writeDeveloperMode } from "./shell/shellPreferences";
 import { Drawer } from "./ui/Drawer";
@@ -241,7 +242,10 @@ export function App() {
             <ShellNavigation currentView={view} onNavigate={navigate} />
           </aside>
         ) : null}
-        <div className="app-shell-content">{selectedSurface}</div>
+        <div className="app-shell-content">
+          {!detail && (view === "Home" || view === "Settings") ? <SAAcquisitionNotice onNavigate={navigate} /> : null}
+          {selectedSurface}
+        </div>
       </div>
 
       <Drawer

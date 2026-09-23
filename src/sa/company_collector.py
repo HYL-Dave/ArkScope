@@ -75,6 +75,27 @@ class CompanyCollector:
         self.clock = clock
         self.marker = self.path.with_suffix(self.path.suffix + ".identity")
 
+    def public_status(self):
+        """Local UI projection: no browser identity, host spawn or database install."""
+        try:
+            now = self.clock()
+            if not self.path.exists():
+                require(not self.marker.exists(), "sa_company_collector_unavailable")
+                state = _empty()
+            else:
+                with closing(sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+                    state = self._read(conn)
+            return {"status": "ok", "configured": state["policy"] is not None,
+                    "observed_at": _iso(now), "paused_reason": state["paused_reason"],
+                    "capability_pauses": dict(state["capability_pauses"]),
+                    "rate_limited": _seconds(state["rate_limit_until"]) > now,
+                    "rate_limit_until": state["rate_limit_until"],
+                    "collector_browser": state["owner"]["browser"] if state["owner"] else None}
+        except CompanyDataFailure as exc:
+            return {"status": "error", "error_code": exc.code}
+        except (OSError, sqlite3.Error, ValueError, KeyError, TypeError, OverflowError):
+            return {"status": "error", "error_code": "sa_company_collector_unavailable"}
+
     def _read(self, conn):
         version = conn.execute("PRAGMA user_version").fetchone()[0]
         require(version != 1, "sa_acquisition_upgrade_required")
@@ -231,6 +252,8 @@ class CompanyCollector:
             with closing(self._connect(message, now)) as conn:
                 state = self._read(conn)
                 require(now >= state["last_seen"], "sa_company_clock_regressed")
+                if message.get("require_idle") is True:
+                    require(state["active"] is None, "sa_company_collector_busy")
                 previous_owner = state["owner"]
                 extra = self._apply(conn, state, message, client, now)
                 state["last_seen"] = now

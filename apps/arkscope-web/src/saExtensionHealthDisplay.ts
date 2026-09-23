@@ -276,6 +276,18 @@ function structuredDetail(
   const status = segment.code;
   let value: string;
   switch (status) {
+    case "login_required":
+      value = t(($) => $.dataSources.extension.reasons.loginRequired);
+      break;
+    case "access_restricted":
+      value = t(($) => $.dataSources.extension.reasons.accessRestricted);
+      break;
+    case "human_verification_required":
+      value = t(($) => $.dataSources.extension.reasons.verificationRequired);
+      break;
+    case "rate_limited":
+      value = t(($) => $.dataSources.extension.reasons.rateLimited);
+      break;
     case "capture_complete":
       value = t(($) => $.dataSources.extension.status.captureComplete);
       break;

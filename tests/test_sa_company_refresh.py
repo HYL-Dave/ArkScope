@@ -714,11 +714,12 @@ def test_current_page_capture_with_another_currency_does_not_freshen_usd_scope()
 
 def test_popup_saves_selected_tickers_views_and_interval_without_starting_refresh():
     result = _run("configure_company_refresh")
-    messages = [message for message in result["sent"] if message["action"] == "configure_company_refresh"]
+    messages = [message for message in result["sent"] if message["action"] == "save_company_refresh"]
     assert len(messages) == 1
     assert messages[0]["config"] == {
         "target_mode": "manual",
-        "enabled": True, "tickers": ["AMD", "AAPL"], "interval_days": 14,
+        "enabled": True, "tickers": ["AMD", "AAPL"],
+        "interval_days_by_view": {"annual": 14, "quarterly": 7}, "financial_gap_seconds": 60,
         "statements": ["income_statement"], "views": ["annual", "quarterly"],
     }
     assert not any(message["action"] == "run_company_refresh" for message in result["sent"])
@@ -939,7 +940,10 @@ def test_mounted_popup_finishes_alarm_run_regardless_of_storage_event_order(deli
       });
       await api.configure({enabled:true,tickers:['AMD'],statements:['income_statement'],views:['annual'],interval_days:7});
       const dom=new JSDOM(fs.readFileSync('extensions/sa_alpha_picks/popup.html','utf8'),{runScripts:'outside-only'});
-      dom.window.chrome={runtime:{sendMessage(msg,cb){api.status().then(cb)}},storage:{onChanged:{addListener(fn){listeners.push(fn)}}}};
+      dom.window.chrome={runtime:{sendMessage(msg,cb){
+        if(msg.action==='preview_company_refresh') api.preview(msg.config).then(cb);
+        else api.status().then(value=>cb({...value,collector:{status:'ok',is_owner:true,generation:1}}));
+      }},storage:{local:{async get(){return {}}},onChanged:{addListener(fn){listeners.push(fn)}}}};
       dom.window.eval(fs.readFileSync('extensions/sa_alpha_picks/popup_company_refresh.js','utf8'));
       const run=api.run(false);
       await new Promise(resolve=>setImmediate(resolve));release();await run;

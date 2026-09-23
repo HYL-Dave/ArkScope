@@ -95,6 +95,7 @@ vi.mock("./api", async (importOriginal) => {
       return READY_STATUS;
     }),
     getRuntimeConfig: vi.fn(async () => RUNTIME),
+    getSAAcquisitionStatus: vi.fn(async () => ({ status: "ok", configured: false })),
   };
 });
 

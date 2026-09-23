@@ -525,6 +525,13 @@ def collect_sa_extension_health(
     if repair_segment is not None:
         segments.append(repair_segment)
     segments.append(_capture_readback_segment(paths))
+    from src.sa.company_collector import CompanyCollector
+    acquisition = CompanyCollector(paths.sa_db_path.with_name("sa_company_refresh.db")).public_status()
+    restriction = acquisition.get("paused_reason") or (
+        "rate_limited" if acquisition.get("rate_limited") else
+        "access_restricted" if acquisition.get("capability_pauses") else None)
+    if restriction:
+        segments.append(_seg("acquisition", "warn", code=restriction))
     return {
         "chain_state": _derive_chain_state(segments),
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

@@ -11,10 +11,18 @@ function clone(value) {
 }
 
 function responseFor(message) {
-  if (message.action === "get_company_refresh" || message.action === "configure_company_refresh" || message.action === "run_company_refresh") {
+  if (message.action === 'enable_sa_updates_here' && fixture.activationError) return {status:'error',error_code:fixture.activationError,activation_step:'configure'};
+  if (message.action === 'preview_company_refresh') {
+    const count=(message.config?.target_mode==='watchlist' ? (fixture.watchlistCount || 180) : message.config?.tickers?.length || 0)
+      * (message.config?.statements?.length || 0) * (message.config?.views?.length || 0);
+    return {status:'ok',counts:{missing:count,due:0,reusable:0,blocked:0},total_scopes:count,first_fill:count>0,
+      pacing_lower_bound_seconds:Math.max(0,count-1)*(message.config?.financial_gap_seconds || 60),
+      observed_duration:{sample_count:0,mean_ms:null,total_scopes:count}};
+  }
+  if (['get_company_refresh','save_company_refresh','enable_sa_updates_here','run_company_refresh'].includes(message.action)) {
     return clone(fixture.companyRefresh || {status:"ok",config:message.config || {
-      enabled:false,tickers:[],statements:['income_statement'],views:['annual'],interval_days:7
-    },scopes:[],running:false,paused_reason:null});
+      enabled:false,target_mode:'watchlist',tickers:[],statements:['income_statement'],views:['annual'],interval_days:7
+    },collector:{status:'ok',generation:0,owner:null,policy:null},scopes:[],running:false,paused_reason:null});
   }
   if (message.action === "capture_company_data") return clone(fixture.companyResult || {status: "error", error_code: "sa_company_page_unsupported"});
   if (message.action === "ensure_auto_sync_alarms") return {status: "ok"};
@@ -296,6 +304,8 @@ function snapshot(document, sent) {
     companyRefreshTargetMode: document.getElementById("companyRefreshTargetMode")?.value,
     companyRefreshTickerRequired: document.getElementById("companyRefreshTickers")?.required,
     companyRefreshNowDisabled: document.getElementById("companyRefreshNow")?.disabled,
+    companyRefreshEnabled: document.getElementById('companyRefreshEnabled')?.checked,
+    companyScopePreview: text(document.getElementById('companyScopePreview')),
     advancedPreview: text(advancedPreview),
     reviewScope: reviewScope
       ? {hidden: reviewScope.hidden, text: text(reviewScope)}
@@ -344,7 +354,20 @@ async function runPopup() {
     }
     await settle();
 
-    if (scenario === "configure_company_watchlist") {
+    if (scenario === 'preview_company_scope' || scenario === 'enable_sa_updates_here') {
+      const doc=dom.window.document;
+      doc.getElementById('companyRefreshTargetMode').value='watchlist';
+      doc.getElementById('companyRefreshEnabled').checked=true;
+      doc.querySelectorAll('[name="companyRefreshStatement"],[name="companyRefreshView"]').forEach(input=>input.checked=true);
+      const gap=doc.getElementById('companyFinancialGap'); if(gap) gap.value='15';
+      for(const [key,value] of Object.entries({hour_limit:20,day_limit:100,hour_reserve:5,day_reserve:20})) {
+        const input=doc.querySelector('[name="'+key+'"]');if(input)input.value=String(value);
+      }
+      const confirmed=doc.getElementById('companyActivationConfirmed');if(confirmed)confirmed.checked=true;
+      doc.getElementById('companyRefreshForm').dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+      await settle();
+      if(scenario==='enable_sa_updates_here') {doc.getElementById('companyCollectorSelect')?.click();await settle();}
+    } else if (scenario === "configure_company_watchlist") {
       const select = dom.window.document.getElementById("companyRefreshTargetMode");
       if (select) { select.value="watchlist"; select.dispatchEvent(new dom.window.Event("change", {bubbles:true})); }
       dom.window.document.getElementById("companyRefreshForm")?.dispatchEvent(new dom.window.Event("submit", {bubbles:true,cancelable:true}));
@@ -354,6 +377,8 @@ async function runPopup() {
       await settle();
     } else if (scenario === "configure_company_refresh") {
       const doc = dom.window.document;
+      doc.getElementById("companyRefreshTargetMode").value = "manual";
+      doc.getElementById("companyRefreshTargetMode").dispatchEvent(new dom.window.Event("change", {bubbles:true}));
       const ticker = doc.getElementById("companyRefreshTickers");
       if (ticker) ticker.value = "amd, aapl AMD";
       const interval = doc.getElementById("companyRefreshDays");
@@ -363,6 +388,9 @@ async function runPopup() {
       const quarterly = doc.querySelector('[name="companyRefreshView"][value="quarterly"]');
       if (quarterly) quarterly.checked = true;
       doc.getElementById("companyRefreshForm")?.dispatchEvent(new dom.window.Event("submit", {bubbles:true,cancelable:true}));
+      await settle();
+    } else if (scenario === "update_company_due") {
+      dom.window.document.getElementById("companyRefreshNow")?.click();
       await settle();
     } else if (scenario === "company_capture_storage_update") {
       await mocks.chrome.storage.local.set({lastCompanyCapture: fixture.companyResult});

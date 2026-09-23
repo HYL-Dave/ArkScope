@@ -1,5 +1,19 @@
 // Translation authority: docs/design/ARKSCOPE_TERMINOLOGY.md
 const shell = {
+  saAcquisition: {
+    title: "Seeking Alpha acquisition",
+    login: "Sign-in expired. Acquisition is paused. Sign in to Seeking Alpha in the collector browser, then explicitly resume from the extension.",
+    verification: "Verification required. Acquisition is paused until you complete verification and explicitly resume from the extension.",
+    access: "Subscription access unavailable: {{capabilities}}. These updates are paused. Premium and Alpha Picks have separate access requirements; signing in alone does not verify either subscription.",
+    cooldown: "Seeking Alpha cooldown active. Acquisition remains stopped until the recorded cooldown expires.",
+    paused: "Acquisition paused. Check the collector extension before resuming.",
+    unavailable: "Status unavailable. Acquisition health cannot be confirmed.",
+    financials: "Financial statements",
+    alphaPicks: "Alpha Picks",
+    news: "News",
+    otherContent: "Other content",
+    openSettings: "Open source settings",
+  },
   navigation: {
     primaryLabel: "Primary navigation",
     drawerTitle: "Navigation",

@@ -22,6 +22,11 @@ const seg = (key: string, state: SAExtensionHealthSegment["state"], detail = "de
 });
 
 describe("displaySAExtensionSegments", () => {
+  it.each(["login_required", "access_restricted", "human_verification_required", "rate_limited"])("names acquisition restriction %s without a generic warning", (code) => {
+    const row = displaySAExtensionSegments([{ key: "acquisition", state: "warn", code }], settingsT("en"))[0];
+    expect(row.label).toBe("Acquisition access");
+    expect(row.copy).not.toContain("currently unavailable");
+  });
   it("shows deferred capture as waiting, not successful or failed", () => {
     const segment: SAExtensionHealthSegment = { key: "telemetry_last", state: "warn", code: "capture_deferred" };
     const en = displaySAExtensionSegments([segment], settingsT("en"))[0];

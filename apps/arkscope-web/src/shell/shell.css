@@ -214,3 +214,8 @@
 .shell-work-open {
   margin-top: var(--space-2);
 }
+.sa-acquisition-notice {
+  padding: 12px 16px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

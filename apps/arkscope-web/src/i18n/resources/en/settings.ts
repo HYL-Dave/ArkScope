@@ -771,6 +771,7 @@ const settings = {
         telemetryBinding: "Telemetry binding",
         telemetryLast: "Latest telemetry",
         captureReadback: "Capture readback",
+        acquisition: "Acquisition access",
       },
       status: {
         captureComplete: "Capture complete",
@@ -804,6 +805,8 @@ const settings = {
       reasons: {
         accessRestricted: "Access restricted",
         loginRequired: "Login required",
+        verificationRequired: "Human verification required; acquisition paused",
+        rateLimited: "Seeking Alpha cooldown; acquisition paused",
         modalBlocked: "A page dialog blocked the operation",
         navigationTimeout: "Navigation timed out; stored evidence cannot distinguish network, provider-page, or browser causes",
         detailTimeout: "Detail page timed out",

@@ -770,6 +770,7 @@ const settings = {
         telemetryBinding: "遙測綁定",
         telemetryLast: "最近遙測",
         captureReadback: "資料回讀",
+        acquisition: "擷取存取狀態",
       },
       status: {
         captureComplete: "擷取完成",
@@ -803,6 +804,8 @@ const settings = {
       reasons: {
         accessRestricted: "存取受限",
         loginRequired: "需要登入",
+        verificationRequired: "需要人機驗證，擷取已暫停",
+        rateLimited: "Seeking Alpha 冷卻中，擷取已暫停",
         modalBlocked: "頁面對話框阻擋操作",
         navigationTimeout: "頁面導覽逾時；現有紀錄無法判定是網路、供應商頁面或瀏覽器因素",
         detailTimeout: "詳情頁等待逾時",

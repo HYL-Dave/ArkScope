@@ -5197,6 +5197,20 @@ export interface SAExtensionHealthResponse {
   segments: SAExtensionHealthSegment[];
 }
 
+export interface SAAcquisitionStatus {
+  status: "ok" | "error";
+  configured?: boolean;
+  error_code?: string;
+  paused_reason?: string | null;
+  capability_pauses?: Record<string, unknown>;
+  rate_limited?: boolean;
+  rate_limit_until?: string | null;
+}
+
+export function getSAAcquisitionStatus(): Promise<SAAcquisitionStatus> {
+  return getJSON<SAAcquisitionStatus>("/sa/acquisition-status", 8_000);
+}
+
 export function getSAExtensionHealth(): Promise<SAExtensionHealthResponse> {
   return getJSON<SAExtensionHealthResponse>("/sa/extension-health", 8_000);
 }
