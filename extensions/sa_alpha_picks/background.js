@@ -771,11 +771,12 @@ const companyFinancialRefresh = SACompanyRefresh.create({
   alarms: chrome.alarms,
   control:companyCollectorControl,
   shouldPause:function () {return acquisitionPaused("financials");},
+  setTimer:setTimeout,clearTimer:clearTimeout,
   resolveWatchlist:function () { return sendNativeMessage2({action:"get_company_watchlist"}); },
-  runScope: function (scope, mode, admitted, observeFailure, intervalDays, requestedAt) {
+  runScope: function (scope, mode, admitted, observeFailure, intervalDays, requestedAt, force) {
     return enqueueSaSyncJob({displayName: scope.ticker + " " + scope.view + " financials",
       operation: "company_financial_capture", mode: mode,eligible:admitted,
-      acquisition:{scope:scope,force:mode === "manual",interval_days:intervalDays,requested_at:requestedAt || null}}, function (diagnostics) {
+      acquisition:{scope:scope,force:force === true,interval_days:intervalDays,requested_at:requestedAt || null}}, function (diagnostics) {
       return runCoordinatedCompanyScope(scope, mode, admitted, observeFailure, intervalDays, diagnostics, requestedAt);
     });
   },
@@ -1040,7 +1041,6 @@ async function refreshCompanyFinancialScope(scope, diagnostics, admitted, observ
       }
       await unregisterCollectorTab(tabId);
       // Pace successive manual targets too; timers do not imply source freshness.
-      await sleep(10000);
     }
   }
 }

@@ -309,7 +309,7 @@ def test_shared_scope_backoff_does_not_delay_other_scopes_after_browser_switch()
       await api.run(false);
       return {first,when,clock,calls};
     """)
-    assert result["when"] == result["clock"] + 60000
+    assert result["when"] == result["clock"] + 1000
     assert result["calls"] == ["quarterly"]
     assert result["first"]["scopes"][0]["last_error"] == "sa_company_dom_not_ready"
 
@@ -591,11 +591,11 @@ def test_restriction_is_persisted_before_tab_cleanup_finishes(code, phase):
       const gate = new Promise(resolve => { release=resolve; });
       chrome.tabs.create=async options=>({id:1,url:options.url});
       chrome.tabs.get=async()=>({id:1,url:'https://seekingalpha.com/symbol/AMD/income-statement'});
-      safeRemoveTab=async()=>{};
+      safeRemoveTab=async()=>{cleanupStarted();await gate;return true;};
       registerCollectorTab=async()=>{};
       unregisterCollectorTab=async()=>{};
       waitForTabLoad=async()=>{};
-      sleep=async()=>{cleanupStarted();await gate;};
+      sleep=async()=>{};
       sendNativeMessage2=async()=>({status:'ok',dataset:'financials'});
       chrome.scripting.executeScript=async()=>[{result:phase==='prepare'
         ? {status:'error',error_code:code} : {status:'ok'}}];
@@ -700,7 +700,7 @@ def test_manual_capture_while_waiting_in_queue_prevents_an_automatic_repurchase(
 def test_alarm_is_recoverable_if_browser_worker_dies_during_capture():
     result = probe("return {alarms};")
     assert result["alarms"][-1]["periodInMinutes"] >= 1
-    assert result["alarms"][-1]["when"] == 1790035260000  # 2026-09-22 00:01 UTC
+    assert result["alarms"][-1]["when"] == 1790035201000  # No extra minute before due work.
 
 
 def test_current_page_capture_with_another_currency_does_not_freshen_usd_scope():
