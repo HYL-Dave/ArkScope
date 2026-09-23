@@ -451,10 +451,9 @@ class CompanyCollector:
                     or requested_at is not None and captured >= _seconds(requested_at)):
                 return {"status": "reused", "observation_id": stored["observation_id"], "currency": "USD", **scope,
                         "last_success_at": stored["last_captured_at"]}
-        if not msg["force"]:
-            failure = state["failures"].get("/".join(scope.values()), {})
-            if _seconds(failure.get("retry_after")) > now:
-                return {"status": "deferred", "deferral_kind": "scope", "error_code": failure["error_code"], "retry_after": failure["retry_after"]}
+        failure = state["failures"].get("/".join(scope.values()), {})
+        if _seconds(failure.get("retry_after")) > now:
+            return {"status": "deferred", "deferral_kind": "scope", "error_code": failure["error_code"], "retry_after": failure["retry_after"]}
         if _seconds(state["next_navigation_at"]) > now:
             return {"status": "deferred", "error_code": "sa_company_pacing", "retry_after": state["next_navigation_at"]}
         return None

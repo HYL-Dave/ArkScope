@@ -184,10 +184,15 @@
         await schedule(now()+3600000);
         return;
       }
-      var times = resolved.scopes.map(function (scope) {
-        return Math.max(deadline(state.records[key(scope)] || {}, state.config.interval_days_by_view[scope.view]), rateLimitDeadline(state));
+      var queuedIds = new Set(state.pending_scopes || []);
+      var times = resolved.scopes.filter(function (scope) {
+        return state.config.enabled || queuedIds.has(key(scope));
+      }).map(function (scope) {
+        var record = state.records[key(scope)] || {};
+        var due = queuedIds.has(key(scope)) ? Date.parse(record.retry_after || "") || 0
+          : deadline(record, state.config.interval_days_by_view[scope.view]);
+        return Math.max(due, rateLimitDeadline(state));
       });
-      if ((state.pending_scopes || []).length) times.push(rateLimitDeadline(state));
       if (!times.length) times.push(now() + 3600000);
       await schedule(Math.max(now()+1000,Math.min.apply(null,times),
         control && Date.parse(control.next_financial_at || "") || 0,Date.parse(state.deferred_until || "") || 0));
@@ -272,6 +277,7 @@
       if ((!manual && !queued && !state.config.enabled) || state.paused_reason) return status();
       force = queued ? state.pending_force === true : force;
       var selected = resolved.scopes.filter(function (scope) {
+        if (Date.parse((state.records[key(scope)] || {}).retry_after || "") > now()) return false;
         if (queued) return state.pending_scopes.includes(key(scope));
         return force || deadline(state.records[key(scope)] || {}, state.config.interval_days_by_view[scope.view]) <= now();
       });

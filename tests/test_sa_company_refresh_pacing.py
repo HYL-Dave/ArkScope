@@ -161,3 +161,29 @@ def test_authority_upgrade_requirement_remains_visible_without_reinitializing():
     """)
     assert result["status"]["collector"]["error_code"] == "sa_acquisition_upgrade_required"
     assert result["operations"] == ["status"]
+
+
+def test_pending_scope_backoff_does_not_block_other_targets_or_poll_every_second():
+    result = probe(WATCHLIST + """
+      members=['AAPL','AMD'];
+      await api.configure({...config,target_mode:'watchlist',tickers:[],views:['annual'],enabled:false});
+      const retry=clock+6*3600000;
+      deps.runScope=async scope=>{
+        calls.push(scope.ticker);
+        if(scope.ticker==='AAPL' && clock<retry)return {status:'deferred',deferral_kind:'scope',
+          error_code:'sa_company_refresh_interrupted',retry_after:new Date(retry).toISOString()};
+        return {status:'ok',observation_id:'a'.repeat(64),currency:'USD'};
+      };
+      await api.run({force:true});
+      await api.run({scheduled:true});
+      const afterOther=await api.status();const wake=alarms.at(-1).when;
+      await api.run({scheduled:true});
+      const early=calls.slice();
+      clock=retry;await api.run({scheduled:true});
+      return {calls,early,afterOther,wake,retry,final:await api.status()};
+    """)
+    assert result["early"] == ["AAPL", "AMD"]
+    assert result["afterOther"]["pending_count"] == 1
+    assert result["wake"] == result["retry"]
+    assert result["calls"] == ["AAPL", "AMD", "AAPL"]
+    assert result["final"]["pending_count"] == 0

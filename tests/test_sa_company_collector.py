@@ -143,6 +143,19 @@ def test_challenge_pause_survives_recovery_and_needs_owner_resume(control):
     assert call(obj, "resume", CHROME)["paused_reason"] is None
 
 
+def test_force_refresh_does_not_bypass_interrupted_scope_backoff(control):
+    obj, clock = control
+    call(obj, "select")
+    assert begin(obj)["status"] == "ok"
+    call(obj, "recover", confirm_stopped=True)
+    clock[0] += 61
+    result = call(obj, "begin", scope=SCOPE, interval_days=7, force=True)
+    assert result["status"] == "deferred"
+    assert result["deferral_kind"] == "scope"
+    assert result["error_code"] == "sa_company_refresh_interrupted"
+    assert call(obj, "status")["active"] is None
+
+
 def test_unpersisted_success_is_not_a_freshness_checkpoint(control):
     obj, _ = control
     call(obj, "select")
@@ -263,5 +276,8 @@ def test_delayed_navigation_keeps_a_gap_after_completion(control, monkeypatch, c
     else:
         call(obj, "recover", confirm_stopped=True)
     clock[0] += 20
-    result = call(obj, "begin", scope=SCOPE, interval_days=7, force=True)
+    other = {**SCOPE, "ticker": "AAPL"}
+    result = call(obj, "begin", scope=other, interval_days=7, force=True)
     assert result["status"] == "deferred" and result["error_code"] == "sa_company_pacing"
+    clock[0] += 41
+    assert call(obj, "begin", scope=other, interval_days=7, force=True)["status"] == "ok"

@@ -217,8 +217,10 @@ Nonstandard/stub periods remain unavailable rather than silently comparable.
 
 `metric_basis` and `metric_gaps` explain available and withheld outputs. Numeric
 provider inputs are not promoted to exact filing evidence. SEC statement inputs
-must carry the current period/debt extraction contract. It checks one report
-end across concepts, expected units and flow duration versus instant facts;
+must carry the current period/debt extraction contract. It anchors the shared
+report end in USD statement totals (assets/equity, revenue, net income and
+operating cash flow), not later share-count disclosures or unrelated units.
+It checks expected units and flow duration versus instant facts;
 cumulative-only quarters and comparative-year figures cannot substitute.
 Overlapping current-debt components are not added together, and operating cash
 flow without known CapEx is not called free cash flow. These guards do not
@@ -562,7 +564,9 @@ alone does not activate collection. Reading status never initializes the store.
 
 **Update missing / due** reuses fresh scopes, including while the periodic
 schedule is off. A separate advanced **Force refresh** needs confirmation;
-it bypasses source-age reuse only, never restrictions, budgets or ownership.
+it bypasses source-age reuse only, never restrictions, budgets, ownership or a
+scope's failed/interrupted-attempt backoff. Other eligible scopes continue while
+that scope waits; pending intent alone does not cause one-second retry polling.
 Changing settings cancels old manual intent. Cancelling a queued update does not
 disable the separate periodic schedule; a late response cannot resurrect cancelled
 work. Closing the popup does not discard the durable queue.

@@ -288,11 +288,15 @@ def test_manual_selected_ticker_intent_is_persisted_before_the_first_request():
       deps.runScope = async scope => { calls.push(scope.view);return {status:'ok',currency:'USD',observation_id:'a'.repeat(64)}; };
       const restarted = SACompanyRefresh.create(deps);
       await restarted.run(false);
-      return {durable,calls,status:await restarted.status()};
+      const waiting=await restarted.status();const early=calls.slice();
+      clock+=6*3600000;await restarted.run(false);
+      return {durable,calls,early,waiting,status:await restarted.status()};
     """)
     assert len(result["durable"].get("pending_scopes", [])) == 2
-    assert result["calls"] == ["annual"]
-    assert result["status"]["pending_count"] == 1
+    assert result["early"] == ["quarterly"]
+    assert result["waiting"]["pending_count"] == 1
+    assert result["calls"] == ["quarterly", "annual"]
+    assert result["status"]["pending_count"] == 0
 
 
 def test_shared_scope_backoff_does_not_delay_other_scopes_after_browser_switch():

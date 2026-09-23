@@ -761,8 +761,8 @@ describe("bundled i18n resources", () => {
     ), "utf8")) as PortfolioOwnershipContract;
     const expectedCounts = {
       common: 82,
-      shell: 37,
-      settings: 1153,
+      shell: 49,
+      settings: 1157,
       research: 240,
       explore: 1178,
       portfolio: 374,
@@ -848,7 +848,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3088);
+      expect(total, `${locale}.total`).toBe(3104);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([
@@ -1393,6 +1393,8 @@ describe("bundled i18n resources", () => {
       "dataSources.extension.degraded",
       "dataSources.extension.workloads.alphaPicks",
       "dataSources.extension.workloads.marketNews",
+      "dataSources.extension.segments.acquisition",
+      "dataSources.extension.status.captureDeferred",
       "dataSources.extension.status.captureDegraded",
       "dataSources.extension.status.legacyCauseAbsent",
       "dataSources.extension.status.diagnosticsRejected",
@@ -1408,6 +1410,8 @@ describe("bundled i18n resources", () => {
       "dataSources.extension.stages.extensionRuntime",
       "dataSources.extension.reasons.accessRestricted",
       "dataSources.extension.reasons.loginRequired",
+      "dataSources.extension.reasons.verificationRequired",
+      "dataSources.extension.reasons.rateLimited",
       "dataSources.extension.reasons.modalBlocked",
       "dataSources.extension.reasons.navigationTimeout",
       "dataSources.extension.reasons.detailTimeout",

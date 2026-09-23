@@ -2,9 +2,22 @@
 
 from tests.test_sa_extension_popup import _run_background_probe
 from tests.sa_acquisition_helpers import AUTHORITY
+import pytest
 
 
 LOAD = "importScripts('acquisition_queue.js', 'acquisition_client.js');\n"
+
+
+@pytest.mark.parametrize("hidden, expected", [(False, "human_verification_required"), (True, "rate_limited")])
+def test_visible_challenge_takes_precedence_over_rate_limit_title(hidden, expected):
+    result = _run_background_probe(r"""
+      globalThis.location={pathname:'/symbol/AMD'};
+      const challenge={hidden:HIDDEN,parentElement:null,getAttribute:()=>null};
+      globalThis.document={title:'Too many requests',querySelector:selector=>selector==='h1' ? null : challenge};
+      globalThis.getComputedStyle=()=>({display:'block',visibility:'visible'});
+      return readSaAccessMarkers();
+    """.replace("HIDDEN", str(hidden).lower()))
+    assert result == expected
 
 
 def test_routine_fifo_runs_before_waiting_financial_work_and_coalesces():

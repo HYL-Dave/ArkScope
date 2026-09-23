@@ -73,3 +73,24 @@ def test_failed_intent_read_does_not_acquire_and_releases_coalescing():
       return { calls };
     """)
     assert result == {"calls": 1}
+
+
+@pytest.mark.parametrize("key", ["alphaPicks", "marketNews"])
+def test_newly_enabled_intent_is_not_coalesced_with_cancelled_queued_intent(key):
+    setter = "setAlphaPicksAutoSyncEnabled" if key == "alphaPicks" else "setMarketNewsAutoSyncEnabled"
+    result = _run_background_probe(SETUP + f"""
+      await {setter}(true, 30);
+      let release, entered;
+      const ready=new Promise(resolve=>entered=resolve);
+      const blocker=enqueueSaSyncJob({{}},async()=>{{entered();await new Promise(resolve=>release=resolve);return {{}};}});
+      await ready;
+      const calls=[];
+      const old=enqueueAutoSaSyncJob('{key}',{{}},async()=>{{calls.push('old');return {{}};}});
+      while(saAcquisitionQueue.status().pending.routine===0)await Promise.resolve();
+      await {setter}(false,30);await {setter}(true,30);
+      const fresh=enqueueAutoSaSyncJob('{key}',{{}},async()=>{{calls.push('fresh');return {{}};}});
+      release();await Promise.all([blocker,old,fresh]);
+      await enqueueAutoSaSyncJob('{key}',{{}},async()=>{{calls.push('later');return {{}};}});
+      return {{calls}};
+    """)
+    assert result == {"calls": ["fresh", "later"]}

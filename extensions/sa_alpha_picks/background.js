@@ -286,10 +286,7 @@ var marketNewsRefreshInFlight = false;
 var saAcquisitionQueue = SAQueue.create({now:Date.now});
 var saAcquisitionTask = null;
 var saSyncJobInFlight = false;
-var saAutoJobPending = {
-  alphaPicks: false,
-  marketNews: false,
-};
+var saAutoJobPending = Object.create(null);
 
 var EXTENSION_ITEM_RETRYABLE_REASONS = [
   "access_restricted",
@@ -738,14 +735,14 @@ function readSaAccessMarkers() {
     }
     return true;
   }
-  if (/^\/(?:login|sign_in|signin)(?:\/|$)/.test(location.pathname)) return "login_required";
   var headline = document.querySelector("h1");
   var heading = visible(headline) ? headline.innerText || "" : "";
   var title = document.title || "";
-  if (/too many requests|rate limit exceeded/i.test(title + " " + heading)) return "rate_limited";
   if (/verify you are human|human verification|just a moment|are you a robot/i.test(title + " " + heading)) return "human_verification_required";
   var challenge = document.querySelector('iframe[src*="captcha"],iframe[src*="challenge"],[data-testid="captcha"]');
   if (visible(challenge)) return "human_verification_required";
+  if (/^\/(?:login|sign_in|signin)(?:\/|$)/.test(location.pathname)) return "login_required";
+  if (/too many requests|rate limit exceeded/i.test(title + " " + heading)) return "rate_limited";
   return null;
 }
 
@@ -1344,15 +1341,16 @@ async function readAutoSyncIntent(jobKey) {
 }
 
 async function enqueueAutoSaSyncJob(jobKey, jobOpts, jobFn) {
-  if (saAutoJobPending[jobKey]) {
+  var submitted;
+  try { submitted = await readAutoSyncIntent(jobKey); }
+  catch (_) { return { status: "skipped", reason: "operator_cancelled" }; }
+  if (!submitted.enabled) return { status: "skipped", reason: "operator_cancelled" };
+  var pendingKey = jobKey + ":" + submitted.revision;
+  if (saAutoJobPending[pendingKey]) {
     return Promise.resolve({ status: "skipped", reason: "already_pending" });
   }
-  saAutoJobPending[jobKey] = true;
+  saAutoJobPending[pendingKey] = true;
   try {
-    var submitted;
-    try { submitted = await readAutoSyncIntent(jobKey); }
-    catch (_) { return { status: "skipped", reason: "operator_cancelled" }; }
-    if (!submitted.enabled) return { status: "skipped", reason: "operator_cancelled" };
     var eligible = async function () {
       var current;
       try { current = await readAutoSyncIntent(jobKey); }
@@ -1364,7 +1362,7 @@ async function enqueueAutoSaSyncJob(jobKey, jobOpts, jobFn) {
       return jobFn(diagnostics);
     });
   } finally {
-    saAutoJobPending[jobKey] = false;
+    delete saAutoJobPending[pendingKey];
   }
 }
 

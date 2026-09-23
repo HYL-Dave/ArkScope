@@ -12,8 +12,9 @@
 
 Status: Tasks 1-7 implementation and isolated browser/native verification are
 complete on the feature branch. Signed-in coordination/Chrome native acceptance
-remains open. Task 8 freezes documentation and source, obtains a fresh review,
-then runs the complete final regression before any merge. See the
+remains open. Task 8's fresh review found four Important defects, all reproduced
+and repaired with a 215-test focused gate. The repaired source must now pass the
+complete final regression before any merge. See the
 [evidence](../evidence/2026-09-23-sa-automation-coordination/README.md).
 Firefox remains the initial preference, not a fixed dependency. No production
 schedule, quota, registration or database has been changed.

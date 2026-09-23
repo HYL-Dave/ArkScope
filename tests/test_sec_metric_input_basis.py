@@ -112,3 +112,29 @@ def test_unknown_currency_is_not_read_as_usd_and_share_units_are_preserved():
     assert cold.roe is None and warm.roe is None
     assert cold.income_statements[0].data["earnings_per_share"] == 2
     assert cold.balance_sheet[0].data["outstanding_shares"] == 50
+
+
+@pytest.mark.parametrize("period,fp,form,end,start,later", [
+    ("annual", "FY", "10-K", "2025-12-31", "2025-01-01", "2026-02-10"),
+    ("quarterly", "Q2", "10-Q", "2025-06-30", "2025-04-01", "2025-08-10"),
+])
+def test_later_instant_disclosure_cannot_date_any_statement(period, fp, form, end, start, later):
+    basis = dict(fp=fp, form=form, end=end)
+    sec = extractor({"Assets": [entry(200, **basis)],
+                     "Revenues": [entry(100, start=start, **basis)],
+                     "NetCashProvidedByUsedInOperatingActivities": [entry(30, start=start, **basis)]})
+    concepts = sec._cache["TEST"]["facts"]["us-gaap"]
+    concepts["CommonStockSharesOutstanding"] = {"units": {"shares": [entry(50, end=later, fp=fp, form=form)]}}
+    concepts["Assets"]["units"]["EUR"] = [entry(900, end=later, fp=fp, form=form)]
+    income = sec.get_income_statement("TEST", years=1, period=period)[0]
+    balance = sec.get_balance_sheet("TEST", years=1, period=period)[0]
+    cash = sec.get_cash_flow_statement("TEST", years=1, period=period)[0]
+    assert income.report_period == balance.report_period == cash.report_period == end
+    assert income.revenue == 100 and balance.total_assets == 200
+    assert cash.net_cash_flow_from_operations == 30
+    assert balance.outstanding_shares is None
+
+
+def test_arbitrary_instant_disclosure_is_not_a_statement_period_anchor():
+    sec = extractor({"CommonStockSharesOutstanding": [entry(50)]})
+    assert sec._get_report_end_date(sec._cache["TEST"], 2025, "10-K", "FY") is None

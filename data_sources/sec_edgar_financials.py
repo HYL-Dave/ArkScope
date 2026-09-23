@@ -526,26 +526,27 @@ class SECEdgarFinancials:
 
         gaap = facts['facts'].get('us-gaap', {})
 
-        # One report end across concepts; a comparative fact must not date the row.
+        # Statement totals anchor the reporting date. Later cover-page share counts
+        # and other instant disclosures do not redefine the financial statements.
+        anchors = (
+            ['Assets', 'LiabilitiesAndStockholdersEquity', 'StockholdersEquity']
+            + INCOME_STATEMENT_MAPPING['revenue']
+            + CASH_FLOW_MAPPING['net_income']
+            + CASH_FLOW_MAPPING['net_cash_flow_from_operations']
+        )
         ends = []
-        for concept, concept_data in gaap.items():
-            if 'units' not in concept_data:
-                continue
-            for entries in concept_data['units'].values():
-                matching = [
-                    e for e in entries
-                    if e.get('form') == form
-                    and e.get('fp') == period_type
-                    and e.get('fy') == fiscal_year
-                ]
-                if matching:
-                    for entry in matching:
-                        try:
-                            value = entry.get('end')
-                            if date.fromisoformat(value).isoformat() == value:
-                                ends.append(value)
-                        except (TypeError, ValueError):
-                            pass
+        for concept in anchors:
+            entries = gaap.get(concept, {}).get('units', {}).get('USD', [])
+            for entry in entries:
+                if (entry.get('form') != form or entry.get('fp') != period_type
+                        or entry.get('fy') != fiscal_year):
+                    continue
+                try:
+                    value = entry.get('end')
+                    if date.fromisoformat(value).isoformat() == value:
+                        ends.append(value)
+                except (TypeError, ValueError):
+                    pass
         return max(ends) if ends else None
 
     def get_income_statement(
