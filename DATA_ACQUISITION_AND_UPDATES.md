@@ -500,6 +500,14 @@ The [bounded Firefox watchlist acceptance](docs/superpowers/evidence/2026-09-23-
 verifies the operator's two-company manual queue and saved-table readback.
 It is not Google Chrome acceptance or authorization to start the production list.
 
+**Planned successor, not current behavior:** the operator approved one selected
+browser for all SA automation and configurable pacing including 15 seconds.
+The [SA Automation Coordination And Controls design](docs/superpowers/specs/2026-09-23-sa-automation-coordination-design.md)
+defines routine-first execution, background financial work, shared navigation
+budgets/restrictions and installation-aware receipts. Its written design is
+awaiting review; the financial-only controls below remain the implemented policy.
+No production browser selection or schedule is changed by this document.
+
 In the extension's **Financial statement updates**, choose selected tickers or
 **App watchlist**, statements
 (income, balance sheet, cash flow), Annual/Quarterly views and an interval of

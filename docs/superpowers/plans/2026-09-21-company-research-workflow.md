@@ -53,6 +53,15 @@ remaining signed-in operator acceptance is separate.
 The user explicitly prioritized this addition on September 22. It does not
 replace the remaining workflow packages or the independent service/MCP lanes.
 
+September 23 follow-up: the operator approved extending explicit acquisition
+ownership to all SA automation, initially Firefox, and requires a simpler
+whole-watchlist UI with configurable pacing including 15 seconds. The
+[coordination design](../specs/2026-09-23-sa-automation-coordination-design.md)
+selects routine-first priority over equal-turn interleaving, preserving existing
+extractors while adding common admission, navigation budgets and identity
+receipts. This written design awaits review; no implementation, production
+cutover or automatic quota selection has occurred.
+
 September 22 sequencing correction: this is one delivery lane, not the complete
 product backlog. Retention, persistent service/failure delivery and external
 read/analysis MCP remain required and do not wait for this lane's signed-in

@@ -22,6 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
+| **P1 design, 2026-09-23** | **SA AUTOMATION COORDINATION AND SIMPLER CONTROLS** | **DIRECTION APPROVED; WRITTEN DESIGN AWAITS REVIEW; NOT IMPLEMENTED.** One explicitly selected browser for all managed SA acquisition, initially Firefox; routine work before background financial fill, configurable gap including 15 seconds, source-aware estimates and common navigation budgets/restrictions. Add installation/admission identity across receipts. The read-only seven-day audit finds 814 news receipts but only 190 complete, with 624 skipped; receipts are not requests. Owner: `docs/superpowers/specs/2026-09-23-sa-automation-coordination-design.md`. No production cutover or invented provider quota. | Protect existing news/Alpha Picks/comment acquisition while making all-watchlist financial updates usable. This is not completion or deferral of the independent service/MCP lanes. |
 | **P1 update, 2026-09-23** | **RESEARCH TOOL REPAIR AND BOUNDED FIREFOX ACCEPTANCE** | Financial input/basis/warm-cache guards, retained earnings release/session analysis and five existing OAuth calculators implemented; review findings repaired. Frozen `e91075cc`: **12,568 backend / 12 unchanged skips**, **1,920 frontend / 126 files**, typecheck/build, scanner and eight desktop checks pass. The private Firefox host preflight passes; the operator now confirms AAPL/AMD annual watchlist capture, corroborated by receipts 11/12 and full pinned readback (440/484 cell positions, 69.508-second inter-job gap). Chrome and production bulk acceptance remain open. Records: `docs/superpowers/evidence/2026-09-23-research-tool-repairs/README.md` and `docs/superpowers/evidence/2026-09-23-sa-watchlist-collector/README.md`. | Advance audited research correctness and usable tool admission. This supersedes the older company-workflow/earnings repair status below, not the independent service/MCP obligations. |
 | **P1** | **PERSISTENT LOCAL SERVICE AND FAILURE DELIVERY** | **REQUIRED; NOT IMPLEMENTED.** Separate API/scheduler ownership from Desktop window lifetime; one supervised owner per profile, authenticated discovery, detach/reattach, explicit stop and observable failure delivery. Review the same cross-workstream design, then verify actual process lifetime and single-owner behavior. Does not wait for SA acceptance, SEC retirement or SQLite replacement. | Unattended collection and the research workbench are complementary requirements. Closing the UI must not silently terminate scheduled work. |
 | **P1** | **EXTERNAL READ / ANALYSIS MCP** | **REQUIRED; NO LONGER DEFERRED.** A thin external adapter forwards to the persistent service; it does not own a DAL or collectors. First admission is stored reads and pure calculations under a distinct server-enforced external policy. Implementation can proceed against the agreed service contract; live acceptance requires that service authority. Internal SDK bridges and OAuth allowlists are not external authorization. Owner: the September 22 cross-workstream design. | External agents must be able to use retained research data without implicit writes, refreshes or spending. This does not require a new notes product. |
@@ -669,6 +670,21 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-23 (ALL-SA OWNER AND ROUTINE-FIRST COORDINATION):** The user approves
+  one explicitly selected collector across SA automation, initially Firefox,
+  with Chrome and Firefox developed together, and configurable pacing including
+  15 seconds. Review favors routine news/Alpha Picks/comment work ahead of
+  background financial scopes rather than equal-turn interleaving. Existing
+  extraction logic stays; admission and telemetry wrappers must change.
+  Read-only production audit: news 814 receipts = 190 complete + 624 skipped;
+  Alpha Picks 38 = 36 complete + two degraded; no browser identity fields.
+  These are not HTTP counts and do not establish safe quotas or 10-50x load.
+  The written coordination design adds local navigation-budget reservations,
+  visible cost/range estimates and identity-bound receipts; it awaits review
+  before an implementation plan. Root acquisition policy links to it and still
+  distinguishes current financial-only controls. No browser/settings/data
+  changes, new SA request, merge or push.
 
 - **2026-09-23 (BOUNDED FIREFOX WATCHLIST ACCEPTANCE):** The operator reports
   successful AAPL/AMD Income/Annual capture through App watchlist and one manual
