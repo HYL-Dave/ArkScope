@@ -1106,18 +1106,38 @@ function enqueueSaSyncJob(opts, jobFn) {
   return run;
 }
 
-function enqueueAutoSaSyncJob(jobKey, jobOpts, jobFn) {
+async function readAutoSyncIntent(jobKey) {
+  if (jobKey !== "alphaPicks" && jobKey !== "marketNews") throw new Error("Unknown automatic job");
+  var enabledKey = jobKey + "AutoSyncEnabled";
+  var revisionKey = jobKey + "AutoSyncRevision";
+  var data = await chrome.storage.local.get([enabledKey, revisionKey]);
+  var revision = data[revisionKey] == null ? 0 : data[revisionKey];
+  if (!Number.isSafeInteger(revision) || revision < 0) throw new Error("Invalid automatic intent");
+  return { enabled: data[enabledKey] === true, revision: revision };
+}
+
+async function enqueueAutoSaSyncJob(jobKey, jobOpts, jobFn) {
   if (saAutoJobPending[jobKey]) {
     return Promise.resolve({ status: "skipped", reason: "already_pending" });
   }
   saAutoJobPending[jobKey] = true;
-  return enqueueSaSyncJob(jobOpts, async function (diagnostics) {
-    try {
-      return await jobFn(diagnostics);
-    } finally {
-      saAutoJobPending[jobKey] = false;
-    }
-  });
+  try {
+    var submitted;
+    try { submitted = await readAutoSyncIntent(jobKey); }
+    catch (_) { return { status: "skipped", reason: "operator_cancelled" }; }
+    if (!submitted.enabled) return { status: "skipped", reason: "operator_cancelled" };
+    return await enqueueSaSyncJob(jobOpts, async function (diagnostics) {
+      var current;
+      try { current = await readAutoSyncIntent(jobKey); }
+      catch (_) { return { status: "skipped", reason: "operator_cancelled" }; }
+      if (!current.enabled || current.revision !== submitted.revision) {
+        return { status: "skipped", reason: "operator_cancelled" };
+      }
+      return jobFn(diagnostics);
+    });
+  } finally {
+    saAutoJobPending[jobKey] = false;
+  }
 }
 
 async function getExtensionActionLimits() {
@@ -1849,15 +1869,31 @@ function buildMarketNewsDetailQueue(result, mode) {
   return queue;
 }
 
-async function setAlphaPicksAutoSyncEnabled(enabled, intervalMinutes) {
-  var data = await chrome.storage.local.get(["alphaPicksAutoSyncIntervalMinutes"]);
-  var normalizedInterval = normalizeAlphaPicksAutoSyncIntervalMinutes(
-    intervalMinutes != null ? intervalMinutes : data.alphaPicksAutoSyncIntervalMinutes
-  );
-  await chrome.storage.local.set({
-    alphaPicksAutoSyncEnabled: enabled,
-    alphaPicksAutoSyncIntervalMinutes: normalizedInterval,
+var autoSyncSettingWrites = Promise.resolve();
+
+function writeAutoSyncSettings(jobKey, enabled, intervalMinutes) {
+  var run = autoSyncSettingWrites.catch(function () {}).then(async function () {
+    var intent = await readAutoSyncIntent(jobKey);
+    if (intent.revision >= Number.MAX_SAFE_INTEGER) throw new Error("Automatic intent revision exhausted");
+    var intervalKey = jobKey + "AutoSyncIntervalMinutes";
+    var data = await chrome.storage.local.get([intervalKey]);
+    var normalize = jobKey === "alphaPicks"
+      ? normalizeAlphaPicksAutoSyncIntervalMinutes : normalizeMarketNewsAutoSyncIntervalMinutes;
+    var interval = normalize(intervalMinutes != null ? intervalMinutes : data[intervalKey]);
+    var update = {};
+    update[jobKey + "AutoSyncEnabled"] = enabled === true;
+    update[jobKey + "AutoSyncRevision"] = intent.revision + 1;
+    update[intervalKey] = interval;
+    if (jobKey === "marketNews") update.marketNewsAutoSyncLastStartedAt = null;
+    await chrome.storage.local.set(update);
+    return interval;
   });
+  autoSyncSettingWrites = run;
+  return run;
+}
+
+async function setAlphaPicksAutoSyncEnabled(enabled, intervalMinutes) {
+  var normalizedInterval = await writeAutoSyncSettings("alphaPicks", enabled, intervalMinutes);
   await syncAlphaPicksAutoSyncAlarm();
   return {
     status: "ok",
@@ -1867,15 +1903,7 @@ async function setAlphaPicksAutoSyncEnabled(enabled, intervalMinutes) {
 }
 
 async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
-  var data = await chrome.storage.local.get(["marketNewsAutoSyncIntervalMinutes"]);
-  var normalizedInterval = normalizeMarketNewsAutoSyncIntervalMinutes(
-    intervalMinutes != null ? intervalMinutes : data.marketNewsAutoSyncIntervalMinutes
-  );
-  await chrome.storage.local.set({
-    marketNewsAutoSyncEnabled: enabled,
-    marketNewsAutoSyncIntervalMinutes: normalizedInterval,
-    marketNewsAutoSyncLastStartedAt: null,
-  });
+  var normalizedInterval = await writeAutoSyncSettings("marketNews", enabled, intervalMinutes);
   await syncMarketNewsAutoSyncAlarm();
   var schedule = getMarketNewsAutoSyncSchedule(normalizedInterval);
   return {
