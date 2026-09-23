@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from datetime import datetime, timezone
 import importlib
+from uuid import uuid4
 
 import pytest
 
@@ -22,10 +23,33 @@ def module():
 def control(tmp_path):
     clock = [NOW]
     obj = module().CompanyCollector(tmp_path / "control.db", clock=lambda: clock[0])
+    assert obj.handle({"operation": "configure", "client": FIREFOX,
+                       "policy": dict(hour_limit=100, day_limit=1000, hour_reserve=10, day_reserve=100),
+                       "financial_gap_seconds": 60, "expected_generation": 0, "confirm_activation": True})["status"] == "ok"
     return obj, clock
 
 
 def call(obj, operation, client=FIREFOX, **kwargs):
+    state = obj.handle({"operation": "status", "client": client})
+    generation = state.get("generation", 0)
+    if operation in {"select", "recover", "resume"}:
+        kwargs.setdefault("expected_generation", generation)
+        if operation == "select":
+            kwargs.setdefault("confirm_schedules", True)
+        if operation == "resume":
+            kwargs.setdefault("confirm_handled", True)
+    elif operation != "status":
+        kwargs.setdefault("generation", generation)
+    if operation == "begin":
+        operation = "begin_task"
+        kwargs.update(request_id=uuid4().hex, task_operation="company_financial_capture", mode="manual",
+                      trigger="manual", intent_revision=0, build="test", protocol_version=2)
+    elif operation == "finish":
+        operation = "finish_task"
+        kwargs.setdefault("cleanup_confirmed", True)
+    elif operation == "report_failure":
+        operation = "observe_restriction"
+        kwargs["reason"] = kwargs.pop("result")["error_code"].removeprefix("sa_company_")
     return obj.handle({"operation": operation, "client": client, **kwargs})
 
 
@@ -114,7 +138,7 @@ def test_challenge_pause_survives_recovery_and_needs_owner_resume(control):
     error = {"status": "error", "error_code": "sa_company_human_verification_required"}
     call(obj, "finish", token=permit["token"], result=error)
     call(obj, "select", CHROME)
-    assert begin(obj, CHROME)["error_code"] == "sa_company_human_verification_required"
+    assert begin(obj, CHROME)["error_code"] == "human_verification_required"
     assert call(obj, "resume")["error_code"] == "sa_company_collector_other_browser"
     assert call(obj, "resume", CHROME)["paused_reason"] is None
 
@@ -159,7 +183,7 @@ def test_native_control_routes_do_not_construct_dal(control, monkeypatch):
 
     monkeypatch.setattr("src.tools.data_access.DataAccessLayer", forbidden)
     monkeypatch.setattr(module(), "CompanyCollector", lambda: control[0])
-    assert handle_message({"action": "company_refresh_control", "operation": "status", "client": FIREFOX})["status"] == "ok"
+    assert handle_message({"action": "sa_acquisition_control", "operation": "status", "client": FIREFOX})["status"] == "ok"
 
 
 def test_recovery_revokes_the_old_collectors_pre_navigation_check(control):
@@ -182,7 +206,7 @@ def test_native_begin_cannot_reuse_a_disabled_source(control, monkeypatch):
     monkeypatch.setattr(module(), "CompanyCollector", lambda: control[0])
     monkeypatch.setattr("src.data_source_routing.load_route", lambda _: DisabledRoute())
     call(control[0], "select")
-    result = handle_message({"action": "company_refresh_control", "operation": "begin", "client": FIREFOX,
+    result = handle_message({"action": "sa_acquisition_control", "operation": "begin_task", "task_operation": "company_financial_capture", "client": FIREFOX,
                              "scope": SCOPE, "force": False, "interval_days": 7})
     assert result["error_code"] == "data_source_not_selected"
     assert call(control[0], "status")["active"] is None

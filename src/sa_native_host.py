@@ -101,10 +101,12 @@ def handle_message(msg):
 
         return watchlist_targets()
     if action == "company_refresh_control":
+        return {"status": "error", "error_code": "sa_acquisition_upgrade_required"}
+    if action == "sa_acquisition_control":
         from src.sa.company_collector import CompanyCollector
         from src.data_source_routing import DataSourcePolicyFailure, load_route
 
-        if msg.get("operation") == "begin":
+        if msg.get("operation") == "begin_task" and msg.get("task_operation") == "company_financial_capture":
             try:
                 load_route("sa_company_financials").candidates("seeking_alpha")
             except DataSourcePolicyFailure as exc:
