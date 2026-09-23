@@ -15,6 +15,12 @@ if (typeof SAExtensionTelemetry === "undefined" && typeof importScripts === "fun
 if (typeof SACompanyRefresh === "undefined" && typeof importScripts === "function") {
   importScripts("company_refresh.js");
 }
+if (typeof SAQueue === "undefined" && typeof importScripts === "function") {
+  importScripts("acquisition_queue.js");
+}
+if (typeof SAAcquisition === "undefined" && typeof importScripts === "function") {
+  importScripts("acquisition_client.js");
+}
 
 const SA_CURRENT_URL = "https://seekingalpha.com/alpha-picks/picks/current";
 const SA_CLOSED_URL = "https://seekingalpha.com/alpha-picks/picks/removed";
@@ -33,6 +39,7 @@ const ALPHA_PICKS_AUTO_SYNC_ALARM = "alpha-picks-auto-sync";
 const ALPHA_PICKS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES = 30;
 const ALPHA_PICKS_AUTO_SYNC_ALLOWED_PERIODS = [15, 30, 60];
 const MARKET_NEWS_AUTO_SYNC_ALARM = "market-news-auto-sync";
+const SA_ACQUISITION_COOLDOWN_ALARM = "sa-acquisition-cooldown";
 const MARKET_NEWS_AUTO_SYNC_DEFAULT_PERIOD_MINUTES = 60;
 const MARKET_NEWS_AUTO_SYNC_AUTO_VALUE = "auto";
 const MARKET_NEWS_AUTO_SYNC_HEARTBEAT_MINUTES = 5;
@@ -276,7 +283,8 @@ const COMMENT_SCROLL_PROFILES = {
 const ARTICLE_INITIAL_SETTLE_MS = 2500;
 const RECONCILIATION_ENRICHMENT_LIMITS = { quick: 4, full: 12, backfill: 20 };
 var marketNewsRefreshInFlight = false;
-var saSyncJobChain = Promise.resolve();
+var saAcquisitionQueue = SAQueue.create({now:Date.now});
+var saAcquisitionTask = null;
 var saSyncJobInFlight = false;
 var saAutoJobPending = {
   alphaPicks: false,
@@ -557,6 +565,31 @@ function buildFailedExtensionProtocolResult(operation, mode) {
 function attachExtensionRunProtocol(operation, mode, legacyResult) {
   if (!operation) return legacyResult;
   var result = legacyResult && typeof legacyResult === "object" ? legacyResult : {};
+  var stop = result.acquisition_stop;
+  if (result.status === "deferred" || result.status === "skipped" || result.status === "cancelled" || result.acquisition_outcome === "reused" || stop) {
+    var contract = SAExtensionRunProtocol.OPERATION_CONTRACTS[operation];
+    var phases = {};
+    var complete = result.completed_phases || [];
+    var skipped = !stop && result.status !== "deferred";
+    var reason = stop && stop.reason || result.reason || "collector_unavailable";
+    if (["capacity_exhausted","waiting_for_priority_work","collector_unavailable","collector_other_installation","site_paused"].indexOf(reason) === -1) reason = "collector_unavailable";
+    var failed = stop && stop.status === "error";
+    var failureSet = false;
+    var prior = operation === "market_news_sync" ? buildMarketNewsProtocolResult(mode,Object.assign({},result,{status:"ok"}))
+      : operation === "alpha_picks_sync" && result.details ? buildAlphaPicksProtocolResult(mode,result) : null;
+    contract.phases.forEach(function (name) {
+      if (complete.indexOf(name) !== -1) phases[name] = extensionPhase("complete",null);
+      else if (failed && !failureSet) {
+        failureSet = true;
+        phases[name] = extensionPhase("failed",stop.error_code);
+      } else phases[name] = skipped ? extensionPhase("skipped",result.acquisition_outcome === "reused" ? "not_due" : "operator_cancelled") : extensionPhase("deferred",reason);
+    });
+    if (prior) Object.keys(prior.phases).forEach(function (name) {
+      if (prior.phases[name].state === "failed" && (operation === "market_news_sync" || name === "article_details" || name === "reconciliation")) phases[name] = prior.phases[name];
+    });
+    return Object.assign({},result,{extension_run:SAExtensionRunProtocol.deriveRunResult({schema_version:2,operation:operation,mode:mode,
+      phases:phases,item_outcomes:result.item_outcomes || prior && prior.item_outcomes || []})});
+  }
   var structured;
   if (operation === "alpha_picks_sync") {
     structured = buildAlphaPicksProtocolResult(mode, result);
@@ -575,10 +608,20 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
         ? { extraction: extensionPhase("complete", null), persistence: extensionPhase("complete", null) }
         : failedProtocolPhases(operation, result.failure_phase || "extraction", result.reason_code || "company_capture_rejected"),
     });
+  } else if (operation === "market_news_retry_recorded" || operation === "market_news_incident_recovery") {
+    var recoveryPhases = {};
+    SAExtensionRunProtocol.OPERATION_CONTRACTS[operation].phases.forEach(function (name) {
+      recoveryPhases[name] = result.status === "succeeded" ? extensionPhase("complete",null)
+        : result.status === "running" ? extensionPhase("deferred","waiting_for_priority_work")
+        : extensionPhase("failed","unknown_failure");
+    });
+    structured = SAExtensionRunProtocol.deriveRunResult({schema_version:2,operation:operation,mode:mode,phases:recoveryPhases,item_outcomes:[]});
   } else {
     throw new Error("unsupported extension operation");
   }
-  return Object.assign({}, result, { extension_run: structured });
+  // Upgrade new producers only; validators still preserve delayed v1 evidence.
+  var projection = {schema_version:2,operation:operation,mode:mode,phases:structured.phases,item_outcomes:structured.item_outcomes};
+  return Object.assign({}, result, { extension_run: SAExtensionRunProtocol.deriveRunResult(projection) });
 }
 
 // --- Message listener (from popup) ---
@@ -603,59 +646,136 @@ async function companyCollectorControl(operation, extra) {
     return client;
   })();
   return sendNativeMessage2(Object.assign({}, extra || {}, {
-    action:"company_refresh_control", operation:operation, client:await companyCollectorIdentity,
+    action:"sa_acquisition_control", operation:operation, client:await companyCollectorIdentity,
   }));
+}
+
+async function syncAcquisitionBadge(state) {
+  var cached = await chrome.storage.local.get(["saAcquisitionRestriction","saAcquisitionPending"]);
+  var reason = state && (state.paused_reason || state.rate_limited && "rate_limited"
+    || Object.keys(state.capability_pauses || {}).length && "access_restricted");
+  if (!reason && cached.saAcquisitionPending && cached.saAcquisitionRestriction) reason = cached.saAcquisitionRestriction.reason;
+  if (state) await chrome.storage.local.set({saAcquisitionStatus:state});
+  if (state && state.rate_limited && Date.parse(state.rate_limit_until) > Date.now()) {
+    await chrome.alarms.create(SA_ACQUISITION_COOLDOWN_ALARM,{when:Date.parse(state.rate_limit_until)});
+  }
+  if (chrome.action) {
+    await chrome.action.setBadgeText({text:reason ? "!" : ""});
+    if (reason) await chrome.action.setBadgeBackgroundColor({color:"#be2535"});
+    await chrome.action.setTitle({title:reason === "login_required" ? "Seeking Alpha: sign in required"
+      : reason === "access_restricted" ? "Seeking Alpha: check subscription access"
+      : reason ? "Seeking Alpha: acquisition paused" : "SA Alpha Picks"});
+  }
+}
+
+var saAcquisition = SAAcquisition.create({control:function (operation,extra) {return companyCollectorControl(operation,extra);},storage:chrome.storage.local,now:Date.now,
+  onStatus:function (state) {return syncAcquisitionBadge(state).catch(function () {});}});
+
+async function acquisitionPaused(capability) {
+  var saved = await chrome.storage.local.get(["saAcquisitionRestriction","saAcquisitionStatus"]);
+  var local = saved.saAcquisitionRestriction, shared = saved.saAcquisitionStatus || {};
+  return !!(shared.paused_reason || shared.rate_limited || shared.capability_pauses && shared.capability_pauses[capability]
+    || local && local.reason !== "rate_limited" && (local.reason !== "access_restricted" || local.capability === capability));
+}
+
+function requireAcquisitionTask() {
+  if (!saAcquisitionTask) throw new SAAcquisition.Stop({status:"deferred",reason:"collector_unavailable"});
+  if (saAcquisitionTask.stop) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
+  return saAcquisitionTask;
+}
+
+function saDestination(url) {
+  var parsed = new URL(url);
+  if (parsed.origin !== "https://seekingalpha.com" || parsed.username || parsed.password) throw new Error("sa_acquisition_url_rejected");
+  return parsed.pathname.indexOf("/alpha-picks/picks/") === 0 ? "picks"
+    : parsed.pathname.indexOf("/alpha-picks/") === 0 ? "article"
+    : parsed.pathname.indexOf("/symbol/") === 0 ? "financials" : "news";
+}
+
+var managedSaTabs = {
+  create:function (options) {
+    return requireAcquisitionTask().navigate({kind:"create",destinationClass:saDestination(options.url)},function () {return chrome.tabs.create(options);});
+  },
+  update:function (tabId, options) {
+    if (!options.url) return chrome.tabs.update(tabId,options);
+    return requireAcquisitionTask().navigate({kind:"update",destinationClass:saDestination(options.url)},function () {return chrome.tabs.update(tabId,options);});
+  },
+  reload:async function (tabId) {
+    var task = requireAcquisitionTask();
+    var tab = await chrome.tabs.get(tabId);
+    return task.navigate({kind:"reload",destinationClass:saDestination(tab.url)},function () {return chrome.tabs.reload(tabId);});
+  },
+};
+
+async function observeSaRestriction(code) {
+  var reason = String(code || "").replace(/^sa_company_/,"");
+  if (["login_required","human_verification_required","rate_limited","access_restricted"].indexOf(reason) === -1) return false;
+  if (saAcquisitionTask) {
+    var sharedState;
+    try { sharedState = await saAcquisitionTask.observeRestriction(reason); }
+    finally {
+      var capability = SAAcquisition.capability(saAcquisitionTask.operation || "alpha_picks_sync");
+      var pauseAll = reason !== "access_restricted";
+      if (pauseAll || capability === "alpha_picks") await chrome.alarms.clear(ALPHA_PICKS_AUTO_SYNC_ALARM).catch(function () {});
+      if (pauseAll || capability === "news") await chrome.alarms.clear(MARKET_NEWS_AUTO_SYNC_ALARM).catch(function () {});
+      if (pauseAll || capability === "financials") await chrome.alarms.clear(SACompanyRefresh.alarm).catch(function () {});
+      var localState = {paused_reason:pauseAll && reason !== "rate_limited" ? reason : null,capability_pauses:{},rate_limited:reason === "rate_limited"};
+      if (!pauseAll) localState.capability_pauses[capability] = reason;
+      await syncAcquisitionBadge(sharedState || localState).catch(function () {});
+    }
+  }
+  return true;
+}
+
+function isAcquisitionStop(error) {return !!error && error.name === "SAAcquisitionStop";}
+
+function readSaAccessMarkers() {
+  function visible(node) {
+    if (!node) return false;
+    for (var item=node; item; item=item.parentElement) {
+      var style=getComputedStyle(item);
+      if (item.hidden || item.getAttribute("aria-hidden") === "true" || style.display === "none" || style.visibility === "hidden") return false;
+    }
+    return true;
+  }
+  if (/^\/(?:login|sign_in|signin)(?:\/|$)/.test(location.pathname)) return "login_required";
+  var headline = document.querySelector("h1");
+  var heading = visible(headline) ? headline.innerText || "" : "";
+  var title = document.title || "";
+  if (/too many requests|rate limit exceeded/i.test(title + " " + heading)) return "rate_limited";
+  if (/verify you are human|human verification|just a moment|are you a robot/i.test(title + " " + heading)) return "human_verification_required";
+  var challenge = document.querySelector('iframe[src*="captcha"],iframe[src*="challenge"],[data-testid="captcha"]');
+  if (visible(challenge)) return "human_verification_required";
+  return null;
+}
+
+async function inspectSaAccess(tabId) {
+  if (!saAcquisitionTask) return;
+  requireAcquisitionTask();
+  var result = await chrome.scripting.executeScript({target:{tabId:tabId},func:readSaAccessMarkers});
+  var reason = result[0] && result[0].result;
+  if (typeof reason === "string" && await observeSaRestriction(reason)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
 }
 
 async function runCoordinatedCompanyScope(scope, mode, admitted, observeFailure, intervalDays, diagnostics, requestedAt) {
   if (!await admitted()) return {status:"cancelled"};
-  var permit = await companyCollectorControl("begin", {scope:scope, force:mode === "manual", interval_days:intervalDays, requested_at:requestedAt || null});
-  if (permit.status === "reused") {
-    var capturedAt = typeof permit.last_success_at === "string" ? Date.parse(permit.last_success_at) : NaN;
-    if (!/^[a-f0-9]{64}$/.test(permit.observation_id || "") || permit.currency !== "USD"
-        || permit.ticker !== scope.ticker || permit.statement !== scope.statement || permit.view !== scope.view
-        || !Number.isFinite(capturedAt) || capturedAt <= 0 || capturedAt > Date.now()) {
-      return {status:"error",error_code:"sa_company_receipt_unverified"};
-    }
-    return Object.assign({}, permit, {status:"ok",acquisition_outcome:"reused"});
-  }
-  if (permit.status !== "ok" || !/^[a-f0-9]{32}$/.test(permit.token || "")) {
-    return Object.assign({}, permit, {status:"deferred", error_code:permit.error_code || "sa_company_collector_unavailable"});
-  }
-  var restrictionSaved = false;
-  var reportFailure = async function (code) {
-    var persisted = await companyCollectorControl("report_failure", {
-      token:permit.token, result:{status:"error",error_code:code},
-    });
-    restrictionSaved = persisted.status === "ok";
+  requireAcquisitionTask();
+  return refreshCompanyFinancialScope(scope,diagnostics,admitted,async function (code) {
+    await observeSaRestriction(code);
     if (observeFailure) await observeFailure(code);
-    if (!restrictionSaved) throw new Error("sa_company_collector_unavailable");
-  };
-  var result;
-  try {
-    var stillAdmitted = async function () {
-      if (!await admitted()) return false;
-      return (await companyCollectorControl("validate", {token:permit.token})).status === "ok";
-    };
-    result = await refreshCompanyFinancialScope(scope, diagnostics, stillAdmitted, reportFailure, true);
-  } catch (_) {
-    // Keep the reservation when cleanup/native acknowledgement is uncertain.
-    return {status:"error",error_code:"sa_company_collector_unavailable"};
-  }
-  if (result.status === "error" && !restrictionSaved) await reportFailure(result.error_code);
-  var finished = await companyCollectorControl("finish", {token:permit.token,result:result});
-  if (finished.status !== "ok") return {status:"error",error_code:finished.error_code || "sa_company_collector_unavailable"};
-  return result;
+  },true);
 }
 
 const companyFinancialRefresh = SACompanyRefresh.create({
   storage: chrome.storage.local,
   alarms: chrome.alarms,
   control:companyCollectorControl,
+  shouldPause:function () {return acquisitionPaused("financials");},
   resolveWatchlist:function () { return sendNativeMessage2({action:"get_company_watchlist"}); },
   runScope: function (scope, mode, admitted, observeFailure, intervalDays, requestedAt) {
     return enqueueSaSyncJob({displayName: scope.ticker + " " + scope.view + " financials",
-      operation: "company_financial_capture", mode: mode}, function (diagnostics) {
+      operation: "company_financial_capture", mode: mode,eligible:admitted,
+      acquisition:{scope:scope,force:mode === "manual",interval_days:intervalDays,requested_at:requestedAt || null}}, function (diagnostics) {
       return runCoordinatedCompanyScope(scope, mode, admitted, observeFailure, intervalDays, diagnostics, requestedAt);
     });
   },
@@ -802,6 +922,7 @@ async function captureCompanyData(target, diagnostics, expectedScope) {
         || selectedUrl.username || selectedUrl.password || !pagePath) {
       throw new Error("sa_company_page_unsupported");
     }
+    requireAcquisitionTask();
     var tab = await chrome.tabs.get(target.id);
     if (tab.url !== target.url) throw new Error("sa_company_page_changed");
     var dataset = { "valuation/metrics": "valuation", "peers/comparison": "peers", "earnings/estimates": "estimates",
@@ -811,6 +932,8 @@ async function captureCompanyData(target, diagnostics, expectedScope) {
     if (!admission || admission.status !== "ok" || admission.dataset !== dataset) {
       throw new Error(admission && admission.error_code || "sa_company_admission_unavailable");
     }
+    if (!expectedScope) await saAcquisitionTask.navigate({kind:"current_tab",destinationClass:"company"},async function () {});
+    await inspectSaAccess(target.id);
     tab = await chrome.tabs.get(target.id);
     if (tab.url !== target.url) throw new Error("sa_company_page_changed");
     var extracted = researchPage
@@ -850,6 +973,7 @@ async function captureCompanyData(target, diagnostics, expectedScope) {
       }
     }
   } catch (error) {
+    if (isAcquisitionStop(error)) throw error;
     var code = error && /^(sa_company_|data_source_)[a-z_]+$/.test(error.message)
       ? error.message : "sa_company_capture_failed";
     var reason = /layout|structure|identity|units|value_unrecognized/.test(code)
@@ -857,6 +981,7 @@ async function captureCompanyData(target, diagnostics, expectedScope) {
     result = { status: "error", error_code: code, failure_phase: failurePhase, reason_code: reason };
     recordExtensionFailure(diagnostics, { stage: failurePhase === "extraction" ? "content_parse" : "local_persistence",
       reason_code: reason, target_kind: "phase", retryable: false, attempt_count: 1 });
+    await observeSaRestriction(code);
   }
   await chrome.storage.local.set({ lastCompanyCapture: Object.assign({ finished_at: new Date().toISOString() }, result) });
   return result;
@@ -877,7 +1002,7 @@ async function refreshCompanyFinancialScope(scope, diagnostics, admitted, observ
     var pathname = "/symbol/" + scope.ticker + "/" + scope.statement.replaceAll("_", "-");
     var url = "https://seekingalpha.com" + pathname;
     // Only collector-owned tabs are navigated or closed. No focus activation is requested.
-    var tab = await chrome.tabs.create({url:url, active:false});
+    var tab = await managedSaTabs.create({url:url, active:false});
     tabId = tab.id;
     await registerCollectorTab(tabId, "company_financials");
     await waitForTabLoad(tabId, 60000);
@@ -896,6 +1021,7 @@ async function refreshCompanyFinancialScope(scope, diagnostics, admitted, observ
     if (result.status === "error" && observeFailure) await observeFailure(result.error_code);
     return result;
   } catch (error) {
+    if (isAcquisitionStop(error)) throw error;
     var code = /^(sa_company_|data_source_)[a-z_]+$/.test(error.message || "")
       ? error.message : "sa_company_dom_not_ready";
     recordExtensionFailure(diagnostics, {stage:"content_parse",reason_code:"company_capture_rejected",
@@ -1002,17 +1128,21 @@ async function prepareCompanyFinancialView(view, pathname) {
 
 chrome.runtime.onInstalled.addListener(function () {
   cleanupCollectorTabs({ maxAgeMs: COLLECTOR_TAB_STALE_MS });
-  syncAllAutoSyncAlarms();
+  refreshAcquisitionStatus().then(syncAllAutoSyncAlarms);
 });
 
 chrome.runtime.onStartup.addListener(function () {
   cleanupCollectorTabs({ maxAgeMs: COLLECTOR_TAB_STALE_MS });
-  syncAllAutoSyncAlarms();
+  refreshAcquisitionStatus().then(syncAllAutoSyncAlarms);
   extensionTelemetryController.flush("startup");
 });
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm) return;
+  if (alarm.name === SA_ACQUISITION_COOLDOWN_ALARM) {
+    refreshAcquisitionStatus().then(syncAllAutoSyncAlarms);
+    return;
+  }
   if (alarm.name === SACompanyRefresh.alarm) {
     companyFinancialRefresh.run(false).catch(function () {});
     return;
@@ -1061,7 +1191,8 @@ function enqueueSaSyncJob(opts, jobFn) {
   var operation = opts.operation || null;
   var mode = opts.mode || null;
 
-  var run = saSyncJobChain.catch(function () {}).then(async function () {
+  return saAcquisitionQueue.enqueue({key:opts.key || crypto.randomUUID(),priority:operation === "company_financial_capture" ? "background" : "routine",
+    eligible:opts.eligible,run:async function (timing) {
     await extensionTelemetryController.flush("next_job");
     if (saSyncJobInFlight) {
       sendProgress("Queued: " + displayName);
@@ -1071,7 +1202,26 @@ function enqueueSaSyncJob(opts, jobFn) {
     var diagnostics = SAExtensionDiagnostics.createCollector();
     var capturedResult = null;
     try {
-      capturedResult = attachExtensionRunProtocol(operation, mode, await jobFn(diagnostics));
+      if (!operation) return await jobFn(diagnostics);
+      capturedResult = await saAcquisition.runTask(Object.assign({},opts.acquisition || {},{
+        operation:operation,mode:mode,trigger:opts.trigger || "manual",intent_revision:opts.intent_revision || 0,
+        build:chrome.runtime.getManifest ? chrome.runtime.getManifest().version : "unknown",queue_wait_ms:timing.queue_wait_ms,
+      }),async function (task) {
+        saAcquisitionTask = task;
+        var value;
+        try { value = await jobFn(diagnostics); }
+        catch (error) {
+          if (isAcquisitionStop(error)) value = Object.assign({},error.detail);
+          else {
+            recordExtensionFailure(diagnostics,{stage:"extension_runtime",reason_code:"unknown_failure",
+              target_kind:"phase",retryable:true,attempt_count:1});
+            value = {status:"error",error_code:"sa_acquisition_failed"};
+          }
+        }
+        if (task.stop) value = Object.assign({},value,{acquisition_stop:task.stop});
+        return attachExtensionRunProtocol(operation,mode,value);
+      });
+      if (!capturedResult.extension_run) capturedResult = attachExtensionRunProtocol(operation,mode,capturedResult);
       return capturedResult;
     } catch (err) {
       recordExtensionFailure(diagnostics, {
@@ -1088,22 +1238,23 @@ function enqueueSaSyncJob(opts, jobFn) {
       }
       throw err;
     } finally {
+      saAcquisitionTask = null;
       saSyncJobInFlight = false;
       try {
         var frozenDiagnostics = diagnostics.freeze();
-        await extensionTelemetryController.submit({
+        var event = {
           started_at: startedAt,
           finished_at: new Date().toISOString(),
           result: capturedResult && capturedResult.extension_run,
           extension_diagnostics: frozenDiagnostics,
-        });
+        };
+        if (capturedResult && capturedResult.acquisition) event.acquisition = capturedResult.acquisition;
+        await extensionTelemetryController.submit(event);
       } catch (_) {
         // Recording must never break the actual sync flow.
       }
     }
-  });
-  saSyncJobChain = run.catch(function () {});
-  return run;
+  }});
 }
 
 async function readAutoSyncIntent(jobKey) {
@@ -1126,13 +1277,14 @@ async function enqueueAutoSaSyncJob(jobKey, jobOpts, jobFn) {
     try { submitted = await readAutoSyncIntent(jobKey); }
     catch (_) { return { status: "skipped", reason: "operator_cancelled" }; }
     if (!submitted.enabled) return { status: "skipped", reason: "operator_cancelled" };
-    return await enqueueSaSyncJob(jobOpts, async function (diagnostics) {
+    var eligible = async function () {
       var current;
       try { current = await readAutoSyncIntent(jobKey); }
-      catch (_) { return { status: "skipped", reason: "operator_cancelled" }; }
-      if (!current.enabled || current.revision !== submitted.revision) {
-        return { status: "skipped", reason: "operator_cancelled" };
-      }
+      catch (_) { return false; }
+      return current.enabled && current.revision === submitted.revision
+        && (jobKey !== "marketNews" || await shouldRunMarketNewsAutoSync());
+    };
+    return await enqueueSaSyncJob(Object.assign({},jobOpts,{eligible:eligible,trigger:"alarm",intent_revision:submitted.revision}), async function (diagnostics) {
       return jobFn(diagnostics);
     });
   } finally {
@@ -1202,25 +1354,29 @@ function sendMarketNewsRecoveryNative(action, payload) {
   return sendNativeMessage2(message);
 }
 
-function enqueueMarketNewsRecovery(request) {
-  var run = saSyncJobChain.catch(function () {}).then(async function () {
-    await extensionTelemetryController.flush("next_job");
-    saSyncJobInFlight = true;
+async function enqueueMarketNewsRecovery(request) {
+  var manifest = request && request.manifest;
+  if (request && Number.isInteger(request.run_id)) {
+    var saved = await sendMarketNewsRecoveryNative("market_news_recovery_state",{run_id:request.run_id});
+    if (!saved || saved.manifest_hash !== request.manifest_hash) return {status:"error",error_code:"manifest_invalid"};
+    manifest = saved.manifest;
+  }
+  var incident = manifest && manifest.kind === "incident_window";
+  return enqueueSaSyncJob({operation:incident ? "market_news_incident_recovery" : "market_news_retry_recorded",
+    mode:incident ? "incident" : "recorded",displayName:"Market news recovery"},async function () {
     marketNewsRefreshInFlight = true;
     try {
       return await executeMarketNewsRecovery(request || {});
     } catch (error) {
+      if (isAcquisitionStop(error)) throw error;
       return {
         status: "error",
         error_code: "recovery_runtime_failed",
       };
     } finally {
       marketNewsRefreshInFlight = false;
-      saSyncJobInFlight = false;
     }
   });
-  saSyncJobChain = run.catch(function () {});
-  return run;
 }
 
 function latestRecoveryAttempts(state) {
@@ -1282,7 +1438,7 @@ async function executeMarketNewsRecovery(request) {
       var initialUrl = attemptTargets.length > 0
         ? "https://seekingalpha.com" + attemptTargets[0].pathname
         : SA_MARKET_NEWS_URL;
-      var tab = await chrome.tabs.create({ url: initialUrl, active: false });
+      var tab = await managedSaTabs.create({ url: initialUrl, active: false });
       tabId = tab.id;
       await registerCollectorTab(tabId, "market_news_recovery");
     }
@@ -1333,7 +1489,7 @@ async function recoverMarketNewsTarget(tabId, target) {
   var url = "https://seekingalpha.com" + target.pathname;
   try {
     await withTimeout(
-      chrome.tabs.update(tabId, { url: url, active: false }),
+      managedSaTabs.update(tabId, { url: url, active: false }),
       MARKET_NEWS_DETAIL_TAB_LOAD_TIMEOUT_MS,
       "market news recovery navigation timeout"
     );
@@ -1363,7 +1519,8 @@ async function recoverMarketNewsTarget(tabId, target) {
       ),
       evidence_code: null,
     };
-  } catch (_) {
+  } catch (error) {
+    if (isAcquisitionStop(error)) throw error;
     return {
       state: "failed_retryable",
       reason_code: "unknown_failure",
@@ -1397,7 +1554,7 @@ async function discoverMarketNewsIncident(tabId, manifest, detailBudget) {
   var reachedStart = false;
   var stopReason = "round_limit";
 
-  await chrome.tabs.update(tabId, { url: SA_MARKET_NEWS_URL, active: true });
+  await managedSaTabs.update(tabId, { url: SA_MARKET_NEWS_URL, active: true });
   await waitForMarketNewsPageLoad(tabId);
   var ready = await waitForMarketNewsReady(tabId);
   if (!ready.ok) {
@@ -1510,7 +1667,7 @@ async function doRefresh(mode, options) {
     await cleanupCollectorTabs({ force: true });
     // --- Scrape current picks ---
     sendProgress("Opening current picks page...");
-    const tab = await chrome.tabs.create({ url: SA_CURRENT_URL, active: false });
+    const tab = await managedSaTabs.create({ url: SA_CURRENT_URL, active: false });
     tabId = tab.id;
     await registerCollectorTab(tabId, "alpha_picks");
 
@@ -1525,6 +1682,12 @@ async function doRefresh(mode, options) {
         attempt_count: 1,
       });
       results.current = await sendToNativeHost("refresh_failure", "current", [], ready.error, batchTs);
+      if (await observeSaRestriction(ready.reason_code)) {
+        results.acquisition_stop = {status:"error",reason:"site_paused",error_code:ready.reason_code};
+        results.completed_phases = [];
+        await saveRefreshState(batchTs,results);
+        return results;
+      }
     } else {
       sendProgress("Scraping current picks...");
       const currentPicks = await injectScraper(tabId);
@@ -1537,7 +1700,7 @@ async function doRefresh(mode, options) {
 
     // --- Scrape closed (removed) picks ---
     sendProgress("Opening closed picks page...");
-    await chrome.tabs.update(tabId, { url: SA_CLOSED_URL });
+    await managedSaTabs.update(tabId, { url: SA_CLOSED_URL });
 
     sendProgress("Waiting for closed picks table...");
     ready = await waitForAlphaPicksTableReady(tabId, SA_CLOSED_URL, "closed picks");
@@ -1550,6 +1713,12 @@ async function doRefresh(mode, options) {
         attempt_count: 1,
       });
       results.closed = await sendToNativeHost("refresh_failure", "closed", [], ready.error, batchTs);
+      if (await observeSaRestriction(ready.reason_code)) {
+        results.acquisition_stop = {status:"error",reason:"site_paused",error_code:ready.reason_code};
+        results.completed_phases = legacyResultIsOk(results.current) ? ["current_picks"] : [];
+        await saveRefreshState(batchTs,results);
+        return results;
+      }
     } else {
       sendProgress("Scraping closed picks...");
       const closedPicks = await injectScraper(tabId);
@@ -1570,12 +1739,26 @@ async function doRefresh(mode, options) {
       sendProgress("Checking detail cache...");
       var detailResult = await doDetailFetch(tabId, currentPicks, mode, diagnostics);
       results.details = detailResult;
+      if (detailResult.acquisition_stop) {
+        results.acquisition_stop = detailResult.acquisition_stop;
+        results.completed_phases = ["current_picks","closed_picks"].filter(function (name) {
+          return legacyResultIsOk(results[name === "current_picks" ? "current" : "closed"]);
+        });
+      }
     }
 
     await saveRefreshState(batchTs, results);
     sendProgress("Done!");
     return results;
   } catch (err) {
+    if (isAcquisitionStop(err)) {
+      results.acquisition_stop = err.detail;
+      results.completed_phases = ["current_picks","closed_picks"].filter(function (name) {
+        return legacyResultIsOk(results[name === "current_picks" ? "current" : "closed"]);
+      });
+      await saveRefreshState(batchTs,results);
+      return results;
+    }
     recordExtensionFailure(diagnostics, {
       stage: "extension_runtime",
       reason_code: "unknown_failure",
@@ -1621,7 +1804,7 @@ async function doMarketNewsRefresh(mode, options) {
   try {
     await cleanupCollectorTabs({ force: true });
     sendProgress("Opening market news page...");
-    const tab = await chrome.tabs.create({ url: SA_MARKET_NEWS_URL, active: false });
+    const tab = await managedSaTabs.create({ url: SA_MARKET_NEWS_URL, active: false });
     tabId = tab.id;
     await registerCollectorTab(tabId, "market_news");
     await waitForMarketNewsPageLoad(tabId);
@@ -1629,6 +1812,7 @@ async function doMarketNewsRefresh(mode, options) {
     sendProgress("Waiting for market news...");
     var ready = await waitForMarketNewsReady(tabId);
     if (!ready.ok) {
+      await observeSaRestriction(ready.reason_code);
       recordExtensionFailure(diagnostics, {
         stage: "page_readiness",
         reason_code: ready.reason_code || "navigation_timeout",
@@ -1695,7 +1879,7 @@ async function doMarketNewsRefresh(mode, options) {
       sendProgress("News detail " + (i + 1) + "/" + needDetail.length + ": " + item.news_id);
       try {
         await withTimeout(
-          chrome.tabs.update(tabId, { url: item.url, active: false }),
+          managedSaTabs.update(tabId, { url: item.url, active: false }),
           45000,
           "market news tab update timeout"
         );
@@ -1747,6 +1931,12 @@ async function doMarketNewsRefresh(mode, options) {
           });
         }
       } catch (err) {
+        if (isAcquisitionStop(err)) {
+          result.acquisition_stop = err.detail;
+          result.completed_phases = ["list_navigation","list_scrape","metadata_save","capture_readback"];
+          result.pending_news_ids = needDetail.slice(i).map(function (pending) {return pending.news_id;});
+          break;
+        }
         detailFailed += recordExtensionFailure(diagnostics, {
           stage: "extension_runtime",
           reason_code: "unknown_failure",
@@ -1776,6 +1966,11 @@ async function doMarketNewsRefresh(mode, options) {
     sendProgress("Market news done!");
     return result;
   } catch (err) {
+    if (isAcquisitionStop(err)) {
+      var stoppedResult = {status:"deferred",acquisition_stop:err.detail,completed_phases:[],saved:0,count:0};
+      await saveMarketNewsState(batchTs,mode,stoppedResult);
+      return stoppedResult;
+    }
     recordExtensionFailure(diagnostics, {
       stage: "extension_runtime",
       reason_code: "unknown_failure",
@@ -1921,6 +2116,11 @@ async function syncAllAutoSyncAlarms() {
   await companyFinancialRefresh.syncAlarm();
 }
 
+async function refreshAcquisitionStatus() {
+  try { await syncAcquisitionBadge(await companyCollectorControl("status")); }
+  catch (_) { await syncAcquisitionBadge(null).catch(function () {}); }
+}
+
 async function ensureAutoSyncAlarms() {
   var data = await chrome.storage.local.get([
     "alphaPicksAutoSyncEnabled",
@@ -1958,7 +2158,7 @@ async function syncAlphaPicksAutoSyncAlarm() {
     await chrome.storage.local.set({ alphaPicksAutoSyncIntervalMinutes: intervalMinutes });
   }
   await chrome.alarms.clear(ALPHA_PICKS_AUTO_SYNC_ALARM);
-  if (enabled) {
+  if (enabled && !await acquisitionPaused("alpha_picks")) {
     await chrome.alarms.create(ALPHA_PICKS_AUTO_SYNC_ALARM, {
       delayInMinutes: intervalMinutes,
       periodInMinutes: intervalMinutes,
@@ -1974,7 +2174,7 @@ async function syncMarketNewsAutoSyncAlarm() {
     await chrome.storage.local.set({ marketNewsAutoSyncIntervalMinutes: intervalMinutes });
   }
   await chrome.alarms.clear(MARKET_NEWS_AUTO_SYNC_ALARM);
-  if (enabled) {
+  if (enabled && !await acquisitionPaused("news")) {
     var periodMinutes = intervalMinutes === MARKET_NEWS_AUTO_SYNC_AUTO_VALUE
       ? MARKET_NEWS_AUTO_SYNC_HEARTBEAT_MINUTES
       : intervalMinutes;
@@ -2125,11 +2325,10 @@ function waitForTabLoad(tabId, timeoutMs, expectedUrlFragment) {
 
     const onUpdated = (id, changeInfo, tab) => {
       if (id !== tabId) return;
-      if (
-        (changeInfo.status === "complete" || (tab && tab.status === "complete")) &&
-        tabMatchesExpectedUrl(tab, expectedUrlFragment)
-      ) {
-        finish();
+      if (changeInfo.status === "complete" || (tab && tab.status === "complete")) {
+        inspectSaAccess(tabId).then(function () {
+          if (tabMatchesExpectedUrl(tab, expectedUrlFragment)) finish();
+        }).catch(finish);
       }
     };
 
@@ -2155,13 +2354,15 @@ function waitForTabLoad(tabId, timeoutMs, expectedUrlFragment) {
         finish(new Error("Tab not found"));
         return;
       }
-      if (tab.status === "complete" && tabMatchesExpectedUrl(tab, expectedUrlFragment)) {
-        finish();
+      if (tab.status === "complete") {
+        inspectSaAccess(tabId).then(function () {
+          if (tabMatchesExpectedUrl(tab, expectedUrlFragment)) finish();
+        }).catch(finish);
       }
     }).catch((err) => {
       finish(err || new Error("Failed to inspect tab state"));
     });
-  });
+  }).then(async function () { await inspectSaAccess(tabId); });
 }
 
 function formatTabLoadTimeout(tab, expectedUrlFragment, timeoutMs) {
@@ -2219,6 +2420,7 @@ async function waitForMarketNewsPageLoad(tabId) {
     await waitForTabLoad(tabId, MARKET_NEWS_INITIAL_TAB_LOAD_TIMEOUT_MS, expectedPath);
     return;
   } catch (err) {
+    if (isAcquisitionStop(err)) throw err;
     firstError = err;
   }
 
@@ -2228,21 +2430,24 @@ async function waitForMarketNewsPageLoad(tabId) {
     return;
   }
   if (firstProbe.status === "login_redirect") {
+    await observeSaRestriction("login_required");
     throw new Error("Session expired");
   }
 
   sendProgress("Retrying market news page load...");
   try {
-    await chrome.tabs.reload(tabId);
+    await managedSaTabs.reload(tabId);
     await waitForTabLoad(tabId, MARKET_NEWS_RETRY_TAB_LOAD_TIMEOUT_MS, expectedPath);
     return;
   } catch (retryErr) {
+    if (isAcquisitionStop(retryErr)) throw retryErr;
     var retryProbe = await probeMarketNewsListDom(tabId);
     if (retryProbe.status === "ready") {
       console.warn("[SA] Market News tab retry did not report complete, but DOM is ready:", retryProbe);
       return;
     }
     if (retryProbe.status === "login_redirect") {
+      await observeSaRestriction("login_required");
       throw new Error("Session expired");
     }
     throw new Error(
@@ -2369,10 +2574,12 @@ async function safeRemoveTab(tabId) {
   if (tabId == null) return false;
   try {
     await chrome.tabs.remove(tabId);
+    if (saAcquisitionTask) saAcquisitionTask.ownedTabs.delete(tabId);
     return true;
   } catch (err) {
     var message = err && err.message ? err.message : String(err || "");
     if (message && message.indexOf("No tab with id") >= 0) {
+      if (saAcquisitionTask) saAcquisitionTask.ownedTabs.delete(tabId);
       return false;
     }
     console.warn("[SA] Failed to remove tab", tabId, message);
@@ -2387,6 +2594,7 @@ async function waitForAlphaPicksTableReady(tabId, expectedUrl, label, timeoutMs 
   const expectedPath = expectedPathFromUrl(expectedUrl);
   let lastSnapshot = null;
   while (Date.now() - start < timeoutMs) {
+    await inspectSaAccess(tabId);
     let tab = null;
     try {
       tab = await chrome.tabs.get(tabId);
@@ -2692,7 +2900,7 @@ function normalizeManualFetchItem(item) {
 async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
   // ── Step 1: Load articles page + scroll ──
   sendProgress("Loading articles page...");
-  await chrome.tabs.update(tabId, { url: SA_ARTICLES_URL });
+  await managedSaTabs.update(tabId, { url: SA_ARTICLES_URL });
   await waitForTabLoad(tabId, 30000, expectedPathFromUrl(SA_ARTICLES_URL));
 
   var articlesReady = await waitForArticlesReady(tabId);
@@ -2801,6 +3009,11 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     });
   }
   var total = needContent.length + needComments.length;
+  function stoppedDetails(error) {
+    return {articles_saved:metaResult.saved || 0,fetched:fetched,failed:failed,
+      comments_refreshed:commentsRefreshed || 0,net_new_comments:netNewComments,
+      reconciliation_failed:reconciliationFailed,acquisition_stop:error.detail};
+  }
 
   if (needContent.length > 0) {
     sendProgress("Fetching " + needContent.length + " article(s)...");
@@ -2812,7 +3025,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
 
     try {
       // Navigate to article (tab must be active for comment scroll)
-      await chrome.tabs.update(tabId, { url: item.url, active: true });
+      await managedSaTabs.update(tabId, { url: item.url, active: true });
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
       var ready = await waitForArticleReady(tabId);
       if (!ready.ok) {
@@ -2824,6 +3037,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
           retryable: true,
           attempt_count: 1,
         });
+        if (await observeSaRestriction(ready.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
         continue;
       }
       await settleArticleBeforeScroll(tabId);
@@ -2902,6 +3116,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         );
       }
     } catch (err) {
+      if (isAcquisitionStop(err)) return stoppedDetails(err);
       failed += recordExtensionFailure(diagnostics, {
         stage: "extension_runtime",
         reason_code: "unknown_failure",
@@ -2924,7 +3139,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     sendProgress("Comments " + (j + 1) + "/" + needComments.length + ": " + cItem.article_id);
 
     try {
-      await chrome.tabs.update(tabId, { url: cItem.url, active: true });
+      await managedSaTabs.update(tabId, { url: cItem.url, active: true });
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(cItem.url));
       var commentsReady = await waitForArticleReady(tabId);
       if (!commentsReady.ok) {
@@ -2936,6 +3151,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
           retryable: true,
           attempt_count: 1,
         });
+        if (await observeSaRestriction(commentsReady.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
         continue;
       }
       await settleArticleBeforeScroll(tabId);
@@ -2983,6 +3199,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         );
       }
     } catch (err) {
+      if (isAcquisitionStop(err)) return stoppedDetails(err);
       failed += recordExtensionFailure(diagnostics, {
         stage: "extension_runtime",
         reason_code: "unknown_failure",
@@ -3070,7 +3287,7 @@ async function doManualFetch(items, diagnostics) {
   try {
     await cleanupCollectorTabs({ force: true });
     // Create a tab for fetching
-    var tab = await chrome.tabs.create({ url: prepared[0].url, active: false });
+    var tab = await managedSaTabs.create({ url: prepared[0].url, active: false });
     tabId = tab.id;
     await registerCollectorTab(tabId, "manual_fetch");
 
@@ -3080,7 +3297,7 @@ async function doManualFetch(items, diagnostics) {
 
       try {
         if (i > 0) {
-          await chrome.tabs.update(tabId, { url: item.url, active: true });
+          await managedSaTabs.update(tabId, { url: item.url, active: true });
         }
         await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
         var ready = await waitForArticleReady(tabId);
@@ -3093,6 +3310,7 @@ async function doManualFetch(items, diagnostics) {
             retryable: true,
             attempt_count: 1,
           });
+          if (await observeSaRestriction(ready.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
           continue;
         }
         await settleArticleBeforeScroll(tabId);
@@ -3211,6 +3429,8 @@ async function doManualFetch(items, diagnostics) {
           );
         }
       } catch (err) {
+        if (isAcquisitionStop(err)) return {fetched:fetched,failed:failed,accepted:accepted,
+          confirmation_required:confirmations,acquisition_stop:err.detail};
         failed += recordExtensionFailure(diagnostics, {
           stage: "extension_runtime",
           reason_code: "unknown_failure",
@@ -3403,6 +3623,7 @@ async function waitForMarketNewsReady(tabId, timeoutMs) {
   timeoutMs = timeoutMs || 20000;
   var start = Date.now();
   while (Date.now() - start < timeoutMs) {
+    await inspectSaAccess(tabId);
     var results = await chrome.scripting.executeScript({
       target: { tabId },
       func: function () {
@@ -3417,7 +3638,9 @@ async function waitForMarketNewsReady(tabId, timeoutMs) {
       },
     });
     var check = results[0] && results[0].result;
-    if (!check || check.status === "login_redirect") {
+    if (!check) return {ok:false,error:"Page readiness unavailable",reason_code:"dom_not_ready"};
+    if (check.status === "login_redirect") {
+      await observeSaRestriction("login_required");
       return { ok: false, error: "Session expired", reason_code: "login_required" };
     }
     if (check.status === "ready") return { ok: true, count: check.count };
@@ -3434,6 +3657,7 @@ async function waitForMarketNewsDetailReady(tabId, timeoutMs) {
   timeoutMs = timeoutMs || 15000;
   var start = Date.now();
   while (Date.now() - start < timeoutMs) {
+    await inspectSaAccess(tabId);
     var results = await chrome.scripting.executeScript({
       target: { tabId },
       func: function (paywallMarkers) {
@@ -3469,7 +3693,9 @@ async function waitForMarketNewsDetailReady(tabId, timeoutMs) {
       args: [PAYWALL_MARKERS],
     });
     var check = results[0] && results[0].result;
-    if (!check || check.status === "login_redirect") {
+    if (!check) return {ok:false,error:"Page readiness unavailable",reason_code:"dom_not_ready"};
+    if (check.status === "login_redirect") {
+      await observeSaRestriction("login_required");
       return { ok: false, error: "Session expired", reason_code: "login_required" };
     }
     if (check.status === "source_unavailable") {
@@ -3489,6 +3715,7 @@ async function waitForMarketNewsDetailReady(tabId, timeoutMs) {
       };
     }
     if (check.status === "paywall") {
+      await observeSaRestriction("access_restricted");
       return {
         ok: false,
         error: "Paywall: " + check.marker,
@@ -3509,9 +3736,10 @@ async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
   var lastReasonCode = "unknown_failure";
   var lastNativeFailure = null;
   for (var attempt = 0; attempt < 2; attempt++) {
+    requireAcquisitionTask();
     if (attempt > 0) {
       sendProgress("Retrying news detail: " + item.news_id);
-      await chrome.tabs.reload(tabId);
+      await managedSaTabs.reload(tabId);
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
       await installMarketNewsPageGuards(tabId);
       await sleep(randomBetween(profile.retryDelayMinMs, profile.retryDelayMaxMs));
@@ -3519,6 +3747,7 @@ async function fetchMarketNewsDetailWithRetry(tabId, item, profile) {
 
     var detailReady = await waitForMarketNewsDetailReady(tabId);
     if (!detailReady.ok) {
+      if (await observeSaRestriction(detailReady.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
       if (detailReady.unavailable_at_source === true) {
         return {
           ok: false,
@@ -3719,6 +3948,7 @@ async function waitForArticlesReady(tabId, timeoutMs) {
   timeoutMs = timeoutMs || 20000;
   var start = Date.now();
   while (Date.now() - start < timeoutMs) {
+    await inspectSaAccess(tabId);
     var results = await chrome.scripting.executeScript({
       target: { tabId },
       func: function () {
@@ -3730,8 +3960,11 @@ async function waitForArticlesReady(tabId, timeoutMs) {
       },
     });
     var check = results[0] && results[0].result;
-    if (!check || check.status === "login_redirect")
+    if (!check) return {ok:false,error:"Page readiness unavailable",reason_code:"dom_not_ready"};
+    if (check.status === "login_redirect") {
+      await observeSaRestriction("login_required");
       return { ok: false, error: "Session expired", reason_code: "login_required" };
+    }
     if (check.status === "ready") return { ok: true };
     await sleep(500);
   }
@@ -3757,6 +3990,7 @@ async function waitForArticleReady(tabId, timeoutMs) {
   timeoutMs = timeoutMs || 15000;
   var start = Date.now();
   while (Date.now() - start < timeoutMs) {
+    await inspectSaAccess(tabId);
     var results = await chrome.scripting.executeScript({
       target: { tabId },
       func: function (paywallMarkers) {
@@ -3774,14 +4008,19 @@ async function waitForArticleReady(tabId, timeoutMs) {
       args: [PAYWALL_MARKERS],
     });
     var check = results[0] && results[0].result;
-    if (!check || check.status === "login_redirect")
+    if (!check) return {ok:false,error:"Page readiness unavailable",reason_code:"dom_not_ready"};
+    if (check.status === "login_redirect") {
+      await observeSaRestriction("login_required");
       return { ok: false, error: "Session expired", reason_code: "login_required" };
-    if (check.status === "paywall")
+    }
+    if (check.status === "paywall") {
+      await observeSaRestriction("access_restricted");
       return {
         ok: false,
         error: "Paywall: " + check.marker,
         reason_code: "access_restricted",
       };
+    }
     if (check.status === "ready") return { ok: true };
     await sleep(500);
   }

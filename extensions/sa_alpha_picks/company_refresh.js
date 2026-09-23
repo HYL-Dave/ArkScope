@@ -87,7 +87,8 @@
       return collector;
     }
     function blocked(control) {
-      return control && (control.status !== "ok" || !control.is_owner || control.rate_limited || control.paused_reason || control.active);
+      return control && (control.status !== "ok" || !control.is_owner || control.rate_limited || control.paused_reason
+        || control.capability_pauses && control.capability_pauses.financials || control.active);
     }
     async function status() {
       var state = await read();
@@ -110,6 +111,7 @@
     async function syncAlarm() {
       var state = await read();
       await deps.alarms.clear(ALARM);
+      if (deps.shouldPause && await deps.shouldPause()) return;
       if ((!state.config.enabled && !(state.pending_scopes || []).length) || state.paused_reason) return;
       // Repair/retry local connectivity even when the complete App list is unavailable.
       if (blocked(collector)) {

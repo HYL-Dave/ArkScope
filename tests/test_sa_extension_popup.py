@@ -242,10 +242,11 @@ def _run_background_probe(body: str):
             base64.b64encode(body.encode("utf-8")).decode("ascii"),
         ],
         cwd=ROOT,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
+    assert completed.returncode == 0, completed.stderr
     return json.loads(completed.stdout)
 
 
@@ -563,6 +564,7 @@ def test_active_repair_resumes_the_same_run_id_and_manifest_hash_after_popup_reo
 
 
 def test_recorded_and_incident_runtime_use_exact_ids_bounds_mutex_and_reach_evidence():
+    from tests.sa_acquisition_helpers import AUTHORITY
     source = BACKGROUND.read_text(encoding="utf-8")
     for literal in (
         "MARKET_NEWS_INCIDENT_RECOVERY_MAX_HOURS = 168",
@@ -578,7 +580,7 @@ def test_recorded_and_incident_runtime_use_exact_ids_bounds_mutex_and_reach_evid
     ):
         assert literal in source
     assert re.search(
-        r"function enqueueMarketNewsRecovery.*?saSyncJobChain",
+        r"function enqueueMarketNewsRecovery.*?enqueueSaSyncJob",
         source,
         re.DOTALL,
     )
@@ -588,7 +590,7 @@ def test_recorded_and_incident_runtime_use_exact_ids_bounds_mutex_and_reach_evid
     assert "typeof performance" in source
     assert "metadata_save_failed" in source
     probe = _run_background_probe(
-        r"""
+        AUTHORITY + r"""
         var limits = await getExtensionActionLimits();
         var active = 0;
         var maxActive = 0;

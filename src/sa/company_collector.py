@@ -385,7 +385,7 @@ class CompanyCollector:
         if blocked:
             return blocked
         require(state["active"] is None, "sa_company_collector_busy")
-        scope = self._scope(msg.get("scope")) if task_operation == "company_financial_capture" else None
+        scope = self._scope(msg.get("scope")) if task_operation == "company_financial_capture" and mode != "current_tab" else None
         if scope:
             reuse = self._financial_eligibility(state, msg, scope, now)
             if reuse:

@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.sa_acquisition_helpers import ADMITTED_TASK, AUTHORITY
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKGROUND = ROOT / "extensions" / "sa_alpha_picks" / "background.js"
@@ -25,6 +27,7 @@ const context = {
   Math,
   Promise,
   Set,
+  TextEncoder, crypto: require('node:crypto').webcrypto,
   console: { info() {}, warn() {}, error() {}, log() {} },
   setTimeout,
   clearTimeout,
@@ -65,14 +68,15 @@ Promise.resolve(vm.runInContext("(async function () {" + body + "})()", context)
 
 
 def _run_background(body: str):
-    encoded = base64.b64encode(body.encode("utf-8")).decode("ascii")
+    encoded = base64.b64encode((ADMITTED_TASK + AUTHORITY + body).encode("utf-8")).decode("ascii")
     completed = subprocess.run(
         ["node", "-e", _NODE_RUNNER, str(BACKGROUND), encoded],
         cwd=ROOT,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
+    assert completed.returncode == 0, completed.stderr
     return json.loads(completed.stdout)
 
 

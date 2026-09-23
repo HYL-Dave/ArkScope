@@ -402,10 +402,11 @@ def test_native_compression_never_fails_open_to_an_oversized_financial_table(loc
 ])
 def test_background_capture_never_navigates_and_reports_native_failure(scenario, expected):
     from tests.test_sa_extension_popup import _run_background_probe
+    from tests.sa_acquisition_helpers import ADMITTED_TASK
     from src.sa.extension_run_protocol import derive_run_result
 
     payload = capture()
-    probe = _run_background_probe("""
+    probe = _run_background_probe(ADMITTED_TASK + """
       const scenario = SCENARIO;
       const capture = PAYLOAD;
       const calls = [];

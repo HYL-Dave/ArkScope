@@ -298,7 +298,8 @@ def test_loading_failure_is_not_saved_or_retried_automatically(tmp_path, scenari
 def test_disabled_source_never_starts_scrolling_or_saving():
     from tests.test_sa_extension_popup import _run_background_probe
 
-    probe = _run_background_probe('''
+    from tests.sa_acquisition_helpers import ADMITTED_TASK
+    probe = _run_background_probe(ADMITTED_TASK + '''
       chrome.tabs.get = async () => ({url:"https://seekingalpha.com/symbol/AMD/peers/comparison"});
       chrome.scripting.executeScript = async () => { throw new Error("must not scroll before admission"); };
       const actions=[];

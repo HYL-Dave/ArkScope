@@ -15,7 +15,7 @@ function createStorage(initial = {}) {
     data,
     async get(keys) {
       const result = {};
-      for (const key of keys) {
+      for (const key of Array.isArray(keys) ? keys : [keys]) {
         if (Object.hasOwn(data, key)) result[key] = structuredClone(data[key]);
       }
       return result;
@@ -84,7 +84,7 @@ function createChrome(storage) {
         callback({status: "ok", persisted: true, run_id: 1});
       },
     },
-    alarms: {onAlarm: listener},
+    alarms: {onAlarm: listener, async clear() {}},
     storage: {local: storage},
     tabs: {
       async create() { return {id: 7}; },
@@ -120,6 +120,17 @@ function loadBackground() {
     }
   };
   vm.runInContext(source(backgroundPath), context, {filename: backgroundPath});
+  // These fixtures exercise extraction/diagnostics, with authority I/O admitted.
+  context.saAcquisitionTask = {operation:'alpha_picks_sync', ownedTabs:new Set(), stop:null,
+    async navigate(_request, perform) { return perform(); },
+    async observeRestriction(reason) { this.stop={status:'error',reason:'site_paused',error_code:reason}; },
+  };
+  context.companyCollectorControl = async operation => {
+    if (operation==='begin_task') return {status:'ok',token:'a'.repeat(32),task_id:'b'.repeat(32),generation:1};
+    if (operation==='admit_navigation') return {status:'ok',allowed:true,replayed:false,attempt_id:'c'.repeat(32)};
+    if (operation==='finish_task') return {status:'ok',acquisition:{}};
+    return {status:'ok',is_owner:true,generation:1,ledger_id:'d'.repeat(32),policy:{}};
+  };
   return {context, imports, storage};
 }
 
@@ -134,6 +145,7 @@ function projection(entry) {
 }
 
 async function runAlphaFailureBranch(context, kind) {
+  context.saAcquisitionTask.stop = null; // Each branch is a separate admitted run.
   const collector = context.SAExtensionDiagnostics.createCollector({
     now: () => Date.UTC(2026, 7, 14, 2),
   });

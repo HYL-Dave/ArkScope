@@ -106,7 +106,7 @@ def handle_message(msg):
         from src.sa.company_collector import CompanyCollector
         from src.data_source_routing import DataSourcePolicyFailure, load_route
 
-        if msg.get("operation") == "begin_task" and msg.get("task_operation") == "company_financial_capture":
+        if msg.get("operation") == "begin_task" and msg.get("task_operation") == "company_financial_capture" and msg.get("mode") != "current_tab":
             try:
                 load_route("sa_company_financials").candidates("seeking_alpha")
             except DataSourcePolicyFailure as exc:

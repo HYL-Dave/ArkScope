@@ -6,6 +6,7 @@ import subprocess
 import pytest
 
 from tests.test_sa_extension_popup import ROOT, _run, _run_background_probe
+from tests.sa_acquisition_helpers import ADMITTED_TASK, AUTHORITY
 
 
 SETUP = """
@@ -37,7 +38,7 @@ def probe(body):
     # JSON cloning is sufficient: this state intentionally contains no Date objects.
     return _run_background_probe(
         "const structuredClone = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value));\n"
-        + SETUP + body
+        + ADMITTED_TASK + SETUP + body
     )
 
 
@@ -139,11 +140,11 @@ def test_manual_watchlist_queue_rechecks_membership_while_waiting():
 
 
 def test_shared_owner_refusal_stops_before_financial_navigation():
-    result = _run_background_probe("""
+    result = _run_background_probe(AUTHORITY + """
       let navigated = 0;
       refreshCompanyFinancialScope = async () => { navigated++; return {status:'ok'}; };
       companyCollectorControl = async () => ({status:'error',error_code:'sa_company_collector_other_browser'});
-      const result = await runCoordinatedCompanyScope({ticker:'AMD',statement:'income_statement',view:'annual'},
+      const result = await coordinatedScope({ticker:'AMD',statement:'income_statement',view:'annual'},
         'manual',async()=>true,async()=>{},7,SAExtensionDiagnostics.createCollector());
       return {result,navigated};
     """)
@@ -152,30 +153,30 @@ def test_shared_owner_refusal_stops_before_financial_navigation():
 
 
 def test_shared_failure_is_reported_before_local_failure_and_finished_after_cleanup():
-    result = _run_background_probe("""
+    result = _run_background_probe(AUTHORITY + """
       const sequence = [];
-      companyCollectorControl = async (operation) => {
+      authorityReply = async (operation) => {
         sequence.push(operation);
-        return {status:'ok',token:'a'.repeat(32)};
+        return null;
       };
       refreshCompanyFinancialScope = async (_scope,_diagnostics,_admitted,failed) => {
         await failed('sa_company_rate_limited');
         sequence.push('cleanup');
         return {status:'error',error_code:'sa_company_rate_limited'};
       };
-      const result = await runCoordinatedCompanyScope({ticker:'AMD',statement:'income_statement',view:'annual'},
+      const result = await coordinatedScope({ticker:'AMD',statement:'income_statement',view:'annual'},
         'scheduled',async()=>true,async()=>{sequence.push('local_failure');},7,SAExtensionDiagnostics.createCollector());
       return {result,sequence};
     """)
-    assert result["sequence"] == ["begin", "report_failure", "local_failure", "cleanup", "finish"]
+    assert result["sequence"] == ["status", "begin_task", "observe_restriction", "local_failure", "cleanup", "finish_task"]
 
 
 def test_native_reuse_skips_navigation_and_keeps_saved_capture_time():
-    result = _run_background_probe("""
+    result = _run_background_probe(AUTHORITY + """
       let navigated = 0;
       refreshCompanyFinancialScope = async () => { navigated++; };
-      companyCollectorControl = async () => ({status:'reused',ticker:'AMD',statement:'income_statement',view:'annual',observation_id:'b'.repeat(64),currency:'USD',last_success_at:'2026-09-20T00:00:00Z'});
-      const result = await runCoordinatedCompanyScope({ticker:'AMD',statement:'income_statement',view:'annual'},
+      authorityReply = async operation => operation === 'begin_task' ? ({status:'reused',ticker:'AMD',statement:'income_statement',view:'annual',observation_id:'b'.repeat(64),currency:'USD',last_success_at:'2026-09-20T00:00:00Z'}) : null;
+      const result = await coordinatedScope({ticker:'AMD',statement:'income_statement',view:'annual'},
         'scheduled',async()=>true,async()=>{},7,SAExtensionDiagnostics.createCollector());
       return {result,navigated};
     """)
@@ -333,11 +334,11 @@ def test_missing_watchlist_keeps_pending_intent_cancellable_and_backs_off():
     {"ticker": "WRONG"}, {"currency": "EUR"}, {"last_success_at": "not-a-time"},
 ])
 def test_malformed_native_reuse_is_not_a_successful_capture(patch):
-    result = _run_background_probe("""
+    result = _run_background_probe(AUTHORITY + """
       const scope = {ticker:'AMD',statement:'income_statement',view:'annual'};
-      companyCollectorControl = async () => ({status:'reused',...scope,
-        observation_id:'b'.repeat(64),currency:'USD',last_success_at:'2026-09-20T00:00:00Z',...PATCH});
-      return runCoordinatedCompanyScope(scope,'scheduled',async()=>true,async()=>{},7,SAExtensionDiagnostics.createCollector());
+      authorityReply = async operation => operation === 'begin_task' ? ({status:'reused',...scope,
+        observation_id:'b'.repeat(64),currency:'USD',last_success_at:'2026-09-20T00:00:00Z',...PATCH}) : null;
+      return coordinatedScope(scope,'scheduled',async()=>true,async()=>{},7,SAExtensionDiagnostics.createCollector());
     """.replace("PATCH", json.dumps(patch)))
     assert result["status"] == "error"
     assert result["error_code"] == "sa_company_receipt_unverified"
@@ -351,8 +352,9 @@ def test_malformed_native_reuse_is_not_a_successful_capture(patch):
 def test_company_telemetry_skips_acquisition_when_it_did_not_happen(result):
     actual = _run_background_probe("return attachExtensionRunProtocol('company_financial_capture','scheduled',"
                                    + json.dumps(result) + ");")
-    assert actual["extension_run"]["derived_outcome"] == "skipped"
-    assert all(phase["state"] == "skipped" for phase in actual["extension_run"]["phases"].values())
+    expected = "deferred" if result["status"] == "deferred" else "skipped"
+    assert actual["extension_run"]["derived_outcome"] == expected
+    assert all(phase["state"] == expected for phase in actual["extension_run"]["phases"].values())
 
 
 def test_due_updates_are_scoped_and_reads_do_not_extend_the_deadline():
@@ -646,7 +648,7 @@ def test_duplicate_triggers_join_and_disabling_queued_work_prevents_navigation()
 
 
 def test_scheduled_capture_rejects_wrong_view_before_writing():
-    result = _run_background_probe("""
+    result = _run_background_probe(ADMITTED_TASK + """
       const url = 'https://seekingalpha.com/symbol/AMD/income-statement';
       let writes = 0;
       chrome.tabs.get = async () => ({url});

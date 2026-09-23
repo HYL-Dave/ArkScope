@@ -20,6 +20,8 @@
       "extension_diagnostics.js",
       "extension_telemetry.js",
       "company_refresh.js",
+      "acquisition_queue.js",
+      "acquisition_client.js",
       "background.js"
     ]
   },

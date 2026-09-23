@@ -165,7 +165,7 @@ def test_successful_saves_submit_an_explicit_empty_diagnostics_envelope():
         "omitted_count": 0,
     }
     assert result["submitted"]["started_at"] <= result["submitted"]["finished_at"]
-    assert result["thrown"] is True
+    assert result["thrown"] is False  # Typed failure still finishes the admission receipt.
     assert result["failed_submitted"]["result"]["derived_outcome"] == "failed"
     assert result["failed_submitted"]["extension_diagnostics"]["entries"] == [
         {
