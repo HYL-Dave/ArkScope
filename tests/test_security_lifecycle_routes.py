@@ -462,8 +462,9 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 229
+    assert len(rows) == 230
     assert {
+        ("GET", "/sa/acquisition-status"),
         ("GET", "/providers/data-catalog"),
         ("GET", "/sec-research/issuer/resolve"),
         ("POST", "/sec-research/issuer/refresh"),
