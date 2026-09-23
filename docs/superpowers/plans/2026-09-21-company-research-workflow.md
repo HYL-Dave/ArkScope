@@ -62,8 +62,14 @@ extractors while adding common admission, navigation budgets and identity
 receipts. The written design is now approved, with Firefox an initial preference
 rather than a fixed browser dependency. The
 [implementation plan](2026-09-23-sa-automation-coordination.md) also owns the
-reproduced queued-disable and login-stop defects. No coordination implementation,
-production cutover or automatic quota selection has occurred.
+reproduced queued-disable and login-stop defects. On September 24 the shared
+authority, queue, configurable pacing, scope preview, one-action activation and
+login-stop/badge/App-warning path are implemented with installed offline
+Firefox/Chromium and private Firefox native-host verification. See the
+[coordination evidence](../evidence/2026-09-23-sa-automation-coordination/README.md).
+Fresh whole-branch review and complete frozen-source regression are the remaining
+pre-merge gates. Signed-in coordination and production activation remain separate;
+no automatic quota selection, bulk capture, merge or push has occurred.
 
 September 22 sequencing correction: this is one delivery lane, not the complete
 product backlog. Retention, persistent service/failure delivery and external

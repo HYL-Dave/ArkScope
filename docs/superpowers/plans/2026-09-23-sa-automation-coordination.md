@@ -10,10 +10,13 @@
 
 **Spec:** [SA Automation Coordination And Controls](../specs/2026-09-23-sa-automation-coordination-design.md).
 
-Status: written after design approval; implementation not started. Review this
-plan and select execution method before changing product code. Firefox is the
-operator's initial preference, not a hard-coded browser dependency. No schedule,
-quota, host registration or production database is changed by this plan.
+Status: Tasks 1-7 implementation and isolated browser/native verification are
+complete on the feature branch. Signed-in coordination/Chrome native acceptance
+remains open. Task 8 freezes documentation and source, obtains a fresh review,
+then runs the complete final regression before any merge. See the
+[evidence](../evidence/2026-09-23-sa-automation-coordination/README.md).
+Firefox remains the initial preference, not a fixed dependency. No production
+schedule, quota, registration or database has been changed.
 
 ## Global Constraints
 
@@ -73,7 +76,7 @@ enable/disable/configuration change. News additionally retains
 `shouldRunMarketNewsAutoSync() -> Promise<boolean>`. Do not apply automatic
 eligibility checks to explicit manual refresh commands.
 
-- [ ] **Write the queued-disable RED test.** Start with the following complete
+- [x] **Write the queued-disable RED test.** Start with the following complete
   behavioral case; repeat for both job keys and for disable-then-reenable.
 
 ```python
@@ -103,8 +106,8 @@ def test_disabling_queued_alpha_picks_prevents_acquisition():
     assert result["calls"] == 0
 ```
 
-- [ ] **Run RED:** `/home/hyl/.virtualenvs/llm_app/bin/python -m pytest tests/test_sa_auto_sync_admission.py -q`. The existing implementation must fail with one call, not with a broken fixture.
-- [ ] **Implement the guard inside the coalesced callback.** The essential
+- [x] **Run RED:** `/home/hyl/.virtualenvs/llm_app/bin/python -m pytest tests/test_sa_auto_sync_admission.py -q`. The existing implementation must fail with one call, not with a broken fixture.
+- [x] **Implement the guard inside the coalesced callback.** The essential
   condition is executable only when both observations agree:
 
 ```javascript
@@ -117,10 +120,10 @@ if (!current.enabled || current.revision !== submitted.revision) {
   keys plus a new integer revision key. Missing revision normalizes to zero;
   a state read failure refuses acquisition. Capture intent before queuing and
   make rapid concurrent triggers coalesce during that read too.
-- [ ] **Add late-alarm and rapid-toggle tests.** After disable, direct alarm
+- [x] **Add late-alarm and rapid-toggle tests.** After disable, direct alarm
   delivery must not acquire. Disable/re-enable must invalidate the old callback.
   A manual command remains available; repeated due triggers still coalesce.
-- [ ] **Run GREEN and commit:** focused admission, popup, company refresh and
+- [x] **Run GREEN and commit:** focused admission, popup, company refresh and
   run-protocol tests. Commit `fix(sa): recheck queued automatic acquisition intent`.
 
 ## Task 2: One Durable Authority And Navigation Allowance
@@ -161,7 +164,7 @@ Retain `get_company_watchlist` as a read-only action. Adapt existing collector
 test helpers to the new messages while keeping their assertions about saved
 observations, source routing, clock rollback and explicit stopped recovery.
 
-- [ ] **Write RED for reserved capacity and exact window boundaries.**
+- [x] **Write RED for reserved capacity and exact window boundaries.**
 
 ```python
 from src.sa.acquisition_policy import navigation_eligibility
@@ -174,8 +177,8 @@ def test_financial_work_leaves_unused_routine_reserve():
     assert navigation_eligibility(attempts, policy, "background", 3701)["allowed"] is True
 ```
 
-- [ ] **Run RED:** `python -m pytest tests/test_sa_acquisition_policy.py -q` with the project interpreter.
-- [ ] **Implement one pure window calculation and use it inside `BEGIN IMMEDIATE`.**
+- [x] **Run RED:** `python -m pytest tests/test_sa_acquisition_policy.py -q` with the project interpreter.
+- [x] **Implement one pure window calculation and use it inside `BEGIN IMMEDIATE`.**
 
 ```python
 used = len(window_attempts)
@@ -191,7 +194,7 @@ allowed = used < ceiling
   No guessed default limits. Store task/attempt rows in the existing authority
   database with unique request/navigation IDs, owner generation and policy
   revision. Switches retain the entire ledger. Never refund an uncertain debit.
-- [ ] **Extend explicit initialization, not read paths.** Store `managed_since`,
+- [x] **Extend explicit initialization, not read paths.** Store `managed_since`,
   ledger UUID and `prior_traffic_coverage="unknown"`. Use an adjacent creation
   marker containing the ledger UUID to distinguish a never-initialized database
   from a lost one. Create the marker exclusively before first initialization;
@@ -199,14 +202,14 @@ allowed = used < ceiling
   existing financial-only database requires an explicit idle/stopped upgrade
   with a local backup, preserving pauses, successful scopes and ownership.
   Unknown schema is refused, not rebuilt. No automatic production migration.
-- [ ] **Add authority tests:** eight independent connections race for one
+- [x] **Add authority tests:** eight independent connections race for one
   reservation; two Chrome installations differ; stale generation fails after
   an explicit Firefox/Chrome switch; 15-second setting cannot bypass cooldown;
   clock regression refuses admission. Duplicate navigation ID returns the same
   debit with `replayed=true`, never a fresh executable permit. Policy changes
   cannot erase attempts; a lowered limit defers existing work. Missing/corrupt
   marker/database/rows after activation must refuse new acquisition.
-- [ ] **Run GREEN and commit:** policy, collector, native-host routing tests.
+- [x] **Run GREEN and commit:** policy, collector, native-host routing tests.
   Commit `feat(sa): share acquisition ownership and navigation capacity`.
 
 ## Task 3: Honest Deferred Results And Identity-Bound Receipts
@@ -240,7 +243,7 @@ pre-admission skips may omit it; neither may claim admitted identity or complete
 acquisition through that exception. A coalesced/not-due callback does not invent
 a task or consume navigation capacity merely to send telemetry.
 
-- [ ] **Write a shared JS/Python protocol fixture for mid-batch deferral.**
+- [x] **Write a shared JS/Python protocol fixture for mid-batch deferral.**
 
 ```json
 {
@@ -259,9 +262,9 @@ a task or consume navigation capacity merely to send telemetry.
 ```
 
   Both derivations must return deferred/not-healthy, not complete/protocol-invalid.
-- [ ] **Run RED:** protocol and native/API roundtrip tests reject the unsupported
+- [x] **Run RED:** protocol and native/API roundtrip tests reject the unsupported
   version/envelope on the old implementation.
-- [ ] **Implement version-specific canonicalization and projection.**
+- [x] **Implement version-specific canonicalization and projection.**
 
 ```python
 event_document = {"client_event_id": client_event_id,
@@ -276,19 +279,19 @@ if acquisition_present:
   envelope before outbox persistence. The strict native/API allowlists and
   `record_extension_event_once` all change in the same commit. Public history
   includes only this bounded projection, never task secrets or URLs.
-- [ ] **Test delayed delivery and tampering.** Complete a task, switch owner,
+- [x] **Test delayed delivery and tampering.** Complete a task, switch owner,
   replay its old outbox event: one durable row with its old identity. Replay the
   same event ID with a different client/generation: reject. Missing terminal
   task evidence: refuse new identity claims, keep outbox delivery failure
   visible. Legacy v1 event hash stays byte-identical and records identity as
   absent. Legacy telemetry does not permit legacy acquisition.
-- [ ] **Test actual health consumers.** `src/service/sa_extension_health.py`
+- [x] **Test actual health consumers.** `src/service/sa_extension_health.py`
   must not promote a deferred event into the healthy anchor; UI/history must
   show waiting rather than a green successful capture. Retain completed data
   despite telemetry delivery errors. Keep task evidence at least through the
   seven-day outbox horizon and never discard active/undelivered evidence merely
   because the rolling traffic window ended.
-- [ ] **Run GREEN and commit:** outbox, protocol, native, job store, health and
+- [x] **Run GREEN and commit:** outbox, protocol, native, job store, health and
   related frontend history tests. Commit `feat(sa): persist acquisition identity and deferred outcomes`.
 
 ## Task 4: Priority Queue And Guarded Existing Navigation
@@ -319,7 +322,7 @@ an absent/ambiguous native response as admission.
 Use Task 3's deferred-result protocol from the first guarded handler; do not
 temporarily route a partial batch through the old complete/failed-only shape.
 
-- [ ] **Write the priority RED fixture in the existing Node VM harness.**
+- [x] **Write the priority RED fixture in the existing Node VM harness.**
 
 ```javascript
 const queue = SAQueue.create({now: () => 1000});
@@ -338,8 +341,8 @@ await Promise.all([active,finance,news]);
 return order; // Python assertion: ['active', 'news', 'finance']
 ```
 
-- [ ] **Run RED:** `python -m pytest tests/test_sa_acquisition_queue.py -q`.
-- [ ] **Implement FIFO within each lane and routine-first selection at every
+- [x] **Run RED:** `python -m pytest tests/test_sa_acquisition_queue.py -q`.
+- [x] **Implement FIFO within each lane and routine-first selection at every
   task boundary.** Select with `routine.shift() || background.shift()`, then
   await and recheck `eligible()` before `run()`. Do not acquire a native active
   reservation while waiting for pacing/capacity. Persist financial waiting
@@ -347,7 +350,7 @@ return order; // Python assertion: ['active', 'news', 'finance']
   Route the old `enqueueSaSyncJob`, `enqueueAutoSaSyncJob` and
   `enqueueMarketNewsRecovery` paths through this one queue. Preserve Task 1's
   revision fences and existing automatic coalescing.
-- [ ] **Wrap every managed top-level navigation before calling the browser.**
+- [x] **Wrap every managed top-level navigation before calling the browser.**
 
 ```javascript
 await task.navigate({id: navigationId, kind: "detail", destinationClass: "sa_article"},
@@ -360,7 +363,7 @@ await task.navigate({id: navigationId, kind: "detail", destinationClass: "sa_art
   financial and recovery pages. Focus-only changes are not navigation debits;
   view clicks/scrolls keep existing bounds and separate observed action counts.
   Current-tab capture still needs task ownership before script injection.
-- [ ] **Fix the known login continuation and share restriction detection.**
+- [x] **Fix the known login continuation and share restriction detection.**
   Move the existing bounded visible login/challenge/rate-limit detection into
   the acquisition client/readiness path for all flows, without network logging.
   On recognized site restriction, await native persistence, save completed
@@ -368,13 +371,13 @@ await task.navigate({id: navigationId, kind: "detail", destinationClass: "sa_art
   layout/row gaps remain scope-specific; do not turn them into site-wide bans.
   If native restriction persistence fails, stop locally and leave the active
   reservation uncertain. Cleanup cannot authorize another page.
-- [ ] **Add tests:** the review's login replay now opens only current picks;
+- [x] **Add tests:** the review's login replay now opens only current picks;
   rate/challenge affects both lanes; a financial layout failure still permits
   news; budget exhausted halfway through a news batch retains completed bodies
   and pending IDs without claiming complete; quick-to-full auto-upgrade also
   passes every navigation through the budget; old owner/current-tab commands
   cannot bypass admission. Verify no raw navigation call site is unaccounted for.
-- [ ] **Run GREEN and commit:** queue, reconciliation, diagnostics, protocol and
+- [x] **Run GREEN and commit:** queue, reconciliation, diagnostics, protocol and
   packaging tests. Commit `feat(sa): prioritize routine work and guard page acquisition`.
 
 ## Task 5: Durable Financial Pacing, Scope Preview And Progress
@@ -392,7 +395,7 @@ flag, pacing lower bound and independently labeled observed-duration coverage.
 `run({force:false})` fills missing/due work; advanced `force:true` is explicit.
 Task 2's `next_financial_at` is the only pacing authority.
 
-- [ ] **Write RED for independent intervals, reads and pacing.** In the existing
+- [x] **Write RED for independent intervals, reads and pacing.** In the existing
   injected-clock fixture, annual and quarterly both succeed at time T. Set
   annual=30 and quarterly=7, advance to T+8 days; preview must report one due
   quarterly scope and one reusable annual scope, with no acquisition calls.
@@ -408,8 +411,8 @@ return {before, after:calls.length, first, second};
 // Assert calls unchanged; identical clock gives identical deadlines and counts.
 ```
 
-- [ ] **Run RED:** `python -m pytest tests/test_sa_company_refresh.py -q`.
-- [ ] **Implement authoritative deadline continuation.** Remove financial
+- [x] **Run RED:** `python -m pytest tests/test_sa_company_refresh.py -q`.
+- [x] **Implement authoritative deadline continuation.** Remove financial
   cleanup's fixed ten-second sleep and stop using the one-minute alarm floor as
   an active-task gap. After cleanup, native authority sets
   `next_financial_at=finished_at+financial_gap_seconds`. Persist intent and this
@@ -418,7 +421,7 @@ return {before, after:calls.length, first, second};
   active token for the gap. Browser sleep makes execution later, never earlier.
   Use bounded timers with alarm fallback for long durations; reject numeric
   values whose millisecond/deadline conversion is not safely representable.
-- [ ] **Implement non-mutating preview and due-only ordinary update.**
+- [x] **Implement non-mutating preview and due-only ordinary update.**
 
 ```javascript
 const remainingGaps = Math.max(0, pendingScopes - 1);
@@ -430,13 +433,13 @@ const pacingFloorSeconds = remainingGaps * config.financial_gap_seconds;
   and capacity waiting separate; unknown sample coverage stays unknown. Resolve
   the complete App watchlist on preview and recheck before each scope. Local
   preview never claims ownership, spends capacity, or advances check time.
-- [ ] **Add tests for 15/30/60 seconds, active timer lost/recreated, stale timer
+- [x] **Add tests for 15/30/60 seconds, active timer lost/recreated, stale timer
   after cancellation, watchlist removal, retry backoff, unchanged content reuse
   and failure preserving old data.** With news arriving at gap second 10, news
   runs before the next financial scope. Setting annual=30 is only a test input;
   do not silently adopt it as the production default because annual pages have
   TTM. Zero/missing/invalid settings must not create an infinite retry loop.
-- [ ] **Run GREEN and commit:** refresh/collector/queue/packaging tests.
+- [x] **Run GREEN and commit:** refresh/collector/queue/packaging tests.
   Commit `feat(sa): add resumable configurable financial refresh pacing`.
 
 ## Task 6: One Explicit Activation And A Useful Scope Preview
@@ -453,7 +456,7 @@ or acquisition. Ordinary `run_company_refresh` uses `force:false`; an explicitly
 confirmed advanced command uses `force:true`. Read existing controls through the
 shared status projection; no independent browser-local notion of active owner.
 
-- [ ] **Write mounted RED scenarios.** Reuse `_run` and extend the runner with
+- [x] **Write mounted RED scenarios.** Reuse `_run` and extend the runner with
   `preview_company_scope`, `enable_sa_updates_here`, and failure responses:
 
 ```python
@@ -470,8 +473,8 @@ def test_failed_activation_keeps_schedule_disabled():
     assert "collector_busy" in result["companyRefreshStatus"]
 ```
 
-- [ ] **Run RED:** popup tests before changing controls.
-- [ ] **Implement a compact shared popup flow.** Main area: explicit test vs
+- [x] **Run RED:** popup tests before changing controls.
+- [x] **Implement a compact shared popup flow.** Main area: explicit test vs
   production, collector/browser/installation, actual complete watchlist count,
   statements/views, per-view repeat checks, first-fill/maintenance preview,
   pending/current/next eligibility and effective financial gap. Primary action:
@@ -479,20 +482,20 @@ def test_failed_activation_keeps_schedule_disabled():
   Advanced: 15/30/60/custom gap, total/reserved capacity, force refresh and
   explicit stopped/recovery. Do not move existing news/AP actions into a second
   browser-specific UI. Use established controls; no nested decorative cards.
-- [ ] **Implement activation as fail-closed steps.** Save intent disabled, verify
+- [x] **Implement activation as fail-closed steps.** Save intent disabled, verify
   expected owner generation/policy acknowledgement, select/configure only while
   idle, persist confirmed state, then set enabled and install alarms. Any failure
   leaves acquisition off and reports exactly which step failed. Idempotent
   repeated activation cannot steal a newly selected owner. Do not auto-copy the
   previous browser's schedules or infer selection from opening this popup.
-- [ ] **Test every preview checkbox and dirty-state refresh.** A 180-company
+- [x] **Test every preview checkbox and dirty-state refresh.** A 180-company
   synthetic universe yields 540 scopes for three annual statements and 1,080
   after quarterly is checked. Pacing wait at 15 seconds is `(1080-1)*15`, not an
   exact ETA. Unsupported symbols, unavailable watchlist, other owner, capacity
   exhaustion and stale heartbeat must all remain visible. Missing heartbeat is
   unavailable/unknown, not proof that a browser is closed. Previews arriving out
   of order cannot overwrite the latest unsaved selection.
-- [ ] **Run GREEN and screenshot real popup layouts in both browser engines.**
+- [x] **Run GREEN and screenshot real popup layouts in both browser engines.**
   Check narrow popup and standalone heights, wrapping, scroll reachability and
   no clipped buttons. Commit `feat(sa): simplify shared collector and watchlist controls`.
 
@@ -510,7 +513,7 @@ remaining reservations. It runs against isolated fake pages/native I/O only.
 The installed private native wrapper must exercise the real framed protocol;
 API mocks alone cannot establish host readiness.
 
-- [ ] **Write RED package-closure and host-action checks.** Both builds must load
+- [x] **Write RED package-closure and host-action checks.** Both builds must load
   queue/client before background registration. The private wrapper must accept
   the exact new action used by the extension, refuse unapproved source actions,
   and preserve test database isolation. Do not fix the previous six-action
@@ -522,12 +525,12 @@ def test_both_builds_include_shared_acquisition_modules():
     assert {"acquisition_queue.js", "acquisition_client.js"} <= set(graph.files)
 ```
 
-- [ ] **Run RED then implement/rebuild the private artifacts atomically.** Keep
+- [x] **Run RED then implement/rebuild the private artifacts atomically.** Keep
   test addon/host IDs and AAPL/AMD private watchlist separate from production.
   Verify the actual framed native request succeeds before asking the user to
   click anything. Preparing Chrome requires a separate test registration, not
   assuming the Firefox host registration covers Chrome.
-- [ ] **Run installed offline cases on Firefox and Chromium.** Use real alarms
+- [x] **Run installed offline cases on Firefox and Chromium.** Use real alarms
   and worker restart plus fake providers: active 15-second continuation, news
   arriving during gap, cancellation, simultaneous browsers, budget exhaustion,
   retained partial data, lost native acknowledgement and sleeping worker restart.
@@ -538,7 +541,7 @@ def test_both_builds_include_shared_acquisition_modules():
   operator-accepted low capacity for the trial. Stop at a challenge/restriction,
   inspect saved rows and receipts. Separately test signed-in Chrome under an
   explicit idle owner switch. Do not start the 180-plus production universe.
-- [ ] **Record evidence and commit:** distinguish installed offline, real SA,
+- [x] **Record evidence and commit:** distinguish installed offline, real SA,
   user-confirmed and unverified cases. Commit `test(sa): verify coordinated browser acquisition end to end`.
 
 ## Task 8: Freeze, Review And Controlled Rollout Handoff
@@ -603,9 +606,10 @@ After the new attempt/yield and coverage receipts exist, evaluate a separately
 bounded comment-maintenance schedule and explicit news-window presets; never
 silently enable unrestricted Full/Deep scans as a workaround.
 
-The initial implementations and the two-company Firefox financial acceptance
-already exist. The coordination features and two scheduling repairs in this
-plan do not. Persistent service/failure delivery and external read/analysis MCP
+The initial implementations and the older two-company Firefox financial acceptance
+already exist. This delivery implements coordination and both scheduling repairs;
+installed offline results do not replace new signed-in coordination acceptance.
+Persistent service/failure delivery and external read/analysis MCP
 remain required independent work; recent-news retention is lower priority by
 the operator's latest decision. Other research-tool gaps retain their existing
 owners. None is declared complete by this handoff.

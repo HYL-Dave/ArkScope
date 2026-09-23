@@ -503,14 +503,15 @@ of the currently enabled browser preferences.
 | Comments | Included with new article bodies; revisit scanned articles when an observed count changes or a first positive count appears | No independent comment timer; an unchanged count does not prove unchanged text. |
 | Additional comment recovery | In Full/Deep scans only: default seven-day age eligibility, with configured additional batches defaulting to 10/50 | The age rule does not itself schedule these scans. Old unscanned articles can remain outside Quick Update coverage. |
 
-Keep existing selected intervals while shared coordination is implemented. Do
+Keep existing selected intervals with shared coordination. Do
 not enable frequent full/deep scans merely to compensate for missing coverage.
 Future frequency changes should use actual navigation attempts, new-item yield,
 retry/backlog age and restriction observations, not raw job receipt counts.
 The [September 23 scheduling review](docs/superpowers/evidence/2026-09-23-sa-scheduling-review/README.md)
-records current behavior and two reproduced defects: queued Alpha Picks can
-execute after disabling auto-sync, and a known login failure does not stop its
-next portfolio navigation. These are planned repairs, not fixed behavior yet.
+records the prior behavior and two reproduced defects: queued Alpha Picks could
+execute after disabling auto-sync, and a known login failure did not stop its
+next portfolio navigation. Both are repaired by the
+[coordination delivery](docs/superpowers/evidence/2026-09-23-sa-automation-coordination/README.md).
 
 ### SA Financial Refresh Scheduling
 
@@ -522,117 +523,141 @@ The [bounded Firefox watchlist acceptance](docs/superpowers/evidence/2026-09-23-
 verifies the operator's two-company manual queue and saved-table readback.
 It is not Google Chrome acceptance or authorization to start the production list.
 
-**Planned successor, not current behavior:** the operator approved one selected
-browser for all SA automation and configurable pacing including 15 seconds.
-The [SA Automation Coordination And Controls design](docs/superpowers/specs/2026-09-23-sa-automation-coordination-design.md)
-defines routine-first execution, background financial work, shared navigation
-budgets/restrictions and installation-aware receipts. The design is approved;
-its [implementation plan](docs/superpowers/plans/2026-09-23-sa-automation-coordination.md)
-is written, not executed. Either browser can be the selected collector; Firefox
-is the operator's current preference only. Stored-data deduplication does not
-prevent repeated network acquisition. The financial-only controls below remain
-the implemented policy.
-No production browser selection or schedule is changed by this document.
+**Shared acquisition authority is implemented, not yet activated in production.**
+Either Chrome or Firefox can be explicitly selected. Firefox is the operator's
+initial preference, not a fixed dependency. The
+[coordination evidence](docs/superpowers/evidence/2026-09-23-sa-automation-coordination/README.md)
+separates installed offline tests, private Firefox native-host checks and
+remaining signed-in/rollout gates. A passing fixture is not live SA acceptance.
 
-In the extension's **Financial statement updates**, choose selected tickers or
-**App watchlist**, statements
-(income, balance sheet, cash flow), Annual/Quarterly views and an interval of
-1-365 days (initially 7). Scheduled scopes use **USD / Absolute** tables.
-The interval is a repeat-check policy, not a claim that financial publications
-expire after seven days. **Update now** explicitly requests a new capture even
-inside the interval, but cannot override a rate-limit cooldown. Valuation,
-estimates, news and Alpha Picks do not inherit
-this schedule or interval. App watchlist targets come from the same complete,
-read-only active-universe authority as the App, not a manually copied list.
-The preview includes membership sources, stale-source warnings and unsupported
-symbols. Unmapped provider symbols are not guessed or counted as captured.
-Retained former Alpha Picks remain targets when still members of the App list.
-Each acquisition rechecks membership; unavailable source databases stop work
-instead of falling back to a partial list. There is no 183-ticker hard limit.
+**Prerequisites are separate.** The local host must connect, the chosen browser
+must be running, SA must be signed in when the requested content requires it,
+and that content must be accessible under the relevant subscription. Premium
+does not imply Alpha Picks access, and a working login does not prove either.
+The App cannot infer all entitlements in advance. Detected login/challenge/access
+failures have explicit states below; unobserved session liveness remains unknown.
 
-**One collector, both browser builds.** Click **Use this browser** explicitly
-in the chosen browser installation. Initial operator rollout uses Firefox;
-Chrome already contains the same implementation. Opening either browser,
-reading status or saving a schedule does not select it. The selection applies
-to an installation UUID, not every profile bearing the same browser name.
-Both native hosts must point at the same SA database to share this authority.
-Another installation can read saved data and status but cannot navigate financial
-acquisition pages. Switching requires an explicit selection while no capture is
-active. The previous browser's local schedule is not copied or automatically
-enabled in the new browser.
+In **Financial statement updates**, choose **App watchlist** or selected tickers,
+statements (income, balance sheet, cash flow) and Annual/Quarterly views.
+Both views initially check every seven days, independently adjustable from 1-365
+days. The annual page also contains TTM, so it is not necessarily unchanged for a
+year. All scheduled scopes use **USD / Absolute** tables. These intervals are
+repeat-check policies, not data expiration or evidence that a new filing exists.
 
-`sa_company_refresh.db`, beside the selected `sa_capture.db`, owns selection,
-active reservation, shared financial cooldown, challenge pause and admission
-failures. Native-host processes serialize mutations with SQLite transactions.
-An active reservation cannot be stolen or expire into competing work. If a
-browser crashes or an acknowledgement/cleanup is uncertain, stop that collector
-and its acquisition tabs, then explicitly **Recover stopped capture**. Recovery
-is logged and revokes the old reservation; it does not select another browser
-or forgive cooldown/challenge state. Do not confirm recovery while the old
-collector is still running. Missing/corrupt control state never grants admission.
-Status/watchlist reads do not install a database or construct a writable DAL.
+The read-only preview updates before activation: membership, missing/due/fresh
+scope counts, current collector, waits and a pacing-only lower bound. Observed
+capture durations, when available, are supplementary. Neither is a completion
+promise: page loading, quotas, routine work, pauses and a sleeping/closed browser
+can extend elapsed time. Whole-watchlist membership comes from the complete App
+active universe, not a copied or hard-coded list. Source/staleness warnings and
+unsupported symbols remain visible; unavailable inputs refuse partial-universe
+acquisition. Membership is rechecked before each scope; removed targets do not run.
 
-Each ticker/statement/view has its own last-success time, observation ID, attempt,
-failure and next eligibility time. Reading data or saving unchanged settings does
-not move the deadline. Only an accepted capture does; unchanged content advances
-the successful check without duplicating observations. Matching manual current-page
-captures can satisfy a scheduled USD scope. Failure preserves old data and the last
-success. Retry starts at six hours and backs off to seven days, not a new freshness
-window. Verification, login/access and recognized structural/identity failures
-pause the batch until explicit manual retry after correction.
+**Enable updates in this browser** is the explicit activation command. It first
+disables local acquisition intent, validates idle authority and the operator's
+policy, selects/configures the installation, then enables the selected financial
+schedule and restores previously selected routine settings. A failed intermediate
+step leaves local schedules disabled and identifies that step. Saving settings
+alone does not activate collection. Reading status never initializes the store.
 
-The existing extension queue serializes work. Repeated refresh requests join the
-pending batch. A queued automatic scope is checked again before navigation and
-capture; a newly successful matching capture or removed/disabled scope prevents
-unnecessary acquisition. Each alarm handles at most one overdue scope, with at
-least one minute between overdue alarm runs. All financial page starts also have
-a shared one-minute minimum gap, conservatively retained through completion
-before another start is admitted. Every manual batch is persisted before its
-first acquisition. Small manual batches remain sequential; when admission asks
-them to wait, remaining scopes persist for a later alarm. A manual
-App-watchlist update immediately queues all selected scopes and processes one per
-alarm, even if the periodic **Scheduled** toggle is off. **Cancel queued update**
-clears that one-time queue; uncheck **Scheduled** separately to stop periodic work.
-The popup reports the remaining scope count. Closing the popup does not discard
-the queue; restarting the background restores it. Saving changed settings cancels
-old manual intent; a late admission response cannot restore it. Missing watchlist
-sources leave the pending count/cancel control visible and retry after an hour.
-Per-scope backoff affects that scope only, not other eligible targets. A browser crash during an active
-reservation requires the explicit recovery above. Source/host admission failures
-are visible and delayed instead of becoming silent one-minute retry loops.
+**Update missing / due** reuses fresh scopes, including while the periodic
+schedule is off. A separate advanced **Force refresh** needs confirmation;
+it bypasses source-age reuse only, never restrictions, budgets or ownership.
+Changing settings cancels old manual intent. Cancelling a queued update does not
+disable the separate periodic schedule; a late response cannot resurrect cancelled
+work. Closing the popup does not discard the durable queue.
 
-Admission reads the saved SA observation's capture timestamp before scheduled
-navigation. Switching browsers does not turn a recent successful capture into
-"never captured", and reusing it does not advance its deadline. A success receipt
-must match a persisted observation captured during that reservation; a fabricated
-or older receipt cannot certify success. Manual saves from an already open page
-remain distinct from navigated acquisition and do not reset acquisition cooldown.
-Manual requests retain their original request time: an observation acquired since
-that request already satisfies it after recovery, even when the browser died
-before recording completion. A later deliberate Update now creates new intent.
-Reused receipts are checked for scope, observation ID, currency and capture time;
-they cannot set a future freshness checkpoint. Telemetry marks reuse, pacing and
-cancellation as skipped acquisition, not completed extraction or failed fetching.
+### SA Ownership, Pacing And Navigation Budget
 
-A recognized visible rate-limit error (a page title or visible heading containing
-`Too many requests` or `Rate limit exceeded`) stops the financial batch. A shared
-financial-refresh cooldown survives reloads, settings changes and ticker changes;
-neither an alarm nor **Update now** can bypass it. Consecutive rate-limit responses
-back off from six hours, doubling to a maximum seven days. A successful new
-acquisition resets that counter; saving an already loaded page does not clear the
-acquisition cooldown. Old observations and successful timestamps are retained.
-The popup shows the cooldown deadline, and automatic alarms respect it.
-Restrictions are persisted before tab cleanup or pacing, not only when the batch
-returns. Verification challenges take priority over simultaneous rate-limit
-messages: a timer expiring must not resume an unresolved human-verification gate.
+The authority is `sa_company_refresh.db`, next to the chosen `sa_capture.db`.
+All managed news, Alpha Picks, comments and company acquisition share it.
+Both hosts must use that same local data root. Selection binds an installation
+UUID, not every browser profile with the same name. Other installations can
+read retained data but cannot acquire. Handoff requires explicit idle selection;
+it does not copy or silently enable the other browser's local schedules.
+There is no automatic failover when the selected browser closes.
 
-These are local safety policies, not published SA request allowances. Visible-page
-detection is not a complete HTTP 429 / `Retry-After` monitor. Financial cooldowns
-are now shared across Chrome/Firefox installations using the same local SA store;
-they do not govern Alpha Picks/news, manually opened pages, other hosts or the
-entire site's subrequests. One page can make several provider requests, so this
-is not a guaranteed account/IP request rate. Before bulk rollout, verify bounded
-real-site behavior. No production/all-watchlist schedule is enabled by this change.
+The queue finishes its current work, then chooses queued routine work before one
+background financial scope. It does not preempt a page operation. Continuous
+routine work can delay financial work, and that waiting state is reported.
+Financial pacing waits do not occupy an active reservation.
+
+Advanced controls offer 15/30/60 seconds and a valid custom positive interval.
+Existing configurations retain 60 seconds until changed. The native next-start
+deadline is measured from financial task completion and confirmed cleanup, not
+from popup reads. Active short timers can continue a 15-second queue while the
+worker remains alive; durable browser alarms/startup restore progress after
+suspension. Browser alarm granularity can make the next run later, never earlier.
+This does not promise 15-second background wakeups.
+
+Hourly and 24-hour limits plus routine reserves are explicit operator inputs.
+Financial work may use only unreserved capacity; routine work can use the reserve
+but cannot exceed the total. Every managed page create, URL change, reload and
+current-page capture admission is checked and debited before the browser action.
+A refused or repeated permission cannot become a second executable navigation.
+Lowering limits, selecting another browser or restarting does not reset spent
+capacity. First Quick Update expanding into Full remains under the same bounds.
+
+**These are local navigation budgets, not HTTP request quotas or SA-approved
+rates.** A page may issue many subrequests, existing user tabs and other devices
+remain unmeasured, and prior traffic coverage is explicitly unknown. Deduplicated
+stored content does not prevent repeated network acquisition. The implementation
+does not automatically turn job receipt counts into a provider allowance.
+
+A reservation never expires into another collector. Lost native replies, uncertain
+browser actions or failed cleanup stop further work until the operator stops old
+acquisitions/tabs and explicitly recovers. Recovery is logged and fences the old
+reservation; it does not change owner, forgive cooldowns or remove login gates.
+Missing/corrupt authority refuses acquisition instead of silently reinitializing.
+Legacy financial-only state requires explicit stopped-instance confirmation,
+one backup, upgrade and subsequent owner selection; old automated clients must be
+stopped/updated before rollout.
+
+### SA Successful Checks, Pauses And Receipts
+
+Each financial ticker/statement/view retains its successful capture timestamp,
+observation ID, next eligibility, attempt and failure. Reads and unchanged saves
+do not move deadlines. Accepted unchanged content advances the successful check
+without duplicating observations. Manual matching USD captures can satisfy a
+scheduled scope; native admission verifies the stored observation rather than
+trusting browser freshness claims. A scope captured after a queued force request
+already satisfies that same intent after recovery. A later explicit force request
+is new intent.
+
+Failures preserve old observations and successful timestamps. Scope backoff starts
+at six hours and grows to seven days without blocking other eligible scopes.
+Recognized structure/identity failures pause that financial batch instead of
+publishing guessed values. Missing watchlist inputs retain visible pending work.
+
+| Observation | Acquisition behavior | Operator signal and recovery |
+| --- | --- | --- |
+| Login required | Site-wide pause; clear acquisition alarms; stop before another page | Extension `!` badge and App home/settings warning; sign in, then explicitly resume |
+| Human verification | Site-wide pause, not a timed retry | Badge/warning; operator resolves verification before explicit resume |
+| Access/subscription restricted | Pause the affected financials, news or Alpha Picks capability only | Name the affected capability; login alone does not claim entitlement |
+| Visible rate limit | Site-wide cooldown, initially six hours, doubling to seven days | Show deadline; force, owner switch and recovery cannot bypass it |
+| Capacity exhausted | Typed deferred result with next eligibility | Retain completed work; do not label it completed or failed extraction |
+| Native state/cleanup uncertain | Refuse new acquisitions | Stop old work, then explicitly recover; do not retry an uncertain navigation |
+
+Restrictions are stored before tab cleanup. Startup/repair cannot recreate alarms
+through an unresolved login/challenge gate. Challenge takes precedence over a
+simultaneous rate message; timer expiry does not resolve a human gate. A successful
+new acquisition resets the rate-failure counter; saving an already loaded page
+does not clear cooldown. Current detection uses visible content and is not a
+complete HTTP 429 / `Retry-After` monitor.
+
+The App polls only a read-only local projection for its home/settings warning;
+it does not spawn the host, contact SA or install a database. The badge uses the
+same persisted restriction meaning. No system notification or remote delivery is
+included here. A closed App cannot display its warning, and a closed browser
+cannot run its alarms.
+
+Protocol-v2 receipts carry installation, generation, task, policy and navigation
+identity. Native terminal proof is checked at native forwarding and API admission;
+delayed outbox delivery remains valid after an owner change, without granting the
+old owner permission to acquire. Waits are deferred, fresh reuse/cancellation are
+skipped, and real failures retain failure/degraded precedence over simultaneous
+waits. Saved partial results are retained. Proof/navigation retention has not been
+added: deleting those records prematurely would invalidate the seven-day outbox.
 
 Only collector-owned tabs are opened/closed, without requesting focus. View and
 currency must match. Changed selectors must produce changed, stable table values;
