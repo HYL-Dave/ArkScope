@@ -49,6 +49,28 @@ async function run() {
   const outboxKey = telemetry.OUTBOX_STORAGE_KEY;
   const stateKey = telemetry.OUTBOX_STATE_STORAGE_KEY;
 
+  if (scenario === "acquisition_identity") {
+    const storage = createStorage();
+    const delivered = [];
+    const controller = telemetry.createController({ storage, now: () => Date.UTC(2026, 6, 25, 2),
+      deliver: async record => { delivered.push(clone(record)); return { persisted: false, error_code: "sidecar_unavailable" }; } });
+    const entry = event("identity");
+    entry.acquisition = { schema_version: 1, ledger_id: "a".repeat(32), browser: "firefox", client_id: "f".repeat(32),
+      build: "test", protocol_version: 2, generation: 1, task_id: "b".repeat(32), batch_id: "request",
+      priority: "routine", trigger: "manual", navigation_attempt_count: 1, queue_wait_ms: 0,
+      acquisition_duration_ms: 100, identity_basis: "native_task_admission" };
+    entry.result.schema_version = 2;
+    delete entry.result.counts;
+    const original = clone(entry.acquisition);
+    await controller.enqueue(entry);
+    entry.acquisition.generation = 20;
+    await controller.flush("first");
+    const restarted = telemetry.createController({ storage, now: () => Date.UTC(2026, 6, 25, 2),
+      deliver: async record => { delivered.push(clone(record)); return { persisted: true, run_id: 99 }; } });
+    await restarted.flush("restart");
+    return { original, delivered, queue: storage.data[outboxKey] };
+  }
+
   if (scenario === "commit_before_delivery") {
     const order = [];
     const storage = createStorage();

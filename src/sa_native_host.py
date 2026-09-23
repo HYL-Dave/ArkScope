@@ -1049,6 +1049,7 @@ def _handle_record_extension_job(dal, msg):
         "finished_at",
         "result",
         "extension_diagnostics",
+        "acquisition",
     }
     if set(msg) - allowed_fields:
         return _extension_record_reply(
@@ -1078,6 +1079,16 @@ def _handle_record_extension_job(dal, msg):
     }
     if "extension_diagnostics" in msg:
         sidecar_payload["extension_diagnostics"] = msg["extension_diagnostics"]
+    if result.get("schema_version") == 2 or "acquisition" in msg:
+        from src.sa.acquisition_receipt import validate_event_acquisition
+        from src.sa.extension_run_protocol import ProtocolError, derive_run_result
+
+        try:
+            acquisition = validate_event_acquisition(derive_run_result(result), msg.get("acquisition"), present="acquisition" in msg)
+        except (ProtocolError, TypeError, ValueError):
+            return _extension_record_reply(status="error", error_code="acquisition_unverified")
+        if "acquisition" in msg:
+            sidecar_payload["acquisition"] = acquisition
     try:
         response = _post_extension_job_to_sidecar(sidecar_payload)
         persisted = response.get("persisted") is True

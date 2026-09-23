@@ -5103,7 +5103,7 @@ export function getSAFeed(params: {
 }
 
 export type SAExtensionChainState = "available" | "degraded" | "interrupted";
-export type SAExtensionCaptureOutcome = "complete" | "skipped" | "degraded" | "failed";
+export type SAExtensionCaptureOutcome = "complete" | "skipped" | "degraded" | "failed" | "deferred";
 export type SAExtensionJobName = "sa_alpha_picks_refresh" | "sa_market_news_refresh";
 export type SAExtensionDiagnosticsStatus = "recorded" | "rejected" | "absent";
 export type SAExtensionDiagnosticStage =

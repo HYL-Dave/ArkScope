@@ -38,6 +38,7 @@ _SAFE_COUNT_KEYS = frozenset(
         "phase_complete",
         "phase_failed",
         "phase_skipped",
+        "phase_deferred",
         "item_total",
         "attempted",
         "repaired",
@@ -419,6 +420,8 @@ def _telemetry_last_segment(job_store: Any) -> dict[str, Any]:
         state, code = "ok", "capture_complete"
     elif outcome == "skipped":
         state, code = "warn", "capture_skipped"
+    elif outcome == "deferred":
+        state, code = "warn", "capture_deferred"
     elif outcome == "degraded":
         state, code = "warn", "capture_degraded"
     else:
@@ -433,7 +436,7 @@ def _telemetry_last_segment(job_store: Any) -> dict[str, Any]:
             else None
         ),
         outcome=outcome
-        if outcome in {"complete", "skipped", "degraded", "failed"}
+        if outcome in {"complete", "skipped", "degraded", "failed", "deferred"}
         else None,
         **_run_fields(latest, counts=counts),
     )

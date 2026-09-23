@@ -100,6 +100,7 @@
     if (record.extension_diagnostics !== undefined) {
       value.extension_diagnostics = record.extension_diagnostics;
     }
+    if (record.acquisition !== undefined) value.acquisition = record.acquisition;
     return value;
   }
 
@@ -242,6 +243,7 @@
       if (event.extension_diagnostics !== undefined) {
         record.extension_diagnostics = canonicalize(event.extension_diagnostics);
       }
+      if (event.acquisition !== undefined) record.acquisition = canonicalize(event.acquisition);
       return record;
     }
 
@@ -382,6 +384,7 @@
             finished_at: record.finished_at,
             result: record.result,
           };
+          if (record.acquisition !== undefined) deliveryRecord.acquisition = canonicalize(record.acquisition);
           if (record.extension_diagnostics !== undefined) {
             deliveryRecord.extension_diagnostics = canonicalize(
               record.extension_diagnostics

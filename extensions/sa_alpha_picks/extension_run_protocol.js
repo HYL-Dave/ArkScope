@@ -1,7 +1,9 @@
 (function (root) {
   "use strict";
 
-  var SCHEMA_VERSION = 1;
+  var SCHEMA_VERSION = 2;
+  var DEFERRED_REASONS = ["capacity_exhausted", "waiting_for_priority_work", "collector_unavailable", "collector_other_installation", "site_paused"];
+  var V2_FAILURE_REASONS = ["human_verification_required", "rate_limited"];
   var REASON_CODES = Object.freeze([
     "body_saved",
     "body_present_at_freeze",
@@ -204,7 +206,7 @@
     return values.indexOf(value) !== -1;
   }
 
-  function validatePhase(name, value) {
+  function validatePhase(name, value, version) {
     if (!hasExactKeys(value, PHASE_KEYS)) {
       fail("protocol_invalid", "invalid phase payload: " + name);
     }
@@ -213,13 +215,15 @@
     if (state === "complete") {
       if (reason !== null) fail("protocol_invalid", "complete phase has a reason: " + name);
     } else if (state === "failed") {
-      if (!includes(FAILED_PHASE_REASONS, reason)) {
+      if (!includes(FAILED_PHASE_REASONS, reason) && !(version === 2 && includes(V2_FAILURE_REASONS, reason))) {
         fail("protocol_invalid", "invalid failed-phase reason: " + name);
       }
     } else if (state === "skipped") {
       if (!includes(SKIPPED_REASONS, reason)) {
         fail("protocol_invalid", "invalid skipped-phase reason: " + name);
       }
+    } else if (state === "deferred" && version === 2) {
+      if (!includes(DEFERRED_REASONS, reason)) fail("protocol_invalid", "invalid deferred-phase reason: " + name);
     } else {
       fail("protocol_invalid", "invalid phase state: " + name);
     }
@@ -266,7 +270,7 @@
     };
   }
 
-  function deriveCounts(phases, items) {
+  function deriveCounts(phases, items, version) {
     var counts = {
       phase_complete: 0,
       phase_failed: 0,
@@ -277,6 +281,7 @@
       unavailable_at_source: 0,
       failed_retryable: 0,
     };
+    if (version === 2) counts.phase_deferred = 0;
     Object.keys(phases).forEach(function (name) {
       counts["phase_" + phases[name].state] += 1;
     });
@@ -307,6 +312,7 @@
     }
     if (phaseValues.some(function (phase) { return phase.state === "failed"; })) return "degraded";
     if (counts.failed_retryable > 0) return "degraded";
+    if (phaseValues.some(function (phase) { return phase.state === "deferred"; })) return "deferred";
     return "complete";
   }
 
@@ -315,7 +321,8 @@
     if (Object.keys(payload).some(function (key) { return !includes(TOP_LEVEL_KEYS, key); })) {
       fail("protocol_invalid", "unknown top-level field");
     }
-    if (payload.schema_version !== SCHEMA_VERSION) {
+    var version = payload.schema_version;
+    if (version !== 1 && version !== 2) {
       fail("protocol_invalid", "unsupported schema version");
     }
 
@@ -333,7 +340,7 @@
     }
     var phases = {};
     contract.phases.forEach(function (name) {
-      phases[name] = validatePhase(name, payload.phases[name]);
+      phases[name] = validatePhase(name, payload.phases[name], version);
     });
 
     if (!Array.isArray(payload.item_outcomes)) {
@@ -347,10 +354,10 @@
       fail("protocol_invalid", "operation does not allow item outcomes");
     }
 
-    var counts = deriveCounts(phases, items);
+    var counts = deriveCounts(phases, items, version);
     if (payload.counts !== undefined) {
-      if (!hasExactKeys(payload.counts, COUNT_KEYS)) fail("count_mismatch");
-      if (COUNT_KEYS.some(function (key) { return payload.counts[key] !== counts[key]; })) {
+      if (!hasExactKeys(payload.counts, Object.keys(counts))) fail("count_mismatch");
+      if (Object.keys(counts).some(function (key) { return payload.counts[key] !== counts[key]; })) {
         fail("count_mismatch");
       }
     }
@@ -359,7 +366,7 @@
     if (payload.derived_outcome !== undefined && payload.derived_outcome !== derivedOutcome) {
       fail("protocol_invalid", "derived outcome mismatch");
     }
-    var dbStatus = includes(["complete", "skipped"], derivedOutcome) ? "succeeded" : "failed";
+    var dbStatus = includes(["complete", "skipped", "deferred"], derivedOutcome) ? "succeeded" : "failed";
     var healthy = derivedOutcome === "complete"
       && includes(["alpha_picks_sync", "market_news_sync"], operation);
     if (payload.healthy_anchor_eligible !== undefined
@@ -368,7 +375,7 @@
     }
 
     return {
-      schema_version: SCHEMA_VERSION,
+      schema_version: version,
       operation: operation,
       mode: payload.mode,
       job_name: contract.job_name,

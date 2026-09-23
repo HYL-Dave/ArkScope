@@ -282,6 +282,9 @@ function structuredDetail(
     case "capture_skipped":
       value = t(($) => $.dataSources.extension.status.captureSkipped);
       break;
+    case "capture_deferred":
+      value = t(($) => $.dataSources.extension.status.captureDeferred);
+      break;
     case "capture_degraded":
       value = t(($) => $.dataSources.extension.status.captureDegraded);
       break;
@@ -312,6 +315,7 @@ function structuredDetail(
   if (
     status === "capture_complete"
     || status === "capture_skipped"
+    || status === "capture_deferred"
     || status === "capture_degraded"
     || status === "capture_failed"
   ) {

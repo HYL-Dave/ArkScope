@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+DEFERRED_REASONS = frozenset({"capacity_exhausted", "waiting_for_priority_work", "collector_unavailable",
+                              "collector_other_installation", "site_paused"})
+_V2_FAILURE_REASONS = frozenset({"human_verification_required", "rate_limited"})
 
 REASON_CODES = frozenset(
     {
@@ -199,7 +202,7 @@ def _exact_keys(value: Mapping[str, Any], expected: frozenset[str]) -> bool:
     return set(value) == expected
 
 
-def _validate_phase(name: str, value: Any) -> dict[str, Any]:
+def _validate_phase(name: str, value: Any, version: int) -> dict[str, Any]:
     if not isinstance(value, Mapping) or not _exact_keys(value, _PHASE_KEYS):
         _fail(message=f"invalid phase payload: {name}")
 
@@ -209,11 +212,14 @@ def _validate_phase(name: str, value: Any) -> dict[str, Any]:
         if reason is not None:
             _fail(message=f"complete phase has a reason: {name}")
     elif state == "failed":
-        if reason not in _FAILED_PHASE_REASONS:
+        if reason not in _FAILED_PHASE_REASONS and not (version == 2 and reason in _V2_FAILURE_REASONS):
             _fail(message=f"invalid failed-phase reason: {name}")
     elif state == "skipped":
         if reason not in _SKIPPED_REASONS:
             _fail(message=f"invalid skipped-phase reason: {name}")
+    elif state == "deferred" and version == 2:
+        if reason not in DEFERRED_REASONS:
+            _fail(message=f"invalid deferred-phase reason: {name}")
     else:
         _fail(message=f"invalid phase state: {name}")
     return {"state": state, "reason_code": reason}
@@ -258,8 +264,10 @@ def _validate_item(value: Any, seen_ids: set[str]) -> dict[str, Any]:
     }
 
 
-def _derive_counts(phases: Mapping[str, Mapping[str, Any]], items: list[dict[str, Any]]):
+def _derive_counts(phases: Mapping[str, Mapping[str, Any]], items: list[dict[str, Any]], version: int):
     counts = {key: 0 for key in _COUNT_KEYS}
+    if version == 2:
+        counts["phase_deferred"] = 0
     for phase in phases.values():
         counts[f"phase_{phase['state']}"] += 1
     counts["item_total"] = len(items)
@@ -295,6 +303,8 @@ def _derive_outcome(contract: Mapping[str, Any], phases, counts) -> str:
         return "degraded"
     if counts["failed_retryable"]:
         return "degraded"
+    if any(phase["state"] == "deferred" for phase in phase_values):
+        return "deferred"
     return "complete"
 
 
@@ -305,7 +315,8 @@ def derive_run_result(payload: Any) -> dict[str, Any]:
         _fail("legacy_unstructured")
     if set(payload) - _TOP_LEVEL_KEYS:
         _fail(message="unknown top-level field")
-    if payload.get("schema_version") != SCHEMA_VERSION:
+    version = payload.get("schema_version")
+    if type(version) is not int or version not in {1, 2}:
         _fail(message="unsupported schema version")
 
     operation = payload.get("operation")
@@ -318,7 +329,7 @@ def derive_run_result(payload: Any) -> dict[str, Any]:
     if not isinstance(raw_phases, Mapping) or set(raw_phases) != set(expected_phases):
         _fail(message="phase set does not match operation")
     phases = {
-        name: _validate_phase(name, raw_phases[name])
+        name: _validate_phase(name, raw_phases[name], version)
         for name in expected_phases
     }
 
@@ -330,14 +341,14 @@ def derive_run_result(payload: Any) -> dict[str, Any]:
     if items and not contract["allows_items"]:
         _fail(message="operation does not allow item outcomes")
 
-    counts = _derive_counts(phases, items)
+    counts = _derive_counts(phases, items, version)
     declared_counts = payload.get("counts")
     if declared_counts is not None:
         if not isinstance(declared_counts, Mapping):
             _fail("count_mismatch")
-        if set(declared_counts) != set(_COUNT_KEYS):
+        if set(declared_counts) != set(counts):
             _fail("count_mismatch")
-        if any(declared_counts[key] != counts[key] for key in _COUNT_KEYS):
+        if any(declared_counts[key] != counts[key] for key in counts):
             _fail("count_mismatch")
 
     derived_outcome = _derive_outcome(contract, phases, counts)
@@ -345,7 +356,7 @@ def derive_run_result(payload: Any) -> dict[str, Any]:
     if claimed_outcome is not None and claimed_outcome != derived_outcome:
         _fail(message="derived outcome mismatch")
 
-    db_status = "succeeded" if derived_outcome in {"complete", "skipped"} else "failed"
+    db_status = "succeeded" if derived_outcome in {"complete", "skipped", "deferred"} else "failed"
     healthy = derived_outcome == "complete" and operation in {
         "alpha_picks_sync",
         "market_news_sync",
@@ -355,7 +366,7 @@ def derive_run_result(payload: Any) -> dict[str, Any]:
         _fail(message="healthy anchor mismatch")
 
     return {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": version,
         "operation": operation,
         "mode": payload["mode"],
         "job_name": contract["job_name"],

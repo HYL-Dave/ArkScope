@@ -125,7 +125,7 @@ def test_unknown_operation_schema_phase_item_or_reason_fails_closed():
     unknown_operation["operation"] = "market_news_magic"
     mutations.append(unknown_operation)
     unknown_schema = copy.deepcopy(baseline)
-    unknown_schema["schema_version"] = 2
+    unknown_schema["schema_version"] = 999
     mutations.append(unknown_schema)
     unknown_phase = copy.deepcopy(baseline)
     unknown_phase["phases"]["surprise"] = {"state": "complete", "reason_code": None}
@@ -151,6 +151,37 @@ def test_declared_counts_must_equal_derived_phase_and_item_counts():
     with pytest.raises(protocol.ProtocolError) as captured:
         protocol.derive_run_result(_case("declared_count_mismatch")["input"])
     assert captured.value.code == "count_mismatch"
+
+
+@pytest.mark.parametrize("failure", [None, "list_navigation", "detail_fetch"])
+def test_version_two_mid_batch_deferral_matches_js_and_keeps_failure_precedence(tmp_path, failure):
+    payload = copy.deepcopy(_case("complete_market_sync")["input"])
+    payload["schema_version"] = 2
+    for key in ("counts", "derived_outcome", "healthy_anchor_eligible"):
+        payload.pop(key, None)
+    payload["phases"]["capture_readback"] = {"state": "deferred", "reason_code": "capacity_exhausted"}
+    if failure:
+        payload["phases"][failure] = {"state": "failed", "reason_code": "login_required"}
+    result = _protocol().derive_run_result(payload)
+    expected = "deferred" if not failure else "failed" if failure == "list_navigation" else "degraded"
+    assert result["derived_outcome"] == expected
+    assert result["healthy_anchor_eligible"] is False
+    assert result["db_status"] == ("succeeded" if not failure else "failed")
+    assert result["counts"]["phase_deferred"] == 1
+    fixture = tmp_path / "cases.json"
+    fixture.write_text(json.dumps({"protocol_cases": [{"name": "deferred", "input": payload}]}))
+    js = subprocess.run(["node", str(RUNNER), str(fixture), str(JS_PROTOCOL)], capture_output=True, text=True, check=True)
+    assert json.loads(js.stdout) == [{"name": "deferred", "ok": True, "result": result}]
+
+
+def test_version_one_does_not_gain_new_states_or_change_canonical_fields():
+    payload = copy.deepcopy(_case("complete_market_sync")["input"])
+    result = _protocol().derive_run_result(payload)
+    assert result["schema_version"] == 1
+    assert "phase_deferred" not in result["counts"]
+    payload["phases"]["detail_fetch"] = {"state": "deferred", "reason_code": "capacity_exhausted"}
+    with pytest.raises(_protocol().ProtocolError):
+        _protocol().derive_run_result(payload)
 
 
 def test_operation_mode_and_job_name_contracts_are_closed():

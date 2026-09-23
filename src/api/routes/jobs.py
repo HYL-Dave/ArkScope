@@ -159,6 +159,7 @@ class ExtensionJobRecordRequest(BaseModel):
     finished_at: str
     result: Dict[str, Any]
     extension_diagnostics: Optional[Any] = None
+    acquisition: Optional[Any] = None
 
 
 class ExtensionJobRecordResponse(BaseModel):
@@ -268,6 +269,10 @@ def record_extension_job(
         if not client_event_id or started is None or finished is None or finished < started:
             raise ValueError("invalid_extension_event")
         result = derive_run_result(request.result)
+        from src.sa.acquisition_receipt import validate_event_acquisition
+
+        acquisition_present = "acquisition" in request.model_fields_set
+        acquisition = validate_event_acquisition(result, request.acquisition, present=acquisition_present)
         event_started = started.isoformat(timespec="milliseconds")
         event_finished = finished.isoformat(timespec="milliseconds")
         diagnostics_present = "extension_diagnostics" in request.model_fields_set
@@ -288,6 +293,8 @@ def record_extension_job(
         }
         if diagnostics_present:
             event_document["extension_diagnostics"] = diagnostics_projection
+        if acquisition_present:
+            event_document["acquisition"] = acquisition
         event_hash = hashlib.sha256(
             json.dumps(
                 event_document,
@@ -317,6 +324,7 @@ def record_extension_job(
             result=result,
             duration_ms=duration_ms,
             extension_diagnostics=diagnostics_projection,
+            acquisition=acquisition,
         )
     except ValueError as exc:
         code = str(exc)

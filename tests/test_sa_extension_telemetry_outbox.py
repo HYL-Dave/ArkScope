@@ -34,6 +34,14 @@ def test_outbox_commits_record_before_native_delivery():
     assert result["queue"] == []
 
 
+def test_acquisition_identity_is_frozen_and_replayed_after_worker_restart():
+    result = _run("acquisition_identity")
+    assert len(result["delivered"]) == 2
+    assert result["delivered"][0]["acquisition"] == result["original"]
+    assert result["delivered"][1]["acquisition"] == result["original"]
+    assert result["queue"] == []
+
+
 def test_persisted_delivery_removes_only_the_matching_event():
     result = _run("remove_matching_only")
     assert [row["client_event_id"] for row in result["queue"]] == ["evt-second"]

@@ -107,6 +107,23 @@ class CompanyCollector:
             marker.flush()
             os.fsync(marker.fileno())
 
+    def verify_receipt(self, receipt, result):
+        """Read immutable terminal evidence, including after an owner switch."""
+        try:
+            with closing(sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+                state = self._read(conn)
+                if receipt["ledger_id"] != state["ledger_id"]:
+                    return False
+                row = conn.execute("SELECT payload, receipt FROM acquisition_tasks WHERE task_id=? AND finished_at IS NOT NULL",
+                                   (receipt["task_id"],)).fetchone()
+                if not row or json.loads(row[1]) != receipt:
+                    return False
+                task = json.loads(row[0])
+                return (task["operation"] == result["operation"] and task["mode"] == result["mode"]
+                        and (result["derived_outcome"] != "complete" or task["result"]["status"] == "ok"))
+        except (CompanyDataFailure, OSError, sqlite3.Error, ValueError, KeyError, TypeError):
+            return False
+
     def _connect(self, msg, now):
         fresh = not self.path.exists()
         if fresh:

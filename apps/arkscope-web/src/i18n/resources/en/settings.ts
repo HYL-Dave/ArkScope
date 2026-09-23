@@ -775,6 +775,7 @@ const settings = {
       status: {
         captureComplete: "Capture complete",
         captureSkipped: "Capture skipped",
+        captureDeferred: "Waiting to capture",
         captureDegraded: "Capture degraded",
         captureFailed: "Capture failed",
         legacyCauseAbsent: "Cause was not recorded (legacy data)",

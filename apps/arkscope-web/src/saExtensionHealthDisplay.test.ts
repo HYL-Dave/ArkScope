@@ -22,6 +22,14 @@ const seg = (key: string, state: SAExtensionHealthSegment["state"], detail = "de
 });
 
 describe("displaySAExtensionSegments", () => {
+  it("shows deferred capture as waiting, not successful or failed", () => {
+    const segment: SAExtensionHealthSegment = { key: "telemetry_last", state: "warn", code: "capture_deferred" };
+    const en = displaySAExtensionSegments([segment], settingsT("en"))[0];
+    const zh = displaySAExtensionSegments([segment], settingsT("zh-Hant"))[0];
+    expect(en.tone).toBe("warn");
+    expect(en.copy).toContain("Waiting to capture");
+    expect(zh.copy).toContain("等待擷取");
+  });
   it("renders the fixed native-host chain order with zh labels and symbols", () => {
     const rows = displaySAExtensionSegments([
       seg("capture_readback", "warn", "尚未有第一次擷取"),

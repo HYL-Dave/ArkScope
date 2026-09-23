@@ -774,6 +774,7 @@ const settings = {
       status: {
         captureComplete: "擷取完成",
         captureSkipped: "本次擷取已略過",
+        captureDeferred: "等待擷取",
         captureDegraded: "擷取部分完成",
         captureFailed: "擷取失敗",
         legacyCauseAbsent: "原因未記錄（舊版資料）",

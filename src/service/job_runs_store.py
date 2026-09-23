@@ -338,6 +338,7 @@ class JobRunsLocalStore:
         result: Dict[str, Any],
         duration_ms: Optional[int],
         extension_diagnostics: Optional[Dict[str, Any]] = None,
+        acquisition: Optional[Dict[str, Any]] = None,
     ) -> int:
         """Atomically deduplicate and persist one structured extension event."""
 
@@ -370,6 +371,10 @@ class JobRunsLocalStore:
             "event_hash": fingerprint,
         }
         payload = {"extension_event": identity}
+        if acquisition is not None:
+            from src.sa.acquisition_receipt import project_acquisition
+
+            payload["acquisition"] = project_acquisition(acquisition)
         if extension_diagnostics is not None:
             payload["extension_diagnostics"] = json.loads(
                 json.dumps(extension_diagnostics, sort_keys=True)
