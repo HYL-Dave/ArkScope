@@ -762,7 +762,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 82,
       shell: 49,
-      settings: 1157,
+      settings: 1158,
       research: 240,
       explore: 1178,
       portfolio: 374,
@@ -848,7 +848,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3104);
+      expect(total, `${locale}.total`).toBe(3105);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([
@@ -1421,6 +1421,7 @@ describe("bundled i18n resources", () => {
       "dataSources.extension.reasons.extensionDependencyMissing",
       "dataSources.extension.reasons.reconciliationFailed",
       "dataSources.extension.reasons.commentScanFailed",
+      "dataSources.extension.reasons.articleContextChanged",
       "dataSources.extension.reasons.unknownFailure",
       "dataSources.extension.reasons.tabClosed",
       "dataSources.extension.reasons.browserApiFailed",

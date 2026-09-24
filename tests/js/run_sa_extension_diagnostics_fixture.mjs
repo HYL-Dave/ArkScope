@@ -167,6 +167,7 @@ async function runAlphaFailureBranch(context, kind) {
       : {ok: true};
   };
   context.settleArticleBeforeScroll = async function () {};
+  context.beginArticleCapture = async function () { return {assert:async()=>{},close:async()=>{}}; };
   context.injectDetailScraper = async function () {
     if (kind === "unknown") throw new Error("private article body");
     if (kind === "parser") return {error: "private article body"};
@@ -217,6 +218,7 @@ async function runCommentFailure(context) {
   };
   context.waitForArticleReady = async function () { return {ok: true}; };
   context.settleArticleBeforeScroll = async function () {};
+  context.beginArticleCapture = async function () { return {assert:async()=>{},close:async()=>{}}; };
   context.scrollToComments = async function () { return {}; };
   context.injectCommentsScraper = async function () { return {comments: []}; };
   context.sendNativeMessage2 = async function (message) {

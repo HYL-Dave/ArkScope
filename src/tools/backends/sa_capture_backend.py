@@ -1509,7 +1509,12 @@ class SACaptureBackend(LocalMarketBackend):
         article = dict(article_row)
 
         existing_rows = self._fetch_existing_article_comments(conn, article_id)
-        prepared_comments = _prepare_comments_for_upsert(existing_rows, comments)
+        # Unrecognized expansion controls may leave truncated text under an
+        # existing synthetic ID. Keep prior comments and checkpoints untouched.
+        controls_unresolved = comment_scan_stop_reason == "controls_unresolved"
+        prepared_comments = _prepare_comments_for_upsert(
+            existing_rows, [] if controls_unresolved else comments
+        )
         existing_by_comment_id = {
             row["comment_id"]: row
             for row in existing_rows
@@ -1541,7 +1546,7 @@ class SACaptureBackend(LocalMarketBackend):
             )
 
         before_count = len(existing_rows)
-        prepared_count = self._upsert_article_comments(
+        prepared_count = 0 if controls_unresolved else self._upsert_article_comments(
             conn, article_id, prepared_comments
         )
         after_count = self._count_article_comments(conn, article_id)
@@ -1550,7 +1555,7 @@ class SACaptureBackend(LocalMarketBackend):
         stable_bottom_rounds = _stable_bottom_rounds(
             comment_scan_stable_bottom_rounds
         )
-        usable = _comment_scan_usable(prepared_count, provider_count)
+        usable = not controls_unresolved and _comment_scan_usable(prepared_count, provider_count)
         transition = self._comment_recovery_transition(
             article,
             usable=usable,

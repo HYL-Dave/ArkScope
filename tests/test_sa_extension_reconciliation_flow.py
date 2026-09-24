@@ -93,6 +93,7 @@ injectArticlesListScraper = async function () {
 };
 waitForArticleReady = async function () { return { ok: true }; };
 settleArticleBeforeScroll = async function () {};
+beginArticleCapture = async function () { return {assert:async()=>{},close:async()=>{}}; };
 injectDetailScraper = async function () {
   return {
     title: "Provider title",
@@ -242,6 +243,7 @@ def test_manual_fetch_never_copies_user_symbol_into_provider_or_content_evidence
         waitForTabLoad = async function () {};
         waitForArticleReady = async function () { return { ok: true }; };
         settleArticleBeforeScroll = async function () {};
+        beginArticleCapture = async function () { return {assert:async()=>{},close:async()=>{}}; };
         injectDetailScraper = async function () {
           return {
             title: "Provider title", publish_date: "Jul 15, 2026",
@@ -249,7 +251,7 @@ def test_manual_fetch_never_copies_user_symbol_into_provider_or_content_evidence
             detail_ticker_observed_at: "2026-07-18T12:00:00Z",
           };
         };
-        scrollToComments = async function () {};
+        scrollToComments = async function () { return {}; };
         injectCommentsScraper = async function () { return { comments: [] }; };
         sendNativeMessage2 = async function (message) {
           calls.push(message);
@@ -521,7 +523,8 @@ def test_comment_refresh_settles_after_ready_before_scrolling():
           return { ok: true };
         };
         settleArticleBeforeScroll = async function () { events.push("settled"); };
-        scrollToComments = async function () { events.push("scrolled"); };
+        beginArticleCapture = async function () { return {assert:async()=>{},close:async()=>{}}; };
+        scrollToComments = async function () { events.push("scrolled"); return {}; };
         injectCommentsScraper = async function () { return { comments: [] }; };
         sendNativeMessage2 = async function (message) {
           if (message.action === "save_articles_meta") {

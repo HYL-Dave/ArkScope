@@ -515,6 +515,42 @@ execute after disabling auto-sync, and a known login failure did not stop its
 next portfolio navigation. Both are repaired by the
 [coordination delivery](docs/superpowers/evidence/2026-09-23-sa-automation-coordination/README.md).
 
+### SA Comment Expansion And Capture Identity
+
+**Candidate, not production-accepted.** The September 24 change remains on the
+feature branch. Signed-in per-run comparison and the final frozen-revision full
+regression are required before merge. See the
+[comment acceptance procedure](tests/sa_comment_acceptance/README.md).
+
+Comment expansion is restricted to recognized comment/reply/text controls.
+Known navigating links, new-context links, submit/reset controls and duplicate
+nested controls are excluded. This does not make arbitrary page JavaScript
+incapable of navigation. During capture, tab URL/loading/closure/new-context
+signals and an isolated-document witness detect unexpected transitions, including
+same-URL reloads. Article URL/canonical identity is checked before and after
+reading body/comments. Invalid captures are not persisted under the requested
+article. Once verified data has been serialized into the background, subsequent
+tab navigation does not invalidate that already captured snapshot.
+
+If a potentially relevant legacy control cannot be recognized safely, the scan
+reports `controls_unresolved`: existing comments and comment checkpoints are
+retained, while a separately valid article body can still be saved. A diagnostic
+failure is not permission to overwrite complete comments with truncated text.
+The existing Quick/Full/Deep/Manual time, round and settle limits are unchanged.
+
+The isolated test package can record old/new candidates on the same DOM and run
+either selector, exporting each run separately. It has no Native Messaging or
+alarm permission, does not navigate to articles automatically and does not write
+production databases. Browser-triggered requests from scrolling/clicking still
+occur. These observations are not an exact HTTP-request count; tab events cannot
+account for every XHR, redirect or page-script action. The normal SA collector
+must be paused during this small manual test.
+
+Same-DOM candidate agreement alone is not acceptance. Compare independently
+captured full comment text and parent relationships, article attribution and
+scan cost, never accumulated database counts. Changed source content, incomplete
+traces or higher work/time are unresolved evidence, not a passing result.
+
 ### SA Financial Refresh Scheduling
 
 **State:** the shared Chrome/Firefox implementation is opt-in and off by default.

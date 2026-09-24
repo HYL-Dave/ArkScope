@@ -471,6 +471,48 @@ def test_body_capture_commits_when_comment_scan_is_unusable(backend):
     assert article["provider_comments_count_at_last_scan"] is None
 
 
+@pytest.mark.parametrize("provider_count", [0, 3])
+@pytest.mark.parametrize("body", [False, True])
+def test_unresolved_controls_preserve_comments_and_checkpoint(backend, provider_count, body):
+    backend.upsert_sa_articles_meta([_article("a1")])
+    backend.save_article_with_comments("a1", "Old body", _comments(), provider_comments_count=2)
+    before = backend.get_sa_article_with_comments("a1")
+    truncated = [dict(_comments()[0], comment_text="Great")]
+    kwargs = dict(provider_comments_count=provider_count, comment_scan_stop_reason="controls_unresolved")
+    result = (backend.save_article_with_comments("a1", "New body", truncated, **kwargs)
+              if body else backend.update_article_comments("a1", truncated, **kwargs))
+    after = backend.get_sa_article_with_comments("a1")
+    assert result["comment_scan_usable"] is False
+    assert result["net_new_comments"] == 0
+    assert after["comments"] == before["comments"]
+    for key in ("comments_fetched_at", "provider_comments_count_at_last_scan", "comment_recovery_state"):
+        assert after[key] == before[key]
+    assert after["body_markdown"] == ("New body" if body else "Old body")
+
+
+@pytest.mark.parametrize("body", [False, True])
+def test_unresolved_scan_does_not_run_duplicate_cleanup(backend, body):
+    backend.upsert_sa_articles_meta([_article("a1")])
+    conn = backend._sa_conn()
+    try:
+        for row_id, date in [(101, None), (102, T1)]:
+            conn.execute("INSERT INTO sa_article_comments (id,article_id,comment_id,commenter,comment_text,comment_date,fetched_at) VALUES (?,'a1',?,'alice','same text',?,?)",
+                         (row_id,str(row_id),date,T1))
+        conn.execute("INSERT INTO sa_comment_signals (comment_row_id,article_id,comment_id,high_value_score,rule_set_version,extracted_at) VALUES (101,'a1','101',1,'test',?)",(T1,))
+        conn.commit()
+        before = [tuple(row) for row in conn.execute("SELECT * FROM sa_article_comments ORDER BY id")]
+        signals = [tuple(row) for row in conn.execute("SELECT * FROM sa_comment_signals")]
+        kwargs = dict(comment_scan_stop_reason="controls_unresolved")
+        if body:
+            backend.save_article_with_comments("a1","valid body",[],**kwargs)
+        else:
+            backend.update_article_comments("a1",[],**kwargs)
+        assert [tuple(row) for row in conn.execute("SELECT * FROM sa_article_comments ORDER BY id")] == before
+        assert [tuple(row) for row in conn.execute("SELECT * FROM sa_comment_signals")] == signals
+    finally:
+        conn.close()
+
+
 def test_first_comment_scan_establishes_baseline_without_pending_recovery(backend):
     backend.upsert_sa_articles_meta([_article("first")])
     result = backend.update_article_comments(

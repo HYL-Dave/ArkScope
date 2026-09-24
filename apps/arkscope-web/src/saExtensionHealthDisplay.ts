@@ -107,6 +107,7 @@ function reasonLabel(value: unknown, t: SettingsT): string | null {
     case "extension_dependency_missing": return t(($) => $.dataSources.extension.reasons.extensionDependencyMissing);
     case "reconciliation_failed": return t(($) => $.dataSources.extension.reasons.reconciliationFailed);
     case "comment_scan_failed": return t(($) => $.dataSources.extension.reasons.commentScanFailed);
+    case "article_context_changed": return t(($) => $.dataSources.extension.reasons.articleContextChanged);
     case "unknown_failure": return t(($) => $.dataSources.extension.reasons.unknownFailure);
     case "tab_closed": return t(($) => $.dataSources.extension.reasons.tabClosed);
     case "browser_api_failed": return t(($) => $.dataSources.extension.reasons.browserApiFailed);

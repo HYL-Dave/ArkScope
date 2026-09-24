@@ -816,6 +816,7 @@ const settings = {
         extensionDependencyMissing: "Extension runtime dependency missing",
         reconciliationFailed: "Data reconciliation failed",
         commentScanFailed: "Comment scan failed",
+        articleContextChanged: "Article page changed during capture; content was not saved",
         unknownFailure: "Unclassified failure",
         tabClosed: "Browser tab closed",
         browserApiFailed: "Browser API call failed",

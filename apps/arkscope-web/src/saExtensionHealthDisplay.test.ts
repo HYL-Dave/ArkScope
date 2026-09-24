@@ -230,6 +230,7 @@ describe("displaySAExtensionSegments", () => {
       ["page_readiness", "dom_not_ready", "頁面尚未就緒"],
       ["native_transport", "native_host_unavailable", "Native 傳輸"],
       ["local_persistence", "database_write_failed", "本機資料庫寫入失敗"],
+      ["tab_navigation", "article_context_changed", "擷取時文章頁面已變更，未儲存內容"],
     ] as const;
 
     const copies = cases.map(([stage, reason]) => displaySAExtensionSegments([{
@@ -255,7 +256,7 @@ describe("displaySAExtensionSegments", () => {
     }], settingsT("zh-Hant"))[0].copy);
 
     cases.forEach(([, , expected], index) => expect(copies[index]).toContain(expected));
-    expect(new Set(copies).size).toBe(3);
+    expect(new Set(copies).size).toBe(cases.length);
     expect(JSON.stringify(copies)).not.toContain("PLANTED_RAW_");
   });
 

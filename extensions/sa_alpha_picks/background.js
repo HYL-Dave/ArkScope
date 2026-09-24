@@ -21,6 +21,9 @@ if (typeof SAQueue === "undefined" && typeof importScripts === "function") {
 if (typeof SAAcquisition === "undefined" && typeof importScripts === "function") {
   importScripts("acquisition_client.js");
 }
+if (typeof SACommentCapture === "undefined" && typeof importScripts === "function") {
+  importScripts("comment_capture.js");
+}
 
 const SA_CURRENT_URL = "https://seekingalpha.com/alpha-picks/picks/current";
 const SA_CLOSED_URL = "https://seekingalpha.com/alpha-picks/picks/removed";
@@ -3114,10 +3117,8 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         if (await observeSaRestriction(ready.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
         continue;
       }
-      await settleArticleBeforeScroll(tabId);
-
-      // Scrape body
-      var detail = await injectDetailScraper(tabId);
+      var captured = await captureArticle(tabId, item, scrollMode, true);
+      var detail = captured.detail;
       if (!detail || detail.error) {
         failed += recordExtensionFailure(diagnostics, {
           stage: "content_parse",
@@ -3130,16 +3131,8 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         continue;
       }
 
-      // Scroll down to comments section + load all comments
-      // This naturally provides human-like dwell time (10-30s per page)
-      var bodyScrollStats = await scrollToComments(tabId, {
-        mode: scrollMode,
-        articleId: item.article_id,
-      });
-
-      // Scrape comments
-      var commentsResult = await injectCommentsScraper(tabId);
-      var comments = (commentsResult && commentsResult.comments) || [];
+      var bodyScrollStats = captured.scroll;
+      var comments = captured.comments;
 
       var report = formatDetailReport(detail);
       var saveResult = await sendNativeMessage2({
@@ -3158,7 +3151,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
       if (saveResult && saveResult.ok) {
         fetched++;
         netNewComments += saveResult.net_new_comments || 0;
-        if (saveResult.comment_scan_usable !== true) {
+        if (saveResult.comment_scan_usable !== true || bodyScrollStats.controls_unresolved) {
           failed += recordExtensionFailure(diagnostics, {
             stage: "content_parse",
             reason_code: "comment_scan_failed",
@@ -3192,8 +3185,9 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     } catch (err) {
       if (isAcquisitionStop(err)) return stoppedDetails(err);
       failed += recordExtensionFailure(diagnostics, {
-        stage: "extension_runtime",
-        reason_code: "unknown_failure",
+        stage: err.code === "article_context_changed" ? "tab_navigation" : "extension_runtime",
+        reason_code: err.code === "article_context_changed" ? err.code : "unknown_failure",
+        message: err.evidence ? "Unexpected navigation signals: " + err.evidence.event_count : undefined,
         target_kind: "article_detail",
         target_ref: item.article_id,
         retryable: true,
@@ -3228,16 +3222,9 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         if (await observeSaRestriction(commentsReady.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
         continue;
       }
-      await settleArticleBeforeScroll(tabId);
-
-      // Scroll to load comments (natural delay)
-      var commentScrollStats = await scrollToComments(tabId, {
-        mode: scrollMode,
-        articleId: cItem.article_id,
-      });
-
-      var cResult = await injectCommentsScraper(tabId);
-      var cComments = (cResult && cResult.comments) || [];
+      var commentCapture = await captureArticle(tabId, cItem, scrollMode, false);
+      var commentScrollStats = commentCapture.scroll;
+      var cComments = commentCapture.comments;
 
       var saveCommentsOnlyResult = await sendNativeMessage2({
         action: "save_comments_only",
@@ -3251,7 +3238,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
           (commentScrollStats && commentScrollStats.stable_bottom_rounds) || 0,
       });
       if (saveCommentsOnlyResult && saveCommentsOnlyResult.status === "ok") {
-        if (saveCommentsOnlyResult.comment_scan_usable === true) {
+        if (saveCommentsOnlyResult.comment_scan_usable === true && !commentScrollStats.controls_unresolved) {
           commentsRefreshed++;
           netNewComments += saveCommentsOnlyResult.net_new_comments || 0;
         } else {
@@ -3275,8 +3262,9 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     } catch (err) {
       if (isAcquisitionStop(err)) return stoppedDetails(err);
       failed += recordExtensionFailure(diagnostics, {
-        stage: "extension_runtime",
-        reason_code: "unknown_failure",
+        stage: err.code === "article_context_changed" ? "tab_navigation" : "extension_runtime",
+        reason_code: err.code === "article_context_changed" ? err.code : "unknown_failure",
+        message: err.evidence ? "Unexpected navigation signals: " + err.evidence.event_count : undefined,
         target_kind: "article_comments",
         target_ref: cItem.article_id,
         retryable: true,
@@ -3387,11 +3375,9 @@ async function doManualFetch(items, diagnostics) {
           if (await observeSaRestriction(ready.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
           continue;
         }
-        await settleArticleBeforeScroll(tabId);
-
         var articleId = item.article_id;
-
-        var detail = await injectDetailScraper(tabId);
+        var captured = await captureArticle(tabId, item, "manual", true);
+        var detail = captured.detail;
         if (!detail || detail.error) {
           failed += recordExtensionFailure(diagnostics, {
             stage: "content_parse",
@@ -3404,13 +3390,8 @@ async function doManualFetch(items, diagnostics) {
           continue;
         }
 
-        // Scroll to load comments (v3 path)
-        var manualScrollStats = await scrollToComments(tabId, {
-          mode: "manual",
-          articleId: articleId,
-        });
-        var commentsResult = await injectCommentsScraper(tabId);
-        var comments = (commentsResult && commentsResult.comments) || [];
+        var manualScrollStats = captured.scroll;
+        var comments = captured.comments;
 
         var report = formatDetailReport(detail);
 
@@ -3450,7 +3431,7 @@ async function doManualFetch(items, diagnostics) {
         });
         if (saveResult && saveResult.ok) {
           fetched++;
-          if (saveResult.comment_scan_usable !== true) {
+          if (saveResult.comment_scan_usable !== true || manualScrollStats.controls_unresolved) {
             failed += recordExtensionFailure(diagnostics, {
               stage: "content_parse",
               reason_code: "comment_scan_failed",
@@ -3506,8 +3487,9 @@ async function doManualFetch(items, diagnostics) {
         if (isAcquisitionStop(err)) return {fetched:fetched,failed:failed,accepted:accepted,
           confirmation_required:confirmations,acquisition_stop:err.detail};
         failed += recordExtensionFailure(diagnostics, {
-          stage: "extension_runtime",
-          reason_code: "unknown_failure",
+          stage: err.code === "article_context_changed" ? "tab_navigation" : "extension_runtime",
+          reason_code: err.code === "article_context_changed" ? err.code : "unknown_failure",
+          message: err.evidence ? "Unexpected navigation signals: " + err.evidence.event_count : undefined,
           target_kind: "article_detail",
           target_ref: item.article_id,
           retryable: true,
@@ -3577,6 +3559,62 @@ function getCommentScrollProfile(mode) {
   return COMMENT_SCROLL_PROFILES[mode] || COMMENT_SCROLL_PROFILES.quick;
 }
 
+async function beginArticleCapture(tabId, item) {
+  var token = crypto.randomUUID();
+  var watch = SACommentCapture.watchNavigation(chrome.tabs, tabId, item.url);
+  async function probe(phase, detailUrl) {
+    watch.assert();
+    var options = {phase:phase,token:token,articleId:item.article_id};
+    if (detailUrl !== undefined) options.detailUrl = detailUrl;
+    var results = await chrome.scripting.executeScript({target:{tabId:tabId},
+      func:SACommentCapture.documentState,
+      args:[options],
+    });
+    watch.assert();
+    if (!results[0] || !results[0].result || !results[0].result.ok) throw SACommentCapture.contextError();
+  }
+  try {await probe('begin');} catch (error) {watch.close(); throw error;}
+  return {
+    token:token,
+    assert:function (detailUrl) {return probe('check', detailUrl);},
+    checkNavigation:watch.assert,
+    evidence:watch.evidence,
+    close:async function () {
+      watch.close();
+      try {
+        await chrome.scripting.executeScript({target:{tabId:tabId},func:SACommentCapture.documentState,
+          args:[{phase:'end',token:token,articleId:item.article_id}]});
+      } catch (_) { /* The tab may have closed or navigated away. */ }
+    },
+  };
+}
+
+async function captureArticle(tabId, item, mode, includeBody, options) {
+  options = options || {};
+  var guard = await beginArticleCapture(tabId, item);
+  var audits = [];
+  try {
+    await settleArticleBeforeScroll(tabId);
+    await guard.assert();
+    var detail = includeBody ? await injectDetailScraper(tabId) : null;
+    await guard.assert(detail && !detail.error ? detail.url || null : undefined);
+    if (includeBody && (!detail || detail.error)) return {detail:detail};
+    var scroll = await scrollToComments(tabId, {mode:mode,articleId:item.article_id,
+      guard:guard,strategy:options.strategy,trace:options.trace,audits:audits});
+    await guard.assert();
+    var result = await injectCommentsScraper(tabId);
+    await guard.assert();
+    // Only serialized, verified data crosses this boundary; cleanup and later
+    // persistence never read the page again, so they need no live-tab lease.
+    return {detail:detail,comments:result.comments || [],scroll:scroll,
+      navigation:guard.evidence ? guard.evidence() : null};
+  } catch (error) {
+    if (options.trace) error.capture_trace = {control_audits:audits,
+      navigation:guard.evidence ? guard.evidence() : null};
+    throw error;
+  } finally {await guard.close();}
+}
+
 async function settleArticleBeforeScroll(tabId) {
   await chrome.scripting.executeScript({
     target: { tabId },
@@ -3600,65 +3638,27 @@ async function scrollToComments(tabId, options) {
   var rounds = 0;
   var stableBottomRounds = 0;
   var stopReason = "max_scrolls";
+  var audits = options.audits || [], unresolved = false;
 
   for (var i = 0; i < profile.maxScrolls; i++) {
+    if (options.guard) options.guard.checkNavigation();
     if ((Date.now() - startedAt) >= profile.maxDurationMs) {
       stopReason = "timeout";
       break;
     }
     var result = await chrome.scripting.executeScript({
       target: { tabId },
-      func: function () {
-        var commentEls = document.querySelectorAll('[class*="border-t-share-separator-thin"]');
-        var atBottom = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 200);
-
-        // Click "Show more replies/comments" buttons — scoped to bottom half of page
-        var pageMiddle = document.body.scrollHeight / 2;
-        var buttons = document.querySelectorAll('button, a');
-        var clicked = false;
-        for (var b = 0; b < buttons.length; b++) {
-          var rect = buttons[b].getBoundingClientRect();
-          var absTop = rect.top + window.scrollY;
-          // Only click buttons in the bottom half (comments area)
-          if (absTop < pageMiddle) continue;
-          var bt = buttons[b].innerText.trim().toLowerCase();
-          if ((bt.indexOf('show') >= 0 || bt.indexOf('load more') >= 0 || bt.indexOf('more repl') >= 0)
-              && buttons[b].offsetParent !== null) {
-            buttons[b].click();
-            clicked = true;
-          }
-        }
-
-        var loading = false;
-        var loadingNodes = document.querySelectorAll(
-          '[aria-busy="true"], [role="progressbar"], [class*="loading"], [class*="spinner"]'
-        );
-        for (var l = 0; l < loadingNodes.length; l++) {
-          var loadingRect = loadingNodes[l].getBoundingClientRect();
-          var loadingTop = loadingRect.top + window.scrollY;
-          var loadingStyle = window.getComputedStyle(loadingNodes[l]);
-          if (
-            loadingTop >= pageMiddle &&
-            loadingRect.width > 0 &&
-            loadingRect.height > 0 &&
-            loadingStyle.display !== 'none' &&
-            loadingStyle.visibility !== 'hidden'
-          ) {
-            loading = true;
-            break;
-          }
-        }
-
-        window.scrollBy(0, window.innerHeight);
-        return {
-          comments: commentEls.length,
-          atBottom: atBottom,
-          clicked: clicked,
-          loading: loading,
-        };
-      },
+      func: SACommentCapture.scanPage,
+      args: [{strategy: options.strategy || "guarded", token:options.guard && options.guard.token}],
     });
     var check = result[0] && result[0].result;
+    if (check && check.control_audit) {
+      var audit = check.control_audit;
+      if (options.trace) audits.push({round:i + 1,audit:audit});
+      if (audit.unresolved_candidates > 0) unresolved = true;
+    }
+    if (options.guard) options.guard.checkNavigation();
+    if (check && check.page_changed) throw SACommentCapture.contextError();
     rounds++;
 
     var grew = Boolean(check && check.comments > bestCount);
@@ -3685,10 +3685,12 @@ async function scrollToComments(tabId, options) {
     comments_loaded: bestCount,
     rounds: rounds,
     elapsed_ms: Date.now() - startedAt,
-    stop_reason: stopReason,
+    stop_reason: unresolved ? "controls_unresolved" : stopReason,
     stable_bottom_rounds: stableBottomRounds,
+    controls_unresolved:unresolved,
   };
   console.info("[SA] scrollToComments", JSON.stringify(stats));
+  if (options.trace) stats.control_audits = audits;
   return stats;
 }
 

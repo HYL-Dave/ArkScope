@@ -815,6 +815,7 @@ const settings = {
         extensionDependencyMissing: "Extension 執行元件缺失",
         reconciliationFailed: "資料核對失敗",
         commentScanFailed: "留言掃描失敗",
+        articleContextChanged: "擷取時文章頁面已變更，未儲存內容",
         unknownFailure: "未分類失敗",
         tabClosed: "瀏覽器分頁已關閉",
         browserApiFailed: "瀏覽器 API 呼叫失敗",

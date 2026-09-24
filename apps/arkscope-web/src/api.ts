@@ -5147,6 +5147,7 @@ export type SAExtensionDiagnosticReason =
   | "detail_queue_failed"
   | "capture_readback_failed"
   | "tab_closed"
+  | "article_context_changed"
   | "browser_api_failed"
   | "script_injection_failed"
   | "native_response_invalid"
