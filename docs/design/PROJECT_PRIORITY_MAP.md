@@ -671,6 +671,17 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
+- **2026-09-25 (UNIFIED SA REVIEW FIX PASS; ARTICLE ASSOCIATION NEXT):** The
+  operator approves repairing activation/stop races, force-consent dirty state
+  and stale routine switches before a fresh frozen full regression and local
+  merge. Unified installed Firefox/Chromium control checks are isolated, not
+  production activation. Post-merge, improve historical Alpha Picks article-to-
+  ticker association: reliable entry/exit evidence may refine it; otherwise
+  useful generic association is sufficient, with no mandatory manual review.
+  Do not infer identity or entry/exit from ambiguous data, overwrite explicit
+  choices, or run a production backfill without a bounded design. Service, MCP
+  and retention commitments remain open; this follow-up does not replace them.
+
 - **2026-09-24 (COORDINATION IMPLEMENTED; FREEZE BEFORE MERGE):** The approved
   eight-task delivery now has shared browser ownership, native navigation budgets,
   routine priority, resumable financial queues, configurable pacing, preview and

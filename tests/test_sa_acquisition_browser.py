@@ -25,6 +25,7 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
     from selenium import webdriver
     from selenium.webdriver.firefox.options import Options
     from selenium.webdriver.firefox.service import Service
+    from selenium.webdriver.support.ui import Select
     from src.sa.company_collector import CompanyCollector
     from src.sa.company_store import save_capture
     from tests.test_sa_company_data import capture
@@ -142,9 +143,34 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
                     time.sleep(.2)
                 raise AssertionError({"timeout": label, "state": state, "saved": saved, "admissions": admissions})
 
-            assert ff("activate")["status"] == "ok"
+            def ff_click(selector):
+                element = driver.find_element("css selector", selector)
+                driver.execute_script("arguments[0].scrollIntoView({block:'center'})", element)
+                element.click()
+
+            def ff_activate(enabled=False):
+                driver.get(firefox_popup)
+                wait_for(lambda _: driver.find_element("id", "companyCollectorStatus").text.startswith("Collector:"), "Firefox popup ready")
+                Select(driver.find_element("id", "companyRefreshTargetMode")).select_by_value("watchlist")
+                if driver.find_element("id", "companyRefreshEnabled").is_selected() != enabled:
+                    ff_click("#companyRefreshEnabled")
+                if not driver.find_element("id", "companyAdvanced").get_attribute("open"):
+                    ff_click("#companyAdvanced summary")
+                for selector, value in {"#companyFinancialGap": 15, '[name="hour_limit"]': 20,
+                        '[name="day_limit"]': 100, '[name="hour_reserve"]': 4, '[name="day_reserve"]': 20}.items():
+                    element = driver.find_element("css selector", selector)
+                    element.clear(); element.send_keys(str(value))
+                ff_click("#companyActivationConfirmed")
+                ff_click("#companyCollectorSelect")
+                wait_for(lambda s: s["collector"].get("is_owner") and s["refresh"]["config"]["enabled"] is enabled
+                         and driver.find_element("id", "companyCollectorSelect").is_enabled(), "Firefox activation complete")
+
+            assert not saved and not admissions
+            ff_activate()
+            driver.save_screenshot(str(tmp_path / "firefox-unified.png"))
+            assert driver.execute_script("return document.body.scrollWidth <= innerWidth")
             assert ch("news")["reason"] == "collector_other_installation"
-            ff("run")
+            ff_click("#companyRefreshNow")
             first = wait_for(lambda s: len(saved) == 1 and not s["refresh"]["running"], "first scope")
             assert first["collector"]["active"] is None
             routine = ff("news")
@@ -159,7 +185,14 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
             assert len(saved) == 2
             ff("alarm"); time.sleep(1)
             assert len(saved) == 2
-            ff("run", force=True); ff("cancel")
+            ff_activate(enabled=True)
+            if not driver.find_element("id", "companyAdvanced").get_attribute("open"):
+                ff_click("#companyAdvanced summary")
+            ff_click("#companyForceConfirmed")
+            ff_click("#companyRefreshForce")
+            wait_for(lambda s: s["refresh"]["pending_count"] > 0, "force queued from Firefox popup")
+            assert ff("snapshot")["refresh"]["config"]["enabled"] is True
+            ff("cancel")
             assert ff("snapshot")["refresh"]["pending_count"] == 0
 
             # A real extension reload destroys worker timers, retaining native pacing and browser storage.
@@ -177,12 +210,29 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
             assert ff("news")["status"] == "deferred"
             assert len(admissions) == before
             assert ff("recover")["status"] == "ok"
-            assert ch("activate")["status"] == "ok"
+            page.reload()
+            page.wait_for_function("document.querySelector('#companyCollectorStatus').textContent.startsWith('Collector:')")
+            page.locator("#companyRefreshTargetMode").select_option("watchlist")
+            if not page.locator("#companyAdvanced").evaluate("element=>element.open"):
+                page.locator("#companyAdvanced summary").click()
+            page.locator("#companyFinancialGap").fill("15")
+            for key, value in {"hour_limit": 20, "day_limit": 100, "hour_reserve": 4, "day_reserve": 20}.items():
+                page.locator('[name="'+key+'"]').fill(str(value))
+            page.locator("#companyActivationConfirmed").check()
+            page.locator("#companyCollectorSelect").click()
+            wait_for(lambda _: ch("snapshot")["collector"].get("is_owner")
+                     and page.locator("#companyCollectorSelect").is_enabled(), "Chromium popup activation")
+            page.screenshot(path=str(tmp_path / "chromium-unified.png"), full_page=True)
+            assert page.evaluate("document.body.scrollWidth <= innerWidth")
             assert ff("news")["reason"] == "collector_other_installation"
             assert ch("news").get("detail_fetched") == 1
-            ch("run", force=True)
+            if not page.locator("#companyAdvanced").evaluate("element=>element.open"):
+                page.locator("#companyAdvanced summary").click()
+            page.locator("#companyForceConfirmed").check()
+            page.locator("#companyRefreshForce").click()
             wait_for(lambda _: len(saved) == 4 and not ch("snapshot")["refresh"]["running"], "Chromium active continuation")
             assert saved[3][1] - saved[2][1] >= 15
+            assert ch("snapshot")["refresh"]["config"]["enabled"] is False
             chrome_before = ch("snapshot")
             chrome_url = page.url
             page.evaluate("()=>{setTimeout(()=>chrome.runtime.reload(),100);}")

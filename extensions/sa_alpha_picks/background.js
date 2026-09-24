@@ -799,11 +799,14 @@ function activateSaUpdates(request) {
       if (!upgrade && (!state || state.status !== "ok")) throw new Error(state && state.error_code || "sa_company_collector_unavailable");
       if (!upgrade && state.generation !== request.expected_generation) throw new Error("sa_acquisition_generation_stale");
       if (!upgrade && state.active) throw new Error("sa_company_collector_busy");
-      var routine = await chrome.storage.local.get(["alphaPicksAutoSyncEnabled","alphaPicksAutoSyncIntervalMinutes","marketNewsAutoSyncEnabled","marketNewsAutoSyncIntervalMinutes"]);
+      var routine = await chrome.storage.local.get(["alphaPicksAutoSyncEnabled","alphaPicksAutoSyncIntervalMinutes","alphaPicksAutoSyncRevision",
+        "marketNewsAutoSyncEnabled","marketNewsAutoSyncIntervalMinutes","marketNewsAutoSyncRevision"]);
       step = "disable";
       disabled = true;
-      await setAlphaPicksAutoSyncEnabled(false,routine.alphaPicksAutoSyncIntervalMinutes);
-      await setMarketNewsAutoSyncEnabled(false,routine.marketNewsAutoSyncIntervalMinutes);
+      var alphaSuspension = await setAlphaPicksAutoSyncEnabled(false,routine.alphaPicksAutoSyncIntervalMinutes,
+        routine.alphaPicksAutoSyncRevision == null ? 0 : routine.alphaPicksAutoSyncRevision);
+      var newsSuspension = await setMarketNewsAutoSyncEnabled(false,routine.marketNewsAutoSyncIntervalMinutes,
+        routine.marketNewsAutoSyncRevision == null ? 0 : routine.marketNewsAutoSyncRevision);
       await companyFinancialRefresh.configure(Object.assign({},config,{enabled:false}));
       if (!upgrade && state.policy && !state.is_owner) {
         step = "select";
@@ -824,8 +827,11 @@ function activateSaUpdates(request) {
       await chrome.storage.local.set({saAcquisitionLedger:state.ledger_id,saAcquisitionStatus:state});
       step = "enable";
       await companyFinancialRefresh.configure(config);
-      await setAlphaPicksAutoSyncEnabled(routine.alphaPicksAutoSyncEnabled === true,routine.alphaPicksAutoSyncIntervalMinutes);
-      await setMarketNewsAutoSyncEnabled(routine.marketNewsAutoSyncEnabled === true,routine.marketNewsAutoSyncIntervalMinutes);
+      // Restore only this activation's suspension, never a newer operator choice.
+      if (alphaSuspension.status === "ok") await setAlphaPicksAutoSyncEnabled(
+        routine.alphaPicksAutoSyncEnabled === true,routine.alphaPicksAutoSyncIntervalMinutes,alphaSuspension.revision);
+      if (newsSuspension.status === "ok") await setMarketNewsAutoSyncEnabled(
+        routine.marketNewsAutoSyncEnabled === true,routine.marketNewsAutoSyncIntervalMinutes,newsSuspension.revision);
       await syncAcquisitionBadge(state);
       return companyFinancialRefresh.status();
     } catch (error) {
@@ -2143,9 +2149,13 @@ function buildMarketNewsDetailQueue(result, mode) {
 
 var autoSyncSettingWrites = Promise.resolve();
 
-function writeAutoSyncSettings(jobKey, enabled, intervalMinutes) {
+function writeAutoSyncSettings(jobKey, enabled, intervalMinutes, expectedRevision) {
   var run = autoSyncSettingWrites.catch(function () {}).then(async function () {
     var intent = await readAutoSyncIntent(jobKey);
+    // The comparison belongs inside the write queue, not before awaiting it.
+    if (expectedRevision !== undefined && intent.revision !== expectedRevision) {
+      return {status:"skipped",reason:"operator_settings_changed"};
+    }
     if (intent.revision >= Number.MAX_SAFE_INTEGER) throw new Error("Automatic intent revision exhausted");
     var intervalKey = jobKey + "AutoSyncIntervalMinutes";
     var data = await chrome.storage.local.get([intervalKey]);
@@ -2158,24 +2168,28 @@ function writeAutoSyncSettings(jobKey, enabled, intervalMinutes) {
     update[intervalKey] = interval;
     if (jobKey === "marketNews") update.marketNewsAutoSyncLastStartedAt = null;
     await chrome.storage.local.set(update);
-    return interval;
+    return {status:"ok",interval:interval,revision:intent.revision + 1};
   });
   autoSyncSettingWrites = run;
   return run;
 }
 
-async function setAlphaPicksAutoSyncEnabled(enabled, intervalMinutes) {
-  var normalizedInterval = await writeAutoSyncSettings("alphaPicks", enabled, intervalMinutes);
+async function setAlphaPicksAutoSyncEnabled(enabled, intervalMinutes, expectedRevision) {
+  var written = await writeAutoSyncSettings("alphaPicks", enabled, intervalMinutes, expectedRevision);
+  if (written.status !== "ok") return written;
   await syncAlphaPicksAutoSyncAlarm();
   return {
     status: "ok",
     enabled: enabled,
-    interval_minutes: normalizedInterval,
+    interval_minutes: written.interval,
+    revision: written.revision,
   };
 }
 
-async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
-  var normalizedInterval = await writeAutoSyncSettings("marketNews", enabled, intervalMinutes);
+async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes, expectedRevision) {
+  var written = await writeAutoSyncSettings("marketNews", enabled, intervalMinutes, expectedRevision);
+  if (written.status !== "ok") return written;
+  var normalizedInterval = written.interval;
   await syncMarketNewsAutoSyncAlarm();
   var schedule = getMarketNewsAutoSyncSchedule(normalizedInterval);
   return {
@@ -2184,6 +2198,7 @@ async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes) {
     interval_minutes: schedule.intervalMinutes,
     interval_setting: normalizedInterval,
     interval_label: schedule.label,
+    revision: written.revision,
   };
 }
 

@@ -102,3 +102,29 @@ def test_partial_activation_failures_leave_all_three_intents_disabled(failure):
     assert result["saved"]["companyFinancialRefresh"]["config"]["enabled"] is False
     assert result["saved"]["alphaPicksAutoSyncEnabled"] is False
     assert result["saved"]["marketNewsAutoSyncEnabled"] is False
+
+
+@pytest.mark.parametrize("job,setter", [("alphaPicks", "setAlphaPicksAutoSyncEnabled"),
+                                       ("marketNews", "setMarketNewsAutoSyncEnabled")])
+def test_activation_does_not_restore_intent_changed_before_suspension(job, setter):
+    result = _run_background_probe(SETUP + """
+      await setAlphaPicksAutoSyncEnabled(true,30);
+      await setMarketNewsAutoSyncEnabled(true,60);
+      const read=chrome.storage.local.get;
+      let intercepted=false;
+      chrome.storage.local.get=async keys=>{
+        const snapshot=await read(keys);
+        if(!intercepted && Array.isArray(keys) && keys.includes('alphaPicksAutoSyncEnabled')
+            && keys.includes('marketNewsAutoSyncEnabled') && keys.includes('alphaPicksAutoSyncIntervalMinutes')) {
+          intercepted=true;
+          await """ + setter + """(false,15);
+        }
+        return snapshot;
+      };
+      const activated=await activateSaUpdates(accepted);
+      return {activated,intercepted,saved:await read(['""" + job + """AutoSyncEnabled','""" + job + """AutoSyncIntervalMinutes'])};
+    """)
+    assert result["intercepted"] is True
+    assert result["activated"]["status"] == "ok"
+    assert result["saved"][job + "AutoSyncEnabled"] is False
+    assert str(result["saved"][job + "AutoSyncIntervalMinutes"]) == "15"

@@ -19,6 +19,15 @@ complete final regression before any merge. See the
 Firefox remains the initial preference, not a fixed dependency. No production
 schedule, quota, registration or database has been changed.
 
+September 25 integration follow-up: review of frozen `b6ece944` reproduced
+activation restoring over a newer stop, force consent causing a disabled save,
+and stale routine switches/summary. The operator approved these three repairs
+before re-freezing, without a layout redesign or article-association work.
+All are repaired with cross-popup/background/storage tests; the focused gate is
+63 passed and the installed Firefox/Chromium gate is 1 passed. Task 8 requires a
+new full run on the repair commit, not reuse of the earlier counts. See
+[the integration record](../evidence/2026-09-23-sa-automation-coordination/2026-09-25-schedule-integration.md).
+
 ## Global Constraints
 
 - No automatic browser failover.

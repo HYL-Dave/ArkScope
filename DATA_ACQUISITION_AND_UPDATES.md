@@ -704,12 +704,21 @@ policy, selects/configures the installation, then enables the selected financial
 schedule and restores previously selected routine settings. A failed intermediate
 step leaves local schedules disabled and identifies that step. Saving settings
 alone does not activate collection. Reading status never initializes the store.
+Restoration is conditional on the stored routine-setting revision: a newer stop
+or interval change, before suspension or while activation awaits the host, wins.
+The open popup's routine switches, intervals and summary follow storage changes;
+an activation failure must not leave an apparently enabled switch on screen.
 
 **Update missing / due** reuses fresh scopes, including while the periodic
 schedule is off. A separate advanced **Force refresh** needs confirmation;
 it bypasses source-age reuse only, never restrictions, budgets, ownership or a
 scope's failed/interrupted-attempt backoff. Other eligible scopes continue while
 that scope waits; pending intent alone does not cause one-second retry polling.
+Checking force/recovery/activation consent alone is not a configuration edit and
+does not save or disable the periodic schedule. Unsaved capacity-policy edits
+remain a separate draft until explicit activation. Actual scope/interval edits
+still use the existing disabled-save step before a manual update; re-enabling
+that changed schedule requires the explicit activation command.
 Changing settings cancels old manual intent. Cancelling a queued update does not
 disable the separate periodic schedule; a late response cannot resurrect cancelled
 work. Closing the popup does not discard the durable queue.

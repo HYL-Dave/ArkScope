@@ -67,6 +67,22 @@ var MARKET_NEWS_AUTO_SYNC_WINDOWS_ET = {
 // Labels and accessible descriptions are available before native limits resolve.
 renderActionCatalog({ status: "loading", limits: {} });
 
+var routineSettingKeys = ["alphaPicksAutoSyncEnabled", "alphaPicksAutoSyncIntervalMinutes",
+  "marketNewsAutoSyncEnabled", "marketNewsAutoSyncIntervalMinutes"];
+var routineSettings = {};
+function renderRoutineSettings(values) {
+  routineSettingKeys.forEach(function(key) {if (Object.prototype.hasOwnProperty.call(values,key)) routineSettings[key]=values[key];});
+  alphaPicksAutoSyncToggle.checked = routineSettings.alphaPicksAutoSyncEnabled === true;
+  alphaPicksAutoSyncInterval.value = normalizeAlphaPicksAutoSyncIntervalValue(routineSettings.alphaPicksAutoSyncIntervalMinutes);
+  alphaPicksAutoSyncInterval.setAttribute("data-last-value", alphaPicksAutoSyncInterval.value);
+  marketNewsAutoSyncToggle.checked = routineSettings.marketNewsAutoSyncEnabled === true;
+  marketNewsAutoSyncInterval.value = normalizeMarketNewsAutoSyncIntervalValue(routineSettings.marketNewsAutoSyncIntervalMinutes);
+  marketNewsAutoSyncInterval.setAttribute("data-last-value", marketNewsAutoSyncInterval.value);
+  renderMarketNewsAutoSyncResolved();
+  document.getElementById("companyRoutineIntent").textContent = "Routine schedules: Alpha Picks "
+    + (alphaPicksAutoSyncToggle.checked ? "on" : "off") + " | News " + (marketNewsAutoSyncToggle.checked ? "on" : "off");
+}
+
 // Load last refresh state + restore manual input
 chrome.storage.local.get([
   "lastRefresh",
@@ -82,13 +98,8 @@ chrome.storage.local.get([
   if (data.manualDraft) {
     manualInput.value = data.manualDraft;
   }
-  alphaPicksAutoSyncToggle.checked = !!data.alphaPicksAutoSyncEnabled;
-  alphaPicksAutoSyncInterval.value = normalizeAlphaPicksAutoSyncIntervalValue(data.alphaPicksAutoSyncIntervalMinutes);
-  alphaPicksAutoSyncInterval.setAttribute("data-last-value", alphaPicksAutoSyncInterval.value);
-  marketNewsAutoSyncToggle.checked = !!data.marketNewsAutoSyncEnabled;
-  marketNewsAutoSyncInterval.value = normalizeMarketNewsAutoSyncIntervalValue(data.marketNewsAutoSyncIntervalMinutes);
-  marketNewsAutoSyncInterval.setAttribute("data-last-value", marketNewsAutoSyncInterval.value);
-  renderMarketNewsAutoSyncResolved();
+  // Storage events may have overtaken this initial read.
+  renderRoutineSettings(Object.assign({},data,routineSettings));
   renderStatus(data.lastRefresh);
   renderMarketNewsStatus(data.lastMarketNewsRefresh);
   renderStructuredLastRun(data[EXTENSION_LAST_RUN_STORAGE_KEY]);
@@ -1024,6 +1035,9 @@ chrome.runtime.onMessage.addListener(function (msg) {
 
 chrome.storage.onChanged.addListener(function (changes, areaName) {
   if (areaName !== "local") return;
+  var routineChanges = {};
+  routineSettingKeys.forEach(function(key) {if(changes[key])routineChanges[key]=changes[key].newValue;});
+  if(Object.keys(routineChanges).length)renderRoutineSettings(routineChanges);
   if (changes.lastCompanyCapture) {
     renderCompanyCapture(changes.lastCompanyCapture.newValue);
   }

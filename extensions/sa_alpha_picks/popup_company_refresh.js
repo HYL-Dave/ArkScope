@@ -2,7 +2,7 @@
   "use strict";
   var $ = function(id) {return document.getElementById(id);};
   var form=$("companyRefreshForm"), output=$("companyRefreshStatus"), target=$("companyRefreshTargetMode"), ticker=$("companyRefreshTickers");
-  var dirty=false, busy=false, revision=0, readRevision=0, state=null, expectedGeneration=null;
+  var dirty=false, policyDirty=false, busy=false, revision=0, readRevision=0, state=null, expectedGeneration=null;
   function lockForm(value) {
     busy=value;
     form.querySelectorAll('input, select, button').forEach(function(input){
@@ -80,10 +80,12 @@
       $("companyFinancialGap").value=values.financial_gap_seconds || 60;
       form.querySelectorAll('[name="companyRefreshStatement"]').forEach(function(input){input.checked=values.statements.includes(input.value);});
       form.querySelectorAll('[name="companyRefreshView"]').forEach(function(input){input.checked=values.views.includes(input.value);});
+      targetControls();
+    }
+    if (!dirty && !policyDirty) {
       if(control.policy)Object.keys(control.policy).forEach(function(key){var input=form.querySelector('[name="'+key+'"]');if(input)input.value=control.policy[key];});
       $("companyAdvanced").open=!control.policy;
       expectedGeneration=control.generation == null ? 0 : control.generation;
-      targetControls();
     }
     var changed=control.generation != null && control.generation!==expectedGeneration;
     $("companyReloadSettings").hidden=!changed;
@@ -132,7 +134,14 @@
     output.appendChild(records);
   }
   async function reload() {var ticket=++readRevision;var result=await send("get_company_refresh");if(ticket!==readRevision || busy)return;render(result);await preview();}
-  form.addEventListener("input",function(){dirty=true;targetControls();preview();});
+  form.addEventListener("input",function(event){
+    var input=event.target;
+    if(input.matches('[name="hour_limit"], [name="day_limit"], [name="hour_reserve"], [name="day_reserve"]')) {
+      policyDirty=true;return;
+    }
+    if(!input.matches('#companyRefreshEnabled, #companyRefreshTargetMode, #companyRefreshTickers, #companyRefreshDays, #companyRefreshQuarterlyDays, #companyFinancialGap, [name="companyRefreshStatement"], [name="companyRefreshView"]'))return;
+    dirty=true;targetControls();preview();
+  });
   target.addEventListener("change",function(){dirty=true;targetControls();preview();});
   form.addEventListener("submit",async function(event){event.preventDefault();if(busy)return;lockForm(true);var result;try{result=await send("save_company_refresh",{config:config()});}finally{lockForm(false);}dirty=result.status!=="ok";render(result);await preview();});
   $("companyCollectorSelect").addEventListener("click",async function(){
@@ -143,7 +152,7 @@
       confirm_activation:true,confirm_schedules:true,confirm_stopped:$("companyRecoveryConfirmed").checked});
     lockForm(false);
     if(result.status!=="ok")$("companyRefreshEnabled").checked=false;
-    else dirty=false;
+    else {dirty=false;policyDirty=false;}
     render(result);
     if(result.status==='ok')await preview();
   });
@@ -171,12 +180,9 @@
     var caps=Object.keys(state.collector.capability_pauses || {});
     render(await send("resume_sa_acquisition",{expected_generation:state.collector.generation,confirm_handled:true,capability:caps[0]}));
   });
-  $("companyReloadSettings").addEventListener("click",function(){dirty=false;reload();});
+  $("companyReloadSettings").addEventListener("click",function(){dirty=false;policyDirty=false;reload();});
   chrome.storage.onChanged.addListener(function(changes,area){
     if(area === "local" && (changes.companyFinancialRefresh || changes.saAcquisitionStatus || changes.saAcquisitionPending))reload();
-  });
-  chrome.storage.local.get(["alphaPicksAutoSyncEnabled","marketNewsAutoSyncEnabled"]).then(function(value){
-    $("companyRoutineIntent").textContent="Routine schedules: Alpha Picks "+(value.alphaPicksAutoSyncEnabled ? "on" : "off")+" | News "+(value.marketNewsAutoSyncEnabled ? "on" : "off");
   });
   reload();
 })();

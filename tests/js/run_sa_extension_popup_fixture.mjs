@@ -364,7 +364,7 @@ async function runPopup() {
         const input=doc.querySelector('[name="'+key+'"]');if(input)input.value=String(value);
       }
       const confirmed=doc.getElementById('companyActivationConfirmed');if(confirmed)confirmed.checked=true;
-      doc.getElementById('companyRefreshForm').dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+      doc.getElementById('companyRefreshTargetMode').dispatchEvent(new dom.window.Event('input',{bubbles:true}));
       await settle();
       if(scenario==='enable_sa_updates_here') {doc.getElementById('companyCollectorSelect')?.click();await settle();}
     } else if (scenario === "configure_company_watchlist") {
