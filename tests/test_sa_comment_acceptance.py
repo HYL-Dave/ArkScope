@@ -72,6 +72,88 @@ def test_each_acceptance_panel_keeps_its_own_article():
     assert json.loads(result.stdout) == [101]
 
 
+def test_loaded_structure_probe_is_passive_bounded_and_excludes_comment_text():
+    script = r"""
+    const fs=require('node:fs'),vm=require('node:vm'),{JSDOM}=require('jsdom');
+    const html='<article>PRIVATE ARTICLE TEXT</article><section><h3>Comments (107)</h3>'+
+      '<div class="print:block"><div class="border-t-share-separator-thin">PRIVATE COMMENT TEXT</div>'+
+      '<div class="mb-18 ml-52"><button type="button">See More Replies</button></div></div></section>'+
+      '<input value="PRIVATE FORM VALUE"><a href="#info">Read more about PRIVATE LINK TEXT</a>'+
+      Array(70).fill('<button>Show more replies</button>').join('');
+    const dom=new JSDOM(html,{url:'https://seekingalpha.com/article/123-test',runScripts:'outside-only'});
+    const w=dom.window;
+    w.chrome={action:{onClicked:{addListener(){}}},runtime:{onMessage:{addListener(){}}}};
+    vm.runInContext(fs.readFileSync('tests/sa_comment_acceptance/test_background.js','utf8'),dom.getInternalVMContext());
+    if(w.eval('typeof inspectLoadedComments')!=='function') {
+      process.stdout.write(JSON.stringify({missing:true}));process.exit(0);
+    }
+    let sideEffects=0;
+    w.HTMLElement.prototype.click=w.scrollBy=w.scrollTo=w.fetch=()=>{sideEffects++;throw Error('not passive');};
+    const before=w.document.documentElement.outerHTML;
+    const result=w.inspectLoadedComments('123');
+    const wrong=w.inspectLoadedComments('999');
+    process.stdout.write(JSON.stringify({result,wrong,sideEffects,unchanged:before===w.document.documentElement.outerHTML}));
+    """
+    run = subprocess.run(["node", "-e", script], text=True, capture_output=True, check=True)
+    result = json.loads(run.stdout)
+    assert not result.get("missing"), "The passive structure probe is missing"
+    assert result["unchanged"] and result["sideEffects"] == 0
+    report = result["result"]
+    assert report["article_id"] == "123"
+    assert report["comment_rows"] == 1
+    assert report["control_count"] == 72
+    assert len(report["controls"]) == 64 and report["omitted_controls"] == 8
+    first = report["controls"][0]
+    assert first["label"] == "See More Replies"
+    assert first["ancestors"][0]["classes"] == ["mb-18", "ml-52"]
+    assert first["ancestors"][0]["comment_rows"] == 0
+    assert first["ancestors"][1]["comment_rows"] == 1
+    assert first["ancestors"][2]["comment_headings"] == ["Comments (107)"]
+    assert first["ancestors"][1]["children"][0]["comment_rows"] == 1
+    assert report["controls"][1]["label"] is None
+    assert len(report["row_samples"]) == 1
+    assert "PRIVATE" not in json.dumps(report)
+    assert result["wrong"] == {"error": "Selected article changed"}
+
+
+def test_structure_export_uses_selected_tab_without_capture_or_navigation():
+    script = r"""
+    const fs=require('node:fs'),vm=require('node:vm');
+    let action,message;const injections=[],downloads=[],unexpected=[];
+    const chrome={action:{onClicked:{addListener:f=>action=f}},
+      runtime:{id:'test',getURL:p=>'moz-extension://test/'+p,onMessage:{addListener:f=>message=f}},
+      tabs:{create:async()=>({id:301}),update:async()=>{},get:async()=>({url:'https://seekingalpha.com/article/123-test',status:'complete'})},
+      downloads:{download:async request=>{downloads.push(request);return 1;}},
+      scripting:{executeScript:async request=>{
+        injections.push({tabId:request.target.tabId,name:request.func.name,args:request.args});
+        return [{result:{article_id:'123',comment_rows:81,controls:[]}}];
+      }}};
+    const context={chrome,URL,Blob,Date,CAPTURE_SOURCE_HASH:'test',setTimeout:()=>{},
+      captureArticle:async()=>{unexpected.push('capture');}};
+    vm.runInNewContext(fs.readFileSync('tests/sa_comment_acceptance/test_background.js','utf8'),context);
+    (async()=>{
+      await action({id:101,url:'https://seekingalpha.com/article/123-test'});
+      chrome.tabs.update=async()=>{unexpected.push('tab update');};
+      let answer=null;
+      const handled=message({action:'inspect'},{id:'test',tab:{id:301}},r=>answer=r);
+      if(handled) await new Promise(resolve=>setTimeout(resolve,20));
+      let exported=null;
+      if(downloads[0]) exported=await (await fetch(downloads[0].url)).json();
+      process.stdout.write(JSON.stringify({handled,answer,injections,downloads,unexpected,exported}));
+    })().catch(e=>{console.error(e);process.exitCode=1});
+    """
+    run = subprocess.run(["node", "-e", script], text=True, capture_output=True, check=True)
+    result = json.loads(run.stdout)
+    assert result["handled"] is True
+    assert result["unexpected"] == []
+    assert result["injections"] == [{"tabId": 101, "name": "inspectLoadedComments", "args": ["123"]}]
+    assert len(result["downloads"]) == 1
+    assert result["downloads"][0]["filename"].startswith("ArkScope-Comment-Test/123-structure-")
+    assert result["exported"]["kind"] == "loaded_comment_structure"
+    assert result["exported"]["source_hash"] == "test"
+    assert "exported" in result["answer"]["status"].lower()
+
+
 @pytest.mark.skipif(os.environ.get("ARKSCOPE_BROWSER_ACCEPTANCE") != "1", reason="installed Firefox package gate")
 def test_installed_firefox_acceptance_panel_and_driver(tmp_path):
     from selenium import webdriver
@@ -114,6 +196,9 @@ def test_installed_firefox_acceptance_panel_and_driver(tmp_path):
             driver.find_element("id","capture").click()
             from selenium.webdriver.support.ui import WebDriverWait
             WebDriverWait(driver,10).until(lambda d:not d.find_element("id","capture").get_property("disabled"))
+            assert "No selected article" in driver.find_element("id","status").text
+            driver.find_element("id","inspect").click()
+            WebDriverWait(driver,10).until(lambda d:not d.find_element("id","inspect").get_property("disabled"))
             assert "No selected article" in driver.find_element("id","status").text
             for width in (900, 450):
                 driver.set_window_size(width, 800)

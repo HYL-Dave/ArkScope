@@ -41,6 +41,19 @@ The legacy mode retains legacy click selection, including its known risks, but
 uses the new document/identity rejection guard. Do not run it over a list of
 articles or interpret this diagnostic mode as an approved production option.
 
+## Passive Structure Inspection
+
+If an observed control's ancestry is insufficient to explain a selector
+difference, **Export Loaded Comment Structure** reads the currently loaded
+article without clicking, scrolling, reloading, or starting another capture.
+Open the panel from the article's toolbar icon after reloading the test add-on;
+do not reload the article just for this inspection. The export is named
+`ARTICLE-structure-TIME.json`, distinct from a capture or paired-run result.
+It records bounded control labels, ancestor/child structure and comment-row
+counts, not article prose, comment text, form values or URL query parameters.
+Already-expanded controls may have disappeared; absence in this later
+inspection does not overturn the earlier same-DOM observation.
+
 ## Paired Candidate Run
 
 Only after reviewing the observed controls, reload the same article and run
@@ -74,7 +87,11 @@ normal collection only when no test capture is running.
   identity rejection and preservation of comments/checkpoints.
 - A real installed Firefox package test checks dependencies, message handling
   and panel dimensions. It never signs into SA.
-- Signed-in observation and independent paired capture are **pending**.
+- The first signed-in Firefox observation exported successfully. It found two
+  real **See More Replies** controls rejected as `outside_comment_controls` by
+  the candidate. The selector also lacks `see` for reply expansion. Adoption is
+  **blocked pending correction and paired evidence**, not validated by this
+  successful export. See [the observation record](../../docs/superpowers/evidence/2026-09-24-sa-comment-observation.md).
 - A final code freeze, complete backend/frontend/typecheck/build run and review
   are **pending**. Earlier revision results cannot stand in for these.
 - No merge, production extension replacement or 180-company run is authorized

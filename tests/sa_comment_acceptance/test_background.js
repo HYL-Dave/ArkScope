@@ -9,6 +9,83 @@ chrome.action.onClicked.addListener(async tab => {
   await chrome.tabs.update(panel.id,{url:chrome.runtime.getURL("panel.html"),active:true});
 });
 
+// Passive diagnostic only: no clicks, scrolling, DOM writes or provider calls.
+function inspectLoadedComments(articleId) {
+  const match = location.pathname.match(/^\/(?:alpha-picks\/articles|article)\/(\d+)(?:-[^/]*)?\/?$/);
+  if (location.origin !== "https://seekingalpha.com" || !match || match[1] !== articleId) {
+    return {error:"Selected article changed"};
+  }
+  const rowSelector = '[class*="border-t-share-separator-thin"]';
+  const rows = Array.from(document.querySelectorAll(rowSelector));
+  const headings = Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6,[role="heading"]'))
+    .filter(el=>/^comments(?:\s*\([\d,]+\))?$/i.test(el.textContent.trim()));
+  function describe(el) {
+    return {tag:el.tagName.toLowerCase(),role:el.getAttribute('role'),
+      classes:Array.from(el.classList).slice(0,10).map(name=>name.slice(0,80)),
+      comment_rows:rows.filter(row=>el.contains(row)).length};
+  }
+  function ancestry(el) {
+    const ancestors = [];
+    let parent = el.parentElement;
+    for (; parent && ancestors.length < 16; parent = parent.parentElement) {
+      ancestors.push({...describe(parent),
+        comment_headings:headings.filter(heading=>parent.contains(heading)).slice(0,4).map(heading=>heading.textContent.trim().slice(0,100)),
+        children:Array.from(parent.children).slice(0,8).map(child=>({...describe(child),contains_target:child.contains(el)})),
+        child_count:parent.children.length});
+      if (parent.matches('body')) {parent=null; break;}
+    }
+    return {ancestors,ancestors_truncated:!!parent};
+  }
+  const controls = Array.from(document.querySelectorAll('button,a,[role="button"]'))
+    .map(el=>({el,label:el.textContent.trim().replace(/\s+/g,' ')}))
+    .filter(item=>/^(?:show|see|read|view|load)\b.*\b(?:more|comments?|replies|reply)\b/i.test(item.label));
+  return {article_id:articleId,document_key:location.origin+':'+performance.timeOrigin,
+    comment_rows:rows.length,control_count:controls.length,omitted_controls:Math.max(0,controls.length-64),
+    controls:controls.slice(0,64).map(({el,label})=>{
+      const link=el.closest('a[href]'),button=el.closest('button,input');
+      let href=null;
+      if(link) {
+        try {const url=new URL(link.href);href=/^https?:$/.test(url.protocol)?url.origin+url.pathname:url.protocol;}
+        catch(_){href='invalid';}
+      }
+      const knownLabel = /^(?:show|see|read|view|load)\s+(?:(?:all|more|previous|older|\d+)\s+)*(?:comments?|replies|reply)(?:\s*\([\d,]+\))?$/i.test(label)
+        || /^(?:show|see|read)\s+(?:more|less)(?:\s*\.{3})?$/i.test(label);
+      return {...describe(el),label:knownLabel ? label.slice(0,100) : null,href,
+        button_type:button?.type || null,form_associated:!!button?.form,...ancestry(el)};
+    }),
+    row_samples:rows.slice(0,3).map(el=>({...describe(el),...ancestry(el)}))};
+}
+
+async function exportTestArtifact(result, articleId, suffix) {
+  const blob = URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:"application/json"}));
+  try {
+    await chrome.downloads.download({url:blob,filename:"ArkScope-Comment-Test/" + articleId + "-" + suffix + "-" + Date.now() + ".json",saveAs:false});
+  } finally {setTimeout(()=>URL.revokeObjectURL(blob),60000);}
+}
+
+async function inspectTest(selection) {
+  if (!selection) return {error:"No selected article; open the test from its toolbar icon on an article"};
+  if (running) return {error:"Capture already running"};
+  running = true;
+  try {
+    const tab = await chrome.tabs.get(selection.tabId);
+    const url = new URL(tab.url);
+    const match = url.pathname.match(/^\/(?:alpha-picks\/articles|article)\/(\d+)(?:-[^/]*)?\/?$/);
+    if (url.origin !== "https://seekingalpha.com" || !match || tab.status !== "complete"
+        || tab.url.split('#')[0] !== selection.url.split('#')[0]) return {error:"Selected article changed or not loaded"};
+    const probe = await chrome.scripting.executeScript({target:{tabId:selection.tabId},
+      func:inspectLoadedComments,args:[match[1]]});
+    const result = probe[0]?.result;
+    if (!result || result.error) return {error:result?.error || "Structure could not be read"};
+    await exportTestArtifact({...result,kind:"loaded_comment_structure",schema_version:1,
+      source_hash:CAPTURE_SOURCE_HASH,inspected_at:new Date().toISOString()},match[1],"structure");
+    selection.status = "Loaded comment structure exported";
+    return {status:selection.status};
+  } catch (_) {
+    return {error:"Structure export failed; no automatic retry"};
+  } finally {running = false;}
+}
+
 async function captureTest(strategy, selection) {
   if (!selection) return {error:"No selected article; open the test from its toolbar icon on an article"};
   if (running) return {error:"Capture already running"};
@@ -51,10 +128,7 @@ async function captureTest(strategy, selection) {
     }
     const lastResult = {...result,...initial,article_id:match[1],mode:"manual",strategy,
       source_hash:CAPTURE_SOURCE_HASH,captured_at:new Date().toISOString(),schema_version:1};
-    const blob = URL.createObjectURL(new Blob([JSON.stringify(lastResult,null,2)],{type:"application/json"}));
-    try {
-      await chrome.downloads.download({url:blob,filename:"ArkScope-Comment-Test/" + match[1] + "-" + strategy + "-" + Date.now() + ".json",saveAs:false});
-    } finally {setTimeout(()=>URL.revokeObjectURL(blob),60000);}
+    await exportTestArtifact(lastResult,match[1],strategy);
     selection.status = lastResult.status + " / " + (lastResult.comments?.length ?? 0) + " comments / " + (lastResult.reason || "JSON exported");
     return {status:selection.status};
   } catch (_) {
@@ -69,8 +143,9 @@ chrome.runtime.onMessage.addListener((message,sender,respond) => {
     respond({running,status:selection?.status || "No selected article",target:selection?.url || "",
       source_hash:CAPTURE_SOURCE_HASH}); return false;
   }
-  if (message.action === "capture") {
-    captureTest(message.strategy,selection).then(result=>{
+  if (message.action === "capture" || message.action === "inspect") {
+    const task = message.action === "capture" ? captureTest(message.strategy,selection) : inspectTest(selection);
+    task.then(result=>{
       if (selection && result.error) selection.status = result.error;
       respond(result);
     }); return true;
