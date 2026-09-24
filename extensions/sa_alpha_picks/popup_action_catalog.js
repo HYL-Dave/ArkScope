@@ -42,9 +42,11 @@
           " article-list rounds; all normal missing-body and changed-count detail work " +
           "returned by that scan, with no separate global Alpha detail cap; " +
           integer(quick.detail_enrichment_limit) +
-          " additional reconciliation enrichments; each comment scan is capped at " +
+          " additional reconciliation enrichments; routine comment scans are capped at " +
           integer(quick.comment_scroll_rounds) + " comment-scroll rounds within " +
-          seconds(quick.comment_scroll_ms) + " seconds.",
+          seconds(quick.comment_scroll_ms) + " seconds; eligible first or pending captures use up to " +
+          integer(backfill.comment_scroll_rounds) + " comment-scroll rounds within " +
+          seconds(backfill.comment_scroll_ms) + " seconds.",
         whenToUse: "Routine updates when no continuity warning is active.",
         nonGuarantee: "Does not prove older article or comment history is complete.",
       },
@@ -56,10 +58,13 @@
         scope: "Up to " + integer(full.article_list_rounds) +
           " article-list rounds; all normal detail work returned by that scan, with no " +
           "separate global Alpha detail cap; " + integer(full.detail_enrichment_limit) +
-          " additional reconciliation enrichments; each comment scan is capped at " +
+          " additional reconciliation enrichments; routine comment scans are capped at " +
           integer(full.comment_scroll_rounds) + " comment-scroll rounds within " +
           seconds(full.comment_scroll_ms) + " seconds; plus " +
-          configuredBatch(full.configured_comment_recovery_batch) + ".",
+          configuredBatch(full.configured_comment_recovery_batch) +
+          "; eligible first or pending captures use up to " +
+          integer(backfill.comment_scroll_rounds) + " comment-scroll rounds within " +
+          seconds(backfill.comment_scroll_ms) + " seconds.",
         whenToUse: "Periodic review or a pending continuity warning that is not parked.",
         nonGuarantee: "Bounded scanning may leave older provider history unreachable.",
       },

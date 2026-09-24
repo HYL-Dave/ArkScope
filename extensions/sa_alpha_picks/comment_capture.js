@@ -73,6 +73,7 @@
         || globalThis.__arkCommentDocument.hidden)) return {page_changed:true};
     var rowSelector = '[class*="border-t-share-separator-thin"]';
     var commentEls = document.querySelectorAll(rowSelector);
+    var scrollBefore = window.scrollY;
     var atBottom = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 200);
     var pageMiddle = document.body.scrollHeight / 2;
     var controls = Array.from(document.querySelectorAll('button, a, [role="button"]'));
@@ -223,7 +224,9 @@
     }
     if (!changed) window.scrollBy(0, window.innerHeight);
     return {comments:commentEls.length, atBottom:atBottom, clicked:clicked,
-      click_count:clickCount, loading:loading, page_changed:changed, control_audit:audit};
+      click_count:clickCount, loading:loading, page_changed:changed, control_audit:audit,
+      progress:{scroll_y_before:scrollBefore,scroll_y_after:window.scrollY,
+        document_height:document.body.scrollHeight,viewport_height:window.innerHeight}};
   }
 
   root.SACommentCapture = Object.freeze({scanPage:scanPage, documentState:documentState,

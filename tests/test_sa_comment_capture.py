@@ -81,6 +81,15 @@ def _observed_reply_footer(control: str):
     )
 
 
+def test_scan_reports_document_geometry_without_extra_scrolls_or_clicks():
+    result = _round(_thread(''))
+    assert result["clicked"] == []
+    assert result["result"]["progress"] == {
+        "scroll_y_before": 0, "scroll_y_after": 0,
+        "document_height": 1000, "viewport_height": 768,
+    }
+
+
 @pytest.mark.parametrize("top", [100, 700])
 def test_observed_sa_sibling_reply_footer_is_recognized_above_or_below_page_midpoint(top):
     result = _round(_observed_reply_footer('<button id="reply" type="button">See More Replies</button>'), top=top)

@@ -50,6 +50,30 @@ def test_positive_provider_count_with_two_empty_captures_is_not_evidence():
                    dict(common,strategy="guarded",document_key="two"))["status"] == "inconclusive"
 
 
+def test_initial_pair_with_identical_partial_results_still_requires_terminal_evidence():
+    from tests.sa_comment_acceptance.compare import compare
+    common = dict(article_id="123",mode="backfill",status="captured",detail={"body_markdown":"body"},
+                  source_hash="same",provider_count=3,
+                  comments=[dict(comment_id="1",commenter="a",comment_date="2026-01-01",comment_text="body")],
+                  scroll={"rounds":75,"elapsed_ms":120000,"stop_reason":"timeout","stable_bottom_rounds":0})
+    result = compare(dict(common,strategy="observe",document_key="one"),
+                     dict(common,strategy="guarded",document_key="two"))
+    assert result["status"] == "inconclusive"
+    assert "initial_scan_not_terminal" in result["reasons"]
+
+
+def test_initial_pair_compares_the_recorded_budget_not_just_its_label():
+    from tests.sa_comment_acceptance.compare import compare
+    common = dict(article_id="123",mode="backfill",status="captured",detail={"body_markdown":"body"},
+                  source_hash="same",provider_count=1,
+                  comments=[dict(comment_id="1",commenter="a",comment_date="2026-01-01",comment_text="body")],
+                  scroll={"rounds":6,"elapsed_ms":9600,"stop_reason":"stable_bottom","stable_bottom_rounds":5})
+    result = compare(dict(common,strategy="observe",document_key="one",capture_profile={"maxDurationMs":45000}),
+                     dict(common,strategy="guarded",document_key="two",capture_profile={"maxDurationMs":120000}))
+    assert result["status"] == "inconclusive"
+    assert "capture_profile_changed" in result["reasons"]
+
+
 def test_each_acceptance_panel_keeps_its_own_article():
     script = r"""
     const fs=require('node:fs'),vm=require('node:vm');
@@ -152,6 +176,36 @@ def test_structure_export_uses_selected_tab_without_capture_or_navigation():
     assert result["exported"]["kind"] == "loaded_comment_structure"
     assert result["exported"]["source_hash"] == "test"
     assert "exported" in result["answer"]["status"].lower()
+
+
+@pytest.mark.parametrize("mode,duration", [("backfill", 120000), ("quick", 12000)])
+def test_acceptance_capture_uses_selected_profile_and_exports_its_budget(mode, duration):
+    script = r"""
+    const fs=require('node:fs'),vm=require('node:vm');
+    let action,message,call;const downloads=[];
+    const chrome={action:{onClicked:{addListener:f=>action=f}},
+      runtime:{id:'test',getURL:p=>'moz-extension://test/'+p,onMessage:{addListener:f=>message=f}},
+      tabs:{create:async()=>({id:301}),update:async()=>{},get:async()=>({url:'https://seekingalpha.com/article/123-test',status:'complete'})},
+      storage:{local:{get:async()=>({}),set:async()=>{}}},
+      downloads:{download:async request=>{downloads.push(request);return 1;}},
+      scripting:{executeScript:async request=>[{result:request.func===access?null:{document_key:'doc1',provider_count:107}}]}};
+    const access=()=>{};
+    const context={chrome,URL,Blob,Date,CAPTURE_SOURCE_HASH:'test',setTimeout:()=>{},readSaAccessMarkers:access,
+      getCommentScrollProfile:mode=>({name:mode,maxDurationMs:mode==='backfill'?120000:12000}),
+      captureArticle:async(tab,item,mode)=>{call={tab,mode};return {detail:{body_markdown:'body'},comments:[],scroll:{mode}};}};
+    vm.runInNewContext(fs.readFileSync('tests/sa_comment_acceptance/test_background.js','utf8'),context);
+    (async()=>{
+      await action({id:101,url:'https://seekingalpha.com/article/123-test'});
+      const answer=await new Promise(resolve=>message({action:'capture',strategy:'guarded',mode:MODE},{id:'test',tab:{id:301}},resolve));
+      const exported=downloads[0]?await (await fetch(downloads[0].url)).json():null;
+      process.stdout.write(JSON.stringify({answer,call,exported}));
+    })().catch(e=>{console.error(e);process.exitCode=1});
+    """.replace("MODE", json.dumps(mode))
+    run = subprocess.run(["node", "-e", script], text=True, capture_output=True, check=True)
+    result = json.loads(run.stdout)
+    assert result["call"] == {"tab": 101, "mode": mode}
+    assert result["exported"]["mode"] == mode
+    assert result["exported"]["capture_profile"]["maxDurationMs"] == duration
 
 
 @pytest.mark.skipif(os.environ.get("ARKSCOPE_BROWSER_ACCEPTANCE") != "1", reason="installed Firefox package gate")

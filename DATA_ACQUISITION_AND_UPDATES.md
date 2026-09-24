@@ -503,6 +503,7 @@ of the currently enabled browser preferences.
 | News | Fixed 5/15/60 minutes, default 60; optional `auto` checks a custom ET time-window table every 5 minutes | A heartbeat can skip without opening a page. `auto` is not an exchange-session calendar. |
 | Alpha Picks | Quick Update every selected 15/30/60 minutes, default 30 | Scans recent article-list content; does not imply a full historical scan. |
 | Comments | Included with new article bodies; revisit scanned articles when an observed count changes or a first positive count appears | No independent comment timer; an unchanged count does not prove unchanged text. |
+| Incomplete comment capture | A pending capture remains eligible even if the displayed count is unchanged; ordinary retries wait six hours after the last scan attempt | Quick adds at most one pending article per pass; Full shares its existing additional batch limit. Explicit Deep Repair can bypass this retry delay, not website admission or restrictions. |
 | Additional comment recovery | In Full/Deep scans only: default seven-day age eligibility, with configured additional batches defaulting to 10/50 | The age rule does not itself schedule these scans. Old unscanned articles can remain outside Quick Update coverage. |
 
 Keep existing selected intervals with shared coordination. Do
@@ -521,6 +522,14 @@ next portfolio navigation. Both are repaired by the
 feature branch. Signed-in per-run comparison and the final frozen-revision full
 regression are required before merge. See the
 [comment acceptance procedure](tests/sa_comment_acceptance/README.md).
+The first independent Firefox pair is **not accepted**: the candidate captured
+105 comments versus 81, but omitted two baseline comments and hit the existing
+45-second Manual cap. More total comments do not compensate for a lost subset.
+That pair remains failed; changing its budget or combining its exports cannot
+retroactively make it pass. The operator subsequently approved a separate
+first-capture policy using the existing 120-second Deep budget, requiring a new
+same-budget pair rather than comparing it to the earlier 45-second capture.
+See the [paired evidence](docs/superpowers/evidence/2026-09-24-sa-comment-observation.md#paired-firefox-result-not-accepted).
 
 Comment expansion is restricted to recognized comment/reply/text controls.
 This includes SA's observed sibling reply-list footer, validated against its
@@ -540,7 +549,8 @@ recognized safely, including one outside the known comment structure, the scan
 reports `controls_unresolved`: existing comments and comment checkpoints are
 retained, while a separately valid article body can still be saved. A diagnostic
 failure is not permission to overwrite complete comments with truncated text.
-The existing Quick/Full/Deep/Manual time, round and settle limits are unchanged.
+The existing Quick/Full/Deep/Manual profile constants are unchanged. New
+per-article selection below determines which profile an acquisition actually uses.
 
 The isolated test package can record old/new candidates on the same DOM and run
 either selector, exporting each run separately. It has no Native Messaging or
@@ -554,6 +564,42 @@ Same-DOM candidate agreement alone is not acceptance. Compare independently
 captured full comment text and parent relationships, article attribution and
 scan cost, never accumulated database counts. Changed source content, incomplete
 traces or higher work/time are unresolved evidence, not a passing result.
+
+### SA First Capture And Incremental Maintenance
+
+**Candidate policy, not yet accepted on the live site.** First capture is a
+per-article decision, not merely an empty-database decision. A never-scanned
+article, eligible pending capture or explicit manual article repair uses the
+existing Deep profile: up to 140 rounds or 120 seconds, with 1.6-second settling
+and five stable-bottom observations. These are loop admission limits, not a
+guarantee that an in-flight browser operation finishes at an exact deadline.
+Ordinary Quick updates retain the 12-round/12-second profile; ordinary Full
+updates retain 80 rounds/60 seconds. Partial work does not automatically retry
+within the same pass. Website owner, allowance, pause and cooldown gates still
+apply.
+
+Valid partial captures can add comments without certifying completion. Budget
+exhaustion leaves a separate pending-acquisition marker and does not advance
+the provider-count checkpoint. The existing identity-overlap recovery state is
+not a substitute for that marker: seeing an old comment does not prove the
+unloaded tail or nested replies were visited. A qualifying stable-bottom scan
+can finish pending acquisition; this still does not prove that every comment
+ever published is available. Readers expose the pending state and stop reason.
+Existing records without terminal evidence are not retroactively certified.
+
+Unchanged comment values do not rewrite an existing row. New comments and real
+changes/enrichments still persist under the existing identity and merge rules;
+truncated or unresolved captures must not overwrite fuller stored content.
+This saves local writes, not necessarily provider requests: the DOM collector
+may need to load old parent threads to discover new nested replies. It has no
+provider cursor that guarantees network-level per-comment continuation.
+
+Routine updates skip articles with unchanged observed counts only when no
+eligible pending acquisition exists. First/backfill acceptance and routine
+maintenance are tested separately. The isolated harness exports the selected
+profile, per-round scroll position, page height, bottom/loading state and click
+count. Neither click count nor navigation count is a full HTTP request meter.
+See [comment acceptance](tests/sa_comment_acceptance/README.md).
 
 ### SA Financial Refresh Scheduling
 

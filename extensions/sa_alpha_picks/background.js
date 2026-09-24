@@ -3143,7 +3143,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         detail_ticker: detail.detail_ticker || null,
         detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
         provider_comments_count: item.provider_comments_count,
-        comment_scan_mode: scrollMode,
+        comment_scan_mode: bodyScrollStats.mode || scrollMode,
         comment_scan_stop_reason: bodyScrollStats && bodyScrollStats.stop_reason,
         comment_scan_stable_bottom_rounds:
           (bodyScrollStats && bodyScrollStats.stable_bottom_rounds) || 0,
@@ -3151,7 +3151,8 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
       if (saveResult && saveResult.ok) {
         fetched++;
         netNewComments += saveResult.net_new_comments || 0;
-        if (saveResult.comment_scan_usable !== true || bodyScrollStats.controls_unresolved) {
+        if (saveResult.comment_scan_usable !== true || saveResult.comment_backfill_pending === true
+            || bodyScrollStats.controls_unresolved) {
           failed += recordExtensionFailure(diagnostics, {
             stage: "content_parse",
             reason_code: "comment_scan_failed",
@@ -3231,16 +3232,17 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         article_id: cItem.article_id,
         comments: cComments,
         provider_comments_count: cItem.provider_comments_count,
-        comment_scan_mode: scrollMode,
+        comment_scan_mode: commentScrollStats.mode || scrollMode,
         comment_scan_stop_reason:
           commentScrollStats && commentScrollStats.stop_reason,
         comment_scan_stable_bottom_rounds:
           (commentScrollStats && commentScrollStats.stable_bottom_rounds) || 0,
       });
       if (saveCommentsOnlyResult && saveCommentsOnlyResult.status === "ok") {
-        if (saveCommentsOnlyResult.comment_scan_usable === true && !commentScrollStats.controls_unresolved) {
+        netNewComments += saveCommentsOnlyResult.net_new_comments || 0;
+        if (saveCommentsOnlyResult.comment_scan_usable === true
+            && saveCommentsOnlyResult.comment_backfill_pending !== true && !commentScrollStats.controls_unresolved) {
           commentsRefreshed++;
-          netNewComments += saveCommentsOnlyResult.net_new_comments || 0;
         } else {
           failed += recordExtensionFailure(diagnostics, {
             stage: "content_parse",
@@ -3376,7 +3378,7 @@ async function doManualFetch(items, diagnostics) {
           continue;
         }
         var articleId = item.article_id;
-        var captured = await captureArticle(tabId, item, "manual", true);
+        var captured = await captureArticle(tabId, item, "backfill", true);
         var detail = captured.detail;
         if (!detail || detail.error) {
           failed += recordExtensionFailure(diagnostics, {
@@ -3423,7 +3425,7 @@ async function doManualFetch(items, diagnostics) {
           detail_ticker: detail.detail_ticker || null,
           detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
           provider_comments_count: null,
-          comment_scan_mode: "manual",
+          comment_scan_mode: manualScrollStats.mode || "backfill",
           comment_scan_stop_reason:
             manualScrollStats && manualScrollStats.stop_reason,
           comment_scan_stable_bottom_rounds:
@@ -3431,7 +3433,8 @@ async function doManualFetch(items, diagnostics) {
         });
         if (saveResult && saveResult.ok) {
           fetched++;
-          if (saveResult.comment_scan_usable !== true || manualScrollStats.controls_unresolved) {
+          if (saveResult.comment_scan_usable !== true || saveResult.comment_backfill_pending === true
+              || manualScrollStats.controls_unresolved) {
             failed += recordExtensionFailure(diagnostics, {
               stage: "content_parse",
               reason_code: "comment_scan_failed",
@@ -3591,6 +3594,8 @@ async function beginArticleCapture(tabId, item) {
 
 async function captureArticle(tabId, item, mode, includeBody, options) {
   options = options || {};
+  // The backend selects first/pending article work independently of the job mode.
+  if (item.comment_scan_mode === "backfill") mode = "backfill";
   var guard = await beginArticleCapture(tabId, item);
   var audits = [];
   try {
@@ -3639,6 +3644,7 @@ async function scrollToComments(tabId, options) {
   var stableBottomRounds = 0;
   var stopReason = "max_scrolls";
   var audits = options.audits || [], unresolved = false;
+  var lastObservation = null;
 
   for (var i = 0; i < profile.maxScrolls; i++) {
     if (options.guard) options.guard.checkNavigation();
@@ -3652,9 +3658,15 @@ async function scrollToComments(tabId, options) {
       args: [{strategy: options.strategy || "guarded", token:options.guard && options.guard.token}],
     });
     var check = result[0] && result[0].result;
+    if (check) lastObservation = {
+      elapsed_ms: Date.now() - startedAt, comments: check.comments,
+      at_bottom: typeof check.atBottom === "boolean" ? check.atBottom : null,
+      loading: Boolean(check.loading), click_count: check.click_count || 0,
+      progress: check.progress || null,
+    };
     if (check && check.control_audit) {
       var audit = check.control_audit;
-      if (options.trace) audits.push({round:i + 1,audit:audit});
+      if (options.trace) audits.push(Object.assign({round:i + 1,audit:audit}, lastObservation));
       if (audit.unresolved_candidates > 0) unresolved = true;
     }
     if (options.guard) options.guard.checkNavigation();
@@ -3688,6 +3700,7 @@ async function scrollToComments(tabId, options) {
     stop_reason: unresolved ? "controls_unresolved" : stopReason,
     stable_bottom_rounds: stableBottomRounds,
     controls_unresolved:unresolved,
+    last_observation:lastObservation,
   };
   console.info("[SA] scrollToComments", JSON.stringify(stats));
   if (options.trace) stats.control_audits = audits;

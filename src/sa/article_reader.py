@@ -17,6 +17,7 @@ _ARTICLE_COLUMNS = (
     "provider_comments_count_at_last_scan, comment_recovery_state, "
     "comment_recovery_last_terminal_reason"
 )
+_OPTIONAL_SCAN_COLUMNS = ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason")
 _COMMENT_COLUMNS = (
     "comment_id, parent_comment_id, commenter, comment_text, upvotes, comment_date, fetched_at"
 )
@@ -52,7 +53,12 @@ def read_article(
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA query_only=ON")
             conn.execute("BEGIN")
-            row = conn.execute(f"SELECT {_ARTICLE_COLUMNS} FROM sa_articles WHERE article_id=?", (article_id,)).fetchone()
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(sa_articles)")}
+            scan_columns = ", ".join(
+                column if column in columns else f"NULL AS {column}"
+                for column in _OPTIONAL_SCAN_COLUMNS
+            )
+            row = conn.execute(f"SELECT {_ARTICLE_COLUMNS}, {scan_columns} FROM sa_articles WHERE article_id=?", (article_id,)).fetchone()
             if row is None:
                 return article_unavailable("sa_article_not_found")
             article = dict(row)
@@ -124,6 +130,8 @@ def read_article(
 def _coverage(article, body, count):
     reasons = []
     state = article["comment_recovery_state"]
+    if article.get("comment_backfill_pending"):
+        reasons.append("comment_backfill_pending")
     if state != "repaired":
         reasons.append("comment_recovery_" + state)
     if not article["comments_fetched_at"]:
@@ -142,6 +150,9 @@ def _coverage(article, body, count):
         "body": {"status": "available" if body.strip() else "not_captured",
                  "fetched_at": article["detail_fetched_at"]},
         "comments": {"status": status, "stored_count": count, "complete": None,
+                     "backfill_pending": bool(article.get("comment_backfill_pending")),
+                     "scan_attempted_at": article.get("comment_scan_attempted_at"),
+                     "scan_stop_reason": article.get("comment_scan_stop_reason"),
                      "fetched_at": article["comments_fetched_at"], "gap_reasons": reasons,
                      "completeness_basis": "provider_counts_and_capture_times_do_not_prove_exhaustion"},
     }

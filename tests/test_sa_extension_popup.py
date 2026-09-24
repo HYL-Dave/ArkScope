@@ -437,6 +437,15 @@ def test_alpha_rows_show_exact_deep_bounds_and_never_use_market_18_30_80_limits(
     assert "18 Market News details" not in rows["quick"]
 
 
+def test_quick_and_full_scope_distinguish_first_capture_budget_from_routine_budget():
+    rows = {row["id"]: " ".join(row["cells"]) for row in _run()["disclosure"]}
+    for action in ("quick", "full"):
+        assert "first or pending captures" in rows[action]
+        assert "140 comment-scroll rounds within 120 seconds" in rows[action]
+    assert "12 comment-scroll rounds within 12 seconds" in rows["quick"]
+    assert "80 comment-scroll rounds within 60 seconds" in rows["full"]
+
+
 def test_configured_comment_limits_render_or_report_configured_limit_unavailable():
     available = _run()
     assert "10 configured pending comment rows" in available["bodyText"]

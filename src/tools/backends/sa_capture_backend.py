@@ -1228,10 +1228,11 @@ class SACaptureBackend(LocalMarketBackend):
         conn: sqlite3.Connection,
         article_id: str,
         prepared_comments: List[Dict[str, Any]],
-    ) -> int:
+    ) -> Dict[str, int]:
         now = store.now_ts()
+        written = 0
         for comment in prepared_comments:
-            conn.execute(
+            cursor = conn.execute(
                 """INSERT INTO sa_article_comments
                 (article_id, comment_id, parent_comment_id,
                  commenter, comment_text, upvotes, comment_date, fetched_at)
@@ -1242,6 +1243,11 @@ class SACaptureBackend(LocalMarketBackend):
                     comment_text = excluded.comment_text,
                     upvotes = MAX(COALESCE(sa_article_comments.upvotes, 0), COALESCE(excluded.upvotes, 0)),
                     comment_date = COALESCE(sa_article_comments.comment_date, excluded.comment_date)
+                WHERE sa_article_comments.parent_comment_id IS NOT COALESCE(sa_article_comments.parent_comment_id, excluded.parent_comment_id)
+                   OR sa_article_comments.commenter IS NOT COALESCE(sa_article_comments.commenter, excluded.commenter)
+                   OR sa_article_comments.comment_text IS NOT excluded.comment_text
+                   OR COALESCE(sa_article_comments.upvotes, 0) IS NOT MAX(COALESCE(sa_article_comments.upvotes, 0), COALESCE(excluded.upvotes, 0))
+                   OR sa_article_comments.comment_date IS NOT COALESCE(sa_article_comments.comment_date, excluded.comment_date)
                 """,
                 (
                     article_id,
@@ -1254,6 +1260,7 @@ class SACaptureBackend(LocalMarketBackend):
                     now,
                 ),
             )
+            written += cursor.rowcount
         cleanup = self._cleanup_article_comment_duplicates(conn, article_id)
         if cleanup["comments_deleted"] or cleanup["parent_links_repointed"]:
             logger.info(
@@ -1262,7 +1269,7 @@ class SACaptureBackend(LocalMarketBackend):
                 cleanup["comments_deleted"],
                 cleanup["parent_links_repointed"],
             )
-        return len(prepared_comments)
+        return {"written": written, "skipped": len(prepared_comments) - written}
 
     def _cleanup_article_comment_duplicates(
         self, conn: sqlite3.Connection, article_id: str
@@ -1496,6 +1503,7 @@ class SACaptureBackend(LocalMarketBackend):
     ) -> Dict[str, Any]:
         article_row = conn.execute(
             "SELECT comments_fetched_at, provider_comments_count_at_last_scan, "
+            "comment_backfill_pending, comment_scan_attempted_at, comment_scan_stop_reason, "
             "comment_recovery_state, comment_recovery_started_at, "
             "comment_recovery_baseline_max_row_id, "
             "comment_recovery_full_miss_count, comment_recovery_parked_at, "
@@ -1509,6 +1517,13 @@ class SACaptureBackend(LocalMarketBackend):
         article = dict(article_row)
 
         existing_rows = self._fetch_existing_article_comments(conn, article_id)
+        mode = _comment_scan_mode(comment_scan_mode)
+        stable_bottom_rounds = _stable_bottom_rounds(comment_scan_stable_bottom_rounds)
+        terminal_evidence = (
+            comment_scan_mode in _COMMENT_SCAN_MODES
+            and comment_scan_stop_reason == "stable_bottom"
+            and stable_bottom_rounds >= {"quick": 2, "full": 4, "backfill": 5}[mode]
+        )
         # Unrecognized expansion controls may leave truncated text under an
         # existing synthetic ID. Keep prior comments and checkpoints untouched.
         controls_unresolved = comment_scan_stop_reason == "controls_unresolved"
@@ -1520,6 +1535,11 @@ class SACaptureBackend(LocalMarketBackend):
             for row in existing_rows
             if row.get("comment_id")
         }
+        if not terminal_evidence:
+            for comment in prepared_comments:
+                previous = existing_by_comment_id.get(comment.get("comment_id"))
+                if previous and len(comment.get("comment_text") or "") < len(previous.get("comment_text") or ""):
+                    comment["comment_text"] = previous["comment_text"]
         prepared_ids = {
             row["comment_id"]
             for row in prepared_comments
@@ -1546,16 +1566,15 @@ class SACaptureBackend(LocalMarketBackend):
             )
 
         before_count = len(existing_rows)
-        prepared_count = 0 if controls_unresolved else self._upsert_article_comments(
+        writes = {"written": 0, "skipped": 0} if controls_unresolved else self._upsert_article_comments(
             conn, article_id, prepared_comments
         )
+        prepared_count = len(prepared_comments)
         after_count = self._count_article_comments(conn, article_id)
         provider_count = _provider_comment_count(provider_comments_count)
-        mode = _comment_scan_mode(comment_scan_mode)
-        stable_bottom_rounds = _stable_bottom_rounds(
-            comment_scan_stable_bottom_rounds
-        )
         usable = not controls_unresolved and _comment_scan_usable(prepared_count, provider_count)
+        completed = usable and terminal_evidence
+        pending = not completed
         transition = self._comment_recovery_transition(
             article,
             usable=usable,
@@ -1573,7 +1592,7 @@ class SACaptureBackend(LocalMarketBackend):
         if usable:
             checkpoint = (
                 provider_count
-                if provider_count is not None
+                if completed and provider_count is not None
                 else article.get("provider_comments_count_at_last_scan")
             )
             conn.execute(
@@ -1601,11 +1620,24 @@ class SACaptureBackend(LocalMarketBackend):
                 ),
             )
 
+        conn.execute(
+            "UPDATE sa_articles SET comment_backfill_pending = ?, "
+            "comment_scan_attempted_at = ?, comment_scan_stop_reason = ?, updated_at = ? "
+            "WHERE article_id = ?",
+            (int(pending), now, comment_scan_stop_reason if isinstance(comment_scan_stop_reason, str) else None,
+             now, article_id),
+        )
+
         return {
             "prepared_comments": prepared_count,
             "stored_comments_total": after_count,
             "net_new_comments": max(after_count - before_count, 0),
+            "changed_comments": max(writes["written"] - len(prepared_ids - existing_by_comment_id.keys()), 0),
+            "skipped_comments": writes["skipped"],
             "comment_scan_usable": usable,
+            "comment_backfill_pending": pending,
+            "comment_scan_attempted_at": now,
+            "comment_scan_stop_reason": comment_scan_stop_reason if isinstance(comment_scan_stop_reason, str) else None,
             "comment_scan_existing_overlap_count": len(existing_overlap_ids),
             "comment_scan_baseline_overlap_count": len(baseline_overlap_ids),
             "comment_scan_identity_overlap_rate": (
@@ -1856,12 +1888,18 @@ class SACaptureBackend(LocalMarketBackend):
             logger.error("Failed to query SA articles: %s", e)
             return []
         try:
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(sa_articles)")}
+            scan_columns = ", ".join(
+                column if column in columns else f"NULL AS {column}"
+                for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason")
+            )
             rows = conn.execute(
                 f"SELECT article_id, url, title, ticker, published_date, "
                 f"article_type, comments_count, "
                 f"CASE WHEN body_markdown IS NOT NULL THEN 1 ELSE 0 END AS has_content, "
                 f"detail_fetched_at, comments_fetched_at, comments_count_observed_at, "
                 f"provider_comments_count_at_last_scan, comment_recovery_state, "
+                f"{scan_columns}, "
                 f"comment_recovery_started_at, "
                 f"comment_recovery_baseline_max_row_id, "
                 f"comment_recovery_full_miss_count, comment_recovery_parked_at, "

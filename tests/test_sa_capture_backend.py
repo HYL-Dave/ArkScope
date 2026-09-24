@@ -412,7 +412,7 @@ def test_save_article_with_comments_shape_and_pick_sync(backend):
     assert missing is None
 
 
-def test_comment_scan_checkpoint_advances_only_on_usable_observation(backend):
+def test_comment_scan_checkpoint_advances_only_on_usable_terminal_observation(backend):
     backend.upsert_sa_articles_meta([
         _article("positive"),
         _article("zero"),
@@ -421,10 +421,12 @@ def test_comment_scan_checkpoint_advances_only_on_usable_observation(backend):
     ])
 
     positive = backend.update_article_comments(
-        "positive", _comments(), provider_comments_count=12
+        "positive", _comments(), provider_comments_count=12,
+        comment_scan_stop_reason="stable_bottom", comment_scan_stable_bottom_rounds=2,
     )
     zero = backend.update_article_comments(
-        "zero", [], provider_comments_count=0
+        "zero", [], provider_comments_count=0,
+        comment_scan_stop_reason="stable_bottom", comment_scan_stable_bottom_rounds=2,
     )
     empty = backend.update_article_comments(
         "empty", [], provider_comments_count=7
@@ -436,7 +438,8 @@ def test_comment_scan_checkpoint_advances_only_on_usable_observation(backend):
         "zero-pending", [_comment("zero-new")], provider_comments_count=2
     )
     zero_pending = backend.update_article_comments(
-        "zero-pending", [], provider_comments_count=0
+        "zero-pending", [], provider_comments_count=0,
+        comment_scan_stop_reason="stable_bottom", comment_scan_stable_bottom_rounds=2,
     )
 
     rows = {row["article_id"]: row for row in backend.query_sa_articles()}

@@ -801,9 +801,56 @@ class DataAccessLayer:
         articles_by_id = {
             a["article_id"]: a for a in all_articles if a.get("article_id")
         }
+        from datetime import datetime, timezone, timedelta
+        retry_cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=6)
+        from src.agents.config import get_agent_config
+        try:
+            config = get_agent_config()
+            ttl = getattr(config, "sa_comments_cache_days", 7)
+            limit_field = ("sa_comments_backfill_per_backfill_scan" if mode == "backfill"
+                           else "sa_comments_backfill_per_full_scan")
+            backfill_limit = max(0, int(getattr(config, limit_field, 50 if mode == "backfill" else 10)))
+        except Exception:
+            ttl = 7
+            backfill_limit = 50 if mode == "backfill" else 10
+        if mode == "quick":
+            backfill_limit = 1
+        pending_work_ids = set()
 
-        def comment_work_item(a: Dict[str, Any]) -> Dict[str, Any]:
+        def pending_due(a: Dict[str, Any]) -> bool:
+            if mode == "backfill":
+                return True
+            attempted = a.get("comment_scan_attempted_at")
+            if not attempted:
+                return True
+            try:
+                if isinstance(attempted, str):
+                    attempted = datetime.fromisoformat(attempted.replace("Z", "+00:00"))
+                if attempted.tzinfo is None:
+                    attempted = attempted.replace(tzinfo=timezone.utc)
+                return attempted <= retry_cutoff
+            except (TypeError, ValueError, AttributeError):
+                return False
+
+        def admit_pending(a: Dict[str, Any]) -> bool:
+            article_id = a["article_id"]
+            if not pending_due(a):
+                return False
+            if article_id not in pending_work_ids:
+                if len(pending_work_ids) >= backfill_limit:
+                    return False
+                pending_work_ids.add(article_id)
+            return True
+
+        def first_capture(a: Dict[str, Any]) -> bool:
+            return (not a.get("comments_fetched_at")
+                    and a.get("provider_comments_count_at_last_scan") is None
+                    and not a.get("comment_scan_attempted_at"))
+
+        def comment_work_item(a: Dict[str, Any], *, backfill: bool = False) -> Dict[str, Any]:
             item = {"article_id": a["article_id"], "url": a.get("url", "")}
+            if backfill or first_capture(a):
+                item["comment_scan_mode"] = "backfill"
             if a["article_id"] in scanned_ids:
                 provider_count = current_count_observations.get(a["article_id"])
             elif a.get("comments_count_observed_at"):
@@ -820,7 +867,11 @@ class DataAccessLayer:
         for article_id in scanned_article_ids:
             article = articles_by_id.get(article_id)
             if article is not None and not article.get("has_content"):
-                need_content.append(comment_work_item(article))
+                if article.get("comment_backfill_pending") and not admit_pending(article):
+                    continue
+                need_content.append(comment_work_item(
+                    article, backfill=bool(article.get("comment_backfill_pending"))
+                ))
 
         # Determine need_comments
         need_comments = []
@@ -833,36 +884,18 @@ class DataAccessLayer:
                 article is None
                 or article_id in need_content_ids
                 or not article.get("has_content")
-                or article_id not in current_count_observations
+                or article.get("comment_backfill_pending")
             ):
                 continue
-            provider_count = current_count_observations[article_id]
+            provider_count = current_count_observations.get(article_id)
             checkpoint = article.get("provider_comments_count_at_last_scan")
-            count_changed = checkpoint is not None and provider_count != int(checkpoint)
-            first_positive = checkpoint is None and provider_count > 0
-            if count_changed or first_positive:
+            count_changed = provider_count is not None and checkpoint is not None and provider_count != int(checkpoint)
+            first_positive = checkpoint is None and provider_count is not None and provider_count > 0
+            if count_changed or first_positive or first_capture(article):
                 need_comments.append(comment_work_item(article))
                 need_comment_ids.add(article_id)
 
-        if mode in ("full", "backfill"):
-            from src.agents.config import get_agent_config
-            try:
-                config = get_agent_config()
-                ttl = getattr(config, "sa_comments_cache_days", 7)
-                if mode == "backfill":
-                    backfill_limit = max(
-                        0,
-                        int(getattr(config, "sa_comments_backfill_per_backfill_scan", 50)),
-                    )
-                else:
-                    backfill_limit = max(
-                        0,
-                        int(getattr(config, "sa_comments_backfill_per_full_scan", 10)),
-                    )
-            except Exception:
-                ttl = 7
-                backfill_limit = 50 if mode == "backfill" else 10
-            from datetime import datetime, timezone, timedelta
+        if mode in ("quick", "full", "backfill"):
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=ttl)
             recovery_candidates = []
             ttl_candidates = []
@@ -882,12 +915,18 @@ class DataAccessLayer:
                     published_key = str(published)
                 order_key = (published_key, str(a["article_id"]))
 
+                if a.get("comment_backfill_pending"):
+                    if pending_due(a):
+                        recovery_candidates.append((order_key, a))
+                    continue
                 state = a.get("comment_recovery_state") or "repaired"
                 if state == "pending":
-                    if mode == "backfill" or not a.get("comment_recovery_parked_at"):
+                    if pending_due(a) and (mode == "backfill" or not a.get("comment_recovery_parked_at")):
                         recovery_candidates.append((order_key, a))
                     continue
                 if state == "unreachable_terminal":
+                    continue
+                if mode == "quick":
                     continue
 
                 fetched = a.get("comments_fetched_at")
@@ -909,9 +948,16 @@ class DataAccessLayer:
 
             recovery_candidates.sort(key=lambda item: item[0], reverse=True)
             ttl_candidates.sort(key=lambda item: item[0], reverse=True)
-            for _, a in (recovery_candidates + ttl_candidates)[:backfill_limit]:
+            remaining = max(0, backfill_limit - len(pending_work_ids))
+            for _, a in (recovery_candidates + ttl_candidates)[:remaining]:
                 if a["article_id"] not in need_comment_ids:
-                    need_comments.append(comment_work_item(a))
+                    if a.get("comment_backfill_pending") or a.get("comment_recovery_state") == "pending":
+                        if not admit_pending(a):
+                            continue
+                    need_comments.append(comment_work_item(
+                        a, backfill=bool(a.get("comment_backfill_pending"))
+                        or a.get("comment_recovery_state") == "pending",
+                    ))
                     need_comment_ids.add(a["article_id"])
 
         # Unresolved symbols (current picks only, metadata-only matching)
@@ -930,6 +976,25 @@ class DataAccessLayer:
                 "SA article reconciliation failed after metadata capture: %s", exc
             )
             reconciliation = _failed_sa_reconciliation()
+
+        enrichment = reconciliation.get("enrichment") if isinstance(reconciliation, dict) else None
+        if isinstance(enrichment, list):
+            eligible_enrichment = []
+            for item in enrichment:
+                if not isinstance(item, dict):
+                    eligible_enrichment.append(item)
+                    continue
+                article = articles_by_id.get(item.get("article_id"))
+                if article:
+                    pending = bool(article.get("comment_backfill_pending")) or article.get("comment_recovery_state") == "pending"
+                    if pending and not admit_pending(article):
+                        continue
+                    if first_capture(article) or pending:
+                        item["comment_scan_mode"] = "backfill"
+                eligible_enrichment.append(item)
+            reconciliation["enrichment"] = eligible_enrichment
+            enrichment_ids = {item.get("article_id") for item in eligible_enrichment if isinstance(item, dict)}
+            need_comments = [item for item in need_comments if item["article_id"] not in enrichment_ids]
 
         return {
             "status": "ok",

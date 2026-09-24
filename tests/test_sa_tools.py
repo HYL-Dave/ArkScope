@@ -1684,6 +1684,7 @@ class TestDataAccessArticleMeta:
             {
                 "article_id": "body-current",
                 "url": "https://example.com/body-current",
+                "comment_scan_mode": "backfill",
             }
         ]
 
@@ -1770,11 +1771,11 @@ class TestDataAccessArticleMeta:
             ], mode="full")
 
         assert result["need_content"] == [
-            {"article_id": "need-content", "url": "https://example.com/need-content"},
+            {"article_id": "need-content", "url": "https://example.com/need-content", "comment_scan_mode": "backfill"},
         ]
         assert result["need_comments"] == [
-            {"article_id": "gap-newer-big", "url": "https://example.com/gap-newer-big"},
-            {"article_id": "gap-older-big", "url": "https://example.com/gap-older-big"},
+            {"article_id": "gap-newer-big", "url": "https://example.com/gap-newer-big", "comment_scan_mode": "backfill"},
+            {"article_id": "gap-older-big", "url": "https://example.com/gap-older-big", "comment_scan_mode": "backfill"},
             {"article_id": "ttl-refresh", "url": "https://example.com/ttl-refresh"},
         ]
 
@@ -1806,7 +1807,7 @@ class TestDataAccessArticleMeta:
             ], mode="full")
 
         assert result["need_comments"] == [
-            {"article_id": "never-fetched", "url": "https://example.com/never-fetched"},
+            {"article_id": "never-fetched", "url": "https://example.com/never-fetched", "comment_scan_mode": "backfill"},
         ]
 
 
@@ -1851,7 +1852,7 @@ class TestDataAccessArticleMeta:
             ], mode="backfill")
 
         assert result["need_comments"] == [
-            {"article_id": "gap-positive", "url": "https://example.com/gap-positive"},
+            {"article_id": "gap-positive", "url": "https://example.com/gap-positive", "comment_scan_mode": "backfill"},
         ]
 
     def test_backfill_mode_uses_deeper_backfill_limit(self):
@@ -1907,9 +1908,9 @@ class TestDataAccessArticleMeta:
             ], mode="backfill")
 
         assert result["need_comments"] == [
-            {"article_id": "gap-a", "url": "https://example.com/gap-a"},
-            {"article_id": "gap-b", "url": "https://example.com/gap-b"},
-            {"article_id": "gap-c", "url": "https://example.com/gap-c"},
+            {"article_id": "gap-a", "url": "https://example.com/gap-a", "comment_scan_mode": "backfill"},
+            {"article_id": "gap-b", "url": "https://example.com/gap-b", "comment_scan_mode": "backfill"},
+            {"article_id": "gap-c", "url": "https://example.com/gap-c", "comment_scan_mode": "backfill"},
         ]
 
 

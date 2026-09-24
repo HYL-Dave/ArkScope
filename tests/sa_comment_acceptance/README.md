@@ -28,10 +28,13 @@ is registered and no website is opened by this command.
 3. Open one Alpha Picks article. Wait until its body is readable; do not expand
    comments manually first. Click the Comment Test toolbar icon while on that
    article. A test panel opens; the article remains the selected target.
-4. Keep **Legacy + candidate observation** and click **Capture Selected Article**
-   once. The target tab becomes active, as with the original collector. It uses
-   the existing Manual limits: 60 rounds, 45 seconds, 1.2-second settle, plus the
-   original 2.5-second initial settle. It does not increase retries or limits.
+4. In version 1.0.3 keep **Legacy + candidate observation** and select
+   **Initial / backfill (120 seconds)**, then click **Capture Selected Article**
+   once. The target tab becomes active, as with the original collector. This
+   uses the approved existing Deep profile: 140 rounds, 120 seconds,
+   1.6-second settle and five stable-bottom rounds, plus the original
+   2.5-second initial settle. It is a new paired baseline, not a relabeling of
+   the earlier 45-second Manual run. No automatic retry is added.
 5. The run exports JSON to the browser download directory under
    `ArkScope-Comment-Test/`. Return to the panel for status, then report completion
    to the developer. Stop on verification, login, restriction or capture errors;
@@ -62,6 +65,10 @@ After capture code changes, create a fresh **Legacy + candidate observation**
 baseline using the updated package first, then reload for **Guarded candidate**.
 Both exports must identify the same capture-code fingerprint; do not edit old
 artifacts to relabel their source revision.
+The selected profile and its limits are exported with each capture. For the
+new first-capture pair, both runs must select Initial / backfill. The Routine
+option retains the 12-second Quick profile and is a separate experiment, not
+an interchangeable comparison partner.
 Never compare two modes on one already-expanded document. The harness rejects
 repeated captures of the same document, enforces 60 seconds between attempts and
 allows at most six attempts in its own storage. It does not alter the production
@@ -78,6 +85,25 @@ or changed comments fail acceptance; different provider counts, changed bodies,
 unknown totals, additional comments, truncated traces, or higher rounds/time are
 inconclusive. Review elapsed-time differences rather than increasing budgets to
 make a candidate pass. Synthetic IDs alone are not used as text identity.
+The operator has explicitly approved a higher first-capture budget for the new
+pair. That approval does not waive missing-text, parent or identity checks, and
+does not establish that the increased runtime/work is acceptable in every
+routine update. Per-round geometry now distinguishes cap exhaustion before
+the bottom from a stable terminal scan.
+
+## Incremental Maintenance Gate
+
+Hermetic store/metadata-flow tests separately verify that identical comments
+cause no row updates, new comments remain insertable, first capture is selected
+per article, unchanged provider counts do not hide pending work, and partial
+scans cannot advance a completion checkpoint. A six-hour retry delay and a
+one-pending-article Quick batch prevent immediate repeated deep captures.
+Explicit Deep Repair bypasses only that local retry delay.
+
+These database tests do not establish a website incremental cursor. Reopening
+SA may still load existing parent comments to discover replies, and seeing one
+known comment is not an early-stop proof. A signed-in routine probe cannot by
+itself prove that no new replies exist in older threads.
 
 At least a nested-reply case and a larger thread remain required before adoption.
 The initial one-article observation is deliberately not the whole acceptance.
@@ -95,9 +121,16 @@ normal collection only when no test capture is running.
   real **See More Replies** controls rejected as `outside_comment_controls` by
   the initial candidate. Passive inspection then established the sibling reply
   footer structure. Version 1.0.2 corrects that recognition, the `see` verb and
-  unresolved-state reporting, with offline regression tests. Adoption is still
-  **blocked pending independent paired evidence**, not validated by these
-  successful exports. See [the observation record](../../docs/superpowers/evidence/2026-09-24-sa-comment-observation.md).
+  unresolved-state reporting, with offline regression tests. Its independent
+  paired run is **not accepted**: legacy captured 81 comments; guarded captured
+  105 but missed two legacy comments and reached the existing 45-second cap.
+  The 79 shared comments have identical text and parent relationships; that does
+  not compensate for missing comments. Investigate traversal before another
+  live pair; do not extend time limits, add retries or merge the exports to
+  manufacture acceptance. See [the observation record](../../docs/superpowers/evidence/2026-09-24-sa-comment-observation.md).
+- The operator approved version 1.0.3's first/backfill profile selection and
+  pending/unchanged-row fixes. Its new paired live result is **pending**. It
+  does not inherit success from an offline test or from combining old captures.
 - A final code freeze, complete backend/frontend/typecheck/build run and review
   are **pending**. Earlier revision results cannot stand in for these.
 - No merge, production extension replacement or 180-company run is authorized

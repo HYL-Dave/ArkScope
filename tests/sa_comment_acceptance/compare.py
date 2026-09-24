@@ -6,7 +6,7 @@ import sys
 
 def compare(old, new):
     reasons = []
-    for field in ("article_id", "mode", "source_hash", "provider_count"):
+    for field in ("article_id", "mode", "source_hash", "provider_count", "capture_profile"):
         if old.get(field) != new.get(field):
             reasons.append(field + "_changed")
     if old.get("strategy") != "observe" or new.get("strategy") != "guarded":
@@ -51,6 +51,11 @@ def compare(old, new):
         reasons.append("new_comments_or_different_coverage")
     if new.get("scroll", {}).get("controls_unresolved"):
         reasons.append("unrecognized_controls")
+    if new.get("mode") == "backfill" and (
+        new["scroll"].get("stop_reason") != "stable_bottom"
+        or new["scroll"].get("stable_bottom_rounds", 0) < 5
+    ):
+        reasons.append("initial_scan_not_terminal")
     if any(round_.get("audit", {}).get("omitted_count", 0) for capture in (old, new)
            for round_ in capture.get("scroll", {}).get("control_audits", [])):
         reasons.append("candidate_trace_truncated")

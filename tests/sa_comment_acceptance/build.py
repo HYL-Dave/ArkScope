@@ -38,7 +38,7 @@ def build(output: Path):
         + "function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}\n"
         + "\n\n".join(payload["functions"]) + "\n", encoding="utf-8")
     manifest = {
-        "manifest_version":3,"name":"ArkScope Comment Test","version":"1.0.2",
+        "manifest_version":3,"name":"ArkScope Comment Test","version":"1.0.3",
         "permissions":["scripting","tabs","storage","downloads"],
         "host_permissions":["https://seekingalpha.com/*"],
         "background":{"scripts":["compat_firefox.js","comment_capture.js","capture_driver.js","test_background.js"]},

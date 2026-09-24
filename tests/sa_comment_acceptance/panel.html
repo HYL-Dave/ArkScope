@@ -7,6 +7,9 @@
 <label for="strategy">Capture mode</label>
 <select id="strategy"><option value="observe">Legacy + candidate observation</option>
 <option value="guarded">Guarded candidate</option></select>
+<label for="profile">Scan budget</label>
+<select id="profile"><option value="backfill">Initial / backfill (120 seconds)</option>
+<option value="quick">Routine (12 seconds)</option></select>
 <button id="capture" type="button">Capture Selected Article</button>
 <button id="inspect" type="button">Export Loaded Comment Structure</button>
 <output id="status" aria-live="polite">Ready</output>

@@ -111,6 +111,8 @@ def _create_v2_with_provider_marked_symbol(
     seeded.close()
     conn = sqlite3.connect(path)
     try:
+        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason"):
+            conn.execute(f"ALTER TABLE sa_articles DROP COLUMN {column}")
         conn.execute("DELETE FROM schema_migrations WHERE version > 2")
         conn.execute(
             "INSERT OR REPLACE INTO schema_migrations(version, applied_at) "
@@ -223,7 +225,7 @@ def _insert_lineage_and_article(conn: sqlite3.Connection) -> tuple[int, str]:
 def test_current_schema_keeps_lineage_link_decision_and_provider_evidence_contract(tmp_path):
     conn = scs.connect(str(tmp_path / "fresh.db"))
     try:
-        assert scs.SCHEMA_VERSION == 4
+        assert scs.SCHEMA_VERSION == 5
         tables = {
             row[0]
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -327,7 +329,7 @@ def test_v2_to_v3_migration_canonicalizes_identity_and_preserves_provider_litera
 
     conn = scs.connect(str(path))
     try:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
         picks = conn.execute(
             "SELECT id, symbol, closed_date, return_pct, raw_data, lineage_id "
             "FROM sa_alpha_picks ORDER BY id"
@@ -444,7 +446,7 @@ def test_v1_migration_does_not_grandfather_legacy_canonical_values(tmp_path):
         conn.close()
 
 
-def test_v1_migration_seeds_comment_checkpoint_without_recovery_flag(tmp_path):
+def test_v1_migration_preserves_unknown_comment_completion(tmp_path):
     path = tmp_path / "comments-v1.db"
     _create_v1(path)
     raw = sqlite3.connect(path)
@@ -476,7 +478,7 @@ def test_v1_migration_seeds_comment_checkpoint_without_recovery_flag(tmp_path):
     assert rows["legacy-entry"] == {
         "article_id": "legacy-entry",
         "comments_count_observed_at": None,
-        "provider_comments_count_at_last_scan": 41,
+        "provider_comments_count_at_last_scan": None,
         "comment_recovery_state": "repaired",
         "comment_recovery_started_at": None,
         "comment_recovery_baseline_max_row_id": None,
@@ -627,10 +629,10 @@ def test_v1_to_v2_migration_is_serialized_across_two_real_processes(tmp_path):
     ]
     outputs = [proc.communicate(timeout=60) for proc in procs]
     assert all(proc.returncode == 0 for proc in procs), outputs
-    assert all(stdout.strip() == "4" for stdout, _ in outputs)
+    assert all(stdout.strip() == "5" for stdout, _ in outputs)
     conn = sqlite3.connect(path)
     try:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert conn.execute(
             "SELECT COUNT(*) FROM sa_alpha_picks WHERE lineage_id IS NULL"

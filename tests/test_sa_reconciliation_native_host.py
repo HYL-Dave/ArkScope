@@ -141,7 +141,7 @@ def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconcilia
     assert meta_calls[1][0] == "reconcile"
     assert meta_calls[1][1]["article_ids"] == ["6316639"]
     assert meta_result["need_content"] == [
-        {"article_id": "6316639", "url": "https://sa/6316639"}
+        {"article_id": "6316639", "url": "https://sa/6316639", "comment_scan_mode": "backfill"}
     ]
     assert meta_result["reconciliation"]["status"] == "failed"
     assert "secret database detail" not in json.dumps(meta_result)
@@ -297,7 +297,7 @@ def test_get_reconciliation_queue_action_is_read_only_and_sanitized(
 
     check = sqlite3.connect(path)
     try:
-        assert check.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert check.execute("PRAGMA user_version").fetchone()[0] == 5
         before = (
             check.execute("SELECT COUNT(*) FROM sa_pick_article_links").fetchone()[0],
             check.execute("SELECT COUNT(*) FROM sa_pick_article_decisions").fetchone()[0],
