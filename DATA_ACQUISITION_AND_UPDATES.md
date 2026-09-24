@@ -523,6 +523,9 @@ regression are required before merge. See the
 [comment acceptance procedure](tests/sa_comment_acceptance/README.md).
 
 Comment expansion is restricted to recognized comment/reply/text controls.
+This includes SA's observed sibling reply-list footer, validated against its
+parent row and wrapped reply rows; the whole `paywall-full-content` container
+does not become an authorized control scope.
 Known navigating links, new-context links, submit/reset controls and duplicate
 nested controls are excluded. This does not make arbitrary page JavaScript
 incapable of navigation. During capture, tab URL/loading/closure/new-context
@@ -532,7 +535,8 @@ reading body/comments. Invalid captures are not persisted under the requested
 article. Once verified data has been serialized into the background, subsequent
 tab navigation does not invalidate that already captured snapshot.
 
-If a potentially relevant legacy control cannot be recognized safely, the scan
+If a visible reply-expansion control or relevant legacy control cannot be
+recognized safely, including one outside the known comment structure, the scan
 reports `controls_unresolved`: existing comments and comment checkpoints are
 retained, while a separately valid article body can still be saved. A diagnostic
 failure is not permission to overwrite complete comments with truncated text.

@@ -22,7 +22,7 @@ const dom=new JSDOM(input.html, {
 const w=dom.window;
 Object.defineProperty(w.HTMLElement.prototype,'innerText',{get(){return this.textContent || '';}});
 Object.defineProperty(w.HTMLElement.prototype,'offsetParent',{get(){return this.hidden ? null : this.parentElement;}});
-w.HTMLElement.prototype.getBoundingClientRect=function(){return {top:700,width:100,height:30};};
+w.HTMLElement.prototype.getBoundingClientRect=function(){return {top:input.top ?? 700,width:100,height:30};};
 Object.defineProperty(w.document.body,'scrollHeight',{value:1000});
 w.scrollBy=()=>{};
 w.clicked=[];
@@ -35,7 +35,7 @@ process.stdout.write(JSON.stringify({result,clicked:w.clicked}));
 """
 
 
-def _round(html: str, *, strategy="guarded"):
+def _round(html: str, *, strategy="guarded", top=700):
     injected = _run_background(
         r"""
         let injected;
@@ -51,7 +51,7 @@ def _round(html: str, *, strategy="guarded"):
     if injected["args"]:
         injected["args"][0]["strategy"] = strategy
     result = subprocess.run(
-        ["node", "-e", DOM_RUNNER, json.dumps(dict(injected, html=html))],
+        ["node", "-e", DOM_RUNNER, json.dumps(dict(injected, html=html, top=top))],
         cwd=ROOT, capture_output=True, text=True, check=True,
     )
     return json.loads(result.stdout)
@@ -64,6 +64,94 @@ def _thread(control: str):
         '<div class="border-t-share-separator-thin"><div class="break-words">Reply body</div>'
         + control + '</div></section></div>'
     )
+
+
+def _observed_reply_footer(control: str):
+    # Structural projection of 6338740's passive Firefox export, no SA prose.
+    replies = ''.join(
+        '<div><div class="flex border-t border-t-share-separator-thin pl-52">'
+        f'<div class="break-words">Fixture reply {i}</div></div></div>' for i in range(3)
+    )
+    return (
+        '<div class="paywall-full-content"><article>Unrelated article content</article>'
+        '<div><h3>Comments (107)</h3></div><div><div id="thread">'
+        '<div id="parent" class="flex border-t border-t-share-separator-thin">Parent</div>'
+        '<div class="print:block">' + replies
+        + '<div class="mb-18 ml-52">' + control + '</div></div></div></div></div>'
+    )
+
+
+@pytest.mark.parametrize("top", [100, 700])
+def test_observed_sa_sibling_reply_footer_is_recognized_above_or_below_page_midpoint(top):
+    result = _round(_observed_reply_footer('<button id="reply" type="button">See More Replies</button>'), top=top)
+    assert result["clicked"] == ["reply"]
+    audit = result["result"]["control_audit"]
+    assert audit["guarded_candidates"] == 1
+    assert audit["unresolved_candidates"] == 0
+    assert audit["items"][0]["in_comment_scope"] is True
+
+
+@pytest.mark.parametrize("top,clicked", [(100, []), (700, ["reply"])])
+def test_observation_preserves_the_legacy_midpoint_selection(top, clicked):
+    html = _observed_reply_footer('<button id="reply" type="button">See More Replies</button>')
+    assert _round(html, strategy="observe", top=top)["clicked"] == clicked
+
+
+@pytest.mark.parametrize("label", ["See More Replies", "View newest replies"])
+@pytest.mark.parametrize("top", [100, 700])
+def test_recognizable_reply_intent_outside_known_structure_is_unresolved(label, top):
+    html = '<div class="paywall-full-content"><button id="unknown" type="button">' + label + '</button></div>'
+    result = _round(html, top=top)
+    assert result["clicked"] == []
+    audit = result["result"]["control_audit"]
+    assert audit["unresolved_candidates"] == 1
+    assert audit["items"][0]["reason"] == "outside_comment_controls"
+
+
+@pytest.mark.parametrize("old,new", [
+    ('class="print:block"', 'class="new-layout"'),
+    ('id="parent" class="flex border-t border-t-share-separator-thin"', 'id="parent"'),
+    ('border-t-share-separator-thin pl-52', 'different-row pl-52'),
+])
+def test_changed_reply_footer_structure_is_not_authorized_by_label_alone(old, new):
+    html = _observed_reply_footer('<button id="reply" type="button">See More Replies</button>').replace(old, new)
+    result = _round(html)
+    assert result["clicked"] == []
+    assert result["result"]["control_audit"]["unresolved_candidates"] == 1
+
+
+@pytest.mark.parametrize("control", [
+    '<a id="unsafe" href="/article/999-other">See More Replies</a>',
+    '<a id="unsafe" role="button" href="/article/999-other">See More Replies</a>',
+    '<a id="unsafe" href="#replies" target="_blank">See More Replies</a>',
+    '<button id="unsafe" form="f">See More Replies</button>',
+])
+def test_observed_footer_does_not_bypass_navigation_and_form_guards(control):
+    result = _round(_observed_reply_footer(control) + '<form id="f"></form>')
+    assert result["clicked"] == []
+    assert result["result"]["control_audit"]["unresolved_candidates"] == 1
+
+
+def test_hidden_unrecognized_reply_control_does_not_claim_incomplete_capture():
+    result = _round('<div class="paywall-full-content"><button hidden>See More Replies</button></div>')
+    assert result["clicked"] == []
+    assert result["result"]["control_audit"]["unresolved_candidates"] == 0
+
+
+def test_nested_reply_control_is_unresolved_unless_an_accepted_ancestor_handles_it():
+    result = _round(_thread('<div role="button">Actions <button type="button">See More Replies</button></div>'), top=100)
+    assert result["clicked"] == []
+    assert result["result"]["control_audit"]["unresolved_candidates"] == 1
+    handled = _round(_observed_reply_footer('<button id="outer" type="button"><span role="button">See More Replies</span></button>'))
+    assert handled["clicked"] == ["outer"]
+    assert handled["result"]["control_audit"]["unresolved_candidates"] == 0
+
+
+@pytest.mark.parametrize("label", ["See my comments on the earnings report", "Show more of my replies"])
+def test_prose_links_do_not_turn_valid_comment_capture_into_unresolved(label):
+    result = _round('<article><a href="/article/999-other">' + label + '</a></article>', top=100)
+    assert result["clicked"] == []
+    assert result["result"]["control_audit"]["unresolved_candidates"] == 0
 
 
 @pytest.mark.parametrize("control", [
@@ -88,6 +176,7 @@ def test_mixed_article_container_does_not_authorize_unrelated_show_button():
 
 @pytest.mark.parametrize("control", [
     '<button id="reply" type="button">Show more replies</button>',
+    '<button id="reply" type="button">See More Replies</button>',
     '<a id="reply" role="button" href="#replies">Show 2 replies</a>',
     '<div id="reply" role="button">Load more comments</div>',
 ])
@@ -261,7 +350,9 @@ def test_real_browsers_preserve_expansion_and_detect_document_replacement(tmp_pa
     <div class="break-words"><span id="text">Initial comment.</span>
     <button type="button" id="expand" onclick="document.getElementById('text').textContent='Initial comment. Full text.';this.remove()">Show more</button></div>
     <form onsubmit="window.submissions++;return false"><button><span role="button">Show more replies</span></button></form>
-    </div></section><script>window.submissions=0</script></body></html>"""
+    </div></section>""" + _observed_reply_footer(
+        '<button type="button" id="footer" onclick="window.footerExpansions++;this.remove()">See More Replies</button>'
+    ) + '<script>window.submissions=0;window.footerExpansions=0</script></body></html>'
     with sync_playwright() as pw:
         browser = getattr(pw,browser_name).launch(headless=True, proxy={"server":"http://127.0.0.1:9"})
         try:
@@ -272,8 +363,9 @@ def test_real_browsers_preserve_expansion_and_detect_document_replacement(tmp_pa
             state = page.evaluate("SACommentCapture.documentState({phase:'begin',token:'one',articleId:'123'})")
             assert state["ok"] is True
             scan = page.evaluate("SACommentCapture.scanPage({strategy:'guarded',token:'one'})")
-            assert scan["click_count"] == 1
+            assert scan["click_count"] == 2
             assert page.locator("#text").inner_text() == "Initial comment. Full text."
+            assert page.evaluate("window.footerExpansions") == 1
             assert page.evaluate("window.submissions") == 0
             # Real reload replaces even a document with exactly the same URL.
             page.reload()

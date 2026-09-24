@@ -78,8 +78,25 @@
     var controls = Array.from(document.querySelectorAll('button, a, [role="button"]'));
     var initialUrl = location.href.split('#')[0];
 
+    function inReplyFooter(element) {
+      // Observed SA layout: parent row + reply list ending in a separate footer.
+      var footer = element.parentElement;
+      var replies = footer && footer.parentElement;
+      var parentRow = replies && replies.previousElementSibling;
+      if (!footer || !footer.matches('div.mb-18.ml-52') || footer.children.length !== 1
+          || footer.firstElementChild !== element || !replies || replies.tagName !== 'DIV'
+          || !replies.classList.contains('print:block') || replies.lastElementChild !== footer
+          || !parentRow || !parentRow.matches(rowSelector) || replies.parentElement.children.length !== 2) return false;
+      var rows = Array.from(replies.children).slice(0, -1);
+      return rows.length > 0 && rows.every(function (wrapper) {
+        var row = wrapper.firstElementChild;
+        return wrapper.tagName === 'DIV' && wrapper.children.length === 1 && row
+          && row.matches(rowSelector) && row.classList.contains('pl-52');
+      });
+    }
+
     function inCommentScope(element) {
-      if (element.closest(rowSelector)) return true;
+      if (element.closest(rowSelector) || inReplyFooter(element)) return true;
       for (var parent = element.parentElement; parent; parent = parent.parentElement) {
         if (parent.matches('body, main, article, .paywall-full-content')) return false;
         var heading = parent.querySelector('h2, h3, h4, [role="heading"]');
@@ -89,20 +106,27 @@
       return false;
     }
 
-    function rejection(element, label) {
-      if (!inCommentScope(element)) return 'outside_comment_controls';
-      var inlineText = element.closest('[class*="break-words"]');
-      var textExpansion = inlineText && /^(?:show|read|see) more(?:\s*\.\.\.)?$/i.test(label);
-      if (/^(?:show|read|see) less$/i.test(label)) return 'already_expanded';
-      if (!textExpansion && !/^(?:show|load|view)\s+(?:(?:all|more|previous|older|\d+)\s+)*(?:comments?|replies|reply)(?:\s*\([\d,]+\))?$/i.test(label)) {
-        return 'label_unrecognized';
-      }
+    function unavailable(element) {
       if (element.disabled || element.getAttribute('aria-disabled') === 'true'
           || element.closest('[inert]')) return 'control_disabled';
       var style = getComputedStyle(element);
       var rect = element.getBoundingClientRect();
       if (element.offsetParent === null || style.display === 'none' || style.visibility === 'hidden'
           || rect.width <= 0 || rect.height <= 0) return 'control_hidden';
+      return null;
+    }
+
+    function rejection(element, label) {
+      if (element.parentElement && element.parentElement.closest('button, a, [role="button"]')) return 'nested_control';
+      if (!inCommentScope(element)) return 'outside_comment_controls';
+      var inlineText = element.closest('[class*="break-words"]');
+      var textExpansion = inlineText && /^(?:show|read|see) more(?:\s*\.\.\.)?$/i.test(label);
+      if (/^(?:show|read|see) less$/i.test(label)) return 'already_expanded';
+      if (!textExpansion && !/^(?:show|load|view|see)\s+(?:(?:all|more|previous|older|\d+)\s+)*(?:comments?|replies|reply)(?:\s*\([\d,]+\))?$/i.test(label)) {
+        return 'label_unrecognized';
+      }
+      var inactive = unavailable(element);
+      if (inactive) return inactive;
       var link = element.closest('a[href]');
       if (link) {
         var href = link.getAttribute('href').trim();
@@ -113,7 +137,6 @@
       }
       var button = element.closest('button, input');
       if (button && button.form && button.type !== 'button') return 'form_submission';
-      if (element.parentElement && element.parentElement.closest('button, a, [role="button"]')) return 'nested_control';
       return null;
     }
 
@@ -147,16 +170,25 @@
       var label = (element.innerText || '').trim().replace(/\s+/g, ' ');
       var legacy = isLegacy(element);
       var reason = rejection(element, label);
-      return {element:element, legacy:legacy, reason:reason,
-        description:describe(element, label, legacy, reason, index)};
+      var description = describe(element, label, legacy, reason, index);
+      var replyIntent = /^(?:show|load|view|see)\s+(?:(?:all|more|previous|older|newer|newest|latest|additional|hidden|\d+)\s+)*(?:comments?|replies|reply)(?:\s*\([\d,]+\))?$/i.test(label);
+      var unresolved = reason !== null && ['control_hidden','control_disabled','already_expanded'].indexOf(reason) === -1
+        && (replyIntent || legacy && description.in_comment_scope) && !unavailable(element);
+      return {element:element, legacy:legacy, reason:reason, unresolved:unresolved, description:description};
     });
-    var relevant = candidates.filter(function (item) {return item.legacy || item.reason === null;});
+    var accepted = new Set(candidates.filter(function (item) {return item.reason === null;})
+      .map(function (item) {return item.element;}));
+    candidates.forEach(function (item) {
+      if (item.reason !== 'nested_control' || !item.unresolved) return;
+      // A duplicate is covered only when its outer control is actually accepted.
+      for (var parent = item.element.parentElement; parent; parent = parent.parentElement) {
+        if (accepted.has(parent)) {item.unresolved = false; break;}
+      }
+    });
+    var relevant = candidates.filter(function (item) {return item.legacy || item.reason === null || item.unresolved;});
     var audit = {legacy_candidates:candidates.filter(function (item) {return item.legacy;}).length,
       guarded_candidates:candidates.filter(function (item) {return item.reason === null;}).length,
-      unresolved_candidates:candidates.filter(function (item) {
-        return item.legacy && item.reason !== null && item.description.in_comment_scope
-          && ['control_hidden','control_disabled','already_expanded','nested_control'].indexOf(item.reason) === -1;
-      }).length,
+      unresolved_candidates:candidates.filter(function (item) {return item.unresolved;}).length,
       items:relevant.slice(0, 64).map(function (item) {return item.description;}),
       omitted_count:Math.max(0, relevant.length - 64), clicked_indices:[]};
     var clicked = false, clickCount = 0, changed = false;

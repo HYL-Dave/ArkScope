@@ -58,6 +58,10 @@ inspection does not overturn the earlier same-DOM observation.
 
 Only after reviewing the observed controls, reload the same article and run
 **Guarded candidate** with the same profile and otherwise unchanged environment.
+After capture code changes, create a fresh **Legacy + candidate observation**
+baseline using the updated package first, then reload for **Guarded candidate**.
+Both exports must identify the same capture-code fingerprint; do not edit old
+artifacts to relabel their source revision.
 Never compare two modes on one already-expanded document. The harness rejects
 repeated captures of the same document, enforces 60 seconds between attempts and
 allows at most six attempts in its own storage. It does not alter the production
@@ -89,9 +93,11 @@ normal collection only when no test capture is running.
   and panel dimensions. It never signs into SA.
 - The first signed-in Firefox observation exported successfully. It found two
   real **See More Replies** controls rejected as `outside_comment_controls` by
-  the candidate. The selector also lacks `see` for reply expansion. Adoption is
-  **blocked pending correction and paired evidence**, not validated by this
-  successful export. See [the observation record](../../docs/superpowers/evidence/2026-09-24-sa-comment-observation.md).
+  the initial candidate. Passive inspection then established the sibling reply
+  footer structure. Version 1.0.2 corrects that recognition, the `see` verb and
+  unresolved-state reporting, with offline regression tests. Adoption is still
+  **blocked pending independent paired evidence**, not validated by these
+  successful exports. See [the observation record](../../docs/superpowers/evidence/2026-09-24-sa-comment-observation.md).
 - A final code freeze, complete backend/frontend/typecheck/build run and review
   are **pending**. Earlier revision results cannot stand in for these.
 - No merge, production extension replacement or 180-company run is authorized
