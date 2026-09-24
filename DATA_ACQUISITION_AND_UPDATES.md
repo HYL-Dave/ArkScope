@@ -653,6 +653,10 @@ maintenance are tested separately. The isolated harness exports the selected
 profile, per-round scroll position, page height, bottom/loading state and click
 count. Neither click count nor navigation count is a full HTTP request meter.
 See [comment acceptance](tests/sa_comment_acceptance/README.md).
+The [September 24 signed-in Firefox evidence](docs/superpowers/evidence/2026-09-24-sa-comment-recent-and-routine-acceptance.md)
+records the large-thread improvement and partial routine scan separately.
+It does not establish complete recent coverage, equal HTTP load, or Chrome
+live acceptance; stored-row preservation is verified by isolated replay.
 
 ### SA Financial Refresh Scheduling
 

@@ -30,8 +30,15 @@ no production data deletion, extension replacement, merge or push.
 - Prepared: separate private Firefox 1.0.5 package with two recent-only slots,
   prior attempt/stop records preserved, and no production database permission.
 - Pending: frozen-revision whole-project regression before merge.
-- Pending: new signed-in large-thread and routine acceptance. The prior large
-  pair failed (53 missing baseline comments, all within 30 days) and remains failed.
+- Completed: bounded signed-in Firefox large-thread and routine procedures,
+  with independent exports and isolated persistence/scheduling replay. See
+  [the evidence and limits](../evidence/2026-09-24-sa-comment-recent-and-routine-acceptance.md).
+  The new large pair preserves 259 baseline rows and adds 93 in less time;
+  its strict comparator remains inconclusive for added coverage. The short
+  routine probe remains partial and preserves existing data in replay.
+- Pending: final integration decision with the recorded completeness/load
+  limitations. The prior large pair failed (53 missing baseline comments, all
+  within 30 days) and remains failed; it is not relabeled or combined.
 
 The current implementation neither proves website-wide recent completeness nor
 provides a provider-level incremental cursor. The browser can still load older

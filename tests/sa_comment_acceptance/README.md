@@ -141,10 +141,16 @@ normal collection only when no test capture is running.
   206 shared unchanged, 53 missing and 12 added. Both timed out before bottom.
   All 53 missing comments were recent. New recency priority does not relabel it.
 - Version 1.0.5 adds loaded-frontier traversal and recency/context priority.
-  Its new signed-in result is **pending**. Acceptance first checks recent text,
-  parents, article identity and budget; missing older text must be distinguished
-  from missing recent or unknown-date evidence. The strict comparison still
-  reports full-export differences; it must not silently waive earlier failures.
+  The new signed-in pair retains all 259 baseline rows, adds 93 and reaches
+  stable bottom in 91.879 seconds versus the baseline's 121.271-second timeout.
+  The strict comparator remains inconclusive for added coverage; five extra
+  expansion clicks and the 352/353 count gap are explicitly not waived.
+- Private 1.0.6 uses identical capture code with one separate routine slot.
+  Its 12-second probe captures 105 rows, stops partial, and preserves all 107
+  previously stored rows in isolated replay with zero comment row writes.
+  This is not a complete capture or live new-reply test. See
+  [the recent/routine evidence](../../docs/superpowers/evidence/2026-09-24-sa-comment-recent-and-routine-acceptance.md).
+  No existing failures are relabeled; raw subscribed artifacts stay outside Git.
 - A final code freeze, complete backend/frontend/typecheck/build run and review
   are **pending**. Earlier revision results cannot stand in for these.
 - No merge, production extension replacement or 180-company run is authorized
