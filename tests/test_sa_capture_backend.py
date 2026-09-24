@@ -756,6 +756,14 @@ def test_comment_dedupe_cascade_leaves_no_orphan_signals(backend):
 
     backend.save_article_with_comments("a1", "body", [])
 
+    # Acquisition must not run destructive maintenance or cascade signals.
+    before_cleanup = backend.get_sa_article_with_comments("a1")
+    assert {c["comment_id"] for c in before_cleanup["comments"]} == {"dup", "keep", "child"}
+    with scs.connect(backend._sa_db) as check:
+        assert check.execute("SELECT COUNT(*) FROM sa_comment_signals").fetchone()[0] == 1
+        assert check.execute("SELECT COUNT(*) FROM sa_signal_ticker_mentions").fetchone()[0] == 1
+    backend.cleanup_mixed_null_date_comment_duplicates()
+
     art = backend.get_sa_article_with_comments("a1")
     by_id = {c["comment_id"]: c for c in art["comments"]}
     assert set(by_id) == {"keep", "child"}                   # 'dup' deleted

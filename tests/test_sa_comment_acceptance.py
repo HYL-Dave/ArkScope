@@ -192,7 +192,7 @@ def test_acceptance_capture_uses_selected_profile_and_exports_its_budget(mode, d
     const access=()=>{};
     const context={chrome,URL,Blob,Date,CAPTURE_SOURCE_HASH:'test',setTimeout:()=>{},readSaAccessMarkers:access,
       getCommentScrollProfile:mode=>({name:mode,maxDurationMs:mode==='backfill'?120000:12000}),
-      captureArticle:async(tab,item,mode)=>{call={tab,mode};return {detail:{body_markdown:'body'},comments:[],scroll:{mode}};}};
+      captureArticle:async(tab,item,mode,body,options)=>{call={tab,mode,scope:options.scope};return {detail:{body_markdown:'body'},comments:[],scroll:{mode}};}};
     vm.runInNewContext(fs.readFileSync('tests/sa_comment_acceptance/test_background.js','utf8'),context);
     (async()=>{
       await action({id:101,url:'https://seekingalpha.com/article/123-test'});
@@ -203,7 +203,8 @@ def test_acceptance_capture_uses_selected_profile_and_exports_its_budget(mode, d
     """.replace("MODE", json.dumps(mode))
     run = subprocess.run(["node", "-e", script], text=True, capture_output=True, check=True)
     result = json.loads(run.stdout)
-    assert result["call"] == {"tab": 101, "mode": mode}
+    assert result["call"] == {"tab": 101, "mode": mode, "scope": "recent"}
+    assert result["exported"]["scope"] == "recent"
     assert result["exported"]["mode"] == mode
     assert result["exported"]["capture_profile"]["maxDurationMs"] == duration
 

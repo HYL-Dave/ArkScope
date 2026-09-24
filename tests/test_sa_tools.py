@@ -2018,6 +2018,7 @@ class TestNativeHostArticles:
             comment_scan_mode="full",
             comment_scan_stop_reason="stable_bottom",
             comment_scan_stable_bottom_rounds=4,
+            comment_scan_policy=None,
         )
 
     def test_audit_unresolved(self):

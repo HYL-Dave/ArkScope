@@ -159,6 +159,7 @@ def test_save_article_content_commits_before_reconciliation_failure_and_stays_ok
             detail_ticker=None, detail_ticker_observed_at=None,
             provider_comments_count=None, comment_scan_mode="quick",
             comment_scan_stop_reason=None, comment_scan_stable_bottom_rounds=0,
+            comment_scan_policy=None,
         ):
             calls.append((
                 "capture_body", article_id, body_markdown, detail_ticker,
@@ -236,6 +237,7 @@ def test_save_article_content_passes_detail_ticker_without_manual_symbol_injecti
     })
     assert result["status"] == "ok"
     assert dal.capture_kwargs == {
+        "comment_scan_policy": None,
         "detail_ticker": "BTSG",
         "detail_ticker_observed_at": "2026-07-18T12:00:00Z",
         "provider_comments_count": 265,
@@ -269,6 +271,7 @@ def test_save_comments_only_forwards_recovery_scan_evidence():
         comment_scan_mode="backfill",
         comment_scan_stop_reason="stable_bottom",
         comment_scan_stable_bottom_rounds=5,
+        comment_scan_policy=None,
     )
     assert result["status"] == "ok"
     assert result["comment_scan_usable"] is False
@@ -297,7 +300,7 @@ def test_get_reconciliation_queue_action_is_read_only_and_sanitized(
 
     check = sqlite3.connect(path)
     try:
-        assert check.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert check.execute("PRAGMA user_version").fetchone()[0] == 6
         before = (
             check.execute("SELECT COUNT(*) FROM sa_pick_article_links").fetchone()[0],
             check.execute("SELECT COUNT(*) FROM sa_pick_article_decisions").fetchone()[0],

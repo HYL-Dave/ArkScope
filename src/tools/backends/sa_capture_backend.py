@@ -19,6 +19,7 @@ from urllib.parse import unquote, urlsplit
 from ... import sa_capture_store as store
 from ... import sa_article_reconciliation_store as reconciliation_store
 from ...sqlite_id_sets import text_ids_query
+from ...sa.comment_scope import validate_policy
 from .local_market_backend import LocalMarketBackend
 from .sqlite_backend import SqliteBackend
 
@@ -1261,60 +1262,9 @@ class SACaptureBackend(LocalMarketBackend):
                 ),
             )
             written += cursor.rowcount
-        cleanup = self._cleanup_article_comment_duplicates(conn, article_id)
-        if cleanup["comments_deleted"] or cleanup["parent_links_repointed"]:
-            logger.info(
-                "Cleaned SA comment duplicates for %s: deleted=%s parent_links_repointed=%s",
-                article_id,
-                cleanup["comments_deleted"],
-                cleanup["parent_links_repointed"],
-            )
+        # Historical deduplication can cascade signals and rewrite parent links.
+        # It is explicit maintenance, never a side effect of acquisition.
         return {"written": written, "skipped": len(prepared_comments) - written}
-
-    def _cleanup_article_comment_duplicates(
-        self, conn: sqlite3.Connection, article_id: str
-    ) -> Dict[str, int]:
-        groups_processed = 0
-        comments_deleted = 0
-        parent_links_repointed = 0
-        groups = conn.execute(
-            "SELECT commenter, comment_text FROM sa_article_comments "
-            "WHERE article_id = ? "
-            "GROUP BY commenter, comment_text HAVING COUNT(*) > 1",
-            (article_id,),
-        ).fetchall()
-        for group in groups:
-            # IS NOT DISTINCT FROM → SQLite's null-safe IS
-            rows = [dict(row) for row in conn.execute(
-                "SELECT id, comment_id, parent_comment_id, comment_date "
-                "FROM sa_article_comments "
-                "WHERE article_id = ? AND commenter IS ? AND comment_text IS ? "
-                "ORDER BY (comment_date IS NULL), comment_date ASC, id ASC",
-                (article_id, group["commenter"], group["comment_text"]),
-            ).fetchall()]
-            plan = _plan_comment_duplicate_cleanup(rows)
-            if not plan["delete_ids"]:
-                continue
-            groups_processed += 1
-            for duplicate_comment_id, canonical_comment_id in plan["parent_rewrites"]:
-                cur = conn.execute(
-                    "UPDATE sa_article_comments SET parent_comment_id = ? "
-                    "WHERE article_id = ? AND parent_comment_id = ?",
-                    (canonical_comment_id, article_id, duplicate_comment_id),
-                )
-                parent_links_repointed += cur.rowcount or 0
-            for delete_id in plan["delete_ids"]:
-                # FK ON DELETE CASCADE purges sa_comment_signals (+ mention
-                # junctions) — foreign_keys=ON comes free from store.connect.
-                cur = conn.execute(
-                    "DELETE FROM sa_article_comments WHERE id = ?", (delete_id,)
-                )
-                comments_deleted += cur.rowcount or 0
-        return {
-            "groups_processed": groups_processed,
-            "comments_deleted": comments_deleted,
-            "parent_links_repointed": parent_links_repointed,
-        }
 
     def cleanup_mixed_null_date_comment_duplicates(self) -> Dict[str, int]:
         """Collapse safe duplicate groups where a null-date row matches a dated row."""
@@ -1499,6 +1449,7 @@ class SACaptureBackend(LocalMarketBackend):
         comment_scan_mode: Any,
         comment_scan_stop_reason: Any,
         comment_scan_stable_bottom_rounds: Any,
+        comment_scan_policy: Any,
         now: str,
     ) -> Dict[str, Any]:
         article_row = conn.execute(
@@ -1516,6 +1467,8 @@ class SACaptureBackend(LocalMarketBackend):
             raise ValueError(f"unknown SA article: {article_id}")
         article = dict(article_row)
 
+        policy = validate_policy(comment_scan_policy)
+        recent_scope = policy is not None and policy["scope"] == "recent"
         existing_rows = self._fetch_existing_article_comments(conn, article_id)
         mode = _comment_scan_mode(comment_scan_mode)
         stable_bottom_rounds = _stable_bottom_rounds(comment_scan_stable_bottom_rounds)
@@ -1535,7 +1488,7 @@ class SACaptureBackend(LocalMarketBackend):
             for row in existing_rows
             if row.get("comment_id")
         }
-        if not terminal_evidence:
+        if not terminal_evidence or recent_scope:
             for comment in prepared_comments:
                 previous = existing_by_comment_id.get(comment.get("comment_id"))
                 if previous and len(comment.get("comment_text") or "") < len(previous.get("comment_text") or ""):
@@ -1577,7 +1530,7 @@ class SACaptureBackend(LocalMarketBackend):
         pending = not completed
         transition = self._comment_recovery_transition(
             article,
-            usable=usable,
+            usable=usable and not recent_scope,
             provider_count=provider_count,
             mode=mode,
             stop_reason=comment_scan_stop_reason,
@@ -1592,7 +1545,7 @@ class SACaptureBackend(LocalMarketBackend):
         if usable:
             checkpoint = (
                 provider_count
-                if completed and provider_count is not None
+                if completed and not recent_scope and provider_count is not None
                 else article.get("provider_comments_count_at_last_scan")
             )
             conn.execute(
@@ -1620,12 +1573,14 @@ class SACaptureBackend(LocalMarketBackend):
                 ),
             )
 
+        if policy is not None:
+            policy = {**policy, "traversal_terminal": completed, "provider_count": provider_count}
         conn.execute(
             "UPDATE sa_articles SET comment_backfill_pending = ?, "
-            "comment_scan_attempted_at = ?, comment_scan_stop_reason = ?, updated_at = ? "
+            "comment_scan_attempted_at = ?, comment_scan_stop_reason = ?, comment_scan_policy = ?, updated_at = ? "
             "WHERE article_id = ?",
             (int(pending), now, comment_scan_stop_reason if isinstance(comment_scan_stop_reason, str) else None,
-             now, article_id),
+             json.dumps(policy, sort_keys=True) if policy is not None else None, now, article_id),
         )
 
         return {
@@ -1635,6 +1590,7 @@ class SACaptureBackend(LocalMarketBackend):
             "changed_comments": max(writes["written"] - len(prepared_ids - existing_by_comment_id.keys()), 0),
             "skipped_comments": writes["skipped"],
             "comment_scan_usable": usable,
+            "comment_scan_policy": policy,
             "comment_backfill_pending": pending,
             "comment_scan_attempted_at": now,
             "comment_scan_stop_reason": comment_scan_stop_reason if isinstance(comment_scan_stop_reason, str) else None,
@@ -1666,6 +1622,7 @@ class SACaptureBackend(LocalMarketBackend):
         comment_scan_mode="quick",
         comment_scan_stop_reason=None,
         comment_scan_stable_bottom_rounds=0,
+        comment_scan_policy=None,
     ) -> dict:
         """Capture article content, detail ticker evidence, and comments atomically."""
         conn = self._sa_conn()
@@ -1712,6 +1669,7 @@ class SACaptureBackend(LocalMarketBackend):
                 comment_scan_mode=comment_scan_mode,
                 comment_scan_stop_reason=comment_scan_stop_reason,
                 comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
+                comment_scan_policy=comment_scan_policy,
                 now=now,
             )
             conn.commit()
@@ -1735,6 +1693,7 @@ class SACaptureBackend(LocalMarketBackend):
         comment_scan_mode="quick",
         comment_scan_stop_reason=None,
         comment_scan_stable_bottom_rounds=0,
+        comment_scan_policy=None,
     ) -> Dict[str, Any]:
         """Comments-only update (refresh runs). Returns refresh stats."""
         conn = self._sa_conn()
@@ -1749,6 +1708,7 @@ class SACaptureBackend(LocalMarketBackend):
                 comment_scan_mode=comment_scan_mode,
                 comment_scan_stop_reason=comment_scan_stop_reason,
                 comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
+                comment_scan_policy=comment_scan_policy,
                 now=now,
             )
             conn.commit()
@@ -1891,7 +1851,7 @@ class SACaptureBackend(LocalMarketBackend):
             columns = {row[1] for row in conn.execute("PRAGMA table_info(sa_articles)")}
             scan_columns = ", ".join(
                 column if column in columns else f"NULL AS {column}"
-                for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason")
+                for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy")
             )
             rows = conn.execute(
                 f"SELECT article_id, url, title, ticker, published_date, "

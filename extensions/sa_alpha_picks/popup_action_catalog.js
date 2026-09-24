@@ -37,7 +37,7 @@
         id: "quick",
         group: "alpha-picks",
         label: "Quick Update",
-        description: "Refresh current and removed picks, recent articles, and a shallow comment window.",
+        description: "Refresh picks and recent articles; prioritize comments from the last 30 days.",
         scope: "Up to " + integer(quick.article_list_rounds) +
           " article-list rounds; all normal missing-body and changed-count detail work " +
           "returned by that scan, with no separate global Alpha detail cap; " +
@@ -54,7 +54,7 @@
         id: "full",
         group: "alpha-picks",
         label: "Full Article Scan",
-        description: "Load the full reachable article list and perform a bounded deep content and comment scan.",
+        description: "Scan the reachable article list; prioritize the last 30 days of comments and their context.",
         scope: "Up to " + integer(full.article_list_rounds) +
           " article-list rounds; all normal detail work returned by that scan, with no " +
           "separate global Alpha detail cap; " + integer(full.detail_enrichment_limit) +
@@ -72,7 +72,7 @@
         id: "backfill",
         group: "alpha-picks",
         label: "Deep Repair Scan",
-        description: "Run the deepest bounded article scan and give comment recovery terminal authority.",
+        description: "Include historical comment expansion and repair within the deep scan budget.",
         scope: "Up to " + integer(backfill.article_list_rounds) +
           " article-list rounds; all normal detail work returned by that scan, with no " +
           "separate global Alpha detail cap; " + integer(backfill.detail_enrichment_limit) +

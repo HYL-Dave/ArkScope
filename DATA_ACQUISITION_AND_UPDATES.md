@@ -506,6 +506,11 @@ of the currently enabled browser preferences.
 | Incomplete comment capture | A pending capture remains eligible even if the displayed count is unchanged; ordinary retries wait six hours after the last scan attempt | Quick adds at most one pending article per pass; Full shares its existing additional batch limit. Explicit Deep Repair can bypass this retry delay, not website admission or restrictions. |
 | Additional comment recovery | In Full/Deep scans only: default seven-day age eligibility, with configured additional batches defaulting to 10/50 | The age rule does not itself schedule these scans. Old unscanned articles can remain outside Quick Update coverage. |
 
+Comment age and scan budget are separate. Quick/Full, including first-capture
+work and manual article linking, prioritize the last **30 days of comments**.
+Only explicit **Deep Repair Scan** requests historical expansion. A first
+capture's 120-second budget does not silently opt into historical repair.
+
 Keep existing selected intervals with shared coordination. Do
 not enable frequent full/deep scans merely to compensate for missing coverage.
 Future frequency changes should use actual navigation attempts, new-item yield,
@@ -530,6 +535,15 @@ retroactively make it pass. The operator subsequently approved a separate
 first-capture policy using the existing 120-second Deep budget, requiring a new
 same-budget pair rather than comparing it to the earlier 45-second capture.
 See the [paired evidence](docs/superpowers/evidence/2026-09-24-sa-comment-observation.md#paired-firefox-result-not-accepted).
+
+The later 120-second large-thread pair (article `6334961`) is also **not
+accepted**: legacy exported 259 comments, guarded 218; 206 shared comments
+matched, 53 were missing and 12 were added. All 53 missing comments were within
+30 days. Both runs exhausted their budget before reaching the bottom. The new
+recency priority cannot retroactively pass that failed pair. Its geometry
+motivates traversing already-loaded rows faster, without increasing the scan
+budget, retries or settling frequency. Signed-in acceptance of that change
+remains separate from offline browser tests.
 
 Comment expansion is restricted to recognized comment/reply/text controls.
 This includes SA's observed sibling reply-list footer, validated against its
@@ -587,9 +601,48 @@ can finish pending acquisition; this still does not prove that every comment
 ever published is available. Readers expose the pending state and stop reason.
 Existing records without terminal evidence are not retroactively certified.
 
+#### Recent Comment Priority
+
+The 30-day priority uses **each comment/reply's own displayed date**, not the
+article or parent date. The reference time is fixed at the start of a capture.
+Dates without a timezone retain the existing browser-local interpretation;
+unknown/future dates remain unknown and are not treated as old. A date quoted
+inside comment prose cannot establish its publication time.
+
+Recent/unknown comment text and their resolved parent context get priority.
+Other older text-expansion controls are deferred in routine scans. Reply-list
+controls are still inspected even under old parents: an unloaded reply's age
+is unknown. Encountering an old row is **not** an early-stop condition, and no
+unverified chronological ordering or guessed "Newest" control is assumed.
+Already materialized older rows remain saveable; this is priority, not deletion
+or a hard storage cutoff. Existing comments and article bodies are not purged.
+Explicit Deep Repair includes older text expansion under its existing limits.
+
+Traversal moves toward the materialized frontier in rendered, overlapping
+viewport steps, not one large jump. Intermediate IntersectionObserver triggers
+must still see the viewport. A round admits at most eight such steps and 500 ms
+of render-wait work, within the existing capture deadline; changed row count
+ends that batch. A render timeout stops acceleration and cannot support a
+stable-bottom claim. The ordinary settle remains between rounds. Before any
+rows exist it retains ordinary incremental scrolling. It does not increase
+capture timeouts, retries, or click privileges.
+
+Schema v6 records the last scan's scope, reference/cutoff, displayed-date basis,
+observed recent/older/unknown counts, context count and deferred controls.
+`coverage: unverified` remains explicit: these are observed counts, not a
+provider-certified recent denominator. A terminal recent scan can finish its
+pending acquisition and record the provider-count observation for detecting
+changes, without advancing the full-history checkpoint or forcing historical
+identity repair. Timeout/unresolved scans remain pending. Readers expose this
+scope separately from overall stored-history gaps; old unscoped records remain
+unknown. Identical-count Quick updates cannot prove that no text edit or
+count-neutral reply replacement occurred.
+
 Unchanged comment values do not rewrite an existing row. New comments and real
 changes/enrichments still persist under the existing identity and merge rules;
 truncated or unresolved captures must not overwrite fuller stored content.
+Historical duplicate cleanup, which can cascade associated signals, is not run
+as an acquisition side effect; destructive maintenance requires a separate action.
 This saves local writes, not necessarily provider requests: the DOM collector
 may need to load old parent threads to discover new nested replies. It has no
 provider cursor that guarantees network-level per-comment continuation.

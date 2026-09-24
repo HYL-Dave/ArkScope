@@ -8,6 +8,43 @@
     return error;
   }
 
+  function commentPolicy(comments, scope, nowMs) {
+    scope = scope === 'history' ? 'history' : 'recent';
+    var cutoff = nowMs - 30 * 86400000;
+    var byId = new Map(), selected = new Set(), kinds = new Map();
+    var counts = {recent_count:0,older_count:0,unknown_date_count:0,context_count:0};
+    comments.forEach(function (row) {
+      byId.set(row.comment_id, row);
+      // Unzoned dates are SA's displayed browser-local time, not verified UTC.
+      var date = typeof row.comment_date === 'string' ? Date.parse(row.comment_date) : NaN;
+      var kind = !Number.isFinite(date) || date > nowMs ? 'unknown' : date >= cutoff ? 'recent' : 'older';
+      kinds.set(row.comment_id, kind);
+      counts[kind === 'unknown' ? 'unknown_date_count' : kind + '_count']++;
+      if (scope === 'history' || kind !== 'older') selected.add(row.comment_id);
+    });
+    // Resolve context before filtering; parent age never determines reply age.
+    Array.from(selected).forEach(function (id) {
+      var seen = new Set();
+      for (var row = byId.get(id); row && row.parent_comment_id && !seen.has(row.parent_comment_id);) {
+        seen.add(row.parent_comment_id);
+        row = byId.get(row.parent_comment_id);
+        if (row) selected.add(row.comment_id);
+      }
+    });
+    var priorities = {};
+    comments.forEach(function (row) {
+      if (kinds.get(row.comment_id) === 'older' && selected.has(row.comment_id) && scope !== 'history') counts.context_count++;
+      priorities[row.dom_index] = selected.has(row.comment_id) ? 0 : 2;
+    });
+    // Priority is not retention: already materialized older rows cost no extra
+    // provider request and remain available as context. Nothing is deleted.
+    return {comments:comments,
+      priorities:priorities, summary:Object.assign({scope:scope,window_days:scope === 'recent' ? 30 : null,
+        reference_at:new Date(nowMs).toISOString(),cutoff_at:scope === 'recent' ? new Date(cutoff).toISOString() : null,
+        date_basis:'displayed_date_browser_local_if_unzoned',coverage:'unverified',
+        deferred_historical_controls:0},counts)};
+  }
+
   // Events are observations, not cancellable navigation or a request counter.
   function watchNavigation(tabs, tabId, initialUrl) {
     var events = [], count = 0;
@@ -66,7 +103,7 @@
   }
 
   // Serialized by scripting.executeScript: keep DOM helpers inside this function.
-  function scanPage(options) {
+  async function scanPage(options) {
     options = options || {};
     if (options.token && (!globalThis.__arkCommentDocument
         || globalThis.__arkCommentDocument.token !== options.token
@@ -78,6 +115,10 @@
     var pageMiddle = document.body.scrollHeight / 2;
     var controls = Array.from(document.querySelectorAll('button, a, [role="button"]'));
     var initialUrl = location.href.split('#')[0];
+    var policy = globalThis.SACommentCapture.commentPolicy(
+      globalThis.__arkReadComments ? globalThis.__arkReadComments({includeDomIndex:true}).comments : [],
+      options.scope, Number.isFinite(options.nowMs) ? options.nowMs : Date.now());
+    var rowIndices = new Map(Array.from(commentEls).map(function (row, index) {return [row,index];}));
 
     function inReplyFooter(element) {
       // Observed SA layout: parent row + reply list ending in a separate footer.
@@ -175,7 +216,17 @@
       var replyIntent = /^(?:show|load|view|see)\s+(?:(?:all|more|previous|older|newer|newest|latest|additional|hidden|\d+)\s+)*(?:comments?|replies|reply)(?:\s*\([\d,]+\))?$/i.test(label);
       var unresolved = reason !== null && ['control_hidden','control_disabled','already_expanded'].indexOf(reason) === -1
         && (replyIntent || legacy && description.in_comment_scope) && !unavailable(element);
-      return {element:element, legacy:legacy, reason:reason, unresolved:unresolved, description:description};
+      var row = element.closest(rowSelector);
+      var priority = row && policy.priorities[rowIndices.get(row)];
+      var textExpansion = element.closest('[class*="break-words"]')
+        && /^(?:show|read|see) more(?:\s*\.\.\.)?$/i.test(label);
+      // Hidden replies have unknown dates even when their parent is old.
+      var deferred = reason === null && options.strategy !== 'observe'
+        && policy.summary.scope === 'recent' && textExpansion && priority === 2;
+      if (deferred) policy.summary.deferred_historical_controls++;
+      description.deferred_historical = Boolean(deferred);
+      return {element:element, legacy:legacy, reason:reason, unresolved:unresolved, description:description,
+        priority:priority === 0 ? 0 : 1,deferred:deferred};
     });
     var accepted = new Set(candidates.filter(function (item) {return item.reason === null;})
       .map(function (item) {return item.element;}));
@@ -193,9 +244,12 @@
       items:relevant.slice(0, 64).map(function (item) {return item.description;}),
       omitted_count:Math.max(0, relevant.length - 64), clicked_indices:[]};
     var clicked = false, clickCount = 0, changed = false;
-    for (var i = 0; i < candidates.length; i++) {
-      var item = candidates[i];
+    var ordered = candidates.slice();
+    if (options.strategy !== 'observe') ordered.sort(function (a,b) {return a.priority - b.priority;});
+    for (var i = 0; i < ordered.length; i++) {
+      var item = ordered[i];
       if (options.strategy === 'observe' ? !isLegacy(item.element) : item.reason !== null) continue;
+      if (item.deferred) continue;
       if (!item.element.isConnected) continue;
       if (location.href.split('#')[0] !== initialUrl) {changed = true; break;}
       // Recheck after earlier clicks, which may have changed a later control.
@@ -204,7 +258,7 @@
       item.element.click();
       clicked = true;
       clickCount++;
-      if (audit.clicked_indices.length < 64) audit.clicked_indices.push(i);
+      if (audit.clicked_indices.length < 64) audit.clicked_indices.push(item.description.index);
     }
     changed = changed || location.href.split('#')[0] !== initialUrl;
 
@@ -222,13 +276,60 @@
         break;
       }
     }
-    if (!changed) window.scrollBy(0, window.innerHeight);
+    var traversalSteps = 0, renderIncomplete = false;
+    if (!changed) {
+      var advance = window.innerHeight;
+      if (options.strategy !== 'observe') {
+        // Locate the materialized frontier, but render intermediate viewports:
+        // an IntersectionObserver may sit before already expanded replies.
+        for (var r = 0; r < commentEls.length; r++) {
+          var rect = commentEls[r].getBoundingClientRect();
+          var bottom = Number.isFinite(rect.bottom) ? rect.bottom : rect.top + rect.height;
+          if (rect.width > 0 && rect.height > 0 && Number.isFinite(bottom)) {
+            advance = Math.max(advance, bottom - window.innerHeight);
+          }
+        }
+      }
+      if (advance <= window.innerHeight || options.strategy === 'observe') {
+        window.scrollBy(0, window.innerHeight);
+        traversalSteps++;
+      } else {
+        var deadline = Math.min(Date.now() + 500,
+          Number.isFinite(options.deadlineMs) ? options.deadlineMs : Infinity);
+        for (var step = 0; step < 8 && advance > 0 && Date.now() < deadline; step++) {
+          if (location.href.split('#')[0] !== initialUrl) {changed = true; break;}
+          var before = window.scrollY;
+          window.scrollBy(0, Math.min(advance, window.innerHeight * 0.75));
+          traversalSteps++;
+          var moved = window.scrollY - before;
+          if (moved <= 0) break;
+          advance -= moved;
+          var painted = await new Promise(function (resolve) {
+            var first, second;
+            var timer = setTimeout(function () {
+              cancelAnimationFrame(first); cancelAnimationFrame(second); resolve(false);
+            }, Math.max(1, Math.min(100, deadline - Date.now())));
+            first = requestAnimationFrame(function () {
+              second = requestAnimationFrame(function () {clearTimeout(timer); resolve(true);});
+            });
+          });
+          if (!painted) {renderIncomplete = true; break;}
+          if (options.token && (!globalThis.__arkCommentDocument
+              || globalThis.__arkCommentDocument.token !== options.token
+              || globalThis.__arkCommentDocument.hidden)) {changed = true; break;}
+          if (document.querySelectorAll(rowSelector).length !== commentEls.length) break;
+        }
+      }
+    }
+    changed = changed || location.href.split('#')[0] !== initialUrl;
     return {comments:commentEls.length, atBottom:atBottom, clicked:clicked,
-      click_count:clickCount, loading:loading, page_changed:changed, control_audit:audit,
+      click_count:clickCount, loading:loading || renderIncomplete, page_changed:changed, control_audit:audit,
+      traversal_steps:traversalSteps,render_wait_incomplete:renderIncomplete,
+      recency:policy.summary,
       progress:{scroll_y_before:scrollBefore,scroll_y_after:window.scrollY,
         document_height:document.body.scrollHeight,viewport_height:window.innerHeight}};
   }
 
   root.SACommentCapture = Object.freeze({scanPage:scanPage, documentState:documentState,
-    watchNavigation:watchNavigation, contextError:contextError});
+    watchNavigation:watchNavigation, contextError:contextError,commentPolicy:commentPolicy});
 }(globalThis));

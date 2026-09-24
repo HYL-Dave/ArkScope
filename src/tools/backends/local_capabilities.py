@@ -145,6 +145,7 @@ class LocalDataCapabilities(Protocol):
         comment_scan_mode: str = "quick",
         comment_scan_stop_reason: Optional[str] = None,
         comment_scan_stable_bottom_rounds: int = 0,
+        comment_scan_policy: dict | None = None,
     ) -> dict: ...
 
     def save_sa_market_news_detail(
@@ -160,6 +161,7 @@ class LocalDataCapabilities(Protocol):
         comment_scan_mode: str = "quick",
         comment_scan_stop_reason: Optional[str] = None,
         comment_scan_stable_bottom_rounds: int = 0,
+        comment_scan_policy: dict | None = None,
     ) -> Dict[str, Any]: ...
 
     def update_sa_pick_detail(

@@ -41,7 +41,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _SCHEMA_VERSION_V2 = 2
 _SCHEMA_VERSION_V3 = 3
 _SCHEMA_VERSION_V4 = 4
-SCHEMA_VERSION = 5
+_SCHEMA_VERSION_V5 = 5
+SCHEMA_VERSION = 6
 USE_LOCAL_SA_KEY = "use_local_sa"  # profile_settings key for the persisted flip toggle
 
 
@@ -208,7 +209,8 @@ CREATE TABLE IF NOT EXISTS sa_articles (
     comment_backfill_pending INTEGER NOT NULL DEFAULT 0
         CHECK(comment_backfill_pending IN (0, 1)),
     comment_scan_attempted_at TEXT,
-    comment_scan_stop_reason TEXT
+    comment_scan_stop_reason TEXT,
+    comment_scan_policy TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_sa_articles_ticker ON sa_articles(ticker);
 CREATE INDEX IF NOT EXISTS idx_sa_articles_published ON sa_articles(published_date DESC);
@@ -635,7 +637,7 @@ def _migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     try:
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-        if version in {_SCHEMA_VERSION_V2, _SCHEMA_VERSION_V3, _SCHEMA_VERSION_V4, SCHEMA_VERSION}:
+        if version in {_SCHEMA_VERSION_V2, _SCHEMA_VERSION_V3, _SCHEMA_VERSION_V4, _SCHEMA_VERSION_V5, SCHEMA_VERSION}:
             conn.commit()
             return
         if version != 1:
@@ -698,7 +700,7 @@ def _migrate_v2_to_v3(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     try:
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-        if version in {_SCHEMA_VERSION_V3, _SCHEMA_VERSION_V4, SCHEMA_VERSION}:
+        if version in {_SCHEMA_VERSION_V3, _SCHEMA_VERSION_V4, _SCHEMA_VERSION_V5, SCHEMA_VERSION}:
             conn.commit()
             return
         if version != _SCHEMA_VERSION_V2:
@@ -773,7 +775,7 @@ def _migrate_v3_to_v4(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     try:
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-        if version in {_SCHEMA_VERSION_V4, SCHEMA_VERSION}:
+        if version in {_SCHEMA_VERSION_V4, _SCHEMA_VERSION_V5, SCHEMA_VERSION}:
             conn.commit()
             return
         if version != _SCHEMA_VERSION_V3:
@@ -794,7 +796,7 @@ def _migrate_v4_to_v5(conn: sqlite3.Connection) -> None:
     conn.execute("BEGIN IMMEDIATE")
     try:
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-        if version == SCHEMA_VERSION:
+        if version in {_SCHEMA_VERSION_V5, SCHEMA_VERSION}:
             conn.commit()
             return
         if version != _SCHEMA_VERSION_V4:
@@ -803,6 +805,25 @@ def _migrate_v4_to_v5(conn: sqlite3.Connection) -> None:
                      "INTEGER NOT NULL DEFAULT 0 CHECK(comment_backfill_pending IN (0, 1))")
         conn.execute("ALTER TABLE sa_articles ADD COLUMN comment_scan_attempted_at TEXT")
         conn.execute("ALTER TABLE sa_articles ADD COLUMN comment_scan_stop_reason TEXT")
+        conn.execute("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                     (_SCHEMA_VERSION_V5, now_ts()))
+        conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION_V5}")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def _migrate_v5_to_v6(conn: sqlite3.Connection) -> None:
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if version == SCHEMA_VERSION:
+            conn.commit()
+            return
+        if version != _SCHEMA_VERSION_V5:
+            raise RuntimeError(f"unsupported sa_capture schema version: {version}")
+        conn.execute("ALTER TABLE sa_articles ADD COLUMN comment_scan_policy TEXT")
         conn.execute("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
                      (SCHEMA_VERSION, now_ts()))
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
@@ -830,18 +851,25 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         _migrate_v2_to_v3(conn)
         _migrate_v3_to_v4(conn)
         _migrate_v4_to_v5(conn)
+        _migrate_v5_to_v6(conn)
         return
     if version == _SCHEMA_VERSION_V2:
         _migrate_v2_to_v3(conn)
         _migrate_v3_to_v4(conn)
         _migrate_v4_to_v5(conn)
+        _migrate_v5_to_v6(conn)
         return
     if version == _SCHEMA_VERSION_V3:
         _migrate_v3_to_v4(conn)
         _migrate_v4_to_v5(conn)
+        _migrate_v5_to_v6(conn)
         return
     if version == _SCHEMA_VERSION_V4:
         _migrate_v4_to_v5(conn)
+        _migrate_v5_to_v6(conn)
+        return
+    if version == _SCHEMA_VERSION_V5:
+        _migrate_v5_to_v6(conn)
         return
     if version != 0:
         raise RuntimeError(f"unsupported sa_capture schema version: {version}")
@@ -852,7 +880,7 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         if version == SCHEMA_VERSION:
             conn.commit()
             return
-        if version in {1, _SCHEMA_VERSION_V2, _SCHEMA_VERSION_V3, _SCHEMA_VERSION_V4}:
+        if version in {1, _SCHEMA_VERSION_V2, _SCHEMA_VERSION_V3, _SCHEMA_VERSION_V4, _SCHEMA_VERSION_V5}:
             conn.commit()
             ensure_schema(conn)
             return

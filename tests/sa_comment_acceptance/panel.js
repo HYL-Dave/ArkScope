@@ -9,12 +9,13 @@ async function status() {
   document.getElementById("inspect").disabled = result.running;
   document.getElementById("strategy").disabled = result.running;
   document.getElementById("profile").disabled = result.running;
+  document.getElementById("scope").disabled = result.running;
 }
 document.getElementById("capture").addEventListener("click",async()=>{
   document.getElementById("capture").disabled = true;
   document.getElementById("inspect").disabled = true;
   const result = await api.runtime.sendMessage({action:"capture",strategy:document.getElementById("strategy").value,
-    mode:document.getElementById("profile").value});
+    mode:document.getElementById("profile").value,scope:document.getElementById("scope").value});
   await status();
   if (result.error) document.getElementById("status").textContent = result.error;
 });

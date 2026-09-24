@@ -111,7 +111,7 @@ def _create_v2_with_provider_marked_symbol(
     seeded.close()
     conn = sqlite3.connect(path)
     try:
-        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason"):
+        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy"):
             conn.execute(f"ALTER TABLE sa_articles DROP COLUMN {column}")
         conn.execute("DELETE FROM schema_migrations WHERE version > 2")
         conn.execute(
@@ -225,7 +225,7 @@ def _insert_lineage_and_article(conn: sqlite3.Connection) -> tuple[int, str]:
 def test_current_schema_keeps_lineage_link_decision_and_provider_evidence_contract(tmp_path):
     conn = scs.connect(str(tmp_path / "fresh.db"))
     try:
-        assert scs.SCHEMA_VERSION == 5
+        assert scs.SCHEMA_VERSION == 6
         tables = {
             row[0]
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -329,7 +329,7 @@ def test_v2_to_v3_migration_canonicalizes_identity_and_preserves_provider_litera
 
     conn = scs.connect(str(path))
     try:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == scs.SCHEMA_VERSION
         picks = conn.execute(
             "SELECT id, symbol, closed_date, return_pct, raw_data, lineage_id "
             "FROM sa_alpha_picks ORDER BY id"
@@ -629,10 +629,10 @@ def test_v1_to_v2_migration_is_serialized_across_two_real_processes(tmp_path):
     ]
     outputs = [proc.communicate(timeout=60) for proc in procs]
     assert all(proc.returncode == 0 for proc in procs), outputs
-    assert all(stdout.strip() == "5" for stdout, _ in outputs)
+    assert all(stdout.strip() == str(scs.SCHEMA_VERSION) for stdout, _ in outputs)
     conn = sqlite3.connect(path)
     try:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == scs.SCHEMA_VERSION
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert conn.execute(
             "SELECT COUNT(*) FROM sa_alpha_picks WHERE lineage_id IS NULL"

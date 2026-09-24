@@ -86,12 +86,14 @@ async function inspectTest(selection) {
   } finally {running = false;}
 }
 
-async function captureTest(strategy, selection, mode) {
+async function captureTest(strategy, selection, mode, scope) {
   if (!selection) return {error:"No selected article; open the test from its toolbar icon on an article"};
   if (running) return {error:"Capture already running"};
   if (!["observe","guarded"].includes(strategy)) return {error:"Invalid strategy"};
   mode = mode || "backfill";
   if (!["backfill","quick"].includes(mode)) return {error:"Invalid capture profile"};
+  scope = scope || "recent";
+  if (!["recent","history"].includes(scope)) return {error:"Invalid comment scope"};
   running = true;
   try {
     const tabId = selection.tabId;
@@ -117,18 +119,18 @@ async function captureTest(strategy, selection, mode) {
     const initial = start[0]?.result;
     if (!initial) return {error:"Missing document evidence"};
     if (attempts.some(item=>item.document_key === initial.document_key)) return {error:"Reload the article before a new run"};
-    attempts.push({at:Date.now(),document_key:initial.document_key,article_id:match[1],strategy});
+    attempts.push({at:Date.now(),document_key:initial.document_key,article_id:match[1],strategy,scope});
     await chrome.storage.local.set({attempts});
     selection.status = "Capturing " + match[1] + " / " + strategy + " / " + mode;
     await chrome.tabs.update(tabId,{active:true});
     let result;
     try {
-      const captured = await captureArticle(tabId,{article_id:match[1],url:tab.url},mode,true,{strategy,trace:true});
+      const captured = await captureArticle(tabId,{article_id:match[1],url:tab.url},mode,true,{strategy,scope,trace:true});
       result = {...captured,status:captured.detail && !captured.detail.error ? "captured" : "capture_failed"};
     } catch (error) {
       result = {status:"capture_failed",reason:error.code || "capture_exception",trace:error.capture_trace || null};
     }
-    const lastResult = {...result,...initial,article_id:match[1],mode,strategy,
+    const lastResult = {...result,...initial,article_id:match[1],mode,strategy,scope,
       capture_profile:getCommentScrollProfile(mode),
       source_hash:CAPTURE_SOURCE_HASH,captured_at:new Date().toISOString(),schema_version:2};
     await exportTestArtifact(lastResult,match[1],strategy);
@@ -148,7 +150,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond) => {
       source_hash:CAPTURE_SOURCE_HASH}); return false;
   }
   if (message.action === "capture" || message.action === "inspect") {
-    const task = message.action === "capture" ? captureTest(message.strategy,selection,message.mode) : inspectTest(selection);
+    const task = message.action === "capture" ? captureTest(message.strategy,selection,message.mode,message.scope) : inspectTest(selection);
     task.then(result=>{
       if (selection && result.error) selection.status = result.error;
       respond(result);

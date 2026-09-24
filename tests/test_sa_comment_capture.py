@@ -30,8 +30,9 @@ w.document.addEventListener('click',event=>{
   w.clicked.push(event.target.id); event.preventDefault();
 });
 const context=dom.getInternalVMContext();
-const result=vm.runInContext('('+input.func+')',context)(...(input.args || []));
-process.stdout.write(JSON.stringify({result,clicked:w.clicked}));
+vm.runInContext(require('node:fs').readFileSync('extensions/sa_alpha_picks/comment_capture.js','utf8'),context);
+Promise.resolve(vm.runInContext('('+input.func+')',context)(...(input.args || [])))
+  .then(result=>process.stdout.write(JSON.stringify({result,clicked:w.clicked})));
 """
 
 
@@ -382,7 +383,7 @@ def test_real_browsers_preserve_expansion_and_detect_document_replacement(tmp_pa
             assert page.evaluate("SACommentCapture.documentState({phase:'check',token:'one',articleId:'123'}).ok") is False
             # Exercise the actual orchestration with DOM-backed executeScript.
             page.add_script_tag(path=str(package / "capture_driver.js"))
-            scripts = {name:(package / name).read_text() for name in ("article_identity.js","scrape_detail.js","scrape_comments.js")}
+            scripts = {name:(package / name).read_text() for name in ("comment_capture.js","article_identity.js","scrape_detail.js","scrape_comments.js")}
             result = page.evaluate("""async scripts=>{
               function event(){return {addListener(){},removeListener(){}};}
               window.chrome={tabs:{onUpdated:event(),onRemoved:event(),onCreated:event()},

@@ -19,6 +19,7 @@ import pandas as pd
 import yaml
 
 from src.news_content_availability import ContentFilter, empty_content_counts
+from src.sa.comment_scope import read_policy
 
 from .backends.local_capabilities import LocalDataCapabilities
 from .backends.sa_capture_backend import SACaptureBackend
@@ -842,6 +843,15 @@ class DataAccessLayer:
                 pending_work_ids.add(article_id)
             return True
 
+        def recovery_state(a: Dict[str, Any]) -> str:
+            policy = read_policy(a.get("comment_scan_policy"))
+            if mode != "backfill" and policy and policy["scope"] == "recent" and policy["traversal_terminal"]:
+                return "repaired"  # Historical identity repair is explicit work.
+            return a.get("comment_recovery_state") or "repaired"
+
+        def acquisition_pending(a: Dict[str, Any]) -> bool:
+            return bool(a.get("comment_backfill_pending")) or recovery_state(a) == "pending"
+
         def first_capture(a: Dict[str, Any]) -> bool:
             return (not a.get("comments_fetched_at")
                     and a.get("provider_comments_count_at_last_scan") is None
@@ -889,6 +899,10 @@ class DataAccessLayer:
                 continue
             provider_count = current_count_observations.get(article_id)
             checkpoint = article.get("provider_comments_count_at_last_scan")
+            policy = read_policy(article.get("comment_scan_policy"))
+            if (mode != "backfill" and policy and policy["scope"] == "recent"
+                    and policy["traversal_terminal"] and policy["provider_count"] is not None):
+                checkpoint = policy["provider_count"]
             count_changed = provider_count is not None and checkpoint is not None and provider_count != int(checkpoint)
             first_positive = checkpoint is None and provider_count is not None and provider_count > 0
             if count_changed or first_positive or first_capture(article):
@@ -919,7 +933,7 @@ class DataAccessLayer:
                     if pending_due(a):
                         recovery_candidates.append((order_key, a))
                     continue
-                state = a.get("comment_recovery_state") or "repaired"
+                state = recovery_state(a)
                 if state == "pending":
                     if pending_due(a) and (mode == "backfill" or not a.get("comment_recovery_parked_at")):
                         recovery_candidates.append((order_key, a))
@@ -951,12 +965,11 @@ class DataAccessLayer:
             remaining = max(0, backfill_limit - len(pending_work_ids))
             for _, a in (recovery_candidates + ttl_candidates)[:remaining]:
                 if a["article_id"] not in need_comment_ids:
-                    if a.get("comment_backfill_pending") or a.get("comment_recovery_state") == "pending":
+                    if acquisition_pending(a):
                         if not admit_pending(a):
                             continue
                     need_comments.append(comment_work_item(
-                        a, backfill=bool(a.get("comment_backfill_pending"))
-                        or a.get("comment_recovery_state") == "pending",
+                        a, backfill=acquisition_pending(a),
                     ))
                     need_comment_ids.add(a["article_id"])
 
@@ -986,7 +999,7 @@ class DataAccessLayer:
                     continue
                 article = articles_by_id.get(item.get("article_id"))
                 if article:
-                    pending = bool(article.get("comment_backfill_pending")) or article.get("comment_recovery_state") == "pending"
+                    pending = acquisition_pending(article)
                     if pending and not admit_pending(article):
                         continue
                     if first_capture(article) or pending:
@@ -1018,6 +1031,7 @@ class DataAccessLayer:
         comment_scan_mode="quick",
         comment_scan_stop_reason=None,
         comment_scan_stable_bottom_rounds=0,
+        comment_scan_policy=None,
     ) -> Dict:
         """Capture body/comments first, then reconcile in a separate transaction."""
         captured = self._backend.save_article_with_comments(
@@ -1030,6 +1044,7 @@ class DataAccessLayer:
             comment_scan_mode=comment_scan_mode,
             comment_scan_stop_reason=comment_scan_stop_reason,
             comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
+            comment_scan_policy=comment_scan_policy,
         )
         try:
             reconciliation = self._backend.reconcile_sa_articles(
@@ -1051,6 +1066,7 @@ class DataAccessLayer:
         comment_scan_mode="quick",
         comment_scan_stop_reason=None,
         comment_scan_stable_bottom_rounds=0,
+        comment_scan_policy=None,
     ) -> Dict[str, Any]:
         """Update comments only (refresh run). Returns refresh stats."""
         return self._backend.update_article_comments(
@@ -1060,6 +1076,7 @@ class DataAccessLayer:
             comment_scan_mode=comment_scan_mode,
             comment_scan_stop_reason=comment_scan_stop_reason,
             comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
+            comment_scan_policy=comment_scan_policy,
         )
 
     def audit_sa_unresolved_symbols(self) -> Dict:

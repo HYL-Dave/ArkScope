@@ -4,6 +4,7 @@ from contextlib import closing
 import hashlib
 from pathlib import Path
 import sqlite3
+from src.sa.comment_scope import read_policy
 
 from src.tools.retained_read_results import (
     RetainedReadFailure, bounded_result, canonical_json, page_integer, require,
@@ -17,7 +18,7 @@ _ARTICLE_COLUMNS = (
     "provider_comments_count_at_last_scan, comment_recovery_state, "
     "comment_recovery_last_terminal_reason"
 )
-_OPTIONAL_SCAN_COLUMNS = ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason")
+_OPTIONAL_SCAN_COLUMNS = ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy")
 _COMMENT_COLUMNS = (
     "comment_id, parent_comment_id, commenter, comment_text, upvotes, comment_date, fetched_at"
 )
@@ -153,6 +154,7 @@ def _coverage(article, body, count):
                      "backfill_pending": bool(article.get("comment_backfill_pending")),
                      "scan_attempted_at": article.get("comment_scan_attempted_at"),
                      "scan_stop_reason": article.get("comment_scan_stop_reason"),
+                     "scan_policy": read_policy(article.get("comment_scan_policy")),
                      "fetched_at": article["comments_fetched_at"], "gap_reasons": reasons,
                      "completeness_basis": "provider_counts_and_capture_times_do_not_prove_exhaustion"},
     }

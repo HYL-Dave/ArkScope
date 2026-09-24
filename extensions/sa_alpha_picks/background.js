@@ -3144,6 +3144,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
         provider_comments_count: item.provider_comments_count,
         comment_scan_mode: bodyScrollStats.mode || scrollMode,
+        comment_scan_policy: bodyScrollStats.recency || null,
         comment_scan_stop_reason: bodyScrollStats && bodyScrollStats.stop_reason,
         comment_scan_stable_bottom_rounds:
           (bodyScrollStats && bodyScrollStats.stable_bottom_rounds) || 0,
@@ -3233,6 +3234,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         comments: cComments,
         provider_comments_count: cItem.provider_comments_count,
         comment_scan_mode: commentScrollStats.mode || scrollMode,
+        comment_scan_policy: commentScrollStats.recency || null,
         comment_scan_stop_reason:
           commentScrollStats && commentScrollStats.stop_reason,
         comment_scan_stable_bottom_rounds:
@@ -3378,7 +3380,7 @@ async function doManualFetch(items, diagnostics) {
           continue;
         }
         var articleId = item.article_id;
-        var captured = await captureArticle(tabId, item, "backfill", true);
+        var captured = await captureArticle(tabId, item, "backfill", true, {scope:"recent"});
         var detail = captured.detail;
         if (!detail || detail.error) {
           failed += recordExtensionFailure(diagnostics, {
@@ -3426,6 +3428,7 @@ async function doManualFetch(items, diagnostics) {
           detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
           provider_comments_count: null,
           comment_scan_mode: manualScrollStats.mode || "backfill",
+          comment_scan_policy: manualScrollStats.recency || null,
           comment_scan_stop_reason:
             manualScrollStats && manualScrollStats.stop_reason,
           comment_scan_stable_bottom_rounds:
@@ -3594,6 +3597,8 @@ async function beginArticleCapture(tabId, item) {
 
 async function captureArticle(tabId, item, mode, includeBody, options) {
   options = options || {};
+  var scope = options.scope || item.comment_scan_scope || (mode === "backfill" ? "history" : "recent");
+  var referenceMs = Date.now();
   // The backend selects first/pending article work independently of the job mode.
   if (item.comment_scan_mode === "backfill") mode = "backfill";
   var guard = await beginArticleCapture(tabId, item);
@@ -3604,14 +3609,19 @@ async function captureArticle(tabId, item, mode, includeBody, options) {
     var detail = includeBody ? await injectDetailScraper(tabId) : null;
     await guard.assert(detail && !detail.error ? detail.url || null : undefined);
     if (includeBody && (!detail || detail.error)) return {detail:detail};
+    await injectCommentsScraper(tabId);
+    await guard.assert();
     var scroll = await scrollToComments(tabId, {mode:mode,articleId:item.article_id,
-      guard:guard,strategy:options.strategy,trace:options.trace,audits:audits});
+      scope:scope,nowMs:referenceMs,guard:guard,strategy:options.strategy,trace:options.trace,audits:audits});
     await guard.assert();
     var result = await injectCommentsScraper(tabId);
     await guard.assert();
+    var selection = SACommentCapture.commentPolicy(result.comments || [],scope,referenceMs);
+    selection.summary.deferred_historical_controls = scroll.deferred_historical_controls || 0;
+    scroll.recency = selection.summary;
     // Only serialized, verified data crosses this boundary; cleanup and later
     // persistence never read the page again, so they need no live-tab lease.
-    return {detail:detail,comments:result.comments || [],scroll:scroll,
+    return {detail:detail,comments:selection.comments,scroll:scroll,
       navigation:guard.evidence ? guard.evidence() : null};
   } catch (error) {
     if (options.trace) error.capture_trace = {control_audits:audits,
@@ -3645,6 +3655,7 @@ async function scrollToComments(tabId, options) {
   var stopReason = "max_scrolls";
   var audits = options.audits || [], unresolved = false;
   var lastObservation = null;
+  var deferredHistorical = 0;
 
   for (var i = 0; i < profile.maxScrolls; i++) {
     if (options.guard) options.guard.checkNavigation();
@@ -3655,13 +3666,16 @@ async function scrollToComments(tabId, options) {
     var result = await chrome.scripting.executeScript({
       target: { tabId },
       func: SACommentCapture.scanPage,
-      args: [{strategy: options.strategy || "guarded", token:options.guard && options.guard.token}],
+      args: [{strategy: options.strategy || "guarded", token:options.guard && options.guard.token,
+        scope:options.scope,nowMs:options.nowMs,deadlineMs:startedAt + profile.maxDurationMs}],
     });
     var check = result[0] && result[0].result;
+    if (check && check.recency) deferredHistorical = check.recency.deferred_historical_controls;
     if (check) lastObservation = {
       elapsed_ms: Date.now() - startedAt, comments: check.comments,
       at_bottom: typeof check.atBottom === "boolean" ? check.atBottom : null,
       loading: Boolean(check.loading), click_count: check.click_count || 0,
+      traversal_steps:check.traversal_steps || 0,render_wait_incomplete:Boolean(check.render_wait_incomplete),
       progress: check.progress || null,
     };
     if (check && check.control_audit) {
@@ -3700,6 +3714,7 @@ async function scrollToComments(tabId, options) {
     stop_reason: unresolved ? "controls_unresolved" : stopReason,
     stable_bottom_rounds: stableBottomRounds,
     controls_unresolved:unresolved,
+    deferred_historical_controls:deferredHistorical,
     last_observation:lastObservation,
   };
   console.info("[SA] scrollToComments", JSON.stringify(stats));
@@ -4133,7 +4148,7 @@ function injectDetailScraper(tabId) {
 
 function injectCommentsScraper(tabId) {
   return chrome.scripting
-    .executeScript({ target: { tabId }, files: ["scrape_comments.js"] })
+    .executeScript({ target: { tabId }, files: ["comment_capture.js", "scrape_comments.js"] })
     .then(function (results) {
       return (results[0] && results[0].result) || { comments: [] };
     });

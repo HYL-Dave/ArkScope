@@ -15,19 +15,23 @@
 (function () {
   "use strict";
 
-  var commentEls = document.querySelectorAll('[class*="border-t-share-separator-thin"]');
-  if (commentEls.length === 0) {
-    return { comments: [], info: "No comment elements found" };
-  }
+  // Reuse the same date/parser semantics during traversal and final extraction.
+  globalThis.__arkReadComments = readComments;
+  return readComments();
 
-  var comments = [];
-  for (var i = 0; i < commentEls.length; i++) {
-    var parsed = parseComment(commentEls[i]);
-    if (parsed) comments.push(parsed);
+  function readComments(options) {
+    var commentEls = document.querySelectorAll('[class*="border-t-share-separator-thin"]');
+    var comments = [];
+    for (var i = 0; i < commentEls.length; i++) {
+      var parsed = parseComment(commentEls[i]);
+      if (parsed) {
+        if (options && options.includeDomIndex) parsed.dom_index = i;
+        comments.push(parsed);
+      }
+    }
+    resolveReplyParents(comments);
+    return { comments: comments };
   }
-
-  resolveReplyParents(comments);
-  return { comments: comments };
 
   function parseComment(el) {
     var textEl = el.querySelector('div[class*="break-words"]');
@@ -72,7 +76,9 @@
   }
 
   function extractCommentDate(el, textEl) {
-    var timeEl = el.querySelector('time[datetime]');
+    var timeEl = Array.from(el.querySelectorAll('time[datetime]')).find(function (node) {
+      return !textEl || !textEl.contains(node);
+    });
     if (timeEl) {
       var datetimeAttr = normalizeDatetimeAttr(timeEl.getAttribute('datetime'));
       if (datetimeAttr) return datetimeAttr;
@@ -93,12 +99,11 @@
     var nodes = el.querySelectorAll('span, a, div');
     for (var i = 0; i < nodes.length; i++) {
       var node = nodes[i];
-      if (textEl && textEl.contains(node)) continue;
+      if (textEl && (textEl.contains(node) || node.contains(textEl))) continue;
       var text = normalizeWhitespace(node.innerText);
       if (!text || text.length > 80 || text.indexOf('\n') >= 0) continue;
       addCandidate(text);
     }
-    addCandidate(el.innerText);
 
     for (var j = 0; j < candidates.length; j++) {
       var parsed = normalizeTextDate(candidates[j]);
@@ -211,11 +216,11 @@
 
   function normalizeDatetimeAttr(value) {
     var text = normalizeWhitespace(value);
-    if (!text) return null;
+    if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.test(text)) return null;
 
     var parsed = Date.parse(text);
     if (!isNaN(parsed)) return serializeLocalDate(new Date(parsed));
-    return text;
+    return null;
   }
 
   function normalizeTextDate(value) {

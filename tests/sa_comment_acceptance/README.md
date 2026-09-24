@@ -20,6 +20,13 @@ is registered and no website is opened by this command.
 
 ## First Observation
 
+Version 1.0.5 adds **Recent 30 days + context** (default) and separate historical
+expansion. Use the same scope for both sides of a new pair. The 120-second
+**Initial** budget is independent of that selection. Older rows already loaded
+by the page are kept; recent scope defers unnecessary older text expansion, not
+old-parent traversal. Current production code remains a candidate until live
+acceptance; do not repeat the old 1.0.4 campaign automatically.
+
 1. Pause the normal SA extension's automatic collection for this test, or
    temporarily disable that extension. Leave the SA login intact.
 2. In Firefox `about:debugging#/runtime/this-firefox`, load the generated
@@ -128,9 +135,16 @@ normal collection only when no test capture is running.
   not compensate for missing comments. Investigate traversal before another
   live pair; do not extend time limits, add retries or merge the exports to
   manufacture acceptance. See [the observation record](../../docs/superpowers/evidence/2026-09-24-sa-comment-observation.md).
-- The operator approved version 1.0.3's first/backfill profile selection and
-  pending/unchanged-row fixes. Its new paired live result is **pending**. It
-  does not inherit success from an offline test or from combining old captures.
+- The later 120-second small-thread pair kept all 81 baseline comments and
+  added 26, but used more work/time: supporting evidence, not blanket acceptance.
+- The large-thread 1.0.4 pair is **not accepted**: 259 legacy vs 218 guarded,
+  206 shared unchanged, 53 missing and 12 added. Both timed out before bottom.
+  All 53 missing comments were recent. New recency priority does not relabel it.
+- Version 1.0.5 adds loaded-frontier traversal and recency/context priority.
+  Its new signed-in result is **pending**. Acceptance first checks recent text,
+  parents, article identity and budget; missing older text must be distinguished
+  from missing recent or unknown-date evidence. The strict comparison still
+  reports full-export differences; it must not silently waive earlier failures.
 - A final code freeze, complete backend/frontend/typecheck/build run and review
   are **pending**. Earlier revision results cannot stand in for these.
 - No merge, production extension replacement or 180-company run is authorized

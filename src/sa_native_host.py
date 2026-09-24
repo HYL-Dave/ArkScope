@@ -800,6 +800,7 @@ def _handle_save_article_content(dal, msg):
             detail_ticker_observed_at=msg.get("detail_ticker_observed_at"),
             provider_comments_count=msg.get("provider_comments_count"),
             comment_scan_mode=msg.get("comment_scan_mode", "quick"),
+            comment_scan_policy=msg.get("comment_scan_policy"),
             comment_scan_stop_reason=msg.get("comment_scan_stop_reason"),
             comment_scan_stable_bottom_rounds=msg.get(
                 "comment_scan_stable_bottom_rounds", 0
@@ -831,6 +832,7 @@ def _handle_save_comments_only(dal, msg):
             comments,
             provider_comments_count=msg.get("provider_comments_count"),
             comment_scan_mode=msg.get("comment_scan_mode", "quick"),
+            comment_scan_policy=msg.get("comment_scan_policy"),
             comment_scan_stop_reason=msg.get("comment_scan_stop_reason"),
             comment_scan_stable_bottom_rounds=msg.get(
                 "comment_scan_stable_bottom_rounds", 0

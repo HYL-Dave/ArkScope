@@ -53,6 +53,82 @@ def age_attempt(backend, article_id="a", hours=7):
         conn.execute("UPDATE sa_articles SET comment_scan_attempted_at=? WHERE article_id=?", (attempted, article_id))
 
 
+def recent_policy(**changes):
+    return dict(dict(scope="recent", window_days=30, reference_at="2026-09-24T12:00:00Z",
+                     cutoff_at="2026-08-25T12:00:00Z", date_basis="displayed_date_browser_local_if_unzoned",
+                     coverage="unverified", recent_count=1, older_count=9, unknown_date_count=0,
+                     context_count=0, deferred_historical_controls=2), **changes)
+
+
+def test_recent_terminal_does_not_require_historical_count_or_overwrite_history(backend, tmp_path):
+    seed(backend, count=100)
+    scan(backend, comments=[comment("old", comment_date="2026-01-01")], count=90)
+    result = backend.update_article_comments("a", [comment("new", comment_date="2026-09-23")],
+        provider_comments_count=100, comment_scan_mode="backfill", comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5, comment_scan_policy=recent_policy())
+    assert result["comment_backfill_pending"] is False
+    assert result["comment_scan_policy"]["coverage"] == "unverified"
+    assert row(backend)["provider_comments_count_at_last_scan"] == 90
+    assert {c["comment_id"] for c in row(backend)["comments"]} == {"old", "new"}
+    coverage = read_article(backend._sa_db, "a")["coverage"]["comments"]
+    assert coverage["scan_policy"]["scope"] == "recent"
+    assert coverage["complete"] is None
+    dal = DataAccessLayer(base_path=tmp_path, backend=backend)
+    assert dal.save_sa_articles_meta([meta("a", 100)])["need_comments"] == []
+    assert dal.save_sa_articles_meta([meta("a", 101)])["need_comments"][0]["article_id"] == "a"
+
+
+def test_old_only_recent_scan_is_not_scheduled_forever_as_missing_history(backend, tmp_path):
+    seed(backend)
+    result = backend.update_article_comments("a", [comment("old", comment_date="2026-01-01")], provider_comments_count=5,
+        comment_scan_mode="backfill", comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5, comment_scan_policy=recent_policy(recent_count=0))
+    assert result["comment_scan_usable"] is True
+    assert result["comment_backfill_pending"] is False
+    dal = DataAccessLayer(base_path=tmp_path, backend=backend)
+    assert dal.save_sa_articles_meta([meta("a")])["need_comments"] == []
+
+
+@pytest.mark.parametrize("enrichment", [False, True])
+def test_historical_pending_cannot_promote_or_delay_completed_recent_work(backend, tmp_path, monkeypatch, enrichment):
+    seed(backend)
+    with store.connect(backend._sa_db) as conn:
+        conn.execute("UPDATE sa_articles SET comment_recovery_state='pending' WHERE article_id='a'")
+    backend.update_article_comments("a", [comment()], provider_comments_count=5,
+        comment_scan_mode="backfill", comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5, comment_scan_policy=recent_policy())
+    with store.connect(backend._sa_db) as conn:
+        conn.execute("UPDATE sa_articles SET comments_fetched_at='2020-01-01T00:00:00+00:00' WHERE article_id='a'")
+    dal = DataAccessLayer(base_path=tmp_path, backend=backend)
+    if enrichment:
+        monkeypatch.setattr(backend, "reconcile_sa_articles", lambda **kwargs: {
+            "status":"ok", "enrichment":[{"article_id":"a", "url":"u"}]})
+    result = dal.save_sa_articles_meta([meta("a")], mode="full")
+    items = result["reconciliation"]["enrichment"] if enrichment else result["need_comments"]
+    assert len(items) == 1
+    assert "comment_scan_mode" not in items[0]
+
+
+def test_manual_capture_without_count_keeps_known_scheduling_checkpoint(backend, tmp_path):
+    seed(backend)
+    scan(backend, count=5)
+    backend.save_article_with_comments("a", "body", [comment()],
+        comment_scan_mode="backfill", comment_scan_stop_reason="stable_bottom",
+        comment_scan_stable_bottom_rounds=5, comment_scan_policy=recent_policy())
+    dal = DataAccessLayer(base_path=tmp_path, backend=backend)
+    assert dal.save_sa_articles_meta([meta("a", 5)])["need_comments"] == []
+
+
+@pytest.mark.parametrize("changes", [{"scope":"all"}, {"window_days":0}, {"coverage":"complete"},
+                                      {"recent_count":-1}, {"cutoff_at":"invalid"}])
+def test_invalid_scope_receipt_cannot_modify_article_or_comments(backend, changes):
+    seed(backend)
+    before = row(backend)
+    with pytest.raises(ValueError, match="comment_scan_policy"):
+        backend.save_article_with_comments("a", "replacement body", [comment()], comment_scan_policy=recent_policy(**changes))
+    assert row(backend) == before
+
+
 @pytest.mark.parametrize("reason", ["timeout", "max_scrolls"])
 @pytest.mark.parametrize("empty", [False, True])
 def test_budget_stop_preserves_comments_without_advancing_checkpoint(backend, reason, empty):
@@ -273,7 +349,7 @@ def test_v4_migration_is_concurrent_and_preserves_unknown_history(tmp_path):
     path = str(tmp_path / "old.db")
     with store.connect(path) as conn:
         conn.execute("INSERT INTO sa_articles(article_id,url,title,comments_fetched_at) VALUES ('a','u','t','2026-01-01')")
-        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason"):
+        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy"):
             if column in {r[1] for r in conn.execute("PRAGMA table_info(sa_articles)")}:
                 conn.execute(f"ALTER TABLE sa_articles DROP COLUMN {column}")
         conn.execute("DELETE FROM schema_migrations WHERE version > 4")
@@ -287,7 +363,7 @@ def test_v4_migration_is_concurrent_and_preserves_unknown_history(tmp_path):
             conn.close()
 
     with ThreadPoolExecutor(max_workers=4) as pool:
-        assert list(pool.map(migrate, range(4))) == [5] * 4
+        assert list(pool.map(migrate, range(4))) == [store.SCHEMA_VERSION] * 4
     with sqlite3.connect(path) as conn:
         assert conn.execute("SELECT comments_fetched_at, comment_backfill_pending, comment_scan_attempted_at, comment_scan_stop_reason FROM sa_articles").fetchone() == ("2026-01-01", 0, None, None)
         assert conn.execute("SELECT count(*) FROM schema_migrations WHERE version=5").fetchone()[0] == 1
@@ -297,9 +373,9 @@ def test_v4_migration_is_concurrent_and_preserves_unknown_history(tmp_path):
 def v4_backend(backend):
     seed(backend)
     with store.connect(backend._sa_db) as conn:
-        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason"):
+        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy"):
             conn.execute(f"ALTER TABLE sa_articles DROP COLUMN {column}")
-        conn.execute("DELETE FROM schema_migrations WHERE version=5")
+        conn.execute("DELETE FROM schema_migrations WHERE version>4")
         conn.execute("PRAGMA user_version=4")
     return backend
 
@@ -334,5 +410,5 @@ def test_quick_submission_does_not_treat_v4_articles_as_empty(v4_backend, tmp_pa
     assert result.get("auto_upgrade") is not True
     assert result["saved"] == 1
     with sqlite3.connect(v4_backend._sa_db) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == store.SCHEMA_VERSION
         assert conn.execute("SELECT comments_count FROM sa_articles WHERE article_id='a'").fetchone()[0] == 6

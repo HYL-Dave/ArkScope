@@ -6,7 +6,7 @@ import sys
 
 def compare(old, new):
     reasons = []
-    for field in ("article_id", "mode", "source_hash", "provider_count", "capture_profile"):
+    for field in ("article_id", "mode", "scope", "source_hash", "provider_count", "capture_profile"):
         if old.get(field) != new.get(field):
             reasons.append(field + "_changed")
     if old.get("strategy") != "observe" or new.get("strategy") != "guarded":
