@@ -41,7 +41,8 @@ function backgroundFixtureResults() {
               && !!context.SAExtensionTelemetry
               && !!context.SACompanyRefresh
               && !!context.SAQueue
-              && !!context.SAAcquisition;
+              && !!context.SAAcquisition
+              && !!context.SACommentCapture;
           },
         },
         onInstalled: {addListener() {}},
