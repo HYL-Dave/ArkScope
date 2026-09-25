@@ -1169,7 +1169,7 @@ function renderStatus(lastRefresh) {
     if (Number.isInteger(details.review_required) && details.review_required > 0) {
       statusEl.append(
         document.createElement("br"),
-        document.createTextNode("Article links: " + details.review_required + " events to review")
+        document.createTextNode("Article links: " + details.review_required + " unlinked event roles; review optional")
       );
     }
   }

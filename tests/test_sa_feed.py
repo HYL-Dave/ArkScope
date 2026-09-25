@@ -242,6 +242,8 @@ _REQUIRED_FEED_COLUMNS = {
         "article_id TEXT",
         "title TEXT",
         "ticker TEXT",
+        "list_ticker TEXT",
+        "detail_ticker TEXT",
         "published_date TEXT",
         "url TEXT",
         "body_markdown TEXT",
@@ -258,6 +260,11 @@ _REQUIRED_FEED_COLUMNS = {
         "comments_count INTEGER",
     ),
     "sa_market_news_tickers": ("news_row_id INTEGER", "ticker TEXT"),
+    "sa_pick_lineages": ("lineage_id INTEGER", "symbol_key TEXT", "picked_date TEXT"),
+    "sa_pick_article_links": (
+        "link_id INTEGER", "lineage_id INTEGER", "article_id TEXT", "role TEXT",
+        "event_anchor_date TEXT", "link_source TEXT", "evidence_codes TEXT", "revoked_at TEXT",
+    ),
 }
 
 
@@ -360,6 +367,8 @@ def test_sa_store_open_failure_is_unreadable_and_sanitized(tmp_path, monkeypatch
         "sa_market_news_tickers",
         "sa_articles_fts",
         "sa_market_news_fts",
+        "sa_pick_article_links",
+        "sa_pick_lineages",
     ),
     ids=(
         "sa_articles",
@@ -367,6 +376,8 @@ def test_sa_store_open_failure_is_unreadable_and_sanitized(tmp_path, monkeypatch
         "sa_market_news_tickers",
         "sa_articles_fts",
         "sa_market_news_fts",
+        "sa_pick_article_links",
+        "sa_pick_lineages",
     ),
 )
 def test_missing_required_feed_table_is_schema_incompatible(

@@ -39,6 +39,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
+from src.sa.article_associations import ASSOCIATIONS_CTE, ARTICLE_TICKER_FILTER, attach_associations
 
 logger = logging.getLogger(__name__)
 
@@ -381,7 +382,7 @@ def _query_articles_local(
     DESC ordering are lexicographic, which equals date order. NULLS LAST is
     SQLite's native DESC behavior (and the WHERE already excludes NULLs).
     """
-    sql = f"""
+    sql = ASSOCIATIONS_CTE + f"""
         SELECT
             article_id,
             title,
@@ -393,14 +394,22 @@ def _query_articles_local(
             substr(COALESCE(body_markdown, title), 1, {EXCERPT_LEN}) AS summary_excerpt,
             (body_markdown IS NULL) AS body_missing
         FROM sa_articles
-        WHERE UPPER(ticker) = ?
+        WHERE {ARTICLE_TICKER_FILTER}
           AND published_date >= ?
         ORDER BY published_date DESC, fetched_at DESC
         LIMIT ?
     """
-    return _fetch_dicts_local(
-        sa_db, sql, (ticker, window_start.date().isoformat(), max_articles)
-    )
+    from src import sa_capture_store as store
+
+    conn = store.connect(sa_db, read_only=True)
+    try:
+        conn.execute("BEGIN")
+        rows = [dict(row) for row in conn.execute(
+            sql, (ticker.strip().upper(), window_start.date().isoformat(), max_articles),
+        )]
+        return attach_associations(conn, rows)
+    finally:
+        conn.close()
 
 
 def _query_news_local(
@@ -571,6 +580,8 @@ def _normalize_article_row(r: Dict[str, Any]) -> Dict[str, Any]:
         "published_date":  _iso(r.get("published_date")),
         "url":             r.get("url"),
         "article_type":    r.get("article_type"),
+        "associations":    r.get("associations", []),
+        "tickers":         r.get("tickers", []),
         "comments_count":  _to_int(r.get("comments_count")),
         "summary_excerpt": _truncated(r.get("summary_excerpt")),
     }

@@ -85,8 +85,12 @@ def _stub_fetch_dicts(monkeypatch, mapping):
             raise value
         return value
 
+    def fake_articles(_sa_db, _ticker, _window_start, _max_articles):
+        return fake(_sa_db, "SELECT * FROM sa_articles\n", ())
+
     monkeypatch.setattr(sd, "_fetch_dicts_local", fake)
     monkeypatch.setattr(sd, "_query_news_local", fake_news)
+    monkeypatch.setattr(sd, "_query_articles_local", fake_articles)
 
 
 # ---------------------------------------------------------------------------
@@ -158,8 +162,6 @@ class TestParamClamping:
         captured = {}
 
         def fake(_sa_db, sql, params):
-            if "sa_articles\n" in sql or "FROM sa_articles" in sql and "JOIN sa_article_comments" not in sql:
-                captured["max_articles"] = params[2]
             if "sa_comment_signals" in sql:
                 captured["max_comments"] = params[8]
             return []
@@ -168,8 +170,13 @@ class TestParamClamping:
             captured["max_news"] = max_news
             return []
 
+        def fake_articles(_sa_db, _ticker, _window_start, max_articles):
+            captured["max_articles"] = max_articles
+            return []
+
         monkeypatch.setattr(sd, "_fetch_dicts_local", fake)
         monkeypatch.setattr(sd, "_query_news_local", fake_news)
+        monkeypatch.setattr(sd, "_query_articles_local", fake_articles)
         get_sa_digest(
             dal=_dal_with(_fake_backend()),
             ticker="NVDA", max_articles=0, max_news=0, max_comments=0,

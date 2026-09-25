@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getNewsFeed, type NewsContentFilter, type NewsFeedItem, type NewsFeedResponse,
-  getSAFeed, type SAFeedEmptyReason, type SAFeedItem, type SAFeedResponse,
+  getSAFeed, type SAArticleAssociation, type SAFeedEmptyReason, type SAFeedItem, type SAFeedResponse,
 } from "./api";
 import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
 import {
@@ -21,6 +21,7 @@ import type { NavigationTarget } from "./shell/navigation";
 
 const PAGE = 50;
 const DAY_OPTIONS = [7, 30, 90, 365] as const;
+const SA_DAY_OPTIONS = [...DAY_OPTIONS, 3650] as const;
 const MASSIVE_SOURCE_ID = "polygon" as const;
 const SOURCE_OPTIONS = ["auto", MASSIVE_SOURCE_ID, "finnhub", "ibkr"] as const;
 const SA_TYPE_OPTIONS = ["", "article", "market_news"] as const;
@@ -148,7 +149,11 @@ export function NewsView({
       <div className="news-toolbar">
         <select
           value={mode}
-          onChange={(e) => setMode(e.target.value as Mode)}
+          onChange={(e) => {
+            const nextMode = e.target.value as Mode;
+            setMode(nextMode);
+            if (nextMode === "market") setDays((current) => Math.min(current, 365));
+          }}
           title={t(($) => $.news.sourceLabel)}
           aria-label={t(($) => $.news.modeLabel)}
         >
@@ -223,9 +228,11 @@ export function NewsView({
           onChange={(e) => setDays(Number(e.target.value))}
           aria-label={t(($) => $.news.dayWindowLabel)}
         >
-          {DAY_OPTIONS.map((dayOption) => (
+          {(mode === "sa" ? SA_DAY_OPTIONS : DAY_OPTIONS).map((dayOption) => (
             <option key={dayOption} value={dayOption}>
-              {dayOption} {t(($) => $.news.daysSuffix)}
+              {dayOption === 3650
+                ? t(($) => $.news.pastTenYears)
+                : <>{dayOption} {t(($) => $.news.daysSuffix)}</>}
             </option>
           ))}
         </select>
@@ -468,7 +475,9 @@ function SAFeedBody({
             <span key={type}> · {saRuntimeTypeLabel(type, t)} {count.toLocaleString()}</span>
           ))}
           {q && (
-            <span> {t(($) => $.news.seekingAlphaSearchSummary, { query: q })}</span>
+            <span> {feed.query_mode === "ticker" && feed.resolved_ticker
+              ? t(($) => $.news.seekingAlphaTickerSearchSummary, { ticker: feed.resolved_ticker })
+              : t(($) => $.news.seekingAlphaSearchSummary, { query: q })}</span>
           )}
         </p>
       )}
@@ -491,7 +500,7 @@ function SAFeedBody({
         <ul className="news-list">
           {items.map((item, index) => (
             <li key={`${item.type}-${item.id}-${index}`} className="news-item">
-              <div className="news-row">
+              <div className="news-row" style={{ flexWrap: "wrap" }}>
                 <span className="muted mono tiny news-time">
                   {item.published_at.slice(5, 16).replace("T", " ")}
                 </span>
@@ -507,11 +516,20 @@ function SAFeedBody({
                   </button>
                 ))}
                 {item.url ? (
-                  <a className="news-title" href={item.url} target="_blank" rel="noreferrer">
+                  <a
+                    className="news-title"
+                    style={{ flexBasis: 240, whiteSpace: "normal", overflowWrap: "anywhere" }}
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     {item.title}
                   </a>
                 ) : (
-                  <span className="news-title">{item.title}</span>
+                  <span
+                    className="news-title"
+                    style={{ flexBasis: 240, whiteSpace: "normal", overflowWrap: "anywhere" }}
+                  >{item.title}</span>
                 )}
                 <span className="muted tiny news-meta">
                   {t(($) => $.news.saShort)}
@@ -526,6 +544,13 @@ function SAFeedBody({
               {/* snippet is server-cleaned plain text (src/text_snippet.py) — render as
                   text only; do NOT add a markdown/HTML renderer here. */}
               {item.snippet && <div className="news-desc muted tiny">{item.snippet}</div>}
+              {item.type === "article" && item.associations?.map((association, index) => (
+                <SAArticleAssociationDetails
+                  key={`${association.symbol}-${association.role}-${association.link_id}-${index}`}
+                  association={association}
+                  t={t}
+                />
+              ))}
             </li>
           ))}
         </ul>
@@ -551,6 +576,76 @@ function saFilterTypeLabel(type: (typeof SA_TYPE_OPTIONS)[number], t: ExploreT):
   if (type === "article") return t(($) => $.news.analysisArticle);
   if (type === "market_news") return t(($) => $.news.marketNewsType);
   return t(($) => $.news.allTypes);
+}
+
+function SAArticleAssociationDetails({ association, t }: {
+  association: SAArticleAssociation;
+  t: ExploreT;
+}) {
+  const role = association.role === "entry"
+    ? t(($) => $.news.articleAssociations.entry)
+    : association.role === "exit"
+      ? t(($) => $.news.articleAssociations.exit)
+      : t(($) => $.news.articleAssociations.related);
+  const sources = {
+    auto: t(($) => $.news.articleAssociations.automatic),
+    user: t(($) => $.news.articleAssociations.manual),
+    provider: t(($) => $.news.articleAssociations.provider),
+    legacy: t(($) => $.news.articleAssociations.legacy),
+  };
+  let dateLabel: string | null = null;
+  if (association.role === "entry" || association.role === "exit") {
+    dateLabel = association.event_anchor_date
+      ? t(($) => $.news.articleAssociations.eventDate, { date: association.event_anchor_date })
+      : association.role === "entry" && association.picked_date
+        ? t(($) => $.news.articleAssociations.pickedDate, { date: association.picked_date })
+        : t(($) => $.news.articleAssociations.dateMissing);
+  }
+  const summary = [association.symbol, role, dateLabel, sources[association.link_source]]
+    .filter(Boolean).join(" · ");
+
+  return (
+    <details className="news-association tiny" style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+      <summary style={{ cursor: "pointer" }}>{summary}</summary>
+      <div className="muted" style={{ padding: "4px 0 4px 16px" }}>
+        {(association.role === "entry" || association.role === "exit") && association.picked_date && (
+          <div>{t(($) => $.news.articleAssociations.pickedDate, { date: association.picked_date })}</div>
+        )}
+        <span>{t(($) => $.news.articleAssociations.evidenceLabel)}</span>
+        {association.evidence_codes.length > 0 ? (
+          <ul style={{ margin: "4px 0", paddingLeft: 16 }}>
+            {association.evidence_codes.map((code, index) => (
+              <li key={`${code}-${index}`}>{saAssociationEvidenceLabel(code, t)}</li>
+            ))}
+          </ul>
+        ) : (
+          <div>{t(($) => $.news.articleAssociations.noEvidence)}</div>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function saAssociationEvidenceLabel(code: string, t: ExploreT): string {
+  switch (code) {
+    case "date_exact": return t(($) => $.news.articleAssociations.evidence.dateExact);
+    case "date_near": return t(($) => $.news.articleAssociations.evidence.dateNear);
+    case "date_outside": return t(($) => $.news.articleAssociations.evidence.dateOutside);
+    case "date_missing": return t(($) => $.news.articleAssociations.evidence.dateMissing);
+    case "ticker_list_exact": return t(($) => $.news.articleAssociations.evidence.listTicker);
+    case "ticker_detail_exact": return t(($) => $.news.articleAssociations.evidence.articleTicker);
+    case "ticker_text_symbol": return t(($) => $.news.articleAssociations.evidence.textSymbol);
+    case "ticker_text_company": return t(($) => $.news.articleAssociations.evidence.textCompany);
+    case "role_entry_strong": return t(($) => $.news.articleAssociations.evidence.entryWording);
+    case "role_exit_strong": return t(($) => $.news.articleAssociations.evidence.exitWording);
+    case "ticker_metadata_conflict": return t(($) => $.news.articleAssociations.evidence.tickerConflict);
+    case "user_selected": return t(($) => $.news.articleAssociations.evidence.userSelected);
+    case "user_confirmed": return t(($) => $.news.articleAssociations.evidence.userConfirmed);
+    case "legacy_ticker_projection": return t(($) => $.news.articleAssociations.evidence.legacyTicker);
+    case "date_mismatch": return t(($) => $.news.articleAssociations.evidence.dateMismatch);
+    case "replacement": return t(($) => $.news.articleAssociations.evidence.replacement);
+    default: return t(($) => $.news.articleAssociations.unknownEvidence, { code });
+  }
 }
 
 function saRuntimeTypeLabel(type: string, t: ExploreT): string {

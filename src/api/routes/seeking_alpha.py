@@ -93,6 +93,10 @@ def _recovery_error(exc: MarketNewsRecoveryError) -> HTTPException:
 
 def _unwrap_sa_result(result: dict) -> dict:
     """Translate tool-style SA responses into explicit HTTP semantics."""
+    if result.get("error_code") == "sa_article_associations_unavailable":
+        raise HTTPException(status_code=503, detail={"code": result["error_code"]})
+    if result.get("error_code") == "sa_pick_related_offset_invalid":
+        raise HTTPException(status_code=400, detail={"code": result["error_code"]})
     message = result.get("message")
     if message == _DISABLED_MSG:
         raise HTTPException(status_code=503, detail=message)
@@ -108,7 +112,7 @@ def _unwrap_sa_result(result: dict) -> dict:
 
 @router.get("/feed")
 def sa_feed(
-    q: Optional[str] = Query(None, description="search terms (FTS5; short/symbol → LIKE)"),
+    q: Optional[str] = Query(None, description="Known symbol or text; quotes force text. With ticker, q is text."),
     ticker: Optional[str] = Query(None),
     item_type: Optional[str] = Query(None, pattern="^(article|market_news)$"),
     days: int = Query(30, ge=1, le=3650),
@@ -142,10 +146,13 @@ def alpha_picks(
 def alpha_pick_detail(
     symbol: str,
     picked_date: Optional[str] = Query(None),
+    related_offset: int = Query(0, ge=0),
     dal=Depends(get_dal),
 ):
     """Read one cached Alpha Picks detail report."""
-    return _unwrap_sa_result(get_sa_pick_detail(dal, symbol=symbol, picked_date=picked_date))
+    return _unwrap_sa_result(get_sa_pick_detail(
+        dal, symbol=symbol, picked_date=picked_date, related_offset=related_offset,
+    ))
 
 
 @router.get("/articles")

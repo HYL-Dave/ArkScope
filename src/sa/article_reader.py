@@ -5,6 +5,7 @@ import hashlib
 from pathlib import Path
 import sqlite3
 from src.sa.comment_scope import read_policy
+from src.sa.article_associations import attach_associations
 
 from src.tools.retained_read_results import (
     RetainedReadFailure, bounded_result, canonical_json, page_integer, require,
@@ -63,6 +64,7 @@ def read_article(
             if row is None:
                 return article_unavailable("sa_article_not_found")
             article = dict(row)
+            attach_associations(conn, [article])
             # Hash all served fields, not row counts or acquisition timestamps alone:
             # comment edits and upvote changes also invalidate continuation pages.
             hasher = hashlib.sha256(canonical_json({"version": 1, "article": article}).encode("utf-8"))

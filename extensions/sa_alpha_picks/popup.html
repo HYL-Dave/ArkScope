@@ -108,6 +108,7 @@
       font-size: 13px;
       font-weight: 600;
       color: #222;
+      cursor: pointer;
     }
     #reconciliationError,
     .reconciliation-action-error {
@@ -555,8 +556,8 @@
     </details>
   </section>
   <div id="progress"></div>
-  <section id="reconciliationSection">
-    <div class="reconciliation-heading">Article link review</div>
+  <details id="reconciliationSection">
+    <summary class="reconciliation-heading">Article link review (advanced, optional)</summary>
     <div id="reconciliationError" hidden></div>
     <div id="reconciliationQueue">Loading events to review...</div>
     <div id="manualConfirmation"></div>
@@ -566,7 +567,7 @@
       <textarea id="manualInput" rows="3"></textarea>
       <button id="manualBtn">Fetch and review</button>
     </details>
-  </section>
+  </details>
   <script src="popup_action_catalog.js"></script>
   <script src="reconciliation_ui.js"></script>
   <script src="popup_company_refresh.js"></script>

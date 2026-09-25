@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from src.app_records_store import resolve_profile_state_db_path
 from src.service.job_runs_store import read_job_activity_if_exists
+from src.tools.retained_read_results import RetainedReadFailure, page_integer
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,7 @@ def get_sa_alpha_picks(
 
 
 def get_sa_pick_detail(
-    dal: Any, symbol: str, picked_date: Optional[str] = None
+    dal: Any, symbol: str, picked_date: Optional[str] = None, related_offset: int = 0,
 ) -> Dict:
     """Get detail for a specific Alpha Pick.
 
@@ -122,9 +123,12 @@ def get_sa_pick_detail(
     if not _is_sa_enabled():
         return {"message": _DISABLED_MSG}
 
+    if not page_integer(related_offset):
+        return {"status": "invalid_request", "error_code": "sa_pick_related_offset_invalid"}
+
     try:
         client = _get_client(dal)
-        result = client.get_pick_detail(symbol, picked_date)
+        result = client.get_pick_detail(symbol, picked_date, related_offset=related_offset)
 
         if result is None:
             # Check if symbol exists in closed
@@ -144,6 +148,8 @@ def get_sa_pick_detail(
 
         return result
 
+    except RetainedReadFailure as e:
+        return {"status": "unavailable", "error_code": e.code}
     except Exception as e:
         logger.error("get_sa_pick_detail error: %s", e)
         return {"error": str(e)}
@@ -191,6 +197,8 @@ def get_sa_articles(
             article_type=article_type, limit=limit,
         )
         return {"articles": articles, "count": len(articles)}
+    except RetainedReadFailure as e:
+        return {"status": "unavailable", "error_code": e.code}
     except Exception as e:
         logger.error("get_sa_articles error: %s", e)
         return {"error": str(e)}
@@ -717,6 +725,8 @@ _SA_FEED_REQUIRED_SCHEMA = {
             "article_id",
             "title",
             "ticker",
+            "list_ticker",
+            "detail_ticker",
             "published_date",
             "url",
             "body_markdown",
@@ -738,6 +748,11 @@ _SA_FEED_REQUIRED_SCHEMA = {
     "sa_market_news_tickers": frozenset({"news_row_id", "ticker"}),
     "sa_articles_fts": frozenset({"title", "body_markdown"}),
     "sa_market_news_fts": frozenset({"title", "summary"}),
+    "sa_pick_lineages": frozenset({"lineage_id", "symbol_key", "picked_date"}),
+    "sa_pick_article_links": frozenset({
+        "link_id", "lineage_id", "article_id", "role", "event_anchor_date",
+        "link_source", "evidence_codes", "revoked_at",
+    }),
 }
 
 
@@ -771,11 +786,13 @@ def get_sa_feed(
     (SA reads the current local capture store and reports unavailable state clearly).
 
     Args:
-        q: search terms. Empty → pure time sort. len < 3 (incl. 2-char CJK) or any
+        q: a complete known symbol (optionally $-prefixed) uses exact association
+           lookup unless ticker is also provided. Quotes force text search.
+           Empty → pure time sort. len < 3 (incl. 2-char CJK) or any
            non-alphanumeric char → LIKE substring fallback (SA is full of short
            tickers/abbrevs that FTS tokenizes poorly; %/_ are escaped). Otherwise
            FTS5 (tokenized AND) over the sa_*_fts mirrors.
-        ticker: filter by mention — article.ticker column / market-news junction
+        ticker: exact retained article association / market-news junction
            (NOT text search).
         item_type: 'article' | 'market_news' | None (both).
         days: published window 1..3650 (default 30).
@@ -889,6 +906,7 @@ def _sa_feed_local(sa_db, *, q, ticker, item_type, days, limit, offset) -> Dict[
                 days, query=q, empty_reason="store_schema_incompatible"
             )
         try:
+            conn.execute("BEGIN")
             return _sa_feed_local_conn(
                 conn,
                 q=q,
@@ -917,27 +935,37 @@ def _sa_feed_local_conn(
 ) -> Dict[str, Any]:
     """Query a validated feed connection without acquiring another store."""
     from src import sa_capture_store as store
+    from src.sa.article_associations import (
+        ASSOCIATIONS_CTE, ARTICLE_TICKER_FILTER, associations_by_article, known_query_symbol,
+    )
 
     now = datetime.now(timezone.utc) - timedelta(days=days)
     cutoff_date = store.canon_date(now)
     cutoff_ts = store.canon_ts(now)
 
-    # q routing: simple = plain alphanumeric/CJK + spaces (isalnum covers CJK).
-    simple = bool(q) and len(q) >= 3 and all(c.isalnum() or c.isspace() for c in q)
-    fts_match = " ".join(f'"{t}"' for t in q.split()) if simple else None
+    resolved_ticker = known_query_symbol(conn, q) if not ticker else None
+    ticker = ticker.strip().upper() if ticker else resolved_ticker
+    text_query = None if resolved_ticker else q
+    quoted = bool(text_query and len(text_query) >= 2 and text_query[0] == text_query[-1] == '"')
+    if quoted:
+        text_query = text_query[1:-1]
+    simple = bool(text_query) and len(text_query) >= 3 and all(c.isalnum() or c.isspace() for c in text_query)
+    fts_match = " ".join(f'"{t}"' for t in text_query.split()) if simple else None
+    if quoted and text_query:
+        fts_match = '"' + text_query.replace('"', '""') + '"'
     # LIKE fallback: escape % / _ / \ so a literal symbol in q is matched literally
     # (q routes here precisely BECAUSE it has such chars), via ESCAPE '\' below.
-    if q is None or simple:
+    if not text_query or fts_match is not None:
         like = None
     else:
-        esc = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        esc = text_query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         like = f"%{esc}%"
 
     def _branch(kind):
         if kind == "article":
             where, params = ["published_date >= ?"], [cutoff_date]
             if ticker:
-                where.append("ticker = ?"); params.append(ticker)
+                where.append(ARTICLE_TICKER_FILTER); params.append(ticker)
             if fts_match is not None:
                 where.append("id IN (SELECT rowid FROM sa_articles_fts WHERE sa_articles_fts MATCH ?)")
                 params.append(fts_match)
@@ -974,14 +1002,18 @@ def _sa_feed_local_conn(
     base = " UNION ALL ".join(s for s, _ in parts)
     bp = [p for _, ps in parts for p in ps]
 
-    total = conn.execute(f"SELECT COUNT(*) FROM ({base})", bp).fetchone()[0]
+    total = conn.execute(ASSOCIATIONS_CTE + f"SELECT COUNT(*) FROM ({base})", bp).fetchone()[0]
     by_type = {r[0]: r[1] for r in conn.execute(
-        f"SELECT type, COUNT(*) FROM ({base}) GROUP BY type", bp)}
+        ASSOCIATIONS_CTE + f"SELECT type, COUNT(*) FROM ({base}) GROUP BY type", bp)}
     by_day = {r[0]: r[1] for r in conn.execute(
-        f"SELECT substr(published_at,1,10) d, COUNT(*) FROM ({base}) GROUP BY d ORDER BY d DESC", bp)}
+        ASSOCIATIONS_CTE + f"SELECT substr(published_at,1,10) d, COUNT(*) FROM ({base}) GROUP BY d ORDER BY d DESC", bp)}
     rows = conn.execute(
-        f"SELECT * FROM ({base}) ORDER BY published_at DESC, item_id DESC LIMIT ? OFFSET ?",
+        ASSOCIATIONS_CTE + f"SELECT * FROM ({base}) ORDER BY published_at DESC, item_id DESC LIMIT ? OFFSET ?",
         bp + [limit, offset]).fetchall()
+
+    article_associations = associations_by_article(
+        conn, [r["item_id"] for r in rows if r["type"] == "article"],
+    )
 
     news_ids = [r["row_id"] for r in rows if r["type"] == "market_news"]
     news_tk: Dict[int, List[str]] = {}
@@ -995,16 +1027,19 @@ def _sa_feed_local_conn(
     items = []
     for r in rows:
         if r["type"] == "article":
-            tickers = [r["single_ticker"]] if r["single_ticker"] else []
+            associations = article_associations.get(r["item_id"], [])
+            tickers = sorted({a["symbol"] for a in associations})
             detail_route = f"/sa/articles/{r['item_id']}" if r["has_detail"] else None
         else:
             tickers = sorted(news_tk.get(r["row_id"], []))
             detail_route = None  # no /sa/market-news/{id} endpoint in C-1 -> click uses url
+            associations = []
         items.append({
             "type": r["type"],
             "id": r["item_id"],
             "title": r["title"],
             "tickers": tickers,
+            "associations": associations,
             "published_at": r["published_at"],
             "url": r["url"],
             "source": "seeking_alpha",
@@ -1018,6 +1053,8 @@ def _sa_feed_local_conn(
         "available": True,
         "days": days,
         "query": q,
+        "query_mode": "ticker" if resolved_ticker else ("text" if q else None),
+        "resolved_ticker": resolved_ticker,
         "total": total,
         "items": items,
         "by_type": by_type,

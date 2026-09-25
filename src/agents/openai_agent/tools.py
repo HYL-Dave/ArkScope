@@ -965,15 +965,23 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         return _serialize_result(result, "get_sa_alpha_picks")
 
     @function_tool
-    def tool_get_sa_pick_detail(symbol: str, picked_date: str = "") -> str:
+    def tool_get_sa_pick_detail(
+        symbol: str, picked_date: str = "", related_offset: Annotated[int, Field(strict=True)] = 0,
+    ) -> str:
         """Get detail report for a specific Alpha Pick.
+
+        articles.entry and articles.exit identify selection and sale/removal
+        articles for this investment, with event dates and association evidence.
+        articles.related has no confirmed event role. Read content with
+        tool_get_sa_article_detail.
 
         Args:
             symbol: Stock ticker symbol (e.g. NVDA)
             picked_date: Specific pick date (YYYY-MM-DD). Omit for latest current.
+            related_offset: Related-article page offset. Follow articles.related_pagination.next_offset; event links stay included.
         """
         result = _get_sa_pick_detail(
-            dal, symbol=symbol, picked_date=picked_date or None,
+            dal, symbol=symbol, picked_date=picked_date or None, related_offset=related_offset,
         )
         return _serialize_result(result, "get_sa_pick_detail")
 
@@ -987,7 +995,11 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     def tool_get_sa_articles(
         ticker: str = "", keyword: str = "", article_type: str = "", limit: int = 10
     ) -> str:
-        """Search SA Alpha Picks articles by ticker, keyword, or type."""
+        """Search SA Alpha Picks articles by exact ticker association, keyword or type.
+
+        Results preserve entry/exit/related roles, auto/user/provider/legacy
+        association origin and evidence_codes; never infer an event from related.
+        """
         result = _get_sa_articles(
             dal,
             ticker=ticker or None,
@@ -1095,8 +1107,10 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
 
         Newest-first, paginated, with per-type/per-day facets. Score-free; reads
         the local sa_capture.db. Pull recent SA coverage for a ticker or topic as
-        evidence (cite item url / detail_route). q uses FTS5 (short/symbol → LIKE);
-        ticker filters by mention; item_type = article | market_news. For
+        evidence (cite item url / detail_route). A complete known-symbol q uses
+        exact associations unless ticker is supplied; quotes force text search.
+        Other q uses FTS5 (short or punctuated text falls back to LIKE).
+        ticker filters exact associations; item_type = article | market_news. For
         per-ticker comment attention use tool_get_sa_comment_focus; for one
         article's body + comments use tool_get_sa_article_detail.
         """

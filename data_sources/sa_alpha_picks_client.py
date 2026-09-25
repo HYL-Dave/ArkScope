@@ -70,7 +70,7 @@ class SAAlphaPicksClient:
         return result
 
     def get_pick_detail(
-        self, symbol: str, picked_date: Optional[str] = None
+        self, symbol: str, picked_date: Optional[str] = None, *, related_offset: int = 0,
     ) -> Optional[Dict[str, Any]]:
         """Get detail for a specific pick from DAL cache.
 
@@ -82,7 +82,7 @@ class SAAlphaPicksClient:
         if self._dal is None:
             return None
 
-        cached = self._dal.get_sa_pick_detail(symbol, picked_date)
+        cached = self._dal.get_sa_pick_detail(symbol, picked_date, related_offset=related_offset)
         if not cached:
             return None  # Preserves None contract for sa_tools.py hint logic
 

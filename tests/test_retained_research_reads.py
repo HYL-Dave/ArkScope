@@ -18,6 +18,8 @@ from src.tools.backends.sa_capture_backend import SACaptureBackend
 from src.tools.data_access import DataAccessLayer
 from src.tools.portfolio_holdings_tools import get_portfolio_holdings
 from src.tools.sa_tools import get_sa_article_detail, get_sa_comment_focus
+# eventkit needs an event loop when first imported, before channel tests run asyncio.run.
+from src import portfolio_ibkr
 
 
 def _write(path, sql, parameters=()):
@@ -370,7 +372,7 @@ def test_all_channels_can_read_holdings_without_initialization_or_sync(holdings,
     from tests.test_sec_research_tool_adapters import unwrap
 
     monkeypatch.setattr(PortfolioStore, "_ensure_schema", Mock(side_effect=AssertionError("schema write")))
-    monkeypatch.setattr("src.portfolio_ibkr.read_ibkr_portfolio_snapshot", Mock(side_effect=AssertionError("broker access")))
+    monkeypatch.setattr(portfolio_ibkr, "read_ibkr_portfolio_snapshot", Mock(side_effect=AssertionError("broker access")))
     before = _digest(holdings[2])
     first = unwrap(asyncio.run(invoke(channel, "get_portfolio_holdings", {"row_limit": 2}, object())))
     assert len(first["positions"]) == 2 and first["pagination"]["total_rows"] == 13

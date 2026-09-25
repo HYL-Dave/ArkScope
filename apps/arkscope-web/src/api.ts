@@ -5048,6 +5048,16 @@ export function getNewsFeed(params: {
 }
 
 // --- Seeking Alpha evidence feed (Layer C-1) — unified SA articles + market-news ---
+export interface SAArticleAssociation {
+  symbol: string;
+  role: "entry" | "exit" | "related";
+  link_source: "auto" | "user" | "provider" | "legacy";
+  evidence_codes: string[];
+  picked_date: string | null;
+  event_anchor_date: string | null;
+  link_id: number | null;
+}
+
 export interface SAFeedItem {
   type: "article" | "market_news";
   id: string;
@@ -5060,6 +5070,7 @@ export interface SAFeedItem {
   has_detail: boolean;
   comments_count: number;
   detail_route: string | null; // present → open internally; null → fall back to url
+  associations?: SAArticleAssociation[];
 }
 
 export type SAFeedEmptyReason =
@@ -5077,6 +5088,8 @@ export interface SAFeedResponse {
   available: boolean; // false = typed unavailable state, not an HTTP error
   days: number;
   query: string | null;
+  query_mode?: "ticker" | "text" | null;
+  resolved_ticker?: string | null;
   total: number;
   items: SAFeedItem[];
   by_type: Record<string, number>;

@@ -987,7 +987,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "name": "get_sa_pick_detail",
             "description": (
                 "Get detail report for a specific Alpha Pick. "
-                "If picked_date is omitted, returns the latest current (non-stale) pick."
+                "If picked_date is omitted, returns the latest current (non-stale) pick. "
+                "articles.entry and articles.exit identify selection and sale/removal "
+                "articles for that investment, with event dates and association evidence. "
+                "articles.related has no confirmed event role. Read content with get_sa_article_detail."
             ),
             "input_schema": {
                 "type": "object",
@@ -999,6 +1002,10 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "picked_date": {
                         "type": "string",
                         "description": "Specific pick date (YYYY-MM-DD). Omit for latest.",
+                    },
+                    "related_offset": {
+                        "type": "integer",
+                        "description": "Related-article page offset (default 0). Follow articles.related_pagination.next_offset; event links stay included.",
                     },
                 },
                 "required": ["symbol"],
@@ -1024,7 +1031,9 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "description": (
                 "Search SA Alpha Picks articles. Returns article list with title, "
                 "date, ticker, type (analysis/recap/webinar/commentary/removal), "
-                "and comment count. Use get_sa_article_detail for full content."
+                "and comment count. Ticker uses exact retained associations; results include "
+                "entry/exit/related roles, auto/user/provider/legacy origin and evidence_codes. "
+                "Use get_sa_article_detail for full content."
             ),
             "input_schema": {
                 "type": "object",
@@ -1129,16 +1138,18 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "market-news items in ONE newest-first, paginated list with per-type/"
                 "per-day facets. Score-free; reads the local sa_capture.db. Pull recent "
                 "SA coverage for a ticker or topic as evidence (cite item url / "
-                "detail_route). q uses FTS5 (short/symbol queries fall back to LIKE); "
-                "ticker filters by mention; item_type = article | market_news. For "
+                "detail_route). A complete known-symbol q uses exact associations unless "
+                "ticker is supplied; quotes force text search. Other q uses FTS5 "
+                "(short or punctuated text falls back to LIKE). ticker filters exact "
+                "associations; item_type = article | market_news. For "
                 "per-ticker comment attention use get_sa_comment_focus; for one "
                 "article's body+comments use get_sa_article_detail."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "q": {"type": "string", "description": "Search terms (FTS5; short/symbol → LIKE)"},
-                    "ticker": {"type": "string", "description": "Filter by mentioned ticker"},
+                    "q": {"type": "string", "description": "Known symbol or text; quotes force text. With ticker, q is text."},
+                    "ticker": {"type": "string", "description": "Filter by exactly associated ticker"},
                     "item_type": {"type": "string", "enum": ["article", "market_news"], "description": "Filter item type"},
                     "days": {"type": "integer", "description": "Lookback window (1-3650, default 30)"},
                     "limit": {"type": "integer", "description": "Max items (1-200, default 50)"},
@@ -1721,6 +1732,7 @@ def execute_tool(
             dal,
             symbol=tool_input["symbol"],
             picked_date=tool_input.get("picked_date"),
+            related_offset=tool_input.get("related_offset", 0),
         ),
         "refresh_sa_alpha_picks": lambda: refresh_sa_alpha_picks(dal),
         "get_sa_articles": lambda: get_sa_articles(

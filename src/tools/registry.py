@@ -1157,7 +1157,9 @@ class ToolRegistry:
             description=(
                 "Get detail report for a specific Alpha Pick. "
                 "If picked_date is omitted, returns the latest current (non-stale) pick. "
-                "Shows company analysis, thesis, and rating rationale."
+                "articles.entry and articles.exit identify the selection and sale/removal "
+                "articles for that investment, with event dates and association evidence. "
+                "articles.related has no confirmed event role; use get_sa_article_detail for content."
             ),
             function=get_sa_pick_detail,
             category="portfolio",
@@ -1166,6 +1168,9 @@ class ToolRegistry:
                 ToolParameter("symbol", "string", "Stock ticker symbol (e.g. NVDA)"),
                 ToolParameter("picked_date", "string",
                               "Specific pick date (YYYY-MM-DD). Omit for latest current.",
+                              required=False),
+                ToolParameter("related_offset", "integer",
+                              "Related-article page offset (default 0). Follow articles.related_pagination.next_offset; event links stay included.",
                               required=False),
             ],
         ))
@@ -1191,7 +1196,9 @@ class ToolRegistry:
             description=(
                 "Search SA Alpha Picks articles. Returns article list with title, "
                 "date, ticker, type (analysis/recap/webinar/commentary/removal), "
-                "and comment count. Use get_sa_article_detail for full content."
+                "and comment count. Ticker uses exact retained associations; results include "
+                "entry/exit/related roles, auto/user/provider/legacy origin and evidence_codes. "
+                "Use get_sa_article_detail for full content."
             ),
             function=get_sa_articles,
             category="portfolio",
@@ -1375,8 +1382,10 @@ class ToolRegistry:
                 "market-news items in ONE newest-first, paginated list with "
                 "per-type/per-day facets. Score-free; reads the local sa_capture.db. "
                 "Use to pull recent SA coverage for a ticker or topic as evidence, "
-                "then cite item url / detail_route. q uses FTS5 (short or symbol "
-                "queries fall back to LIKE); ticker filters by mention; item_type = "
+                "then cite item url / detail_route. A complete known-symbol q uses exact "
+                "associations unless ticker is supplied; quotes force text search. "
+                "Other q uses FTS5 (short or punctuated text falls back to LIKE). "
+                "ticker filters exact associations; item_type = "
                 "article | market_news. Each item: type, title, tickers, "
                 "published_at, url, snippet, has_detail, comments_count, detail_route. "
                 "For per-ticker comment attention use get_sa_comment_focus; for one "
@@ -1387,10 +1396,10 @@ class ToolRegistry:
             requires_dal=True,
             parameters=[
                 ToolParameter("q", "string",
-                              "Search terms (FTS5; short/symbol queries → LIKE)",
+                              "Known symbol or text; quotes force text. With ticker, q is text.",
                               required=False),
                 ToolParameter("ticker", "string",
-                              "Filter by mentioned ticker", required=False),
+                              "Filter by exactly associated ticker", required=False),
                 ToolParameter("item_type", "string", "Filter item type",
                               required=False, enum=["article", "market_news"]),
                 ToolParameter("days", "integer",

@@ -595,10 +595,10 @@ class DataAccessLayer:
             logger.warning("File cache meta write failed: %s", e)
 
     def get_sa_pick_detail(
-        self, symbol: str, picked_date: Optional[str] = None
+        self, symbol: str, picked_date: Optional[str] = None, *, related_offset: int = 0,
     ) -> Optional[Dict]:
         """Get detail for a specific SA pick."""
-        result = self._backend.get_sa_pick_detail(symbol, picked_date)
+        result = self._backend.get_sa_pick_detail(symbol, picked_date, related_offset=related_offset)
         if result:
             return result
 

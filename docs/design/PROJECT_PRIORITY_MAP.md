@@ -671,6 +671,18 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
+- **2026-09-25 (ARTICLE ASSOCIATION READS; EVENT ROLES PRESERVED):** The operator
+  approves exact historical article association reads and clarifies that the
+  selection explanation and sale/removal explanation must remain separate.
+  Reuse active event links and provider identities; expose automatic/manual
+  provenance and evidence, permit generic related articles without mandatory
+  manual review, and do not guess missing roles or overwrite operator choices.
+  Closed-list acceptance starts from 124 active links / 121 distinct
+  article-symbol pairs: the five previously missed pairs are all exits.
+  Query/read projections require no recrawl, production backfill or schema
+  change. Final regression/merge and production activation are separate gates;
+  service, external MCP and retention remain open, not superseded.
+
 - **2026-09-25 (UNIFIED SA REVIEW FIX PASS; ARTICLE ASSOCIATION NEXT):** The
   operator approves repairing activation/stop races, force-consent dirty state
   and stale routine switches before a fresh frozen full regression and local

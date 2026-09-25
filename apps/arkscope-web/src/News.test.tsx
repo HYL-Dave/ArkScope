@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   NewsFeedItem,
   NewsFeedResponse,
+  SAArticleAssociation,
   SAFeedResponse,
 } from "./api";
 import type { NavigationTarget } from "./shell/navigation";
@@ -163,6 +164,33 @@ const saFeed: SAFeedResponse = {
   by_day: { "2026-07-17": 2 },
   empty_reason: null,
 };
+
+function articleAssociation(over: Partial<SAArticleAssociation> = {}): SAArticleAssociation {
+  return {
+    symbol: "SA",
+    role: "entry",
+    link_source: "auto",
+    evidence_codes: ["ticker_list_exact", "date_exact", "role_entry_strong"],
+    picked_date: "2026-07-01",
+    event_anchor_date: "2026-07-15",
+    link_id: 777,
+    ...over,
+  };
+}
+
+function mockArticleAssociations(associations: SAArticleAssociation[]) {
+  apiMocks.getSAFeed.mockResolvedValue({
+    ...saFeed,
+    total: 1,
+    items: [{
+      ...saFeed.items[0],
+      tickers: [...new Set(associations.map((association) => association.symbol))],
+      associations,
+    }],
+    by_type: { article: 1 },
+    by_day: { "2026-07-17": 1 },
+  } satisfies SAFeedResponse);
+}
 
 const UNAVAILABLE_SA_FEED_REASONS = [
   "backend_unavailable",
@@ -593,6 +621,244 @@ describe("News content availability", () => {
     expect(host!.querySelector<HTMLAnchorElement>(`.news-title[href="${saFeed.items[0].url}"]`))
       .not.toBeNull();
     expect(requestCounts()).toEqual(before);
+  });
+});
+
+describe("Seeking Alpha article associations", () => {
+  it("offers a localized ten-year SA window and caps it when returning to Market News", async () => {
+    await mount();
+    expect(host!.querySelector('option[value="3650"]')).toBeNull();
+    expect(selectWithOption("365").value).toBe("7");
+    await change(modeSelect(), "sa");
+    const days = selectWithOption("365");
+    expect(days.querySelector('option[value="3650"]')?.textContent).toBe("近10年");
+    expect(days.value).toBe("7");
+    await change(days, "3650");
+    expect(apiMocks.getSAFeed).toHaveBeenLastCalledWith(expect.objectContaining({ days: 3650 }));
+    const before = requestCounts();
+    await switchLocale("en");
+    expect(days.querySelector('option[value="3650"]')?.textContent).toBe("Past 10 years");
+    expect(days.value).toBe("3650");
+    expect(requestCounts()).toEqual(before);
+    await change(modeSelect(), "market");
+    expect(apiMocks.getNewsFeed).toHaveBeenLastCalledWith(expect.objectContaining({ days: 365 }));
+    expect(apiMocks.getNewsFeed.mock.calls.some(([params]) => params.days === 3650)).toBe(false);
+    expect(days.value).toBe("365");
+    expect(days.querySelector('option[value="3650"]')).toBeNull();
+    expect(Array.from(days.options).map((option) => option.value)).toEqual(["7", "30", "90", "365"]);
+  });
+
+  it.each([
+    { query: "$sa", mode: "ticker" as const, resolved: "SA", en: "· Ticker search “SA”", zh: "· 標的搜尋「SA」" },
+    { query: '"SA"', mode: "text" as const, resolved: null, en: '· Search “"SA"”', zh: '· 搜尋「"SA"」' },
+    { query: "SA growth", mode: "text" as const, resolved: null, en: "· Search “SA growth”", zh: "· 搜尋「SA growth」" },
+    { query: "SA", mode: null, resolved: null, en: "· Search “SA”", zh: "· 搜尋「SA」" },
+  ])("labels the backend's $mode search interpretation for $query", async ({ query, mode, resolved, en, zh }) => {
+    apiMocks.getSAFeed.mockResolvedValue({
+      ...saFeed,
+      query,
+      query_mode: mode,
+      resolved_ticker: resolved,
+    } satisfies SAFeedResponse);
+    await mount();
+    await change(modeSelect(), "sa");
+    const input = host!.querySelector<HTMLInputElement>(".news-search")!;
+    await setInput(input, query);
+    await pressKey(input, "Enter");
+    expect(host!.querySelector(".news-stats")?.textContent).toContain(zh);
+    const before = requestCounts();
+    await switchLocale("en");
+    expect(host!.querySelector(".news-stats")?.textContent).toContain(en);
+    expect(requestCounts()).toEqual(before);
+    expect(apiMocks.getSAFeed).toHaveBeenLastCalledWith(expect.objectContaining({ q: query }));
+  });
+
+  it("separates selection and sale links with event dates and localized provenance", async () => {
+    mockArticleAssociations([
+      articleAssociation(),
+      articleAssociation({
+        role: "exit",
+        link_source: "user",
+        event_anchor_date: "2026-07-16",
+        evidence_codes: ["role_exit_strong", "user_selected"],
+        link_id: 888,
+      }),
+    ]);
+    const onOpenTicker = vi.fn();
+    await mount({ onOpenTicker });
+    await change(modeSelect(), "sa");
+
+    const summaries = () => Array.from(host!.querySelectorAll(".news-association > summary"))
+      .map((summary) => summary.textContent);
+    expect(summaries()).toEqual([
+      "SA · 入選原因 · 事件日期：2026-07-15 · 自動關聯",
+      "SA · 賣出／移除原因 · 事件日期：2026-07-16 · 人工關聯",
+    ]);
+    const before = requestCounts();
+    await switchLocale("en");
+    expect(summaries()).toEqual([
+      "SA · Entry: why selected · Event date: 2026-07-15 · Automatic link",
+      "SA · Exit: sold / removed · Event date: 2026-07-16 · Manual link",
+    ]);
+    expect(requestCounts()).toEqual(before);
+    expect(host!.querySelector<HTMLAnchorElement>(".news-title")?.href).toBe(saFeed.items[0].url);
+    expect(host!.textContent).not.toContain("777");
+    expect(host!.textContent).not.toContain("888");
+    expect(host!.textContent).not.toMatch(/confidence|strength|score/i);
+    await click(host!.querySelector(".news-ticker-chip")!);
+    expect(onOpenTicker).toHaveBeenCalledExactlyOnceWith("SA");
+  });
+
+  it("keeps provider and legacy associations related without inferring event reasons or dates", async () => {
+    mockArticleAssociations([
+      articleAssociation({
+        symbol: "PROV",
+        role: "related",
+        link_source: "provider",
+        evidence_codes: ["ticker_detail_exact"],
+        link_id: null,
+      }),
+      articleAssociation({
+        symbol: "OLD",
+        role: "related",
+        link_source: "legacy",
+        evidence_codes: [],
+        link_id: null,
+      }),
+    ]);
+    await mount();
+    await change(modeSelect(), "sa");
+    expect(Array.from(host!.querySelectorAll(".news-association > summary"))
+      .map((summary) => summary.textContent)).toEqual([
+      "PROV · 相關文章 · 來源標的資料",
+      "OLD · 相關文章 · 舊有關聯",
+    ]);
+    await switchLocale("en");
+    expect(Array.from(host!.querySelectorAll(".news-association > summary"))
+      .map((summary) => summary.textContent)).toEqual([
+      "PROV · Related article · Provider ticker metadata",
+      "OLD · Related article · Legacy association",
+    ]);
+    expect(host!.textContent).not.toContain("Entry:");
+    expect(host!.textContent).not.toContain("Exit:");
+    expect(host!.textContent).not.toContain("2026-07-15");
+    expect(host!.textContent).not.toContain("2026-07-01");
+    expect(host!.textContent).not.toMatch(/confirmed|manual review required/i);
+    expect(Array.from(host!.querySelectorAll(".news-ticker-chip"))
+      .map((chip) => chip.textContent)).toEqual(["PROV", "OLD"]);
+  });
+
+  it("uses the pick date only for an entry without an anchor, never for an undated exit", async () => {
+    mockArticleAssociations([
+      articleAssociation({ event_anchor_date: null }),
+      articleAssociation({ role: "exit", event_anchor_date: null, link_id: 888 }),
+      articleAssociation({
+        symbol: "UNDATED",
+        picked_date: null,
+        event_anchor_date: null,
+        link_id: 999,
+      }),
+    ]);
+    await switchLocale("en");
+    await mount();
+    await change(modeSelect(), "sa");
+    expect(Array.from(host!.querySelectorAll(".news-association > summary"))
+      .map((summary) => summary.textContent)).toEqual([
+      "SA · Entry: why selected · Picked: 2026-07-01 · Automatic link",
+      "SA · Exit: sold / removed · Event date not provided · Automatic link",
+      "UNDATED · Entry: why selected · Event date not provided · Automatic link",
+    ]);
+  });
+
+  it("distinguishes investment rounds with the same exit date inside expanded details", async () => {
+    mockArticleAssociations([
+      articleAssociation({ role: "exit", picked_date: "2025-01-15" }),
+      articleAssociation({ role: "exit", picked_date: "2026-07-01", link_id: 888 }),
+    ]);
+    await switchLocale("en");
+    await mount();
+    await change(modeSelect(), "sa");
+    const details = host!.querySelectorAll<HTMLDetailsElement>(".news-association");
+    expect(details).toHaveLength(2);
+    expect(details[0].querySelector("summary")?.textContent)
+      .toBe(details[1].querySelector("summary")?.textContent);
+    await click(details[0].querySelector("summary")!);
+    await click(details[1].querySelector("summary")!);
+    expect(details[0].open).toBe(true);
+    expect(details[1].open).toBe(true);
+    expect(details[0].textContent).toContain("Picked: 2025-01-15");
+    expect(details[0].textContent).not.toContain("2026-07-01");
+    expect(details[1].textContent).toContain("Picked: 2026-07-01");
+    expect(details[1].textContent).not.toContain("2025-01-15");
+    await switchLocale("zh-Hant");
+    expect(details[0].textContent).toContain("入選日期：2025-01-15");
+    expect(details[1].textContent).toContain("入選日期：2026-07-01");
+  });
+
+  it("exposes actual reconciliation evidence as readable text in collapsed details in both locales", async () => {
+    const evidence = [
+      ["date_exact", "Article date matches event", "文章日期與事件相同"],
+      ["date_near", "Article date within 3 days of event", "文章日期與事件相差 3 天內"],
+      ["date_outside", "Article date outside matching window", "文章日期超出配對範圍"],
+      ["date_missing", "Article or event date missing", "缺少文章或事件日期"],
+      ["ticker_list_exact", "List ticker match", "列表標的代號相符"],
+      ["ticker_detail_exact", "Article ticker match", "文章標的代號相符"],
+      ["ticker_text_symbol", "Ticker mentioned in article", "文章提及標的代號"],
+      ["ticker_text_company", "Company mentioned in article", "文章提及公司名稱"],
+      ["role_entry_strong", "Selection wording in article", "文章含入選措辭"],
+      ["role_exit_strong", "Sale or removal wording in article", "文章含賣出或移除措辭"],
+      ["ticker_metadata_conflict", "List and article tickers conflict", "列表與文章標的代號衝突"],
+      ["user_selected", "User selected", "使用者選定"],
+      ["user_confirmed", "User confirmed", "使用者確認"],
+      ["legacy_ticker_projection", "Legacy ticker metadata", "舊有標的資料"],
+      ["date_mismatch", "Article date differs from event", "文章日期與事件不同"],
+      ["replacement", "Replaced previous link", "已取代先前關聯"],
+    ];
+    mockArticleAssociations([articleAssociation({ evidence_codes: evidence.map(([code]) => code) })]);
+    await mount();
+    await change(modeSelect(), "sa");
+    const details = host!.querySelector<HTMLDetailsElement>("details.news-association")!;
+    expect(details).not.toBeNull();
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain("關聯依據");
+    for (const [code, , zhLabel] of evidence) {
+      expect(details.textContent).toContain(zhLabel);
+      expect(details.textContent).not.toContain(code);
+    }
+    await click(details.querySelector("summary")!);
+    expect(details.open).toBe(true);
+    await switchLocale("en");
+    expect(details.open).toBe(true);
+    expect(details.textContent).toContain("Association evidence");
+    for (const [, enLabel] of evidence) expect(details.textContent).toContain(enLabel);
+  });
+
+  it("keeps missing and unfamiliar evidence honest and renders codes as plain text", async () => {
+    mockArticleAssociations([
+      articleAssociation({ evidence_codes: [] }),
+      articleAssociation({ evidence_codes: ['future_<img src=x onerror="alert(1)">'], link_id: 888 }),
+    ]);
+    await switchLocale("en");
+    await mount();
+    await change(modeSelect(), "sa");
+    const details = host!.querySelectorAll(".news-association");
+    expect(details).toHaveLength(2);
+    expect(details[0].textContent).toContain("No evidence recorded");
+    expect(details[1].textContent).toContain('Unrecognized evidence: future_<img src=x onerror="alert(1)">');
+    expect(host!.querySelector("img")).toBeNull();
+    await switchLocale("zh-Hant");
+    expect(details[0].textContent).toContain("尚無關聯依據紀錄");
+    expect(details[1].textContent).toContain("未識別的依據：future_");
+  });
+
+  it("keeps old article mocks and nonarticles without associations usable without inventing roles", async () => {
+    await mount();
+    await change(modeSelect(), "sa");
+    expect(host!.querySelectorAll(".news-association")).toHaveLength(0);
+    expect(host!.textContent).toContain(SA_TITLE);
+    expect(host!.textContent).toContain("SOURCE transcript / 保留");
+    expect(Array.from(host!.querySelectorAll(".news-ticker-chip"))
+      .map((chip) => chip.textContent)).toEqual(["SA", "RAW"]);
   });
 });
 

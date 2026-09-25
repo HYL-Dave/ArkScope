@@ -6,23 +6,40 @@
     exit: "Exit",
   };
   var EVIDENCE_LABELS = {
-    list_ticker: "List ticker",
-    detail_ticker: "Article ticker",
-    exact_ticker: "Ticker match",
-    date_within_window: "Date within window",
-    exact_event_date: "Event date match",
+    ticker_list_exact: "List ticker match",
+    ticker_detail_exact: "Article ticker match",
+    ticker_text_symbol: "Ticker mentioned in article",
+    ticker_text_company: "Company mentioned in article",
+    date_exact: "Article date matches event",
+    date_near: "Article date within 3 days of event",
+    date_outside: "Article date outside matching window",
+    date_missing: "Article or event date missing",
+    role_entry_strong: "Selection wording in article",
+    role_exit_strong: "Sale or removal wording in article",
+    ticker_metadata_conflict: "List and article tickers conflict",
     user_selected: "User selected",
     user_confirmed: "User confirmed",
+    legacy_ticker_projection: "Legacy ticker metadata",
+    date_mismatch: "Article date differs from event",
+    replacement: "Replaced previous link",
   };
   var REASON_LABELS = {
     ambiguous_candidates: "Multiple candidate articles",
     ticker_metadata_conflict: "List and article tickers conflict",
-    missing_event_anchor: "Event date missing; manual review required",
+    missing_event_anchor: "Event date missing; review optional",
     outside_match_window: "Article date outside matching window",
     date_mismatch: "Article date differs from event",
     replacement: "Replaces current link",
     no_candidate: "No candidate article",
-    review_required: "Manual review required",
+    no_candidates: "No candidate articles",
+    date_missing: "Article or event date missing",
+    outside_date_window: "Article date outside matching window",
+    ticker_mismatch: "Article ticker does not match event",
+    explicit_ticker_required: "Explicit ticker missing for nearby article date",
+    needs_enrichment: "Article content needed to identify ticker",
+    ticker_identity_missing: "Ticker identity not established",
+    role_phrase_missing: "Role unassigned; review optional",
+    review_required: "Review optional",
   };
 
   function element(tag, className, text) {
@@ -33,7 +50,7 @@
   }
 
   function reasonLabel(code) {
-    return REASON_LABELS[code] || "Manual review required";
+    return REASON_LABELS[code] || "Review optional";
   }
 
   function eventPayload(event, candidate, confirmWarnings) {
@@ -82,7 +99,9 @@
     confirmation.setAttribute("data-confirmation", "");
     var warningCodes = Array.isArray(result.warnings) ? result.warnings : [];
     var warningText = warningCodes.length > 0
-      ? warningCodes.map(reasonLabel).join("; ")
+      ? warningCodes.map(function (code) {
+        return REASON_LABELS[code] || "This link requires another confirmation";
+      }).join("; ")
       : "This link requires another confirmation";
     confirmation.appendChild(element("div", "reconciliation-warning", warningText));
 
@@ -144,8 +163,9 @@
       ? candidate.evidence_codes
       : [];
     var evidenceLabels = evidenceCodes
-      .map(function (code) { return EVIDENCE_LABELS[code]; })
-      .filter(Boolean);
+      .map(function (code) {
+        return EVIDENCE_LABELS[code] || "Unrecognized evidence: " + code;
+      });
     if (evidenceLabels.length > 0) {
       node.appendChild(element(
         "div",

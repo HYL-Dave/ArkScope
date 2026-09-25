@@ -20,6 +20,10 @@ from ... import sa_capture_store as store
 from ... import sa_article_reconciliation_store as reconciliation_store
 from ...sqlite_id_sets import text_ids_query
 from ...sa.comment_scope import validate_policy
+from ...sa.article_associations import (
+    ASSOCIATIONS_CTE, ARTICLE_TICKER_FILTER, attach_associations, pick_articles,
+)
+from ..retained_read_results import RetainedReadFailure
 from .local_market_backend import LocalMarketBackend
 from .sqlite_backend import SqliteBackend
 
@@ -576,15 +580,18 @@ class SACaptureBackend(LocalMarketBackend):
             conn.close()
 
     def get_sa_pick_detail(
-        self, symbol: str, picked_date: Optional[str] = None
+        self, symbol: str, picked_date: Optional[str] = None, *, related_offset: int = 0,
     ) -> Optional[dict]:
         """Detail for one pick, preferring current non-stale rows."""
         try:
             conn = self._sa_read()
+        except (OSError, sqlite3.Error) as e:
+            raise RetainedReadFailure("sa_article_associations_unavailable") from e
         except Exception as e:
             logger.error("Failed to get SA pick detail: %s", e)
             return None
         try:
+            conn.execute("BEGIN")
             if picked_date:
                 row = conn.execute(
                     "SELECT * FROM sa_alpha_picks "
@@ -603,10 +610,17 @@ class SACaptureBackend(LocalMarketBackend):
             if not row:
                 return None
             d = dict(row)
+            if d.get("lineage_id") is None:
+                raise RetainedReadFailure("sa_article_associations_unavailable")
+            d["articles"] = pick_articles(conn, d["lineage_id"], d["symbol"], related_offset=related_offset)
             d.pop("lineage_id", None)  # internal reconciliation identity, not legacy DTO
             d["is_stale"] = bool(d["is_stale"])
             d["raw_data"] = _loads(d.get("raw_data"))
             return d
+        except RetainedReadFailure:
+            raise
+        except sqlite3.Error as e:
+            raise RetainedReadFailure("sa_article_associations_unavailable") from e
         except Exception as e:
             logger.error("Failed to get SA pick detail: %s", e)
             return None
@@ -1826,8 +1840,8 @@ class SACaptureBackend(LocalMarketBackend):
         conditions = []
         params: list = []
         if ticker:
-            conditions.append("(ticker = ? OR ticker LIKE ?)")
-            params.extend([ticker.upper(), ticker.upper() + "%"])
+            conditions.append(ARTICLE_TICKER_FILTER)
+            params.append(ticker.strip().upper())
         if keyword:
             match = _fts_match(keyword)
             if not match:
@@ -1844,16 +1858,20 @@ class SACaptureBackend(LocalMarketBackend):
         params.append(int(limit))
         try:
             conn = self._sa_read()
+        except sqlite3.Error as e:
+            raise RetainedReadFailure("sa_article_associations_unavailable") from e
         except Exception as e:
             logger.error("Failed to query SA articles: %s", e)
             return []
         try:
+            conn.execute("BEGIN")
             columns = {row[1] for row in conn.execute("PRAGMA table_info(sa_articles)")}
             scan_columns = ", ".join(
                 column if column in columns else f"NULL AS {column}"
                 for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy")
             )
             rows = conn.execute(
+                ASSOCIATIONS_CTE +
                 f"SELECT article_id, url, title, ticker, published_date, "
                 f"article_type, comments_count, "
                 f"CASE WHEN body_markdown IS NOT NULL THEN 1 ELSE 0 END AS has_content, "
@@ -1877,7 +1895,11 @@ class SACaptureBackend(LocalMarketBackend):
                 d = dict(r)
                 d["has_content"] = bool(d["has_content"])
                 out.append(d)
-            return out
+            return attach_associations(conn, out)
+        except RetainedReadFailure:
+            raise
+        except sqlite3.Error as e:
+            raise RetainedReadFailure("sa_article_associations_unavailable") from e
         except Exception as e:
             logger.error("Failed to query SA articles: %s", e)
             return []
@@ -1892,6 +1914,7 @@ class SACaptureBackend(LocalMarketBackend):
             logger.error("Failed to get SA article with comments: %s", e)
             return None
         try:
+            conn.execute("BEGIN")
             article = conn.execute(
                 "SELECT * FROM sa_articles WHERE article_id = ?",
                 (article_id,),
@@ -1906,9 +1929,12 @@ class SACaptureBackend(LocalMarketBackend):
                 (article_id,),
             ).fetchall()]
             result = dict(article)
+            attach_associations(conn, [result])
             result["comments"] = comments
             result["raw_data"] = _loads(result.get("raw_data"))
             return result
+        except RetainedReadFailure:
+            raise
         except Exception as e:
             logger.error("Failed to get SA article with comments: %s", e)
             return None

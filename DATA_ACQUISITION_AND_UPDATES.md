@@ -1,6 +1,6 @@
 # Data Acquisition And Updates
 
-Maintained policy and implementation map. Last reconciled with source: 2026-09-23.
+Maintained policy and implementation map. Last reconciled with source: 2026-09-25.
 
 This document owns the cross-source acquisition, update-trigger, freshness and retention
 contract. It distinguishes current behavior from approved follow-up work; dated
@@ -367,6 +367,54 @@ allowlist now admits 27, including five pure calculators. `get_sa_feed` supplies
 research/summarizer subagents can follow them to `get_sa_article_detail` and
 `get_sa_comment_focus`. Holdings are the user's local account positions, not the
 Alpha Picks recommendation membership.
+
+**Alpha Picks article associations.** A stock's selection article and its
+sale/removal articles are separate event links, not interchangeable company
+coverage. `get_sa_pick_detail(symbol, picked_date)` returns `articles.entry`,
+`articles.exit`, and `articles.related`. Entry/exit links belong to the requested
+investment (symbol and pick date); separate sale dates remain visible. An empty
+event group means no accepted link is stored, not that the event never happened.
+Related articles have no confirmed selection/removal role and remain usable
+without manual review. Manual link selection/rejection remains an optional
+advanced operation; this read path does not make new reconciliation decisions.
+Related articles use pages of 20; follow `articles.related_pagination.next_offset`
+as the next call's `related_offset`. Accepted entry/exit links remain included
+on every page. Items retain all associated symbols' evidence, while
+`matching_link_ids` identifies the links for the requested investment and role.
+An association-store read failure is explicitly unavailable (HTTP 503 at the
+UI route), never an empty list or a suggestion that the pick was merely closed.
+The existing API adapters expose per-pick detail. The internal OAuth allowlists
+remain unchanged: those agents use `get_sa_feed` with an appropriate historical
+window and follow the article ID through `get_sa_article_detail`, both carrying
+the same event/provenance fields. This change does not silently admit the legacy
+`get_sa_pick_detail` or `get_sa_articles` tools to either OAuth allowlist.
+
+Article lists, the SA feed, digest and article reader share retained association
+rules. Active accepted links can associate one article with multiple stocks;
+the provider's single primary ticker does not erase those links. Non-conflicting
+list/detail ticker observations provide generic association. Legacy ticker-only
+projections remain explicitly `legacy`, not promoted to provider evidence.
+Conflicting provider tickers alone do not establish an association. Revoked
+event links do not participate. Matching uses exact symbols, never prefixes or
+arbitrary mentions in the body. One article appears once per result list even
+when it has multiple event links. Each returned association preserves `role`,
+`link_source` (`auto`, `user`, `provider`, `legacy`), `evidence_codes`, pick date,
+event date and link ID where applicable. These describe the stored basis, not a
+confidence score or a new verification of the investment thesis.
+
+In `get_sa_feed`, a complete locally known symbol in `q` (case-insensitive,
+optionally prefixed with `$`) uses exact article associations/news membership
+when no `ticker` filter is supplied. A quoted query forces text search; with
+explicit `ticker`, `q` remains an additional text filter. Results disclose
+`query_mode` and `resolved_ticker`. Other text queries retain FTS/short-text
+fallback behavior. These semantics apply to the SA feed, not every provider's
+search. Date windows and page limits still apply: digest is recent coverage,
+whereas per-pick detail is the route to older selection/removal explanations.
+Association metadata is part of the article reader's snapshot identity; a
+changed link invalidates continuation just like changed article/comment text.
+
+Owner: [association projection](src/sa/article_associations.py).
+Regression: [association and role reads](tests/test_sa_article_associations.py).
 
 **Acquisition and time.** Reading does not start an extension, reload a page,
 extract comment signals, poll a provider, call IBKR, update configuration or
