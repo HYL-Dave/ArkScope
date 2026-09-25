@@ -111,7 +111,7 @@ def _create_v2_with_provider_marked_symbol(
     seeded.close()
     conn = sqlite3.connect(path)
     try:
-        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy"):
+        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy", "body_capture_json"):
             conn.execute(f"ALTER TABLE sa_articles DROP COLUMN {column}")
         conn.execute("DELETE FROM schema_migrations WHERE version > 2")
         conn.execute(
@@ -225,7 +225,7 @@ def _insert_lineage_and_article(conn: sqlite3.Connection) -> tuple[int, str]:
 def test_current_schema_keeps_lineage_link_decision_and_provider_evidence_contract(tmp_path):
     conn = scs.connect(str(tmp_path / "fresh.db"))
     try:
-        assert scs.SCHEMA_VERSION == 6
+        assert scs.SCHEMA_VERSION == 7
         tables = {
             row[0]
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -240,6 +240,7 @@ def test_current_schema_keeps_lineage_link_decision_and_provider_evidence_contra
             "list_ticker_observed_at",
             "detail_ticker",
             "detail_ticker_observed_at",
+            "body_capture_json",
         } <= article_columns
 
         indexes = {

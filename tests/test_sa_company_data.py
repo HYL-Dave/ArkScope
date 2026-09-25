@@ -229,7 +229,7 @@ def test_two_writers_share_unique_content_and_serialized_upgrade(local):
     # Start at v3 to exercise concurrent upgrade admission as well as inserts.
     conn = sa_capture_store.connect(db)
     conn.execute("DROP TABLE sa_company_observations")
-    for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy"):
+    for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy", "body_capture_json"):
         conn.execute(f"ALTER TABLE sa_articles DROP COLUMN {column}")
     conn.execute("DELETE FROM schema_migrations WHERE version>=4")
     conn.execute("PRAGMA user_version=3")
@@ -270,7 +270,7 @@ def test_old_sa_store_read_does_not_upgrade_and_new_capture_preserves_existing_c
     dal, db = local
     conn = sa_capture_store.connect(db)
     conn.execute("DROP TABLE sa_company_observations")
-    for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy"):
+    for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy", "body_capture_json"):
         conn.execute(f"ALTER TABLE sa_articles DROP COLUMN {column}")
     conn.execute("DELETE FROM schema_migrations WHERE version>=4")
     conn.execute("PRAGMA user_version=3")

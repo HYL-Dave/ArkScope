@@ -349,7 +349,7 @@ def test_v4_migration_is_concurrent_and_preserves_unknown_history(tmp_path):
     path = str(tmp_path / "old.db")
     with store.connect(path) as conn:
         conn.execute("INSERT INTO sa_articles(article_id,url,title,comments_fetched_at) VALUES ('a','u','t','2026-01-01')")
-        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy"):
+        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy", "body_capture_json"):
             if column in {r[1] for r in conn.execute("PRAGMA table_info(sa_articles)")}:
                 conn.execute(f"ALTER TABLE sa_articles DROP COLUMN {column}")
         conn.execute("DELETE FROM schema_migrations WHERE version > 4")
@@ -373,7 +373,7 @@ def test_v4_migration_is_concurrent_and_preserves_unknown_history(tmp_path):
 def v4_backend(backend):
     seed(backend)
     with store.connect(backend._sa_db) as conn:
-        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy"):
+        for column in ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy", "body_capture_json"):
             conn.execute(f"ALTER TABLE sa_articles DROP COLUMN {column}")
         conn.execute("DELETE FROM schema_migrations WHERE version>4")
         conn.execute("PRAGMA user_version=4")
@@ -388,6 +388,7 @@ def test_reader_keeps_v4_capture_readable_without_migration(v4_backend):
     assert coverage["scan_attempted_at"] is None
     assert coverage["scan_stop_reason"] is None
     assert coverage["complete"] is None
+    assert result["coverage"]["references"]["status"] == "not_recorded"
     with sqlite3.connect(backend._sa_db) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
 
@@ -402,6 +403,7 @@ def test_article_list_keeps_v4_rows_visible_without_migration(v4_backend):
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
         columns = {row[1] for row in conn.execute("PRAGMA table_info(sa_articles)")}
         assert "comment_backfill_pending" not in columns
+        assert "body_capture_json" not in columns
 
 
 def test_quick_submission_does_not_treat_v4_articles_as_empty(v4_backend, tmp_path):
