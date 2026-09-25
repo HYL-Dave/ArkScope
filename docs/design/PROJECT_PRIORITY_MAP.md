@@ -22,6 +22,7 @@ foundation work. The active resolver for "what next?" is now:
 
 | Priority | Workstream | Status / next action | Why it is here |
 |---|---|---|---|
+| **P1, 2026-09-25** | **SA ARTICLE BODY QUALITY AND BOUNDED RECOVERY** | **IMPLEMENTED; FROZEN FULL REGRESSION AND SIGNED-IN ACCEPTANCE GATES REMAIN. NO PRODUCTION BACKFILL OR DELETION.** Reject known legal-only/comment-only captures in DB/file writes and reads, protect good text and independent comments, and preview a manual five-article current-pick/recent-article recovery batch. Current original analyses can precede the one-year window; recent team/portfolio commentary does not require a ticker. Preserve the 16 older shell candidates pending a dependency/value review. LLM event inference waits for usable bodies. Owner: root `DATA_ACQUISITION_AND_UPDATES.md`; evidence: `docs/superpowers/evidence/2026-09-25-sa-article-body-recovery/README.md`. | The retained body audit found 407 known unusable article captures out of 418. Download timestamps and nonempty fields are not body success. This is a data-quality repair, not completion of retention, service or external MCP work. |
 | **P1, 2026-09-24** | **SA AUTOMATION COORDINATION AND SIMPLER CONTROLS** | **IMPLEMENTED; INSTALLED OFFLINE VERIFIED; PRE-MERGE GATES OPEN.** One explicit Chrome/Firefox installation owns managed acquisition; routine-first queue, configurable financial gap including 15 seconds, due/scope preview, common navigation limits/reserves, restriction pauses and immutable receipts. Queued-disable, login-stop and acceptance-discovered cancellation/upgrade defects are repaired. Login/challenge badge and local App home/settings warning are implemented; subscription restrictions are capability-specific. Installed Firefox/Chromium offline and private Firefox native-read checks pass. Fresh review and final frozen regression precede merge; signed-in coordination/Chrome host and production activation remain open. Current cadence unchanged, no invented SA quota. Owner: `docs/superpowers/plans/2026-09-23-sa-automation-coordination.md`; evidence: `docs/superpowers/evidence/2026-09-23-sa-automation-coordination/README.md`. | Protect routine news/Alpha Picks/comments while making financial updates usable. Service/MCP and recent-news retention retain their independent owners; this is not their completion. |
 | **P1 update, 2026-09-23** | **RESEARCH TOOL REPAIR AND BOUNDED FIREFOX ACCEPTANCE** | Financial input/basis/warm-cache guards, retained earnings release/session analysis and five existing OAuth calculators implemented; review findings repaired. Frozen `e91075cc`: **12,568 backend / 12 unchanged skips**, **1,920 frontend / 126 files**, typecheck/build, scanner and eight desktop checks pass. The private Firefox host preflight passes; the operator now confirms AAPL/AMD annual watchlist capture, corroborated by receipts 11/12 and full pinned readback (440/484 cell positions, 69.508-second inter-job gap). Chrome and production bulk acceptance remain open. Records: `docs/superpowers/evidence/2026-09-23-research-tool-repairs/README.md` and `docs/superpowers/evidence/2026-09-23-sa-watchlist-collector/README.md`. | Advance audited research correctness and usable tool admission. This supersedes the older company-workflow/earnings repair status below, not the independent service/MCP obligations. |
 | **P1** | **PERSISTENT LOCAL SERVICE AND FAILURE DELIVERY** | **REQUIRED; NOT IMPLEMENTED.** Separate API/scheduler ownership from Desktop window lifetime; one supervised owner per profile, authenticated discovery, detach/reattach, explicit stop and observable failure delivery. Review the same cross-workstream design, then verify actual process lifetime and single-owner behavior. Does not wait for SA acceptance, SEC retirement or SQLite replacement. | Unattended collection and the research workbench are complementary requirements. Closing the UI must not silently terminate scheduled work. |
@@ -670,6 +671,18 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > "what just happened?" reading mode — most recent decisions front-loaded.
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
+
+- **2026-09-25 (ARTICLE BODY QUALITY BEFORE SEMANTIC ASSOCIATION):** The operator
+  approves repairing recognized invalid captures and prioritizing current Alpha
+  Picks original analyses and recent follow-up/team commentary. A ticker-free
+  portfolio assessment can be valuable; absence of a database link does not
+  justify deletion. Older shell deletion stays on hold, protected comments and
+  event/citation dependencies remain, and good historical bodies are not purged.
+  Recovery is explicitly bounded and uses shared browser acquisition admission;
+  it must not turn a quality reclassification into an automatic full-history
+  scan. Pure body repair does not backfill historical comments or infer roles.
+  Policy is maintained in root `DATA_ACQUISITION_AND_UPDATES.md`; live recovery
+  and subsequent LLM association are not yet accepted.
 
 - **2026-09-25 (ARTICLE ASSOCIATION READS; EVENT ROLES PRESERVED):** The operator
   approves exact historical article association reads and clarifies that the

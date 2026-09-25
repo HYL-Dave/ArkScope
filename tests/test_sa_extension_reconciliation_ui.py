@@ -106,7 +106,7 @@ def test_review_queue_renders_ticker_conflict_and_content_state_honestly():
         """
     )
     assert "List and article tickers conflict" in result
-    assert "Headline only" in result
+    assert "Body unavailable" in result
     assert "List ticker" in result
     assert "Article ticker" in result
 

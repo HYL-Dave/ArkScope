@@ -287,7 +287,7 @@ class CompanyCollector:
 
     @staticmethod
     def _lane(operation):
-        return "background" if operation == "company_financial_capture" else "routine"
+        return "background" if operation in {"company_financial_capture", "alpha_picks_body_repair"} else "routine"
 
     @staticmethod
     def _capability(operation):
@@ -302,6 +302,10 @@ class CompanyCollector:
                     "retry_after": state["rate_limit_until"]}
         if reason:
             return {"status": "deferred", "reason": "site_paused", "error_code": reason, "retry_after": None}
+        # Reuse the operator-configured background page gap, not a provider quota.
+        if operation == "alpha_picks_body_repair" and _seconds(state["next_navigation_at"]) > now:
+            return {"status": "deferred", "reason": "site_pacing", "error_code": "sa_company_pacing",
+                    "retry_after": state["next_navigation_at"]}
         return None
 
     @staticmethod
@@ -396,6 +400,8 @@ class CompanyCollector:
         task_operation, mode = msg.get("task_operation"), msg.get("mode")
         contract = OPERATION_CONTRACTS.get(task_operation) if type(task_operation) is str else None
         require(contract is not None and mode in contract["modes"], "sa_company_control_invalid")
+        if task_operation == "alpha_picks_body_repair":
+            require(msg.get("trigger") == "manual", "sa_company_control_invalid")
         request_id = msg.get("request_id")
         require(type(request_id) is str and _ID.fullmatch(request_id)
                 and msg.get("trigger") in {"manual", "alarm", "startup", "continuation"}

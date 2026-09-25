@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 
 SCHEMA_VERSION = 2
-DEFERRED_REASONS = frozenset({"capacity_exhausted", "waiting_for_priority_work", "collector_unavailable",
+DEFERRED_REASONS = frozenset({"capacity_exhausted", "site_pacing", "waiting_for_priority_work", "collector_unavailable",
                               "collector_other_installation", "site_paused"})
 _V2_FAILURE_REASONS = frozenset({"human_verification_required", "rate_limited"})
 
@@ -98,6 +98,13 @@ _EVIDENCE_BY_UNAVAILABLE_REASON = {
 }
 
 OPERATION_CONTRACTS = {
+    "alpha_picks_body_repair": {
+        "modes": ("manual",),
+        "job_name": "sa_alpha_picks_body_repair",
+        "phases": ("extraction", "persistence"),
+        "fatal_phases": ("extraction", "persistence"),
+        "allows_items": False,
+    },
     "company_financial_capture": {
         "modes": ("current_tab", "manual", "scheduled"),
         "job_name": "sa_company_financial_capture",

@@ -6,6 +6,7 @@ from pathlib import Path
 import sqlite3
 from src.sa.comment_scope import read_policy
 from src.sa.article_associations import attach_associations
+from src.sa.article_body_quality import assess_body
 
 from src.tools.retained_read_results import (
     RetainedReadFailure, bounded_result, canonical_json, page_integer, require,
@@ -64,10 +65,15 @@ def read_article(
             if row is None:
                 return article_unavailable("sa_article_not_found")
             article = dict(row)
+            body_quality = assess_body(article["body_markdown"], title=article["title"] or "")
+            if body_quality["status"] != "available":
+                article["body_markdown"] = ""
             attach_associations(conn, [article])
             # Hash all served fields, not row counts or acquisition timestamps alone:
             # comment edits and upvote changes also invalidate continuation pages.
-            hasher = hashlib.sha256(canonical_json({"version": 1, "article": article}).encode("utf-8"))
+            hasher = hashlib.sha256(canonical_json({
+                "version": 2, "article": article, "body_quality": body_quality,
+            }).encode("utf-8"))
             count = 0
             for comment in conn.execute(
                 f"SELECT {_COMMENT_COLUMNS} FROM sa_article_comments WHERE article_id=? ORDER BY {_COMMENT_ORDER}",
@@ -103,7 +109,7 @@ def read_article(
                     ).fetchone()) if parent else None,
                 )
                 comments.append(comment)
-            coverage = _coverage(article, body, count)
+            coverage = _coverage(article, body_quality, count)
             result = {
                 **article, "status": "ok", "provider": "seeking_alpha", "retrieval": "stored",
                 "snapshot_id": current_id, "body_markdown": body[body_offset:body_offset + body_limit],
@@ -130,7 +136,7 @@ def read_article(
         return article_unavailable("sa_article_store_unavailable")
 
 
-def _coverage(article, body, count):
+def _coverage(article, body_quality, count):
     reasons = []
     state = article["comment_recovery_state"]
     if article.get("comment_backfill_pending"):
@@ -150,8 +156,7 @@ def _coverage(article, body, count):
     else:
         status = "observed_empty" if observed == 0 else "unknown"
     return {
-        "body": {"status": "available" if body.strip() else "not_captured",
-                 "fetched_at": article["detail_fetched_at"]},
+        "body": {**body_quality, "fetched_at": article["detail_fetched_at"]},
         "comments": {"status": status, "stored_count": count, "complete": None,
                      "backfill_pending": bool(article.get("comment_backfill_pending")),
                      "scan_attempted_at": article.get("comment_scan_attempted_at"),

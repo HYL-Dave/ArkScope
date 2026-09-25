@@ -416,6 +416,61 @@ changed link invalidates continuation just like changed article/comment text.
 Owner: [association projection](src/sa/article_associations.py).
 Regression: [association and role reads](tests/test_sa_article_associations.py).
 
+**Article body quality and recovery.** A nonempty field or `detail_fetched_at`
+does not prove that an article was obtained. The shared quality assessment
+distinguishes missing text, recognized unusable captures (title/byline/legal
+disclosures only, or a comment thread in the body field), and available article
+text. Available text is **not** a certificate of completeness. Short prose and
+real analysis containing disclosures remain usable; no minimum article length
+is used to discard retained text. Invalid legacy captures remain stored for
+inspection but are withheld as article prose by the readers, digest, feed and
+reconciliation. Comments have independent coverage and remain accessible.
+The raw full-text search index is not rebuilt by a read: text matching can still
+find an invalid historical capture, whose result must not claim usable prose.
+
+Failed body captures cannot replace usable text or advance its successful
+capture time. A comment save can independently succeed while `body_saved` is
+false. A copied per-pick report is repaired only through its existing canonical
+article ID, and only if that copy is unusable; a matching ticker is insufficient.
+Legacy file-cache fallback applies the same body assessment. Secondary report
+files are updated only after the local store accepts a body; a rejected capture
+cannot overwrite a good file or reappear through fallback.
+This repair does not invent entry/exit links, accept candidate roles, overwrite
+valid reports, or remove any article, comment or citation.
+
+Body recovery is an explicit extension action, not an automatic historical
+backfill triggered by the new quality detector. Its read-only preview favors
+original analyses for current retained Alpha Picks cohorts (including older
+articles), then recent follow-ups and recent team/portfolio commentary. All
+unusable articles published within one year remain candidates even without a
+ticker. Publication date, not download date, defines recency. Current membership
+comes from non-stale retained Alpha Picks rows, not the user's holdings or App
+watchlist; stale/unknown membership does not establish that a pick was closed.
+Title, ticker and date matches provide recovery candidates, not confirmed
+selection/removal roles. Long-closed companies' entire histories are not a
+default recovery scope. Existing usable historical text stays untouched.
+
+The operator previews and starts at most five bodies per batch. Each page is
+background-priority work under the selected browser owner and existing shared
+navigation budget/reserves, pacing and login/challenge pauses. Routine work can
+run between pages. There is no new automatic schedule or retry loop. Each target
+is rechecked before opening it; the write compares the original body hash again
+so a newer capture cannot be overwritten. Only the body is acquired in this
+operation; no deep historical comment scan is added. A later explicit batch
+omits successful repairs and shows unresolved work, and cancellation prevents
+further pages after the active operation stops. Browser interruptions require
+another explicit preview, not an unobserved restart of the batch.
+
+Older shell deletion is on hold. Comments, event links, manual decisions,
+research citations and potentially useful pick history must be reviewed before
+any cleanup. Absence of a stored link is not evidence of no research value.
+LLM-assisted semantic association and commentary classification remain separate
+follow-up work after usable source prose is actually recovered.
+
+Owners: [quality assessment](src/sa/article_body_quality.py),
+[read-only recovery scope](src/sa/article_body_recovery.py),
+[native recovery boundary](src/sa_native_host.py).
+
 **Acquisition and time.** Reading does not start an extension, reload a page,
 extract comment signals, poll a provider, call IBKR, update configuration or
 spend. Article body/comment capture times are distinct, and holdings retain
@@ -463,7 +518,7 @@ Unchanged retained data can reopen across process restart, but an overwritten
 old article/comment/holding version cannot be reconstructed by its hash. This
 is distinct from immutable SA company-table observations and SEC citations.
 No retained content is deleted by this change, and no news retention policy is
-introduced here. Existing complete UI/native-host readers remain unchanged.
+introduced here. UI/native-host article reads use the same body-quality boundary.
 
 Owners: [article reader](src/sa/article_reader.py),
 [holdings reader](src/tools/portfolio_holdings_tools.py),

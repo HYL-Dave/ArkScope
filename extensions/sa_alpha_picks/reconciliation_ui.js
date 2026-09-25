@@ -152,7 +152,8 @@
     details.appendChild(element(
       "span",
       "reconciliation-content-state",
-      candidate.content_state === "complete" ? "Full text" : "Headline only"
+      candidate.content_state === "available" || candidate.content_state === "complete"
+        ? "Article text" : "Body unavailable"
     ));
     if (candidate.published_date) {
       details.appendChild(element("span", "", "Article date " + candidate.published_date));

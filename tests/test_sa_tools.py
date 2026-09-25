@@ -885,7 +885,8 @@ class TestGetDetailFileMerge:
 
         result = dal.get_sa_pick_detail("NVDA", "2025-11-15")
         assert result is not None
-        assert result.get("detail_report") == "# Report"
+        assert result.get("detail_report") is None
+        assert result["body_quality"]["reason_code"] == "sa_article_body_metadata_only"
 
 
 class TestDataAccessMarketNews:

@@ -190,6 +190,7 @@ def test_operation_mode_and_job_name_contracts_are_closed():
         "company_financial_capture": ({"current_tab", "manual", "scheduled"}, "sa_company_financial_capture"),
         "alpha_picks_sync": ({"quick", "full", "backfill"}, "sa_alpha_picks_refresh"),
         "alpha_picks_manual_fetch": ({"manual"}, "sa_extension:manual_fetch"),
+        "alpha_picks_body_repair": ({"manual"}, "sa_alpha_picks_body_repair"),
         "market_news_sync": ({"quick", "full", "catchup"}, "sa_market_news_refresh"),
         "market_news_retry_recorded": ({"recorded"}, "sa_market_news_retry_recorded"),
         "market_news_incident_recovery": ({"incident"}, "sa_market_news_incident_recovery"),

@@ -8,6 +8,7 @@ from collections.abc import Collection, Sequence
 from typing import Any
 
 from . import sa_capture_store as capture_store
+from .sa.article_body_quality import assess_body, usable_body
 from .sqlite_id_sets import integer_ids_json, text_ids_query
 from .sa_article_reconciliation import (
     ArticleEvidence,
@@ -139,15 +140,16 @@ def _current_link(
 
 
 def _article_evidence(row: sqlite3.Row) -> ArticleEvidence:
+    body = usable_body(row["body_markdown"], title=row["title"] or "")
     return ArticleEvidence(
         article_id=str(row["article_id"]),
         published_date=row["published_date"],
         title=row["title"] or "",
-        body_markdown=row["body_markdown"],
+        body_markdown=body,
         article_type=row["article_type"],
         list_ticker=row["list_ticker"],
         detail_ticker=row["detail_ticker"],
-        has_content=bool(row["body_markdown"]),
+        has_content=bool(body),
     )
 
 
@@ -295,13 +297,14 @@ def accept_link(
         )
         link_id = int(cur.lastrowid)
         if role == "entry":
-            if article["body_markdown"]:
+            body = usable_body(article["body_markdown"], title=article["title"] or "")
+            if body:
                 conn.execute(
                     "UPDATE sa_alpha_picks SET canonical_article_id=?, detail_report=?, "
                     "detail_fetched_at=?, updated_at=? WHERE lineage_id=?",
                     (
                         str(article_id),
-                        article["body_markdown"],
+                        body,
                         article["detail_fetched_at"],
                         linked_at,
                         int(lineage_id),
@@ -469,6 +472,7 @@ def _candidate_projection(
     *,
     current_link: sqlite3.Row | None,
 ) -> dict[str, Any]:
+    quality = assess_body(row["body_markdown"], title=row["title"] or "")
     return {
         "article_id": str(row["article_id"]),
         "url": str(row["url"]),
@@ -476,7 +480,7 @@ def _candidate_projection(
         "title": row["title"],
         "evidence_codes": list(evaluation.evidence_codes),
         "reason_code": evaluation.reason_code,
-        "content_state": "complete" if row["body_markdown"] else "missing",
+        "content_state": "missing" if quality["status"] == "not_captured" else quality["status"],
         "requires_confirmation": (
             not evaluation.auto_eligible
             or (

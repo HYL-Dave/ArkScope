@@ -8,8 +8,23 @@
   "use strict";
 
   var COMMENT_ROW = '[class*="border-t-share-separator-thin"]';
+  var ARTICLE_LEGAL_SENTENCES = [
+    "i/we have no stock, option or similar derivative position in any of the companies mentioned, " +
+      "and no plans to initiate any such positions within the next 72 hours.",
+    "i wrote this article myself, and it expresses my own opinions.",
+    "i am not receiving compensation for it (other than from seeking alpha).",
+    "i have no business relationship with any company whose stock is mentioned in this article.",
+    "past performance is no guarantee of future results.",
+    "no recommendation or advice is being given as to whether any investment is suitable for a particular investor.",
+    "any views or opinions expressed above may not reflect those of seeking alpha as a whole.",
+    "seeking alpha is not a licensed securities dealer, broker or us investment adviser or investment bank.",
+    "our analysts are third party authors that include both professional investors and individual investors " +
+      "who may not be licensed or certified by any institute or regulatory body.",
+  ];
   var commentExclusions = new Set();
+  var articleExclusionCache = new WeakMap();
   var textCache = new WeakMap();
+  var bodyTextCache = new WeakMap();
   var displayCache = new WeakMap();
   var narrativeCache = new WeakMap();
   if (document.body) classifyCommentUnits(document.body);
@@ -99,14 +114,39 @@
       for (var j = 0; j < nodes.length; j++) {
         if (hasExcludedAncestor(nodes[j])) continue;
         if (inCommentOnlyContext(nodes[j])) continue;
-        var length = retainedText(nodes[j]).text.trim().length;
-        if (length > 200 && length > bestLength) {
+        var length = retainedText(nodes[j], !isMarketNewsPage()).text.trim().length;
+        var eligible = length > 200 || (!isMarketNewsPage() && hasShortProviderProse(nodes[j]));
+        if (eligible && length > bestLength) {
           best = nodes[j];
           bestLength = length;
         }
       }
     }
     return best;
+  }
+
+  function hasShortProviderProse(node) {
+    var bodyId = /^(?:article-body|content-container)$/;
+    if (!bodyId.test(node.getAttribute("data-test-id") || "") &&
+        !bodyId.test(node.getAttribute("data-testid") || "")) return false;
+
+    // Short-body eligibility, not completeness: require an exact provider marker
+    // and a retained paragraph with two complete sentences of at least four words.
+    // No character floor here; generic containers still require >200 characters.
+    var paragraphs = node.matches("p") ? [node] : node.querySelectorAll("p");
+    var segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
+    for (var i = 0; i < paragraphs.length; i++) {
+      if (hasExcludedAncestor(paragraphs[i])) continue;
+      var text = retainedText(paragraphs[i], true).text.replace(/\s+/g, " ").trim();
+      if (/^(?:short placeholder|content (?:is )?(?:temporarily )?(?:unavailable|loading))\b/i.test(text) ||
+          /^(?:(?:please )?(?:sign|log) in|subscribe to (?:read|continue))\b/i.test(text)) continue;
+      var sentences = Array.from(segmenter.segment(text)).filter(function (part) {
+        var sentence = part.segment.trim();
+        return /[.!?]["')\]]*$/.test(sentence) && sentence.split(/\s+/).length >= 4;
+      });
+      if (sentences.length >= 2) return true;
+    }
+    return false;
   }
 
   // --- Core extraction ---
@@ -176,14 +216,16 @@
 
   // Preserve rendered text when unchanged; never recover an excluded subtree
   // through a parent, list item or table cell's unfiltered innerText.
-  function retainedText(node) {
-    if (textCache.has(node)) return textCache.get(node);
+  // Headings remain in Markdown but do not establish a usable article body.
+  function retainedText(node, bodyOnly) {
+    var cache = bodyOnly ? bodyTextCache : textCache;
+    if (cache.has(node)) return cache.get(node);
     var result;
     if (node.nodeType === 3) {
       result = { text: node.textContent || "", pruned: false };
     } else if (node.nodeType !== 1) {
       result = { text: "", pruned: false };
-    } else if (isExcluded(node)) {
+    } else if (isExcluded(node) || (bodyOnly && /^H[1-6]$/.test(node.tagName))) {
       result = { text: "", pruned: true };
     } else if (node.tagName === "BR") {
       result = { text: "\n", pruned: false };
@@ -192,7 +234,7 @@
       var pruned = false;
       for (var i = 0; i < node.childNodes.length; i++) {
         var element = node.childNodes[i];
-        var child = retainedText(element);
+        var child = retainedText(element, bodyOnly);
         var block = isBlock(element);
         if (block && parts.length && !parts[parts.length - 1].endsWith("\n")) parts.push("\n");
         if (child.text) parts.push(child.text);
@@ -201,7 +243,7 @@
       }
       result = { text: pruned ? parts.join("") : (node.innerText || ""), pruned: pruned };
     }
-    textCache.set(node, result);
+    cache.set(node, result);
     return result;
   }
 
@@ -438,6 +480,47 @@
 
   // --- Exclusion ---
 
+  function isArticleBoilerplate(node) {
+    var metadataId = /^(?:author-name|post-page-meta|post-date|post-primary-tickers)$/;
+    if (metadataId.test(node.getAttribute("data-test-id") || "") ||
+        metadataId.test(node.getAttribute("data-testid") || "")) return true;
+    if (node.matches("time[datetime]") && node.parentElement && isBlock(node.parentElement)) {
+      var standalone = Array.from(node.parentElement.childNodes).every(function (sibling) {
+        return sibling === node || isBlock(sibling) ||
+          (sibling.nodeType !== 1 && sibling.nodeType !== 3) || !sibling.textContent.trim();
+      });
+      if (standalone) return true;
+    }
+
+    // Only classify a standalone rendered block. Never discard a mixed parent
+    // from its combined text, or an inline mention inside an analysis paragraph.
+    if (!isBlock(node)) return false;
+    var descendants = node.querySelectorAll("*");
+    for (var i = 0; i < descendants.length; i++) {
+      if (isBlock(descendants[i])) return false;
+    }
+    var text = (node.innerText || "").replace(/\u2019/g, "'").replace(/\s+/g, " ").trim();
+    if (/^(?:Analyst's|Seeking Alpha's) Disclosure\s*(?::|$)/i.test(text)) return true;
+    if (/^By:\s+[^.!?]{1,120}$/i.test(text)) return true;
+
+    // Split-label layouts can leave the legal paragraphs unlabelled. Require
+    // the entire block to consist of known sentences, not just a legal prefix.
+    var remaining = text.toLowerCase();
+    while (remaining) {
+      var matched = false;
+      for (var j = 0; j < ARTICLE_LEGAL_SENTENCES.length; j++) {
+        var sentence = ARTICLE_LEGAL_SENTENCES[j];
+        if (remaining.startsWith(sentence)) {
+          remaining = remaining.slice(sentence.length).trim();
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) return false;
+    }
+    return !!text;
+  }
+
   function isExcluded(node) {
     if (commentExclusions.has(node)) return true;
     if (node.matches && node.matches(COMMENT_ROW + ', button, input, select, textarea, [role="button"]')) return true;
@@ -459,7 +542,13 @@
     for (var i = 0; i < classes.length; i++) {
       if (/^(?:ad-|related-|cta-|(?:promo|comments?|sidebar|newsletter)(?:[-_]|$))/.test(classes[i])) return true;
     }
-    return node.nodeType === 1 && displayOf(node) === "none";
+    if (node.nodeType !== 1) return false;
+    if (displayOf(node) === "none") return true;
+    if (isMarketNewsPage()) return false;
+    if (!articleExclusionCache.has(node)) {
+      articleExclusionCache.set(node, isArticleBoilerplate(node));
+    }
+    return articleExclusionCache.get(node);
   }
 
   // --- Table → Markdown ---

@@ -40,6 +40,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 from src.sa.article_associations import ASSOCIATIONS_CTE, ARTICLE_TICKER_FILTER, attach_associations
+from src.sa.article_body_quality import usable_body
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +215,7 @@ def _query_articles(
     if rows and body_missing:
         missing.append(
             f"body_markdown unavailable for {body_missing} of {len(rows)} "
-            f"articles (extension hasn't fetched detail)"
+            f"articles (body not captured or unusable)"
         )
 
     return [_normalize_article_row(r) for r in rows]
@@ -313,7 +314,8 @@ def _build_source_notes(
     notes: List[str] = []
     notes.append(
         f"Articles up to {days}d back from sa_articles, ordered by "
-        f"published_date DESC (cap {max_articles})."
+        f"published_date DESC (cap {max_articles}); observed article text "
+        "is not verified as complete."
     )
     notes.append(
         f"News restricted to comments_count >= {NEWS_DISCUSSION_GATE}, ordered "
@@ -391,8 +393,7 @@ def _query_articles_local(
             url,
             article_type,
             comments_count,
-            substr(COALESCE(body_markdown, title), 1, {EXCERPT_LEN}) AS summary_excerpt,
-            (body_markdown IS NULL) AS body_missing
+            body_markdown
         FROM sa_articles
         WHERE {ARTICLE_TICKER_FILTER}
           AND published_date >= ?
@@ -407,6 +408,10 @@ def _query_articles_local(
         rows = [dict(row) for row in conn.execute(
             sql, (ticker.strip().upper(), window_start.date().isoformat(), max_articles),
         )]
+        for row in rows:
+            body = usable_body(row.pop("body_markdown"), title=row["title"] or "")
+            row["body_missing"] = not bool(body)
+            row["summary_excerpt"] = (body or row["title"] or "")[:EXCERPT_LEN]
         return attach_associations(conn, rows)
     finally:
         conn.close()

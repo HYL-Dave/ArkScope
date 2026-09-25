@@ -2,7 +2,7 @@
   "use strict";
 
   var SCHEMA_VERSION = 2;
-  var DEFERRED_REASONS = ["capacity_exhausted", "waiting_for_priority_work", "collector_unavailable", "collector_other_installation", "site_paused"];
+  var DEFERRED_REASONS = ["capacity_exhausted", "site_pacing", "waiting_for_priority_work", "collector_unavailable", "collector_other_installation", "site_paused"];
   var V2_FAILURE_REASONS = ["human_verification_required", "rate_limited"];
   var REASON_CODES = Object.freeze([
     "body_saved",
@@ -92,6 +92,13 @@
   });
 
   var OPERATION_CONTRACTS = Object.freeze({
+    alpha_picks_body_repair: Object.freeze({
+      modes: Object.freeze(["manual"]),
+      job_name: "sa_alpha_picks_body_repair",
+      phases: Object.freeze(["extraction", "persistence"]),
+      fatal_phases: Object.freeze(["extraction", "persistence"]),
+      allows_items: false,
+    }),
     company_financial_capture: Object.freeze({
       modes: Object.freeze(["current_tab", "manual", "scheduled"]),
       job_name: "sa_company_financial_capture",

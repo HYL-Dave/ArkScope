@@ -5071,6 +5071,14 @@ export interface SAFeedItem {
   comments_count: number;
   detail_route: string | null; // present → open internally; null → fall back to url
   associations?: SAArticleAssociation[];
+  has_content?: boolean;
+  stored_comments_count?: number;
+  body_quality?: {
+    status: "available" | "not_captured" | "unusable";
+    reason_code: string | null;
+    assessment_version: number;
+    completeness: "not_verified";
+  };
 }
 
 export type SAFeedEmptyReason =
@@ -5095,6 +5103,7 @@ export interface SAFeedResponse {
   by_type: Record<string, number>;
   by_day: Record<string, number>;
   empty_reason: SAFeedEmptyReason;
+  limitations?: string[];
 }
 
 export function getSAFeed(params: {

@@ -96,6 +96,8 @@ def handle_message(msg):
         return _handle_record_extension_job(None, msg)
     if action in _MARKET_NEWS_RECOVERY_PATHS:
         return _handle_market_news_recovery_action(action, msg)
+    if action in {"preview_article_body_recovery", "check_article_body_recovery_target", "save_article_body_recovery"}:
+        return _handle_article_body_recovery(action, msg)
     if action == "get_company_watchlist":
         from src.sa.company_collector import watchlist_targets
 
@@ -198,6 +200,55 @@ def handle_message(msg):
         return _handle_reject_reconciliation_candidate(dal, msg)
 
     return {"status": "error", "error": f"unknown action: {action}"}
+
+
+def _handle_article_body_recovery(action, msg):
+    """The browser chooses a bounded batch, not arbitrary URLs or old captures."""
+    from contextlib import closing
+    from src import sa_capture_store as store
+    from src.sa.article_body_quality import assess_body
+    from src.sa.article_body_recovery import build_recovery_manifest
+
+    path = store.resolve_sa_db_path()
+    manifest = build_recovery_manifest(path)
+    if manifest.get("status") != "ok":
+        return manifest
+    if action == "preview_article_body_recovery":
+        # Native Messaging responses are bounded independently of corpus size.
+        return {key: manifest[key] for key in ("status", "manifest_id", "as_of", "scope", "counts")} | {
+            "targets": manifest["targets"][:5],
+        }
+    article_id = msg.get("article_id")
+    digest = msg.get("expected_body_sha256" if action == "save_article_body_recovery" else "body_sha256")
+    if (not isinstance(article_id, str) or not re.fullmatch(r"[0-9]{1,20}", article_id)
+            or not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest)):
+        return {"status": "error", "error_code": "sa_article_body_recovery_target_invalid", "body_saved": False}
+    target = next((t for t in manifest["targets"] if t["article_id"] == article_id), None)
+    if target is None:
+        try:
+            with closing(store.connect(path, read_only=True)) as conn:
+                row = conn.execute("SELECT title, body_markdown FROM sa_articles WHERE article_id=?", (article_id,)).fetchone()
+                available = row is not None and assess_body(row["body_markdown"], title=row["title"])["status"] == "available"
+        except (sqlite3.Error, OSError):
+            return {"status": "unavailable", "error_code": "sa_article_store_unavailable", "body_saved": False}
+        return {"status": "skipped", "reason": "already_present" if available else "out_of_scope", "body_saved": False}
+    if target["body_sha256"] != digest:
+        return {"status": "skipped", "reason": "source_changed", "body_saved": False}
+    if action == "check_article_body_recovery_target":
+        return {"status": "ok", "target": target}
+    body = msg.get("body_markdown")
+    if not isinstance(body, str) or len(body) > 2_000_000:
+        return {"status": "error", "error_code": "sa_article_body_invalid", "body_saved": False}
+    from src.tools.backends.sa_capture_backend import SACaptureBackend
+
+    try:
+        return SACaptureBackend(sa_db=path, market_db=":memory:").repair_article_body(
+            article_id, body, expected_body_sha256=digest,
+            detail_ticker=msg.get("detail_ticker"),
+            detail_ticker_observed_at=msg.get("detail_ticker_observed_at"),
+        )
+    except (sqlite3.Error, OSError, ValueError):
+        return {"status": "error", "error_code": "sa_article_body_recovery_save_failed", "body_saved": False}
 
 
 _SA_PICK_DATE_RE = re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$|^\d{4}-\d{2}-\d{2}")

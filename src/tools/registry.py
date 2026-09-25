@@ -1198,7 +1198,7 @@ class ToolRegistry:
                 "date, ticker, type (analysis/recap/webinar/commentary/removal), "
                 "and comment count. Ticker uses exact retained associations; results include "
                 "entry/exit/related roles, auto/user/provider/legacy origin and evidence_codes. "
-                "Use get_sa_article_detail for full content."
+                "Use get_sa_article_detail for retained text, body-quality gaps and independent comments."
             ),
             function=get_sa_articles,
             category="portfolio",

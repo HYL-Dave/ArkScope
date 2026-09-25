@@ -41,6 +41,101 @@ var recoveryPreviews = {
   incident_window: null,
 };
 var activeRecoveryState = null;
+initializeArticleBodyRecovery();
+
+function initializeArticleBodyRecovery() {
+  var previewButton = document.getElementById("bodyRecoveryPreviewBtn");
+  if (!previewButton) return;
+  var startButton = document.getElementById("bodyRecoveryStartBtn");
+  var cancelButton = document.getElementById("bodyRecoveryCancelBtn");
+  var previewText = document.getElementById("bodyRecoveryPreview");
+  var targets = document.getElementById("bodyRecoveryTargets");
+  var resultText = document.getElementById("bodyRecoveryResult");
+  var preview = null, batch = null, pending = false;
+
+  function controls() {
+    var running = batch && ["running","cancelling"].includes(batch.status);
+    previewButton.disabled = pending || !!running;
+    startButton.disabled = pending || !!running || !preview || !preview.targets.length;
+    cancelButton.disabled = pending || !running || batch.status === "cancelling";
+    startButton.textContent = "Start next up to " + (preview ? preview.targets.length : 5);
+  }
+  function renderBatch(value) {
+    batch = value;
+    resultText.replaceChildren();
+    if (batch) {
+      var counts = batch.counts || {};
+      var summary = document.createElement("p");
+      summary.textContent = batch.status + ": " + (counts.saved || 0) + " saved, "
+        + (counts.failed || 0) + " failed, " + (counts.skipped || 0) + " skipped"
+        + (batch.stop_reason ? " | " + batch.stop_reason : "");
+      var list = document.createElement("ol");
+      (batch.items || []).slice(0,5).forEach(function (item) {
+        var row = document.createElement("li");
+        row.textContent = (item.title || item.article_id) + ": " + item.state
+          + (item.reason ? " (" + item.reason + ")" : "");
+        list.appendChild(row);
+      });
+      resultText.append(summary,list);
+    } else resultText.textContent = "No attempts.";
+    controls();
+  }
+  previewButton.addEventListener("click", async function () {
+    if (previewButton.disabled) return;
+    preview = null;
+    pending = true;
+    targets.replaceChildren();
+    previewText.textContent = "Loading preview...";
+    controls();
+    var reply = await sendRuntimeMessage({action:"preview_article_body_recovery"});
+    pending = false;
+    if (reply && reply.status === "ok" && typeof reply.manifest_id === "string"
+        && Array.isArray(reply.targets) && Number.isSafeInteger(reply.remaining_count)) {
+      preview = {manifest_id:reply.manifest_id,targets:reply.targets.slice(0,5)};
+      previewText.textContent = reply.remaining_count + " remaining | " + reply.as_of;
+      preview.targets.forEach(function (item) {
+        var row = document.createElement("li");
+        row.textContent = item.title || item.article_id;
+        targets.appendChild(row);
+      });
+    } else previewText.textContent = "Preview unavailable.";
+    controls();
+  });
+  startButton.addEventListener("click", async function () {
+    if (startButton.disabled || !preview) return;
+    var manifestId = preview.manifest_id;
+    preview = null;
+    pending = true;
+    controls();
+    var reply = await sendRuntimeMessage({action:"start_article_body_recovery",manifest_id:manifestId});
+    pending = false;
+    if (reply && reply.status === "ok" && reply.batch) renderBatch(reply.batch);
+    else {
+      previewText.textContent = "Batch not started. Preview required.";
+      controls();
+    }
+  });
+  cancelButton.addEventListener("click", async function () {
+    if (cancelButton.disabled || !batch) return;
+    pending = true;
+    controls();
+    var reply = await sendRuntimeMessage({action:"cancel_article_body_recovery",batch_id:batch.batch_id});
+    pending = false;
+    if (reply && reply.batch) renderBatch(reply.batch);
+    else controls();
+  });
+  chrome.storage.onChanged.addListener(function (changes, area) {
+    if (area === "local" && changes.saArticleBodyRecovery) {
+      preview = null;
+      renderBatch(changes.saArticleBodyRecovery.newValue || null);
+    }
+  });
+  sendRuntimeMessage({action:"get_article_body_recovery_state"}).then(function (reply) {
+    if (!batch && reply && reply.status === "ok") renderBatch(reply.batch || null);
+  });
+  controls();
+}
+
 var MARKET_NEWS_AUTO_SYNC_WINDOWS_ET = {
   weekday: [
     { start: 0, end: 4 * 60, interval: 15 },

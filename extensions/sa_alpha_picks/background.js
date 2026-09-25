@@ -572,7 +572,7 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
     var complete = result.completed_phases || [];
     var skipped = !stop && result.status !== "deferred";
     var reason = stop && stop.reason || result.reason || "collector_unavailable";
-    if (["capacity_exhausted","waiting_for_priority_work","collector_unavailable","collector_other_installation","site_paused"].indexOf(reason) === -1) reason = "collector_unavailable";
+    if (["capacity_exhausted","site_pacing","waiting_for_priority_work","collector_unavailable","collector_other_installation","site_paused"].indexOf(reason) === -1) reason = "collector_unavailable";
     var failed = stop && stop.status === "error";
     var failureSet = false;
     var prior = operation === "market_news_sync" ? buildMarketNewsProtocolResult(mode,Object.assign({},result,{status:"ok"}))
@@ -595,6 +595,14 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
     structured = buildAlphaPicksProtocolResult(mode, result);
   } else if (operation === "alpha_picks_manual_fetch") {
     structured = buildAlphaPicksManualProtocolResult(result);
+  } else if (operation === "alpha_picks_body_repair") {
+    structured = SAExtensionRunProtocol.deriveRunResult({
+      schema_version: 2, operation: operation, mode: mode, item_outcomes: [],
+      phases: result.status === "ok" && result.body_saved === true
+        ? {extraction:extensionPhase("complete",null), persistence:extensionPhase("complete",null)}
+        : failedProtocolPhases(operation, result.failure_phase || "persistence",
+          stableExtensionReason(result.reason_code, EXTENSION_PHASE_FAILURE_REASONS, "detail_save_failed")),
+    });
   } else if (operation === "market_news_sync") {
     structured = buildMarketNewsProtocolResult(mode, result);
   } else if (operation === "company_financial_capture") {
@@ -847,6 +855,269 @@ function activateSaUpdates(request) {
   return work;
 }
 
+const ARTICLE_BODY_RECOVERY_STORAGE_KEY = "saArticleBodyRecovery";
+const ARTICLE_BODY_RECOVERY_LIMIT = 5;
+var articleBodyRecoveryPreview = null;
+var articleBodyRecoveryPreviewRevision = 0;
+var articleBodyRecoveryActive = null;
+var articleBodyRecoveryWrites = Promise.resolve();
+
+function bodyRecoveryTarget(value) {
+  if (!value || typeof value.article_id !== "string" || !/^\d+$/.test(value.article_id)
+      || typeof value.body_sha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.body_sha256)) return null;
+  try {
+    var url = new URL(value.url);
+    var match = url.pathname.match(/^\/(?:alpha-picks\/articles|article)\/(\d+)(?:-[^/]+)?\/?$/);
+    if (url.origin !== "https://seekingalpha.com" || url.username || url.password || url.search || url.hash
+        || !match || match[1] !== value.article_id) return null;
+    return {article_id:value.article_id, url:url.href, body_sha256:value.body_sha256,
+      title:typeof value.title === "string" ? value.title.slice(0,500) : value.article_id,
+      published_date:typeof value.published_date === "string" ? value.published_date.slice(0,32) : null};
+  } catch (_) {return null;}
+}
+
+function bodyRecoveryReason(value, fallback) {
+  return ["already_present", "out_of_scope", "source_changed", "operator_cancelled", "interrupted",
+    "article_context_changed", "parser_empty", "detail_timeout", "navigation_timeout", "dom_not_ready",
+    "detail_save_failed", "native_host_unavailable", "unknown_failure", "manifest_invalid",
+    "login_required", "access_restricted", "human_verification_required", "rate_limited",
+    "site_paused", "site_pacing", "capacity_exhausted", "waiting_for_priority_work", "collector_unavailable",
+    "collector_other_installation", "cleanup_unconfirmed"].includes(value) ? value : fallback;
+}
+
+function persistArticleBodyRecovery(batch) {
+  batch.counts = {saved:0, failed:0, skipped:0, deferred:0, cancelled:0, pending:0};
+  batch.items.forEach(function (item) {
+    var name = Object.prototype.hasOwnProperty.call(batch.counts,item.state) ? item.state : "pending";
+    batch.counts[name]++;
+  });
+  var snapshot = JSON.parse(JSON.stringify(batch));
+  var write = articleBodyRecoveryWrites.then(function () {
+    return chrome.storage.local.set({[ARTICLE_BODY_RECOVERY_STORAGE_KEY]:snapshot});
+  });
+  articleBodyRecoveryWrites = write.catch(function () {});
+  return write;
+}
+
+async function articleBodyRecoveryState() {
+  if (articleBodyRecoveryActive) return {status:"ok",batch:articleBodyRecoveryActive.batch};
+  var saved = await chrome.storage.local.get(ARTICLE_BODY_RECOVERY_STORAGE_KEY);
+  var batch = saved[ARTICLE_BODY_RECOVERY_STORAGE_KEY] || null;
+  // A suspended worker never resumes a preview or automatically retries a page.
+  if (batch && ["running","cancelling"].includes(batch.status)) {
+    batch.status = "interrupted";
+    batch.items.forEach(function (item) {
+      if (item.state === "running") {item.state = "failed"; item.reason = "interrupted";}
+      else if (item.state === "queued") {item.state = "cancelled"; item.reason = "interrupted";}
+    });
+    await persistArticleBodyRecovery(batch);
+  }
+  return {status:"ok",batch:batch};
+}
+
+async function handleArticleBodyRecovery(msg) {
+  if (msg.action === "get_article_body_recovery_state") return articleBodyRecoveryState();
+  if (msg.action === "cancel_article_body_recovery") {
+    var active = articleBodyRecoveryActive;
+    if (!active || active.batch.batch_id !== msg.batch_id) return {status:"skipped",reason:"not_running"};
+    active.cancelled = true;
+    if (active.wake) active.wake();
+    active.batch.status = "cancelling";
+    await persistArticleBodyRecovery(active.batch);
+    return {status:"ok",batch:active.batch};
+  }
+  if (articleBodyRecoveryActive) return {status:"error",error_code:"already_pending"};
+  if (msg.action === "preview_article_body_recovery") {
+    articleBodyRecoveryPreview = null;
+    var revision = ++articleBodyRecoveryPreviewRevision;
+    var response = await sendNativeMessage2({action:"preview_article_body_recovery"});
+    if (revision !== articleBodyRecoveryPreviewRevision || articleBodyRecoveryActive) {
+      return {status:"error",error_code:"preview_stale"};
+    }
+    if (!response || response.status !== "ok" || typeof response.manifest_id !== "string"
+        || !response.manifest_id || typeof response.as_of !== "string"
+        || !/^\d{4}-\d{2}-\d{2}$/.test(response.as_of) || !Array.isArray(response.targets)) {
+      return {status:"error",error_code:"body_recovery_preview_unavailable"};
+    }
+    var targets = response.targets.slice(0,ARTICLE_BODY_RECOVERY_LIMIT).map(bodyRecoveryTarget);
+    if (targets.some(function (item) {return !item;})
+        || new Set(targets.map(function (item) {return item.article_id;})).size !== targets.length) {
+      return {status:"error",error_code:"manifest_invalid"};
+    }
+    var remaining = response.counts && response.counts.targets;
+    articleBodyRecoveryPreview = {status:"ok",manifest_id:response.manifest_id,as_of:response.as_of,
+      targets:targets,remaining_count:Number.isSafeInteger(remaining) && remaining >= response.targets.length
+        ? remaining : response.targets.length};
+    return articleBodyRecoveryPreview;
+  }
+  var preview = articleBodyRecoveryPreview;
+  if (!preview || msg.manifest_id !== preview.manifest_id || !preview.targets.length) {
+    return {status:"error",error_code:"preview_required"};
+  }
+  articleBodyRecoveryPreview = null;
+  articleBodyRecoveryPreviewRevision++;
+  var batch = {batch_id:crypto.randomUUID(),manifest_id:preview.manifest_id,as_of:preview.as_of,
+    status:"running",started_at:new Date().toISOString(),items:preview.targets.map(function (item) {
+      return {article_id:item.article_id,title:item.title,state:"queued",reason:null,attempt_count:0};
+    })};
+  var run = {batch:batch,cancelled:false};
+  articleBodyRecoveryActive = run;
+  try {await persistArticleBodyRecovery(batch);}
+  catch (error) {articleBodyRecoveryActive = null; throw error;}
+  run.promise = runArticleBodyRecovery(run,preview.targets).catch(async function () {
+    batch.status = "interrupted";
+    batch.items.forEach(function (item) {
+      if (item.state === "running") {item.state = "failed"; item.reason = "interrupted";}
+      else if (item.state === "queued") {item.state = "cancelled"; item.reason = "interrupted";}
+    });
+    await persistArticleBodyRecovery(batch).catch(function () {});
+  }).finally(function () {if (articleBodyRecoveryActive === run) articleBodyRecoveryActive = null;});
+  return {status:"ok",batch:batch};
+}
+
+async function runArticleBodyRecovery(run, targets) {
+  var batch = run.batch, stopped = false;
+  for (var index = 0; index < targets.length && !run.cancelled && !stopped; index++) {
+    if (index > 0) await waitForArticleBodyRecoveryGap(run);
+    if (run.cancelled) break;
+    var item = batch.items[index], target = targets[index];
+    var result = await enqueueSaSyncJob({key:batch.batch_id + ":" + target.article_id,
+      displayName:"Article body repair",operation:"alpha_picks_body_repair",mode:"manual",
+      eligible:function () {return !run.cancelled;}}, async function (diagnostics) {
+      if (run.cancelled) return {status:"cancelled",reason:"operator_cancelled"};
+      item.state = "running";
+      item.attempt_count = 1;
+      await persistArticleBodyRecovery(batch);
+      return captureArticleBodyRecovery(target,run,diagnostics);
+    });
+    var stop = result.acquisition_stop;
+    if (result.status === "ok" && result.body_saved === true) {
+      item.state = "saved"; item.reason = null;
+    } else if (result.status === "cancelled" || result.reason === "operator_cancelled") {
+      item.state = "cancelled"; item.reason = "operator_cancelled";
+    } else if (result.status === "skipped") {
+      item.state = "skipped"; item.reason = bodyRecoveryReason(result.reason,"unknown_failure");
+    } else if (result.status === "deferred") {
+      item.state = "deferred"; item.reason = bodyRecoveryReason(result.reason,"collector_unavailable");
+    } else {
+      item.state = "failed";
+      item.reason = bodyRecoveryReason(stop && stop.error_code || result.reason || result.reason_code,"unknown_failure");
+    }
+    stopped = !!stop || !!result.acquisition_uncertain || result.status === "deferred";
+    if (result.acquisition_uncertain) batch.stop_reason = "cleanup_unconfirmed";
+    else if (stopped) batch.stop_reason = bodyRecoveryReason(stop && stop.error_code || result.reason,"collector_unavailable");
+    await persistArticleBodyRecovery(batch);
+  }
+  batch.items.forEach(function (item) {
+    if (item.state === "queued") {
+      item.state = "cancelled";
+      item.reason = run.cancelled ? "operator_cancelled" : batch.stop_reason || "interrupted";
+    }
+  });
+  batch.status = run.cancelled ? "cancelled" : stopped ? "stopped"
+    : batch.items.some(function (item) {return item.state === "failed";}) ? "partial" : "complete";
+  batch.finished_at = new Date().toISOString();
+  await persistArticleBodyRecovery(batch);
+}
+
+async function waitForArticleBodyRecoveryGap(run) {
+  while (!run.cancelled) {
+    var state = await companyCollectorControl("status");
+    var deadline = state && Date.parse(state.next_navigation_at);
+    if (!state || state.status !== "ok" || !state.is_owner || state.paused_reason || state.rate_limited
+        || state.capability_pauses && state.capability_pauses.alpha_picks
+        || !Number.isFinite(deadline) || deadline <= Date.now()) break;
+    run.batch.next_page_at = state.next_navigation_at;
+    await persistArticleBodyRecovery(run.batch);
+    // Keep this explicit batch responsive to shared state and worker idling.
+    // Waiting holds neither a queue slot nor the native acquisition reservation.
+    await new Promise(function (resolve) {
+      var timer;
+      run.wake = function () {clearTimeout(timer); run.wake = null; resolve();};
+      timer = setTimeout(run.wake,Math.min(20000,Math.max(0,deadline - Date.now())));
+      if (run.cancelled) run.wake();
+    });
+  }
+  delete run.batch.next_page_at;
+}
+
+async function captureArticleBodyRecovery(target, run, diagnostics) {
+  var tabId = null, guard = null, phase = "extraction";
+  function cancelled() {return run.cancelled;}
+  async function checkpoint() {
+    requireAcquisitionTask();
+    if (await acquisitionPaused("alpha_picks")) {
+      throw new SAAcquisition.Stop({status:"deferred",reason:"site_paused"});
+    }
+    return !cancelled();
+  }
+  function failure(reason) {
+    var code = bodyRecoveryReason(reason,phase === "persistence" ? "detail_save_failed" : "unknown_failure");
+    recordExtensionFailure(diagnostics,{stage:phase === "persistence" && code !== "parser_empty" ? "local_persistence" : "content_parse",
+      reason_code:code,target_kind:"article_detail",target_ref:target.article_id,retryable:true,attempt_count:1});
+    return {status:"error",failure_phase:phase,reason:code,
+      reason_code:code === "article_context_changed" ? "navigation_timeout" : code};
+  }
+  try {
+    if (!await checkpoint()) return {status:"cancelled"};
+    var check = await sendNativeMessage2({action:"check_article_body_recovery_target",
+      article_id:target.article_id,body_sha256:target.body_sha256});
+    if (cancelled()) return {status:"cancelled"};
+    if (check.status === "skipped" && ["already_present","out_of_scope","source_changed"].includes(check.reason)) {
+      return {status:"skipped",reason:check.reason};
+    }
+    if (check.status !== "ok") return failure(check.error_code || "native_host_unavailable");
+    var verified = bodyRecoveryTarget(Object.assign({body_sha256:target.body_sha256},check.target));
+    if (!verified || verified.article_id !== target.article_id) return failure("manifest_invalid");
+    if (verified.body_sha256 !== target.body_sha256) return {status:"skipped",reason:"source_changed"};
+    if (!await checkpoint()) return {status:"cancelled"};
+    var tab = await managedSaTabs.create({url:verified.url,active:false});
+    tabId = tab.id;
+    await registerCollectorTab(tabId,"alpha_picks_body_repair");
+    if (cancelled()) return {status:"cancelled"};
+    await waitForTabLoad(tabId,30000,expectedPathFromUrl(verified.url));
+    if (!await checkpoint()) return {status:"cancelled"};
+    var ready = await waitForArticleReady(tabId);
+    if (!ready.ok) {
+      if (await observeSaRestriction(ready.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
+      return failure(ready.reason_code || "dom_not_ready");
+    }
+    if (cancelled()) return {status:"cancelled"};
+    guard = await beginArticleCapture(tabId,verified);
+    await settleArticleBeforeScroll(tabId);
+    if (!await checkpoint()) return {status:"cancelled"};
+    await inspectSaAccess(tabId);
+    await guard.assert();
+    var detail = await injectDetailScraper(tabId);
+    await guard.assert(detail && !detail.error ? detail.url || null : undefined);
+    if (cancelled()) return {status:"cancelled"};
+    if (!detail || detail.error || !detail.body_markdown || !detail.body_markdown.trim()) return failure("parser_empty");
+    var report = formatDetailReport(detail);
+    await guard.close();
+    guard = null;
+    phase = "persistence";
+    if (!await checkpoint()) return {status:"cancelled"};
+    var saved = await sendNativeMessage2({action:"save_article_body_recovery",article_id:target.article_id,
+      expected_body_sha256:target.body_sha256,body_markdown:report,
+      detail_ticker:detail.detail_ticker || null,detail_ticker_observed_at:detail.detail_ticker_observed_at || null});
+    if (saved.status === "skipped" && ["already_present","out_of_scope","source_changed"].includes(saved.reason)) {
+      return {status:"skipped",reason:saved.reason};
+    }
+    if (saved.body_saved === false && (saved.body_quality || saved.status === "ok")) return failure("parser_empty");
+    if (saved.status !== "ok" || saved.body_saved !== true) return failure("detail_save_failed");
+    return {status:"ok",body_saved:true};
+  } catch (error) {
+    if (isAcquisitionStop(error)) throw error;
+    return failure(error.code || (phase === "extraction" ? "unknown_failure" : "detail_save_failed"));
+  } finally {
+    if (guard) await guard.close();
+    if (tabId !== null) {
+      await safeRemoveTab(tabId);
+      if (!saAcquisitionTask.ownedTabs.has(tabId)) await unregisterCollectorTab(tabId);
+    }
+  }
+}
+
 async function handleAcquisitionControl(msg) {
   if (msg.action === "enable_sa_updates_here") return activateSaUpdates(msg);
   if (msg.action === "get_company_refresh") {
@@ -876,6 +1147,17 @@ async function handleAcquisitionControl(msg) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (["preview_article_body_recovery", "start_article_body_recovery",
+      "get_article_body_recovery_state", "cancel_article_body_recovery"].includes(msg.action)) {
+    if (!sender || sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("popup.html")) {
+      sendResponse({status:"error",error_code:"extension_request_rejected"});
+      return false;
+    }
+    handleArticleBodyRecovery(msg).then(sendResponse).catch(function () {
+      sendResponse({status:"error",error_code:"body_recovery_unavailable"});
+    });
+    return true;
+  }
   if (msg.action === "reconciliation_native_request") {
     forwardReconciliationNative(msg.payload, sender).then(sendResponse).catch(function () {
       sendResponse({status:"error", error_code:"native_host_unavailable"});
@@ -1273,7 +1555,8 @@ function enqueueSaSyncJob(opts, jobFn) {
   var operation = opts.operation || null;
   var mode = opts.mode || null;
 
-  return saAcquisitionQueue.enqueue({key:opts.key || crypto.randomUUID(),priority:operation === "company_financial_capture" ? "background" : "routine",
+  return saAcquisitionQueue.enqueue({key:opts.key || crypto.randomUUID(),priority:
+    operation === "company_financial_capture" || operation === "alpha_picks_body_repair" ? "background" : "routine",
     eligible:opts.eligible,run:async function (timing) {
     await extensionTelemetryController.flush("next_job");
     if (saSyncJobInFlight) {
@@ -3164,9 +3447,9 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         comment_scan_stable_bottom_rounds:
           (bodyScrollStats && bodyScrollStats.stable_bottom_rounds) || 0,
       });
-      if (saveResult && saveResult.ok) {
+      if (saveResult && saveResult.ok) netNewComments += saveResult.net_new_comments || 0;
+      if (saveResult && saveResult.ok && saveResult.body_saved !== false) {
         fetched++;
-        netNewComments += saveResult.net_new_comments || 0;
         if (saveResult.comment_scan_usable !== true || saveResult.comment_backfill_pending === true
             || bodyScrollStats.controls_unresolved) {
           failed += recordExtensionFailure(diagnostics, {
@@ -3191,6 +3474,11 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
             attempt_count: 1,
           });
         }
+      } else if (saveResult && saveResult.body_saved === false) {
+        failed += recordExtensionFailure(diagnostics, {
+          stage: "content_parse", reason_code: "parser_empty", target_kind: "article_detail",
+          target_ref: item.article_id, retryable: true, attempt_count: 1,
+        });
       } else {
         failed += recordNativeExtensionFailure(
           diagnostics,
@@ -3449,7 +3737,7 @@ async function doManualFetch(items, diagnostics) {
           comment_scan_stable_bottom_rounds:
             (manualScrollStats && manualScrollStats.stable_bottom_rounds) || 0,
         });
-        if (saveResult && saveResult.ok) {
+        if (saveResult && saveResult.ok && saveResult.body_saved !== false) {
           fetched++;
           if (saveResult.comment_scan_usable !== true || saveResult.comment_backfill_pending === true
               || manualScrollStats.controls_unresolved) {
@@ -3496,6 +3784,11 @@ async function doManualFetch(items, diagnostics) {
               attempt_count: 1,
             });
           }
+        } else if (saveResult && saveResult.body_saved === false) {
+          failed += recordExtensionFailure(diagnostics, {
+            stage: "content_parse", reason_code: "parser_empty", target_kind: "article_detail",
+            target_ref: articleId, retryable: true, attempt_count: 1,
+          });
         } else {
           failed += recordNativeExtensionFailure(
             diagnostics,

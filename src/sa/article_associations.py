@@ -8,6 +8,7 @@ import sqlite3
 from collections.abc import Collection
 
 from src.sqlite_id_sets import text_ids_query
+from src.sa.article_body_quality import assess_body
 from src.tools.retained_read_results import RetainedReadFailure, page_integer, require
 
 
@@ -112,7 +113,7 @@ def pick_articles(conn: sqlite3.Connection, lineage_id: int, symbol: str, *, rel
     if picked is None:
         return result
     select = ASSOCIATIONS_CTE + (
-        "SELECT article_id, url, title, published_date, COALESCE(body_markdown, '') != '' AS has_content "
+        "SELECT article_id, url, title, published_date, body_markdown "
         "FROM sa_articles WHERE article_id IN (SELECT article_id FROM article_associations "
         "WHERE symbol=? AND "
     )
@@ -133,7 +134,9 @@ def pick_articles(conn: sqlite3.Connection, lineage_id: int, symbol: str, *, rel
     related_ids = {row["article_id"] for row in related}
     attach_associations(conn, rows)
     for row in rows:
-        row["has_content"] = bool(row["has_content"])
+        row["has_content"] = assess_body(
+            row.pop("body_markdown"), title=row["title"] or "",
+        )["status"] == "available"
         for role in ("entry", "exit", "related"):
             if role == "related" and row["article_id"] not in related_ids:
                 continue

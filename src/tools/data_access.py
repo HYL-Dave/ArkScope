@@ -602,6 +602,15 @@ class DataAccessLayer:
         if result:
             return result
 
+        def file_detail(item):
+            from src.sa.article_body_quality import assess_body, usable_body
+
+            if not item:
+                return item
+            title = item.get("title") or ""
+            return {**item, "body_quality": assess_body(item.get("detail_report"), title=title),
+                    "detail_report": usable_body(item.get("detail_report"), title=title) or None}
+
         # File fallback: check file cache
         if picked_date:
             detail = self._load_sa_file_detail(symbol, picked_date)
@@ -618,8 +627,8 @@ class DataAccessLayer:
                 if row:
                     break
             if row and detail:
-                return {**row, **detail}
-            return detail or row
+                return file_detail({**row, **detail})
+            return file_detail(detail or row)
 
         # Deterministic fallback for file mode
         picks = self._load_sa_file_cache("current", symbol=symbol, include_stale=False)
@@ -627,14 +636,14 @@ class DataAccessLayer:
             p = sorted(picks, key=lambda x: x.get("picked_date", ""), reverse=True)[0]
             detail = self._load_sa_file_detail(symbol, p.get("picked_date", ""))
             if detail:
-                return {**p, **detail}
-            return p
+                return file_detail({**p, **detail})
+            return file_detail(p)
 
         # Check stale
         picks = self._load_sa_file_cache("current", symbol=symbol, include_stale=True)
         if picks:
             p = sorted(picks, key=lambda x: x.get("picked_date", ""), reverse=True)[0]
-            return p
+            return file_detail(p)
 
         return None
 
@@ -652,14 +661,15 @@ class DataAccessLayer:
                 symbol, picked_date, content
             )
             if not local_ok:
-                logger.warning("No local row found for %s/%s", symbol, picked_date)
+                logger.warning("Local detail was not saved for %s/%s", symbol, picked_date)
         except Exception as exc:
             logger.error("Local detail save failed for %s/%s: %s", symbol, picked_date, exc)
 
-        try:
-            self._save_sa_file_detail(symbol, picked_date, content)
-        except Exception as exc:
-            logger.warning("File detail save failed: %s", exc)
+        if local_ok:
+            try:
+                self._save_sa_file_detail(symbol, picked_date, content)
+            except Exception as exc:
+                logger.warning("File detail save failed: %s", exc)
         return local_ok
 
     def get_sa_refresh_meta(self) -> Dict[str, Any]:
@@ -874,9 +884,25 @@ class DataAccessLayer:
             return item
 
         need_content = []
+        def body_recovery_required(article):
+            quality = (article.get("body_quality") or {}).get("status")
+            return quality == "unusable" or (
+                quality == "not_captured" and bool(article.get("detail_fetched_at"))
+            )
+
+        def comment_refresh_eligible(article):
+            quality = (article.get("body_quality") or {}).get("status")
+            if quality == "not_captured" and article.get("detail_fetched_at"):
+                # An old empty capture must not turn into a first-time comment
+                # backfill merely because its body was reclassified.
+                return not first_capture(article) or bool(article.get("stored_comments_count"))
+            return article.get("has_content") or quality == "unusable"
+
         for article_id in scanned_article_ids:
             article = articles_by_id.get(article_id)
             if article is not None and not article.get("has_content"):
+                if body_recovery_required(article):
+                    continue  # Historical invalid captures require the bounded repair action.
                 if article.get("comment_backfill_pending") and not admit_pending(article):
                     continue
                 need_content.append(comment_work_item(
@@ -893,7 +919,7 @@ class DataAccessLayer:
             if (
                 article is None
                 or article_id in need_content_ids
-                or not article.get("has_content")
+                or not comment_refresh_eligible(article)
                 or article.get("comment_backfill_pending")
             ):
                 continue
@@ -918,7 +944,7 @@ class DataAccessLayer:
                     continue  # Mutual exclusion: need_content takes priority
                 if a["article_id"] in need_comment_ids:
                     continue
-                if not a.get("has_content"):
+                if not comment_refresh_eligible(a):
                     continue
                 published = a.get("published_date")
                 if hasattr(published, "isoformat"):
@@ -999,6 +1025,8 @@ class DataAccessLayer:
                     continue
                 article = articles_by_id.get(item.get("article_id"))
                 if article:
+                    if body_recovery_required(article):
+                        continue
                     pending = acquisition_pending(article)
                     if pending and not admit_pending(article):
                         continue
@@ -1016,6 +1044,7 @@ class DataAccessLayer:
             "need_comments": need_comments,
             "unresolved_symbols": unresolved,
             "auto_upgrade": False,
+            "body_recovery_pending": sum(body_recovery_required(a) for a in all_articles),
             "reconciliation": reconciliation,
         }
 

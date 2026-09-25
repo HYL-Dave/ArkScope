@@ -7,6 +7,7 @@ honest empty results; there is no alternate storage authority.
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import re
 import sqlite3
@@ -20,6 +21,7 @@ from ... import sa_capture_store as store
 from ... import sa_article_reconciliation_store as reconciliation_store
 from ...sqlite_id_sets import text_ids_query
 from ...sa.comment_scope import validate_policy
+from ...sa.article_body_quality import assess_body, usable_body
 from ...sa.article_associations import (
     ASSOCIATIONS_CTE, ARTICLE_TICKER_FILTER, attach_associations, pick_articles,
 )
@@ -613,6 +615,11 @@ class SACaptureBackend(LocalMarketBackend):
             if d.get("lineage_id") is None:
                 raise RetainedReadFailure("sa_article_associations_unavailable")
             d["articles"] = pick_articles(conn, d["lineage_id"], d["symbol"], related_offset=related_offset)
+            canonical = conn.execute("SELECT title FROM sa_articles WHERE article_id=?",
+                                     (d.get("canonical_article_id"),)).fetchone()
+            title = canonical["title"] if canonical else ""
+            d["body_quality"] = assess_body(d.get("detail_report"), title=title)
+            d["detail_report"] = usable_body(d.get("detail_report"), title=title) or None
             d.pop("lineage_id", None)  # internal reconciliation identity, not legacy DTO
             d["is_stale"] = bool(d["is_stale"])
             d["raw_data"] = _loads(d.get("raw_data"))
@@ -629,12 +636,22 @@ class SACaptureBackend(LocalMarketBackend):
 
     def update_sa_pick_detail(self, symbol: str, picked_date: str, content: str) -> bool:
         """Update detail_report for a specific pick."""
+        if assess_body(content)["status"] != "available":
+            return False
         try:
             conn = self._sa_conn()
         except Exception as e:
             logger.error("Failed to update SA pick detail: %s", e)
             return False
         try:
+            conn.execute("BEGIN IMMEDIATE")
+            titles = conn.execute(
+                "SELECT a.title FROM sa_alpha_picks p JOIN sa_articles a "
+                "ON a.article_id=p.canonical_article_id WHERE p.symbol=? AND p.picked_date=?",
+                (symbol.upper(), store.canon_date(picked_date)),
+            ).fetchall()
+            if any(assess_body(content, title=row["title"])["status"] != "available" for row in titles):
+                return False
             now = store.now_ts()
             cur = conn.execute(
                 "UPDATE sa_alpha_picks SET detail_report = ?, "
@@ -1643,14 +1660,21 @@ class SACaptureBackend(LocalMarketBackend):
         try:
             now = store.now_ts()
             conn.execute("BEGIN IMMEDIATE")
+            article = conn.execute("SELECT title FROM sa_articles WHERE article_id=?", (article_id,)).fetchone()
+            if article is None:
+                raise ValueError("sa_article_not_found")
+            quality = assess_body(body_markdown, title=article["title"])
+            body_saved = quality["status"] == "available"
             conn.execute(
-                "UPDATE sa_articles SET body_markdown = ?, "
-                "detail_fetched_at = ?, "
+                "UPDATE sa_articles SET body_markdown = CASE WHEN ? THEN ? ELSE body_markdown END, "
+                "detail_fetched_at = CASE WHEN ? THEN ? ELSE detail_fetched_at END, "
                 "detail_ticker = COALESCE(?, detail_ticker), "
                 "detail_ticker_observed_at = COALESCE(?, detail_ticker_observed_at), "
                 "updated_at = ? WHERE article_id = ?",
                 (
+                    body_saved,
                     body_markdown,
+                    body_saved,
                     now,
                     detail_ticker,
                     store.canon_ts(detail_ticker_observed_at),
@@ -1686,8 +1710,10 @@ class SACaptureBackend(LocalMarketBackend):
                 comment_scan_policy=comment_scan_policy,
                 now=now,
             )
+            if body_saved:
+                self._repair_pick_body_copies(conn, article_id, body_markdown, now)
             conn.commit()
-            return {"ok": True, **scan}
+            return {"ok": True, "body_saved": body_saved, "body_quality": quality, **scan}
         except Exception as e:
             try:
                 conn.rollback()
@@ -1695,6 +1721,51 @@ class SACaptureBackend(LocalMarketBackend):
                 pass
             logger.error("save_article_with_comments failed: %s", e)
             raise
+        finally:
+            conn.close()
+
+    @staticmethod
+    def _repair_pick_body_copies(conn, article_id, body, now):
+        # Only an existing canonical link authorizes updating a copied report.
+        # A matching symbol alone is not an entry-analysis association.
+        for row in conn.execute(
+            "SELECT p.id, p.detail_report, a.title FROM sa_alpha_picks p "
+            "JOIN sa_articles a ON a.article_id=p.canonical_article_id "
+            "WHERE p.canonical_article_id=?", (article_id,),
+        ).fetchall():
+            if assess_body(row["detail_report"], title=row["title"])["status"] != "available":
+                conn.execute("UPDATE sa_alpha_picks SET detail_report=?, detail_fetched_at=?, updated_at=? WHERE id=?",
+                             (body, now, now, row["id"]))
+
+    def repair_article_body(self, article_id, body_markdown, *, expected_body_sha256,
+                            detail_ticker=None, detail_ticker_observed_at=None):
+        """Compare-and-save a failed body capture without touching comment state."""
+        conn = self._sa_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT title, body_markdown FROM sa_articles WHERE article_id=?", (article_id,)).fetchone()
+            if row is None:
+                return {"status": "skipped", "reason": "out_of_scope", "body_saved": False}
+            if assess_body(row["body_markdown"], title=row["title"])["status"] == "available":
+                return {"status": "skipped", "reason": "already_present", "body_saved": False}
+            digest = hashlib.sha256((row["body_markdown"] or "").encode("utf-8")).hexdigest()
+            if expected_body_sha256 != digest:
+                return {"status": "skipped", "reason": "source_changed", "body_saved": False}
+            quality = assess_body(body_markdown, title=row["title"])
+            if quality["status"] != "available":
+                return {"status": "error", "error_code": quality["reason_code"], "body_saved": False,
+                        "body_quality": quality}
+            now = store.now_ts()
+            conn.execute(
+                "UPDATE sa_articles SET body_markdown=?, detail_fetched_at=?, "
+                "detail_ticker=COALESCE(?,detail_ticker), "
+                "detail_ticker_observed_at=COALESCE(?,detail_ticker_observed_at), updated_at=? WHERE article_id=?",
+                (body_markdown, now, detail_ticker, store.canon_ts(detail_ticker_observed_at), now, article_id),
+            )
+            self._repair_pick_body_copies(conn, article_id, body_markdown, now)
+            conn.commit()
+            return {"status": "ok", "body_saved": True, "body_quality": quality,
+                    "article_id": article_id, "body_sha256": hashlib.sha256(body_markdown.encode("utf-8")).hexdigest()}
         finally:
             conn.close()
 
@@ -1874,7 +1945,7 @@ class SACaptureBackend(LocalMarketBackend):
                 ASSOCIATIONS_CTE +
                 f"SELECT article_id, url, title, ticker, published_date, "
                 f"article_type, comments_count, "
-                f"CASE WHEN body_markdown IS NOT NULL THEN 1 ELSE 0 END AS has_content, "
+                f"body_markdown, "
                 f"detail_fetched_at, comments_fetched_at, comments_count_observed_at, "
                 f"provider_comments_count_at_last_scan, comment_recovery_state, "
                 f"{scan_columns}, "
@@ -1893,7 +1964,8 @@ class SACaptureBackend(LocalMarketBackend):
             out = []
             for r in rows:
                 d = dict(r)
-                d["has_content"] = bool(d["has_content"])
+                d["body_quality"] = assess_body(d.pop("body_markdown"), title=d["title"])
+                d["has_content"] = d["body_quality"]["status"] == "available"
                 out.append(d)
             return attach_associations(conn, out)
         except RetainedReadFailure:
@@ -1907,7 +1979,7 @@ class SACaptureBackend(LocalMarketBackend):
             conn.close()
 
     def get_sa_article_with_comments(self, article_id: str) -> dict:
-        """Return a full article and ordered comments with decoded raw data."""
+        """Return usable retained text and independent ordered comments."""
         try:
             conn = self._sa_read()
         except Exception as e:
@@ -1929,6 +2001,8 @@ class SACaptureBackend(LocalMarketBackend):
                 (article_id,),
             ).fetchall()]
             result = dict(article)
+            result["body_quality"] = assess_body(result.get("body_markdown"), title=result["title"])
+            result["body_markdown"] = usable_body(result.get("body_markdown"), title=result["title"]) or None
             attach_associations(conn, [result])
             result["comments"] = comments
             result["raw_data"] = _loads(result.get("raw_data"))

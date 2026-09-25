@@ -186,7 +186,7 @@ def get_sa_articles(
     """Search SA Alpha Picks articles.
 
     Returns article list with title, date, ticker, type, comments_count.
-    Use get_sa_article_detail for full content + comments.
+    Use get_sa_article_detail for available article text and independent comments.
     """
     if not _is_sa_enabled():
         return {"message": _DISABLED_MSG}
@@ -801,6 +801,10 @@ def get_sa_feed(
     Returns: {available, days, query, total, items[], by_type{}, by_day{},
         empty_reason}. Each item: {type, id, title, tickers[], published_at, url,
         source, snippet, has_detail, comments_count, detail_route}.
+        Articles also carry has_content, body_quality, and stored_comments_count;
+        has_detail means usable article text or independently retained comments.
+        Article text searches include limitations because matching uses the raw
+        capture index, while snippets and has_content use usable article text.
     """
     if not _is_sa_enabled():
         return {"message": _DISABLED_MSG}
@@ -845,8 +849,8 @@ def _display_snippet(raw: Optional[str], title: Optional[str]) -> str:
     """Clean plain-text list snippet (markdown stripped, SA boilerplate dropped,
     leading ``# {title}`` heading de-duplicated against the title shown above it).
     Returns "" when nothing new is left to display (e.g. a pure heading+byline
-    article body). Raw body_markdown is untouched in the DB (FTS / detail / agent
-    evidence keep the original)."""
+    article body). Raw body_markdown remains in the DB and search index;
+    article read projections assess its quality before serving it."""
     from src.text_snippet import markdown_to_plain_snippet
 
     return markdown_to_plain_snippet(raw, drop_title=title)
@@ -938,6 +942,7 @@ def _sa_feed_local_conn(
     from src.sa.article_associations import (
         ASSOCIATIONS_CTE, ARTICLE_TICKER_FILTER, associations_by_article, known_query_symbol,
     )
+    from src.sa.article_body_quality import assess_body
 
     now = datetime.now(timezone.utc) - timedelta(days=days)
     cutoff_date = store.canon_date(now)
@@ -974,8 +979,7 @@ def _sa_feed_local_conn(
                 params += [like, like]
             sql = ("SELECT 'article' type, id row_id, article_id item_id, title, "
                    "ticker single_ticker, published_date published_at, url, "
-                   "substr(COALESCE(NULLIF(body_markdown,''), title), 1, 1000) snippet_src, "
-                   "CASE WHEN COALESCE(body_markdown,'')!='' THEN 1 ELSE 0 END has_detail, "
+                   "body_markdown snippet_src, NULL has_detail, "
                    "COALESCE(comments_count,0) comments_count "
                    f"FROM sa_articles WHERE {' AND '.join(where)}")
             return sql, params
@@ -1011,9 +1015,18 @@ def _sa_feed_local_conn(
         ASSOCIATIONS_CTE + f"SELECT * FROM ({base}) ORDER BY published_at DESC, item_id DESC LIMIT ? OFFSET ?",
         bp + [limit, offset]).fetchall()
 
-    article_associations = associations_by_article(
-        conn, [r["item_id"] for r in rows if r["type"] == "article"],
-    )
+    article_ids = [r["item_id"] for r in rows if r["type"] == "article"]
+    article_associations = associations_by_article(conn, article_ids)
+    article_comment_counts = {}
+    if article_ids:
+        placeholders = ",".join("?" * len(article_ids))
+        article_comment_counts = {
+            row["article_id"]: row["stored_count"]
+            for row in conn.execute(
+                "SELECT article_id, COUNT(*) AS stored_count FROM sa_article_comments "
+                f"WHERE article_id IN ({placeholders}) GROUP BY article_id", article_ids,
+            )
+        }
 
     news_ids = [r["row_id"] for r in rows if r["type"] == "market_news"]
     news_tk: Dict[int, List[str]] = {}
@@ -1026,10 +1039,23 @@ def _sa_feed_local_conn(
 
     items = []
     for r in rows:
+        snippet_src = r["snippet_src"]
+        has_detail = bool(r["has_detail"])
+        article_content = {}
         if r["type"] == "article":
+            quality = assess_body(snippet_src, title=r["title"] or "")
+            has_content = quality["status"] == "available"
+            body = snippet_src if has_content else ""
+            snippet_src = body[:1000]
+            stored_count = article_comment_counts.get(r["item_id"], 0)
+            has_detail = has_content or stored_count > 0
+            article_content = {
+                "has_content": has_content, "body_quality": quality,
+                "stored_comments_count": stored_count,
+            }
             associations = article_associations.get(r["item_id"], [])
             tickers = sorted({a["symbol"] for a in associations})
-            detail_route = f"/sa/articles/{r['item_id']}" if r["has_detail"] else None
+            detail_route = f"/sa/articles/{r['item_id']}" if has_detail else None
         else:
             tickers = sorted(news_tk.get(r["row_id"], []))
             detail_route = None  # no /sa/market-news/{id} endpoint in C-1 -> click uses url
@@ -1043,13 +1069,14 @@ def _sa_feed_local_conn(
             "published_at": r["published_at"],
             "url": r["url"],
             "source": "seeking_alpha",
-            "snippet": _display_snippet(r["snippet_src"], r["title"]),
-            "has_detail": bool(r["has_detail"]),
+            "snippet": _display_snippet(snippet_src, r["title"]),
+            "has_detail": has_detail,
             "comments_count": r["comments_count"],
             "detail_route": detail_route,
+            **article_content,
         })
 
-    return {
+    result = {
         "available": True,
         "days": days,
         "query": q,
@@ -1061,3 +1088,6 @@ def _sa_feed_local_conn(
         "by_day": by_day,
         "empty_reason": "no_items_in_window" if total == 0 else None,
     }
+    if text_query and "article" in kinds:
+        result["limitations"] = ["article_text_search_matches_raw_capture"]
+    return result
