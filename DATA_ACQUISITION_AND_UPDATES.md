@@ -490,6 +490,47 @@ Owners: [quality assessment](src/sa/article_body_quality.py),
 [read-only recovery scope](src/sa/article_body_recovery.py),
 [native recovery boundary](src/sa_native_host.py).
 
+**Article source links and graphics.** Alpha Picks article captures retain safe
+HTTP(S) hyperlink destinations, HTTPS image references, alternative text, image
+titles and ordinary figure captions in their original document order. Links
+inside paragraphs, lists and native HTML tables are retained as Markdown; the
+original prose/table cells are not replaced by a generated interpretation. An
+image reference comes from the browser-selected source or an explicit lazy-image
+attribute. An unresolved image source and unsupported canvas/SVG/embedded media
+remain visible gaps. The scraper neither clicks links nor downloads additional
+images to fill those gaps. Unsafe schemes, embedded credentials and control
+characters are rejected; relative paths resolve against the article URL rather
+than a page-supplied `base` element. Excluded comments, advertising and controls
+do not become article resources.
+
+This is **remote references only, not an offline image copy**. Viewing the image
+still requires a reachable original server and any applicable access permission;
+the reference is not a guarantee that the image remains accessible. No image
+bytes, OCR, chart values or chart interpretation are acquired. A text-only model
+read has not read the image pixels. It must not claim otherwise from a caption
+or URL. Quality assessment version 2 and deterministic article reconciliation
+exclude reference destinations, image labels and standalone resource markers
+from narrative evidence; a resource-only capture cannot establish usable prose.
+Reference labels inside actual prose remain readable text.
+
+Schema 7 adds nullable `sa_articles.body_capture_json`. The validated capture
+observations (links/images observed and retained, unsupported-media count,
+extractor version) are bound to the exact saved Markdown by SHA-256. Reads expose
+`coverage.references` / `body_references`: `observed_references_retained` means
+only the references observed in the selected article DOM were retained;
+`partial` exposes missing references or unsupported media; `not_recorded` means
+an older capture has no such evidence; `unavailable` means the evidence is
+invalid or does not match the body. None verifies the entire source page or an
+image download. The public evidence is included in the article pagination
+snapshot identity. A preserved pick report can reuse it only when its body
+matches the canonical article body; an older independent copy cannot borrow
+newer evidence. Missing legacy evidence is not backfilled by inference or by a
+read. The migration adds no network acquisition, image files or automatic recrawl.
+
+Owners: [shared scraper](extensions/sa_alpha_picks/scrape_detail.js),
+[body-bound observations](src/sa/article_body_capture.py).
+Regression: [reference capture and downstream evidence](tests/test_sa_article_body_references.py).
+
 **Acquisition and time.** Reading does not start an extension, reload a page,
 extract comment signals, poll a provider, call IBKR, update configuration or
 spend. Article body/comment capture times are distinct, and holdings retain
@@ -498,13 +539,18 @@ summary-generation time is a fresh market observation. Update remains an
 explicit extension/sync operation with its existing requirements. A missing or
 incompatible store is unavailable; it is not silently created or migrated.
 
-**Article pages.** Defaults are 4,000 Markdown characters and two comments,
+**Article pages.** Defaults are 3,500 Markdown characters and two comments,
 with 500 characters per comment. These are page defaults, not retention or
 total-content caps. `body_limit=0` or `comment_limit=0` omits that section. Follow
 `next_body_offset` / `next_comment_offset`; a long comment uses `comment_id` plus
 its `next_text_offset`. Text offsets count Unicode code points. Comments are a
 flat list with original parent IDs, not a claimed complete nested tree. Parents
 outside the page can be read by ID; missing retained parents are flagged.
+The default reserves room for source/reference evidence inside the existing
+native model-insertion budget; neither the stored article nor its references are
+shortened. All tool exporters share the same default. Larger explicitly requested
+pages still face the existing output-boundary guards, with actionable continuation
+or smaller-page instructions rather than malformed/truncated JSON.
 
 Every nonzero continuation offset requires the first response's `snapshot_id`.
 The article and comments are read in one SQLite read transaction. Identity

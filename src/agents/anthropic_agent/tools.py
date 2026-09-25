@@ -10,6 +10,8 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from src.tools.retained_read_results import SA_ARTICLE_DEFAULT_BODY_LIMIT
+
 if TYPE_CHECKING:
     from src.tools.data_access import DataAccessLayer
 
@@ -1051,6 +1053,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
             "description": (
                 "Read stored SA article Markdown and flat comments with parent IDs, never acquire. "
                 "Article ids come from get_sa_feed article items. Capture coverage is separate for body/comments. "
+                "Image URLs are remote references, not image pixels or chart values. "
                 "Continue with snapshot_id and returned offsets; long comments use comment_id and "
                 "comment_text_offset. Changed snapshots require a fresh read."
             ),
@@ -1059,7 +1062,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                 "properties": {
                     "article_id": {"type": "string", "description": "Article ID (from get_sa_articles)"},
                     "body_offset": {"type": "integer", "description": "Markdown Unicode character offset", "default": 0},
-                    "body_limit": {"type": "integer", "description": "Markdown characters; 0 omits body", "default": 4000},
+                    "body_limit": {"type": "integer", "description": "Maximum Markdown characters; 0 omits body", "default": SA_ARTICLE_DEFAULT_BODY_LIMIT},
                     "comment_offset": {"type": "integer", "description": "Stored comment row offset", "default": 0},
                     "comment_limit": {"type": "integer", "description": "Comment rows; 0 omits comments", "default": 2},
                     "comment_id": {"type": "string", "description": "Read one comment, including an off-page parent"},
@@ -1744,7 +1747,7 @@ def execute_tool(
         ),
         "get_sa_article_detail": lambda: get_sa_article_detail(
             dal, tool_input["article_id"],
-            body_offset=tool_input.get("body_offset", 0), body_limit=tool_input.get("body_limit", 4000),
+            body_offset=tool_input.get("body_offset", 0), body_limit=tool_input.get("body_limit", SA_ARTICLE_DEFAULT_BODY_LIMIT),
             comment_offset=tool_input.get("comment_offset", 0), comment_limit=tool_input.get("comment_limit", 2),
             comment_id=tool_input.get("comment_id"), comment_text_offset=tool_input.get("comment_text_offset", 0),
             comment_text_limit=tool_input.get("comment_text_limit", 500), snapshot_id=tool_input.get("snapshot_id"),

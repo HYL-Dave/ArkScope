@@ -76,13 +76,20 @@ def test_body_repair_popup_offline_layout(width, tmp_path):
             elif state == "extracting":
                 page.evaluate("""() => chrome.storage.local.set({saArticleBodyRecovery:{
                   status:'running',batch_id:'offline-batch',counts:{saved:1,failed:0,skipped:0,pending:1},
-                  items:[{article_id:'1000',title:'Saved article',state:'saved'},
+                  started_at:'2026-09-25T15:00:00Z',
+                  items:[{article_id:'1000',title:'Saved article',state:'saved',references:{
+                      image_storage:'remote_references_only',links:{retained:10000,observed:10000},
+                      images:{retained:99,observed:100},unsupported_embeds:1}},
                     {article_id:'1001',title:'LongTitleWithoutSpaces'.repeat(7),state:'running',phase:'extracting'}]
                 }})""")
                 assert "Reading article text" in page.locator("#bodyRecoveryTiming").inner_text()
+                text = page.locator("#bodyRecoveryResult").inner_text()
+                assert "Current batch" in text and "99/100 online image references" in text
+                assert "10000/10000 source links" in text and "1 unsupported media" in text
             elif state == "cancelled":
                 page.locator("#bodyRecoveryCancelBtn").click()
                 page.wait_for_function("document.querySelector('#bodyRecoveryResult').textContent.includes('cancelled')")
+                assert "Last batch" in page.locator("#bodyRecoveryResult").inner_text()
             issues = page.evaluate(r"""() => {
               const root = document.querySelector('section[aria-labelledby="bodyRecoveryHeading"]');
               const failures = [];

@@ -105,6 +105,11 @@ function initializeArticleBodyRecovery() {
       progress.max = (batch.items || []).length || 1;
       progress.value = processed;
       var summary = document.createElement("p");
+      var running = ["running", "cancelling"].includes(batch.status);
+      var stamp = Date.parse(batch.started_at);
+      var heading = document.createElement("p");
+      heading.textContent = (running ? "Current batch" : "Last batch")
+        + (Number.isFinite(stamp) ? " | " + new Date(stamp).toLocaleString() : "");
       summary.textContent = batch.status + ": " + (counts.saved || 0) + " saved, "
         + (counts.failed || 0) + " failed, " + (counts.skipped || 0) + " skipped"
         + ", " + (counts.pending || 0) + " pending, " + (counts.deferred || 0) + " deferred, "
@@ -115,9 +120,17 @@ function initializeArticleBodyRecovery() {
         var row = document.createElement("li");
         row.textContent = (item.title || item.article_id) + ": " + item.state
           + (item.reason ? " | " + reasonText(item.reason) : "");
+        var refs = item.references;
+        if (refs && refs.image_storage === "remote_references_only" && refs.links && refs.images) {
+          var resources = document.createElement("div");
+          resources.textContent = refs.links.retained + "/" + refs.links.observed + " source links; "
+            + refs.images.retained + "/" + refs.images.observed + " online image references; "
+            + refs.unsupported_embeds + " unsupported media";
+          row.appendChild(resources);
+        }
         list.appendChild(row);
       });
-      resultText.append(summary,list);
+      resultText.append(heading,summary,list);
     } else resultText.textContent = "No attempts.";
     renderTiming();
     controls();

@@ -1,6 +1,6 @@
 // scrape_detail.js — Injected into SA Alpha Picks detail page by chrome.scripting.executeScript
 // Extracts article content as structured Markdown.
-// Returns: { title, author, body_markdown, url, scraped_at } or { error, ... }
+// Returns: { title, author, body_markdown, body_capture, url, scraped_at } or { error, ... }
 //
 // Uses recursive TreeWalker (not querySelectorAll) to avoid nested content duplication.
 
@@ -27,6 +27,14 @@
   var bodyTextCache = new WeakMap();
   var displayCache = new WeakMap();
   var narrativeCache = new WeakMap();
+  var captureManifest = {
+    schema_version: 1,
+    extractor_version: 2,
+    links: { observed: 0, retained: 0 },
+    images: { observed: 0, retained: 0 },
+    unsupported_embeds: 0,
+  };
+  var referenceCache = new WeakMap();
   if (document.body) classifyCommentUnits(document.body);
 
   // Prefer provider-owned content containers. Generic <article> nodes can be
@@ -102,6 +110,7 @@
     detail_ticker: detailTicker,
     detail_ticker_observed_at: detailTicker ? new Date().toISOString() : null,
     body_markdown: bodyMd,
+    body_capture: isMarketNewsPage() ? null : captureManifest,
     url: location.href,
     scraped_at: new Date().toISOString(),
   };
@@ -165,8 +174,8 @@
       var node = children[i];
       if (node.nodeType !== 1 && node.nodeType !== 3) continue;
       if (isExcluded(node)) continue;
-      if (node.nodeType === 3 || (!isBlock(node) && /^(A|SPAN|STRONG|EM|B|I|CODE|SMALL|SUB|SUP|BR)$/.test(node.tagName || ""))) {
-        inline.push(retainedText(node).text);
+      if (node.nodeType === 3 || (!isBlock(node) && /^(A|IMG|SPAN|STRONG|EM|B|I|CODE|SMALL|SUB|SUP|BR)$/.test(node.tagName || ""))) {
+        inline.push(inlineMarkdown(node));
         continue;
       }
       finishInline();
@@ -175,6 +184,89 @@
     }
     finishInline();
     return parts.join("\n\n");
+  }
+
+  function escapeLabel(text) {
+    return text.replace(/\\/g, "\\\\").replace(/([\[\]`*_<>!])/g, "\\$1").replace(/\s+/g, " ").trim();
+  }
+
+  function referenceUrl(raw, image) {
+    if (typeof raw !== "string" || !raw.trim() || /[\u0000-\u001f\u007f]/.test(raw)) return null;
+    try {
+      // Resolve against the verified page, not an untrusted <base> element.
+      var url = new URL(raw, location.href);
+      if (url.username || url.password || !url.hostname ||
+          (image ? url.protocol !== "https:" : !/^https?:$/.test(url.protocol))) return null;
+      return url.href.replace(/[<>\\|`]/g, function (char) { return encodeURIComponent(char); });
+    } catch (_) { return null; }
+  }
+
+  function imageMarkdown(node) {
+    if (isMarketNewsPage()) return "";
+    if (referenceCache.has(node)) return referenceCache.get(node);
+    captureManifest.images.observed++;
+    var candidates = [node.currentSrc, node.getAttribute("src"), node.getAttribute("data-src"),
+      node.getAttribute("data-original"), node.getAttribute("data-lazy-src")];
+    var url = null;
+    for (var i = 0; i < candidates.length && !url; i++) url = referenceUrl(candidates[i], true);
+    var label = escapeLabel(node.getAttribute("alt") || node.getAttribute("title") || "Image");
+    var title = (node.getAttribute("title") || "").replace(/\s+/g, " ").trim();
+    var titlePart = title && escapeLabel(title) !== label ? ' "' + title.replace(/([\\"])/g, "\\$1") + '"' : "";
+    var result = url ? "![" + label + "](<" + url + ">" + titlePart + ")"
+      : "[Image reference unavailable: " + label + (titlePart ? "; " + escapeLabel(title) : "") + "]";
+    if (url) captureManifest.images.retained++;
+    referenceCache.set(node, result);
+    return result;
+  }
+
+  function inlineMarkdown(node, inLabel) {
+    if (isMarketNewsPage()) return retainedText(node).text;
+    if (isExcluded(node)) return "";
+    if (node.nodeType === 3) return inLabel ? escapeLabelText(node.textContent || "") : node.textContent || "";
+    if (node.nodeType !== 1) return "";
+    if (node.tagName === "BR") return "\n";
+    if (node.tagName === "IMG") return imageMarkdown(node);
+    if (/^(SVG|CANVAS|IFRAME|VIDEO|AUDIO|OBJECT|EMBED)$/.test((node.tagName || "").toUpperCase())) {
+      if (!referenceCache.has(node)) {
+        captureManifest.unsupported_embeds++;
+        referenceCache.set(node, "[Embedded visual or media not captured]");
+      }
+      return referenceCache.get(node);
+    }
+    if (node.tagName === "A" && node.hasAttribute("href")) {
+      if (referenceCache.has(node)) return referenceCache.get(node);
+      captureManifest.links.observed++;
+      var href = referenceUrl(node.getAttribute("href"), false);
+      var label = inlineChildren(node, true).trim() || escapeLabel(node.getAttribute("aria-label") || "Source link");
+      var result = href ? "[" + label + "](<" + href + ">)" : label;
+      if (href) captureManifest.links.retained++;
+      referenceCache.set(node, result);
+      return result;
+    }
+    // Preserve the established rendered-text/whitespace behavior when there is
+    // no structured reference to serialize. Excluded descendants stay excluded.
+    if (!node.querySelector("a[href],img,svg,canvas,iframe,video,audio,object,embed")) {
+      var text = retainedText(node).text;
+      return inLabel ? escapeLabelText(text) : text;
+    }
+    return inlineChildren(node, inLabel);
+  }
+
+  function escapeLabelText(text) {
+    return text.replace(/\\/g, "\\\\").replace(/([\[\]`*_<>!])/g, "\\$1");
+  }
+
+  function inlineChildren(node, inLabel) {
+    var parts = [];
+    for (var i = 0; i < node.childNodes.length; i++) {
+      var child = node.childNodes[i];
+      var text = inlineMarkdown(child, inLabel);
+      var block = isBlock(child);
+      if (block && parts.length && !parts[parts.length - 1].endsWith("\n")) parts.push("\n");
+      if (text) parts.push(text);
+      if (block && text && !text.endsWith("\n")) parts.push("\n");
+    }
+    return parts.join("");
   }
 
   function hasExcludedAncestor(node) {
@@ -446,15 +538,11 @@
     if (isExcluded(node)) return null;
 
     var tag = node.tagName ? node.tagName.toLowerCase() : "";
-    var text = retainedText(node).text.trim();
-    if (!text) return null;
-
-    if (tag === "h1") return "# " + text;
-    if (tag === "h2") return "## " + text;
-    if (tag === "h3") return "### " + text;
-    if (tag === "h4") return "#### " + text;
-    if (tag === "blockquote") return "> " + text.replace(/\n/g, "\n> ");
-
+    if (tag === "img") return imageMarkdown(node);
+    // Image-only wrappers have no innerText. Visit them before the text guard.
+    if (["div", "section", "figure", "picture", "article", "main"].includes(tag)) {
+      return extractMarkdown(node) || null;
+    }
     if (tag === "ul" || tag === "ol") {
       // :scope > li — direct children only, avoid nested list duplication
       var items = node.querySelectorAll(":scope > li");
@@ -462,17 +550,20 @@
       for (var j = 0; j < items.length; j++) {
         if (isExcluded(items[j])) continue;
         var prefix = tag === "ol" ? j + 1 + ". " : "- ";
-        lines.push(prefix + retainedText(items[j]).text.trim());
+        lines.push(prefix + inlineMarkdown(items[j]).trim());
       }
       return lines.join("\n");
     }
 
     if (tag === "table") return tableToMarkdown(node);
 
-    // Container elements: recurse into children
-    if (tag === "div" || tag === "section" || tag === "figure" || tag === "article" || tag === "main") {
-      return extractMarkdown(node) || null;
-    }
+    var text = inlineMarkdown(node).trim();
+    if (!text) return null;
+    if (tag === "h1") return "# " + text;
+    if (tag === "h2") return "## " + text;
+    if (tag === "h3") return "### " + text;
+    if (tag === "h4") return "#### " + text;
+    if (tag === "blockquote") return "> " + text.replace(/\n/g, "\n> ");
 
     // p, span, etc. — direct text
     return text;
@@ -555,14 +646,15 @@
 
   function tableToMarkdown(table) {
     var rows = table.rows;
-    if (rows.length === 0) return "";
+    var caption = !isMarketNewsPage() && table.caption ? inlineMarkdown(table.caption).trim() : "";
+    if (rows.length === 0) return caption;
     var lines = [];
     for (var r = 0; r < rows.length; r++) {
       if (hasExcludedAncestor(rows[r])) continue;
       var cells = rows[r].cells;
       var line = "| ";
       for (var c = 0; c < cells.length; c++) {
-        line += retainedText(cells[c]).text.trim() + " | ";
+        line += inlineMarkdown(cells[c]).trim().replace(/\|/g, "\\|") + " | ";
       }
       var first = lines.length === 0;
       lines.push(line);
@@ -572,6 +664,6 @@
         lines.push(sep);
       }
     }
-    return lines.join("\n");
+    return (caption ? caption + "\n\n" : "") + lines.join("\n");
   }
 })();

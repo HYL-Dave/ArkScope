@@ -1407,7 +1407,7 @@ class TestArticleTools:
             result = get_sa_article_detail(dal, "123")
             assert result["body_markdown"] == "# Test\nContent"
             assert len(result["comments"]) == 1
-            assert reader.call_args.kwargs["body_limit"] == 4000
+            assert reader.call_args.kwargs["body_limit"] == 3500
             dal.get_sa_article_detail.assert_not_called()
 
     def test_get_sa_article_detail_not_found(self, tmp_path):
@@ -2013,6 +2013,7 @@ class TestNativeHostArticles:
             "123",
             "# Content",
             [],
+            body_capture=None,
             detail_ticker="NVDA",
             detail_ticker_observed_at="2026-07-18T12:00:00Z",
             provider_comments_count=18,

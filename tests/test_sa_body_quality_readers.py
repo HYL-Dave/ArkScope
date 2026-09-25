@@ -96,7 +96,7 @@ def test_invalid_body_is_hidden_before_pagination_and_hashing_but_comments_survi
     assert quality["status"] == "unusable"
     assert quality["reason_code"].startswith("sa_article_body_")
     assert quality["completeness"] == "not_verified"
-    assert quality["assessment_version"] == 1
+    assert quality["assessment_version"] == 2
     assert result["comments"][0]["comment_text"] == COMMENT
     assert result["coverage"]["comments"]["status"] == "captured"
     assert result["coverage"]["comments"]["complete"] is None

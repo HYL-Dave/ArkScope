@@ -7,9 +7,10 @@ import sqlite3
 from src.sa.comment_scope import read_policy
 from src.sa.article_associations import attach_associations
 from src.sa.article_body_quality import assess_body
+from src.sa.article_body_capture import reference_coverage
 
 from src.tools.retained_read_results import (
-    RetainedReadFailure, bounded_result, canonical_json, page_integer, require,
+    RetainedReadFailure, SA_ARTICLE_DEFAULT_BODY_LIMIT, bounded_result, canonical_json, page_integer, require,
     valid_snapshot_id,
 )
 
@@ -20,7 +21,7 @@ _ARTICLE_COLUMNS = (
     "provider_comments_count_at_last_scan, comment_recovery_state, "
     "comment_recovery_last_terminal_reason"
 )
-_OPTIONAL_SCAN_COLUMNS = ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy")
+_OPTIONAL_SCAN_COLUMNS = ("comment_backfill_pending", "comment_scan_attempted_at", "comment_scan_stop_reason", "comment_scan_policy", "body_capture_json")
 _COMMENT_COLUMNS = (
     "comment_id, parent_comment_id, commenter, comment_text, upvotes, comment_date, fetched_at"
 )
@@ -33,7 +34,7 @@ def article_unavailable(code):
 
 
 def read_article(
-    db_path, article_id, *, body_offset=0, body_limit=4000,
+    db_path, article_id, *, body_offset=0, body_limit=SA_ARTICLE_DEFAULT_BODY_LIMIT,
     comment_offset=0, comment_limit=2, comment_id=None,
     comment_text_offset=0, comment_text_limit=500, snapshot_id=None,
 ):
@@ -65,6 +66,7 @@ def read_article(
             if row is None:
                 return article_unavailable("sa_article_not_found")
             article = dict(row)
+            references = reference_coverage(article["body_markdown"], article.pop("body_capture_json"))
             body_quality = assess_body(article["body_markdown"], title=article["title"] or "")
             if body_quality["status"] != "available":
                 article["body_markdown"] = ""
@@ -72,7 +74,7 @@ def read_article(
             # Hash all served fields, not row counts or acquisition timestamps alone:
             # comment edits and upvote changes also invalidate continuation pages.
             hasher = hashlib.sha256(canonical_json({
-                "version": 2, "article": article, "body_quality": body_quality,
+                "version": 3, "article": article, "body_quality": body_quality, "references": references,
             }).encode("utf-8"))
             count = 0
             for comment in conn.execute(
@@ -110,6 +112,7 @@ def read_article(
                 )
                 comments.append(comment)
             coverage = _coverage(article, body_quality, count)
+            coverage["references"] = references
             result = {
                 **article, "status": "ok", "provider": "seeking_alpha", "retrieval": "stored",
                 "snapshot_id": current_id, "body_markdown": body[body_offset:body_offset + body_limit],
@@ -127,7 +130,8 @@ def read_article(
                 "source_ref": {"provider": "seeking_alpha", "article_id": article_id,
                                "url": article["url"], "snapshot_id": current_id},
                 "limitations": ["retained_capture_not_live", "comments_are_unverified_opinions",
-                                "snapshot_id_detects_changes_not_historical_archive"],
+                                "snapshot_id_detects_changes_not_historical_archive",
+                                "image_pixels_not_stored_or_read_by_this_tool"],
             }
             return bounded_result("get_sa_article_detail", result)
     except RetainedReadFailure as exc:

@@ -1088,6 +1088,7 @@ async function runArticleBodyRecovery(run, targets) {
     }
     if (result.status === "ok" && result.body_saved === true) {
       item.state = "saved"; item.reason = null;
+      item.references = result.body_references || null;
     } else if (result.status === "cancelled" || result.reason === "operator_cancelled") {
       item.state = "cancelled"; item.reason = run.interruption || "operator_cancelled";
     } else if (result.status === "skipped") {
@@ -1212,6 +1213,7 @@ async function captureArticleBodyRecovery(target, run, diagnostics) {
     await progress("saving");
     var saved = await sendNativeMessage2({action:"save_article_body_recovery",article_id:target.article_id,
       expected_body_sha256:target.body_sha256,body_markdown:report,
+      body_capture:detail.body_capture || null,
       detail_ticker:detail.detail_ticker || null,detail_ticker_observed_at:detail.detail_ticker_observed_at || null});
     if (saved.status === "skipped" && ["already_present","out_of_scope","source_changed"].includes(saved.reason)) {
       return {status:"skipped",reason:saved.reason};
@@ -1221,7 +1223,7 @@ async function captureArticleBodyRecovery(target, run, diagnostics) {
       return failure(bodyRecoveryReason(saved.body_quality && saved.body_quality.reason_code, "parser_empty"));
     }
     if (saved.status !== "ok" || saved.body_saved !== true) return failure("detail_save_failed");
-    return {status:"ok",body_saved:true};
+    return {status:"ok",body_saved:true,body_references:saved.body_references || null};
   } catch (error) {
     if (isAcquisitionStop(error)) throw error;
     return failure(error.code || (phase === "extraction" ? "unknown_failure" : "detail_save_failed"));
@@ -3553,6 +3555,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         action: "save_article_content",
         article_id: item.article_id,
         body_markdown: report,
+        body_capture: detail.body_capture || null,
         comments: comments,
         detail_ticker: detail.detail_ticker || null,
         detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
@@ -3842,6 +3845,7 @@ async function doManualFetch(items, diagnostics) {
           action: "save_article_content",
           article_id: articleId,
           body_markdown: report,
+          body_capture: detail.body_capture || null,
           comments: comments,
           detail_ticker: detail.detail_ticker || null,
           detail_ticker_observed_at: detail.detail_ticker_observed_at || null,

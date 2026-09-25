@@ -9,6 +9,8 @@ from datetime import date
 from typing import AbstractSet, Literal
 from urllib.parse import urlsplit
 
+from src.sa.article_body_quality import narrative_text
+
 
 Role = Literal["entry", "exit"]
 DateBand = Literal["exact", "near", "outside", "missing"]
@@ -172,7 +174,8 @@ def evaluate_candidate(event: PickEvent, article: ArticleEvidence) -> CandidateE
     if detail_ticker == symbol and detail_ticker is not None:
         evidence.append("ticker_detail_exact")
 
-    text = _normalized_text(article.title, article.body_markdown)
+    body_text = "\n\n".join(narrative_text(block) for block in re.split(r"\n\s*\n", article.body_markdown or ""))
+    text = _normalized_text(article.title, body_text)
     symbol_fallback = not explicit_tickers and _contains_symbol(text, symbol)
     company_fallback = (
         not explicit_tickers

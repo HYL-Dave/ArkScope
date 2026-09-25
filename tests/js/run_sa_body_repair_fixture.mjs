@@ -17,6 +17,11 @@ const targets = Array.from({length: 8}, (_, index) => ({
 }));
 const manifest = {status: 'ok', manifest_id: 'manifest-one', as_of: '2026-09-25',
   targets: targets.slice(0,5), counts: {targets: 8}};
+const bodyCapture = {schema_version:1, extractor_version:2,
+  links:{observed:2,retained:2}, images:{observed:1,retained:1}, unsupported_embeds:0};
+const bodyReferences = {status:'observed_references_retained',basis:'selected_article_dom',
+  extractor_version:2, image_storage:'remote_references_only',
+  links:{observed:2,retained:2}, images:{observed:1,retained:1}, unsupported_embeds:0};
 
 function event() {
   const listeners = new Set();
@@ -95,7 +100,7 @@ function background(options = {}) {
           }
           if (message.action === 'save_article_body_recovery') {
             events.push(`save:${message.article_id}`);
-            return {status: 'ok', body_saved: true, body_quality: {state: 'usable'}};
+            return {status: 'ok', body_saved: true, body_quality: {state: 'usable'}, body_references:bodyReferences};
           }
           if (message.action === 'record_extension_job') return {status: 'ok', persisted: true, run_id:native.length};
           if (message.action === 'sa_acquisition_control') {
@@ -169,6 +174,7 @@ function background(options = {}) {
         events.push('detail');
         if (options.detail) await options.detail(chrome, tab);
         return [{result:{title:'Article title', body_markdown:'PRIVATE BODY CONTENT', url:tab.url,
+          body_capture:bodyCapture,
           detail_ticker:'ABC', detail_ticker_observed_at:'2026-09-25T00:00:00Z'}}];
       }
       if (func.name === 'readSaAccessMarkers' && options.restriction) return [{result:options.restriction}];
@@ -354,8 +360,10 @@ async function runBackground() {
     assert.equal(batch.status, 'complete');
     assert.equal(batch.counts.saved, 5);
     for (const save of saves) assert.deepEqual(Object.keys(save).sort(), [
-      'action','article_id','expected_body_sha256','body_markdown','detail_ticker','detail_ticker_observed_at',
+      'action','article_id','expected_body_sha256','body_markdown','body_capture','detail_ticker','detail_ticker_observed_at',
     ].sort());
+    for (const save of saves) assert.deepEqual(save.body_capture,bodyCapture);
+    for (const item of batch.items) assert.deepEqual(item.references,bodyReferences);
     assert.ok(saves.every(value => value.expected_body_sha256 === 'a'.repeat(64)));
     assert.equal(app.events.filter(value => value === 'guard:end').length, 5);
     assert.equal(app.events.filter(value => value === 'finish_task').length, 5);

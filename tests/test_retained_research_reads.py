@@ -63,9 +63,9 @@ def captured(tmp_path, monkeypatch):
 def test_article_default_is_bounded_and_does_not_claim_comments_complete(captured):
     dal, _, body = captured
     result = get_sa_article_detail(dal, "123")
-    assert result["body_markdown"] == body[:4000]
+    assert result["body_markdown"] == body[:3500]
     assert result["status"] == "ok"
-    assert result["pagination"]["next_body_offset"] == 4000
+    assert result["pagination"]["next_body_offset"] == 3500
     assert result["coverage"]["comments"]["status"] == "partial"
     assert result["coverage"]["comments"]["complete"] is None
     assert len(result["comments"]) == 2
@@ -240,7 +240,7 @@ def test_sa_read_is_one_snapshot_even_if_writer_commits_during_hash(captured, mo
 
     monkeypatch.setattr(sqlite3, "connect", lambda *a, **kw: original(*a, **kw, factory=Reader))
     result = get_sa_article_detail(dal, "123")
-    assert result["body_markdown"] == body[:4000]
+    assert result["body_markdown"] == body[:3500]
     assert result["comments"][0]["comment_text"] == "Discussion " * 5
     assert get_sa_article_detail(dal, "123", snapshot_id=result["snapshot_id"])["error_code"] == "sa_article_snapshot_changed"
 
@@ -350,19 +350,30 @@ def test_holdings_never_sum_unverified_broker_base_currencies(tmp_path, monkeypa
 def test_all_channels_can_read_article_then_complete_comment(captured, channel):
     from tests.test_freshness_tool_channels import invoke
     from tests.test_sec_research_tool_adapters import unwrap
+    from src.sa.article_body_capture import encode_capture
 
-    dal, path, _ = captured
+    dal, path, body = captured
+    body = '[Source](<https://issuer.example/report>)\n\n![Chart](<https://images.example/chart.png>)\n\n' + body
+    capture = {"schema_version": 1, "extractor_version": 2, "links": {"observed": 1, "retained": 1},
+               "images": {"observed": 1, "retained": 1}, "unsupported_embeds": 0}
+    _write(path, "UPDATE sa_articles SET body_markdown=?, body_capture_json=? WHERE article_id='123'",
+           (body, encode_capture(body, capture)))
     before = _digest(path)
     feed = unwrap(asyncio.run(invoke(channel, "get_sa_feed", {"ticker": "AMD", "item_type": "article", "limit": 1}, dal)))
     article_id = feed["items"][0]["id"]
     first = unwrap(asyncio.run(invoke(channel, "get_sa_article_detail", {"article_id": article_id}, dal)))
     assert first["url"] == feed["items"][0]["url"]
-    assert first["pagination"]["next_body_offset"] == 4000
+    assert first["pagination"]["next_body_offset"] == 3500
+    assert first["body_markdown"] == body[:3500]
+    assert first["coverage"]["references"]["status"] == "observed_references_retained"
+    assert first["coverage"]["references"]["image_storage"] == "remote_references_only"
+    assert "image_pixels_not_stored_or_read_by_this_tool" in first["limitations"]
     args = {"article_id": "123", "body_limit": 0, "comment_id": "c1", "comment_text_offset": 500,
             "snapshot_id": first["snapshot_id"]}
     next_page = unwrap(asyncio.run(invoke(channel, "get_sa_article_detail", args, dal)))
     assert next_page["comments"][0]["text_offset"] == 500
     assert next_page["source_ref"] == first["source_ref"]
+    assert next_page["coverage"]["references"] == first["coverage"]["references"]
     assert _digest(path) == before
 
 
@@ -443,11 +454,18 @@ def test_summary_transcript_preserves_whole_read_or_typed_failure(tool):
     assert result["error_code"].endswith("_page_too_large") and result["snapshot_id"] == "e" * 64
 
 
-def test_default_long_comment_page_fits_native_insertion_budget(captured):
+@pytest.mark.parametrize("reference_evidence", [False, True])
+def test_default_long_comment_page_fits_native_insertion_budget(captured, reference_evidence):
     from src.agents.shared.compressor.layers import apply_layer_0
     from src.agents.config import AgentConfig
 
-    dal, path, _ = captured
+    dal, path, body = captured
+    if reference_evidence:
+        from src.sa.article_body_capture import encode_capture
+        capture = {"schema_version": 1, "extractor_version": 2,
+                   "links": {"observed": 10000, "retained": 10000},
+                   "images": {"observed": 10000, "retained": 10000}, "unsupported_embeds": 0}
+        _write(path, "UPDATE sa_articles SET body_capture_json=?", (encode_capture(body, capture),))
     _write(path, "UPDATE sa_article_comments SET comment_text=?", ("x" * 5000,))
     value = get_sa_article_detail(dal, "123")
     payload = '<tool_output tool="get_sa_article_detail">\n' + json.dumps(value) + '\n</tool_output>'
@@ -507,3 +525,6 @@ def test_all_exporters_admit_only_the_intended_new_tools_and_publish_paging():
     for name in required:
         expected = {parameter.name for parameter in registry.get(name).parameters}
         assert expected == set(native_anthropic[name]) == set(native_openai[name])
+    assert next(p.default for p in registry.get("get_sa_article_detail").parameters if p.name == "body_limit") == 3500
+    assert native_anthropic["get_sa_article_detail"]["body_limit"]["default"] == 3500
+    assert native_openai["get_sa_article_detail"]["body_limit"]["default"] == 3500

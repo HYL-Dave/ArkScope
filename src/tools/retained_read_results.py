@@ -11,6 +11,7 @@ from src.tools.result_policy import MAX_OUTPUT_BYTES
 RETAINED_READ_TOOLS = frozenset({
     "get_sa_article_detail", "get_sa_comment_focus", "get_portfolio_holdings",
 })
+SA_ARTICLE_DEFAULT_BODY_LIMIT = 3500
 _RECOVERY = {
     "get_sa_article_detail": ("sa_article", "retry_same_snapshot_with_smaller_body_comment_or_text_page"),
     "get_sa_comment_focus": ("sa_comment_focus", "reduce_limit_or_window_days"),

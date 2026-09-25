@@ -244,6 +244,7 @@ def _handle_article_body_recovery(action, msg):
     try:
         return SACaptureBackend(sa_db=path, market_db=":memory:").repair_article_body(
             article_id, body, expected_body_sha256=digest,
+            body_capture=msg.get("body_capture"),
             detail_ticker=msg.get("detail_ticker"),
             detail_ticker_observed_at=msg.get("detail_ticker_observed_at"),
         )
@@ -847,6 +848,7 @@ def _handle_save_article_content(dal, msg):
             article_id,
             body_markdown,
             comments,
+            body_capture=msg.get("body_capture"),
             detail_ticker=msg.get("detail_ticker"),
             detail_ticker_observed_at=msg.get("detail_ticker_observed_at"),
             provider_comments_count=msg.get("provider_comments_count"),

@@ -335,7 +335,7 @@ def test_manifest_has_no_body_or_disclosure_prose_and_hashes_snapshot(capture):
     assert "body_markdown" not in encoded
     item = by_id(first)["1002"]
     assert item["body_sha256"] == hashlib.sha256(DISCLOSURE.encode()).hexdigest()
-    assert item["body_assessment"]["assessment_version"] == 1
+    assert item["body_assessment"]["assessment_version"] == 2
     assert len(first["manifest_id"]) == 64
     assert finish(capture) == first
     conn.execute("UPDATE sa_articles SET body_markdown=? WHERE article_id='1002'", (DISCLOSURE + "\n",))

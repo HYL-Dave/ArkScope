@@ -108,6 +108,24 @@ def test_native_save_rejects_bad_capture_and_preserves_raw_evidence(db):
         assert conn.execute("SELECT body_markdown FROM sa_articles WHERE article_id='123'").fetchone()[0] == BAD
 
 
+def test_native_repair_preserves_body_bound_reference_counts(db):
+    from src.sa.article_reader import read_article
+
+    capture = {"schema_version": 1, "extractor_version": 2, "links": {"observed": 0, "retained": 0},
+               "images": {"observed": 1, "retained": 1}, "unsupported_embeds": 0}
+    body = GOOD + "\n\n![Outlook](<https://images.example/chart.png>)"
+    message = {"action": "save_article_body_recovery", "article_id": "123",
+               "expected_body_sha256": hashlib.sha256(BAD.encode()).hexdigest(), "body_markdown": body}
+    rejected = handle_message({**message, "body_capture": {**capture, "extractor_version": 999}})
+    assert rejected["status"] == "error" and rejected["body_saved"] is False
+    with sqlite3.connect(str(db)) as conn:
+        assert conn.execute("SELECT body_markdown FROM sa_articles WHERE article_id='123'").fetchone()[0] == BAD
+    result = handle_message({**message, "body_capture": capture})
+    assert result["body_saved"] is True
+    assert result["body_references"]["images"] == {"observed": 1, "retained": 1}
+    assert read_article(db, "123")["coverage"]["references"] == result["body_references"]
+
+
 def test_native_host_handles_a_port_until_eof(monkeypatch):
     from src import sa_native_host as host
 

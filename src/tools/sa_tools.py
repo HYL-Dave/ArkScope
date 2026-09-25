@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from src.app_records_store import resolve_profile_state_db_path
 from src.service.job_runs_store import read_job_activity_if_exists
-from src.tools.retained_read_results import RetainedReadFailure, page_integer
+from src.tools.retained_read_results import RetainedReadFailure, SA_ARTICLE_DEFAULT_BODY_LIMIT, page_integer
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +206,7 @@ def get_sa_articles(
 
 
 def get_sa_article_detail(
-    dal: Any, article_id: str, body_offset: int = 0, body_limit: int = 4000,
+    dal: Any, article_id: str, body_offset: int = 0, body_limit: int = SA_ARTICLE_DEFAULT_BODY_LIMIT,
     comment_offset: int = 0, comment_limit: int = 2,
     comment_id: Optional[str] = None, comment_text_offset: int = 0,
     comment_text_limit: int = 500, snapshot_id: Optional[str] = None,
@@ -216,6 +216,7 @@ def get_sa_article_detail(
     Return snapshot_id on every page; continuation offsets require that ID.
     Long comments have their own text continuation, addressed by comment_id.
     Body and comment capture coverage are independent, not completeness claims.
+    Image URLs are remote references, not image pixels or chart values.
     """
     from src.sa.article_reader import article_unavailable, read_article
 

@@ -13,6 +13,7 @@ from functools import wraps
 from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Literal, Optional
 
 from pydantic import Field
+from src.tools.retained_read_results import SA_ARTICLE_DEFAULT_BODY_LIMIT
 
 try:
     from agents import function_tool as _sdk_function_tool, RunContextWrapper
@@ -1012,7 +1013,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     @function_tool
     def tool_get_sa_article_detail(
         article_id: str, body_offset: Annotated[int, Field(strict=True)] = 0,
-        body_limit: Annotated[int, Field(strict=True)] = 4000,
+        body_limit: Annotated[int, Field(strict=True)] = SA_ARTICLE_DEFAULT_BODY_LIMIT,
         comment_offset: Annotated[int, Field(strict=True)] = 0,
         comment_limit: Annotated[int, Field(strict=True)] = 2,
         comment_id: Optional[str] = None, comment_text_offset: Annotated[int, Field(strict=True)] = 0,
@@ -1025,6 +1026,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         comment_offset counts rows. Set body_limit/comment_limit=0 to omit that
         section. For long comments use comment_id and comment_text_offset.
         Body/comment coverage is separate; snapshot changes require a fresh read.
+        Image URLs are remote references, not image pixels or chart values.
         """
         result = _get_sa_article_detail(
             dal, article_id, body_offset=body_offset, body_limit=body_limit,

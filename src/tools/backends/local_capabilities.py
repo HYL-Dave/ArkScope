@@ -139,6 +139,7 @@ class LocalDataCapabilities(Protocol):
         body_markdown: str,
         comments: list,
         *,
+        body_capture: dict | None = None,
         detail_ticker: Optional[str] = None,
         detail_ticker_observed_at: Any = None,
         provider_comments_count: Any = None,

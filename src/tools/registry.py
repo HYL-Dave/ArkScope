@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 from .result_policy import PUBLIC_JSON, PUBLIC_TEXT, ResultPolicy
+from .retained_read_results import SA_ARTICLE_DEFAULT_BODY_LIMIT
 
 
 @dataclass
@@ -1226,6 +1227,7 @@ class ToolRegistry:
             description=(
                 "Read stored SA article Markdown and flat comments with parent IDs, never acquire. "
                 "Use an article item id from get_sa_feed. Body/comment capture coverage is independent. "
+                "Image URLs are remote references, not image pixels or chart values. "
                 "Continue pages using snapshot_id and the returned offsets; for a long comment "
                 "pass comment_id and comment_text_offset. Snapshot changes require a fresh read."
             ),
@@ -1236,7 +1238,7 @@ class ToolRegistry:
                 ToolParameter("article_id", "string",
                               "Article id from get_sa_feed article items or get_sa_articles"),
                 ToolParameter("body_offset", "integer", "Markdown Unicode character offset", required=False, default=0),
-                ToolParameter("body_limit", "integer", "Markdown characters (0 omits body)", required=False, default=4000),
+                ToolParameter("body_limit", "integer", "Maximum Markdown characters (0 omits body)", required=False, default=SA_ARTICLE_DEFAULT_BODY_LIMIT),
                 ToolParameter("comment_offset", "integer", "Stored comment row offset", required=False, default=0),
                 ToolParameter("comment_limit", "integer", "Comment rows (0 omits comments)", required=False, default=2),
                 ToolParameter("comment_id", "string", "Read one specific comment, including an off-page parent", required=False),

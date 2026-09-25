@@ -604,11 +604,13 @@ class DataAccessLayer:
 
         def file_detail(item):
             from src.sa.article_body_quality import assess_body, usable_body
+            from src.sa.article_body_capture import reference_coverage
 
             if not item:
                 return item
             title = item.get("title") or ""
             return {**item, "body_quality": assess_body(item.get("detail_report"), title=title),
+                    "body_references": reference_coverage(item.get("detail_report"), None),
                     "detail_report": usable_body(item.get("detail_report"), title=title) or None}
 
         # File fallback: check file cache
@@ -1054,6 +1056,7 @@ class DataAccessLayer:
         body_markdown: str,
         comments: List[Dict],
         *,
+        body_capture=None,
         detail_ticker: str | None = None,
         detail_ticker_observed_at=None,
         provider_comments_count=None,
@@ -1067,6 +1070,7 @@ class DataAccessLayer:
             article_id,
             body_markdown,
             comments,
+            body_capture=body_capture,
             detail_ticker=detail_ticker,
             detail_ticker_observed_at=detail_ticker_observed_at,
             provider_comments_count=provider_comments_count,
