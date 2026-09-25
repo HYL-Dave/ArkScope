@@ -1370,14 +1370,17 @@ def _parse_iso_dt(value):
 def main():
     _init_script_runtime()
     try:
-        msg = read_message()
-        if msg is None:
-            return
+        # sendNativeMessage closes stdin after its reply; connectNative retains
+        # the channel for an explicit batch until the browser disconnects it.
+        while True:
+            msg = read_message()
+            if msg is None:
+                return
 
-        logger.info("Received: action=%s scope=%s", msg.get("action"), msg.get("scope"))
-        result = handle_message(msg)
-        write_message(result)
-        logger.info("Sent: %s", json.dumps(result)[:200])
+            logger.info("Received: action=%s scope=%s", msg.get("action"), msg.get("scope"))
+            result = handle_message(msg)
+            write_message(result)
+            logger.info("Sent: %s", json.dumps(result)[:200])
 
     except Exception as e:
         logger.exception("Native host error")

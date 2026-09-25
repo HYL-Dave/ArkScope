@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { initializeI18n } from "./i18n/resources";
 import { displaySAExtensionSegments } from "./saExtensionHealthDisplay";
-import type { SAExtensionHealthSegment } from "./api";
+import type { SAExtensionDiagnosticReason, SAExtensionHealthSegment } from "./api";
 
 type Locale = "zh-Hant" | "en";
 
@@ -22,6 +22,24 @@ const seg = (key: string, state: SAExtensionHealthSegment["state"], detail = "de
 });
 
 describe("displaySAExtensionSegments", () => {
+  it.each([
+    ["sa_article_body_missing", "Article text is missing", "未取得文章正文"],
+    ["sa_article_body_comment_thread", "Captured comments instead of article text", "取得的是留言，不是文章正文"],
+    ["sa_article_body_disclosure_only", "Only disclosures were captured", "僅取得免責聲明"],
+    ["sa_article_body_metadata_only", "Only title and metadata were captured", "僅取得標題與文章資訊"],
+  ] as const)("preserves body quality cause %s in both locales", (reason, en, zh) => {
+    const segment: SAExtensionHealthSegment = {
+      key: "telemetry_last", state: "warn", code: "capture_failed", outcome: "failed",
+      diagnostics_status: "recorded",
+      diagnostics: [{
+        occurred_at: "2026-09-25T14:00:00+00:00", stage: "content_parse",
+        reason_code: reason satisfies SAExtensionDiagnosticReason, target_kind: "article_detail",
+        target_ref: "123", retryable: true, attempt_count: 1,
+      }],
+    };
+    expect(displaySAExtensionSegments([segment], settingsT("en"))[0].copy).toContain(en);
+    expect(displaySAExtensionSegments([segment], settingsT("zh-Hant"))[0].copy).toContain(zh);
+  });
   it.each(["login_required", "access_restricted", "human_verification_required", "rate_limited"])("names acquisition restriction %s without a generic warning", (code) => {
     const row = displaySAExtensionSegments([{ key: "acquisition", state: "warn", code }], settingsT("en"))[0];
     expect(row.label).toBe("Acquisition access");

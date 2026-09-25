@@ -51,10 +51,45 @@ function initializeArticleBodyRecovery() {
   var previewText = document.getElementById("bodyRecoveryPreview");
   var targets = document.getElementById("bodyRecoveryTargets");
   var resultText = document.getElementById("bodyRecoveryResult");
+  var progress = document.getElementById("bodyRecoveryProgress");
+  var timing = document.getElementById("bodyRecoveryTiming");
   var preview = null, batch = null, pending = false;
+  var timingTimer = null;
+
+  function reasonText(reason) {
+    var descriptions = {
+      sa_article_body_comment_thread:"Comment content, not article text",
+      sa_article_body_disclosure_only:"Disclosure only; article text missing",
+      sa_article_body_metadata_only:"Title and metadata only; article text missing",
+      sa_article_body_missing:"Article text missing",
+      parser_empty:"No usable article text extracted",
+      site_pacing:"Local page interval",
+      interrupted:"Batch interrupted",
+      batch_timeout:"Manual batch time limit reached",
+    };
+    return descriptions[reason] ? descriptions[reason] + " (" + reason + ")" : reason;
+  }
+
+  function renderTiming() {
+    clearTimeout(timingTimer);
+    var running = batch && ["running","cancelling"].includes(batch.status);
+    timing.hidden = !running;
+    if (!running) return;
+    var remaining = Math.ceil((Date.parse(batch.next_page_at) - Date.now()) / 1000);
+    var current = (batch.items || []).find(function (item) {return item.state === "running";});
+    var phases = {opening:"Opening page",loading:"Loading article",extracting:"Reading article text",saving:"Saving article text"};
+    timing.textContent = batch.status === "cancelling" ? "Stopping batch..."
+      : remaining > 0 ? "Waiting " + remaining + " s before the next article (local page interval)"
+      : current ? (phases[current.phase] || "Processing article") + ": " + (current.title || current.article_id)
+      : "Preparing next article...";
+    if (remaining > 0) timingTimer = setTimeout(renderTiming, 1000);
+  }
+  window.addEventListener("pagehide", function () {clearTimeout(timingTimer);});
 
   function controls() {
     var running = batch && ["running","cancelling"].includes(batch.status);
+    targets.hidden = Boolean(running);
+    previewText.hidden = Boolean(running);
     previewButton.disabled = pending || !!running;
     startButton.disabled = pending || !!running || !preview || !preview.targets.length;
     cancelButton.disabled = pending || !running || batch.status === "cancelling";
@@ -63,24 +98,31 @@ function initializeArticleBodyRecovery() {
   function renderBatch(value) {
     batch = value;
     resultText.replaceChildren();
+    progress.hidden = !batch;
     if (batch) {
       var counts = batch.counts || {};
+      var processed = (counts.saved || 0) + (counts.failed || 0) + (counts.skipped || 0);
+      progress.max = (batch.items || []).length || 1;
+      progress.value = processed;
       var summary = document.createElement("p");
       summary.textContent = batch.status + ": " + (counts.saved || 0) + " saved, "
         + (counts.failed || 0) + " failed, " + (counts.skipped || 0) + " skipped"
-        + (batch.stop_reason ? " | " + batch.stop_reason : "");
+        + ", " + (counts.pending || 0) + " pending, " + (counts.deferred || 0) + " deferred, "
+        + (counts.cancelled || 0) + " cancelled"
+        + (batch.stop_reason ? " | " + reasonText(batch.stop_reason) : "");
       var list = document.createElement("ol");
       (batch.items || []).slice(0,5).forEach(function (item) {
         var row = document.createElement("li");
         row.textContent = (item.title || item.article_id) + ": " + item.state
-          + (item.reason ? " (" + item.reason + ")" : "");
+          + (item.reason ? " | " + reasonText(item.reason) : "");
         list.appendChild(row);
       });
       resultText.append(summary,list);
     } else resultText.textContent = "No attempts.";
+    renderTiming();
     controls();
   }
-  previewButton.addEventListener("click", async function () {
+  async function loadPreview() {
     if (previewButton.disabled) return;
     preview = null;
     pending = true;
@@ -100,7 +142,8 @@ function initializeArticleBodyRecovery() {
       });
     } else previewText.textContent = "Preview unavailable.";
     controls();
-  });
+  }
+  previewButton.addEventListener("click", loadPreview);
   startButton.addEventListener("click", async function () {
     if (startButton.disabled || !preview) return;
     var manifestId = preview.manifest_id;
@@ -130,8 +173,9 @@ function initializeArticleBodyRecovery() {
       renderBatch(changes.saArticleBodyRecovery.newValue || null);
     }
   });
-  sendRuntimeMessage({action:"get_article_body_recovery_state"}).then(function (reply) {
+  sendRuntimeMessage({action:"get_article_body_recovery_state"}).then(async function (reply) {
     if (!batch && reply && reply.status === "ok") renderBatch(reply.batch || null);
+    if (!batch || !["running","cancelling"].includes(batch.status)) await loadPreview();
   });
   controls();
 }

@@ -473,7 +473,7 @@ class CompanyCollector:
                    "identity_basis": "native_task_admission"}
         conn.execute("UPDATE acquisition_tasks SET payload=?, finished_at=?, receipt=? WHERE task_id=?",
                      (json.dumps({**active, "result": result}), now, json.dumps(receipt), active["task_id"]))
-        if active["priority"] == "background":
+        if active["priority"] == "background" and active["navigation_attempt_count"] > 0:
             state["next_navigation_at"] = _iso(max(_seconds(state["next_navigation_at"]), now + state["financial_gap_seconds"]))
         state["active"] = None
         return receipt

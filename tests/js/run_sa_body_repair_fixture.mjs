@@ -55,8 +55,8 @@ async function until(predicate) {
 function background(options = {}) {
   const store = storage({alphaPicksAutoSyncEnabled: true, marketNewsAutoSyncEnabled: true,
     ...options.initial});
-  const native = [], events = [], tabs = new Map(), sent = [], alarms = [];
-  let listener, nextTab = 1, now = Date.parse('2026-09-25T00:00:00Z');
+  const native = [], events = [], tabs = new Map(), sent = [], alarms = [], ports = [];
+  let listener, batchDeadline, nextTab = 1, now = Date.parse('2026-09-25T00:00:00Z');
   class Clock extends Date {
     constructor(...args) {super(...(args.length ? args : [now]));}
     static now() {return now;}
@@ -64,13 +64,24 @@ function background(options = {}) {
   const shared = {status: 'ok', policy: {hour_limit: 100, day_limit: 1000, hour_reserve: 10, day_reserve: 100},
     ledger_id: 'ledger', generation: 1, is_owner: !options.otherOwner,
     paused_reason: options.paused || null, capability_pauses: {}, rate_limited: false,
-    financial_gap_seconds:60, next_navigation_at:null};
+    financial_gap_seconds:60, next_navigation_at:options.initialPacing ? new Clock(now + 60000).toISOString() : null};
   const chrome = {
     runtime: {
       id: 'test-extension', getURL: name => `chrome-extension://test-extension/${name}`,
       getManifest: () => ({version: 'test'}), lastError: null,
       onMessage: {addListener: fn => { listener = fn; }}, onInstalled: event(), onStartup: event(),
       sendMessage: async value => { sent.push(clone(value)); },
+      connectNative() {
+        const port = {onMessage:event(),onDisconnect:event(),closed:false,
+          postMessage(message) {
+            assert.deepEqual(clone(message),{action:'ping'});
+            if (options.handshakeTimeout || options.holdHandshake) return;
+            queueMicrotask(() => options.lifetimeUnavailable ? port.onDisconnect.emit() : port.onMessage.emit({status:'ok'}));
+          },
+          disconnect() {this.closed=true;events.push('lifetime_close');},
+        };
+        ports.push(port); events.push('lifetime_open'); return port;
+      },
       sendNativeMessage(_host, message, callback) {
         native.push(clone(message));
         Promise.resolve().then(async () => {
@@ -89,6 +100,11 @@ function background(options = {}) {
           if (message.action === 'record_extension_job') return {status: 'ok', persisted: true, run_id:native.length};
           if (message.action === 'sa_acquisition_control') {
             events.push(message.operation);
+            if (message.operation === 'begin_task' && options.pacingRace) {
+              options.pacingRace = false;
+              shared.next_navigation_at = new Clock(now + 60000).toISOString();
+              return {status:'deferred',reason:'site_pacing',retry_after:shared.next_navigation_at};
+            }
             if (message.operation === 'begin_task' && message.task_operation === 'alpha_picks_body_repair'
                 && (Date.parse(shared.next_navigation_at) > now || options.pacing)) {
               return {status:'deferred',reason:'site_pacing',error_code:'sa_company_pacing',retry_after:shared.next_navigation_at};
@@ -117,6 +133,7 @@ function background(options = {}) {
       onUpdated: event(), onRemoved: event(), onCreated: event(),
       async create(value) {
         events.push('create');
+        assert.equal(value.active,true,'body repair must activate its admitted article tab for lazy content');
         const id = nextTab++;
         const dom = new JSDOM('<h1>Article</h1><article>' + 'Article content. '.repeat(80) + '</article>',
           {url:value.url, runScripts:'outside-only'});
@@ -162,9 +179,21 @@ function background(options = {}) {
   };
   const context = vm.createContext({chrome, console:{log() {}, warn() {}}, URL, TextEncoder, crypto:webcrypto, Date:Clock,
     navigator:{userAgent:'Test Chrome'}, setTimeout(fn, delay) {
+      if (delay === 30 * 60 * 1000) batchDeadline = fn;
+      if (delay === 15000 && options.handshakeTimeout) return setTimeout(fn,0);
       if (delay === 60000 || delay === 20000) {
         events.push('gap_wait');
-        if (options.idleGap) assert.ok(delay < 30000,'manual batch must check native state within the worker idle window');
+        if (options.idleGap) assert.ok(ports.some(port=>!port.closed),'a real native port must cover the idle wait');
+        if (options.disconnectGap) {
+          options.disconnectGap=false;
+          queueMicrotask(()=>ports[0].onDisconnect.emit());
+          return setTimeout(fn,60000);
+        }
+        if (options.expireGap) {
+          options.expireGap=false;
+          queueMicrotask(()=>batchDeadline());
+          return setTimeout(fn,60000);
+        }
         if (options.holdGap) return setTimeout(fn, 60000);
         return setTimeout(() => {now += delay; fn();}, 0);
       }
@@ -183,7 +212,7 @@ function background(options = {}) {
     await until(() => store.data[key] && !['running','cancelling'].includes(store.data[key].status));
     return clone(store.data[key]);
   };
-  return {context, chrome, store, native, events, tabs, sent, alarms, message, terminal};
+  return {context, chrome, store, native, events, tabs, sent, alarms, ports, message, terminal};
 }
 
 async function start(app) {
@@ -224,6 +253,14 @@ async function runBackground() {
   if (scenario === 'cancel_gap') options.holdGap = true;
   if (scenario === 'idle_gap') options.idleGap = true;
   if (scenario === 'pacing_stop') options.pacing = true;
+  if (scenario === 'initial_pacing') options.initialPacing = true;
+  if (scenario === 'pacing_race') options.pacingRace = true;
+  if (scenario === 'lifetime_disconnect') options.disconnectGap = true;
+  if (scenario === 'lifetime_unavailable') options.lifetimeUnavailable = true;
+  if (scenario === 'lifetime_handshake_timeout') options.handshakeTimeout = true;
+  if (scenario === 'lifetime_deadline') options.expireGap = true;
+  if (scenario === 'lifetime_cancel_setup') options.holdHandshake = true;
+  if (scenario === 'lifetime_disconnect_active') options.detail = async () => app.ports[0].onDisconnect.emit();
   if (scenario === 'interrupted') options.initial = {[key]: {status:'running',batch_id:'lost',items:[
     {article_id:'1000',title:'Article 1',state:'running',attempt_count:1},
     {article_id:'1001',title:'Article 2',state:'queued',attempt_count:0},
@@ -246,6 +283,12 @@ async function runBackground() {
       status:'ok', ok:true, body_saved:false, error:'PRIVATE RAW FAILURE', body_quality:{reason:'too_short'},
     };
   };
+  if (scenario === 'save_comment_thread') options.native = message => {
+    if (message.action === 'save_article_body_recovery') return {
+      status:'error',body_saved:false,error_code:'sa_article_body_comment_thread',
+      body_quality:{status:'unusable',reason_code:'sa_article_body_comment_thread'},
+    };
+  };
   app = background(options);
   if (scenario === 'interrupted') {
     const state = await app.message({action:'get_article_body_recovery_state'});
@@ -260,6 +303,10 @@ async function runBackground() {
     await tick();
   }
   const started = await start(app);
+  if (scenario === 'lifetime_cancel_setup') {
+    await until(()=>app.ports.length===1);
+    await app.message({action:'cancel_article_body_recovery',batch_id:started.batch.batch_id});
+  }
   if (scenario === 'lane_priority') {
     const preferred = app.context.enqueueSaSyncJob({key:'newer-routine'}, async () => {app.events.push('routine');return {};});
     release();
@@ -287,6 +334,9 @@ async function runBackground() {
     release();
   }
   const batch = await app.terminal();
+  await tick();
+  assert.equal(app.ports.length,1,'one native lifetime per explicitly started batch');
+  assert.ok(app.ports.every(port=>port.closed),'native lifetime ends with the batch');
   if (routine) await routine;
   const saves = actions(app, 'save_article_body_recovery');
   const checks = actions(app, 'check_article_body_recovery_target');
@@ -297,7 +347,7 @@ async function runBackground() {
   assert.ok(!JSON.stringify(telemetry).includes('PRIVATE'), 'telemetry cannot contain body or native prose');
   assert.ok(!JSON.stringify(app.store.data[key]).includes('PRIVATE'), 'local result is metadata only');
   assert.ok(app.native.every(value => !['save_article_content','save_comments_only','accept_reconciliation_link'].includes(value.action)));
-  if (['repair_success','priority','gap_priority','lane_priority','idle_gap'].includes(scenario)) {
+  if (['repair_success','priority','gap_priority','lane_priority','idle_gap','initial_pacing','pacing_race'].includes(scenario)) {
     assert.equal(saves.length, 5);
     assert.equal(checks.length, 5);
     assert.deepEqual(saves.map(value => value.article_id), ['1000','1001','1002','1003','1004']);
@@ -310,7 +360,8 @@ async function runBackground() {
     assert.equal(app.events.filter(value => value === 'guard:end').length, 5);
     assert.equal(app.events.filter(value => value === 'finish_task').length, 5);
     assert.ok(telemetry.every(value => value.result.healthy_anchor_eligible === false));
-    assert.equal(telemetry.length, 5);
+    assert.equal(telemetry.length, scenario === 'pacing_race' ? 6 : 5);
+    if (scenario === 'pacing_race') assert.equal(telemetry[0].result.derived_outcome,'deferred');
     assert.ok(app.events.filter(value => value === 'gap_wait').length >= 4);
     assert.ok(app.events.indexOf('guard:begin') < app.events.indexOf('settle'));
     assert.ok(app.events.indexOf('guard:end') < app.events.indexOf('close'));
@@ -320,12 +371,14 @@ async function runBackground() {
       assert.ok(app.events.indexOf('routine') > app.events.indexOf('save:1000'));
     }
     if (scenario === 'lane_priority') assert.ok(app.events.indexOf('routine') < app.events.indexOf('create'));
+    if (scenario === 'initial_pacing') assert.ok(app.events.indexOf('gap_wait') < app.events.indexOf('create'));
+    if (scenario === 'pacing_race') assert.equal(app.events.filter(value=>value==='create').length,5);
     assert.notEqual((await app.message({action:'start_article_body_recovery',manifest_id:'manifest-one'})).status,'ok');
   } else if (scenario === 'cancel_gap') {
     assert.equal(batch.status,'cancelled');
     assert.equal(saves.length,1);
     assert.equal(app.tabs.size,0);
-  } else if (['cancel_active','cancel_queued'].includes(scenario)) {
+  } else if (['cancel_active','cancel_queued','lifetime_cancel_setup'].includes(scenario)) {
     assert.equal(batch.status, 'cancelled');
     assert.equal(saves.length, 0);
     assert.equal(app.tabs.size, 0);
@@ -347,14 +400,28 @@ async function runBackground() {
     assert.equal(batch.counts.saved, 0);
     assert.equal(saves.length, 0);
     assert.equal(app.events.filter(value => value === 'create').length, 0);
-  } else if (scenario === 'save_rejected') {
+  } else if (['lifetime_disconnect','lifetime_unavailable','lifetime_handshake_timeout','lifetime_deadline','lifetime_disconnect_active'].includes(scenario)) {
+    assert.equal(batch.status,'interrupted');
+    assert.equal(batch.stop_reason,scenario==='lifetime_deadline' ? 'batch_timeout' : 'native_host_unavailable');
+    assert.equal(saves.length,['lifetime_disconnect','lifetime_deadline'].includes(scenario) ? 1 : 0);
+    assert.equal(app.tabs.size,0);
+    if (scenario === 'lifetime_disconnect_active') {
+      assert.equal(telemetry.length,1);
+      assert.equal(telemetry[0].result.derived_outcome,'failed');
+      assert.equal(telemetry[0].result.phases.extraction.reason_code,'native_host_unavailable');
+      assert.equal(batch.counts.failed,1);
+    }
+  } else if (scenario === 'save_rejected' || scenario === 'save_comment_thread') {
     assert.equal(saves.length, 5);
     assert.equal(batch.counts.failed, 5);
     assert.equal(batch.counts.saved, 0);
     assert.equal(batch.status, 'partial');
     assert.ok(telemetry.every(value => value.result.derived_outcome === 'failed'));
+    const reason = scenario === 'save_rejected' ? 'parser_empty' : 'sa_article_body_comment_thread';
+    assert.ok(batch.items.every(item=>item.reason===reason));
     assert.ok(telemetry.every(value => value.extension_diagnostics.entries.some(entry =>
-      entry.stage === 'content_parse' && entry.reason_code === 'parser_empty')));
+      entry.stage === 'content_parse' && entry.reason_code === reason)));
+    assert.ok(telemetry.every(value=>value.result.phases.extraction.reason_code===reason));
     await app.message({action:'preview_article_body_recovery'});
     assert.equal(app.store.data[key].counts.failed, 5, 'new preview retains previous attempt results');
   } else if (scenario === 'navigation_changed') {
@@ -395,9 +462,7 @@ async function popup() {
   const preview = document.getElementById('bodyRecoveryPreviewBtn');
   const start = document.getElementById('bodyRecoveryStartBtn');
   assert.ok(preview && start, 'body repair controls must exist');
-  assert.equal(start.disabled,true);
-  preview.click();
-  await tick();
+  // Reopening an idle popup previews local targets, never starts capture.
   assert.equal(start.disabled,false);
   assert.match(start.textContent,/Start next.*5/i);
   assert.match(document.getElementById('bodyRecoveryPreview').textContent,/8 remaining/);
@@ -411,10 +476,19 @@ async function popup() {
     {action:'start_article_body_recovery',manifest_id:'manifest-one'});
   startCallback({status:'ok',batch:{batch_id:'batch',status:'running',items:[],counts:{saved:0,failed:0,skipped:0}}});
   await tick();
+  await store.local.set({[key]:{batch_id:'batch',status:'running',next_page_at:new Date(Date.now()+60000).toISOString(),items:[
+    {article_id:'1000',title:'Article 1',state:'saved'},
+    {article_id:'1001',title:'Article 2',state:'queued'},
+  ],counts:{saved:1,failed:0,skipped:0,pending:1}}});
+  assert.match(document.getElementById('bodyRecoveryTiming').textContent,/Waiting \d+ s.*local page interval/);
+  assert.equal(document.getElementById('bodyRecoveryProgress').value,1);
+  assert.equal(document.getElementById('bodyRecoveryProgress').max,2);
+  assert.equal(start.disabled,true);
   await store.local.set({[key]:{batch_id:'batch',status:'partial',items:[
     {article_id:'1000',title:'Article 1',state:'failed',reason:'detail_save_failed',attempt_count:1},
   ],counts:{saved:0,failed:1,skipped:0}}});
   assert.match(document.getElementById('bodyRecoveryResult').textContent,/detail_save_failed/);
+  assert.equal(document.getElementById('bodyRecoveryTiming').hidden,true);
   assert.equal(start.disabled,true, 'new preview is required after any attempt');
   assert.equal(document.getElementById('alphaPicksAutoSyncToggle').checked,true);
   assert.equal(document.getElementById('marketNewsAutoSyncToggle').checked,true);

@@ -17,7 +17,9 @@ INIT = r"""
     if (message.action === 'preview_article_body_recovery') return {status:'ok',manifest_id:'offline',
       as_of:'2026-09-25',remaining_count:129,targets};
     if (message.action === 'start_article_body_recovery') return {status:'ok',batch:{
-      status:'running',batch_id:'offline-batch',items:targets.map(t => ({...t,state:'queued'}))}};
+      status:'running',batch_id:'offline-batch',counts:{saved:1,failed:0,skipped:0,pending:4},
+      next_page_at:new Date(Date.now()+60000).toISOString(),
+      items:targets.map((t,i) => ({...t,state:i === 0 ? 'saved' : 'queued'}))}};
     if (message.action === 'cancel_article_body_recovery') return {status:'ok',batch:{
       status:'cancelled',batch_id:'offline-batch',counts:{saved:0,failed:1,skipped:0},
       items:targets.map(t => ({...t,state:'failed',reason:'article_context_changed'}))}};
@@ -61,13 +63,24 @@ def test_body_repair_popup_offline_layout(width, tmp_path):
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto((ROOT / "extensions/sa_alpha_picks/popup.html").as_uri())
-        page.locator("#bodyRecoveryPreviewBtn").click()
         page.wait_for_function("document.querySelector('#bodyRecoveryStartBtn').disabled === false")
         assert page.locator("#bodyRecoveryTargets li").count() == 5
         assert "129 remaining" in page.locator("#bodyRecoveryPreview").inner_text()
-        for state in ("preview", "cancelled"):
-            if state == "cancelled":
+        for state in ("preview", "waiting", "extracting", "cancelled"):
+            if state == "waiting":
                 page.locator("#bodyRecoveryStartBtn").click()
+                assert "Waiting" in page.locator("#bodyRecoveryTiming").inner_text()
+                assert page.locator("#bodyRecoveryProgress").evaluate("node=>node.value") == 1
+                assert page.locator("#bodyRecoveryTargets").is_hidden()
+                assert page.locator("#bodyRecoveryTiming").bounding_box()["y"] < page.locator("#bodyRecoveryResult").bounding_box()["y"]
+            elif state == "extracting":
+                page.evaluate("""() => chrome.storage.local.set({saArticleBodyRecovery:{
+                  status:'running',batch_id:'offline-batch',counts:{saved:1,failed:0,skipped:0,pending:1},
+                  items:[{article_id:'1000',title:'Saved article',state:'saved'},
+                    {article_id:'1001',title:'LongTitleWithoutSpaces'.repeat(7),state:'running',phase:'extracting'}]
+                }})""")
+                assert "Reading article text" in page.locator("#bodyRecoveryTiming").inner_text()
+            elif state == "cancelled":
                 page.locator("#bodyRecoveryCancelBtn").click()
                 page.wait_for_function("document.querySelector('#bodyRecoveryResult').textContent.includes('cancelled')")
             issues = page.evaluate(r"""() => {

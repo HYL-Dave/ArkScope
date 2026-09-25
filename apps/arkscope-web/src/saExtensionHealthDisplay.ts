@@ -103,6 +103,10 @@ function reasonLabel(value: unknown, t: SettingsT): string | null {
     case "detail_timeout": return t(($) => $.dataSources.extension.reasons.detailTimeout);
     case "dom_not_ready": return t(($) => $.dataSources.extension.reasons.domNotReady);
     case "parser_empty": return t(($) => $.dataSources.extension.reasons.parserEmpty);
+    case "sa_article_body_missing": return t(($) => $.dataSources.extension.reasons.articleBodyMissing);
+    case "sa_article_body_comment_thread": return t(($) => $.dataSources.extension.reasons.articleBodyCommentThread);
+    case "sa_article_body_disclosure_only": return t(($) => $.dataSources.extension.reasons.articleBodyDisclosureOnly);
+    case "sa_article_body_metadata_only": return t(($) => $.dataSources.extension.reasons.articleBodyMetadataOnly);
     case "native_host_unavailable": return t(($) => $.dataSources.extension.reasons.nativeHostUnavailable);
     case "extension_dependency_missing": return t(($) => $.dataSources.extension.reasons.extensionDependencyMissing);
     case "reconciliation_failed": return t(($) => $.dataSources.extension.reasons.reconciliationFailed);

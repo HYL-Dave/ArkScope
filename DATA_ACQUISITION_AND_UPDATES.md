@@ -450,16 +450,34 @@ Title, ticker and date matches provide recovery candidates, not confirmed
 selection/removal roles. Long-closed companies' entire histories are not a
 default recovery scope. Existing usable historical text stays untouched.
 
-The operator previews and starts at most five bodies per batch. Each page is
+Opening an idle popup refreshes the read-only preview, but never starts capture.
+The operator explicitly starts at most five bodies per batch. Each page is
 background-priority work under the selected browser owner and existing shared
-navigation budget/reserves, pacing and login/challenge pauses. Routine work can
-run between pages. There is no new automatic schedule or retry loop. Each target
+navigation budget/reserves, pacing and login/challenge pauses. Queue priority
+does not mean an inactive tab: body recovery activates the admitted article tab,
+as the existing article capture does, so visible lazy-loaded content can render.
+Routine work can run between pages.
+
+The batch waits for the shared page interval before its first page and between
+pages; the popup shows a countdown, active stage and per-article outcomes.
+Closing the popup does not cancel the batch. An explicit native messaging port
+keeps the browser background alive during this manual operation; completion or
+cancellation closes it. Loss of that port interrupts the batch without automatic
+reconnection. A 30-minute batch deadline requests cancellation and prevents more
+pages after the active operation finishes cleanup. Browser restarts require a
+new explicit start; reopening the popup reports interruption rather than silently
+replaying work. A cancellation that opened no page does not restart the interval.
+
+Only a local pacing denial with a future retry time and no attempted navigation
+returns to the wait state. An opened page is not retried by this batch, and
+budget, login, challenge, unknown admission or uncertain cleanup failures still
+stop it. There is no new automatic schedule or website retry loop. Each target
 is rechecked before opening it; the write compares the original body hash again
 so a newer capture cannot be overwritten. Only the body is acquired in this
 operation; no deep historical comment scan is added. A later explicit batch
-omits successful repairs and shows unresolved work, and cancellation prevents
-further pages after the active operation stops. Browser interruptions require
-another explicit preview, not an unobserved restart of the batch.
+omits successful repairs and shows unresolved work. Missing, disclosure-only,
+metadata-only and comment-thread captures retain their specific quality failure
+codes in the popup and job receipt; they are not all relabeled `parser_empty`.
 
 Older shell deletion is on hold. Comments, event links, manual decisions,
 research citations and potentially useful pick history must be reviewed before

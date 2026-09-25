@@ -857,6 +857,7 @@ function activateSaUpdates(request) {
 
 const ARTICLE_BODY_RECOVERY_STORAGE_KEY = "saArticleBodyRecovery";
 const ARTICLE_BODY_RECOVERY_LIMIT = 5;
+const ARTICLE_BODY_RECOVERY_MAX_MS = 30 * 60 * 1000;
 var articleBodyRecoveryPreview = null;
 var articleBodyRecoveryPreviewRevision = 0;
 var articleBodyRecoveryActive = null;
@@ -882,7 +883,80 @@ function bodyRecoveryReason(value, fallback) {
     "detail_save_failed", "native_host_unavailable", "unknown_failure", "manifest_invalid",
     "login_required", "access_restricted", "human_verification_required", "rate_limited",
     "site_paused", "site_pacing", "capacity_exhausted", "waiting_for_priority_work", "collector_unavailable",
-    "collector_other_installation", "cleanup_unconfirmed"].includes(value) ? value : fallback;
+    "collector_other_installation", "cleanup_unconfirmed", "batch_timeout",
+    "sa_article_body_missing", "sa_article_body_comment_thread",
+    "sa_article_body_disclosure_only", "sa_article_body_metadata_only"].includes(value) ? value : fallback;
+}
+
+function holdArticleBodyRecoveryLifetime(run) {
+  // Timers and one-shot native calls do not keep Firefox event pages alive.
+  // Hold a real native port only for this explicit, time-bounded manual batch.
+  function open() {
+    if (run.cancelled) return false;
+    return new Promise(function (resolve) {
+      var port, closed = false, ready = false, handshakeTimer, deadlineTimer;
+      function cancelSetup() {
+        clearTimeout(handshakeTimer);
+        if (run.wake === cancelSetup) run.wake = null;
+        resolve(false);
+      }
+      run.wake = cancelSetup;
+      function interrupt(reason) {
+        if (closed) return;
+        if (!run.cancelled) {
+          run.interruption = reason;
+          run.cancelled = true;
+          run.batch.status = "cancelling";
+          run.batch.stop_reason = reason;
+          persistArticleBodyRecovery(run.batch).catch(function () {});
+        }
+        if (run.wake) run.wake();
+        clearTimeout(handshakeTimer);
+        resolve(false);
+      }
+      function received(message) {
+        if (ready || closed) return;
+        if (!message || message.status !== "ok") {interrupt("native_host_unavailable"); return;}
+        ready = true;
+        clearTimeout(handshakeTimer);
+        if (run.wake === cancelSetup) run.wake = null;
+        resolve(true);
+      }
+      function disconnected() {
+        // Reading lastError acknowledges Chrome's port error; never expose its
+        // native diagnostic text or reconnect automatically.
+        void chrome.runtime.lastError;
+        interrupt("native_host_unavailable");
+      }
+      run.closeLifetime = function () {
+        closed = true;
+        clearTimeout(handshakeTimer);
+        clearTimeout(deadlineTimer);
+        if (run.wake === cancelSetup) run.wake = null;
+        if (port && port.onMessage && port.onDisconnect) {
+          port.onMessage.removeListener(received);
+          port.onDisconnect.removeListener(disconnected);
+          try {port.disconnect();} catch (_) {}
+        }
+      };
+      try {
+        port = chrome.runtime.connectNative(NATIVE_HOST);
+        if (!port || !port.onMessage || !port.onDisconnect || typeof port.postMessage !== "function") {
+          if (port && typeof port.catch === "function") port.catch(function () {});
+          interrupt("native_host_unavailable"); return;
+        }
+        port.onMessage.addListener(received);
+        port.onDisconnect.addListener(disconnected);
+        handshakeTimer = setTimeout(function () {interrupt("native_host_unavailable");}, 15000);
+        deadlineTimer = setTimeout(function () {interrupt("batch_timeout");}, ARTICLE_BODY_RECOVERY_MAX_MS);
+        port.postMessage({action:"ping"});
+      } catch (_) {interrupt("native_host_unavailable");}
+    });
+  }
+  // Share Firefox's native-launch lock until consent/handshake completes, not
+  // for the lifetime of the port (normal acquisition calls need the same lock).
+  return globalThis.navigator && navigator.locks && typeof navigator.locks.request === "function"
+    ? navigator.locks.request("arkscope-native-messaging:" + NATIVE_HOST, open) : Promise.resolve(open());
 }
 
 function persistArticleBodyRecovery(batch) {
@@ -964,37 +1038,58 @@ async function handleArticleBodyRecovery(msg) {
   articleBodyRecoveryActive = run;
   try {await persistArticleBodyRecovery(batch);}
   catch (error) {articleBodyRecoveryActive = null; throw error;}
-  run.promise = runArticleBodyRecovery(run,preview.targets).catch(async function () {
-    batch.status = "interrupted";
+  run.promise = holdArticleBodyRecoveryLifetime(run).then(function () {
+    return runArticleBodyRecovery(run,preview.targets);
+  }).catch(async function () {
+    batch.status = run.cancelled && !run.interruption ? "cancelled" : "interrupted";
+    batch.stop_reason = run.interruption || (run.cancelled ? "operator_cancelled" : "interrupted");
     batch.items.forEach(function (item) {
       if (item.state === "running") {item.state = "failed"; item.reason = "interrupted";}
       else if (item.state === "queued") {item.state = "cancelled"; item.reason = "interrupted";}
     });
     await persistArticleBodyRecovery(batch).catch(function () {});
-  }).finally(function () {if (articleBodyRecoveryActive === run) articleBodyRecoveryActive = null;});
+  }).finally(function () {
+    if (run.closeLifetime) run.closeLifetime();
+    if (articleBodyRecoveryActive === run) articleBodyRecoveryActive = null;
+  });
   return {status:"ok",batch:batch};
 }
 
 async function runArticleBodyRecovery(run, targets) {
   var batch = run.batch, stopped = false;
   for (var index = 0; index < targets.length && !run.cancelled && !stopped; index++) {
-    if (index > 0) await waitForArticleBodyRecoveryGap(run);
+    await waitForArticleBodyRecoveryGap(run);
     if (run.cancelled) break;
     var item = batch.items[index], target = targets[index];
     var result = await enqueueSaSyncJob({key:batch.batch_id + ":" + target.article_id,
       displayName:"Article body repair",operation:"alpha_picks_body_repair",mode:"manual",
       eligible:function () {return !run.cancelled;}}, async function (diagnostics) {
-      if (run.cancelled) return {status:"cancelled",reason:"operator_cancelled"};
+      if (run.cancelled) return run.interruption
+        ? {status:"error",failure_phase:"extraction",reason:run.interruption,reason_code:"interrupted"}
+        : {status:"cancelled",reason:"operator_cancelled"};
       item.state = "running";
       item.attempt_count = 1;
+      item.phase = "opening";
       await persistArticleBodyRecovery(batch);
       return captureArticleBodyRecovery(target,run,diagnostics);
     });
     var stop = result.acquisition_stop;
+    var pacingUntil = result.retry_after || stop && stop.retry_after;
+    if (result.status === "deferred" && result.reason === "site_pacing"
+        && !result.acquisition_uncertain && (!result.acquisition || result.acquisition.navigation_attempt_count === 0)
+        && Date.parse(pacingUntil) > Date.now() && !run.cancelled) {
+      // Admission was denied before any page request. Wait for the same item;
+      // never retry a page that was opened or had an uncertain outcome.
+      run.waitUntil = pacingUntil;
+      item.state = "queued"; item.attempt_count = 0; delete item.phase;
+      await persistArticleBodyRecovery(batch);
+      index--;
+      continue;
+    }
     if (result.status === "ok" && result.body_saved === true) {
       item.state = "saved"; item.reason = null;
     } else if (result.status === "cancelled" || result.reason === "operator_cancelled") {
-      item.state = "cancelled"; item.reason = "operator_cancelled";
+      item.state = "cancelled"; item.reason = run.interruption || "operator_cancelled";
     } else if (result.status === "skipped") {
       item.state = "skipped"; item.reason = bodyRecoveryReason(result.reason,"unknown_failure");
     } else if (result.status === "deferred") {
@@ -1006,15 +1101,16 @@ async function runArticleBodyRecovery(run, targets) {
     stopped = !!stop || !!result.acquisition_uncertain || result.status === "deferred";
     if (result.acquisition_uncertain) batch.stop_reason = "cleanup_unconfirmed";
     else if (stopped) batch.stop_reason = bodyRecoveryReason(stop && stop.error_code || result.reason,"collector_unavailable");
+    delete item.phase;
     await persistArticleBodyRecovery(batch);
   }
   batch.items.forEach(function (item) {
     if (item.state === "queued") {
       item.state = "cancelled";
-      item.reason = run.cancelled ? "operator_cancelled" : batch.stop_reason || "interrupted";
+      item.reason = run.interruption || (run.cancelled ? "operator_cancelled" : batch.stop_reason || "interrupted");
     }
   });
-  batch.status = run.cancelled ? "cancelled" : stopped ? "stopped"
+  batch.status = run.interruption ? "interrupted" : run.cancelled ? "cancelled" : stopped ? "stopped"
     : batch.items.some(function (item) {return item.state === "failed";}) ? "partial" : "complete";
   batch.finished_at = new Date().toISOString();
   await persistArticleBodyRecovery(batch);
@@ -1023,13 +1119,13 @@ async function runArticleBodyRecovery(run, targets) {
 async function waitForArticleBodyRecoveryGap(run) {
   while (!run.cancelled) {
     var state = await companyCollectorControl("status");
-    var deadline = state && Date.parse(state.next_navigation_at);
+    var deadline = Math.max(state && Date.parse(state.next_navigation_at) || 0, Date.parse(run.waitUntil) || 0);
     if (!state || state.status !== "ok" || !state.is_owner || state.paused_reason || state.rate_limited
         || state.capability_pauses && state.capability_pauses.alpha_picks
         || !Number.isFinite(deadline) || deadline <= Date.now()) break;
-    run.batch.next_page_at = state.next_navigation_at;
+    run.batch.next_page_at = new Date(deadline).toISOString();
     await persistArticleBodyRecovery(run.batch);
-    // Keep this explicit batch responsive to shared state and worker idling.
+    // Keep this explicit batch responsive to shared state while its port lives.
     // Waiting holds neither a queue slot nor the native acquisition reservation.
     await new Promise(function (resolve) {
       var timer;
@@ -1039,11 +1135,22 @@ async function waitForArticleBodyRecoveryGap(run) {
     });
   }
   delete run.batch.next_page_at;
+  delete run.waitUntil;
 }
 
 async function captureArticleBodyRecovery(target, run, diagnostics) {
   var tabId = null, guard = null, phase = "extraction";
+  var item = run.batch.items.find(function (value) {return value.article_id === target.article_id;});
   function cancelled() {return run.cancelled;}
+  function cancelledResult() {
+    return run.interruption
+      ? failure(run.interruption === "batch_timeout" ? "interrupted" : run.interruption)
+      : {status:"cancelled"};
+  }
+  async function progress(value) {
+    if (item) item.phase = value;
+    await persistArticleBodyRecovery(run.batch);
+  }
   async function checkpoint() {
     requireAcquisitionTask();
     if (await acquisitionPaused("alpha_picks")) {
@@ -1053,16 +1160,19 @@ async function captureArticleBodyRecovery(target, run, diagnostics) {
   }
   function failure(reason) {
     var code = bodyRecoveryReason(reason,phase === "persistence" ? "detail_save_failed" : "unknown_failure");
-    recordExtensionFailure(diagnostics,{stage:phase === "persistence" && code !== "parser_empty" ? "local_persistence" : "content_parse",
+    var rejectedBody = code === "parser_empty" || code.startsWith("sa_article_body_");
+    var stage = code === "native_host_unavailable" ? "native_transport" : code === "interrupted" ? "extension_runtime"
+      : phase === "persistence" && !rejectedBody ? "local_persistence" : "content_parse";
+    recordExtensionFailure(diagnostics,{stage:stage,
       reason_code:code,target_kind:"article_detail",target_ref:target.article_id,retryable:true,attempt_count:1});
     return {status:"error",failure_phase:phase,reason:code,
       reason_code:code === "article_context_changed" ? "navigation_timeout" : code};
   }
   try {
-    if (!await checkpoint()) return {status:"cancelled"};
+    if (!await checkpoint()) return cancelledResult();
     var check = await sendNativeMessage2({action:"check_article_body_recovery_target",
       article_id:target.article_id,body_sha256:target.body_sha256});
-    if (cancelled()) return {status:"cancelled"};
+    if (cancelled()) return cancelledResult();
     if (check.status === "skipped" && ["already_present","out_of_scope","source_changed"].includes(check.reason)) {
       return {status:"skipped",reason:check.reason};
     }
@@ -1070,40 +1180,46 @@ async function captureArticleBodyRecovery(target, run, diagnostics) {
     var verified = bodyRecoveryTarget(Object.assign({body_sha256:target.body_sha256},check.target));
     if (!verified || verified.article_id !== target.article_id) return failure("manifest_invalid");
     if (verified.body_sha256 !== target.body_sha256) return {status:"skipped",reason:"source_changed"};
-    if (!await checkpoint()) return {status:"cancelled"};
-    var tab = await managedSaTabs.create({url:verified.url,active:false});
+    if (!await checkpoint()) return cancelledResult();
+    var tab = await managedSaTabs.create({url:verified.url,active:true});
     tabId = tab.id;
     await registerCollectorTab(tabId,"alpha_picks_body_repair");
-    if (cancelled()) return {status:"cancelled"};
+    await progress("loading");
+    if (cancelled()) return cancelledResult();
     await waitForTabLoad(tabId,30000,expectedPathFromUrl(verified.url));
-    if (!await checkpoint()) return {status:"cancelled"};
+    if (!await checkpoint()) return cancelledResult();
     var ready = await waitForArticleReady(tabId);
     if (!ready.ok) {
       if (await observeSaRestriction(ready.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
       return failure(ready.reason_code || "dom_not_ready");
     }
-    if (cancelled()) return {status:"cancelled"};
+    if (cancelled()) return cancelledResult();
     guard = await beginArticleCapture(tabId,verified);
     await settleArticleBeforeScroll(tabId);
-    if (!await checkpoint()) return {status:"cancelled"};
+    if (!await checkpoint()) return cancelledResult();
     await inspectSaAccess(tabId);
     await guard.assert();
+    await progress("extracting");
     var detail = await injectDetailScraper(tabId);
     await guard.assert(detail && !detail.error ? detail.url || null : undefined);
-    if (cancelled()) return {status:"cancelled"};
+    if (cancelled()) return cancelledResult();
     if (!detail || detail.error || !detail.body_markdown || !detail.body_markdown.trim()) return failure("parser_empty");
     var report = formatDetailReport(detail);
     await guard.close();
     guard = null;
     phase = "persistence";
-    if (!await checkpoint()) return {status:"cancelled"};
+    if (!await checkpoint()) return cancelledResult();
+    await progress("saving");
     var saved = await sendNativeMessage2({action:"save_article_body_recovery",article_id:target.article_id,
       expected_body_sha256:target.body_sha256,body_markdown:report,
       detail_ticker:detail.detail_ticker || null,detail_ticker_observed_at:detail.detail_ticker_observed_at || null});
     if (saved.status === "skipped" && ["already_present","out_of_scope","source_changed"].includes(saved.reason)) {
       return {status:"skipped",reason:saved.reason};
     }
-    if (saved.body_saved === false && (saved.body_quality || saved.status === "ok")) return failure("parser_empty");
+    if (saved.body_saved === false && (saved.body_quality || saved.status === "ok")) {
+      phase = "extraction";
+      return failure(bodyRecoveryReason(saved.body_quality && saved.body_quality.reason_code, "parser_empty"));
+    }
     if (saved.status !== "ok" || saved.body_saved !== true) return failure("detail_save_failed");
     return {status:"ok",body_saved:true};
   } catch (error) {
