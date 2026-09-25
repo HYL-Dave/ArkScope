@@ -39,6 +39,7 @@ _MARKET_NEWS_REPAIR_JOB_NAME = "sa_market_news_repair"
 _SA_EXTENSION_DIAGNOSTIC_JOB_NAMES = frozenset(
     {
         "sa_alpha_picks_refresh",
+        "sa_alpha_picks_body_repair",
         "sa_extension:manual_fetch",
         "sa_market_news_refresh",
         "sa_market_news_retry_recorded",

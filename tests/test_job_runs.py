@@ -167,7 +167,24 @@ def test_sa_store_activity_job_names_cover_all_current_authorities():
     expected = extension_names | service_names | {REPAIR_JOB_NAME}
 
     assert SA_STORE_ACTIVITY_JOB_NAMES == expected
-    assert len(SA_STORE_ACTIVITY_JOB_NAMES) == 8
+    assert len(SA_STORE_ACTIVITY_JOB_NAMES) == 9
+
+
+def test_extension_diagnostic_job_names_cover_all_protocol_operations():
+    from src.sa.extension_run_protocol import OPERATION_CONTRACTS
+
+    assert job_runs_store_module._SA_EXTENSION_DIAGNOSTIC_JOB_NAMES == {
+        contract["job_name"] for contract in OPERATION_CONTRACTS.values()
+    }
+
+
+def test_body_repair_failure_is_visible_in_extension_diagnostics(tmp_path):
+    store = _make_local_store(tmp_path)
+    run_id = store.create_run("sa_alpha_picks_body_repair", trigger_source="extension")
+    store.finish_run(run_id, status="failed", error="parser_empty")
+    rows = store.completed_extension_runs_by_name(["sa_alpha_picks_body_repair"])
+    assert [row["id"] for row in rows] == [run_id]
+    assert rows[0]["status"] == "failed"
 
 
 _SA_RUN_OUTCOMES = (

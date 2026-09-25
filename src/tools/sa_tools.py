@@ -32,6 +32,7 @@ _DISABLED_MSG = (
 SA_STORE_ACTIVITY_JOB_NAMES = frozenset(
     {
         "sa_alpha_picks_refresh",
+        "sa_alpha_picks_body_repair",
         "sa_company_financial_capture",
         "sa_extension:manual_fetch",
         "sa_market_news_refresh",
