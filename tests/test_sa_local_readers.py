@@ -306,7 +306,7 @@ class TestHighValueCommentsLocal:
 
 
 ARTICLE_KEYS = {"article_id", "title", "author", "published_date", "url",
-                "article_type", "comments_count", "summary_excerpt"}
+                "article_type", "comments_count", "summary_excerpt", "associations", "tickers"}
 NEWS_KEYS = {"news_id", "title", "url", "published_at", "tickers", "category",
              "comments_count", "summary_excerpt"}
 COMMENT_KEYS = {"comment_id", "article_id", "article_url", "commenter",
@@ -323,6 +323,12 @@ class TestDigestLocal:
         arts = out["recent_articles"]
         assert [a["article_id"] for a in arts] == ["a1", "a2"]  # published DESC
         assert set(arts[0].keys()) == ARTICLE_KEYS
+        assert arts[0]["tickers"] == ["NVDA"]
+        assert arts[0]["associations"] == [{
+            "symbol": "NVDA", "role": "related", "link_source": "legacy",
+            "evidence_codes": ["legacy_ticker_projection"], "picked_date": None,
+            "event_anchor_date": None, "link_id": None,
+        }]
         assert isinstance(arts[0]["comments_count"], int)
         assert isinstance(arts[0]["published_date"], str)
         # a2 has no body → data_quality.missing notes 1 of 2
