@@ -235,6 +235,8 @@ def test_real_persisted_receipt_and_page_pacing(control, monkeypatch, tmp_path):
     call(obj, "select")
     permit = begin(obj)
     clock[0] += 1
+    assert call(obj, "admit_navigation", token=permit["token"], navigation_id=uuid4().hex,
+                kind="create", destination_class="financials")["allowed"] is True
     payload = capture()
     payload["captured_at"] = datetime.fromtimestamp(clock[0], timezone.utc).isoformat()
     receipt = save_capture(payload)
@@ -269,6 +271,8 @@ def test_delayed_navigation_keeps_a_gap_after_completion(control, monkeypatch, c
     permit = begin(obj)
     # The worker suspended between reservation and page navigation.
     clock[0] += 3600
+    assert call(obj, "admit_navigation", token=permit["token"], navigation_id=uuid4().hex,
+                kind="create", destination_class="financials")["allowed"] is True
     observation = {"observation_id": "b" * 64, "last_captured_at": datetime.fromtimestamp(clock[0], timezone.utc).isoformat()}
     monkeypatch.setattr("src.sa.company_store.read_capture", lambda *a, **k: observation)
     if completion == "finish":

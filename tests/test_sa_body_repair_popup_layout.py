@@ -13,7 +13,7 @@ INIT = r"""
   const targets = Array.from({length:5}, (_,i) => ({article_id:String(1000+i),
     title:i === 0 ? 'LongTitleWithoutSpaces'.repeat(7) : 'Article '+(i+1)+' with a longer retained title'}));
   function reply(message) {
-    if (message.action === 'get_article_body_recovery_state') return {status:'ok',batch:null};
+    if (message.action === 'get_article_body_recovery_state') return {status:'ok',batch:globalThis.fixtureBatch || null};
     if (message.action === 'preview_article_body_recovery') return {status:'ok',manifest_id:'offline',
       as_of:'2026-09-25',remaining_count:129,targets};
     if (message.action === 'start_article_body_recovery') return {status:'ok',batch:{
@@ -107,5 +107,18 @@ def test_body_repair_popup_offline_layout(width, tmp_path):
         assert errors == []
         assert page.locator("#alphaPicksAutoSyncToggle").is_checked()
         assert page.locator("#marketNewsAutoSyncToggle").is_checked()
+        page.add_init_script("""globalThis.fixtureBatch={status:'running',batch_id:'persisted',
+          next_page_at:new Date(Date.now()+60000).toISOString(),counts:{saved:1,pending:1},
+          items:[{article_id:'1000',title:'Saved article',state:'saved'},
+            {article_id:'1001',title:'Next article',state:'queued'}]};""")
+        page.reload()
+        page.wait_for_function("document.querySelector('#bodyRecoveryTiming').textContent.includes('Waiting')")
+        assert page.locator("#bodyRecoveryStartBtn").is_disabled()
+        assert page.locator("#bodyRecoveryTargets").is_hidden()
+        assert page.locator("#bodyRecoveryTiming").evaluate("""node=>{
+          const rect=node.getBoundingClientRect();return rect.top>=0 && rect.bottom<=innerHeight;
+        }""")
+        page.screenshot(path=str(tmp_path / f"popup-{width}-reopened.png"), full_page=True)
+        assert errors == []
         context.close()
         browser.close()

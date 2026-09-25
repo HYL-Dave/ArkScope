@@ -176,6 +176,10 @@ function initializeArticleBodyRecovery() {
   sendRuntimeMessage({action:"get_article_body_recovery_state"}).then(async function (reply) {
     if (!batch && reply && reply.status === "ok") renderBatch(reply.batch || null);
     if (!batch || !["running","cancelling"].includes(batch.status)) await loadPreview();
+    else {
+      var heading = document.getElementById("bodyRecoveryHeading");
+      if (heading && typeof heading.scrollIntoView === "function") heading.scrollIntoView({block:"start"});
+    }
   });
   controls();
 }

@@ -460,7 +460,8 @@ Routine work can run between pages.
 
 The batch waits for the shared page interval before its first page and between
 pages; the popup shows a countdown, active stage and per-article outcomes.
-Closing the popup does not cancel the batch. An explicit native messaging port
+Reopening it during a batch brings the progress section into view. Closing the
+popup does not cancel the batch. An explicit native messaging port
 keeps the browser background alive during this manual operation; completion or
 cancellation closes it. Loss of that port interrupts the batch without automatic
 reconnection. A 30-minute batch deadline requests cancellation and prevents more
