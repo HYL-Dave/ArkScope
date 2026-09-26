@@ -70,17 +70,86 @@ def test_status_and_watchlist_on_missing_databases_never_install_anything(tmp_pa
 def test_watchlist_preserves_complete_membership_and_exposes_unsupported(monkeypatch):
     from src.active_universe import ActiveUniverseSnapshot, SourceStatus
 
-    tickers = tuple(f"T{i}" for i in range(183)) + ("BRK B",)
+    tickers = tuple(f"T{i}" for i in range(183)) + ("BRK B", "BRK A")
     snapshot = ActiveUniverseSnapshot(tickers, {s: ("manual_lists",) for s in tickers},
                                       {"manual_lists": SourceStatus(True)}, (), "2026-09-23T00:00:00Z")
     monkeypatch.setattr("src.active_universe.build_active_universe_snapshot", lambda: snapshot)
     result = module().watchlist_targets()
     assert result["status"] == "ok"
-    assert result["total_count"] == 184
-    assert len(result["tickers"]) == 183
-    assert result["unsupported"] == [{"ticker": "BRK B", "reason": "sa_company_symbol_unmapped"}]
-    assert result["sources_by_ticker"] == {s: ["manual_lists"] for s in tickers}
+    assert result["total_count"] == 185
+    assert result["tickers"] == [*(f"T{i}" for i in range(183)), "BRK.B"]
+    assert result["unsupported"] == [{"ticker": "BRK A", "reason": "sa_company_symbol_unmapped"}]
+    assert result["sources_by_ticker"] == {**{s: ["manual_lists"] for s in tickers}, "BRK.B": ["manual_lists"]}
     assert result["source_status"]["manual_lists"] == asdict(SourceStatus(True))
+
+
+def test_watchlist_aliases_share_one_provider_target_without_losing_sources(monkeypatch):
+    from src.active_universe import ActiveUniverseSnapshot, SourceStatus
+    from src.sa_native_host import handle_message
+
+    tickers = ("AMD", "BRK B", "BRK.B", "BRK-B")
+    sources = {"AMD": ("manual_lists",), "BRK B": ("manual_lists", "portfolio_open"),
+               "BRK.B": ("sa_alpha_picks_current",), "BRK-B": ("portfolio_open", "legacy_config_seed")}
+    statuses = {key: SourceStatus(True) for group in sources.values() for key in group}
+    snapshot = ActiveUniverseSnapshot(tickers, sources, statuses, (), "2026-09-23T00:00:00Z")
+    monkeypatch.setattr("src.active_universe.build_active_universe_snapshot", lambda: snapshot)
+    result = handle_message({"action": "get_company_watchlist"})
+    assert result["tickers"] == ["AMD", "BRK.B"]
+    assert result["total_count"] == 4 and result["unsupported"] == []
+    assert set(result["sources_by_ticker"]["BRK.B"]) == {
+        "manual_lists", "portfolio_open", "sa_alpha_picks_current", "legacy_config_seed"}
+    assert len(result["sources_by_ticker"]["BRK.B"]) == 4
+    assert result["sources_by_ticker"]["BRK B"] == ["manual_lists", "portfolio_open"]
+    assert result["sources_by_ticker"]["BRK-B"] == ["portfolio_open", "legacy_config_seed"]
+    assert result["source_status"] == {key: asdict(value) for key, value in statuses.items()}
+    assert result["generated_at"] == snapshot.generated_at
+    assert snapshot.tickers == tickers and snapshot.sources_by_ticker == sources
+
+
+@pytest.mark.parametrize("ticker", ["BRK B", "BRK.B", "BRK-B"])
+def test_aliases_share_a_persisted_collector_receipt(control, ticker):
+    from src.sa.company_store import save_capture
+    from tests.test_sa_company_data import capture
+
+    obj, clock = control
+    call(obj, "select")
+    permit = call(obj, "begin", scope={**SCOPE, "ticker": ticker}, interval_days=7, force=False)
+    assert permit["status"] == "ok"
+    assert permit["active"]["scope"] == {**SCOPE, "ticker": "BRK.B"}
+    payload = capture(ticker="BRK.B")
+    clock[0] += 1
+    payload["captured_at"] = datetime.fromtimestamp(clock[0], timezone.utc).isoformat()
+    receipt = save_capture(payload)
+    finished = call(obj, "finish", token=permit["token"], result=receipt)
+    assert finished["status"] == "ok" and finished["active"] is None
+    for alias in ("BRK B", "BRK.B", "BRK-B"):
+        reused = call(obj, "begin", scope={**SCOPE, "ticker": alias}, interval_days=7, force=False)
+        assert reused["status"] == "reused"
+        assert reused["ticker"] == "BRK.B" and reused["observation_id"] == receipt["observation_id"]
+        assert reused["last_success_at"] == payload["captured_at"]
+    assert call(obj, "status")["active"] is None
+
+
+def test_aliases_cannot_bypass_a_provider_scope_failure(control):
+    obj, clock = control
+    call(obj, "select")
+    permit = call(obj, "begin", scope={**SCOPE, "ticker": "BRK-B"}, interval_days=7, force=True)
+    call(obj, "finish", token=permit["token"], result={"status": "error", "error_code": "sa_company_layout_unrecognized"})
+    clock[0] += 61
+    for ticker in ("BRK.B", "BRK B", "BRK-B"):
+        result = call(obj, "begin", scope={**SCOPE, "ticker": ticker}, interval_days=7, force=True)
+        assert result["status"] == "deferred" and result["deferral_kind"] == "scope"
+        assert result["error_code"] == "sa_company_layout_unrecognized"
+    assert call(obj, "status")["active"] is None
+
+
+@pytest.mark.parametrize("ticker", ["BRK A", "BF B", "BRK/B", "brk.b", " BRK.B "])
+def test_unmapped_or_noncanonical_scope_remains_invalid(control, ticker):
+    obj, _ = control
+    call(obj, "select")
+    result = call(obj, "begin", scope={**SCOPE, "ticker": ticker}, interval_days=7, force=False)
+    assert result["error_code"] == "sa_company_schedule_invalid"
+    assert call(obj, "status")["active"] is None
 
 
 def test_unselected_or_other_browser_cannot_acquire(control):

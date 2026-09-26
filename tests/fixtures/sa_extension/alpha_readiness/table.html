@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Offline Alpha Picks</title>
+<link rel="icon" href="data:,">
+<h1>Alpha Picks</h1>
+<table><thead><tr><th>Symbol</th></tr></thead><tbody></tbody></table>
+<script>
+  const scenario = new URL(location.href).searchParams.get("case");
+  const image = document.createElement("img");
+  image.src = "/hold?case=" + scenario;
+  document.body.append(image);
+  setTimeout(() => {
+    document.querySelector("tbody").innerHTML = "<tr><td>OFFLINE</td></tr>";
+    fetch("/rendered?case=" + scenario);
+  }, 250);
+</script>
+</html>

@@ -5,7 +5,7 @@ import re
 from typing import Literal, Optional
 
 from src.data_source_routing import DataSourcePolicyFailure, load_route
-from src.sa.company_data import CompanyDataFailure, PATHS, VIEWS, require, symbol
+from src.sa.company_data import CompanyDataFailure, PATHS, VIEWS, provider_symbol, require
 from src.sa.company_research import DATASETS, ROUTES
 from src.sa.company_store import read_capture
 
@@ -32,7 +32,7 @@ def get_sa_company_data(
     An observation ID pins subsequent pages and reopens the same source values.
     """
     try:
-        ticker = symbol(ticker)
+        ticker = provider_symbol(ticker)
         require(type(dataset) is str and dataset in {"financials", *DATASETS}, "sa_company_dataset_invalid")
         require(table is None or (type(table) is str and bool(table)), "sa_company_table_invalid")
         if dataset == "financials":

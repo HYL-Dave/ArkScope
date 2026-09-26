@@ -10,7 +10,7 @@ from pathlib import Path
 import sqlite3
 
 from src import sa_capture_store
-from src.sa.company_data import CompanyDataFailure, canonical_json, digest, normalize_capture, require
+from src.sa.company_data import CompanyDataFailure, canonical_json, digest, normalize_capture, provider_symbol, require
 
 
 DEFAULT_BUDGET_BYTES = 256 * 1024**2
@@ -75,6 +75,7 @@ def save_capture(payload, *, db_path=None):
 
 def read_capture(ticker, statement, view, currency, *, observation_id=None, db_path=None):
     """Never migrate, create a DB, update last-seen state or contact a provider."""
+    ticker = provider_symbol(ticker)
     path = Path(db_path or sa_capture_store.resolve_sa_db_path()).expanduser().resolve()
     try:
         if not path.exists():

@@ -10,7 +10,7 @@ from src.data_source_routing import DataSourcePolicyFailure, load_route
 from src.fundamentals.cache import fundamentals_analysis_cache_key, validate_positive_annual_sec_payload
 from src.fundamentals.reuse import policy, read_entry
 from src.fundamentals.source_comparison import METRICS, comparison_rows
-from src.sa.company_data import CompanyDataFailure, canonical_json, symbol
+from src.sa.company_data import CompanyDataFailure, canonical_json, query_symbol
 from src.sa.company_store import read_capture
 
 
@@ -110,7 +110,7 @@ def compare_financial_sources(
     """
     base = dict(status="unavailable", retrieval="stored", comparison_kind="financial_sources")
     try:
-        ticker = symbol(ticker)
+        ticker = query_symbol(ticker)
         valid = (type(statement) is str and statement in METRICS and period in ("annual", "quarterly")
                  and type(currency) is str and re.fullmatch(r"[A-Z]{3}", currency)
                  and (sources is None or type(sources) is list and len(sources) >= 2

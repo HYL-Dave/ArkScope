@@ -1253,8 +1253,8 @@ function renderStatus(lastRefresh) {
   if (lastRefresh.mode === "full") modeLabel = " (full scan)";
   if (lastRefresh.mode === "backfill") modeLabel = " (deep backfill)";
 
-  var currentOk = current && current.status === "ok";
-  var closedOk = closed && closed.status === "ok";
+  var currentOk = current && current.status === "ok" && current.recorded_failure !== true;
+  var closedOk = closed && closed.status === "ok" && closed.recorded_failure !== true;
 
   statusEl.textContent = "";
 

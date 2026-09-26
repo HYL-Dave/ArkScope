@@ -34,16 +34,16 @@ def sources(local, tmp_path, monkeypatch):
 
 
 def save_sec(dal, *, currency="USD", end="2025-12-27", revenue=123_440_000, period="annual",
-             input_basis_version=SEC_STATEMENT_BASIS_VERSION):
+             input_basis_version=SEC_STATEMENT_BASIS_VERSION, ticker="AAPL"):
     fetched = datetime.now(timezone.utc) - timedelta(days=2)
     statement = FinancialStatement(report_period=end, fiscal_period="2025-FY", period_type=period,
                                    input_basis_version=input_basis_version,
                                    currency=currency, data={"revenue": revenue, "net_income": 10_000_000,
                                                             "earnings_per_share": 2.5})
-    result = FundamentalsResult(ticker="AAPL", data_source="sec_edgar", snapshot_date=end,
+    result = FundamentalsResult(ticker=ticker, data_source="sec_edgar", snapshot_date=end,
                                 income_statements=[statement])
     assert dal._backend.set_financial_cache(
-        fundamentals_analysis_cache_key("AAPL", period), "AAPL", result.model_dump(), source="sec_edgar",
+        fundamentals_analysis_cache_key(ticker, period), ticker, result.model_dump(), source="sec_edgar",
         fetched_at=fetched.isoformat(), expires_at=(fetched + timedelta(days=90)).isoformat(),
     )
 
@@ -279,6 +279,29 @@ def test_all_model_channels_preserve_qualified_differences(sources, channel):
     assert result["retrieval"] == "stored" and len(result["rows"]) == 1
     assert result["rows"][0]["comparisons"][0]["status"] == "rounding_compatible"
     assert result["pagination"]["next_row_offset"] == 1
+
+
+@pytest.mark.parametrize("channel", ["openai", "anthropic", "chatgpt", "claude"])
+def test_canonical_comparison_maps_only_the_sa_source(sources, channel):
+    from tests.test_freshness_tool_channels import invoke
+    from tests.test_sec_research_tool_adapters import unwrap
+
+    dal, http, sec = sources
+    receipt = save_capture(capture(ticker="BRK.B"))
+    save_sec(dal, ticker="BRK B")
+    before = sha256(dal._backend._sa_db.read_bytes()).hexdigest()
+    result = unwrap(asyncio.run(invoke(channel, "compare_financial_sources", {
+        "ticker": "BRK B", "sources": ["seeking_alpha", "sec_edgar"], "row_limit": 1,
+    }, dal)))
+    assert result["status"] == "partial" and result["ticker"] == "BRK B"
+    assert [source["provider"] for source in result["sources"]] == ["seeking_alpha", "sec_edgar"]
+    assert [source["status"] for source in result["sources"]] == ["ok", "ok"]
+    assert result["sources"][0]["observation_id"] == receipt["observation_id"]
+    assert result["sources"][0]["source_url"] == "https://seekingalpha.com/symbol/BRK.B/income-statement"
+    assert result["rows"][0]["values"][1]["normalized_value"] == "123440000"
+    assert sha256(dal._backend._sa_db.read_bytes()).hexdigest() == before
+    http.assert_not_called()
+    sec.assert_not_called()
 
 
 def test_same_content_pagination_detects_changed_provider_cache(sources):

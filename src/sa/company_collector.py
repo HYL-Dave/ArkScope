@@ -17,14 +17,13 @@ import time
 from uuid import uuid4
 
 from src import sa_capture_store
-from src.sa.company_data import CompanyDataFailure, require
+from src.sa.company_data import CompanyDataFailure, provider_symbol, require
 from src.sa import company_store
 from src.sa.acquisition_policy import navigation_eligibility, validate_policy
 from src.sa.extension_run_protocol import OPERATION_CONTRACTS
 
 
 PAGE_START_GAP_SECONDS = 60
-_SYMBOL = re.compile(r"[A-Z][A-Z0-9.-]{0,19}\Z")
 _ID = re.compile(r"[A-Za-z0-9_.:-]{1,160}\Z")
 _RESTRICTIONS = {"login_required", "human_verification_required", "rate_limited", "access_restricted"}
 
@@ -36,12 +35,23 @@ def watchlist_targets():
         snapshot = build_active_universe_snapshot()
     except ActiveUniverseUnavailable as exc:
         return {**exc.as_dict(), "status": "error", "error_code": exc.code}
+    tickers, unsupported = [], []
+    sources_by_ticker = {ticker: list(sources) for ticker, sources in snapshot.sources_by_ticker.items()}
+    for ticker in snapshot.tickers:
+        try:
+            target = provider_symbol(ticker)
+        except CompanyDataFailure:
+            unsupported.append({"ticker": ticker, "reason": "sa_company_symbol_unmapped"})
+            continue
+        if target not in tickers:
+            tickers.append(target)
+        # Retain app membership labels and combine sources on the provider target.
+        sources_by_ticker[target] = list(dict.fromkeys(
+            [*sources_by_ticker.get(target, []), *snapshot.sources_by_ticker.get(ticker, ())]))
     return {
         "status": "ok", "total_count": len(snapshot.tickers),
-        "tickers": [symbol for symbol in snapshot.tickers if _SYMBOL.fullmatch(symbol)],
-        "unsupported": [{"ticker": symbol, "reason": "sa_company_symbol_unmapped"}
-                        for symbol in snapshot.tickers if not _SYMBOL.fullmatch(symbol)],
-        "sources_by_ticker": {symbol: list(sources) for symbol, sources in snapshot.sources_by_ticker.items()},
+        "tickers": tickers, "unsupported": unsupported,
+        "sources_by_ticker": sources_by_ticker,
         "source_status": {key: asdict(value) for key, value in snapshot.source_status.items()},
         "generated_at": snapshot.generated_at,
     }
@@ -209,10 +219,14 @@ class CompanyCollector:
     @staticmethod
     def _scope(value):
         require(type(value) is dict and type(value.get("ticker")) is str
-                and _SYMBOL.fullmatch(value["ticker"])
+                and value["ticker"] == value["ticker"].strip().upper()
                 and value.get("statement") in {"income_statement", "balance_sheet", "cash_flow_statement"}
                 and value.get("view") in {"annual", "quarterly"}, "sa_company_schedule_invalid")
-        return {key: value[key] for key in ("ticker", "statement", "view")}
+        try:
+            ticker = provider_symbol(value["ticker"])
+        except CompanyDataFailure as exc:
+            raise CompanyDataFailure("sa_company_schedule_invalid") from exc
+        return {"ticker": ticker, "statement": value["statement"], "view": value["view"]}
 
     @staticmethod
     def _status(state, client, now):

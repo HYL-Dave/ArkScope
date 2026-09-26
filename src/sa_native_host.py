@@ -407,6 +407,8 @@ def _handle_failure(dal, scope, attempt_ts, error):
         logger.warning("Recorded failure for %s: %s", scope, error)
     except Exception as e:
         logger.error("Failed to record failure for %s: %s", scope, e)
+        return {"status": "error", "scope": scope, "recorded_failure": False,
+                "error_code": "database_write_failed"}
     return {"status": "ok", "scope": scope, "recorded_failure": True}
 
 

@@ -137,6 +137,13 @@ failover. Build parity is not a claim of signed-in Chrome acceptance.
    the news run finishes. Check extraction/save outcomes, capture timestamps and
    audit delivery separately. Do not use Full/Deep repair to verify routine sync.
 
+A collector tab closing is not a success signal. News may update existing list
+entries without needing any article bodies. Alpha Picks must report current and
+closed pick counts and a valid run outcome; merely recording a failure is not a
+completed update. `Missing host permission for the tab` is a page-script error,
+not a Native Messaging consent prompt. Do not reset desktop consent or add broad
+website permissions to work around it.
+
 The App may be reopened after the controlled schema migration is complete. Local
 native saving does not require its sidecar, but audit delivery does: with the App
 closed, receipts remain in a bounded browser outbox (100 records / seven days).

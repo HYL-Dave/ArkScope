@@ -64,6 +64,21 @@ def symbol(value):
     return value
 
 
+def query_symbol(value):
+    """Accept the app's canonical class-share spelling without relabeling it."""
+    if type(value) is str and value.strip().upper() == "BRK B":
+        return "BRK B"
+    return symbol(value)
+
+
+def provider_symbol(value):
+    """Resolve query aliases, not captured source identities."""
+    # SA's public company/financials pages use this spelling:
+    # https://seekingalpha.com/symbol/BRK.B/income-statement
+    value = query_symbol(value)
+    return {"BRK B": "BRK.B", "BRK-B": "BRK.B"}.get(value, value)
+
+
 def _text(value):
     require(type(value) is str and bool(value.strip()))
     return " ".join(value.split())

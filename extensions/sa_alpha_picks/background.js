@@ -386,7 +386,8 @@ function recordNativeExtensionFailure(diagnostics, response, targetKind, targetR
 }
 
 function legacyResultIsOk(value) {
-  return !!value && typeof value === "object" && (value.status === "ok" || value.ok === true);
+  return !!value && typeof value === "object" && value.recorded_failure !== true &&
+    (value.status === "ok" || value.ok === true);
 }
 
 function skippedProtocolPhases(operation, reasonCode) {
@@ -416,11 +417,14 @@ function buildAlphaPicksProtocolResult(mode, legacyResult) {
   var details = legacyResult.details || {};
   var currentOk = legacyResultIsOk(legacyResult.current);
   var closedOk = legacyResultIsOk(legacyResult.closed);
-  var detailFailed = Number(details.failed || 0) > 0 || !!details.error;
-  var detailReason = details.error
+  var upstreamFailure = !legacyResult.details && (!currentOk || !closedOk)
+    ? (!currentOk ? "current_scope_failed" : "closed_scope_failed") : null;
+  var detailFailed = !!upstreamFailure || Number(details.failed || 0) > 0 || !!details.error;
+  var detailReason = upstreamFailure || (details.error
     ? stableExtensionReason(details.reason_code, EXTENSION_PHASE_FAILURE_REASONS, "article_metadata_failed")
-    : stableExtensionReason(details.reason_code, EXTENSION_PHASE_FAILURE_REASONS, "detail_save_failed");
-  var reconciliationFailed = Number(details.reconciliation_failed || 0) > 0;
+    : stableExtensionReason(details.reason_code, EXTENSION_PHASE_FAILURE_REASONS, "detail_save_failed"));
+  var reconciliationBlocked = !!upstreamFailure || !!details.error;
+  var reconciliationFailed = reconciliationBlocked || Number(details.reconciliation_failed || 0) > 0;
 
   return SAExtensionRunProtocol.deriveRunResult({
     schema_version: 1,
@@ -437,7 +441,7 @@ function buildAlphaPicksProtocolResult(mode, legacyResult) {
         ? extensionPhase("failed", detailReason)
         : extensionPhase("complete", null),
       reconciliation: reconciliationFailed
-        ? extensionPhase("failed", "reconciliation_failed")
+        ? extensionPhase("failed", reconciliationBlocked ? detailReason : "reconciliation_failed")
         : extensionPhase("complete", null),
     },
     item_outcomes: [],
@@ -2144,6 +2148,15 @@ async function discoverMarketNewsIncident(tabId, manifest, detailBudget) {
 
 // --- Main refresh flow ---
 
+async function recordAlphaPicksFailure(scope, error, batchTs) {
+  const receipt = await sendToNativeHost("refresh_failure", scope, [], error, batchTs);
+  // The native response acknowledges the failure record, not a successful scrape.
+  return {
+    status: "error", scope: scope, error: error,
+    recorded_failure: !!receipt && receipt.status === "ok" && receipt.recorded_failure === true,
+  };
+}
+
 async function doRefresh(mode, options) {
   options = options || {};
   var diagnostics = options.diagnostics;
@@ -2151,6 +2164,7 @@ async function doRefresh(mode, options) {
   const results = { current: null, closed: null, mode: mode, trigger: options.trigger || "manual" };
 
   let tabId = null;
+  let detailsStarted = false;
   try {
     await cleanupCollectorTabs({ force: true });
     // --- Scrape current picks ---
@@ -2169,7 +2183,7 @@ async function doRefresh(mode, options) {
         retryable: true,
         attempt_count: 1,
       });
-      results.current = await sendToNativeHost("refresh_failure", "current", [], ready.error, batchTs);
+      results.current = await recordAlphaPicksFailure("current", ready.error, batchTs);
       if (await observeSaRestriction(ready.reason_code)) {
         results.acquisition_stop = {status:"error",reason:"site_paused",error_code:ready.reason_code};
         results.completed_phases = [];
@@ -2200,7 +2214,7 @@ async function doRefresh(mode, options) {
         retryable: true,
         attempt_count: 1,
       });
-      results.closed = await sendToNativeHost("refresh_failure", "closed", [], ready.error, batchTs);
+      results.closed = await recordAlphaPicksFailure("closed", ready.error, batchTs);
       if (await observeSaRestriction(ready.reason_code)) {
         results.acquisition_stop = {status:"error",reason:"site_paused",error_code:ready.reason_code};
         results.completed_phases = legacyResultIsOk(results.current) ? ["current_picks"] : [];
@@ -2218,13 +2232,14 @@ async function doRefresh(mode, options) {
 
     // --- Incremental detail fetch (current picks only) ---
     var currentPicks = null;
-    if (results.current && results.current.status === "ok") {
+    if (legacyResultIsOk(results.current)) {
       // Re-read currentPicks from the scrape result stored earlier
       // We need to keep them in scope — move the variable up
       currentPicks = results._currentPicks || [];
     }
     if (currentPicks && currentPicks.length > 0) {
       sendProgress("Checking detail cache...");
+      detailsStarted = true;
       var detailResult = await doDetailFetch(tabId, currentPicks, mode, diagnostics);
       results.details = detailResult;
       if (detailResult.acquisition_stop) {
@@ -2255,11 +2270,14 @@ async function doRefresh(mode, options) {
       attempt_count: 1,
     });
     const error = err.message || String(err);
+    if (detailsStarted && !results.details) {
+      results.details = {error: error, reason_code: "article_metadata_failed"};
+    }
     if (!results.current) {
-      results.current = await sendToNativeHost("refresh_failure", "current", [], error, batchTs);
+      results.current = await recordAlphaPicksFailure("current", error, batchTs);
     }
     if (!results.closed) {
-      results.closed = await sendToNativeHost("refresh_failure", "closed", [], error, batchTs);
+      results.closed = await recordAlphaPicksFailure("closed", error, batchTs);
     }
     await saveRefreshState(batchTs, results);
     return results;
@@ -3089,9 +3107,10 @@ async function safeRemoveTab(tabId) {
 async function waitForAlphaPicksTableReady(tabId, expectedUrl, label, timeoutMs = ALPHA_PICKS_PAGE_TIMEOUT_MS) {
   const start = Date.now();
   const expectedPath = expectedPathFromUrl(expectedUrl);
+  const expectedOrigin = new URL(expectedUrl).origin;
   let lastSnapshot = null;
   while (Date.now() - start < timeoutMs) {
-    await inspectSaAccess(tabId);
+    if (saAcquisitionTask) requireAcquisitionTask();
     let tab = null;
     try {
       tab = await chrome.tabs.get(tabId);
@@ -3101,12 +3120,33 @@ async function waitForAlphaPicksTableReady(tabId, expectedUrl, label, timeoutMs 
       continue;
     }
 
-    const snapshot = await inspectAlphaPicksReadiness(tabId, expectedPath);
-    lastSnapshot = Object.assign({}, snapshot || {}, {
+    lastSnapshot = {
       tabStatus: (tab && tab.status) || "unknown",
       tabUrl: (tab && tab.url) || "",
       pendingUrl: (tab && tab.pendingUrl) || "",
-    });
+    };
+    // A newly created tab can be complete but still contain its initial blank document.
+    if (!lastSnapshot.tabUrl || lastSnapshot.tabUrl === "about:blank") {
+      await sleep(500);
+      continue;
+    }
+    const pageOrigin = new URL(lastSnapshot.tabUrl).origin;
+    if (pageOrigin !== expectedOrigin) {
+      return {ok: false, reason_code: "dom_not_ready", error: "Unexpected Alpha Picks page origin: " + pageOrigin};
+    }
+    try {
+      await inspectSaAccess(tabId);
+    } catch (err) {
+      const message = err && err.message ? err.message : String(err || "");
+      // The tab URL may advance before its new document becomes injectable.
+      if (isAcquisitionStop(err) || tab.status !== "loading" ||
+          !/Missing host permission for the tab|Cannot access contents of (?:the )?url/i.test(message)) throw err;
+      lastSnapshot.scriptError = message;
+      await sleep(500);
+      continue;
+    }
+    const snapshot = await inspectAlphaPicksReadiness(tabId, expectedPath);
+    lastSnapshot = Object.assign({}, snapshot || {}, lastSnapshot);
 
     if (lastSnapshot.status === "login_redirect") {
       return {

@@ -836,7 +836,11 @@ The [bounded Firefox watchlist acceptance](docs/superpowers/evidence/2026-09-23-
 verifies the operator's two-company manual queue and saved-table readback.
 It is not Google Chrome acceptance or authorization to start the production list.
 
-**Shared acquisition authority is implemented, not yet activated in production.**
+**Shared acquisition authority is implemented.** The formal Firefox owner was
+selected on September 26. News metadata updates were observed; the first Alpha
+Picks attempt exposed a page-readiness failure and an incorrect success receipt.
+The [readiness repair evidence](docs/superpowers/evidence/2026-09-26-sa-alpha-readiness/README.md)
+keeps that failure separate from the replacement's regression and live checks.
 Either Chrome or Firefox can be explicitly selected. Firefox is the operator's
 initial preference, not a fixed dependency. The
 [coordination evidence](docs/superpowers/evidence/2026-09-23-sa-automation-coordination/README.md)
@@ -865,6 +869,12 @@ can extend elapsed time. Whole-watchlist membership comes from the complete App
 active universe, not a copied or hard-coded list. Source/staleness warnings and
 unsupported symbols remain visible; unavailable inputs refuse partial-universe
 acquisition. Membership is rechecked before each scope; removed targets do not run.
+
+The App's `BRK B` spelling and `BRK-B` alias resolve to SA's `BRK.B` company
+pages. These aliases share one capture scope, stored observation lookup and
+cooldown; the original App membership is not renamed. This mapping applies to
+queries and scheduling, not to validating source captures. No general replacement
+of spaces or punctuation is used, and other unmapped symbols stay visible.
 
 **Enable updates in this browser** is the explicit activation command. It first
 disables local acquisition intent, validates idle authority and the operator's
@@ -954,6 +964,19 @@ one backup, upgrade and subsequent owner selection; old automated clients must b
 stopped/updated before rollout.
 
 ### SA Successful Checks, Pauses And Receipts
+
+Alpha Picks collection distinguishes a saved failure record from a successful
+capture. A native `refresh_failure` acknowledgment is never capture success,
+including when reading an older browser receipt. Failed prerequisite phases or
+interrupted article extraction must not produce completed downstream phases or
+advance a healthy-run anchor. Existing historical job records are not rewritten.
+
+Fresh browser tabs can still contain `about:blank` before the requested document
+commits. Alpha Picks readiness waits inside its existing 90-second deadline,
+without reloading or widening host permissions. Known transient injection-denial
+errors are retryable only while navigation is loading; a denial on a completed
+provider document is an error, and login/challenge stops still take effect.
+Readiness does not require every page resource to finish loading.
 
 Each financial ticker/statement/view retains its successful capture timestamp,
 observation ID, next eligibility, attempt and failure. Reads and unchanged saves
