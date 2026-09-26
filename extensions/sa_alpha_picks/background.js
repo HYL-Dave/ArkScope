@@ -662,12 +662,13 @@ async function companyCollectorControl(operation, extra) {
   }));
 }
 
-async function syncAcquisitionBadge(state) {
+async function syncAcquisitionBadge(state, persistStatus) {
   var cached = await chrome.storage.local.get(["saAcquisitionRestriction","saAcquisitionPending"]);
   var reason = state && (state.paused_reason || state.rate_limited && "rate_limited"
     || Object.keys(state.capability_pauses || {}).length && "access_restricted");
   if (!reason && cached.saAcquisitionPending && cached.saAcquisitionRestriction) reason = cached.saAcquisitionRestriction.reason;
-  if (state) await chrome.storage.local.set({saAcquisitionStatus:state});
+  if (!reason && !saSyncJobInFlight && (cached.saAcquisitionPending || state && state.is_owner && state.active)) reason = "recovery_required";
+  if (state && persistStatus !== false) await chrome.storage.local.set({saAcquisitionStatus:state});
   if (state && state.rate_limited && Date.parse(state.rate_limit_until) > Date.now()) {
     await chrome.alarms.create(SA_ACQUISITION_COOLDOWN_ALARM,{when:Date.parse(state.rate_limit_until)});
   }
@@ -676,6 +677,7 @@ async function syncAcquisitionBadge(state) {
     if (reason) await chrome.action.setBadgeBackgroundColor({color:"#be2535"});
     await chrome.action.setTitle({title:reason === "login_required" ? "Seeking Alpha: sign in required"
       : reason === "access_restricted" ? "Seeking Alpha: check subscription access"
+      : reason === "recovery_required" ? "Seeking Alpha: stopped capture needs recovery"
       : reason ? "Seeking Alpha: acquisition paused" : "SA Alpha Picks"});
   }
 }
@@ -897,9 +899,9 @@ function bodyRecoveryReason(value, fallback) {
     "sa_article_body_disclosure_only", "sa_article_body_metadata_only"].includes(value) ? value : fallback;
 }
 
-function holdArticleBodyRecoveryLifetime(run) {
+function holdSaAcquisitionLifetime(run, maxMilliseconds) {
   // Timers and one-shot native calls do not keep Firefox event pages alive.
-  // Hold a real native port only for this explicit, time-bounded manual batch.
+  // Hold a native port for one finite task, never while an idle queue waits.
   function open() {
     if (run.cancelled) return false;
     return new Promise(function (resolve) {
@@ -915,9 +917,7 @@ function holdArticleBodyRecoveryLifetime(run) {
         if (!run.cancelled) {
           run.interruption = reason;
           run.cancelled = true;
-          run.batch.status = "cancelling";
-          run.batch.stop_reason = reason;
-          persistArticleBodyRecovery(run.batch).catch(function () {});
+          if (run.onInterrupted) run.onInterrupted(reason);
         }
         if (run.wake) run.wake();
         clearTimeout(handshakeTimer);
@@ -957,7 +957,7 @@ function holdArticleBodyRecoveryLifetime(run) {
         port.onMessage.addListener(received);
         port.onDisconnect.addListener(disconnected);
         handshakeTimer = setTimeout(function () {interrupt("native_host_unavailable");}, 15000);
-        deadlineTimer = setTimeout(function () {interrupt("batch_timeout");}, ARTICLE_BODY_RECOVERY_MAX_MS);
+        if (maxMilliseconds) deadlineTimer = setTimeout(function () {interrupt("batch_timeout");}, maxMilliseconds);
         port.postMessage({action:"ping"});
       } catch (_) {interrupt("native_host_unavailable");}
     });
@@ -966,6 +966,15 @@ function holdArticleBodyRecoveryLifetime(run) {
   // for the lifetime of the port (normal acquisition calls need the same lock).
   return globalThis.navigator && navigator.locks && typeof navigator.locks.request === "function"
     ? navigator.locks.request("arkscope-native-messaging:" + NATIVE_HOST, open) : Promise.resolve(open());
+}
+
+function holdArticleBodyRecoveryLifetime(run) {
+  run.onInterrupted = function (reason) {
+    run.batch.status = "cancelling";
+    run.batch.stop_reason = reason;
+    persistArticleBodyRecovery(run.batch).catch(function () {});
+  };
+  return holdSaAcquisitionLifetime(run, ARTICLE_BODY_RECOVERY_MAX_MS);
 }
 
 function persistArticleBodyRecovery(batch) {
@@ -1248,9 +1257,15 @@ async function captureArticleBodyRecovery(target, run, diagnostics) {
 async function handleAcquisitionControl(msg) {
   if (msg.action === "enable_sa_updates_here") return activateSaUpdates(msg);
   if (msg.action === "get_company_refresh") {
+    var pendingState = await saAcquisition.reconcilePending();
     var status = await companyFinancialRefresh.status();
-    var saved = await chrome.storage.local.get("saAcquisitionPending");
-    return Object.assign({},status,{acquisition_pending:!!saved.saAcquisitionPending,queue:saAcquisitionQueue.status()});
+    var active = saAcquisition.running || saSyncJobInFlight;
+    var pending = pendingState.pending;
+    var recovery = !active && !!(pending || status.collector && status.collector.is_owner && status.collector.active);
+    await syncAcquisitionBadge(status.collector, false).catch(function () {});
+    return Object.assign({},status,{acquisition_pending:!!pending,acquisition_runtime_active:active,
+      acquisition_recovery_required:recovery,acquisition_pending_since:pending && pending.started_at || null,
+      queue:saAcquisitionQueue.status()});
   }
   if (msg.action === "preview_company_refresh") return companyFinancialRefresh.preview(msg.config);
   if (msg.action === "save_company_refresh") return companyFinancialRefresh.configure(Object.assign({},msg.config,{enabled:false}));
@@ -1260,10 +1275,29 @@ async function handleAcquisitionControl(msg) {
     return companyFinancialRefresh.run({force:msg.force === true});
   }
   var operation = msg.action === "recover_sa_acquisition" ? "recover" : "resume";
+  if (operation === "recover" && (saSyncJobInFlight || saAcquisition.running || articleBodyRecoveryActive)) {
+    return {status:"error",error_code:"sa_company_collector_busy"};
+  }
+  if (operation === "recover") return saAcquisitionQueue.enqueue({key:"operator-acquisition-recovery",
+    priority:"routine",run:function () {return applyAcquisitionControl(msg,operation);}});
+  return applyAcquisitionControl(msg,operation);
+}
+
+async function applyAcquisitionControl(msg, operation) {
+  if (operation === "recover" && (saSyncJobInFlight || saAcquisition.running || articleBodyRecoveryActive)) {
+    return {status:"error",error_code:"sa_company_collector_busy"};
+  }
+  var pending = (await chrome.storage.local.get("saAcquisitionPending")).saAcquisitionPending;
   var state = await companyCollectorControl(operation,{expected_generation:msg.expected_generation,
     confirm_stopped:msg.confirm_stopped === true,confirm_handled:msg.confirm_handled === true,capability:msg.capability});
   if (state.status !== "ok") return state;
-  if (operation === "recover") await chrome.storage.local.set({saAcquisitionPending:null});
+  if (operation === "recover") {
+    var current = (await chrome.storage.local.get("saAcquisitionPending")).saAcquisitionPending;
+    if (pending && current && current.request_id === pending.request_id
+        && current.ledger_id === pending.ledger_id && current.generation === pending.generation) {
+      await chrome.storage.local.set({saAcquisitionPending:null});
+    }
+  }
   else {
     await chrome.storage.local.set({saAcquisitionRestriction:null});
     await companyFinancialRefresh.resume();
@@ -1691,17 +1725,32 @@ function enqueueSaSyncJob(opts, jobFn) {
     }
     saSyncJobInFlight = true;
     var startedAt = new Date().toISOString();
+    await chrome.storage.local.set({saAcquisitionRuntime:{running:true,operation:operation,started_at:startedAt}}).catch(function () {});
     var diagnostics = SAExtensionDiagnostics.createCollector();
     var capturedResult = null;
+    var lifetime = {cancelled:false,onInterrupted:function (reason) {
+      if (!saAcquisitionTask) return;
+      saAcquisitionTask.interrupt({status:"error",reason:"collector_unavailable",error_code:reason});
+      Array.from(saAcquisitionTask.ownedTabs).forEach(function (tabId) {safeRemoveTab(tabId).catch(function () {});});
+    }};
     try {
       if (!operation) return await jobFn(diagnostics);
+      var borrowedLifetime = operation === "alpha_picks_body_repair" && articleBodyRecoveryActive
+        && !articleBodyRecoveryActive.cancelled && articleBodyRecoveryActive.closeLifetime;
+      if (!borrowedLifetime && !await holdSaAcquisitionLifetime(lifetime)) {
+        capturedResult = attachExtensionRunProtocol(operation,mode,{status:"deferred",
+          reason:"collector_unavailable",error_code:lifetime.interruption || "native_host_unavailable"});
+        return capturedResult;
+      }
       capturedResult = await saAcquisition.runTask(Object.assign({},opts.acquisition || {},{
         operation:operation,mode:mode,trigger:opts.trigger || "manual",intent_revision:opts.intent_revision || 0,
         build:chrome.runtime.getManifest ? chrome.runtime.getManifest().version : "unknown",queue_wait_ms:timing.queue_wait_ms,
       }),async function (task) {
         saAcquisitionTask = task;
+        if (lifetime.cancelled) task.interrupt({status:"error",reason:"collector_unavailable",
+          error_code:lifetime.interruption || "native_host_unavailable"});
         var value;
-        try { value = await jobFn(diagnostics); }
+        try { requireAcquisitionTask(); value = await jobFn(diagnostics); }
         catch (error) {
           if (isAcquisitionStop(error)) value = Object.assign({},error.detail);
           else {
@@ -1744,6 +1793,9 @@ function enqueueSaSyncJob(opts, jobFn) {
         await extensionTelemetryController.submit(event);
       } catch (_) {
         // Recording must never break the actual sync flow.
+      } finally {
+        if (lifetime.closeLifetime) lifetime.closeLifetime();
+        await chrome.storage.local.set({saAcquisitionRuntime:{running:false,finished_at:new Date().toISOString()}}).catch(function () {});
       }
     }
   }});
@@ -3500,25 +3552,6 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     articles: articleList,
   });
 
-  // Check auto_upgrade (first run, empty DB — status is "ok" but auto_upgrade=true)
-  if (metaResult && metaResult.auto_upgrade && mode === "quick") {
-    sendProgress("First run detected, switching to full scan...");
-    scrollMode = "full";
-    await chrome.tabs.update(tabId, { active: true });
-    await sleep(500);
-    await scrollToLoadAll(tabId, ALPHA_PICKS_ARTICLE_LIST_ROUNDS.full);
-    await chrome.tabs.update(tabId, { active: false });
-    // Re-scrape after full scroll
-    articleList = await injectArticlesListScraper(tabId);
-    if (Array.isArray(articleList) && articleList.length > 0) {
-      metaResult = await sendNativeMessage2({
-        action: "save_articles_meta",
-        mode: "full",
-        articles: articleList,
-      });
-    }
-  }
-
   if (!metaResult || metaResult.status !== "ok") {
     recordNativeExtensionFailure(diagnostics, metaResult, "phase", null);
     var metaError = (metaResult && metaResult.error) || "save_articles_meta failed";
@@ -3534,7 +3567,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
   var unresolvedSymbols = metaResult.unresolved_symbols || [];
 
   // ── Step 3: Fetch article content + comments for need_content ──
-  var fetched = 0, failed = 0;
+  var fetched = 0, failed = 0, commentsRefreshed = 0;
   var netNewComments = 0;
   var reconciliationFailed = 0;
   if (metaResult.reconciliation && metaResult.reconciliation.status === "failed") {
@@ -3546,20 +3579,28 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
       attempt_count: 1,
     });
   }
-  var total = needContent.length + needComments.length;
+  var detailIds = new Set(needContent.map(function (item) {return item.article_id;}));
+  var work = needContent.map(function (item) {return {item:item,body:true};}).concat(
+    needComments.filter(function (item) {return !detailIds.has(item.article_id);})
+      .map(function (item) {return {item:item,body:false};}));
+  if (mode === "quick" && metaResult.quick_workload) {
+    var order = metaResult.quick_workload.selected_article_ids || [];
+    work.sort(function (a,b) {return order.indexOf(a.item.article_id) - order.indexOf(b.item.article_id);});
+  }
+  var total = work.length;
   function stoppedDetails(error) {
     return {articles_saved:metaResult.saved || 0,fetched:fetched,failed:failed,
       comments_refreshed:commentsRefreshed || 0,net_new_comments:netNewComments,
-      reconciliation_failed:reconciliationFailed,acquisition_stop:error.detail};
+      reconciliation_failed:reconciliationFailed,quick_workload:metaResult.quick_workload || null,
+      acquisition_stop:error.detail};
   }
 
   if (needContent.length > 0) {
     sendProgress("Fetching " + needContent.length + " article(s)...");
   }
 
-  for (var i = 0; i < needContent.length; i++) {
-    var item = needContent[i];
-    sendProgress("Article " + (i + 1) + "/" + needContent.length + ": " + item.article_id);
+  async function fetchBody(item, i) {
+    sendProgress("Article " + (i + 1) + "/" + total + ": " + item.article_id);
 
     try {
       // Navigate to article (tab must be active for comment scroll)
@@ -3576,7 +3617,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
           attempt_count: 1,
         });
         if (await observeSaRestriction(ready.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
-        continue;
+        return;
       }
       var captured = await captureArticle(tabId, item, scrollMode, true);
       var detail = captured.detail;
@@ -3589,7 +3630,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
           retryable: true,
           attempt_count: 1,
         });
-        continue;
+        return;
       }
 
       var bodyScrollStats = captured.scroll;
@@ -3666,14 +3707,8 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     // No artificial delay — comment scroll provides natural dwell time
   }
 
-  // ── Step 4: Refresh comments for articles flagged by DAL ──
-  var commentsRefreshed = 0;
-  if (needComments.length > 0) {
-    sendProgress("Refreshing comments for " + needComments.length + " article(s)...");
-  }
-  for (var j = 0; j < needComments.length; j++) {
-    var cItem = needComments[j];
-    sendProgress("Comments " + (j + 1) + "/" + needComments.length + ": " + cItem.article_id);
+  async function fetchComments(cItem, i) {
+    sendProgress("Comments " + (i + 1) + "/" + total + ": " + cItem.article_id);
 
     try {
       await managedSaTabs.update(tabId, { url: cItem.url, active: true });
@@ -3689,7 +3724,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
           attempt_count: 1,
         });
         if (await observeSaRestriction(commentsReady.reason_code)) throw new SAAcquisition.Stop(saAcquisitionTask.stop);
-        continue;
+        return;
       }
       var commentCapture = await captureArticle(tabId, cItem, scrollMode, false);
       var commentScrollStats = commentCapture.scroll;
@@ -3744,6 +3779,11 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     }
   }
 
+  for (var i = 0; i < work.length; i++) {
+    var stopped = await (work[i].body ? fetchBody(work[i].item,i) : fetchComments(work[i].item,i));
+    if (stopped) return stopped;
+  }
+
   // ── Step 5: Read the event-scoped review queue ──
   sendProgress("Loading article review queue...");
   var auditResult = await sendNativeMessage2({ action: "audit_unresolved" });
@@ -3765,6 +3805,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     unresolved_symbols: unresolvedSymbols,
     review_required: reviewRequired,
     reconciliation_failed: reconciliationFailed,
+    quick_workload: metaResult.quick_workload || null,
   };
 }
 

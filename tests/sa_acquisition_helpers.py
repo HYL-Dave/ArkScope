@@ -3,6 +3,7 @@
 ADMITTED_TASK = """
 saAcquisitionTask = {
   operation:'alpha_picks_sync', ownedTabs:new Set(), stop:null,
+  interrupt(detail) {this.stop=this.stop || detail;},
   async navigate(_request, perform) { return perform(); },
   async observeRestriction(reason) { this.stop={status:'error',reason:'site_paused',error_code:reason}; },
 };
@@ -10,6 +11,12 @@ chrome.alarms.clear = async () => {};
 """
 
 AUTHORITY = """
+if (!chrome.runtime.connectNative) chrome.runtime.connectNative = () => {
+  const messages=new Set();
+  return {onMessage:{addListener:fn=>messages.add(fn),removeListener:fn=>messages.delete(fn)},
+    onDisconnect:{addListener(){},removeListener(){}},
+    postMessage(){Promise.resolve().then(()=>messages.forEach(fn=>fn({status:'ok'})));},disconnect(){}};
+};
 const admittedState = {status:'ok',is_owner:true,ledger_id:'d'.repeat(32),generation:1,policy:{}};
 let authorityReply = null;
 companyCollectorControl = async (operation, message) => {

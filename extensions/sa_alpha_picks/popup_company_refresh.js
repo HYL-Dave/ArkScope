@@ -3,12 +3,14 @@
   var $ = function(id) {return document.getElementById(id);};
   var form=$("companyRefreshForm"), output=$("companyRefreshStatus"), target=$("companyRefreshTargetMode"), ticker=$("companyRefreshTickers");
   var dirty=false, policyDirty=false, busy=false, revision=0, readRevision=0, state=null, expectedGeneration=null;
+  var liveState=null, reloadPending=false;
   function lockForm(value) {
     busy=value;
     form.querySelectorAll('input, select, button').forEach(function(input){
       if(value){input.dataset.wasDisabled=String(input.disabled);input.disabled=true;}
       else if(input.dataset.wasDisabled!==undefined){input.disabled=input.dataset.wasDisabled==='true';delete input.dataset.wasDisabled;}
     });
+    if(!value && reloadPending) {reloadPending=false;reload();}
   }
   function send(action,extra) {
     return new Promise(function(resolve) {
@@ -59,15 +61,45 @@
     var result=await send("preview_company_refresh",{config:config()});
     if(ticket===revision)renderPreview(result);
   }
+  function recoveryAllowed() {
+    return !busy && liveState && liveState.acquisition_runtime_active === false
+      && liveState.acquisition_recovery_required === true && !(state && state.running);
+  }
+  function renderLifecycle() {
+    var node=$("saAcquisitionLive"), control=state && state.collector || {};
+    var running=liveState && (liveState.acquisition_runtime_active === true || state && state.running);
+    var stopped=!running && liveState && liveState.acquisition_recovery_required === true;
+    var active=control.active || {};
+    node.className=stopped ? "partial" : "empty";
+    node.setAttribute("role",stopped ? "alert" : "status");
+    if(running) {
+      node.textContent="Acquisition running: "+(active.operation || "operation pending")
+        +" | Started: "+(active.started_at || liveState && liveState.acquisition_pending_since || "unknown")
+        +" | Navigation attempts: "+(Number.isInteger(active.navigation_attempt_count) ? active.navigation_attempt_count : "unknown");
+    } else if(stopped) {
+      node.textContent="Stopped capture: recovery required."
+        +" | Operation: "+(active.operation || "unknown")
+        +" | Since: "+(liveState.acquisition_pending_since || active.started_at || "unknown");
+    } else {
+      node.textContent=liveState ? "Acquisition: idle here." : "Acquisition status unavailable.";
+    }
+    var pending=state && state.queue && state.queue.pending;
+    if(pending && Number.isInteger(pending.routine) && Number.isInteger(pending.background)) {
+      node.textContent+=" | Queued: "+(pending.routine+pending.background);
+    }
+    $("saAcquisitionReviewRecovery").hidden=!stopped;
+    $("companyCollectorRecover").hidden=!(stopped || running && (control.active || state.acquisition_pending));
+    $("companyCollectorRecover").disabled=!recoveryAllowed();
+  }
   function warning(control) {
     var node=$("saAcquisitionWarning"), caps=Object.keys(control && control.capability_pauses || {});
     var reason=control && control.paused_reason;
-    node.hidden=!reason && !caps.length && !(control && control.rate_limited) && !(state && state.acquisition_pending);
+    node.hidden=!reason && !caps.length && !(control && control.rate_limited);
     node.textContent=reason === "login_required" ? "Seeking Alpha sign-in expired. Acquisition paused."
       : reason === "human_verification_required" ? "Seeking Alpha verification required. Acquisition paused."
       : caps.length ? "Subscription access unavailable: "+caps.join(", ")+". Premium and Alpha Picks require separate access."
       : control && control.rate_limited ? "Seeking Alpha cooldown until "+control.rate_limit_until
-      : state && state.acquisition_pending ? "Unconfirmed acquisition. Stopped-capture recovery required." : reason || "";
+      : reason || "";
     $("saAcquisitionResume").hidden=!(reason || caps.length);
     $("saAcquisitionResume").disabled=busy || !(control && control.is_owner) || !!control.active;
   }
@@ -76,7 +108,9 @@
     if (!result || result.status !== "ok" || !result.config) {
       line(output,(result && result.activation_step ? result.activation_step+": " : "")+(result && result.error_code || "sa_company_schedule_unavailable"));return;
     }
+    var firstRender=!state;
     state=result;
+    if(typeof result.acquisition_runtime_active === "boolean")liveState=result;
     var control=result.collector || {}, values=result.config;
     if (!dirty) {
       target.value=values.target_mode || "manual";ticker.value=values.tickers.join(", ");
@@ -92,7 +126,7 @@
       $("companyBudgetEnabled").checked=!!(control.policy && control.policy.hour_limit!==null);
       if(control.policy)Object.keys(control.policy).forEach(function(key){var input=form.querySelector('[name="'+key+'"]');if(input)input.value=control.policy[key] == null ? "" : control.policy[key];});
       budgetControls();
-      $("companyAdvanced").open=!control.policy;
+      if(firstRender)$("companyAdvanced").open=!control.policy;
       expectedGeneration=control.generation == null ? 0 : control.generation;
     }
     var changed=control.generation != null && control.generation!==expectedGeneration;
@@ -107,8 +141,7 @@
       || control.capability_pauses && control.capability_pauses.financials || result.paused_reason || result.acquisition_pending;
     $("companyRefreshNow").disabled=busy || !!result.running || !!denied;
     $("companyRefreshForce").disabled=$("companyRefreshNow").disabled;
-    $("companyCollectorRecover").hidden=!(control.active || result.acquisition_pending);
-    $("companyCollectorRecover").disabled=busy || !!result.running;
+    renderLifecycle();
     $("companyRefreshCancel").hidden=!result.pending_count;
     warning(control);
     var targets=$("companyRefreshTargets"), info=result.target_info;targets.replaceChildren();
@@ -143,7 +176,15 @@
     (result.scopes || []).forEach(function(scope){line(records,scope.ticker+" / "+scope.statement+" / "+scope.view+" / USD | Last success: "+(scope.last_success_at || "Never")+" | Next attempt: "+(scope.next_due_at || "Due")+(scope.last_error ? " | "+scope.last_error : ""));});
     output.appendChild(records);
   }
-  async function reload() {var ticket=++readRevision;var result=await send("get_company_refresh");if(ticket!==readRevision || busy)return;render(result);await preview();}
+  async function reload() {
+    if(busy) {reloadPending=true;return;}
+    var ticket=++readRevision;
+    var result=await send("get_company_refresh");
+    if(ticket!==readRevision)return;
+    if(busy) {reloadPending=true;return;}
+    if(result.status!=="ok") {liveState=null;renderLifecycle();$("saAcquisitionResume").disabled=true;}
+    render(result);await preview();
+  }
   form.addEventListener("input",function(event){
     var input=event.target;
     if(input.matches('#companyBudgetEnabled, [name="hour_limit"], [name="day_limit"], [name="hour_reserve"], [name="day_reserve"]')) {
@@ -186,8 +227,17 @@
   $("companyRefreshForce").addEventListener("click",function(){update(true);});
   $("companyRefreshCancel").addEventListener("click",async function(){render(await send("cancel_company_refresh"));await preview();});
   $("companyCollectorRecover").addEventListener("click",async function(){
-    if(!$("companyRecoveryConfirmed").checked)return;
-    render(await send("recover_sa_acquisition",{expected_generation:state.collector.generation,confirm_stopped:true}));
+    if(!recoveryAllowed() || !$("companyRecoveryConfirmed").checked)return;
+    lockForm(true);
+    var result=await send("recover_sa_acquisition",{expected_generation:state.collector.generation,confirm_stopped:true});
+    lockForm(false);
+    if(result.status==="ok") {$("companyRecoveryConfirmed").checked=false;await reload();}
+    else render(result);
+  });
+  $("saAcquisitionReviewRecovery").addEventListener("click",function(){
+    $("companyRefreshOptions").open=true;
+    $("companyAdvanced").open=true;
+    $("companyRecoveryConfirmed").focus();
   });
   $("saAcquisitionResume").addEventListener("click",async function(){
     var caps=Object.keys(state.collector.capability_pauses || {});
@@ -195,7 +245,9 @@
   });
   $("companyReloadSettings").addEventListener("click",function(){dirty=false;policyDirty=false;reload();});
   chrome.storage.onChanged.addListener(function(changes,area){
-    if(area === "local" && (changes.companyFinancialRefresh || changes.saAcquisitionStatus || changes.saAcquisitionPending))reload();
+    // Persisted runtime is a wake-up signal, never evidence of liveness.
+    if(area === "local" && (changes.companyFinancialRefresh || changes.saAcquisitionStatus
+      || changes.saAcquisitionPending || changes.saAcquisitionRuntime))reload();
   });
   reload();
 })();

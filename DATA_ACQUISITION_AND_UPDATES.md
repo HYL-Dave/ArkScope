@@ -669,7 +669,7 @@ of the currently enabled browser preferences.
 | Flow | Eligibility | Coverage limit |
 |---|---|---|
 | News | Fixed 5/15/60 minutes, default 60; optional `auto` checks a custom ET time-window table every 5 minutes | A heartbeat can skip without opening a page. `auto` is not an exchange-session calendar. |
-| Alpha Picks | Quick Update every selected 15/30/60 minutes, default 30 | Scans recent article-list content; does not imply a full historical scan. |
+| Alpha Picks | Quick Update every selected 15/30/60 minutes, default 30 | Recent article list plus at most four unique article pages across body, comment and reconciliation work, newest first. Never silently upgrades to Full, even with an empty local corpus. |
 | Comments | Included with new article bodies; revisit scanned articles when an observed count changes or a first positive count appears | No independent comment timer; an unchanged count does not prove unchanged text. |
 | Incomplete comment capture | A pending capture remains eligible even if the displayed count is unchanged; ordinary retries wait six hours after the last scan attempt | Quick adds at most one pending article per pass; Full shares its existing additional batch limit. Explicit Deep Repair can bypass this retry delay, not website admission or restrictions. |
 | Additional comment recovery | In Full/Deep scans only: default seven-day age eligibility, with configured additional batches defaulting to 10/50 | The age rule does not itself schedule these scans. Old unscanned articles can remain outside Quick Update coverage. |
@@ -678,6 +678,14 @@ Comment age and scan budget are separate. Quick/Full, including first-capture
 work and manual article linking, prioritize the last **30 days of comments**.
 Only explicit **Deep Repair Scan** requests historical expansion. A first
 capture's 120-second budget does not silently opt into historical repair.
+
+Quick's `quick_workload` receipt exposes the selected IDs, per-run navigation
+budget, eligible-candidate count and deferred-candidate count. Existing retry
+gates and reconciliation proposal limits still apply: this is not a whole-corpus
+backlog count. Unselected candidates retain eligibility for a later run. Historical
+unusable bodies remain in the explicit body-repair flow, not the routine Quick
+queue. The older native `check_detail_cache` action is not used by this flow;
+its ticker matching permits exact symbols and documented scraper aliases only.
 
 Keep existing selected intervals with shared coordination. Do
 not enable frequent full/deep scans merely to compensate for missing coverage.
@@ -938,7 +946,8 @@ but cannot exceed the total. Every managed page create, URL change, reload and
 current-page capture admission is checked and debited before the browser action.
 A refused or repeated permission cannot become a second executable navigation.
 Lowering limits, selecting another browser or restarting does not reset spent
-capacity. First Quick Update expanding into Full remains under the same bounds.
+capacity. The Quick action's small batch boundary is separate from these optional
+site-wide caps; Full/Deep scans require their own explicit action.
 
 Uncapped mode removes only the rolling count rejection. Single-owner admission,
 routine-first queueing, financial/body pacing, cancellation, login/challenge pauses
@@ -954,9 +963,14 @@ remain unmeasured, and prior traffic coverage is explicitly unknown. Deduplicate
 stored content does not prevent repeated network acquisition. The implementation
 does not automatically turn job receipt counts into a provider allowance.
 
-A reservation never expires into another collector. Lost native replies, uncertain
-browser actions or failed cleanup stop further work until the operator stops old
-acquisitions/tabs and explicitly recovers. Recovery is logged and fences the old
+A reservation never expires into another collector. A persisted browser pending
+marker is reconciled against the same native ledger, request, installation and
+generation. A matching terminal record clears only that obsolete marker, without
+replaying a navigation. Absence, age, unknown replies or an active native task are
+not completion evidence. Uncertain browser actions or failed cleanup stop further
+work until the operator stops old acquisitions/tabs and explicitly recovers.
+Recovery is refused while this runtime is still executing a capture or body batch.
+Recovery is logged and fences the old
 reservation; it does not change owner, forgive cooldowns or remove login gates.
 Missing/corrupt authority refuses acquisition instead of silently reinitializing.
 Legacy financial-only state requires explicit stopped-instance confirmation,
@@ -970,6 +984,15 @@ capture. A native `refresh_failure` acknowledgment is never capture success,
 including when reading an older browser receipt. Failed prerequisite phases or
 interrupted article extraction must not produce completed downstream phases or
 advance a healthy-run anchor. Existing historical job records are not rewritten.
+
+Routine news, Alpha Picks and financial tasks hold a native messaging port while
+executing, just as manual body repair does. Closing the popup must not suspend a
+task during its page/scroll waits. Ports close after cleanup and telemetry; a lost
+port stops further navigation, never automatically reconnects or retries a page.
+Idle schedules do not hold a port. Browser termination can still interrupt work;
+the popup distinguishes a live runtime from a stopped capture requiring recovery.
+New deferred job records use status `deferred`, not `succeeded`. Older receipts
+retain their original identity and are interpreted using their derived outcome.
 
 Fresh browser tabs can still contain `about:blank` before the requested document
 commits. Alpha Picks readiness waits inside its existing 90-second deadline,

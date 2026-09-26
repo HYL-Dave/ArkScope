@@ -43,7 +43,7 @@ function responseFor(message) {
     return clone(fixture.resumeResult || fixture.state || {status: "error"});
   }
   if (message.action === "refresh" || message.action === "refresh_market_news") {
-    return {status: "ok"};
+    return Object.hasOwn(fixture, "refreshResult") ? clone(fixture.refreshResult) : {status: "ok"};
   }
   return {status: "ok", events: [], total: 0};
 }
@@ -76,7 +76,20 @@ function createChrome(initialStorage) {
       sendMessage(message, callback) {
         sent.push(clone(message));
         const response = responseFor(message);
-        if (callback) queueMicrotask(() => callback(clone(response)));
+        const respond = () => {
+          if (fixture.runtimeError && ["refresh", "refresh_market_news"].includes(message.action)) {
+            chrome.runtime.lastError = {message: fixture.runtimeError};
+          }
+          if (callback) callback(clone(response));
+          chrome.runtime.lastError = null;
+        };
+        if (fixture.runtimeDuringAction === message.action) {
+          queueMicrotask(async () => {
+            fixture.companyRefresh = fixture.nextCompanyRefresh;
+            await chrome.storage.local.set({saAcquisitionRuntime: fixture.runtimeSignal});
+            setTimeout(respond, 0);
+          });
+        } else if (callback) queueMicrotask(respond);
         return Promise.resolve(clone(response));
       },
       sendNativeMessage(_host, message, callback) {
@@ -306,6 +319,21 @@ function snapshot(document, sent) {
     companyRefreshNowDisabled: document.getElementById("companyRefreshNow")?.disabled,
     companyRefreshEnabled: document.getElementById('companyRefreshEnabled')?.checked,
     companyScopePreview: text(document.getElementById('companyScopePreview')),
+    acquisitionLive: text(document.getElementById('saAcquisitionLive')),
+    acquisitionLiveRole: document.getElementById('saAcquisitionLive')?.getAttribute('role'),
+    acquisitionLiveInDetails: !!document.getElementById('saAcquisitionLive')?.closest('details'),
+    acquisitionWarning: text(document.getElementById('saAcquisitionWarning')),
+    acquisitionWarningHidden: document.getElementById('saAcquisitionWarning')?.hidden,
+    acquisitionRecoveryShortcutHidden: document.getElementById('saAcquisitionReviewRecovery')?.hidden,
+    acquisitionRecoverDisabled: document.getElementById('companyCollectorRecover')?.disabled,
+    companyAdvancedOpen: document.getElementById('companyAdvanced')?.open,
+    companyOptionsOpen: document.getElementById('companyRefreshOptions')?.open,
+    refreshAttemptStatus: text(document.getElementById('refreshAttemptStatus')),
+    refreshAttemptRole: document.getElementById('refreshAttemptStatus')?.getAttribute('role'),
+    storedAlphaStatus: text(document.getElementById('status')),
+    storedNewsStatus: text(document.getElementById('marketNewsStatus')),
+    refreshButtonsDisabled: ['quickBtn','fullBtn','backfillBtn','marketNewsBtn','marketNewsCatchupBtn'].map(
+      id => document.getElementById(id)?.disabled),
     advancedPreview: text(advancedPreview),
     reviewScope: reviewScope
       ? {hidden: reviewScope.hidden, text: text(reviewScope)}
@@ -329,7 +357,7 @@ async function settle() {
 async function runPopup() {
   const htmlPath = path.join(extensionDir, "popup.html");
   const dom = new JSDOM(fs.readFileSync(htmlPath, "utf8"), {
-    url: "moz-extension://arkscope/popup.html",
+    url: fixture.browser === "chrome" ? "chrome-extension://arkscope/popup.html" : "moz-extension://arkscope/popup.html",
     runScripts: "outside-only",
     pretendToBeVisual: true,
   });
@@ -354,7 +382,27 @@ async function runPopup() {
     }
     await settle();
 
-    if (scenario === 'preview_company_scope' || scenario === 'enable_sa_updates_here') {
+    if (scenario === 'acquisition_runtime_wakeup') {
+      fixture.companyRefresh = fixture.nextCompanyRefresh;
+      await mocks.chrome.storage.local.set({saAcquisitionRuntime: fixture.runtimeSignal});
+      await settle();
+    } else if (scenario === 'review_stopped_acquisition') {
+      dom.window.document.getElementById('companyRefreshOptions').open = false;
+      dom.window.document.getElementById('companyAdvanced').open = false;
+      dom.window.document.getElementById('saAcquisitionReviewRecovery')?.click();
+      await settle();
+    } else if (scenario === 'recover_acquisition') {
+      dom.window.document.getElementById('companyRecoveryConfirmed').checked = fixture.confirmStopped === true;
+      dom.window.document.getElementById('companyCollectorRecover').click();
+      await settle();
+    } else if (scenario === 'click_alpha_refresh' || scenario === 'click_news_refresh') {
+      dom.window.document.getElementById(scenario === 'click_alpha_refresh' ? 'quickBtn' : 'marketNewsBtn').click();
+      await settle();
+      if (fixture.storageAfterClick) {
+        await mocks.chrome.storage.local.set(fixture.storageAfterClick);
+        await settle();
+      }
+    } else if (scenario === 'preview_company_scope' || scenario === 'enable_sa_updates_here') {
       const doc=dom.window.document;
       doc.getElementById('companyRefreshTargetMode').value='watchlist';
       doc.getElementById('companyRefreshEnabled').checked=true;
@@ -429,6 +477,7 @@ async function runPopup() {
     } else if (scenario === "contrast_audit") {
       exposeContrastStates(dom.window.document, fixture);
     }
+    if (fixture.runtimeDuringAction) await settle();
     const result = snapshot(dom.window.document, mocks.sent);
     if (scenario === "contrast_audit") {
       result.contrastAudit = contrastAudit(dom.window.document);

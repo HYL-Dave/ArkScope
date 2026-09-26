@@ -82,6 +82,14 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
                 const realCreate=chrome.tabs.create.bind(chrome.tabs);
                 chrome.tabs.create=opts=>realCreate({...opts,url:ARK_FIXTURE_URL+'/page'});
                 chrome.runtime.sendNativeMessage=(_host,_msg,cb)=>{if(cb)cb({status:'error',error_code:'offline_fixture_native_disabled'});return Promise.resolve({status:'error'});};
+                // Authority-only fixture; real port lifetime has a separate
+                // ping-only host test. Never open a registered production host.
+                chrome.runtime.connectNative=()=>{
+                  const listeners=new Set();
+                  return {onMessage:{addListener:fn=>listeners.add(fn),removeListener:fn=>listeners.delete(fn)},
+                    onDisconnect:{addListener(){},removeListener(){}},
+                    postMessage(){Promise.resolve().then(()=>listeners.forEach(fn=>fn({status:'ok'})));},disconnect(){}};
+                };
                 """
                 (folder / "fixture_pre.js").write_text(pre)
                 shutil.copyfile(Path(__file__).parent / "js/run_sa_acquisition_browser_fixture.mjs", folder / "fixture_hooks.js")

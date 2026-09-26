@@ -241,6 +241,8 @@
       color: #666;
     }
     #status,
+    #saAcquisitionLive,
+    #refreshAttemptStatus,
     #marketNewsStatus,
     #lastRunStatus,
     #companyCaptureStatus,
@@ -259,9 +261,12 @@
     #companyCaptureStatus.success,
     #marketNewsRecoveryStatus.success { border-left-color: #2e7d32; }
     #marketNewsStatus.partial,
+    #saAcquisitionLive.partial,
+    #refreshAttemptStatus.partial,
     #lastRunStatus.partial,
     #marketNewsRecoveryStatus.partial { border-left-color: #ef6c00; }
     #marketNewsStatus.error,
+    #refreshAttemptStatus.error,
     #lastRunStatus.error,
     #companyCaptureStatus.error,
     #marketNewsRecoveryStatus.error { border-left-color: #c62828; }
@@ -402,8 +407,11 @@
 </head>
 <body>
   <h2>SA Alpha Picks</h2>
+  <div id="saAcquisitionLive" role="status" aria-live="polite">Checking acquisition status...</div>
+  <button class="action-button" id="saAcquisitionReviewRecovery" type="button" hidden>Review stopped capture</button>
   <div id="saAcquisitionWarning" role="alert" hidden></div>
   <button class="action-button" id="saAcquisitionResume" type="button" hidden>Resume after sign-in / access check</button>
+  <div id="refreshAttemptStatus" role="status" aria-live="polite" hidden></div>
   <div id="status" class="empty" role="status">No data yet. Click a button below.</div>
   <div id="marketNewsStatus" class="empty" role="status">Market News: not synced yet.</div>
   <div id="lastRunStatus" class="empty" role="status">No audited extension run yet.</div>

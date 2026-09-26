@@ -367,7 +367,10 @@ def derive_run_result(payload: Any) -> dict[str, Any]:
     if claimed_outcome is not None and claimed_outcome != derived_outcome:
         _fail(message="derived outcome mismatch")
 
-    db_status = "succeeded" if derived_outcome in {"complete", "skipped", "deferred"} else "failed"
+    if derived_outcome == "deferred":
+        db_status = "deferred"
+    else:
+        db_status = "succeeded" if derived_outcome in {"complete", "skipped"} else "failed"
     healthy = derived_outcome == "complete" and operation in {
         "alpha_picks_sync",
         "market_news_sync",

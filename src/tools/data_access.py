@@ -36,6 +36,7 @@ from .schemas import (
 logger = logging.getLogger(__name__)
 _SA_MARKET_NEWS_DETAIL_CACHE_HOURS = 24
 _SA_MARKET_NEWS_BACKFILL_PUBLISHED_WINDOW_HOURS = 24
+_SA_QUICK_NAVIGATION_BUDGET = 4
 
 
 def _failed_sa_reconciliation() -> Dict[str, Any]:
@@ -776,14 +777,6 @@ class DataAccessLayer:
 
         The current local capture store owns this operation.
         """
-        # Auto-upgrade: check if first run (empty DB)
-        try:
-            existing = self._backend.query_sa_articles(limit=1)
-            if not existing and mode == "quick":
-                return {"status": "ok", "auto_upgrade": True, "saved": 0}
-        except Exception:
-            pass
-
         # Upsert metadata
         normalized_articles = [_sanitize_sa_article_meta(a) for a in articles]
         saved = self._backend.upsert_sa_articles_meta(normalized_articles)
@@ -814,6 +807,16 @@ class DataAccessLayer:
         articles_by_id = {
             a["article_id"]: a for a in all_articles if a.get("article_id")
         }
+
+        def article_order(article_id):
+            article = articles_by_id.get(article_id, {})
+            published = article.get("published_date")
+            if hasattr(published, "isoformat"):
+                published = published.isoformat()
+            return (str(published or ""), str(article_id))
+
+        if mode == "quick":
+            scanned_article_ids.sort(key=article_order, reverse=True)
         from datetime import datetime, timezone, timedelta
         retry_cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=6)
         from src.agents.config import get_agent_config
@@ -1008,9 +1011,10 @@ class DataAccessLayer:
             reconciliation = self._backend.reconcile_sa_articles(
                 article_ids=scanned_article_ids,
                 max_events=100,
-                enrichment_limit={"quick": 4, "full": 12, "backfill": 20}.get(
-                    mode, 4
-                ),
+                # Quick applies its shared navigation cap after collecting
+                # proposals, so overlap cannot conceal the eligible backlog.
+                enrichment_limit=(len(scanned_article_ids) if mode == "quick"
+                                  else {"full": 12, "backfill": 20}.get(mode, 4)),
             )
         except Exception as exc:
             logger.warning(
@@ -1039,7 +1043,7 @@ class DataAccessLayer:
             enrichment_ids = {item.get("article_id") for item in eligible_enrichment if isinstance(item, dict)}
             need_comments = [item for item in need_comments if item["article_id"] not in enrichment_ids]
 
-        return {
+        result = {
             "status": "ok",
             "saved": saved,
             "need_content": need_content,
@@ -1049,6 +1053,43 @@ class DataAccessLayer:
             "body_recovery_pending": sum(body_recovery_required(a) for a in all_articles),
             "reconciliation": reconciliation,
         }
+        if mode == "quick":
+            enrichment_work = (reconciliation.get("enrichment", [])
+                               if isinstance(reconciliation, dict) else [])
+            groups = [need_content, need_comments, enrichment_work]
+            eligible_ids = {
+                item["article_id"] for group in groups for item in group
+                if isinstance(item, dict) and item.get("article_id")
+            }
+            detail_ids = {
+                item["article_id"] for item in need_content + enrichment_work
+                if isinstance(item, dict) and item.get("article_id")
+            }
+            ordered_ids = sorted(
+                eligible_ids,
+                key=lambda aid: (article_order(aid)[0], aid in detail_ids, str(aid)),
+                reverse=True,
+            )
+            selected_ids = ordered_ids[:_SA_QUICK_NAVIGATION_BUDGET]
+            selected = set(selected_ids)
+            rank = {aid: i for i, aid in enumerate(selected_ids)}
+            for group in groups:
+                group[:] = sorted(
+                    (item for item in group if isinstance(item, dict)
+                     and item.get("article_id") in selected),
+                    key=lambda item: rank[item["article_id"]],
+                )
+            result["quick_workload"] = {
+                "navigation_budget": _SA_QUICK_NAVIGATION_BUDGET,
+                "selected_count": len(selected_ids),
+                "eligible_count": len(eligible_ids),
+                "deferred_count": len(eligible_ids) - len(selected_ids),
+                # Existing retry gates and the reconciliation event limit
+                # still apply. This is not a whole-corpus recovery count.
+                "backlog_scope": "eligible_candidates",
+                "selected_article_ids": selected_ids,
+            }
+        return result
 
     def save_sa_article_with_comments(
         self,

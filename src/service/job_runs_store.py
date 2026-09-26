@@ -25,6 +25,7 @@ import logging
 import os
 import re
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional
@@ -52,7 +53,7 @@ _SQLITE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS job_runs (
     id              INTEGER PRIMARY KEY,
     job_name        TEXT NOT NULL,
-    status          TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
+    status          TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed', 'deferred')),
     trigger_source  TEXT NOT NULL DEFAULT 'api',
     payload         TEXT NOT NULL DEFAULT '{}',
     result          TEXT,
@@ -69,6 +70,57 @@ CREATE INDEX IF NOT EXISTS idx_job_runs_name_started_at
 CREATE INDEX IF NOT EXISTS idx_job_runs_status_started_at
     ON job_runs (status, started_at DESC);
 """
+
+
+def _upgrade_deferred_status(conn: sqlite3.Connection) -> None:
+    """Rebuild only the known status CHECK, retaining the rest of the schema."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='job_runs'"
+    ).fetchone()
+    if row is None:
+        return
+    ddl = row[0]
+    old_check = "CHECK (status IN ('running', 'succeeded', 'failed'))"
+    new_check = "CHECK (status IN ('running', 'succeeded', 'failed', 'deferred'))"
+    if new_check in ddl:
+        return
+    if ddl.count(old_check) != 1:
+        raise sqlite3.DatabaseError("unrecognized job_runs status constraint")
+    replacement, count = re.subn(
+        r'^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?'
+        r'(?:job_runs|"job_runs"|`job_runs`|\[job_runs\])(?=\s|\()',
+        'CREATE TABLE "job_runs_deferred_upgrade"',
+        ddl.replace(old_check, new_check),
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    if count != 1:
+        raise sqlite3.DatabaseError("unrecognized job_runs table definition")
+    attached = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE tbl_name='job_runs' "
+        "AND type IN ('index', 'trigger') AND sql IS NOT NULL ORDER BY type, name"
+    ).fetchall()
+    columns = ", ".join(
+        '"' + column[1].replace('"', '""') + '"'
+        for column in conn.execute("PRAGMA table_xinfo(job_runs)")
+        if column[6] == 0
+    )
+    sequence = None
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='sqlite_sequence'").fetchone():
+        sequence = conn.execute("SELECT seq FROM sqlite_sequence WHERE name='job_runs'").fetchone()
+
+    # Copy before dropping; create triggers afterwards so historical rows do not
+    # fire insert side effects. All DDL and data changes share the caller's txn.
+    conn.execute(replacement)
+    conn.execute(f'INSERT INTO job_runs_deferred_upgrade ({columns}) SELECT {columns} FROM job_runs')
+    conn.execute("DROP TABLE job_runs")
+    conn.execute("ALTER TABLE job_runs_deferred_upgrade RENAME TO job_runs")
+    for statement in attached:
+        conn.execute(statement[0])
+    if sequence is not None:
+        conn.execute("UPDATE sqlite_sequence SET seq=? WHERE name='job_runs'", (sequence[0],))
+    if conn.execute("PRAGMA foreign_key_check").fetchone() is not None:
+        raise sqlite3.IntegrityError("job_runs upgrade foreign key check failed")
 
 
 def _now_iso() -> str:
@@ -184,12 +236,21 @@ class JobRunsLocalStore:
         return conn
 
     def _ensure_schema(self) -> None:
-        with self._connect() as conn:
+        with closing(self._connect()) as conn, conn:
             try:
                 conn.execute("PRAGMA journal_mode = WAL")
             except sqlite3.OperationalError:
                 pass
-            conn.executescript(_SQLITE_SCHEMA)
+            # This private connection is closed afterwards. Disable FK actions
+            # during rebuild and leave references/views pointing at job_runs.
+            conn.execute("PRAGMA foreign_keys = OFF")
+            conn.execute("PRAGMA legacy_alter_table = ON")
+            conn.execute("BEGIN IMMEDIATE")
+            _upgrade_deferred_status(conn)
+            # executescript would commit the rebuild before creating indexes.
+            for statement in _SQLITE_SCHEMA.split(";"):
+                if statement.strip():
+                    conn.execute(statement)
 
     def is_available(self) -> bool:
         return True
@@ -352,10 +413,18 @@ class JobRunsLocalStore:
         if (
             not event_id
             or not _EXTENSION_EVENT_HASH_RE.fullmatch(fingerprint)
-            or status not in {"succeeded", "failed"}
+            or status not in {"succeeded", "failed", "deferred"}
             or not isinstance(result, dict)
             or result.get("job_name") != job_name
             or result.get("db_status") != status
+            or (
+                status == "deferred"
+                and (
+                    job_name not in _SA_EXTENSION_DIAGNOSTIC_JOB_NAMES
+                    or result.get("schema_version") != 2
+                    or result.get("derived_outcome") != "deferred"
+                )
+            )
             or (
                 extension_diagnostics is not None
                 and not is_durable_diagnostics_projection(extension_diagnostics)
@@ -473,7 +542,7 @@ class JobRunsLocalStore:
                        created_at, updated_at
                 FROM job_runs
                 WHERE trigger_source = 'extension'
-                  AND status IN ('succeeded', 'failed')
+                  AND status IN ('succeeded', 'failed', 'deferred')
                   AND job_name IN ({placeholders})
                 ORDER BY started_at DESC, id DESC
                 LIMIT 20

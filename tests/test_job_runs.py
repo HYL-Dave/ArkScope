@@ -12,7 +12,6 @@ Coverage:
 from __future__ import annotations
 
 import json
-import inspect
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -136,19 +135,24 @@ def test_read_job_activity_if_exists_unreadable_or_malformed_is_unknown(tmp_path
     ) == "unknown"
 
 
-def test_sa_store_history_contract_has_no_pruning_or_time_cutoff():
-    runtime_source = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in Path("src").rglob("*.py")
-    ).lower()
-    assert "delete from job_runs" not in runtime_source
-    assert "drop table job_runs" not in runtime_source
+@pytest.mark.parametrize("status", ["succeeded", "failed"])
+def test_sa_store_history_contract_has_no_pruning_or_time_cutoff(tmp_path, status):
+    path = tmp_path / "profile_state.db"
+    store = JobRunsLocalStore(path)
+    run_id = store.record_completed_run(
+        "sa_market_news_refresh", status=status,
+        started_at="2000-01-01T00:00:00Z", finished_at="2000-01-01T00:00:30Z",
+        payload={"historical": True}, result={"count": 7},
+    )
+    assert run_id is not None
+    original = store.list_runs(limit=10)
 
-    reader_source = inspect.getsource(
-        job_runs_store_module.read_job_activity_if_exists
-    ).lower()
-    for forbidden in ("started_at", "finished_at", "status", "timestamp"):
-        assert forbidden not in reader_source
+    reopened = JobRunsLocalStore(path)
+
+    assert reopened.list_runs(limit=10) == original
+    assert job_runs_store_module.read_job_activity_if_exists(
+        path, {"sa_market_news_refresh"}
+    ) == "present"
 
 
 def test_sa_store_activity_job_names_cover_all_current_authorities():

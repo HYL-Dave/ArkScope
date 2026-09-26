@@ -153,8 +153,9 @@ def test_declared_counts_must_equal_derived_phase_and_item_counts():
     assert captured.value.code == "count_mismatch"
 
 
+@pytest.mark.parametrize("runtime", ["python", "javascript"])
 @pytest.mark.parametrize("failure", [None, "list_navigation", "detail_fetch"])
-def test_version_two_mid_batch_deferral_matches_js_and_keeps_failure_precedence(tmp_path, failure):
+def test_version_two_mid_batch_deferral_matches_js_and_keeps_failure_precedence(tmp_path, failure, runtime):
     payload = copy.deepcopy(_case("complete_market_sync")["input"])
     payload["schema_version"] = 2
     for key in ("counts", "derived_outcome", "healthy_anchor_eligible"):
@@ -162,16 +163,19 @@ def test_version_two_mid_batch_deferral_matches_js_and_keeps_failure_precedence(
     payload["phases"]["capture_readback"] = {"state": "deferred", "reason_code": "capacity_exhausted"}
     if failure:
         payload["phases"][failure] = {"state": "failed", "reason_code": "login_required"}
-    result = _protocol().derive_run_result(payload)
+    if runtime == "python":
+        result = _protocol().derive_run_result(payload)
+    else:
+        fixture = tmp_path / "cases.json"
+        fixture.write_text(json.dumps({"protocol_cases": [{"name": "deferred", "input": payload}]}))
+        js = subprocess.run(["node", str(RUNNER), str(fixture), str(JS_PROTOCOL)], capture_output=True, text=True, check=True)
+        result = json.loads(js.stdout)[0]["result"]
+        assert result == _protocol().derive_run_result(payload)
     expected = "deferred" if not failure else "failed" if failure == "list_navigation" else "degraded"
     assert result["derived_outcome"] == expected
     assert result["healthy_anchor_eligible"] is False
-    assert result["db_status"] == ("succeeded" if not failure else "failed")
+    assert result["db_status"] == ("deferred" if not failure else "failed")
     assert result["counts"]["phase_deferred"] == 1
-    fixture = tmp_path / "cases.json"
-    fixture.write_text(json.dumps({"protocol_cases": [{"name": "deferred", "input": payload}]}))
-    js = subprocess.run(["node", str(RUNNER), str(fixture), str(JS_PROTOCOL)], capture_output=True, text=True, check=True)
-    assert json.loads(js.stdout) == [{"name": "deferred", "ok": True, "result": result}]
 
 
 def test_version_one_does_not_gain_new_states_or_change_canonical_fields():

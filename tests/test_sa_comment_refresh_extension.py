@@ -5,6 +5,30 @@ import pytest
 from tests.test_sa_extension_reconciliation_flow import _DETAIL_FLOW_SETUP, _run_background
 
 
+def test_quick_fetch_respects_global_order_and_does_not_silently_upgrade():
+    result = _run_background(_DETAIL_FLOW_SETUP + r"""
+      const visits=[],rounds=[];
+      scrollToLoadAll=async(_tab,n)=>rounds.push(n);
+      captureArticle=async(_tab,item,_mode,includeBody)=>{
+        visits.push({id:item.article_id,body:includeBody});
+        return {detail:{body:'Analysis'},comments:[],scroll:{mode:'quick'}};
+      };
+      sendNativeMessage2=async message=>{
+        if(message.action==='save_articles_meta')return {status:'ok',saved:6,auto_upgrade:true,
+          need_content:[{article_id:'old',url:'https://seekingalpha.com/article/1-old'}],
+          need_comments:[{article_id:'new',url:'https://seekingalpha.com/article/2-new'}],
+          reconciliation:{enrichment:[]},quick_workload:{navigation_budget:4,selected_count:2,
+            eligible_count:6,deferred_count:4,backlog_scope:'eligible_candidates',selected_article_ids:['new','old']}};
+        return {status:'ok',ok:true,comment_scan_usable:true};
+      };
+      const result=await doDetailFetch(1,[],'quick');
+      return {visits,rounds,result};
+    """)
+    assert result["visits"] == [{"id": "new", "body": False}, {"id": "old", "body": True}]
+    assert result["rounds"] == [5]
+    assert result["result"]["quick_workload"]["deferred_count"] == 4
+
+
 @pytest.mark.parametrize("override,expected_mode,expected_stop,expected_count", [
     ("backfill", "backfill", "stable_bottom", 107),
     (None, "quick", "max_scrolls", 81),

@@ -82,11 +82,20 @@ const storage = {};
 const context = {
   URL, Date, Math, Promise, Set, TextEncoder, crypto: require("node:crypto").webcrypto,
   console: {info() {}, warn() {}, error() {}, log() {}},
-  setTimeout, clearTimeout,
+  setTimeout, clearTimeout, queueMicrotask,
   chrome: {
     runtime: {
       onMessage: listener, onInstalled: listener, onStartup: listener,
       sendMessage() { return Promise.resolve(); },
+      connectNative() {
+        const messages=new Set(),disconnections=new Set();
+        return {
+          onMessage:{addListener:fn=>messages.add(fn),removeListener:fn=>messages.delete(fn)},
+          onDisconnect:{addListener:fn=>disconnections.add(fn),removeListener:fn=>disconnections.delete(fn)},
+          postMessage(){queueMicrotask(()=>messages.forEach(fn=>fn({status:'ok'})));},
+          disconnect(){},
+        };
+      },
       sendNativeMessage(_host, message, callback) {
         if (message.action === "get_extension_action_limits") {
           callback({status: "ok", limits: {

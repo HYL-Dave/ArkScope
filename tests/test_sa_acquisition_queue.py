@@ -77,6 +77,39 @@ const descriptor={operation:'market_news_sync',mode:'quick',trigger:'manual',int
 """
 
 
+def test_routine_task_does_not_start_without_background_lifetime():
+    result = _run_background_probe(AUTHORITY + r"""
+      chrome.runtime.connectNative=()=>{throw new Error('host unavailable');};
+      let ran=0, admitted=0;
+      authorityReply=async operation=>{if(operation==='begin_task')admitted++;return null;};
+      const result=await enqueueSaSyncJob({operation:'alpha_picks_sync',mode:'quick'},async()=>{ran++;return {status:'ok'};});
+      return {ran,admitted,result};
+    """)
+    assert result["ran"] == 0
+    assert result["admitted"] == 0
+    assert result["result"]["extension_run"]["derived_outcome"] == "deferred"
+
+
+def test_runtime_interruption_blocks_the_next_navigation_and_releases_port():
+    result = _run_background_probe(AUTHORITY + r"""
+      let disconnect, closeCount=0, pages=0;
+      chrome.runtime.connectNative=()=>({
+        onMessage:{addListener:fn=>Promise.resolve().then(()=>fn({status:'ok'})),removeListener(){}},
+        onDisconnect:{addListener:fn=>{disconnect=fn;},removeListener(){}},
+        postMessage(){},disconnect(){closeCount++;},
+      });
+      const result=await enqueueSaSyncJob({operation:'alpha_picks_sync',mode:'quick'},async()=>{
+        disconnect();
+        await saAcquisitionTask.navigate({kind:'create',destinationClass:'article'},async()=>{pages++;return {};});
+        return {status:'ok'};
+      });
+      return {pages,closeCount,result,pending:(await chrome.storage.local.get('saAcquisitionPending')).saAcquisitionPending};
+    """)
+    assert result["pages"] == 0
+    assert result["closeCount"] == 1
+    assert result["result"]["extension_run"]["derived_outcome"] != "complete"
+
+
 def test_navigation_debit_is_before_browser_io_and_receipt_is_frozen():
     result = _run_background_probe(CLIENT_SETUP + r"""
       let called=0, durable=false;
@@ -136,6 +169,49 @@ def test_pending_crashed_work_does_not_silently_resume():
     assert result["called"] == 0
     assert result["result"]["reason"] == "collector_unavailable"
     assert not any(c["operation"] == "begin_task" for c in result["calls"])
+
+
+@pytest.mark.parametrize("terminal, expected_calls", [(True, 1), (False, 0)])
+def test_pending_finish_ack_is_reconciled_without_replaying_navigation(terminal, expected_calls):
+    result = _run_background_probe(CLIENT_SETUP + r"""
+      saved.saAcquisitionPending={request_id:'old',ledger_id:'a'.repeat(32),generation:1,navigation:null};
+      const reconciled=SAAcquisition.create({storage,control:async(operation,payload)=>{
+        if(operation==='reconcile_task') {
+          calls.push({operation});
+          return {status:'ok',ledger_id:'a'.repeat(32),pending_task:{request_id:'old',generation:1,
+            task_id:'e'.repeat(32),state:TERMINAL ? 'terminal' : 'active'}};
+        }
+        return control(operation,payload);
+      }});
+      let ran=0;
+      const result=await reconciled.runTask(descriptor,async()=>{ran++;return {status:'ok'};});
+      return {ran,result,calls,pending:saved.saAcquisitionPending};
+    """.replace("TERMINAL", str(terminal).lower()))
+    assert result["ran"] == expected_calls
+    assert any(c["operation"] == "reconcile_task" for c in result["calls"])
+    assert not any(c["operation"] == "admit_navigation" for c in result["calls"])
+    assert (result["pending"] is None) is terminal
+
+
+@pytest.mark.parametrize("change", ["reply.ledger_id='wrong'", "reply.pending_task.request_id='other'",
+                                  "reply.pending_task.generation=2", "reply.pending_task.state='unknown'"])
+def test_reconciliation_requires_identity_bound_terminal_evidence(change):
+    result = _run_background_probe(CLIENT_SETUP + r"""
+      saved.saAcquisitionPending={request_id:'old',ledger_id:'a'.repeat(32),generation:1};
+      const reconciled=SAAcquisition.create({storage,control:async(operation,payload)=>{
+        if(operation==='reconcile_task') {
+          const reply={status:'ok',ledger_id:'a'.repeat(32),pending_task:{request_id:'old',generation:1,state:'terminal'}};
+          CHANGE;
+          return reply;
+        }
+        return control(operation,payload);
+      }});
+      let ran=0;
+      await reconciled.runTask(descriptor,async()=>{ran++;return {status:'ok'};});
+      return {ran,pending:saved.saAcquisitionPending};
+    """.replace("CHANGE", change))
+    assert result["ran"] == 0
+    assert result["pending"]["request_id"] == "old"
 
 
 def test_alpha_picks_login_failure_is_saved_before_cleanup_and_no_second_page():

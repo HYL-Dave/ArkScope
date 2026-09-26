@@ -427,7 +427,8 @@ def _handle_check_detail_cache(dal, picks, articles=None):
         detail_cache_days = 7
 
     # Build ticker → article URL mapping (most recent per ticker)
-    # Also build prefix index for cross-exchange matching (KGC → KGCK)
+    # Explicit legacy scraper concatenations, not general ticker prefixes.
+    article_aliases = {"KGC": ("KGCK",), "CLS": ("CLSCLS",), "SSRM": ("SSRMSSRM",)}
     article_map = {}
     if articles:
         for a in articles:
@@ -455,13 +456,12 @@ def _handle_check_detail_cache(dal, picks, articles=None):
                 if age_days <= detail_cache_days:
                     continue  # Has detail and not expired → skip
 
-        # Find matching article URL (exact match, then prefix match for cross-exchange)
+        # Exact symbols win over the documented legacy scraper aliases.
         article_url = article_map.get(symbol)
         if not article_url:
-            # Prefix match: KGC→KGCK, CLS→CLSCLS, SSRM→SSRMSSRM (US+CA doubled)
-            for art_ticker, art_url in article_map.items():
-                if art_ticker.startswith(symbol) and len(art_ticker) <= len(symbol) * 2:
-                    article_url = art_url
+            for alias in article_aliases.get(symbol, ()):
+                if article_map.get(alias):
+                    article_url = article_map[alias]
                     break
         if not article_url:
             no_article.append(symbol)

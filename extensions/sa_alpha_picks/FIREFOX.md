@@ -144,6 +144,20 @@ completed update. `Missing host permission for the tab` is a page-script error,
 not a Native Messaging consent prompt. Do not reset desktop consent or add broad
 website permissions to work around it.
 
+Routine captures continue when the popup closes. The popup reports the current
+task separately from a stopped capture requiring recovery. Quick Update stays a
+small batch (at most four distinct article pages, newest first), including on a
+new corpus; remaining eligible candidates are not a successful full backfill.
+
+If an interrupted older version left a pending task, first stop its automated
+work and close its acquisition tabs. Reload the updated formal add-on, open
+**Acquisition limits and recovery**, check **Previous capture stopped; its
+acquisition tabs are closed**, then use **Recover stopped capture** once. Recovery
+is refused while this runtime is working. It preserves ownership, pacing, access
+pauses and the selected capped/uncapped policy. A lost acknowledgment whose native
+task already has a matching terminal record is reconciled automatically; an old
+timestamp alone never unlocks a reservation.
+
 The App may be reopened after the controlled schema migration is complete. Local
 native saving does not require its sidecar, but audit delivery does: with the App
 closed, receipts remain in a bounded browser outbox (100 records / seven days).

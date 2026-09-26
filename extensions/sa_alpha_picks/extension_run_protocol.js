@@ -377,7 +377,8 @@
     if (payload.derived_outcome !== undefined && payload.derived_outcome !== derivedOutcome) {
       fail("protocol_invalid", "derived outcome mismatch");
     }
-    var dbStatus = includes(["complete", "skipped", "deferred"], derivedOutcome) ? "succeeded" : "failed";
+    var dbStatus = derivedOutcome === "deferred" ? "deferred"
+      : includes(["complete", "skipped"], derivedOutcome) ? "succeeded" : "failed";
     var healthy = derivedOutcome === "complete"
       && includes(["alpha_picks_sync", "market_news_sync"], operation);
     if (payload.healthy_anchor_eligible !== undefined

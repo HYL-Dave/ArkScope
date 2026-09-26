@@ -104,10 +104,9 @@ def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconcilia
 
     class MetaBackend:
         def __init__(self):
-            self.query_count = 0
+            self.captured = False
 
         def query_sa_articles(self, **kwargs):
-            self.query_count += 1
             old = {
                 "article_id": "old-bodyless",
                 "url": "https://sa/old-bodyless",
@@ -118,10 +117,11 @@ def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconcilia
                 "url": "https://sa/6316639",
                 "has_content": False,
             }
-            return [old] if self.query_count == 1 else [old, current]
+            return [old, current] if self.captured else [old]
 
         def upsert_sa_articles_meta(self, articles):
             meta_calls.append(("capture_meta", tuple(a["article_id"] for a in articles)))
+            self.captured = True
             return len(articles)
 
         def sanitize_corrupted_sa_comments_counts(self):

@@ -30,7 +30,7 @@ def activate(obj, policy=POLICY):
 
 
 def begin(obj, client=FIREFOX, generation=1, **kw):
-    return call(obj, "begin_task", client, generation=generation, request_id=uuid4().hex,
+    return call(obj, "begin_task", client, generation=generation, request_id=kw.pop("request_id", uuid4().hex),
                 task_operation="market_news_sync", mode="quick", trigger="manual",
                 intent_revision=0, build="test", protocol_version=2, **kw)
 
@@ -57,6 +57,46 @@ def test_initialization_is_explicit_and_readers_do_not_create_files(authority):
     assert state["prior_traffic_coverage"] == "unknown"
     assert state["managed_since"]
     assert obj.path.with_suffix(".db.identity").read_text().strip() == state["ledger_id"]
+
+
+def test_reconciliation_reads_matching_terminal_evidence_without_mutation(authority):
+    obj, clock = authority
+    state = activate(obj)
+    request_id = uuid4().hex
+    permit = begin(obj, request_id=request_id)
+    pending = {"request_id": request_id, "generation": 1, "ledger_id": state["ledger_id"]}
+    before = obj.path.read_bytes()
+    active = call(obj, "reconcile_task", **pending)
+    assert active["pending_task"]["state"] == "active"
+    assert active["pending_task"]["task_id"] == permit["task_id"]
+    assert obj.path.read_bytes() == before
+    clock[0] += 60
+    call(obj, "finish_task", token=permit["token"], generation=1,
+         cleanup_confirmed=True, result={"status": "ok"})
+    before = obj.path.read_bytes()
+    reply = call(obj, "reconcile_task", **pending)
+    assert reply["pending_task"]["state"] == "terminal"
+    assert reply["pending_task"]["request_id"] == pending["request_id"]
+    assert "token" not in json.dumps(reply)
+    assert obj.path.read_bytes() == before
+    assert call(obj, "reconcile_task", CHROME, **pending)["pending_task"]["state"] == "unknown"
+    assert call(obj, "reconcile_task", **{**pending, "generation": 2})["status"] == "error"
+    assert call(obj, "reconcile_task", **{**pending, "ledger_id": "0" * 32})["status"] == "error"
+
+
+def test_reconciliation_never_infers_completion_from_age_or_absence(authority):
+    obj, clock = authority
+    state = activate(obj)
+    request_id = uuid4().hex
+    permit = begin(obj, request_id=request_id)
+    clock[0] += 10 * 86400
+    reply = call(obj, "reconcile_task", request_id=request_id,
+                 generation=1, ledger_id=state["ledger_id"])
+    assert reply["pending_task"]["state"] == "active"
+    unknown = call(obj, "reconcile_task", request_id=uuid4().hex,
+                   generation=1, ledger_id=state["ledger_id"])
+    assert unknown["pending_task"]["state"] == "unknown"
+    assert call(obj, "status")["active"]["task_id"] == permit["task_id"]
 
 
 @pytest.mark.parametrize("policy", [POLICY, UNCAPPED])

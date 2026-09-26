@@ -127,7 +127,7 @@ class JobRunRow(BaseModel):
 
     id: int
     job_name: str
-    status: Literal["running", "succeeded", "failed"]
+    status: Literal["running", "succeeded", "failed", "deferred"]
     trigger_source: str
     payload: Dict[str, Any] = Field(default_factory=dict)
     result: Optional[Dict[str, Any]] = None
@@ -291,6 +291,11 @@ def record_extension_job(
             "finished_at": event_finished,
             "result": result,
         }
+        # Keep the original v2 receipt identity while persisting honest status.
+        # Old deferred receipts hashed db_status=succeeded; replay must return
+        # their existing row, not conflict or rewrite historical evidence.
+        if result["schema_version"] == 2 and result["derived_outcome"] == "deferred":
+            event_document["result"] = {**result, "db_status": "succeeded"}
         if diagnostics_present:
             event_document["extension_diagnostics"] = diagnostics_projection
         if acquisition_present:

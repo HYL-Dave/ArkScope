@@ -97,6 +97,69 @@ def test_status_badge_is_distinct_for_login_and_subscription_access():
     assert "sign in" in result["titles"][0] and "subscription" in result["titles"][1]
 
 
+def test_status_read_does_not_republish_its_own_storage_reload_signal():
+    result = _run_background_probe(SETUP + """
+      const signals=[];
+      const write=chrome.storage.local.set;
+      chrome.storage.local.set=async values=>{if('saAcquisitionStatus' in values)signals.push(values);return write(values);};
+      await handleAcquisitionControl({action:'get_company_refresh'});
+      return signals;
+    """)
+    assert result == []
+
+
+def test_abandoned_pending_is_visible_and_active_work_cannot_be_recovered():
+    result = _run_background_probe(SETUP + """
+      await chrome.storage.local.set({saAcquisitionPending:{request_id:'old',generation:1,ledger_id:'d'.repeat(32),
+        operation:'alpha_picks_sync',started_at:'2026-09-26T05:51:32Z'}});
+      const badge=[],titles=[];
+      chrome.action={setBadgeText:async v=>badge.push(v.text),setBadgeBackgroundColor:async()=>{},setTitle:async v=>titles.push(v.title)};
+      const status=await handleAcquisitionControl({action:'get_company_refresh'});
+      await syncAcquisitionBadge(admittedState);
+      saSyncJobInFlight=true;
+      const recover=await handleAcquisitionControl({action:'recover_sa_acquisition',confirm_stopped:true,expected_generation:1});
+      return {status,recover,actions,badge,titles};
+    """)
+    assert result["status"]["acquisition_recovery_required"] is True
+    assert result["status"]["acquisition_runtime_active"] is False
+    assert result["recover"]["error_code"] == "sa_company_collector_busy"
+    assert "recover" not in result["actions"]
+    assert result["badge"][-1] == "!"
+    assert "recovery" in result["titles"][-1]
+
+
+def test_recovery_and_new_admission_share_the_queue_until_acknowledgment():
+    result = _run_background_probe(SETUP + """
+      let releaseRecovery, reachedRecovery, releaseTask, reachedTask;
+      const recovering=new Promise(resolve=>{reachedRecovery=resolve;});
+      const taskStarted=new Promise(resolve=>{reachedTask=resolve;});
+      await chrome.storage.local.set({saAcquisitionPending:{request_id:'old',ledger_id:'d'.repeat(32),generation:1}});
+      authorityReply=async operation=>{
+        if(operation==='recover') {
+          reachedRecovery();
+          await new Promise(resolve=>{releaseRecovery=resolve;});
+          return admittedState;
+        }
+        if(operation==='reconcile_task')return {...admittedState,pending_task:{request_id:'old',generation:1,state:'terminal'}};
+        return null;
+      };
+      const recovery=handleAcquisitionControl({action:'recover_sa_acquisition',confirm_stopped:true,expected_generation:1});
+      await recovering;
+      const task=enqueueSaSyncJob({operation:'alpha_picks_sync',mode:'quick'},async()=>{
+        reachedTask();await new Promise(resolve=>{releaseTask=resolve;});return {status:'ok'};
+      });
+      for(let i=0;i<50;i++)await Promise.resolve();
+      const earlyAdmission=actions.includes('begin_task');
+      releaseRecovery();await recovery;await taskStarted;
+      const pending=(await chrome.storage.local.get('saAcquisitionPending')).saAcquisitionPending;
+      releaseTask();await task;
+      return {earlyAdmission,pending};
+    """)
+    assert result["earlyAdmission"] is False
+    assert result["pending"] is not None
+    assert result["pending"]["request_id"] != "old"
+
+
 @pytest.mark.parametrize("failure", ["select", "persist", "enable", "generation_race"])
 def test_partial_activation_failures_leave_all_three_intents_disabled(failure):
     result = _run_background_probe(SETUP + """

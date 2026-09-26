@@ -254,7 +254,7 @@ class CompanyCollector:
                 require(type(gap) in (int, float) and math.isfinite(gap) and 0 < gap <= 2147483,
                         "sa_company_schedule_invalid")
                 require(message.get("confirm_activation") is True, "sa_acquisition_confirmation_required")
-            if operation in {"status", "validate"}:
+            if operation in {"status", "validate", "reconcile_task"}:
                 if not self.path.exists():
                     require(not self.marker.exists(), "sa_company_collector_unavailable")
                     require(operation == "status", "sa_company_reservation_invalid")
@@ -264,6 +264,9 @@ class CompanyCollector:
                     if operation == "validate":
                         self._active(state, message, client)
                     require(message.get("ledger_id", state["ledger_id"]) == state["ledger_id"], "sa_company_collector_unavailable")
+                    if operation == "reconcile_task":
+                        return {**self._status(state, client, now),
+                                "pending_task": self._reconcile(conn, state, message, client)}
                     return self._status(state, client, now)
             require(operation in {"configure", "select", "begin_task", "admit_navigation", "observe_restriction", "finish_task", "recover", "resume"}, "sa_company_control_invalid")
             with closing(self._connect(message, now)) as conn:
@@ -287,6 +290,23 @@ class CompanyCollector:
             return {"status": "error", "error_code": exc.code}
         except (OSError, sqlite3.Error, ValueError, KeyError, TypeError, AttributeError, OverflowError, IndexError):
             return {"status": "error", "error_code": "sa_company_collector_unavailable"}
+
+    @staticmethod
+    def _reconcile(conn, state, msg, client):
+        request_id = msg.get("request_id")
+        require(type(request_id) is str and _ID.fullmatch(request_id)
+                and type(msg.get("generation")) is int
+                and msg.get("ledger_id") == state["ledger_id"], "sa_company_control_invalid")
+        row = conn.execute("SELECT payload, finished_at, receipt FROM acquisition_tasks WHERE request_id=?",
+                           (client["client_id"] + ":" + request_id,)).fetchone()
+        reply = {"request_id": request_id, "generation": msg["generation"], "state": "unknown"}
+        if row:
+            task = json.loads(row[0])
+            require(task["client"] == client and task["generation"] == msg["generation"],
+                    "sa_company_reservation_invalid")
+            terminal = row[1] is not None and row[2] is not None
+            return {**reply, "task_id": task["task_id"], "state": "terminal" if terminal else "active"}
+        return reply
 
     @staticmethod
     def _generation(state, msg, key="generation"):

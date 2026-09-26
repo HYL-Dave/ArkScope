@@ -319,7 +319,7 @@ def _diagnostic_recurrence(job_store: Any) -> list[dict[str, Any]]:
         if (
             job_name not in _SYNC_JOB_NAME_SET
             or row.get("trigger_source") != "extension"
-            or row.get("status") not in {"succeeded", "failed"}
+            or row.get("status") not in {"succeeded", "failed", "deferred"}
         ):
             continue
         diagnostics = _diagnostics_projection(row)

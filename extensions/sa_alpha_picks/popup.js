@@ -3,6 +3,7 @@
 var statusEl = document.getElementById("status");
 var marketNewsStatusEl = document.getElementById("marketNewsStatus");
 var lastRunStatusEl = document.getElementById("lastRunStatus");
+var refreshAttemptStatusEl = document.getElementById("refreshAttemptStatus");
 var companyCaptureBtn = document.getElementById("companyCaptureBtn");
 var companyCaptureStatusEl = document.getElementById("companyCaptureStatus");
 var quickBtn = document.getElementById("quickBtn");
@@ -447,7 +448,41 @@ marketNewsAutoSyncInterval.addEventListener("change", function () {
   });
 });
 
+function quickWorkloadText(workload) {
+  if (!workload || workload.backlog_scope !== "eligible_candidates"
+      || ![workload.navigation_budget, workload.selected_count, workload.deferred_count]
+        .every(function(value) {return Number.isInteger(value) && value >= 0;})) return "";
+  return "Quick article batch: " + workload.selected_count + " selected / "
+    + workload.navigation_budget + " navigation limit; " + workload.deferred_count
+    + " eligible candidates deferred.";
+}
+
+function renderRefreshAttempt(label, result, runtimeError) {
+  var outcome=result && (result.acquisition_stop || result);
+  var style="empty", text=label + " request returned.";
+  if(runtimeError || !result) {
+    style="error";
+    text=label + " result unknown: " + (runtimeError ? "extension_runtime_unavailable" : "empty_extension_response");
+  } else if(outcome.status === "deferred" || outcome.status === "skipped") {
+    style="partial";
+    text=label + " " + outcome.status + ": " + (outcome.reason || outcome.error_code || "reason unavailable");
+    if(outcome.reason && outcome.error_code && outcome.reason !== outcome.error_code)text+=" ("+outcome.error_code+")";
+    if(outcome.retry_after)text+=" | Retry after: "+outcome.retry_after;
+  } else if(outcome.status === "error" || outcome.error || outcome.error_code) {
+    style="error";
+    text=label + " failed: " + (outcome.error_code || outcome.error || outcome.reason || "reason unavailable");
+  } else if(outcome.status === "pending") {
+    text=label + " request in progress.";
+  }
+  var workload=quickWorkloadText(result && result.details && result.details.quick_workload);
+  refreshAttemptStatusEl.hidden=false;
+  refreshAttemptStatusEl.className=style;
+  refreshAttemptStatusEl.setAttribute("role",style === "error" ? "alert" : "status");
+  refreshAttemptStatusEl.textContent=text + (workload ? " " + workload : "");
+}
+
 function startRefresh(mode) {
+  renderRefreshAttempt("Alpha Picks", {status:"pending"});
   quickBtn.disabled = true;
   fullBtn.disabled = true;
   backfillBtn.disabled = true;
@@ -461,7 +496,8 @@ function startRefresh(mode) {
   progressEl.style.display = "block";
   progressEl.textContent = mode === "backfill" ? "Preparing backlog scan..." : "Opening SA page...";
 
-  chrome.runtime.sendMessage({ action: "refresh", mode: mode }, function () {
+  chrome.runtime.sendMessage({ action: "refresh", mode: mode }, function (result) {
+    renderRefreshAttempt("Alpha Picks", result, chrome.runtime.lastError);
     quickBtn.disabled = false;
     fullBtn.disabled = false;
     backfillBtn.disabled = false;
@@ -479,6 +515,7 @@ function startRefresh(mode) {
 
 
 function startMarketNewsRefresh(mode) {
+  renderRefreshAttempt("Market News", {status:"pending"});
   mode = mode || "quick";
   quickBtn.disabled = true;
   fullBtn.disabled = true;
@@ -493,7 +530,8 @@ function startMarketNewsRefresh(mode) {
     ? "Opening market news for catchup..."
     : "Opening market news...";
 
-  chrome.runtime.sendMessage({ action: "refresh_market_news", mode: mode }, function () {
+  chrome.runtime.sendMessage({ action: "refresh_market_news", mode: mode }, function (result) {
+    renderRefreshAttempt("Market News", result, chrome.runtime.lastError);
     quickBtn.disabled = false;
     fullBtn.disabled = false;
     backfillBtn.disabled = false;
@@ -1230,7 +1268,7 @@ function renderMarketNewsStatus(lastMarketNewsRefresh) {
     if (typeof result.detail_fetched === "number") {
       detailSuffix = ", " + result.detail_fetched + " detail fetched";
     }
-    marketNewsStatusEl.textContent = "Market News" + modeLabel + ": " + (result.saved || 0) + " saved / " + (result.count || 0) + " scraped" + detailSuffix + " (" + timeStr + ")";
+    marketNewsStatusEl.textContent = "Last stored Market News" + modeLabel + ": " + (result.saved || 0) + " saved / " + (result.count || 0) + " scraped" + detailSuffix + " (" + timeStr + ")";
   } else {
     marketNewsStatusEl.className = "error";
     marketNewsStatusEl.textContent = "Market News" + modeLabel +
@@ -1261,7 +1299,7 @@ function renderStatus(lastRefresh) {
   if (currentOk && closedOk) {
     statusEl.className = "success";
     statusEl.append(
-      document.createTextNode("Last refresh: " + timeStr + modeLabel),
+      document.createTextNode("Last stored Alpha Picks refresh: " + timeStr + modeLabel),
       document.createElement("br"),
       document.createTextNode(
         "Current: " + current.count + " picks | Closed: " + closed.count + " picks"
@@ -1318,9 +1356,12 @@ function renderStatus(lastRefresh) {
         parts.push(details.net_new_comments + newCommentsLabel);
       }
       if (details.failed > 0) parts.push(details.failed + " failed");
-      var detailLine = "Articles: " + (parts.length > 0 ? parts.join(", ") : "up to date");
+      var detailLine = "Articles: " + (parts.length > 0 ? parts.join(", ") : "No new captures reported");
       statusEl.append(document.createElement("br"), document.createTextNode(detailLine));
     }
+
+    var workload=quickWorkloadText(details.quick_workload);
+    if(workload)statusEl.append(document.createElement("br"), document.createTextNode(workload));
 
     if (Number.isInteger(details.review_required) && details.review_required > 0) {
       statusEl.append(

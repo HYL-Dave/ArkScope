@@ -23,8 +23,30 @@
   function create(options) {
     var storage = options.storage, control = options.control;
     var now = options.now || Date.now, uuid = options.uuid || function () {return crypto.randomUUID();};
+    var running = false;
 
-    async function runTask(descriptor, handler) {
+    async function reconcilePending() {
+      var pending = (await storage.get("saAcquisitionPending")).saAcquisitionPending;
+      if (!pending || running) return {pending:pending || null,runtime_active:running};
+      try {
+        var reply = await control("reconcile_task", {request_id:pending.request_id,
+          ledger_id:pending.ledger_id,generation:pending.generation});
+        var proof = reply && reply.pending_task;
+        if (reply && reply.status === "ok" && reply.ledger_id === pending.ledger_id && proof
+            && proof.request_id === pending.request_id && proof.generation === pending.generation
+            && proof.state === "terminal") {
+          var current = (await storage.get("saAcquisitionPending")).saAcquisitionPending;
+          if (!running && current && current.request_id === pending.request_id
+              && current.ledger_id === pending.ledger_id && current.generation === pending.generation) {
+            await storage.set({saAcquisitionPending:null});
+            pending = null;
+          }
+        }
+      } catch (_) {} // Unknown or still-active work requires confirmed recovery, never age-based expiry.
+      return {pending:pending || null,runtime_active:running};
+    }
+
+    async function execute(descriptor, handler) {
       var pending, state, permit;
       try {
         if ((await storage.get("saAcquisitionPending")).saAcquisitionPending) return deferred();
@@ -35,7 +57,8 @@
         if (!state.is_owner) return deferred({reason:"collector_other_installation"});
         var restricted = state.paused_reason || state.capability_pauses && state.capability_pauses[capability(descriptor.operation)];
         if (restricted || state.rate_limited) return deferred({reason:"site_paused",error_code:restricted || "rate_limited",retry_after:state.rate_limit_until});
-        pending = {request_id:uuid(),ledger_id:state.ledger_id,generation:state.generation,navigation:null};
+        pending = {request_id:uuid(),ledger_id:state.ledger_id,generation:state.generation,navigation:null,
+          operation:descriptor.operation,started_at:new Date(now()).toISOString()};
         await storage.set({saAcquisitionPending:pending,saAcquisitionLedger:state.ledger_id});
         var beginRequest = Object.assign({}, descriptor, {
           task_operation:descriptor.operation,request_id:pending.request_id,
@@ -75,6 +98,7 @@
         get stop() {return stopped;},
         get uncertain() {return uncertain;},
         ownedTabs:ownedTabs,
+        interrupt: function (detail) {stopped = stopped || detail;},
         navigate: async function (request, perform) {
           if (stopped) throw new Stop(stopped);
           if (terminal || navigationInFlight) return stop(deferred(), true);
@@ -88,6 +112,7 @@
             if (!reply || reply.replayed || reply.status === "error") return stop(deferred(reply), true);
             if (reply.status === "deferred") return stop(deferred(reply));
             if (reply.allowed !== true || reply.replayed !== false || !/^[a-f0-9]{32}$/.test(reply.attempt_id || "")) return stop(deferred(), true);
+            if (stopped) throw new Stop(stopped);
             authorized = true;
             var value = await perform();
             if (request.kind === "create" && value && Number.isInteger(value.id)) ownedTabs.add(value.id);
@@ -137,7 +162,16 @@
       return result;
     }
 
-    return {runTask:runTask};
+    async function runTask(descriptor, handler) {
+      if (running) return deferred();
+      await reconcilePending();
+      if (running) return deferred();
+      running = true;
+      try {return await execute(descriptor, handler);}
+      finally {running = false;}
+    }
+
+    return {runTask:runTask,reconcilePending:reconcilePending,get running() {return running;}};
   }
 
   root.SAAcquisition = Object.freeze({create:create,Stop:Stop,capability:capability});

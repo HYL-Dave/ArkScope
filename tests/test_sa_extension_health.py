@@ -167,6 +167,44 @@ def _structural_segments(state: str = "ok") -> list[dict]:
     ]
 
 
+@pytest.mark.parametrize("status", ["deferred", "succeeded"])
+def test_deferred_capture_warns_and_retains_diagnostics_for_new_and_historical_rows(status):
+    from src.service.sa_extension_health import _telemetry_last_segment
+
+    row = _structured_row(
+        run_id=42,
+        job_name="sa_market_news_refresh",
+        outcome="deferred",
+        status=status,
+        started_at="2026-08-14T01:00:00Z",
+        finished_at="2026-08-14T01:00:30Z",
+        counts={"phase_deferred": 1},
+        diagnostics=_recorded_diagnostics(
+            _diagnostic_entry(occurred_at="2026-08-14T01:00:10Z")
+        ),
+    )
+    row["result"]["schema_version"] = 2
+    store = _FakeJobStore(
+        [row],
+        summary={row["job_name"]: {"latest_attempt": row, "latest_derived_complete": None}},
+        completed=[row],
+    )
+
+    segment = _telemetry_last_segment(store)
+
+    assert segment["state"] == "warn"
+    assert segment["code"] == "capture_deferred"
+    assert segment["outcome"] == "deferred"
+    assert segment["counts"] == {"phase_deferred": 1}
+    assert segment["diagnostic_recurrence"] == [{
+        "job_name": "sa_market_news_refresh",
+        "stage": "page_readiness",
+        "reason_code": "detail_timeout",
+        "affected_run_count": 1,
+        "latest_occurred_at": "2026-08-14T01:00:10.000+00:00",
+    }]
+
+
 def test_each_structural_failure_independently_interrupts_chain():
     from src.service.sa_extension_health import _derive_chain_state
 

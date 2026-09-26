@@ -20,7 +20,8 @@ from tests.test_sa_extension_packaging import EXT_DIR, _load_builder
 @pytest.mark.skipif(os.environ.get("ARKSCOPE_BROWSER_ACCEPTANCE") != "1",
                     reason="installed browser acceptance is an explicit isolated gate")
 @pytest.mark.parametrize("browser_name", ["firefox", "chromium"])
-def test_body_batch_continues_with_popup_closed(tmp_path, browser_name):
+@pytest.mark.parametrize("workload", ["body_batch", "routine"])
+def test_acquisition_continues_with_popup_closed(tmp_path, browser_name, workload):
     from src.sa.company_collector import CompanyCollector
 
     client = {"client_id": "f" * 32, "browser": "firefox" if browser_name == "firefox" else "chrome"}
@@ -145,6 +146,28 @@ async function fixtureNative(message) {
   return {status:'error',error_code:'offline_fixture_disabled'};
 }
 sendNativeMessage2 = fixtureNative;
+chrome.runtime.onMessage.addListener((message,_sender,reply)=>{
+  if(message.action==='fixture_start_routine'){
+    chrome.alarms.create('fixture_routine',{when:Date.now()+1000}).then(()=>reply({status:'ok'}));
+    return true;
+  }
+  if(message.action==='fixture_routine_state'){
+    chrome.storage.local.get(['fixtureRoutineResult','saAcquisitionPending']).then(reply);
+    return true;
+  }
+});
+chrome.alarms.onAlarm.addListener(alarm=>{
+  if(alarm.name!=='fixture_routine')return;
+  enqueueSaSyncJob({operation:'alpha_picks_sync',mode:'quick',trigger:'alarm'},async()=>{
+    const tab=await managedSaTabs.create({url:'https://seekingalpha.com/alpha-picks/articles/1000-fixture'});
+    try {
+      await fixtureRpc({operation:'fixture_capture',article_id:'1000'});
+      await sleep(FIXTURE_GAP_MS);
+      await fixtureRpc({operation:'fixture_capture',article_id:'1001'});
+      return {status:'ok'};
+    } finally {await safeRemoveTab(tab.id);}
+  }).then(result=>chrome.storage.local.set({fixtureRoutineResult:result}));
+});
 captureArticleBodyRecovery = async function(target,run) {
   if(run.cancelled)return {status:'cancelled'};
   let tab;
@@ -153,7 +176,7 @@ captureArticleBodyRecovery = async function(target,run) {
     return await fixtureRpc({operation:'fixture_capture',article_id:target.article_id});
   } finally {if(tab)await safeRemoveTab(tab.id);}
 };
-""")
+""".replace("FIXTURE_GAP_MS", str(gap * 1000)))
             registry = {"name": host, "description": "Offline body lifecycle ping only",
                         "path": str(native_launcher), "type": "stdio"}
 
@@ -280,9 +303,12 @@ captureArticleBodyRecovery = async function(target,run) {
                 def return_popup():
                     page.goto(popup)
 
-            preview = message({"action": "preview_article_body_recovery"})
-            assert preview["status"] == "ok", preview
-            started = message({"action": "start_article_body_recovery", "manifest_id": preview["manifest_id"]})
+            if workload == "body_batch":
+                preview = message({"action": "preview_article_body_recovery"})
+                assert preview["status"] == "ok", preview
+                started = message({"action": "start_article_body_recovery", "manifest_id": preview["manifest_id"]})
+            else:
+                started = message({"action": "fixture_start_routine"})
             assert started["status"] == "ok", started
             leave_popup()
             deadline = time.monotonic() + gap + 15
@@ -290,12 +316,16 @@ captureArticleBodyRecovery = async function(target,run) {
                 # Poll only the local server, never the extension background.
                 time.sleep(.2)
             return_popup()
-            result = message({"action": "get_article_body_recovery_state"})
+            result = message({"action": "get_article_body_recovery_state" if workload == "body_batch" else "fixture_routine_state"})
             assert len(saved) == 2, {"saved": saved, "result": result}
             assert saved[1][1] - saved[0][1] >= gap
-            assert len(admissions) == 2
-            assert result["batch"]["status"] == "complete", result
-            assert result["batch"]["counts"]["saved"] == 2
+            assert len(admissions) == (2 if workload == "body_batch" else 1)
+            if workload == "body_batch":
+                assert result["batch"]["status"] == "complete", result
+                assert result["batch"]["counts"]["saved"] == 2
+            else:
+                assert result["fixtureRoutineResult"].get("acquisition"), result
+                assert not result["saAcquisitionPending"]
             assert collector.handle({"operation": "status", "client": client})["active"] is None
     finally:
         server.shutdown()
