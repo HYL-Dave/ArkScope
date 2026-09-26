@@ -160,7 +160,8 @@ export function ModelRoutingSection({
         {catalog.tasks.map((task) => {
           const savedDraft = draft[task.id];
           if (!savedDraft) return null;
-          const row = taskRouteModelStatus(catalog, savedDraft.provider, savedDraft.model) === "retired"
+          const row = !savedDraft.custom
+            && taskRouteModelStatus(catalog, savedDraft.provider, savedDraft.model) === "retired"
             ? { ...savedDraft, model: "", custom: false }
             : savedDraft;
           const effectiveRoute = catalog.routes[task.id];
@@ -189,7 +190,8 @@ export function ModelRoutingSection({
             thinking_mode: "none",
             effort_options: undefined,
           };
-          const entries = currentEntries.some((entry) => entry.id === row.model) || !row.model
+          const entries = selectedModelStatus === "retired"
+            || currentEntries.some((entry) => entry.id === row.model) || !row.model
             ? currentEntries
             : [...currentEntries, retainedRouteEntry];
           const providerReason = modelProviderReason(context, providerBlock);

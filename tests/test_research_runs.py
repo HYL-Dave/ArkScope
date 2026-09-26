@@ -1178,6 +1178,31 @@ def test_legacy_research_route_remains_readable_but_cannot_start_new_run(
     assert run_store.get_run("legacy").effort == legacy_effort
 
 
+@pytest.mark.parametrize("provider", ["openai", "anthropic"])
+@pytest.mark.parametrize("selected", ["", "gpt-5.3-codex-spark-20260919"])
+def test_unset_research_selection_rejects_before_cross_provider_auth(
+    stores, monkeypatch, provider, selected
+):
+    from src.agents import config as config_module
+    from src.model_route_store import ModelRouteStore
+
+    run_store, thread_store = stores
+    routes = ModelRouteStore(run_store.db_path)
+    routes.set("ai_research", "openai", selected, "default")
+    monkeypatch.setattr(config_module, "_default_route_store", lambda: routes)
+    monkeypatch.setattr(r, "capture_runtime_auth", lambda *_: pytest.fail("must not capture auth"))
+    monkeypatch.setattr(r, "schedule_research_run", lambda **_: pytest.fail("must not schedule"))
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(r.create_research_run(
+            r.ResearchRunCreate(thread_id="unset-route", question="q", provider=provider),
+            dal=object(), thread_store=thread_store, run_store=run_store,
+        ))
+    assert exc.value.status_code == 422
+    assert exc.value.detail == {"code": "model_required", "field": "model"}
+    assert thread_store.get_thread("unset-route") is None
+
+
 def test_retired_fable_5_run_remains_readable_with_exact_effort(stores):
     run_store, thread_store = stores
     thread_store.ensure_thread(id="fable-history", title="historical Fable run")
@@ -1239,7 +1264,8 @@ def test_real_legacy_route_resolution_rejects_until_the_stored_route_is_correcte
         asyncio.run(r.create_research_run(
             request, dal=object(), thread_store=thread_store, run_store=run_store,
         ))
-    assert retired.value.detail == {"code": "model_retired", "field": "model"}
+    assert retired.value.detail == {"code": "model_required", "field": "model"}
+    assert route_store.get("ai_research").model == "gpt-5.4-mini"
 
     route_store.set("ai_research", "openai", "gpt-5.6-luna", "default")
     with pytest.raises(HTTPException) as incomplete:

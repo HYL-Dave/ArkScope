@@ -664,6 +664,37 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(card.textContent).toContain("前往 Provider 登入與憑證");
   });
 
+  it("keeps the custom editor mounted through a retired model prefix", () => {
+    const cat = catalogV2();
+    cat.retired_model_ids = [...(cat.retired_model_ids ?? []), "claude-opus-5"];
+    if (cat.model_lifecycle) cat.model_lifecycle.push({
+      id: "claude-opus-5", provider: "anthropic", task_route_status: "retired", aliases: [],
+    });
+    const props = {
+      catalog: cat,
+      modelsByProvider: {
+        anthropic: MODELS.filter((model) => model.provider === "anthropic"),
+        openai: MODELS.filter((model) => model.provider === "openai"),
+      },
+      testState: {}, onDraft: vi.fn(), onTest: vi.fn(), onReset: vi.fn(), developerMode: false,
+    };
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    let input: HTMLInputElement | null = null;
+    for (const model of ["claude-opus-", "claude-opus-5", "claude-opus-5-", "claude-opus-5-5"]) {
+      act(() => root!.render(React.createElement(ModelRoutingSection, {
+        ...props,
+        draft: { ai_research: { provider: "anthropic", model, effort: "high", custom: true } },
+      })));
+      const next = labelledControl(researchCard(), "custom-model") as HTMLInputElement;
+      expect(next.value).toBe(model);
+      if (input) expect(next).toBe(input);
+      input = next;
+      expect(host.querySelector('option[value="claude-opus-5"]')).toBeNull();
+    }
+  });
+
   it("shows the selected Anthropic credential and its seed-only state", () => {
     const cat = catalogV2();
     for (const task of Object.values(cat.effective!.tasks)) {

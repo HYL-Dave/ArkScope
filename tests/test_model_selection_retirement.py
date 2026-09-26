@@ -37,6 +37,34 @@ def test_explicitly_empty_saved_route_never_uses_yaml_or_provider_default(tmp_pa
     }
 
 
+@pytest.mark.parametrize("selected", ["", "gpt-5.3-codex-spark"])
+@pytest.mark.parametrize("requested_provider", ["openai", "anthropic"])
+def test_unset_research_cannot_switch_to_a_provider_default(tmp_path, selected, requested_provider):
+    store = ModelRouteStore(tmp_path / "profile.db")
+    store.set("ai_research", "openai", selected, "default")
+    model, effort = config.resolve_research_route(requested_provider, route_store=store)
+    assert (model, effort) == ("", None)
+    assert model_execution_admission_detail(model)["code"] == "model_required"
+
+
+@pytest.mark.parametrize("model", [
+    "gpt-5.3-codex-spark-20260919", "gpt-5.3-codex-spark-2026-09-19",
+])
+def test_dated_spark_is_retired_not_an_unknown_custom_model(tmp_path, model):
+    assert model_execution_admission_detail(model, task="card_translation") == {
+        "code": "model_retired", "field": "model",
+    }
+    store = ModelRouteStore(tmp_path / "profile.db")
+    store.set("card_translation", "openai", model, "high")
+    assert config.task_route("card_translation", route_store=store).model == ""
+    assert store.clear_retired_selections() == ["card_translation"]
+
+
+def test_retired_spark_does_not_classify_unreviewed_siblings():
+    assert capability_for("gpt-5.3-codex-spark-2") is None
+    assert capability_for("gpt-5.3-codex-sparkling") is None
+
+
 def test_explicit_retirement_cleanup_preserves_provider_and_unrelated_rows(tmp_path):
     path = tmp_path / "profile.db"
     store = ModelRouteStore(path)

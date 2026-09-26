@@ -461,13 +461,15 @@ function renderRefreshAttempt(label, result, runtimeError) {
   var outcome=result && (result.acquisition_stop || result);
   var commentProgress=commentProgressText(result && result.details && result.details.comment_progress);
   var runOutcome=result && result.extension_run && result.extension_run.derived_outcome;
+  var runFailure=runOutcome === "failed" || runOutcome === "degraded";
   var style="empty", text=label + " request returned.";
   if(runtimeError || !result) {
     style="error";
     text=label + " result unknown: " + (runtimeError ? "extension_runtime_unavailable" : "empty_extension_response");
   } else if(outcome.status === "deferred" || outcome.status === "skipped") {
-    style="partial";
-    text=label + " " + outcome.status + ": " + (outcome.reason || outcome.error_code || "reason unavailable");
+    style=runOutcome === "failed" ? "error" : "partial";
+    text=label + (runFailure ? ": " + SAExtensionPopupActions.outcomeLabel(runOutcome) + ". " : " ")
+      + outcome.status + ": " + (outcome.reason || outcome.error_code || "reason unavailable");
     if(outcome.reason && outcome.error_code && outcome.reason !== outcome.error_code)text+=" ("+outcome.error_code+")";
     if(outcome.retry_after)text+=" | Retry after: "+outcome.retry_after;
   } else if(outcome.status === "error" || outcome.error || outcome.error_code) {
@@ -475,7 +477,7 @@ function renderRefreshAttempt(label, result, runtimeError) {
     text=label + " failed: " + (outcome.error_code || outcome.error || outcome.reason || "reason unavailable");
   } else if(outcome.status === "pending") {
     text=label + " request in progress.";
-  } else if(runOutcome === "failed" || runOutcome === "degraded") {
+  } else if(runFailure) {
     style=runOutcome === "failed" ? "error" : "partial";
     text=label + ": " + SAExtensionPopupActions.outcomeLabel(runOutcome) + ".";
   } else if(commentProgress) {

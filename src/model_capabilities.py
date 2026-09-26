@@ -428,6 +428,11 @@ def capability_for(model: str) -> ModelCapability | None:
     lowered = query.lower()
     for cap in _BY_PREFIX:
         if cap.exact_model_id:
+            # Exact entitlement never admits a dated variant, but retirement
+            # must not let that variant escape as an unrestricted custom ID.
+            if (cap.task_route_status == "retired" and lowered.startswith(cap.id)
+                    and _DATED_VARIANT.fullmatch(lowered[len(cap.id):])):
+                return cap
             continue
         if _matches_reviewed_variant(cap.id, lowered):
             return cap

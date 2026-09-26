@@ -297,6 +297,40 @@ def test_immediate_popup_refresh_result_displays_pending_progress():
     assert "time budget reached" in result["refreshAttemptStatus"]
 
 
+@pytest.mark.parametrize("saved", [0, 38])
+@pytest.mark.parametrize("failure,heading,role", [
+    ("closed_picks", "Alpha Picks: Failed.", "alert"),
+    ("article_details", "Alpha Picks: Needs attention.", "status"),
+    (None, "Alpha Picks deferred:", "status"),
+])
+def test_popup_failure_precedes_acquisition_deferral_with_saved_comments(saved, failure, heading, role):
+    from tests.test_sa_extension_popup import _run
+
+    payload = _pending_payload()
+    payload["comment_progress"]["net_new_comments"] = saved
+    payload["phases"]["reconciliation"] = {"state": "deferred", "reason_code": "capacity_exhausted"}
+    if failure:
+        payload["phases"][failure] = {"state": "failed", "reason_code": "detail_save_failed"}
+    result = _run("click_alpha_refresh", refreshResult={
+        "details": {"failed": int(failure is not None), "comment_progress": payload["comment_progress"]},
+        "acquisition_stop": {
+            "status": "deferred", "reason": "capacity_exhausted", "retry_after": "2026-09-26T12:00:00Z",
+        },
+        "extension_run": derive_run_result(payload),
+    })
+
+    assert result["refreshAttemptStatus"].startswith(heading)
+    assert result["refreshAttemptRole"] == role
+    assert "capacity_exhausted" in result["refreshAttemptStatus"]
+    assert "2026-09-26T12:00:00Z" in result["refreshAttemptStatus"]
+    assert result["refreshAttemptStatus"].count(f"{saved} net new comments stored") == 1
+    assert "1 article pending" in result["refreshAttemptStatus"]
+    assert "time budget reached" in result["refreshAttemptStatus"]
+    captures = [message for message in result["sent"]
+                if message["action"] in {"refresh", "refresh_market_news", "manual_fetch", "run_company_refresh"}]
+    assert captures == [{"action": "refresh", "mode": "quick"}]
+
+
 def test_manual_popup_progress_is_partial_despite_saved_body():
     from tests.test_sa_extension_popup import _run
 
