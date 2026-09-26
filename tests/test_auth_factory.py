@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.auth_drivers import PlaintextTokenStore
+from src.auth_drivers import LLMRequest, PlaintextTokenStore
 from src.auth_drivers.api_key_drivers import AnthropicApiKeyDriver, OpenAIApiKeyDriver
 from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
 from src.auth_drivers.claude_code_sdk_driver import AnthropicClaudeCodeSdkDriver
@@ -75,7 +75,7 @@ def test_chatgpt_oauth_without_token_fails_closed():
     # ever falls through to a backend call. (Previously a bare
     # MissingCredentialError raise before the stream started.)
     with pytest.raises(RuntimeError, match="missing its token store"):
-        asyncio.run(d.call_llm(None))
+        asyncio.run(d.call_llm(LLMRequest(model="gpt-6-luna")))
 
 
 def test_chatgpt_oauth_execution_driver_is_wired():
@@ -150,7 +150,7 @@ def test_oauth_mode_is_not_api_key_path():
     # Without a token-store it fails closed via the classified missing_credential
     # error (S3 D4); it never falls through to the api_key path.
     with pytest.raises(RuntimeError, match="missing its token store"):
-        asyncio.run(d.call_llm(None))
+        asyncio.run(d.call_llm(LLMRequest(model="gpt-6-luna")))
 
 
 # --- optional token_store injection -----------------------------------------
