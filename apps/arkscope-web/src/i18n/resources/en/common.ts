@@ -68,6 +68,7 @@ const common = {
       adapterUnavailable: "The bundled model adapter is unavailable",
       timeout: "The model request timed out",
       modelRetired: "This model is retired for new runs",
+      modelRequired: "No model selected",
     },
     authModes: {
       apiKey: "API key",

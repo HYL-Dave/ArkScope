@@ -704,11 +704,11 @@ export function DataSourcesSection({
                       <td>
                         <StatusBadge
                           state={saSegmentCommonState(row.tone)}
-                          label={row.tone === "ok"
+                          label={row.statusLabel ?? (row.tone === "ok"
                             ? t(($) => $.dataSources.states.ok)
                             : row.tone === "warn"
                               ? t(($) => $.dataSources.states.warn)
-                              : t(($) => $.dataSources.states.failed)}
+                              : t(($) => $.dataSources.states.failed))}
                         />
                       </td>
                       <td className="muted settings-wrap-text">

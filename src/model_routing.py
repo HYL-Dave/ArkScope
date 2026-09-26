@@ -102,7 +102,7 @@ TASKS: list[TaskInfo] = [
         label="Card synthesis",
         description="Generate the structured §2 investment-research card from objective evidence.",
         default_provider="anthropic",
-        recommended_model="claude-opus-5",
+        recommended_model="claude-opus-5-5",
     ),
     TaskInfo(
         id="card_translation",

@@ -149,6 +149,7 @@ export type ModelReasonCode =
   | "model_not_in_registry"
   | "model_not_visible"
   | "model_output_limit_unknown"
+  | "model_required"
   | "model_retired"
   | "model_task_unsupported"
   | "protocol_incompatible"
@@ -4702,6 +4703,9 @@ export interface MacroSnapshotItem {
   label: string;
   title: string | null;
   units: string | null;
+  frequency?: string | null;
+  seasonal_adjustment?: string | null;
+  revision_strategy?: string | null;
   value: number | null;
   observation_date: string | null;
   fetched_at: string | null;
@@ -5211,6 +5215,11 @@ export interface SAExtensionHealthSegment {
   occurred_at?: string | null;
   job_name?: SAExtensionJobName | null;
   outcome?: SAExtensionCaptureOutcome | null;
+  comment_progress?: {
+    pending_articles: number;
+    net_new_comments: number;
+    stop_reasons: Array<"timeout" | "max_scrolls" | "stable_bottom" | "controls_unresolved" | "unknown">;
+  } | null;
   diagnostics_status?: SAExtensionDiagnosticsStatus | null;
   diagnostics_error_code?: "invalid_extension_diagnostics" | null;
   diagnostics?: SAExtensionDiagnosticEntry[];

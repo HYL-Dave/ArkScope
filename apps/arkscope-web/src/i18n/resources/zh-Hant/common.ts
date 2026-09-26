@@ -68,6 +68,7 @@ const common = {
       adapterUnavailable: "內附的模型 adapter 無法使用",
       timeout: "模型請求逾時",
       modelRetired: "此模型已退出新執行",
+      modelRequired: "尚未選擇模型",
     },
     authModes: {
       apiKey: "API key",

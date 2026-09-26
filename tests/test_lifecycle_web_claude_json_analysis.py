@@ -22,10 +22,10 @@ def setup(monkeypatch, *, result=None, init=None, tool=None):
         async def receive_response(self):
             session = self.options.session_id
             yield SystemMessage(subtype="init", data={"session_id": session, "apiKeySource": "none",
-                "model": "claude-opus-5", "tools": [], "mcp_servers": [], **(init or {})})
+                "model": "claude-opus-5-5", "tools": [], "mcp_servers": [], **(init or {})})
             if tool:
-                yield AssistantMessage(content=[ToolUseBlock(id="unexpected", name=tool, input={})], model="claude-opus-5")
-            yield AssistantMessage(content=[TextBlock(text=json.dumps(OUTPUT))], model="claude-opus-5")
+                yield AssistantMessage(content=[ToolUseBlock(id="unexpected", name=tool, input={})], model="claude-opus-5-5")
+            yield AssistantMessage(content=[TextBlock(text=json.dumps(OUTPUT))], model="claude-opus-5-5")
             yield _result(session, **{"num_turns": 1, "structured_output": None,
                                      "result": json.dumps(OUTPUT), **(result or {})})
 

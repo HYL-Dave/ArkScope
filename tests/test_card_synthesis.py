@@ -173,9 +173,9 @@ def test_task_model_routing(tmp_path, monkeypatch):
     # translation defaults to the fast model (not the Opus synthesis model)
     assert task_model("card_translation") == "claude-sonnet-5"
     # env override wins for either task
-    monkeypatch.setenv("ARKSCOPE_CARD_TRANSLATION_MODEL", "claude-haiku-4-5")
+    monkeypatch.setenv("ARKSCOPE_CARD_TRANSLATION_MODEL", "claude-opus-5-5")
     monkeypatch.setenv("ARKSCOPE_CARD_SYNTHESIS_MODEL", "test-model-x")
-    assert task_model("card_translation") == "claude-haiku-4-5"
+    assert task_model("card_translation") == "claude-opus-5-5"
     assert task_model("card_synthesis") == "test-model-x"
     # provider can be set independently; model-only OpenAI ids infer provider.
     monkeypatch.delenv("ARKSCOPE_CARD_SYNTHESIS_MODEL")
@@ -611,7 +611,7 @@ def test_synthesis_provider_override_uses_explicit_task_effort(monkeypatch, prov
         "task_route",
         lambda task: TaskRoute(
             task="card_synthesis", provider="anthropic" if provider == "openai" else "openai",
-            model="claude-opus-5" if provider == "openai" else "gpt-5.6-sol",
+            model="claude-opus-5-5" if provider == "openai" else "gpt-5.6-sol",
             effort="xhigh", source="db",
         ),
     )
@@ -802,14 +802,15 @@ def test_fixed_task_seams_dispatch_current_and_custom_explicit_routes(
     assert calls == [(model, "high")]
 
 
-def test_openai_api_key_synthesis_preserves_schema_on_responses(monkeypatch):
+@pytest.mark.parametrize("model", ["gpt-5.6-luna", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna"])
+def test_openai_api_key_synthesis_preserves_schema_on_responses(monkeypatch, model):
     from types import SimpleNamespace
 
     from src import card_synthesis as cs
     from src.auth_drivers.live_resolver import LiveAuthResolution
 
     response = SimpleNamespace(
-        model="gpt-5.4-mini", status="completed", error=None,
+        model=model, status="completed", error=None,
         output=[
             SimpleNamespace(
                 type="function_call", name="emit_result_card", status="completed",
@@ -837,13 +838,14 @@ def test_openai_api_key_synthesis_preserves_schema_on_responses(monkeypatch):
     )
 
     result, meta = cs._synthesize_openai(
-        _packet(), "gpt-5.4-mini", effort="high", model_timeout_s=456
+        _packet(), model, effort="high", model_timeout_s=456
     )
 
     assert result == _synth() and meta == {"effort": "high"}
     client.with_options.assert_called_once_with(timeout=456, max_retries=0)
     kwargs = bounded.responses.create.call_args.kwargs
-    assert kwargs["model"] == "gpt-5.4-mini"
+    assert kwargs["model"] == model
+    bounded.chat.completions.create.assert_not_called()
     assert kwargs["reasoning"] == {"effort": "high"}
     assert kwargs["max_output_tokens"] == 8192
     assert kwargs["tools"][0]["parameters"] == cs._CARD_TOOL_SCHEMA

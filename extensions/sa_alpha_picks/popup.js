@@ -459,6 +459,8 @@ function quickWorkloadText(workload) {
 
 function renderRefreshAttempt(label, result, runtimeError) {
   var outcome=result && (result.acquisition_stop || result);
+  var commentProgress=commentProgressText(result && result.details && result.details.comment_progress);
+  var runOutcome=result && result.extension_run && result.extension_run.derived_outcome;
   var style="empty", text=label + " request returned.";
   if(runtimeError || !result) {
     style="error";
@@ -473,7 +475,14 @@ function renderRefreshAttempt(label, result, runtimeError) {
     text=label + " failed: " + (outcome.error_code || outcome.error || outcome.reason || "reason unavailable");
   } else if(outcome.status === "pending") {
     text=label + " request in progress.";
+  } else if(runOutcome === "failed" || runOutcome === "degraded") {
+    style=runOutcome === "failed" ? "error" : "partial";
+    text=label + ": " + SAExtensionPopupActions.outcomeLabel(runOutcome) + ".";
+  } else if(commentProgress) {
+    style="partial";
+    text=label + ": Partial.";
   }
+  if(commentProgress)text+=" " + commentProgress;
   var workload=quickWorkloadText(result && result.details && result.details.quick_workload);
   refreshAttemptStatusEl.hidden=false;
   refreshAttemptStatusEl.className=style;
@@ -864,6 +873,17 @@ function renderRecoveryState(state, announceActionable) {
   );
 }
 
+function commentProgressText(progress) {
+  if (!progress || !Number.isSafeInteger(progress.pending_articles) || progress.pending_articles < 1) return "";
+  var pending = progress.pending_articles;
+  var saved = Number.isSafeInteger(progress.net_new_comments) ? progress.net_new_comments : 0;
+  var stops = Array.isArray(progress.stop_reasons)
+    ? progress.stop_reasons.map(SAExtensionPopupActions.commentStopLabel).join(", ") : "";
+  return saved + " net new comment" + (saved === 1 ? "" : "s") + " stored; "
+    + pending + " article" + (pending === 1 ? "" : "s") + " pending"
+    + (stops ? " (" + stops + ")" : "") + ".";
+}
+
 function renderStructuredLastRun(summary, announceActionable) {
   if (!lastRunStatusEl) return;
   if (!summary || typeof summary !== "object") {
@@ -873,6 +893,8 @@ function renderStructuredLastRun(summary, announceActionable) {
     return;
   }
   var outcome = SAExtensionPopupActions.outcomeLabel(summary.derived_outcome);
+  var commentProgress = commentProgressText(summary.comment_progress);
+  if (summary.derived_outcome === "deferred" && commentProgress) outcome = "Partial; comments pending";
   var operation = summary.operation === "market_news_sync"
     ? "Market News"
     : summary.operation === "alpha_picks_sync"
@@ -885,7 +907,8 @@ function renderStructuredLastRun(summary, announceActionable) {
   var phaseComplete = Number.isInteger(counts.phase_complete) ? counts.phase_complete : 0;
   var phaseFailed = Number.isInteger(counts.phase_failed) ? counts.phase_failed : 0;
   var phaseSkipped = Number.isInteger(counts.phase_skipped) ? counts.phase_skipped : 0;
-  var phaseTotal = phaseComplete + phaseFailed + phaseSkipped;
+  var phaseDeferred = Number.isInteger(counts.phase_deferred) ? counts.phase_deferred : 0;
+  var phaseTotal = phaseComplete + phaseFailed + phaseSkipped + phaseDeferred;
   var itemTotal = Number.isInteger(counts.item_total) ? counts.item_total : 0;
   var failures = Number.isInteger(counts.failed_retryable)
     ? counts.failed_retryable
@@ -903,6 +926,7 @@ function renderStructuredLastRun(summary, announceActionable) {
   if (failures > 0) {
     pieces.push(failures + " detail failure" + (failures === 1 ? "" : "s") + " recorded.");
   }
+  if (commentProgress) pieces.push(commentProgress);
   if (summary.audit_state) {
     var audit = SAExtensionPopupActions.auditLabel(summary.audit_state);
     if (summary.audit_reason_code) {
@@ -1199,10 +1223,12 @@ manualBtn.addEventListener("click", function () {
       progressEl.textContent = "Article fetched; confirm the link";
       progressEl.style.color = "#e65100";
     } else if (result && result.fetched > 0) {
+      var commentProgress = commentProgressText(result.comment_progress);
       progressEl.textContent = "Fetched " + result.fetched + " article" +
         (result.fetched === 1 ? "" : "s") +
-        (result.failed > 0 ? "; " + result.failed + " failed" : "");
-      progressEl.style.color = "#2e7d32";
+        (result.failed > 0 ? "; " + result.failed + " failed" : "") +
+        (commentProgress ? ". Partial: " + commentProgress : "");
+      progressEl.style.color = commentProgress || result.failed > 0 ? "#e65100" : "#2e7d32";
       manualInput.value = "";
       chrome.storage.local.remove("manualDraft");
     } else if (result && result.failed > 0) {
@@ -1293,13 +1319,14 @@ function renderStatus(lastRefresh) {
 
   var currentOk = current && current.status === "ok" && current.recorded_failure !== true;
   var closedOk = closed && closed.status === "ok" && closed.recorded_failure !== true;
+  var commentProgress = commentProgressText(lastRefresh.details && lastRefresh.details.comment_progress);
 
   statusEl.textContent = "";
 
   if (currentOk && closedOk) {
-    statusEl.className = "success";
+    statusEl.className = commentProgress ? "partial" : "success";
     statusEl.append(
-      document.createTextNode("Last stored Alpha Picks refresh: " + timeStr + modeLabel),
+      document.createTextNode((commentProgress ? "Partial Alpha Picks refresh: " : "Last stored Alpha Picks refresh: ") + timeStr + modeLabel),
       document.createElement("br"),
       document.createTextNode(
         "Current: " + current.count + " picks | Closed: " + closed.count + " picks"
@@ -1358,6 +1385,7 @@ function renderStatus(lastRefresh) {
       if (details.failed > 0) parts.push(details.failed + " failed");
       var detailLine = "Articles: " + (parts.length > 0 ? parts.join(", ") : "No new captures reported");
       statusEl.append(document.createElement("br"), document.createTextNode(detailLine));
+      if (commentProgress) statusEl.append(document.createElement("br"), document.createTextNode(commentProgress));
     }
 
     var workload=quickWorkloadText(details.quick_workload);

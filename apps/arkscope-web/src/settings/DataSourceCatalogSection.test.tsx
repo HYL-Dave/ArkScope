@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DataSourceCapability, DataSourceCatalog } from "../api";
+import type { DataSourceCapability, DataSourceCatalog, ProvidersConfigResponse } from "../api";
 import { createSettingsReadCache, type SettingsReadCache } from "./settingsReadCache";
 import { settingsParentAnchor } from "./settingsRegistry";
 
@@ -14,12 +14,13 @@ import { settingsParentAnchor } from "./settingsRegistry";
 vi.mock("../api", async (importOriginal) => ({
   ...await importOriginal<typeof import("../api")>(),
   getDataSourceCatalog: vi.fn(),
+  getProvidersConfig: vi.fn(),
   putDataSourceRoute: vi.fn(),
   runScheduleNow: vi.fn(),
   testProvider: vi.fn(),
 }));
 
-import { getDataSourceCatalog, putDataSourceRoute, runScheduleNow, testProvider } from "../api";
+import { getDataSourceCatalog, getProvidersConfig, putDataSourceRoute, runScheduleNow, testProvider } from "../api";
 import { DataSourceCatalogSection } from "./DataSourceCatalogSection";
 
 function source(provider: string, overrides: Partial<DataSourceCapability> = {}): DataSourceCapability {
@@ -38,8 +39,9 @@ function fixture(): DataSourceCatalog {
         source("seeking_alpha", {
           acquisition: "browser_page_capture", controls: ["financial_sources", "sa_extension"],
           access_requirement: "signed_in_browser_subscription",
+          financial_routes: ["sa_company_financials"],
         }),
-        source("massive", { integration: "candidate", acquisition: "not_implemented", controls: [] }),
+        source("massive", { integration: "candidate", acquisition: "not_implemented", controls: [], access_requirement: "endpoint_entitlement_unverified" }),
       ] },
       { id: "valuation_ratings", sources: [source("seeking_alpha", {
         acquisition: "browser_page_capture", controls: ["financial_sources", "sa_extension"],
@@ -50,6 +52,7 @@ function fixture(): DataSourceCatalog {
         access_requirement: "signed_in_browser_subscription",
       })] },
       { id: "news", sources: [
+        source("massive", { acquisition: "app_job", access_requirement: "endpoint_entitlement_unverified", controls: ["source_schedules"] }),
         source("finnhub", { acquisition: "app_job", access_requirement: "endpoint_entitlement_unverified", controls: ["source_schedules"] }),
         source("seeking_alpha", {
           acquisition: "browser_extension", access_requirement: "signed_in_browser_subscription", controls: ["sa_extension"],
@@ -61,6 +64,7 @@ function fixture(): DataSourceCatalog {
 }
 
 let state: DataSourceCatalog;
+let config: ProvidersConfigResponse;
 let root: ReturnType<typeof createRoot> | null;
 let host: HTMLDivElement;
 const navigate = vi.fn();
@@ -102,7 +106,20 @@ beforeEach(async () => {
   await i18n.changeLanguage("en");
   vi.resetAllMocks();
   state = fixture();
+  config = {
+    providers: {
+      massive: { testable: true, default_available: false, fields: [{
+        field: "api_key", label: "API key", secret: true, env_var: "MASSIVE_API_KEY",
+        app_value_set: true, app_value_masked: "MASKED_SECRET_SENTINEL", effective_source: "app",
+        needs_import: false, import_source: null, importable_env_vars: [], defaulted: false,
+        guarded: false, guard_reason: null,
+      }] },
+    },
+    setup: { required: false, code: null, reason: null },
+    env_fallback: { enabled: false, source: "default" },
+  };
   vi.mocked(getDataSourceCatalog).mockImplementation(async () => structuredClone(state));
+  vi.mocked(getProvidersConfig).mockImplementation(async () => structuredClone(config));
 });
 
 afterEach(() => {
@@ -114,10 +131,12 @@ afterEach(() => {
 describe("DataSourceCatalogSection", () => {
   it("shows integration and access requirements without activating sources", async () => {
     await render();
-    expect(provider("sec_edgar").textContent).toContain("Integrated");
+    expect(provider("sec_edgar").textContent).toContain("Category adapter present");
     expect(provider("financial_datasets").textContent).toContain("authorized request budget required");
-    expect(provider("seeking_alpha").textContent).toContain("Integrated");
-    expect(provider("massive").textContent).toContain("Not integrated");
+    expect(provider("seeking_alpha").textContent).toContain("Category adapter present");
+    expect(provider("massive").textContent).toContain("Category adapter missing");
+    expect(provider("massive").textContent).toContain("Provider integrated elsewhere");
+    expect(provider("massive").textContent).toContain("A subscription upgrade alone cannot enable financial acquisition");
     expect(provider("seeking_alpha").querySelector('.data-catalog-provider')?.textContent).toBe("Seeking Alpha");
     expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
     expect(putDataSourceRoute).not.toHaveBeenCalled();
@@ -127,11 +146,13 @@ describe("DataSourceCatalogSection", () => {
 
   it("separates explicit company research capture from extension news alarms", async () => {
     await render();
-    expect(provider("seeking_alpha").textContent).toContain("Explicit company-page capture");
+    expect(provider("seeking_alpha").textContent).toContain("Company-page capture: manual / scheduled");
+    expect(provider("seeking_alpha").textContent).toContain("Captured SA financial tables");
+    expect(provider("seeking_alpha").textContent).toContain("not a generic fundamental-ratio calculator");
     await select("valuation_ratings");
-    expect(provider("seeking_alpha").textContent).toContain("Explicit company-page capture");
+    expect(provider("seeking_alpha").textContent).toContain("Company-page capture: manual / scheduled");
     await select("earnings_estimates");
-    expect(provider("seeking_alpha").textContent).toContain("Explicit company-page capture");
+    expect(provider("seeking_alpha").textContent).toContain("Company-page capture: manual / scheduled");
     await select("news");
     expect(provider("seeking_alpha").textContent).toContain("Browser extension capture / auto-sync");
     expect(provider("finnhub").textContent).toContain("endpoint access unverified");
@@ -168,11 +189,54 @@ describe("DataSourceCatalogSection", () => {
   it("reuses the retained metadata without probing accounts", async () => {
     const cache = createSettingsReadCache();
     cache.replace("data_source_catalog", state);
+    cache.replace("provider_config", config);
     await render(cache);
     expect(getDataSourceCatalog).not.toHaveBeenCalled();
+    expect(getProvidersConfig).not.toHaveBeenCalled();
     await select("news");
     expect(provider("finnhub").textContent).toContain("endpoint access unverified");
     expect(testProvider).not.toHaveBeenCalled();
+  });
+
+  it.each(["app", "env", "config/.env"])("shows configured keys from %s without claiming entitlement or disclosing values", async (effectiveSource) => {
+    config.providers.massive.fields[0].effective_source = effectiveSource;
+    await render();
+    expect(provider("massive").textContent).toContain("API key configured");
+    expect(provider("massive").textContent).toContain("endpoint access unverified");
+    expect(provider("massive").textContent).toContain("Category adapter missing");
+    expect(host.textContent).not.toContain("MASKED_SECRET_SENTINEL");
+    expect(testProvider).not.toHaveBeenCalled();
+  });
+
+  it("treats stored/importable but ineffective keys as missing and reloads after a config change", async () => {
+    config.providers.massive.fields[0].effective_source = "missing";
+    config.providers.massive.fields[0].needs_import = true;
+    const cache = createSettingsReadCache();
+    await render(cache);
+    expect(provider("massive").textContent).toContain("API key not configured");
+    config.providers.massive.fields[0].effective_source = "env";
+    await act(async () => { cache.invalidate("provider_config"); });
+    await flush();
+    expect(provider("massive").textContent).toContain("API key configured");
+    expect(provider("massive").querySelector("button")).toBeNull();
+  });
+
+  it("does not present stale credential state as current after a failed refresh", async () => {
+    await render();
+    vi.mocked(getProvidersConfig).mockRejectedValueOnce(new Error("PRIVATE_CONFIG_ERROR"));
+    await click(reload());
+    expect(provider("massive").textContent).toContain("API key status unavailable");
+    expect(provider("massive").textContent).not.toContain("API key configured");
+    expect(host.textContent).not.toContain("PRIVATE_CONFIG_ERROR");
+    await click(reload());
+    expect(provider("massive").textContent).toContain("API key configured");
+  });
+
+  it("treats an incomplete config store as unknown, not as a verified missing key", async () => {
+    config.setup.required = true;
+    config.providers.massive.fields[0].effective_source = "missing";
+    await render();
+    expect(provider("massive").textContent).toContain("API key status unavailable");
   });
 
   it("keeps the selected category and old definitions on failed reload without displaying diagnostics", async () => {

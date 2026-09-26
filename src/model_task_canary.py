@@ -324,7 +324,12 @@ async def dispatch_task_model_test(
     token_store: Any,
     timeout_s: float = 45.0,
 ) -> TaskModelTestResult:
-    """Reject product-retired models before the credential-aware dispatch checks."""
+    """Reject unset or product-retired models before credential resolution."""
+    if not model.strip():
+        return _result(
+            task=task, provider=provider, model=model, effort=effort,
+            active=None, status="unsupported", error_code="model_required",
+        )
     capability = capability_for(model)
     if capability is not None and not capability.new_execution_allowed:
         return _result(

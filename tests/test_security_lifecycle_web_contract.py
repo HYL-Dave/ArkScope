@@ -27,7 +27,7 @@ def test_all_four_web_channels_have_explicit_transport_without_default():
 @pytest.mark.parametrize("provider,auth,model", [
     ("openai", "api_key", "gpt-5.6-luna"),
     ("openai", "chatgpt_oauth", "gpt-5.6-luna"),
-    ("anthropic", "api_key", "claude-opus-5"),
+    ("anthropic", "api_key", "claude-opus-5-5"),
     ("anthropic", "claude_code_oauth", "claude-sonnet-5"),
 ])
 def test_web_model_admission_keeps_eligible_api_and_oauth(provider, auth, model):
@@ -42,7 +42,7 @@ def test_web_model_admission_keeps_eligible_api_and_oauth(provider, auth, model)
     ("openai", "chatgpt_oauth", "gpt-5.3-codex-spark", "model_retired"),
     ("anthropic", "api_key", "claude-fable-5", "model_retired"),
     ("anthropic", "claude_code_oauth", "claude-fable-5-1", "model_auth_unverified"),
-    ("openai", "api_key", "claude-opus-5", "model_provider_mismatch"),
+    ("openai", "api_key", "claude-opus-5-5", "model_provider_mismatch"),
     ("openai", "api_key", "unknown-model", "model_unregistered"),
 ])
 def test_web_admission_does_not_resurrect_or_expand_models(provider, auth, model, code):

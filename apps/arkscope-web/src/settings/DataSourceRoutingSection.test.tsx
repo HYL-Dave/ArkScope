@@ -135,7 +135,8 @@ describe("DataSourceRoutingSection", () => {
   it("shows actual adapter scope and unverified Finnhub access without activating paid requests", async () => {
     await render();
     expect(host.textContent).toContain("Endpoint access unverified");
-    expect(host.textContent).toContain("Not connected to this analysis tool");
+    expect(host.textContent).toContain("A subscription upgrade alone cannot enable financial acquisition");
+    expect(host.textContent).toContain("not a generic fundamental-ratio calculator");
     expect(host.textContent).toContain("Request limits not configured");
     expect(Array.from(host.querySelectorAll("input[aria-label]")).some((item) =>
       item.getAttribute("aria-label")?.startsWith(FUNDAMENTALS) && /Massive|Seeking Alpha/.test(item.getAttribute("aria-label")!))).toBe(false);
@@ -160,6 +161,9 @@ describe("DataSourceRoutingSection", () => {
     ["sa_company_estimates", "Captured SA estimates and revisions"],
   ] as const)("controls %s independently without enabling paid fallback", async (dataset, label) => {
     await render();
+    const row = source(`${label}: Seeking Alpha`).closest(".data-route-row");
+    expect(row?.textContent).toContain("manual / scheduled");
+    expect(row?.textContent).toContain("not a generic fundamental-ratio calculator");
     await click(source(`${label}: Seeking Alpha`));
     await click(button(`Save sources: ${label}`));
     expect(putDataSourceRoute).toHaveBeenCalledExactlyOnceWith(dataset, []);

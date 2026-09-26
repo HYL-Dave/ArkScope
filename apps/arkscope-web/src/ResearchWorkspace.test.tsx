@@ -40,7 +40,7 @@ const route = (
 
 const RUNTIME: RuntimeConfig = {
   anthropic: {
-    model: "claude-sonnet-5", model_advanced: "claude-opus-5",
+    model: "claude-sonnet-5", model_advanced: "claude-opus-5-5",
     effort: null, thinking: false, key_set: true, credentials: [],
   },
   openai: {
@@ -77,7 +77,7 @@ function catalog(
     }],
     current_model_ids: [
       "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-      "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+      "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
     ],
     retired_model_ids: ["gpt-5.4-mini", "claude-fable-5", "claude-opus-4-8"],
     model_lifecycle: [
@@ -87,7 +87,7 @@ function catalog(
       { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
       { id: "claude-fable-5-1", provider: "anthropic", task_route_status: "current", aliases: [] },
       { id: "claude-fable-5", provider: "anthropic", task_route_status: "retired", aliases: [] },
-      { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-opus-5-5", provider: "anthropic", task_route_status: "current", aliases: [] },
       { id: "claude-sonnet-5", provider: "anthropic", task_route_status: "current", aliases: [] },
       { id: "claude-opus-4-8", provider: "anthropic", task_route_status: "retired", aliases: [] },
     ],
@@ -95,7 +95,7 @@ function catalog(
       ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
         id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
       })),
-      ...["claude-fable-5-1", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
+      ...["claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5"].map((id) => ({
         id, provider: "anthropic" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
       })),
     ] as unknown as ModelCatalog["models"],
@@ -148,7 +148,7 @@ function catalog(
               discovered_at: null,
               models: [
                 model("claude-fable-5-1", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
-                model("claude-opus-5", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
+                model("claude-opus-5-5", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
                 model("claude-sonnet-5", ["low", "medium", "high", "xhigh", "max"], { status: "seed" }),
               ],
             },
@@ -266,7 +266,7 @@ function stubFetch(options: FetchOptions = {}) {
       return json({
         providers: {
           openai: { available: true, model: "gpt-5.6-luna" },
-          anthropic: { available: true, model: "claude-opus-5" },
+          anthropic: { available: true, model: "claude-opus-5-5" },
         },
       });
     }

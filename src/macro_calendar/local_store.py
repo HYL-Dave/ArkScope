@@ -810,7 +810,8 @@ def read_macro_snapshot(
         for sid, label in series:
             try:
                 row = conn.execute(
-                    "SELECT s.series_id, s.title, s.units, "
+                    "SELECT s.series_id, s.title, s.units, s.frequency, "
+                    "s.seasonal_adjustment, s.revision_strategy, "
                     "o.value, o.observation_date, o.realtime_start, o.realtime_end, o.fetched_at "
                     "FROM macro_series s "
                     "JOIN macro_observations o ON o.series_id = s.series_id "

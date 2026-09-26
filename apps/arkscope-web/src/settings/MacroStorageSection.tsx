@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCw } from "lucide-react";
+import { BookOpen, RefreshCw } from "lucide-react";
 
 import {
   getMacroSnapshot,
@@ -11,7 +11,8 @@ import {
   type MacroTableStat,
 } from "../api";
 import { formatSystemTimestamp } from "../timeDisplay";
-import { Button } from "../ui/Button";
+import { IconButton } from "../ui/Button";
+import { Drawer } from "../ui/Drawer";
 import { InlineAlert } from "../ui/Status";
 import {
   DataScheduleTable,
@@ -20,6 +21,7 @@ import {
 } from "./dataScheduleControls";
 import type { SettingsT } from "./settingsCopy";
 import type { SettingsReadCache } from "./settingsReadCache";
+import { isMacroIndicator, macroIndicatorCopy, macroObservationPeriod } from "./macroIndicators";
 
 const MACRO_TABLE_KEYS = [
   "macro_series",
@@ -52,7 +54,7 @@ function storedCoverage(table: MacroTableStat | undefined, t: SettingsT): string
   const count = t(($) => $.macroStorage.counts.stored, {
     value: table.row_count.toLocaleString(),
   });
-  if (table.row_count === 0) return count;
+  if (table.row_count === 0) return t(($) => $.macroStorage.counts.coverageUnknown);
   return t(($) => $.macroStorage.counts.summary, {
     value: count,
     timestamp: formatSystemTimestamp(table.last_fetched_at),
@@ -62,7 +64,7 @@ function storedCoverage(table: MacroTableStat | undefined, t: SettingsT): string
 function snapshotValue(item: MacroSnapshotItem): string {
   if (item.value == null || !Number.isFinite(item.value)) return "—";
   const value = item.value.toLocaleString();
-  return item.units ? `${value} ${item.units}` : value;
+  return value;
 }
 
 export function MacroStorageSection({
@@ -85,6 +87,8 @@ export function MacroStorageSection({
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(false);
   const sequenceRef = useRef(0);
+  const [guideItem, setGuideItem] = useState<MacroSnapshotItem | null>(null);
+  const guideButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const load = useCallback(async (force = false) => {
     const sequence = ++sequenceRef.current;
@@ -151,21 +155,20 @@ export function MacroStorageSection({
         : t(($) => $.macroStorage.schedule.enabledCount_other, { count: enabledScheduleCount });
 
   return (
-    <div>
+    <div className="settings-macro-sections">
       <div className="settings-section-head">
         <div>
           <h2>{t(($) => $.macroStorage.title)}</h2>
           <p className="muted tiny">{t(($) => $.macroStorage.description)}</p>
         </div>
-        <Button
+        <IconButton
           tone="ghost"
           size="compact"
+          label={t(($) => $.actions.refreshStatus)}
           icon={<RefreshCw size={15} />}
-          aria-busy={loading || undefined}
+          busy={loading}
           onClick={() => void load(true)}
-        >
-          {t(($) => $.actions.refreshStatus)}
-        </Button>
+        />
       </div>
 
       {bothTransportLegsUnavailable ? (
@@ -190,7 +193,7 @@ export function MacroStorageSection({
       ) : null}
 
       {statusAvailable ? (
-        <div className="settings-panel">
+        <div className="settings-data-band">
           <h3>{t(($) => $.macroStorage.headings.storedCoverage)}</h3>
           <dl className="ds-kv">
             {MACRO_TABLE_KEYS.map((key) => (
@@ -201,14 +204,16 @@ export function MacroStorageSection({
               />
             ))}
           </dl>
+          <p className="muted tiny">{t(($) => $.macroStorage.counts.coverageNote)}</p>
         </div>
       ) : null}
 
-      <div className="settings-panel">
+      <div className="settings-data-band">
         <div className="settings-section-head">
           <h3>{t(($) => $.macroStorage.schedule.title)}</h3>
           <span className="muted tiny">{automationStatus}</span>
         </div>
+        <p className="muted tiny">{t(($) => $.macroStorage.schedule.historyNote)}</p>
         <DataScheduleTable
           controller={scheduleController}
           scope="macro"
@@ -216,7 +221,7 @@ export function MacroStorageSection({
       </div>
 
       {snapshot?.available ? (
-        <div className="settings-panel">
+        <div className="settings-data-band">
           <div className="settings-section-head">
             <div>
               <h3>{t(($) => $.macroStorage.snapshot.title)}</h3>
@@ -238,13 +243,16 @@ export function MacroStorageSection({
           {snapshot.items.length === 0 ? (
             <p className="muted">{t(($) => $.macroStorage.counts.zero)}</p>
           ) : (
-            <div className="settings-table-scroll" data-testid="fred-snapshot-scroll">
+            <div className="settings-table-scroll" data-testid="fred-snapshot-scroll"
+              tabIndex={0} role="region" aria-label={t(($) => $.macroStorage.snapshot.title)}>
               <table className="ds-table settings-fred-table">
+                <colgroup><col /><col /><col /><col /><col /><col /></colgroup>
                 <thead>
                   <tr>
                     <th>{t(($) => $.macroStorage.headings.seriesId)}</th>
                     <th>{t(($) => $.macroStorage.headings.name)}</th>
                     <th>{t(($) => $.macroStorage.headings.latestValue)}</th>
+                    <th>{t(($) => $.macroStorage.headings.units)}</th>
                     <th>{t(($) => $.macroStorage.headings.observationDate)}</th>
                     <th>{t(($) => $.macroStorage.headings.lastFetch)}</th>
                   </tr>
@@ -252,16 +260,25 @@ export function MacroStorageSection({
                 <tbody>
                   {snapshot.items.map((item) => (
                     <tr key={item.series_id}>
-                      <td>{item.series_id}</td>
+                      <td><div className="settings-fred-series">
+                        <code>{item.series_id}</code>
+                        {isMacroIndicator(item.series_id) ? <IconButton
+                          size="compact" tone="ghost" icon={<BookOpen size={15} />}
+                          label={t(($) => $.macroStorage.guide.open, { id: item.series_id })}
+                          onClick={(event) => {
+                            guideButtonRef.current = event.currentTarget;
+                            setGuideItem(item);
+                          }}
+                        /> : null}
+                      </div></td>
                       <td>
-                        <strong>{item.label}</strong>
-                        {item.title && item.title !== item.label
-                          ? <div className="muted tiny">{item.title}</div>
-                          : null}
+                        <strong title={item.title ?? undefined}>{item.label}</strong>
+                        <div className="muted tiny">{item.frequency}</div>
                       </td>
-                      <td>{snapshotValue(item)}</td>
-                      <td>{item.observation_date ?? "—"}</td>
-                      <td>{formatSystemTimestamp(item.fetched_at)}</td>
+                      <td className="settings-fred-value">{snapshotValue(item)}</td>
+                      <td>{item.units ?? "—"}</td>
+                      <td className="settings-fred-period" title={item.observation_date ?? undefined}>{macroObservationPeriod(item)}</td>
+                      <td className="settings-fred-fetched">{formatSystemTimestamp(item.fetched_at)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -270,6 +287,30 @@ export function MacroStorageSection({
           )}
         </div>
       ) : null}
+      <Drawer open={guideItem !== null} title={guideItem?.label ?? ""}
+        onClose={() => setGuideItem(null)} returnFocusRef={guideButtonRef}>
+        {guideItem && isMacroIndicator(guideItem.series_id) ? <div className="settings-indicator-guide">
+          <h3>{guideItem.title ?? guideItem.series_id}</h3>
+          <p>{macroIndicatorCopy(guideItem.series_id, t)}</p>
+          <dl className="ds-kv">
+            <FragmentKV label={t(($) => $.macroStorage.headings.units)} value={guideItem.units ?? "—"} />
+            <FragmentKV label={t(($) => $.macroStorage.guide.frequency)} value={guideItem.frequency ?? "—"} />
+            <FragmentKV label={t(($) => $.macroStorage.guide.adjustment)} value={guideItem.seasonal_adjustment ?? "—"} />
+            <FragmentKV label={t(($) => $.macroStorage.headings.observationDate)} value={guideItem.observation_date ?? "—"} />
+            <FragmentKV label={t(($) => $.macroStorage.headings.lastFetch)} value={formatSystemTimestamp(guideItem.fetched_at)} />
+          </dl>
+          <p>{t(($) => $.macroStorage.guide.periodNote)}</p>
+          <p>{guideItem.revision_strategy === "latest_only"
+            ? t(($) => $.macroStorage.guide.initialRelease)
+            : guideItem.revision_strategy === "full_vintages"
+              ? t(($) => $.macroStorage.guide.vintages)
+              : t(($) => $.macroStorage.guide.revisionUnknown)}</p>
+          <p>{t(($) => $.macroStorage.guide.interpretationNote)}</p>
+          <a href={`https://fred.stlouisfed.org/series/${guideItem.series_id}`} target="_blank" rel="noreferrer">
+            {t(($) => $.macroStorage.guide.source)}
+          </a>
+        </div> : null}
+      </Drawer>
     </div>
   );
 }

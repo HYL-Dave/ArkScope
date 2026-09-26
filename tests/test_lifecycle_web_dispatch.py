@@ -26,7 +26,7 @@ async def test_four_channel_dispatch_never_changes_selected_transport(monkeypatc
     from src.auth_drivers.lifecycle_web_dispatch import call_lifecycle_web_model
 
     called = []
-    selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-opus-5", "local:7")
+    selection = validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-opus-5-5", "local:7")
     call = ModelCall(selection, "call-1", "search", "public question", {"type": "object", "properties": {}, "additionalProperties": False},
                      "high", 4096 if auth == "api_key" else None, 1, 3)
     control = RunControl(selection=selection, max_model_requests=1)

@@ -6,8 +6,10 @@ from typing import Any, Mapping
 
 
 SCHEMA_VERSION = 2
+COMMENT_PENDING_REASONS = frozenset({"comment_backfill_pending", "controls_unresolved"})
+COMMENT_STOP_REASONS = frozenset({"timeout", "max_scrolls", "stable_bottom", "controls_unresolved", "unknown"})
 DEFERRED_REASONS = frozenset({"capacity_exhausted", "site_pacing", "waiting_for_priority_work", "collector_unavailable",
-                              "collector_other_installation", "site_paused"})
+                              "collector_other_installation", "site_paused"}) | COMMENT_PENDING_REASONS
 _V2_FAILURE_REASONS = frozenset({"human_verification_required", "rate_limited"})
 
 REASON_CODES = frozenset(
@@ -179,6 +181,7 @@ _TOP_LEVEL_KEYS = frozenset(
         "counts",
         "derived_outcome",
         "healthy_anchor_eligible",
+        "comment_progress",
     }
 )
 _PHASE_KEYS = frozenset({"state", "reason_code"})
@@ -211,6 +214,23 @@ def _fail(code: str = "protocol_invalid", message: str = "") -> None:
 
 def _exact_keys(value: Mapping[str, Any], expected: frozenset[str]) -> bool:
     return set(value) == expected
+
+
+def validate_comment_progress(value: Any) -> dict[str, Any]:
+    """Validate the optional v2 saved-but-incomplete comment summary."""
+    if not isinstance(value, Mapping) or set(value) != {"pending_articles", "net_new_comments", "stop_reasons"}:
+        _fail(message="invalid comment progress")
+    for name, minimum in (("pending_articles", 1), ("net_new_comments", 0)):
+        count = value[name]
+        if type(count) is not int or not minimum <= count <= 9007199254740991:
+            _fail(message="invalid comment progress count")
+    stops = value["stop_reasons"]
+    if (not isinstance(stops, list) or not stops
+            or any(not isinstance(stop, str) or stop not in COMMENT_STOP_REASONS for stop in stops)
+            or len(set(stops)) != len(stops)):
+        _fail(message="invalid comment stop reasons")
+    return {"pending_articles": value["pending_articles"], "net_new_comments": value["net_new_comments"],
+            "stop_reasons": sorted(stops)}
 
 
 def _validate_phase(name: str, value: Any, version: int) -> dict[str, Any]:
@@ -343,6 +363,18 @@ def derive_run_result(payload: Any) -> dict[str, Any]:
         name: _validate_phase(name, raw_phases[name], version)
         for name in expected_phases
     }
+    comment_phase = {"alpha_picks_sync": "article_details", "alpha_picks_manual_fetch": "manual_fetch"}.get(operation)
+    progress = None
+    if "comment_progress" in payload:
+        if version != 2 or comment_phase is None or phases[comment_phase]["state"] not in {"deferred", "failed"}:
+            _fail(message="comment progress requires unfinished comment work")
+        progress = validate_comment_progress(payload["comment_progress"])
+    for name, phase in phases.items():
+        if phase["reason_code"] in COMMENT_PENDING_REASONS:
+            if name != comment_phase or progress is None:
+                _fail(message="comment deferral requires comment progress")
+            if phase["reason_code"] == "controls_unresolved" and "controls_unresolved" not in progress["stop_reasons"]:
+                _fail(message="unresolved controls missing from comment progress")
 
     raw_items = payload.get("item_outcomes")
     if not isinstance(raw_items, list):
@@ -379,7 +411,7 @@ def derive_run_result(payload: Any) -> dict[str, Any]:
     if claimed_healthy is not None and claimed_healthy is not healthy:
         _fail(message="healthy anchor mismatch")
 
-    return {
+    result = {
         "schema_version": version,
         "operation": operation,
         "mode": payload["mode"],
@@ -391,6 +423,10 @@ def derive_run_result(payload: Any) -> dict[str, Any]:
         "counts": counts,
         "item_outcomes": items,
     }
+    # Do not add defaults to historical receipts: their canonical hashes are durable.
+    if progress is not None:
+        result["comment_progress"] = progress
+    return result
 
 
 __all__ = [

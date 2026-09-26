@@ -191,7 +191,7 @@ export function resolveResearchSelection({
     model: tuple.model,
     effort: tuple.effort ?? "",
   }, "ai_research");
-  if (routeBlocker === "model_retired") {
+  if (routeBlocker === "model_retired" || routeBlocker === "model_required") {
     return blocked(tuple, provenance, routeBlocker, authMode);
   }
 

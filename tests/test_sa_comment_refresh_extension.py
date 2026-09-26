@@ -111,8 +111,12 @@ def test_actual_per_article_mode_is_saved_and_pending_is_not_reported_complete(c
     assert result["modes"] == ["backfill"]
     assert len(result["saves"]) == 1
     assert result["saves"][0]["comment_scan_mode"] == "backfill"
-    assert result["summary"]["failed"] == int(pending)
+    assert result["summary"]["failed"] == 0
     assert result["summary"]["net_new_comments"] == 1
+    if pending:
+        assert result["summary"]["comment_progress"] == {
+            "pending_articles": 1, "net_new_comments": 1, "stop_reasons": ["timeout"],
+        }
     if not content:
         assert result["summary"]["comments_refreshed"] == int(not pending)
 
@@ -147,15 +151,24 @@ def test_explicit_manual_article_repair_uses_deep_budget_and_reports_pending():
       sendNativeMessage2=async message=>{
         calls.push(message);
         if(message.action==='save_article_content')
-          return {ok:true,comment_scan_usable:true,comment_backfill_pending:true};
+          return {ok:true,comment_scan_usable:true,comment_backfill_pending:true,net_new_comments:38};
         return {status:'ok',lineage_id:7};
       };
       const summary=await doManualFetch([{symbol:'TEST',role:'entry',event_anchor_date:'2026-07-15',
         url:'https://seekingalpha.com/alpha-picks/articles/6316639-test'}]);
-      return {modes,summary,saves:calls.filter(m=>m.action==='save_article_content')};
+      return {modes,summary,saves:calls.filter(m=>m.action==='save_article_content'),
+        run:attachExtensionRunProtocol('alpha_picks_manual_fetch','manual',summary).extension_run};
     """)
     assert result["modes"] == ["backfill"]
     assert result["saves"][0]["comment_scan_mode"] == "backfill"
     assert len(result["saves"]) == 1
     assert result["summary"]["fetched"] == 1
-    assert result["summary"]["failed"] == 1
+    assert result["summary"]["failed"] == 0
+    assert result["summary"]["net_new_comments"] == 38
+    assert result["summary"]["comment_progress"] == {
+        "pending_articles": 1, "net_new_comments": 38, "stop_reasons": ["timeout"],
+    }
+    assert result["run"]["derived_outcome"] == "deferred"
+    assert result["run"]["phases"]["manual_fetch"] == {
+        "state": "deferred", "reason_code": "comment_backfill_pending",
+    }

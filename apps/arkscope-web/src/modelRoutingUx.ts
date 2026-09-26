@@ -68,6 +68,7 @@ export function modelReasonLabel(id: string, t: ModelCommonT): string {
     case "adapter_unavailable": return t(($) => $.models.reasons.adapterUnavailable);
     case "timeout": return t(($) => $.models.reasons.timeout);
     case "model_retired": return t(($) => $.models.reasons.modelRetired);
+    case "model_required": return t(($) => $.models.reasons.modelRequired);
     default: return id;
   }
 }
@@ -178,6 +179,7 @@ export function blockedRouteSaves(
   for (const task of Object.keys(draft) as ModelTask[]) {
     const row = draft[task];
     if (!row) continue;
+    if (!row.model.trim() && routesSemanticallyEqual(row, baseline[task])) continue;
     const routeBlocker = taskRouteBlocker(catalog, row, task);
     if (routeBlocker) {
       blocked.push({ task, reason: routeBlocker });

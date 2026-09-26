@@ -161,7 +161,7 @@ const ROUTE_SAVE_REASONS = new Set([
   "missing_active_credential", "task_auth_mode_unsupported", "model_auth_unverified",
   "model_entitlement_unverified", "task_capability_missing", "model_not_visible",
   "model_not_in_registry", "discovery_unavailable", "reauth_required", "model_task_unsupported",
-  "model_output_limit_unknown", "version_incompatible", "model_retired",
+  "model_output_limit_unknown", "version_incompatible", "model_retired", "model_required",
   "subscription_plan_required", "subscription_plan_unverified",
 ]);
 
@@ -698,6 +698,7 @@ export function SettingsView({
       // An explicit save of unchanged defaults still persists them; edits touch only their own tasks.
       for (const task of changedTasks.length ? changedTasks : catalog.tasks) {
         const row = draft[task.id];
+        if (row && !row.model.trim() && routesSemanticallyEqual(row, catalog.routes[task.id])) continue;
         if (!row || !row.model.trim()) {
           setRouteOutcome({ kind: "missing_model", task: task.id });
           return;
@@ -705,6 +706,7 @@ export function SettingsView({
         if (taskRouteBlocker(catalog, row, task.id)) return;
         routes[task.id] = { provider: row.provider, model: row.model.trim(), effort: row.effort.trim() };
       }
+      if (Object.keys(routes).length === 0) return;
       pendingRouteSave.current = { routes, baseline: { ...catalog.routes }, editedTasks: new Set(), acknowledged: false };
       try {
         const result = await saveModelRoutes(routes);
@@ -1024,7 +1026,7 @@ export function SettingsView({
             ) : null}
             {routeSaveBlocks.length > 0 ? (
               <div id="route-save-blocked">
-                {(["missing_active_credential", "effort_required", "model_retired"] as const)
+                {(["missing_active_credential", "effort_required", "model_retired", "model_required"] as const)
                   .map((reason) => {
                     const tasks = routeSaveBlocks
                       .filter((block) => block.reason === reason)
@@ -1035,7 +1037,9 @@ export function SettingsView({
                       ? t(($) => $.workspace.routes.saveBlocked, { value: tasks })
                       : reason === "effort_required"
                         ? t(($) => $.workspace.routes.effortRequired, { value: tasks })
-                        : t(($) => $.workspace.routes.modelRetired, { value: tasks });
+                        : reason === "model_required"
+                          ? `${commonT(($) => $.models.reasons.modelRequired)}: ${tasks}`
+                          : t(($) => $.workspace.routes.modelRetired, { value: tasks });
                     return <p className="warn-text" key={reason}>{message}</p>;
                   })}
               </div>

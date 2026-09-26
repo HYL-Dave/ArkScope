@@ -42,6 +42,7 @@ export interface SAExtensionHealthDisplayRow {
   label: string;
   mark: string;
   tone: SAExtensionHealthSegment["state"];
+  statusLabel?: string;
   copy: string;
   diagnostic: string | null;
   showDetail: boolean;
@@ -202,6 +203,45 @@ function captureCounts(segment: SAExtensionHealthSegment, t: SettingsT): string 
   });
 }
 
+function commentStopLabel(value: unknown, t: SettingsT): string | null {
+  switch (value) {
+    case "timeout": return t(($) => $.dataSources.extension.commentProgress.stops.timeout);
+    case "max_scrolls": return t(($) => $.dataSources.extension.commentProgress.stops.maxScrolls);
+    case "stable_bottom": return t(($) => $.dataSources.extension.commentProgress.stops.stableBottom);
+    case "controls_unresolved": return t(($) => $.dataSources.extension.commentProgress.stops.controlsUnresolved);
+    case "unknown": return t(($) => $.dataSources.extension.commentProgress.stops.unknown);
+    default: return null;
+  }
+}
+
+function commentProgressCopy(segment: SAExtensionHealthSegment, t: SettingsT): string | null {
+  if (
+    segment.code !== "capture_deferred"
+    && segment.code !== "capture_degraded"
+    && segment.code !== "capture_failed"
+  ) return null;
+  const progress = segment.comment_progress;
+  if (!progress || typeof progress !== "object") return null;
+  const pending = safePositiveInteger(progress.pending_articles, Number.MAX_SAFE_INTEGER);
+  const saved = safePositiveInteger(progress.net_new_comments, Number.MAX_SAFE_INTEGER);
+  if (
+    pending === null || pending < 1 || saved === null
+    || !Array.isArray(progress.stop_reasons)
+    || progress.stop_reasons.length < 1
+    || progress.stop_reasons.length > 5
+    || new Set(progress.stop_reasons).size !== progress.stop_reasons.length
+  ) return null;
+  const stops = progress.stop_reasons.map((reason) => commentStopLabel(reason, t));
+  if (stops.some((label) => label === null)) return null;
+  const savedCopy = saved === 1
+    ? t(($) => $.dataSources.extension.commentProgress.saved_one, { count: saved })
+    : t(($) => $.dataSources.extension.commentProgress.saved_other, { count: saved });
+  const pendingCopy = pending === 1
+    ? t(($) => $.dataSources.extension.commentProgress.pending_one, { count: pending })
+    : t(($) => $.dataSources.extension.commentProgress.pending_other, { count: pending });
+  return [savedCopy, pendingCopy, ...stops].join(" · ");
+}
+
 function diagnosticCopy(segment: SAExtensionHealthSegment, t: SettingsT): string | null {
   if (segment.diagnostics_status === "rejected") {
     return t(($) => $.dataSources.extension.status.diagnosticsRejected);
@@ -277,6 +317,8 @@ function developerDiagnostic(segment: SAExtensionHealthSegment, t: SettingsT): s
 function structuredDetail(
   segment: SAExtensionHealthSegment,
   t: SettingsT,
+  commentProgress: string | null,
+  partial: boolean,
 ): string {
   const status = segment.code;
   let value: string;
@@ -300,7 +342,9 @@ function structuredDetail(
       value = t(($) => $.dataSources.extension.status.captureSkipped);
       break;
     case "capture_deferred":
-      value = t(($) => $.dataSources.extension.status.captureDeferred);
+      value = partial
+        ? t(($) => $.dataSources.extension.status.capturePartial)
+        : t(($) => $.dataSources.extension.status.captureDeferred);
       break;
     case "capture_degraded":
       value = t(($) => $.dataSources.extension.status.captureDegraded);
@@ -339,7 +383,12 @@ function structuredDetail(
     const context = captureContext(segment, t);
     const counts = captureCounts(segment, t);
     const cause = diagnosticCopy(segment, t);
-    value = [...context, value, ...(counts ? [counts] : []), ...(cause ? [cause] : [])]
+    value = [
+      ...context, value,
+      ...(counts ? [counts] : []),
+      ...(cause ? [cause] : []),
+      ...(commentProgress ? [commentProgress] : []),
+    ]
       .join(" · ");
     const omitted = safePositiveInteger(segment.diagnostics_omitted_count, 10_000);
     if (segment.diagnostics_status === "recorded" && omitted !== null && omitted > 0) {
@@ -369,14 +418,20 @@ export function displaySAExtensionSegments(
   ];
   return ordered.map((segment) => {
     const isSetup = SETUP_SEGMENTS.has(segment.key) && !segment.code;
+    const commentProgress = commentProgressCopy(segment, t);
+    const partial = commentProgress !== null
+      && segment.code === "capture_deferred"
+      && segment.state === "warn"
+      && (segment.outcome == null || segment.outcome === "deferred");
     return {
       key: segment.key,
       label: saSegmentLabel(segment.key, t),
       mark: MARKS[segment.state] ?? "—",
       tone: segment.state,
+      ...(partial ? { statusLabel: t(($) => $.dataSources.extension.status.partial) } : {}),
       copy: isSetup
         ? String(segment.detail ?? "")
-        : structuredDetail(segment, t),
+        : structuredDetail(segment, t, commentProgress, partial),
       diagnostic: developerMode
         ? isSetup
           ? String(segment.detail ?? "").trim() || null

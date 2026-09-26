@@ -23,7 +23,7 @@ OUTPUT = {"sources": ["https://ir.example.com/notice"]}
 
 
 def _request(**changes):
-    selection = validate_selection("anthropic", "claude_code_oauth", "claude-opus-5", "local:7")
+    selection = validate_selection("anthropic", "claude_code_oauth", "claude-opus-5-5", "local:7")
     request = ModelCall(selection, "search-1", "search", "Investigate only public Issuer Old Inc.",
                         SCHEMA, "high", None, 2, 5.0)
     return replace(request, **changes)
@@ -34,7 +34,7 @@ def _result(session, **changes):
         "subtype": "success", "duration_ms": 100, "duration_api_ms": 50, "is_error": False,
         "num_turns": 2, "session_id": session, "stop_reason": "end_turn", "terminal_reason": "completed",
         "structured_output": OUTPUT, "usage": {"input_tokens": 100, "output_tokens": 50},
-        "model_usage": {"claude-opus-5": {"inputTokens": 100, "outputTokens": 50}}, **changes,
+        "model_usage": {"claude-opus-5-5": {"inputTokens": 100, "outputTokens": 50}}, **changes,
     })
 
 
@@ -68,7 +68,7 @@ class Client:
     async def receive_response(self):
         session = self.options.session_id
         yield SystemMessage(subtype="init", data={
-            "session_id": session, "apiKeySource": "none", "model": "claude-opus-5",
+            "session_id": session, "apiKeySource": "none", "model": "claude-opus-5-5",
             "tools": list(self.options.tools) + (["StructuredOutput"] if self.options.output_format else []), "mcp_servers": [],
             **self.init_changes,
         })
@@ -80,7 +80,7 @@ class Client:
                     "tool_use_id": "web-1",
                 }, "web-1", {})
             yield AssistantMessage(content=[ToolUseBlock(id="web-1", name="WebSearch",
-                                                         input={"query": "Issuer Old Inc listing notice"})], model="claude-opus-5")
+                                                         input={"query": "Issuer Old Inc listing notice"})], model="claude-opus-5-5")
         if self.before_result is not None:
             async for item in self.before_result(self):
                 yield item
@@ -127,7 +127,7 @@ async def test_claude_oauth_web_uses_exact_bundled_scope_and_subscription_witnes
     assert options.env.get("ANTHROPIC_API_KEY", "") == ""
     assert options.env["CLAUDE_CODE_MAX_RETRIES"] == "0"
     assert options.env["DISABLE_AUTO_COMPACT"] == "1"
-    assert options.model == "claude-opus-5" and options.effort == "high" and options.fallback_model is None
+    assert options.model == "claude-opus-5-5" and options.effort == "high" and options.fallback_model is None
     assert options.output_format == {"type": "json_schema", "schema": SCHEMA}
     assert options.max_turns == 4
     assert not Path(options.cwd).exists() and not Path(options.env["CLAUDE_CONFIG_DIR"]).exists()
@@ -166,7 +166,7 @@ async def test_claude_web_pins_internal_helper_models_to_exact_selected_model(mo
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("result,code", [
-    ({"model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}}, "execution_identity_changed"),
+    ({"model_usage": {"claude-opus-5-5": {}, "claude-haiku-4-5-20251001": {}}}, "execution_identity_changed"),
     ({"model_usage": []}, "model_usage_invalid"),
     ({"num_turns": 100}, "model_result_incomplete"),
     ({"permission_denials": [{"tool_name": "Bash"}]}, "unexpected_tool_activity"),
@@ -205,7 +205,7 @@ def test_claude_mixed_model_result_is_durable_current_failure_without_followup_o
     from tests.lifecycle_investigation_fixtures import controller, wait_done
 
     mod, clients = _setup(monkeypatch, result={
-        "model_usage": {"claude-opus-5": {}, "claude-haiku-4-5-20251001": {}}})
+        "model_usage": {"claude-opus-5-5": {}, "claude-haiku-4-5-20251001": {}}})
     selected = _request().selection
     service, store, loads, binding = controller(tmp_path, runner=run_agent,
         loader=lambda selected: WebCredential(selected, generation="generation-1", token_record=StoredTokenRecord("selected-token")))

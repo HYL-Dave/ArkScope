@@ -9,23 +9,11 @@ import {
 } from "../api";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { IconButton } from "../ui/Button";
-import { providerName } from "./settingsBackendCopy";
-import type { SettingsT } from "./settingsCopy";
+import { dataSourceDatasetLabel, providerName } from "./settingsBackendCopy";
 import type { SettingsReadCache } from "./settingsReadCache";
 import {
   CLEAR_SETTINGS_NAVIGATION_GUARD, type SettingsNavigationGuardReporter,
 } from "./settingsNavigationGuard";
-
-function datasetLabel(dataset: DataSourceDataset, t: SettingsT) {
-  switch (dataset) {
-    case "fundamentals_analysis": return t(($) => $.dataSources.routing.datasets.fundamentals);
-    case "detailed_financials": return t(($) => $.dataSources.routing.datasets.detailed);
-    case "earnings_supplements": return t(($) => $.dataSources.routing.datasets.earnings);
-    case "sa_company_financials": return t(($) => $.dataSources.routing.datasets.saCompany);
-    case "sa_company_valuation": return t(($) => $.dataSources.routing.datasets.saValuation);
-    case "sa_company_estimates": return t(($) => $.dataSources.routing.datasets.saEstimates);
-  }
-}
 
 type BudgetDraft = { enabled: boolean; daily: string; minute: string };
 
@@ -178,11 +166,14 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
         {data.routes.map((row) => {
           const selected = drafts[row.dataset] ?? row.providers ?? [];
           const changed = drafts[row.dataset] != null && JSON.stringify(selected) !== JSON.stringify(row.providers);
-          const label = datasetLabel(row.dataset, t);
+          const label = dataSourceDatasetLabel(row.dataset, t);
           const ordered = [...selected, ...row.options.map((option) => option.provider).filter((provider) => !selected.includes(provider))];
           return <div className="data-route-row" key={row.dataset}>
             <div className="data-route-label">
               <strong>{label}</strong>
+              {row.dataset.startsWith("sa_company_") ? <span className="muted tiny">
+                {t(($) => $.dataSources.catalog.methods.browser_page_capture)}. {t(($) => $.dataSources.catalog.saCaptureScope)}
+              </span> : null}
               <span className={row.error_code ? "refresh-err tiny" : "muted tiny"}>
                 {row.error_code ? t(($) => $.dataSources.routing.invalid)
                   : row.providers?.length === 0 ? t(($) => $.dataSources.routing.noSources)
@@ -223,7 +214,10 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
                 </div>;
               })}
               {row.unimplemented.map((provider) => <div className="data-route-unimplemented muted tiny" key={provider}>
-                <span>{provider === "seeking_alpha" ? t(($) => $.dataSources.catalog.seekingAlpha) : providerName(provider, t)}</span><span>{t(($) => $.dataSources.routing.notImplemented)}</span>
+                <span>{provider === "seeking_alpha" ? t(($) => $.dataSources.catalog.seekingAlpha) : providerName(provider, t)}</span>
+                <span>{provider === "massive" ? t(($) => $.dataSources.catalog.massiveFinancialMissing)
+                  : provider === "seeking_alpha" ? t(($) => $.dataSources.catalog.saCaptureScope)
+                    : t(($) => $.dataSources.routing.notImplemented)}</span>
               </div>)}
             </fieldset>
             <div className="data-route-actions">

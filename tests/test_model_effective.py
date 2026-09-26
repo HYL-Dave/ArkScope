@@ -93,7 +93,7 @@ def _routes_mixed() -> dict:
     # Round-3 MF1: the DEFAULT config shape — anthropic cards + openai research.
     return {
         "card_synthesis": TaskRoute(task="card_synthesis", provider="anthropic",
-                                    model="claude-opus-5", effort="high"),
+                                    model="claude-opus-5-5", effort="high"),
         "card_translation": TaskRoute(task="card_translation", provider="anthropic",
                                       model="claude-sonnet-5", effort="medium"),
         "ai_research": TaskRoute(task="ai_research", provider="openai",
@@ -116,7 +116,7 @@ def _seed_cache(tmp_path):
     cache = ModelDiscoveryCache(tmp_path / "profile_state.db")
     cache.record_run(provider="anthropic", auth_mode="api_key", credential_id="a1",
                      secret_fingerprint=_fp("sk-ant"), status="ok",
-                     models=[{"id": "claude-opus-5", "label": "Opus 5", "source": "provider_api"}])
+                     models=[{"id": "claude-opus-5-5", "label": "Opus 5", "source": "provider_api"}])
     cache.record_run(provider="openai", auth_mode="chatgpt_oauth", credential_id="o1",
                      secret_fingerprint="oauth", status="ok",
                      models=[{"id": "gpt-5.6-luna", "label": "Luna", "source": "provider_api"}])
@@ -128,7 +128,7 @@ def test_effective_view_handles_mixed_providers_per_task(tmp_path):
                                 credentials=_credentials())
     # Anthropic API-key cards expose the discovered current Opus 5 route.
     synth = view["tasks"]["card_synthesis"]
-    assert [m["id"] for m in synth["verified"]] == ["claude-opus-5"]
+    assert [m["id"] for m in synth["verified"]] == ["claude-opus-5-5"]
     assert synth["cache_state"] == "ok" and synth["discovered_at"]
     # A selected but undiscovered current route remains visible as its route pin.
     trans = view["tasks"]["card_translation"]
@@ -152,8 +152,8 @@ def test_new_registry_default_appears_as_seed_when_discovery_predates_it(tmp_pat
         entry["id"]: entry
         for entry in view["tasks"]["card_synthesis"]["providers"]["anthropic"]["models"]
     }
-    assert entries["claude-opus-5"]["status"] == "visible"
-    assert entries["claude-opus-5"]["visible_to_credential"] is True
+    assert entries["claude-opus-5-5"]["status"] == "visible"
+    assert entries["claude-opus-5-5"]["visible_to_credential"] is True
     assert entries["claude-fable-5-1"]["status"] == "seed"
     assert entries["claude-fable-5-1"]["visible_to_credential"] is None
     assert entries["claude-fable-5-1"]["eligible"] is True
@@ -228,7 +228,7 @@ def test_absent_discovery_does_not_offer_retired_spark(tmp_path):
     assert all(entry["id"] != "gpt-5.3-codex-spark" for entry in entries)
 
 
-def test_pinned_only_model_appears_only_when_route_pins_it(tmp_path):
+def test_retired_model_does_not_reappear_when_route_pins_it(tmp_path):
     routes = _routes_mixed()
     routes["ai_research"] = TaskRoute(task="ai_research", provider="openai",
                                       model="gpt-5.5", effort="default")
@@ -236,7 +236,7 @@ def test_pinned_only_model_appears_only_when_route_pins_it(tmp_path):
                                 credentials=_credentials())
     research = view["tasks"]["ai_research"]
     pinned = [m for m in research["advanced"] if m["id"] == "gpt-5.5"]
-    assert pinned and pinned[0]["badge"] == "route"
+    assert pinned == []
     # and still absent from every task that does NOT pin it
     assert all(m["id"] != "gpt-5.5"
                for m in view["tasks"]["card_synthesis"]["advanced"])
@@ -258,10 +258,7 @@ def test_retired_discovery_stays_out_of_verified_and_route_pin_is_ineligible(tmp
         credentials=credentials,
     )
     models = view["tasks"]["ai_research"]["providers"]["openai"]["models"]
-    retired = next(entry for entry in models if entry["id"] == "gpt-5.4-mini-snapshot")
-    assert retired["status"] == "route"
-    assert retired["eligible"] is False
-    assert retired["reason_code"] == "model_retired"
+    assert all(entry["id"] != "gpt-5.4-mini-snapshot" for entry in models)
     assert "gpt-5.4-mini-snapshot" not in {
         entry["id"] for entry in models if entry["status"] == "visible"
     }
@@ -450,18 +447,14 @@ def test_spark_saved_route_stays_retired_despite_discovery_or_plan(tmp_path):
                 entry["id"] != "gpt-5.3-codex-spark"
                 for entry in view["tasks"][task]["providers"]["openai"]["models"]
             )
-        return next(
+        return [
             entry
             for entry in view["tasks"]["card_translation"]["providers"]["openai"]["models"]
             if entry["id"] == "gpt-5.3-codex-spark"
-        )
+        ]
 
     for diagnostic_plan in ("pro", "prolite", "plus", None):
-        spark = spark_entry(diagnostic_plan)
-        assert spark["visible_to_credential"] is True
-        assert spark["status"] == "route"
-        assert spark["eligible"] is False
-        assert spark["reason_code"] == "model_retired"
+        assert spark_entry(diagnostic_plan) == []
 
 
 def test_model_catalog_route_gains_additive_effective_block(monkeypatch, tmp_path):
@@ -678,8 +671,8 @@ def test_v2_entry_schema_and_grouping(tmp_path):
     synth = view["tasks"]["card_synthesis"]["providers"]["anthropic"]
     entries = {entry["id"]: entry for entry in synth["models"]}
 
-    assert entries["claude-opus-5"]["status"] == "visible"
-    assert entries["claude-opus-5"]["visible_to_credential"] is True
+    assert entries["claude-opus-5-5"]["status"] == "visible"
+    assert entries["claude-opus-5-5"]["visible_to_credential"] is True
     assert not ({"claude-opus-4-8", "claude-opus-4-7"} & entries.keys())
     for entry in entries.values():
         assert set(entry) in ({
@@ -810,7 +803,7 @@ def test_v2_thinking_mode_carried_from_registry(tmp_path):
         entries.update({entry["id"]: entry for entry in block["models"]})
     assert entries["claude-fable-5-1"]["thinking_mode"] == "adaptive_always_on"
     assert entries["claude-sonnet-5"]["thinking_mode"] == "adaptive_default_on"
-    assert entries["claude-opus-5"]["thinking_mode"] == "adaptive_default_on"
+    assert entries["claude-opus-5-5"]["thinking_mode"] == "adaptive_always_on"
     assert entries["gpt-5.6-luna"]["thinking_mode"] == "none"
     assert entries["mystery-model"]["thinking_mode"] == "none"
 
@@ -827,7 +820,7 @@ def test_v2_effort_options_are_model_specific(tmp_path):
     assert entries["gpt-5.6-luna"]["effort_options"] == [
         "none", "low", "medium", "high", "xhigh", "max",
     ]
-    assert entries["claude-opus-5"]["effort_options"] == [
+    assert entries["claude-opus-5-5"]["effort_options"] == [
         "max", "xhigh", "high", "medium", "low",
     ]
     assert "effort_options" not in entries["mystery-model"]
@@ -841,8 +834,8 @@ def test_v2_visibility_is_orthogonal_to_tier(tmp_path):
         entry["id"]: entry
         for entry in view["tasks"]["card_synthesis"]["providers"]["anthropic"]["models"]
     }
-    assert entries["claude-opus-5"]["status"] == "visible"
-    assert entries["claude-opus-5"]["visible_to_credential"] is True
+    assert entries["claude-opus-5-5"]["status"] == "visible"
+    assert entries["claude-opus-5-5"]["visible_to_credential"] is True
     assert not ({"claude-opus-4-7", "claude-sonnet-4-6"} & entries.keys())
 
     seed_cache = ModelDiscoveryCache(tmp_path / "seed.db")

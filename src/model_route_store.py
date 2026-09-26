@@ -129,3 +129,27 @@ class ModelRouteStore:
             return cur.rowcount > 0
         finally:
             conn.close()
+
+    def clear_retired_selections(self) -> list[str]:
+        """Explicit maintenance: unset retired routes without changing providers.
+
+        An empty model remains a DB-owned choice, not absence of an override.
+        Reads never invoke this cleanup or mutate historical execution records.
+        """
+        from src.model_capabilities import capability_for
+
+        conn = self._connect()
+        try:
+            with conn:
+                conn.execute("BEGIN IMMEDIATE")
+                retired = [task for task, model in conn.execute(
+                    "SELECT task, model FROM model_route ORDER BY task"
+                ) if (cap := capability_for(model)) is not None
+                    and cap.task_route_status == "retired"]
+                conn.executemany(
+                    "UPDATE model_route SET model='', effort='default', updated_at=? WHERE task=?",
+                    [(_now(), task) for task in retired],
+                )
+            return retired
+        finally:
+            conn.close()

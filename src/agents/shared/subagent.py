@@ -382,7 +382,7 @@ SUBAGENT_REGISTRY: Dict[str, SubagentConfig] = {
             "flaws, overlooked risks, data gaps, and common analytical biases. "
             "Returns structured confidence adjustment."
         ),
-        model="claude-opus-5",
+        model="claude-opus-5-5",
         system_prompt=_REVIEWER_PROMPT,
         tool_names=[
             "get_ticker_news",

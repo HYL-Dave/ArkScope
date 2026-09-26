@@ -285,9 +285,9 @@ describe("DataStorageSection lifecycle automation controls", () => {
     expect(section?.querySelector('input[aria-label="Stock symbol"]')).not.toBeNull();
   });
   it.each([
-    { language: "en" as const, summary: "48 cache entries (24 reusable · 24 refresh due)", timestamp: "latest cache timestamp" },
-    { language: "zh-Hant" as const, summary: "48 個快取項目（可重用 24 · 待重新取得 24）", timestamp: "最新快取時間" },
-  ])("reports cache freshness without claiming a newer financial report in $language", async ({ language, summary, timestamp }) => {
+    { language: "en" as const, summary: "48 cache entries (24 TTL-unexpired · 24 TTL-expired)", timestamp: "latest cache timestamp" },
+    { language: "zh-Hant" as const, summary: "48 個快取項目（TTL 未到期 24 · TTL 已到期 24）", timestamp: "最新快取時間" },
+  ])("reports cache TTL without promising reusability or a scheduled refresh in $language", async ({ language, summary, timestamp }) => {
     vi.mocked(getMarketDataStatus).mockResolvedValue({
       ...EMPTY_MARKET_STATUS, exists: true,
       financial_cache: { row_count: 48, valid_count: 24, expired_count: 24, latest_fetched_at: "2026-09-09T18:38:00Z" },
@@ -295,6 +295,26 @@ describe("DataStorageSection lifecycle automation controls", () => {
     await renderSection(language);
     expect(host!.textContent).toContain(summary);
     expect(host!.textContent).toContain(timestamp);
+    expect(host!.textContent).not.toMatch(/24 reusable|24 refresh due|可重用 24|待重新取得 24/);
+    expect(host!.querySelector("details[data-cache-diagnostics]")?.textContent).toContain(summary);
+  });
+
+  it.each(["en", "zh-Hant"] as const)("separates local price coverage and annual SEC projections from News in %s", async (language) => {
+    vi.mocked(getMarketDataStatus).mockResolvedValue({
+      ...EMPTY_MARKET_STATUS, exists: true,
+      prices: { row_count: 789, ticker_count: 6, latest_datetime: "2026-09-25T20:00:00Z" },
+      news: { row_count: 987654, source_count: 12, latest_published: "2026-09-26T01:00:00Z" },
+      fundamentals: { row_count: 10, ticker_count: 10, latest_date: "2025-12-31" },
+    });
+    await renderSection(language);
+    const stored = host!.querySelector('[data-storage-summary="prices"]');
+    expect(stored?.textContent).toContain("789");
+    expect(stored?.textContent).not.toContain("SEC");
+    const diagnostics = host!.querySelector("details[data-cache-diagnostics]");
+    expect(diagnostics?.textContent).toContain(language === "en" ? "Validated, TTL-unexpired annual SEC projections" : "已驗證且 TTL 未到期的 SEC 年度投影");
+    expect(diagnostics?.textContent).toContain(language === "en" ? "not total SEC coverage" : "不代表全部 SEC 覆蓋");
+    expect(host!.textContent).not.toContain("987,654");
+    expect(host!.textContent).not.toMatch(/Stored SEC Fundamentals|已儲存的 SEC 基本面/);
   });
 
   it.each([

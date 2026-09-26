@@ -15,6 +15,18 @@ import {
   type TaskTestSnapshot,
 } from "./modelRoutingUx";
 
+it("an unchanged unselected task does not block saving other task routes", () => {
+  const unset = { provider: "openai" as const, model: "", effort: "default", custom: false };
+  const baseline = { card_translation: { ...unset, task: "card_translation" as const, source: "db" as const, warning: "model_required" } };
+  const catalog = { models: [], effort_options: { openai: [], anthropic: [] } } as unknown as ModelCatalog;
+  expect(blockedRouteSaves({ card_translation: unset }, baseline,
+    { openai: null, anthropic: null }, catalog)).toEqual([]);
+  expect(blockedRouteSaves({ card_translation: { ...unset, provider: "anthropic" } }, baseline,
+    { openai: null, anthropic: null }, catalog)).toEqual([
+    { task: "card_translation", reason: "model_required" },
+  ]);
+});
+
 describe("official model pricing links", () => {
   it("separates metered API pricing from subscription plan pricing", () => {
     expect(officialModelPricingUrl("openai", "api_key"))
@@ -215,7 +227,7 @@ const route = (provider: "openai" | "anthropic", model: string): TaskRoute => ({
 const taskCatalog = {
   current_model_ids: [
     "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-    "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+    "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
   ],
   retired_model_ids: ["gpt-5.4-mini", "claude-fable-5", "claude-opus-4-8"],
   effort_options: {
@@ -230,7 +242,7 @@ const taskCatalog = {
     ...["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"].map((id) => ({
       id, provider: "openai" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
     })),
-    ...["claude-fable-5-1", "claude-opus-5", "claude-sonnet-5"].map((id) => ({
+    ...["claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5"].map((id) => ({
       id, provider: "anthropic" as const, effort_options: ["low", "medium", "high", "xhigh", "max"],
     })),
   ],
@@ -298,7 +310,7 @@ describe("blockedRouteSaves", () => {
 
   it("blocks only a task freshly drafted onto that provider", () => {
     const draft = {
-      ai_research: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+      ai_research: { provider: "anthropic", model: "claude-opus-5-5", effort: "low", custom: false },
     } satisfies Partial<Record<string, DraftRouteValue>>;
     expect(blockedRouteSaves(draft, baseline, contexts, taskCatalog)).toEqual([
       { task: "ai_research", reason: "missing_active_credential" },

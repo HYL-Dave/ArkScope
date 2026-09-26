@@ -173,7 +173,7 @@ def select(world, task, provider, model, effort, mode):
 
 def change_settings(world, task, provider, cred, monkeypatch):
     world.routes.set(task, "anthropic" if provider == "openai" else "openai",
-                     "claude-opus-5" if provider == "openai" else "gpt-5.6-sol", "low")
+                     "claude-opus-5-5" if provider == "openai" else "gpt-5.6-sol", "low")
     if cred.auth_type == "api_key":
         world.credentials.update(f"local:{cred.id}", secret="mutated-card-secret")
     world.credentials.add(provider=provider, auth_type="api_key", alias="replacement", secret="replacement-card-secret")
@@ -201,7 +201,7 @@ def test_api_fixed_dispatch_pins_complete_selection(world, wire, monkeypatch, sa
     def mutate():
         change_settings(world, task, provider, cred, monkeypatch)
         if same_provider:
-            world.routes.set(task, provider, "gpt-5.6-sol" if provider == "openai" else "claude-opus-5", "low")
+            world.routes.set(task, provider, "gpt-5.6-sol" if provider == "openai" else "claude-opus-5-5", "low")
     if task == "card_synthesis":
         gather = api.gather_evidence
         def changed_gather(*args, **kwargs):
@@ -429,10 +429,10 @@ def test_output_and_receipt_commit_atomically(world, operation):
 
 
 @pytest.mark.parametrize("task,provider,model,effort,mode,code", [
-    ("card_synthesis", "openai", "gpt-5.3-codex-spark", "high", "chatgpt_oauth", "model_retired"),
-    ("card_translation", "openai", "gpt-5.3-codex-spark", "high", "api_key", "model_retired"),
-    ("card_synthesis", "anthropic", "claude-opus-4-7", "high", "api_key", "model_retired"),
-    ("card_translation", "anthropic", "claude-opus-4-7", "high", "api_key", "model_retired"),
+    ("card_synthesis", "openai", "gpt-5.3-codex-spark", "high", "chatgpt_oauth", "model_required"),
+    ("card_translation", "openai", "gpt-5.3-codex-spark", "high", "api_key", "model_required"),
+    ("card_synthesis", "anthropic", "claude-opus-4-7", "high", "api_key", "model_required"),
+    ("card_translation", "anthropic", "claude-opus-4-7", "high", "api_key", "model_required"),
     ("card_synthesis", "anthropic", "claude-fable-5-1", "high", "claude_code_oauth", "model_auth_unverified"),
     ("card_translation", "anthropic", "claude-fable-5-1", "high", "claude_code_oauth", "model_auth_unverified"),
     ("card_translation", "openai", "gpt-5.6-luna", "default", "api_key", "effort_required"),
@@ -473,7 +473,7 @@ def test_oauth_selected_token_missing_never_bills_replacement_key(world, wire, m
     assert world.cards.translation_versions(run.id, "zh-Hant") == []
 
 
-@pytest.mark.parametrize("provider,model", [("anthropic", "claude-opus-5"), ("openai", "gpt-5.6-sol")])
+@pytest.mark.parametrize("provider,model", [("anthropic", "claude-opus-5-5"), ("openai", "gpt-5.6-sol")])
 def test_genuine_missing_route_env_auth_and_explicit_provider_override(world, wire, monkeypatch, provider, model):
     monkeypatch.setenv(f"{provider.upper()}_API_KEY", "chosen-card-secret")
     gather = api.gather_evidence

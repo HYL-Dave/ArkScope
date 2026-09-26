@@ -145,6 +145,13 @@
     pending: "Audit pending",
     unavailable: "Audit unavailable",
   });
+  var commentStopLabels = Object.freeze({
+    timeout: "time budget reached",
+    max_scrolls: "scroll budget reached",
+    stable_bottom: "backfill still pending after stable bottom",
+    controls_unresolved: "unresolved controls",
+    unknown: "stop reason unavailable",
+  });
 
   root.SAExtensionPopupActions = Object.freeze({
     buildCatalog: buildCatalog,
@@ -153,6 +160,9 @@
     },
     reasonLabel: function (value) {
       return reasonLabels[value] || "Additional details are available in ArkScope";
+    },
+    commentStopLabel: function (value) {
+      return commentStopLabels[value] || commentStopLabels.unknown;
     },
     auditLabel: function (value) {
       return auditLabels[value] || "Audit state unavailable";

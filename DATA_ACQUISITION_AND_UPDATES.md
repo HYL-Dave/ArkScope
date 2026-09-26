@@ -76,6 +76,47 @@ one successful endpoint request cannot certify an entire provider plan.
 
 ## Data Categories Before Provider Integrations
 
+### Settings Interpretation
+
+The category catalog reports three independent facts: the adapter for the
+selected category, integrations for other categories, and credential/access
+requirements. Massive price/news support and a configured key do not implement
+its financial adapter or establish financial endpoint entitlement. SA financial
+tables support manual and scheduled browser capture and local reads; they are
+not yet an input adapter for the common SEC/FD ratio calculator. Source switches
+remain scoped to the named tool route, not every use of that provider.
+
+Stored prices and financial-cache diagnostics have their own surface; news
+volume and per-provider collection outcomes belong to News Data. Financial-cache
+TTL counts are diagnostic, not proof of reuse eligibility or a command to fetch.
+The SEC summary counts valid unexpired annual cache projections only, not all
+retained filings, observations or company data. News completion uncertainty
+remains partial/unknown and is not reworded as a network-request failure.
+
+FRED snapshots expose stored units, frequency, seasonal adjustment and revision
+strategy. Monthly/quarterly observation periods are not publication dates, and
+fetch time is not a live freshness guarantee. `latest_only` is the existing
+initial-release strategy; `full_vintages` retains revisions. Indicator guides
+link to each official FRED series and distinguish index levels, rates and
+changes. The eleven-series snapshot is not a complete monitoring product;
+user-defined formulas/indicators and alerts remain pending. Calendar zero counts
+mean no local rows, not established empty upstream coverage. Disabled schedules
+keep historical outcomes without retrying merely because an old failure exists.
+
+### Saved Comment Work Is Not Complete Coverage
+
+A usable scan that successfully persisted comments but exhausted its scroll/time
+budget or left unresolved controls is a v2 `deferred` comment phase, not a parser
+failure and not complete. `comment_progress` records pending articles, net-new
+comments saved in that run, and typed stop reasons. The extension and App display
+partial work; it never advances the healthy-complete anchor. Actual parser and
+storage failures retain precedence. No extra retries, longer scans, weaker
+navigation admission, or bulk detail work were added to make this status green.
+Quick Update retains its four-distinct-detail-article cap; historical body repair
+remains a separate resumable workflow. Old receipts without this optional field
+retain their canonical identity. Updated native validation must be deployed
+before or with the updated extension.
+
 The catalog starts with **what data or intelligence is needed**, then lists
 providers for that category. It does not require implementing every listed
 provider before the category is useful. A provider's advertised capability, a

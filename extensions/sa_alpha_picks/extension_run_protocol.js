@@ -2,7 +2,9 @@
   "use strict";
 
   var SCHEMA_VERSION = 2;
-  var DEFERRED_REASONS = ["capacity_exhausted", "site_pacing", "waiting_for_priority_work", "collector_unavailable", "collector_other_installation", "site_paused"];
+  var COMMENT_PENDING_REASONS = ["comment_backfill_pending", "controls_unresolved"];
+  var COMMENT_STOP_REASONS = Object.freeze(["timeout", "max_scrolls", "stable_bottom", "controls_unresolved", "unknown"]);
+  var DEFERRED_REASONS = ["capacity_exhausted", "site_pacing", "waiting_for_priority_work", "collector_unavailable", "collector_other_installation", "site_paused"].concat(COMMENT_PENDING_REASONS);
   var V2_FAILURE_REASONS = ["human_verification_required", "rate_limited"];
   var REASON_CODES = Object.freeze([
     "body_saved",
@@ -162,6 +164,7 @@
     "counts",
     "derived_outcome",
     "healthy_anchor_eligible",
+    "comment_progress",
   ]);
   var PHASE_KEYS = Object.freeze(["state", "reason_code"]);
   var ITEM_KEYS = Object.freeze([
@@ -215,6 +218,22 @@
 
   function includes(values, value) {
     return values.indexOf(value) !== -1;
+  }
+
+  function validateCommentProgress(value) {
+    if (!hasExactKeys(value, ["pending_articles", "net_new_comments", "stop_reasons"])) {
+      fail("protocol_invalid", "invalid comment progress");
+    }
+    if (!Number.isSafeInteger(value.pending_articles) || value.pending_articles < 1
+        || !Number.isSafeInteger(value.net_new_comments) || value.net_new_comments < 0) {
+      fail("protocol_invalid", "invalid comment progress count");
+    }
+    var stops = value.stop_reasons;
+    if (!Array.isArray(stops) || !stops.length || stops.some(function (stop, index) {
+      return !includes(COMMENT_STOP_REASONS, stop) || stops.indexOf(stop) !== index;
+    })) fail("protocol_invalid", "invalid comment stop reasons");
+    return {pending_articles:value.pending_articles, net_new_comments:value.net_new_comments,
+      stop_reasons:stops.slice().sort()};
   }
 
   function validatePhase(name, value, version) {
@@ -353,6 +372,21 @@
     contract.phases.forEach(function (name) {
       phases[name] = validatePhase(name, payload.phases[name], version);
     });
+    var commentPhase = {alpha_picks_sync:"article_details", alpha_picks_manual_fetch:"manual_fetch"}[operation];
+    var progress = null;
+    if (Object.prototype.hasOwnProperty.call(payload, "comment_progress")) {
+      if (version !== 2 || !commentPhase || !includes(["deferred", "failed"], phases[commentPhase].state)) {
+        fail("protocol_invalid", "comment progress requires unfinished comment work");
+      }
+      progress = validateCommentProgress(payload.comment_progress);
+    }
+    Object.keys(phases).forEach(function (name) {
+      if (!includes(COMMENT_PENDING_REASONS, phases[name].reason_code)) return;
+      if (name !== commentPhase || !progress) fail("protocol_invalid", "comment deferral requires comment progress");
+      if (phases[name].reason_code === "controls_unresolved" && !includes(progress.stop_reasons, "controls_unresolved")) {
+        fail("protocol_invalid", "unresolved controls missing from comment progress");
+      }
+    });
 
     if (!Array.isArray(payload.item_outcomes)) {
       fail("protocol_invalid", "item_outcomes must be a list");
@@ -386,7 +420,7 @@
       fail("protocol_invalid", "healthy anchor mismatch");
     }
 
-    return {
+    var result = {
       schema_version: version,
       operation: operation,
       mode: payload.mode,
@@ -398,12 +432,16 @@
       counts: counts,
       item_outcomes: items,
     };
+    // Missing optional fields must not change historical receipt identities.
+    if (progress) result.comment_progress = progress;
+    return result;
   }
 
   root.SAExtensionRunProtocol = Object.freeze({
     OPERATION_CONTRACTS: OPERATION_CONTRACTS,
     ProtocolError: ProtocolError,
     REASON_CODES: REASON_CODES,
+    COMMENT_STOP_REASONS: COMMENT_STOP_REASONS,
     SCHEMA_VERSION: SCHEMA_VERSION,
     deriveRunResult: deriveRunResult,
   });

@@ -41,7 +41,7 @@ def test_model_catalog_exposes_seed_models(tmp_path):
     store = CredentialStore(tmp_path / "profile_state.db")
     res = model_catalog(store=store)
     ids = {m["id"] for m in res["models"]}
-    assert "claude-opus-5" in ids
+    assert "claude-opus-5-5" in ids
     assert "gpt-5.6-luna" in ids
     assert "claude-opus-4-8" not in ids
     assert "gpt-5.5" not in ids
@@ -77,11 +77,11 @@ def test_catalog_exposes_canonical_current_and_retired_model_policy():
 
     policy = catalog()
     assert set(policy.current_model_ids) == {
-        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-6-astra",
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
     }
-    assert len(policy.retired_model_ids) == 14
+    assert len(policy.retired_model_ids) == 15
     assert "claude-fable-5" in policy.retired_model_ids
     assert "gpt-5.3-codex-spark" in policy.retired_model_ids
     assert set(policy.current_model_ids).isdisjoint(policy.retired_model_ids)
@@ -103,7 +103,7 @@ def test_task_route_effort_order_is_canonical_and_provider_native_facts_remain()
 
 
 @pytest.mark.parametrize("model", [
-    "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+    "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
     "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
 ])
 def test_current_models_expose_identical_explicit_task_efforts(model):
@@ -603,7 +603,7 @@ def test_save_route_claude_oauth_active_preserves_effort_without_drop_warning(tm
     store.add_oauth_credential(provider="anthropic", auth_mode="claude_code_oauth", alias="claude", make_active=True)
 
     res = update_model_routes(
-        ModelRoutesUpdate(routes={"ai_research": RouteUpdate(provider="anthropic", model="claude-opus-5", effort="high")}),
+        ModelRoutesUpdate(routes={"ai_research": RouteUpdate(provider="anthropic", model="claude-opus-5-5", effort="high")}),
         store=store,
     )
     w = res["routes"]["ai_research"]["warning"]
@@ -747,7 +747,7 @@ def test_update_model_routes_preflights_entire_payload_before_any_write(tmp_path
 
     store = CredentialStore(tmp_path / "profile_state.db")
     route_store = ModelRouteStore(store.db_path)
-    route_store.set("card_synthesis", "anthropic", "claude-opus-5", "high")
+    route_store.set("card_synthesis", "anthropic", "claude-opus-5-5", "high")
     profile_writes = []
     monkeypatch.setattr(
         cr,
@@ -771,7 +771,7 @@ def test_update_model_routes_preflights_entire_payload_before_any_write(tmp_path
     assert exc.value.status_code == 400
     assert exc.value.detail == {"code": "effort_required", "field": "effort"}
     row = route_store.get("card_synthesis")
-    assert (row.provider, row.model, row.effort) == ("anthropic", "claude-opus-5", "high")
+    assert (row.provider, row.model, row.effort) == ("anthropic", "claude-opus-5-5", "high")
     assert route_store.get("ai_research") is None
     assert profile_writes == []
 
@@ -951,7 +951,7 @@ def test_credential_store_concurrent_first_init_does_not_lock(tmp_path):
 
 _YAML_AI = {"llm_preferences": {
     "ai_research_provider": "openai",
-    "ai_research_model": "gpt-5.4-mini",
+    "ai_research_model": "gpt-5.6-luna",
     "ai_research_effort": "xhigh",
 }}
 
@@ -983,10 +983,10 @@ def test_task_route_db_wins_over_yaml(make_route_store):
     from src.agents.config import task_route
 
     rs = make_route_store(_YAML_AI)
-    rs.set("ai_research", "anthropic", "claude-opus-4-8", "high")
+    rs.set("ai_research", "anthropic", "claude-opus-5-5", "high")
     route = task_route("ai_research", route_store=rs)
     assert (route.provider, route.model, route.effort, route.source) == (
-        "anthropic", "claude-opus-4-8", "high", "db")
+        "anthropic", "claude-opus-5-5", "high", "db")
 
 
 def test_task_route_retired_db_model_is_not_custom(make_route_store):
@@ -998,7 +998,8 @@ def test_task_route_retired_db_model_is_not_custom(make_route_store):
     route = task_route("ai_research", route_store=route_store)
 
     assert route.source == "db"
-    assert route.model == "gpt-5.5"
+    assert route.model == ""
+    assert route.warning == "model_required"
     assert route.custom is False
 
 
@@ -1023,7 +1024,8 @@ def test_task_route_retired_profile_or_env_model_is_not_custom(
     route = task_route("ai_research", route_store=route_store)
 
     assert route.source == source
-    assert route.model == "gpt-5.5"
+    assert route.model == ""
+    assert route.warning == "model_required"
     assert route.custom is False
 
 
@@ -1044,10 +1046,10 @@ def test_task_route_db_is_atomic_not_field_merged_with_yaml(make_route_store):
     # (that would re-introduce the half-applied-route problem the schema avoids).
     from src.agents.config import task_route
 
-    rs = make_route_store(_YAML_AI)            # yaml: openai / gpt-5.4-mini / xhigh
-    rs.set("ai_research", "anthropic", "claude-opus-4-8")  # effort omitted → "default"
+    rs = make_route_store(_YAML_AI)            # yaml: openai / gpt-5.6-luna / xhigh
+    rs.set("ai_research", "anthropic", "claude-opus-5-5")  # effort omitted → "default"
     route = task_route("ai_research", route_store=rs)
-    assert route.model == "claude-opus-4-8"    # DB model, NOT yaml's gpt-5.4-mini
+    assert route.model == "claude-opus-5-5"    # DB model, NOT yaml's gpt-5.6-luna
     assert route.effort == "default"           # DB effort, NOT yaml's xhigh
 
 
@@ -1057,7 +1059,7 @@ def test_task_route_yaml_fallback_when_db_empty(make_route_store):
     rs = make_route_store(_YAML_AI)            # DB empty → fall back to yaml
     route = task_route("ai_research", route_store=rs)
     assert (route.provider, route.model, route.effort, route.source) == (
-        "openai", "gpt-5.4-mini", "xhigh", "profile")
+        "openai", "gpt-5.6-luna", "xhigh", "profile")
 
 
 def test_task_route_default_when_no_db_no_yaml(make_route_store):
@@ -1106,11 +1108,11 @@ def test_task_route_real_env_overrides_db(make_route_store, monkeypatch):
     from src.agents.config import task_route
 
     rs = make_route_store(None)
-    rs.set("ai_research", "anthropic", "claude-opus-4-8", "high")
+    rs.set("ai_research", "anthropic", "claude-opus-5-5", "high")
     monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_PROVIDER", "openai")
-    monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_MODEL", "gpt-5.5")
+    monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_MODEL", "gpt-6-sol")
     route = task_route("ai_research", route_store=rs)
-    assert (route.provider, route.model, route.source) == ("openai", "gpt-5.5", "env")
+    assert (route.provider, route.model, route.source) == ("openai", "gpt-6-sol", "env")
 
 
 # --- ④ import/export (yaml <-> DB) -------------------------------------------------
@@ -1137,13 +1139,13 @@ def test_export_routes_writes_db_to_yaml_preserving_other_keys(make_route_store,
     from src.api.routes.config_routes import export_model_routes
 
     rs = make_route_store({"llm_preferences": {"reasoning_effort": "xhigh"}})  # unrelated key
-    rs.set("ai_research", "openai", "gpt-5.4-mini", "low")
+    rs.set("ai_research", "openai", "gpt-5.6-luna", "low")
 
     res = export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
 
     assert "ai_research" in res["exported"]
     data = yaml.safe_load((tmp_path / "user_profile.local.yaml").read_text())
-    assert data["llm_preferences"]["ai_research_model"] == "gpt-5.4-mini"   # route written back
+    assert data["llm_preferences"]["ai_research_model"] == "gpt-5.6-luna"   # route written back
     assert data["llm_preferences"]["ai_research_provider"] == "openai"
     assert data["llm_preferences"]["reasoning_effort"] == "xhigh"           # UNRELATED key preserved
 
@@ -1163,7 +1165,7 @@ def test_import_skips_provider_model_mismatch(make_route_store, tmp_path):
     from src.api.routes.config_routes import import_model_routes
 
     rs = make_route_store({"llm_preferences": {
-        "ai_research_provider": "openai", "ai_research_model": "claude-opus-4-8",  # claude model, openai provider
+        "ai_research_provider": "openai", "ai_research_model": "claude-opus-5-5",  # claude model, openai provider
     }})
     res = import_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
     assert "ai_research" in res["skipped"]      # same guard as the save path
@@ -1213,7 +1215,7 @@ def test_import_export_do_not_rewrite_env_override(make_route_store, tmp_path, m
     from src.agents.config import task_route
 
     rs = make_route_store({"llm_preferences": {
-        "ai_research_provider": "openai", "ai_research_model": "gpt-5.4-mini", "ai_research_effort": "low"}})
+        "ai_research_provider": "openai", "ai_research_model": "gpt-5.6-luna", "ai_research_effort": "low"}})
     monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_MODEL", "gpt-5.5")
     import_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
     export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
@@ -1227,7 +1229,7 @@ def test_delete_model_route_reverts_to_yaml(make_route_store, tmp_path):
     from src.api.routes.config_routes import delete_model_route
 
     rs = make_route_store(_YAML_AI)                          # yaml fallback present
-    rs.set("ai_research", "anthropic", "claude-opus-4-8", "high")  # DB overrides it
+    rs.set("ai_research", "anthropic", "claude-opus-5-5", "high")  # DB overrides it
 
     res = delete_model_route("ai_research", store=CredentialStore(tmp_path / "profile_state.db"))
 
@@ -1235,7 +1237,7 @@ def test_delete_model_route_reverts_to_yaml(make_route_store, tmp_path):
     assert rs.get("ai_research") is None                     # DB row gone
     # returns the now-resolved route → reverted to the yaml fallback
     assert res["route"]["source"] == "profile"
-    assert res["route"]["model"] == "gpt-5.4-mini"
+    assert res["route"]["model"] == "gpt-5.6-luna"
 
 
 def test_delete_model_route_no_row_is_idempotent_returns_default(make_route_store, tmp_path):
@@ -1263,14 +1265,14 @@ def test_export_clears_keys_for_tasks_absent_from_db(make_route_store, tmp_path)
         "card_synthesis_provider": "openai", "card_synthesis_model": "gpt-5.5", "card_synthesis_effort": "high",
         "reasoning_effort": "xhigh",
     }})
-    rs.set("ai_research", "openai", "gpt-5.4-mini", "low")
+    rs.set("ai_research", "openai", "gpt-5.6-luna", "low")
 
     res = export_model_routes(store=CredentialStore(tmp_path / "profile_state.db"))
 
     assert "ai_research" in res["exported"]
     assert "card_synthesis" in res["cleared"]                # mirrored DB absence
     data = yaml.safe_load((tmp_path / "user_profile.local.yaml").read_text())
-    assert data["llm_preferences"]["ai_research_model"] == "gpt-5.4-mini"   # DB route written
+    assert data["llm_preferences"]["ai_research_model"] == "gpt-5.6-luna"   # DB route written
     assert "card_synthesis_provider" not in data["llm_preferences"]         # stale keys cleared
     assert "card_synthesis_model" not in data["llm_preferences"]
     assert "card_synthesis_effort" not in data["llm_preferences"]
@@ -1286,10 +1288,10 @@ def test_save_local_override_coerces_non_dict_section(make_route_store, tmp_path
     # a hand-edited local yaml with an empty header → llm_preferences parses to None
     (tmp_path / "user_profile.local.yaml").write_text("llm_preferences:\nother:\n  keep: 1\n")
 
-    save_local_override("llm_preferences", "ai_research_model", "gpt-5.4-mini")  # must NOT raise
+    save_local_override("llm_preferences", "ai_research_model", "gpt-5.6-luna")  # must NOT raise
 
     data = yaml.safe_load((tmp_path / "user_profile.local.yaml").read_text())
-    assert data["llm_preferences"]["ai_research_model"] == "gpt-5.4-mini"
+    assert data["llm_preferences"]["ai_research_model"] == "gpt-5.6-luna"
     assert data["other"]["keep"] == 1  # unrelated section preserved
 
 
@@ -1322,7 +1324,7 @@ def test_export_audits_both_write_and_clear_branches(make_route_store, tmp_path,
     import src.api.routes.config_routes as cr
 
     rs = make_route_store(None)
-    rs.set("ai_research", "openai", "gpt-5.4-mini", "low")    # present → write branch
+    rs.set("ai_research", "openai", "gpt-5.6-luna", "low")    # present → write branch
     calls: list[tuple[str, str]] = []
     monkeypatch.setattr(cr, "require_profile_state_write",
                         lambda action, detail=None: calls.append((action, (detail or {}).get("task"))))

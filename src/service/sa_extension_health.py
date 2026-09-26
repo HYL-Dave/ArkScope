@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
 from src.sa.extension_diagnostics import project_extension_diagnostics
+from src.sa.extension_run_protocol import ProtocolError, validate_comment_progress
 from src.sa_capture_store import connect as connect_sa_capture
 from src.sa_capture_store import resolve_sa_db_path
 from src.service.job_runs_store import get_job_runs_store
@@ -441,6 +442,11 @@ def _telemetry_last_segment(job_store: Any) -> dict[str, Any]:
         **_run_fields(latest, counts=counts),
     )
     segment.update(_latest_diagnostics_fields(latest, job_store))
+    if result.get("schema_version") == 2 and "comment_progress" in result:
+        try:
+            segment["comment_progress"] = validate_comment_progress(result["comment_progress"])
+        except ProtocolError:
+            pass
     return segment
 
 

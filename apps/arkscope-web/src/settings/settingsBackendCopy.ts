@@ -1,5 +1,6 @@
 import {
   ApiError,
+  type DataSourceDataset,
   type ScheduleRunResult,
 } from "../api";
 import {
@@ -186,6 +187,17 @@ export function providerName(id: string, t: SettingsT): string {
   }
 }
 
+export function dataSourceDatasetLabel(dataset: DataSourceDataset, t: SettingsT): string {
+  switch (dataset) {
+    case "fundamentals_analysis": return t(($) => $.dataSources.routing.datasets.fundamentals);
+    case "detailed_financials": return t(($) => $.dataSources.routing.datasets.detailed);
+    case "earnings_supplements": return t(($) => $.dataSources.routing.datasets.earnings);
+    case "sa_company_financials": return t(($) => $.dataSources.routing.datasets.saCompany);
+    case "sa_company_valuation": return t(($) => $.dataSources.routing.datasets.saValuation);
+    case "sa_company_estimates": return t(($) => $.dataSources.routing.datasets.saEstimates);
+  }
+}
+
 export function providerConfigFieldLabel(
   provider: string,
   field: string,
@@ -324,6 +336,26 @@ export function scheduleSourceCopy(
   t: SettingsT,
 ): { label: string; description: string } {
   switch (id) {
+    case "fred_series": return {
+      label: t(($) => $.dataSources.schedule.sources.fredSeries.label),
+      description: t(($) => $.dataSources.schedule.sources.fredSeries.description),
+    };
+    case "fred_release_dates": return {
+      label: t(($) => $.dataSources.schedule.sources.fredReleaseDates.label),
+      description: t(($) => $.dataSources.schedule.sources.fredReleaseDates.description),
+    };
+    case "finnhub_economic_calendar": return {
+      label: t(($) => $.dataSources.schedule.sources.finnhubEconomic.label),
+      description: t(($) => $.dataSources.schedule.sources.finnhubEconomic.description),
+    };
+    case "finnhub_earnings_calendar": return {
+      label: t(($) => $.dataSources.schedule.sources.finnhubEarnings.label),
+      description: t(($) => $.dataSources.schedule.sources.finnhubEarnings.description),
+    };
+    case "finnhub_ipo_calendar": return {
+      label: t(($) => $.dataSources.schedule.sources.finnhubIpo.label),
+      description: t(($) => $.dataSources.schedule.sources.finnhubIpo.description),
+    };
     case "sec_research_filings":
       return {
         label: t(($) => $.dataSources.schedule.sources.secResearch.label),

@@ -29,7 +29,7 @@ async def test_real_api_sdk_serialization_keeps_selected_key_and_basic_search(mo
     http_module = (httpx if provider == "openai" else importlib.import_module(next(
         base.__module__.split(".")[0] for base in DefaultAsyncHttpxClient.__mro__ if base.__name__ == "AsyncClient")))
 
-    model = "gpt-5.6-luna" if provider == "openai" else "claude-opus-5"
+    model = "gpt-5.6-luna" if provider == "openai" else "claude-opus-5-5"
     selection = validate_selection(provider, "api_key", model, "local:7")
     call = ModelCall(selection, "search-1", "search", "Public issuer question", SCHEMA, "high", 4096, 2, 5)
     control = RunControl(selection=selection, max_model_requests=1)

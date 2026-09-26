@@ -58,13 +58,7 @@ def test_stale_discovery_cannot_reintroduce_a_spark_option(tmp_path, saved_route
     )
     for task, value in view["tasks"].items():
         entries = [row for row in value["providers"]["openai"]["models"] if row["id"] == MODEL]
-        if saved_route and task == "card_translation":
-            assert len(entries) == 1
-            assert entries[0]["status"] == "route"
-            assert entries[0]["eligible"] is False
-            assert entries[0]["reason_code"] == "model_retired"
-        else:
-            assert entries == []
+        assert entries == []
     assert routes["card_translation"].model == (MODEL if saved_route else "gpt-5.6-luna")
 
 

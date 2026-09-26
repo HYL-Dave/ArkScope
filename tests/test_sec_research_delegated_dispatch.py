@@ -24,7 +24,7 @@ from tests.test_sec_research_tool_service import (
 from tests.test_task_runtime_binding import add_key, isolated, response_json
 
 
-PARENT_MODEL = "claude-opus-5"
+PARENT_MODEL = "claude-opus-5-5"
 CHILD_MODEL = "claude-sonnet-4-6"
 KEY = "fixture-delegated-selected-key"
 DELEGATE = dict(subagent="deep_researcher", task="Read retained SEC evidence.", context_json="")

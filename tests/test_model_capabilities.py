@@ -97,21 +97,21 @@ def test_openai_models_record_model_specific_effort_sets():
 def test_routing_seed_flags_pin_exact_current_membership():
     routing = {c.id for c in all_models() if c.in_routing_seed}
     assert routing == {
-        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-6-astra",
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
     }
 
 
 def test_picker_visibility_matches_the_ruling():
     vis = {c.id: c.picker_visibility for c in all_models()}
-    for current in ("claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
-                    "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra"):
+    for current in ("claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
+                    "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna"):
         assert vis[current] == "default", current
     for pinned in (set(vis) - {
-        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-6-astra",
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
     }):
         assert vis[pinned] == "pinned_only", pinned
 
@@ -119,10 +119,10 @@ def test_picker_visibility_matches_the_ruling():
 def test_default_picker_models_helper():
     assert {c.id for c in default_picker_models("openai")} == {
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-6-astra",
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
     }
     assert {c.id for c in default_picker_models("anthropic")} == {
-        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
     }
 
 
@@ -380,9 +380,9 @@ def test_routing_view_keeps_exact_membership_and_capability_facts():
     from src.model_routing import MODEL_CATALOG as ROUTING_VIEW, is_seed_model
 
     assert {m.id for m in ROUTING_VIEW} == {
-        "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+        "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-6-astra",
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
     }
     assert is_seed_model("openai", "gpt-5.6-luna")
 
@@ -439,26 +439,26 @@ def test_new_generation_entries_present_with_task0_facts():
         assert cap.in_routing_seed, mid
 
 
-def test_opus5_is_the_current_anthropic_advanced_model_with_official_facts():
-    opus5 = capability_for("claude-opus-5")
-    assert len(all_models()) == 21
+def test_opus55_is_the_current_anthropic_advanced_model_with_official_facts():
+    opus5 = capability_for("claude-opus-5-5")
+    assert len(all_models()) == 24
     assert opus5.provider == "anthropic"
     assert opus5.context_limit == 1_000_000 and opus5.max_output == 128_000
-    assert opus5.thinking_mode == "adaptive_default_on"
+    assert opus5.thinking_mode == "adaptive_always_on"
     assert opus5.effort_options == ("max", "xhigh", "high", "medium", "low")
     assert opus5.task_route_status == "current"
     assert opus5.source_url == (
-        "https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5"
+        "https://platform.claude.com/docs/en/models/opus-5-5/migration-guide"
     )
-    assert opus5.verified_at == "2026-08-28"
+    assert opus5.verified_at == "2026-09-26"
 
 
 def test_known_retired_models_keep_capabilities_but_leave_new_task_routes():
-    current = {"claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+    current = {"claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
                "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-               "gpt-6-astra"}
+               "gpt-6-astra", "gpt-6-sol", "gpt-6-luna"}
     retired = {cap.id for cap in all_models()} - current
-    assert len(retired) == 14
+    assert len(retired) == 15
     for model_id in retired:
         capability = capability_for(model_id)
         assert capability is not None, model_id

@@ -26,7 +26,7 @@ MODEL_COUNTS = {
 async def test_claude_web_uses_reported_model_totals_not_main_loop_or_sum_of_scopes(monkeypatch):
     mod, clients = _setup(monkeypatch, result={
         "num_turns": 4, "usage": {"input_tokens": 4, "output_tokens": 1036},
-        "model_usage": {"claude-opus-5": MODEL_COUNTS},
+        "model_usage": {"claude-opus-5-5": MODEL_COUNTS},
     })
     call = _request(max_search_uses=4)
     control = RunControl(selection=call.selection, max_model_requests=2)
@@ -43,7 +43,7 @@ async def test_claude_web_uses_reported_model_totals_not_main_loop_or_sum_of_sco
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("aggregate", [None, {}, {"claude-opus-5": {}}])
+@pytest.mark.parametrize("aggregate", [None, {}, {"claude-opus-5-5": {}}])
 async def test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage(monkeypatch, aggregate):
     mod, clients = _setup(monkeypatch, result={"model_usage": aggregate})
     call = _request()
@@ -57,7 +57,7 @@ async def test_missing_model_aggregate_does_not_fall_back_to_main_loop_usage(mon
 @pytest.mark.anyio
 @pytest.mark.parametrize("value", [True, "10", -1, 1.5, 2**53, []])
 async def test_malformed_reported_model_counter_is_not_silently_unknown(monkeypatch, value):
-    mod, clients = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": {**MODEL_COUNTS, "inputTokens": value}}})
+    mod, clients = _setup(monkeypatch, result={"model_usage": {"claude-opus-5-5": {**MODEL_COUNTS, "inputTokens": value}}})
     call = _request()
     control = RunControl(selection=call.selection, max_model_requests=2)
     with pytest.raises(WebModelError, match="^model_usage_invalid$"):
@@ -68,7 +68,7 @@ async def test_malformed_reported_model_counter_is_not_silently_unknown(monkeypa
 
 @pytest.mark.anyio
 async def test_reported_zero_is_not_replaced_by_nonzero_main_loop(monkeypatch):
-    mod, _ = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": dict.fromkeys(MODEL_COUNTS, 0)}})
+    mod, _ = _setup(monkeypatch, result={"model_usage": {"claude-opus-5-5": dict.fromkeys(MODEL_COUNTS, 0)}})
     call = _request()
     control = RunControl(selection=call.selection, max_model_requests=2)
     reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
@@ -127,7 +127,7 @@ async def test_each_missing_aggregate_field_remains_unknown_without_hiding_other
 
     values = {**MODEL_COUNTS}
     del values[counter]
-    mod, _ = _setup(monkeypatch, result={"model_usage": {"claude-opus-5": values}})
+    mod, _ = _setup(monkeypatch, result={"model_usage": {"claude-opus-5-5": values}})
     call = _request()
     control = RunControl(selection=call.selection, max_model_requests=2)
     reply = await mod.call_claude_web(call, WebCredential(call.selection, token_record=StoredTokenRecord("synthetic")), control)
@@ -138,14 +138,14 @@ def test_model_rows_sum_only_equal_scopes_and_missing_row_is_not_zero():
     from src.auth_drivers.lifecycle_web_usage import claude_usage_observation
 
     message = SimpleNamespace(usage={"input_tokens": 999, "output_tokens": 888}, model_usage={
-        "claude-opus-5": {"inputTokens": 10, "outputTokens": 20},
-        "CLAUDE-OPUS-5": {"inputTokens": 5},
+        "claude-opus-5-5": {"inputTokens": 10, "outputTokens": 20},
+        "CLAUDE-OPUS-5-5": {"inputTokens": 5},
     })
-    result = claude_usage_observation(message, "claude-opus-5")
+    result = claude_usage_observation(message, "claude-opus-5-5")
     assert result["values"]["input_tokens"] == 15 and result["values"]["output_tokens"] is None
-    message.model_usage["CLAUDE-OPUS-5"]["inputTokens"] = 2**53 - 1
+    message.model_usage["CLAUDE-OPUS-5-5"]["inputTokens"] = 2**53 - 1
     with pytest.raises(WebModelError, match="^model_usage_invalid$"):
-        claude_usage_observation(message, "claude-opus-5")
+        claude_usage_observation(message, "claude-opus-5-5")
 
 
 @pytest.mark.parametrize("main_loop", [False, [], 0, {"input_tokens": "4"}, {"output_tokens": -1}])
@@ -153,4 +153,4 @@ def test_present_malformed_main_loop_is_not_silently_dropped(main_loop):
     from src.auth_drivers.lifecycle_web_usage import claude_usage_observation
 
     with pytest.raises(WebModelError, match="^model_usage_invalid$"):
-        claude_usage_observation(SimpleNamespace(usage=main_loop, model_usage={"claude-opus-5": MODEL_COUNTS}), "claude-opus-5")
+        claude_usage_observation(SimpleNamespace(usage=main_loop, model_usage={"claude-opus-5-5": MODEL_COUNTS}), "claude-opus-5-5")

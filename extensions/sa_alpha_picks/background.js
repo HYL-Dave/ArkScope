@@ -412,6 +412,35 @@ function failedProtocolPhases(operation, failedPhase, reasonCode) {
   return phases;
 }
 
+function recordCommentScan(progress, receipt, scroll) {
+  if (Number.isSafeInteger(receipt.net_new_comments) && receipt.net_new_comments > 0) {
+    progress.net_new_comments += receipt.net_new_comments;
+  }
+  if (receipt.comment_scan_usable !== true) return "failed";
+  if (receipt.comment_backfill_pending !== true && !scroll.controls_unresolved
+      && scroll.stop_reason !== "controls_unresolved") return "complete";
+  progress.pending_articles++;
+  var stop = stableExtensionReason(scroll.stop_reason, SAExtensionRunProtocol.COMMENT_STOP_REASONS, "unknown");
+  if (progress.stop_reasons.indexOf(stop) === -1) progress.stop_reasons.push(stop);
+  if (scroll.controls_unresolved && progress.stop_reasons.indexOf("controls_unresolved") === -1) {
+    progress.stop_reasons.push("controls_unresolved");
+  }
+  progress.stop_reasons.sort();
+  return "deferred";
+}
+
+function commentPendingPhase(progress) {
+  return progress && progress.pending_articles > 0
+    ? extensionPhase("deferred", progress.stop_reasons.indexOf("controls_unresolved") !== -1
+      ? "controls_unresolved" : "comment_backfill_pending")
+    : extensionPhase("complete", null);
+}
+
+function commentPendingMessage(progress) {
+  return "Partial: " + progress.net_new_comments + " net new comments stored; "
+    + progress.pending_articles + " article(s) pending (" + progress.stop_reasons.join(", ") + ")";
+}
+
 function buildAlphaPicksProtocolResult(mode, legacyResult) {
   legacyResult = legacyResult || {};
   var details = legacyResult.details || {};
@@ -427,7 +456,7 @@ function buildAlphaPicksProtocolResult(mode, legacyResult) {
   var reconciliationFailed = reconciliationBlocked || Number(details.reconciliation_failed || 0) > 0;
 
   return SAExtensionRunProtocol.deriveRunResult({
-    schema_version: 1,
+    schema_version: 2,
     operation: "alpha_picks_sync",
     mode: mode,
     phases: {
@@ -439,12 +468,13 @@ function buildAlphaPicksProtocolResult(mode, legacyResult) {
         : extensionPhase("failed", "closed_scope_failed"),
       article_details: detailFailed
         ? extensionPhase("failed", detailReason)
-        : extensionPhase("complete", null),
+        : commentPendingPhase(details.comment_progress),
       reconciliation: reconciliationFailed
         ? extensionPhase("failed", reconciliationBlocked ? detailReason : "reconciliation_failed")
         : extensionPhase("complete", null),
     },
     item_outcomes: [],
+    ...(details.comment_progress ? {comment_progress:details.comment_progress} : {}),
   });
 }
 
@@ -453,18 +483,19 @@ function buildAlphaPicksManualProtocolResult(legacyResult) {
   var failed = Number(legacyResult.failed || 0) > 0 || legacyResult.status === "error";
   var reconciliationFailed = Number(legacyResult.reconciliation_failed || 0) > 0;
   return SAExtensionRunProtocol.deriveRunResult({
-    schema_version: 1,
+    schema_version: 2,
     operation: "alpha_picks_manual_fetch",
     mode: "manual",
     phases: {
       manual_fetch: failed
-        ? extensionPhase("failed", "article_detail_failed")
-        : extensionPhase("complete", null),
+        ? extensionPhase("failed", stableExtensionReason(legacyResult.reason_code, EXTENSION_PHASE_FAILURE_REASONS, "article_detail_failed"))
+        : commentPendingPhase(legacyResult.comment_progress),
       reconciliation: reconciliationFailed
         ? extensionPhase("failed", "reconciliation_failed")
         : extensionPhase("complete", null),
     },
     item_outcomes: [],
+    ...(legacyResult.comment_progress ? {comment_progress:legacyResult.comment_progress} : {}),
   });
 }
 
@@ -580,7 +611,8 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
     var failed = stop && stop.status === "error";
     var failureSet = false;
     var prior = operation === "market_news_sync" ? buildMarketNewsProtocolResult(mode,Object.assign({},result,{status:"ok"}))
-      : operation === "alpha_picks_sync" && result.details ? buildAlphaPicksProtocolResult(mode,result) : null;
+      : operation === "alpha_picks_sync" && result.details ? buildAlphaPicksProtocolResult(mode,result)
+      : operation === "alpha_picks_manual_fetch" ? buildAlphaPicksManualProtocolResult(result) : null;
     contract.phases.forEach(function (name) {
       if (complete.indexOf(name) !== -1) phases[name] = extensionPhase("complete",null);
       else if (failed && !failureSet) {
@@ -589,10 +621,12 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
       } else phases[name] = skipped ? extensionPhase("skipped",result.acquisition_outcome === "reused" ? "not_due" : "operator_cancelled") : extensionPhase("deferred",reason);
     });
     if (prior) Object.keys(prior.phases).forEach(function (name) {
-      if (prior.phases[name].state === "failed" && (operation === "market_news_sync" || name === "article_details" || name === "reconciliation")) phases[name] = prior.phases[name];
+      if (prior.phases[name].state === "failed" && (operation === "market_news_sync" || name === "article_details" || name === "manual_fetch" || name === "reconciliation")) phases[name] = prior.phases[name];
+      else if (prior.phases[name].state === "deferred" && phases[name].state !== "failed") phases[name] = prior.phases[name];
     });
     return Object.assign({},result,{extension_run:SAExtensionRunProtocol.deriveRunResult({schema_version:2,operation:operation,mode:mode,
-      phases:phases,item_outcomes:result.item_outcomes || prior && prior.item_outcomes || []})});
+      phases:phases,item_outcomes:result.item_outcomes || prior && prior.item_outcomes || [],
+      ...(prior && prior.comment_progress ? {comment_progress:prior.comment_progress} : {})})});
   }
   var structured;
   if (operation === "alpha_picks_sync") {
@@ -633,6 +667,7 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
   }
   // Upgrade new producers only; validators still preserve delayed v1 evidence.
   var projection = {schema_version:2,operation:operation,mode:mode,phases:structured.phases,item_outcomes:structured.item_outcomes};
+  if (structured.comment_progress) projection.comment_progress = structured.comment_progress;
   return Object.assign({}, result, { extension_run: SAExtensionRunProtocol.deriveRunResult(projection) });
 }
 
@@ -2304,7 +2339,10 @@ async function doRefresh(mode, options) {
     }
 
     await saveRefreshState(batchTs, results);
-    sendProgress("Done!");
+    sendProgress(results.details && results.details.comment_progress
+      ? commentPendingMessage(results.details.comment_progress)
+        + (results.details.failed ? "; " + results.details.failed + " failed" : "")
+      : "Done!");
     return results;
   } catch (err) {
     if (isAcquisitionStop(err)) {
@@ -3568,7 +3606,8 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
 
   // ── Step 3: Fetch article content + comments for need_content ──
   var fetched = 0, failed = 0, commentsRefreshed = 0;
-  var netNewComments = 0;
+  var commentProgress = {pending_articles:0,net_new_comments:0,stop_reasons:[]};
+  var commentScanFailed = false;
   var reconciliationFailed = 0;
   if (metaResult.reconciliation && metaResult.reconciliation.status === "failed") {
     reconciliationFailed += recordExtensionFailure(diagnostics, {
@@ -3590,7 +3629,9 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
   var total = work.length;
   function stoppedDetails(error) {
     return {articles_saved:metaResult.saved || 0,fetched:fetched,failed:failed,
-      comments_refreshed:commentsRefreshed || 0,net_new_comments:netNewComments,
+      comments_refreshed:commentsRefreshed || 0,net_new_comments:commentProgress.net_new_comments,
+      comment_progress:commentProgress.pending_articles ? commentProgress : undefined,
+      reason_code:commentScanFailed ? "comment_scan_failed" : undefined,
       reconciliation_failed:reconciliationFailed,quick_workload:metaResult.quick_workload || null,
       acquisition_stop:error.detail};
   }
@@ -3652,11 +3693,12 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         comment_scan_stable_bottom_rounds:
           (bodyScrollStats && bodyScrollStats.stable_bottom_rounds) || 0,
       });
-      if (saveResult && saveResult.ok) netNewComments += saveResult.net_new_comments || 0;
+      var bodyCommentState = saveResult && saveResult.ok
+        ? recordCommentScan(commentProgress, saveResult, bodyScrollStats) : null;
       if (saveResult && saveResult.ok && saveResult.body_saved !== false) {
         fetched++;
-        if (saveResult.comment_scan_usable !== true || saveResult.comment_backfill_pending === true
-            || bodyScrollStats.controls_unresolved) {
+        if (bodyCommentState === "failed") {
+          commentScanFailed = true;
           failed += recordExtensionFailure(diagnostics, {
             stage: "content_parse",
             reason_code: "comment_scan_failed",
@@ -3743,11 +3785,11 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
           (commentScrollStats && commentScrollStats.stable_bottom_rounds) || 0,
       });
       if (saveCommentsOnlyResult && saveCommentsOnlyResult.status === "ok") {
-        netNewComments += saveCommentsOnlyResult.net_new_comments || 0;
-        if (saveCommentsOnlyResult.comment_scan_usable === true
-            && saveCommentsOnlyResult.comment_backfill_pending !== true && !commentScrollStats.controls_unresolved) {
+        var commentState = recordCommentScan(commentProgress, saveCommentsOnlyResult, commentScrollStats);
+        if (commentState === "complete") {
           commentsRefreshed++;
-        } else {
+        } else if (commentState === "failed") {
+          commentScanFailed = true;
           failed += recordExtensionFailure(diagnostics, {
             stage: "content_parse",
             reason_code: "comment_scan_failed",
@@ -3801,7 +3843,9 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     fetched: fetched,
     failed: failed,
     comments_refreshed: commentsRefreshed,
-    net_new_comments: netNewComments,
+    net_new_comments: commentProgress.net_new_comments,
+    comment_progress: commentProgress.pending_articles ? commentProgress : undefined,
+    reason_code: commentScanFailed ? "comment_scan_failed" : undefined,
     unresolved_symbols: unresolvedSymbols,
     review_required: reviewRequired,
     reconciliation_failed: reconciliationFailed,
@@ -3816,6 +3860,8 @@ async function doManualFetch(items, diagnostics) {
 
   var tabId = null;
   var fetched = 0, failed = 0;
+  var commentProgress = {pending_articles:0,net_new_comments:0,stop_reasons:[]};
+  var commentScanFailed = false;
   var accepted = 0;
   var confirmations = [];
   var prepared = [];
@@ -3945,8 +3991,8 @@ async function doManualFetch(items, diagnostics) {
         });
         if (saveResult && saveResult.ok && saveResult.body_saved !== false) {
           fetched++;
-          if (saveResult.comment_scan_usable !== true || saveResult.comment_backfill_pending === true
-              || manualScrollStats.controls_unresolved) {
+          if (recordCommentScan(commentProgress, saveResult, manualScrollStats) === "failed") {
+            commentScanFailed = true;
             failed += recordExtensionFailure(diagnostics, {
               stage: "content_parse",
               reason_code: "comment_scan_failed",
@@ -4005,6 +4051,9 @@ async function doManualFetch(items, diagnostics) {
         }
       } catch (err) {
         if (isAcquisitionStop(err)) return {fetched:fetched,failed:failed,accepted:accepted,
+          net_new_comments:commentProgress.net_new_comments,
+          comment_progress:commentProgress.pending_articles ? commentProgress : undefined,
+          reason_code:commentScanFailed ? "comment_scan_failed" : undefined,
           confirmation_required:confirmations,acquisition_stop:err.detail};
         failed += recordExtensionFailure(diagnostics, {
           stage: err.code === "article_context_changed" ? "tab_navigation" : "extension_runtime",
@@ -4018,11 +4067,16 @@ async function doManualFetch(items, diagnostics) {
       }
     }
 
-    sendProgress("Manual fetch done: " + fetched + " saved");
+    sendProgress(commentProgress.pending_articles
+      ? commentPendingMessage(commentProgress) + (failed ? "; " + failed + " failed" : "")
+      : "Manual fetch done: " + fetched + " saved");
 
     return {
       fetched: fetched,
       failed: failed,
+      net_new_comments: commentProgress.net_new_comments,
+      comment_progress: commentProgress.pending_articles ? commentProgress : undefined,
+      reason_code: commentScanFailed ? "comment_scan_failed" : undefined,
       accepted: accepted,
       confirmation_required: confirmations,
     };

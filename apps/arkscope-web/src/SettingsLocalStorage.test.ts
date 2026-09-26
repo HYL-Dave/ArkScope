@@ -395,8 +395,9 @@ describe("local storage panels", () => {
     const storage = host!.querySelector('[data-settings-anchor="data_storage"]');
     expect(storage).not.toBeNull();
     expect(storage!.querySelector("h2")?.textContent).toBe("市場資料");
-    expect(storage!.textContent).toContain("價格與新聞的抓取工作由「資料來源與排程」管理");
-    expect(storage!.textContent).toContain("基本面資料尚未接入 App 排程");
+    expect(storage!.textContent).toContain("本機已儲存的價格與交易日覆蓋");
+    expect(storage!.textContent).toContain("新聞數量與收集結果另列於「新聞資料」");
+    expect(storage!.textContent).not.toContain("371,672");
     expect(storage!.textContent).not.toContain("攝入");
     expect(storage!.textContent).toContain(
       "以正規交易時段的預期 15 分鐘格線比對本地觀測；沒有獨立證據時，未觀測到的格子只標為未知。",
@@ -409,7 +410,7 @@ describe("local storage panels", () => {
     expect(storage!.textContent).toContain("2027-12-31");
     expect(host!.textContent).toContain("價格");
     expect(storage!.textContent).not.toContain("最近增量更新");
-    expect(host!.textContent).toContain("已儲存的 SEC 基本面");
+    expect(host!.textContent).toContain("已驗證且 TTL 未到期的 SEC 年度投影");
     expect(host!.textContent).toContain("財務快取");
     expect(host!.textContent).toContain("市場資料");
   });
@@ -421,10 +422,10 @@ describe("local storage panels", () => {
     expect(host!.textContent).toContain("總經資料");
     expect(host!.textContent).toContain("總經資料排程");
     expect(host!.textContent).toContain(
-      "可在下方設定五個資料來源的自動更新排程，或按「立即更新」手動執行",
+      "本機總經觀測值與事件日曆。供應商權限、收集紀錄與觀測期間須分別判斷。",
     );
     expect(host!.textContent).toContain(
-      "「重新讀取狀態」只會讀取本機資料，不會向資料供應商抓取資料。",
+      "排程關閉後仍保留歷史執行結果；上次失敗不表示正在持續重試。已停用的排程不會更新快照。",
     );
     expect(host!.textContent).not.toContain("攝入");
     expect(host!.textContent).toContain("FRED 序列");
@@ -561,7 +562,7 @@ describe("local storage panels", () => {
     const mountedStorage = host!.querySelector('[data-settings-anchor="data_storage"]');
     if (!mountedStorage) throw new Error("missing mounted Market Data section");
     expect(mountedStorage.textContent).toContain(
-      "查看已儲存的價格、新聞、SEC 基本面與獨立財務快取。價格與新聞的抓取工作由「資料來源與排程」管理；基本面資料尚未接入 App 排程，基本面摘要只會重新讀取狀態。",
+      "本機已儲存的價格與交易日覆蓋。新聞數量與收集結果另列於「新聞資料」。",
     );
     expect(mountedStorage.textContent).not.toContain("隱含波動率");
     expect(mountedStorage.textContent).not.toContain("最近增量更新");
@@ -611,15 +612,14 @@ describe("local storage panels", () => {
     expect(storage).toBe(mountedStorage);
     expect(storage.querySelector("h2")?.textContent).toBe("Market Data");
     expect(storage.textContent).toContain(
-      "Review stored prices, news, SEC fundamentals, and the separate financial cache. Price and news collection is managed under Data Sources and Schedules; fundamentals data is not connected to an App schedule, and the fundamentals summary only reloads status.",
+      "Local stored prices and trading-day coverage. News volume and collection outcomes are reported separately in News Data.",
     );
     expect(storage.textContent).not.toContain("implied volatility");
     expect(Array.from(storage.querySelectorAll("dl.ds-kv > dt")).map((node) => node.textContent))
       .toEqual([
         "Market Data",
         "Prices",
-        "News",
-        "Stored SEC Fundamentals",
+        "Validated, TTL-unexpired annual SEC projections",
         "Financial Cache",
         "Cases with source observations",
         "Cases missing source observations",
@@ -634,7 +634,7 @@ describe("local storage panels", () => {
       "2,324,487 rows · 149 tickers · latest 2026-07-03T20:00:00+0000",
     );
     expect(storage.textContent).toContain(
-      `24 cache entries (7 reusable · 17 refresh due) · latest cache timestamp ${formatSystemTimestamp("2026-07-01T00:00:00+00:00")}`,
+      `24 cache entries (7 TTL-unexpired · 17 TTL-expired) · latest cache timestamp ${formatSystemTimestamp("2026-07-01T00:00:00+00:00")}`,
     );
     expect(storage.textContent).not.toContain("Latest Incremental Update");
     expect(storage.textContent).not.toContain("Prices +11");

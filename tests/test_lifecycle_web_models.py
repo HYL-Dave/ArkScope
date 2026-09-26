@@ -19,7 +19,7 @@ def anyio_backend():
 
 
 def _selection(provider="openai", auth="api_key"):
-    return validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-opus-5", "local:7")
+    return validate_selection(provider, auth, "gpt-5.6-luna" if provider == "openai" else "claude-opus-5-5", "local:7")
 
 
 def _request(provider="openai", auth="api_key", **overrides):
@@ -312,7 +312,7 @@ def _emission(**changes):
 
 def _anthropic_result(**changes):
     return SimpleNamespace(**{
-        "id": "msg-1", "model": "claude-opus-5", "stop_reason": "tool_use",
+        "id": "msg-1", "model": "claude-opus-5-5", "stop_reason": "tool_use",
         "content": [SimpleNamespace(type="server_tool_use", name="web_search", id="web-1"),
                     SimpleNamespace(type="web_search_tool_result", tool_use_id="web-1", content=[]), _emission()],
         "usage": SimpleNamespace(input_tokens=100, output_tokens=50), **changes,

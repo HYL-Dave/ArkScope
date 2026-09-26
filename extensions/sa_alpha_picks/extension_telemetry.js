@@ -68,6 +68,7 @@
     if (result && result.healthy_anchor_eligible !== undefined) {
       candidate.healthy_anchor_eligible = result.healthy_anchor_eligible;
     }
+    if (result && result.comment_progress !== undefined) candidate.comment_progress = result.comment_progress;
     var derived = SAExtensionRunProtocol.deriveRunResult(candidate);
     return {
       schema_version: derived.schema_version,
@@ -78,6 +79,7 @@
       counts: derived.counts,
       derived_outcome: derived.derived_outcome,
       healthy_anchor_eligible: derived.healthy_anchor_eligible,
+      ...(derived.comment_progress ? {comment_progress:derived.comment_progress} : {}),
     };
   }
 
@@ -111,6 +113,7 @@
       mode: record.result.mode,
       derived_outcome: record.result.derived_outcome,
       counts: record.result.counts,
+      ...(record.result.comment_progress ? {comment_progress:record.result.comment_progress} : {}),
       started_at: record.started_at,
       finished_at: record.finished_at,
       audit_state: auditState,

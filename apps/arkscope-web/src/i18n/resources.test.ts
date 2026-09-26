@@ -561,7 +561,7 @@ describe("bundled i18n resources", () => {
         coverageReadOnly: "覆蓋診斷為唯讀；補抓須另行確認。",
         coverageMarketScope: "美國上市股票代理範圍",
         coverageSession: "正規交易時段（RTH）",
-        storedFundamentals: "已儲存的 SEC 基本面",
+        storedFundamentals: "已驗證且 TTL 未到期的 SEC 年度投影",
         financialCache: "財務快取",
         news: "新聞資料",
         macro: "總經資料",
@@ -611,7 +611,7 @@ describe("bundled i18n resources", () => {
         coverageReadOnly: "Coverage is read-only. Backfill requires separate confirmation.",
         coverageMarketScope: "US-listed equity proxy",
         coverageSession: "Regular trading hours (RTH)",
-        storedFundamentals: "Stored SEC Fundamentals",
+        storedFundamentals: "Validated, TTL-unexpired annual SEC projections",
         financialCache: "Financial Cache",
         news: "News Data",
         macro: "Macro Data",
@@ -760,9 +760,9 @@ describe("bundled i18n resources", () => {
       "../../scripts/i18n/fixtures/portfolio-resource-ownership.json",
     ), "utf8")) as PortfolioOwnershipContract;
     const expectedCounts = {
-      common: 82,
+      common: 83,
       shell: 49,
-      settings: 1162,
+      settings: 1227,
       research: 240,
       explore: 1209,
       portfolio: 374,
@@ -848,7 +848,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3140);
+      expect(total, `${locale}.total`).toBe(3206);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([
@@ -1118,6 +1118,7 @@ describe("bundled i18n resources", () => {
           adapterUnavailable: "內附的模型 adapter 無法使用",
           timeout: "模型請求逾時",
           modelRetired: "此模型已退出新執行",
+          modelRequired: "尚未選擇模型",
         },
         authModes: {
           apiKey: "API key",
@@ -1168,6 +1169,7 @@ describe("bundled i18n resources", () => {
           adapterUnavailable: "The bundled model adapter is unavailable",
           timeout: "The model request timed out",
           modelRetired: "This model is retired for new runs",
+          modelRequired: "No model selected",
         },
         authModes: {
           apiKey: "API key",
@@ -1217,7 +1219,7 @@ describe("bundled i18n resources", () => {
     for (const locale of ["zh-Hant", "en"] as const) {
       const commonModels = (resources[locale].common as ResourceTree).models as ResourceTree;
       expect(commonModels, `${locale}.common.models`).toEqual(expectedModels[locale]);
-      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(38);
+      expect(flattenResource(commonModels).size, `${locale}.common.models`).toBe(39);
       const settings = flattenResource(resources[locale].settings as ResourceTree);
       for (const path of removedSettingsPaths) {
         expect.soft(settings.has(path), `${locale}.settings.${path}`).toBe(false);
@@ -1228,6 +1230,7 @@ describe("bundled i18n resources", () => {
   it("preserves the reviewed pre-Slice-5 Settings-origin inventory across the Common move", () => {
     const postSliceCommonModelPaths = [
       "reasons.modelRetired",
+      "reasons.modelRequired",
       "reasons.subscriptionPlanUnverified",
       "reasons.modelEntitlementUnverified",
     ] as const;
@@ -1246,6 +1249,15 @@ describe("bundled i18n resources", () => {
       "dataSources.catalog.management",
       "dataSources.catalog.implemented",
       "dataSources.catalog.candidate",
+      "dataSources.catalog.integratedElsewhere",
+      "dataSources.catalog.notIntegrated",
+      "dataSources.catalog.routeScope",
+      "dataSources.catalog.massiveFinancialMissing",
+      "dataSources.catalog.saCaptureScope",
+      "dataSources.catalog.credentials.configured",
+      "dataSources.catalog.credentials.missing",
+      "dataSources.catalog.credentials.unknown",
+      "dataSources.catalog.credentials.notUsed",
       "dataSources.catalog.reload",
       "dataSources.catalog.empty",
       "dataSources.catalog.loadFailed",
@@ -1330,6 +1342,16 @@ describe("bundled i18n resources", () => {
       ...secFormNameKeys.map((key) => `secResearch.formNames.${key}`),
       "dataSources.schedule.sources.secResearch.label",
       "dataSources.schedule.sources.secResearch.description",
+      "dataSources.schedule.sources.fredSeries.label",
+      "dataSources.schedule.sources.fredSeries.description",
+      "dataSources.schedule.sources.fredReleaseDates.label",
+      "dataSources.schedule.sources.fredReleaseDates.description",
+      "dataSources.schedule.sources.finnhubEconomic.label",
+      "dataSources.schedule.sources.finnhubEconomic.description",
+      "dataSources.schedule.sources.finnhubEarnings.label",
+      "dataSources.schedule.sources.finnhubEarnings.description",
+      "dataSources.schedule.sources.finnhubIpo.label",
+      "dataSources.schedule.sources.finnhubIpo.description",
       ...secResearchKeys.map((key) => `secResearch.${key}`),
       "workspace.routes.savedRefreshFailed",
       "workspace.routes.saveUnknown",
@@ -1339,6 +1361,17 @@ describe("bundled i18n resources", () => {
       "dataStorage.coverage.drilldown.providerAttemptFailed",
       "dataStorage.coverage.drilldown.issueRecordedAt",
       "dataStorage.coverage.drilldown.issueTimeUnknown",
+      "dataStorage.storedPriceCoverage",
+      "dataStorage.cacheDiagnostics",
+      "dataStorage.cacheScope",
+      "dataStorage.secProjectionScope",
+      "newsStorage.anyProviderSuccess",
+      "newsStorage.freshnessScope",
+      "newsStorage.latestRunCounts",
+      "newsStorage.runCounts",
+      "newsStorage.tickerIssues",
+      "newsStorage.completenessUnknown",
+      "newsStorage.collectionFailed",
       "dataStorage.lifecycle.summary.diagnostics",
       "dataStorage.lifecycle.automation.schedule",
       "dataStorage.lifecycle.automation.scheduleLabels.scheduled",
@@ -1395,11 +1428,22 @@ describe("bundled i18n resources", () => {
       "dataSources.extension.workloads.marketNews",
       "dataSources.extension.segments.acquisition",
       "dataSources.extension.status.captureDeferred",
+      "dataSources.extension.status.capturePartial",
+      "dataSources.extension.status.partial",
       "dataSources.extension.status.captureDegraded",
       "dataSources.extension.status.legacyCauseAbsent",
       "dataSources.extension.status.diagnosticsRejected",
       "dataSources.extension.status.additionalDiagnostics",
       "dataSources.extension.status.captureCounts",
+      "dataSources.extension.commentProgress.saved_one",
+      "dataSources.extension.commentProgress.saved_other",
+      "dataSources.extension.commentProgress.pending_one",
+      "dataSources.extension.commentProgress.pending_other",
+      "dataSources.extension.commentProgress.stops.timeout",
+      "dataSources.extension.commentProgress.stops.maxScrolls",
+      "dataSources.extension.commentProgress.stops.stableBottom",
+      "dataSources.extension.commentProgress.stops.controlsUnresolved",
+      "dataSources.extension.commentProgress.stops.unknown",
       "dataSources.extension.stages.tabNavigation",
       "dataSources.extension.stages.pageReadiness",
       "dataSources.extension.stages.scriptInjection",
@@ -1448,6 +1492,30 @@ describe("bundled i18n resources", () => {
       "macroStorage.schedule.enabledCount_other",
       "macroStorage.schedule.unknown",
       "macroStorage.schedule.title",
+      "macroStorage.schedule.historyNote",
+      "macroStorage.headings.units",
+      "macroStorage.counts.coverageUnknown",
+      "macroStorage.counts.coverageNote",
+      "macroStorage.guide.open",
+      "macroStorage.guide.frequency",
+      "macroStorage.guide.adjustment",
+      "macroStorage.guide.periodNote",
+      "macroStorage.guide.initialRelease",
+      "macroStorage.guide.vintages",
+      "macroStorage.guide.revisionUnknown",
+      "macroStorage.guide.interpretationNote",
+      "macroStorage.guide.source",
+      "macroStorage.guide.series.FEDFUNDS",
+      "macroStorage.guide.series.DGS10",
+      "macroStorage.guide.series.DGS2",
+      "macroStorage.guide.series.T10Y2Y",
+      "macroStorage.guide.series.CPIAUCNS",
+      "macroStorage.guide.series.CPILFESL",
+      "macroStorage.guide.series.UNRATE",
+      "macroStorage.guide.series.PAYEMS",
+      "macroStorage.guide.series.GDP",
+      "macroStorage.guide.series.GDPC1",
+      "macroStorage.guide.series.VIXCLS",
       "dataStorage.lifecycle.title",
       "dataStorage.lifecycle.openWorkflow",
       "dataStorage.lifecycle.summary.activeCases",
@@ -1533,6 +1601,8 @@ describe("bundled i18n resources", () => {
       investor: 140,
     } as const;
 
+    expect(new Set(postSliceSettingsPaths).size).toBe(postSliceSettingsPaths.length);
+    expect(new Set(postSliceCommonModelPaths).size).toBe(postSliceCommonModelPaths.length);
     for (const locale of ["zh-Hant", "en"] as const) {
       const settings = resources[locale].settings as ResourceTree;
       const workspaceCount = flattenResource(

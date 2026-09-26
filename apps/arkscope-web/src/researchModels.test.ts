@@ -61,7 +61,7 @@ describe("effortOptionsForModel", () => {
     effort_options: { openai: options("openai"), anthropic: options("anthropic") },
     current_model_ids: [
       "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-      "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+      "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
     ],
     retired_model_ids: ["gpt-5.4-mini", "claude-fable-5", "claude-opus-4-8"],
     model_lifecycle: [
@@ -90,7 +90,7 @@ describe("effortOptionsForModel", () => {
         aliases: [],
       },
       {
-        id: "claude-opus-5", provider: "anthropic", task_route_status: "current",
+        id: "claude-opus-5-5", provider: "anthropic", task_route_status: "current",
         aliases: [],
       },
     ],
@@ -102,7 +102,7 @@ describe("effortOptionsForModel", () => {
         id, provider: "anthropic" as const, effort_options: taskEfforts,
       })),
       {
-        id: "claude-opus-5", provider: "anthropic" as const,
+        id: "claude-opus-5-5", provider: "anthropic" as const,
         effort_options: ["max", "xhigh", "high", "medium", "low"],
       },
     ],
@@ -111,7 +111,7 @@ describe("effortOptionsForModel", () => {
   it("projects the closed current roster into the product effort order", () => {
     expect(effortOptionsForModel(catalog, "openai", "gpt-5.6-luna").map((item) => item.id))
       .toEqual(["low", "medium", "high", "xhigh", "max"]);
-    expect(effortOptionsForModel(catalog, "anthropic", "claude-opus-5").map((item) => item.id))
+    expect(effortOptionsForModel(catalog, "anthropic", "claude-opus-5-5").map((item) => item.id))
       .toEqual(["low", "medium", "high", "xhigh", "max"]);
   });
 
@@ -120,7 +120,7 @@ describe("effortOptionsForModel", () => {
       ...catalog,
       task_route_effort_order: ["high", "low"],
     } as ModelCatalog;
-    expect(effortOptionsForModel(catalogOrder, "anthropic", "claude-opus-5").map((item) => item.id))
+    expect(effortOptionsForModel(catalogOrder, "anthropic", "claude-opus-5-5").map((item) => item.id))
       .toEqual(["high", "low"]);
   });
 
@@ -129,7 +129,7 @@ describe("effortOptionsForModel", () => {
       ...catalog,
       task_route_effort_order: undefined,
     } as ModelCatalog;
-    expect(effortOptionsForModel(oldSidecarCatalog, "anthropic", "claude-opus-5").map((item) => item.id))
+    expect(effortOptionsForModel(oldSidecarCatalog, "anthropic", "claude-opus-5-5").map((item) => item.id))
       .toEqual(["low", "medium", "high", "xhigh", "max"]);
   });
 
@@ -193,18 +193,18 @@ describe("model lifecycle matching", () => {
       { id: "gpt-5.6-sol", provider: "openai", effort_options: taskEfforts },
       { id: "gpt-5.6-terra", provider: "openai", effort_options: taskEfforts },
       { id: "gpt-5.6-luna", provider: "openai", effort_options: taskEfforts },
-      { id: "claude-opus-5", provider: "anthropic", effort_options: taskEfforts },
+      { id: "claude-opus-5-5", provider: "anthropic", effort_options: taskEfforts },
     ],
     model_lifecycle: [
       { id: "gpt-5.6-sol", provider: "openai", task_route_status: "current", aliases: ["gpt-5.6"] },
       { id: "gpt-5.6-terra", provider: "openai", task_route_status: "current", aliases: [] },
       { id: "gpt-5.6-luna", provider: "openai", task_route_status: "current", aliases: [] },
       { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
-      { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+      { id: "claude-opus-5-5", provider: "anthropic", task_route_status: "current", aliases: [] },
       { id: "claude-fable-5-1", provider: "anthropic", task_route_status: "current", aliases: [] },
       { id: "claude-fable-5", provider: "anthropic", task_route_status: "retired", aliases: [] },
     ],
-    current_model_ids: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "claude-opus-5"],
+    current_model_ids: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "claude-opus-5-5"],
     retired_model_ids: ["gpt-5.4-mini"],
   } as unknown as ModelCatalog;
 

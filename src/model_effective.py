@@ -245,6 +245,9 @@ def effective_model_view_v2(
         route = routes.get(task)
         current_provider = getattr(route, "provider", None) or "anthropic"
         route_model = getattr(route, "model", "") or ""
+        route_capability = capability_for(route_model)
+        if route_capability is not None and route_capability.task_route_status == "retired":
+            route_model = ""
         provider_blocks: dict[str, Any] = {}
         for provider in _PROVIDERS:
             credential = credentials.get(provider)

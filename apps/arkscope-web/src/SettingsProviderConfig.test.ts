@@ -1830,6 +1830,59 @@ describe("Settings provider config authority", () => {
     expect(host!.textContent).toContain("08-14 09:01 Asia/Taipei");
   });
 
+  it.each([
+    ["en", 38, "Partial", "38 net new comments stored", "1 article pending", "Unresolved controls", "Waiting to capture"],
+    ["en", 0, "Partial", "0 net new comments stored", "1 article pending", "Unresolved controls", "Waiting to capture"],
+    ["zh-Hant", 38, "部分完成", "已儲存 38 則新留言", "1 篇文章待續抓", "仍有未解決的控制項", "等待擷取"],
+    ["zh-Hant", 0, "部分完成", "已儲存 0 則新留言", "1 篇文章待續抓", "仍有未解決的控制項", "等待擷取"],
+  ] as const)("renders partial SA comment health in %s with %i saved comments", async (locale, saved, label, progress, pending, stop, waiting) => {
+    await i18n.changeLanguage(locale);
+    vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
+      chain_state: "available", generated_at: "2026-09-26T01:00:00Z",
+      segments: [{
+        key: "telemetry_last", state: "warn", code: "capture_deferred", outcome: "deferred",
+        job_name: "sa_alpha_picks_refresh", counts: { phase_complete: 3, phase_deferred: 1 },
+        comment_progress: { pending_articles: 1, net_new_comments: saved, stop_reasons: ["controls_unresolved"] },
+      }],
+    });
+    await renderDataSources();
+
+    const row = host!.querySelector("[data-testid='sa-health-scroll'] tbody tr")!;
+    const badge = row.querySelector(".ui-status-badge")!;
+    expect(badge.getAttribute("data-state")).toBe("partial");
+    expect(badge.textContent).toContain(label);
+    expect(row.textContent).toContain(progress);
+    expect(row.textContent).toContain(pending);
+    expect(row.textContent).toContain(stop);
+    expect(row.textContent).not.toContain(waiting);
+    expect(row.textContent).not.toContain("controls_unresolved");
+    expect(host!.querySelector("[data-testid='sa-chain-state'] .ui-status-badge")?.getAttribute("data-state")).toBe("ready");
+  });
+
+  it("keeps genuine SA failure styling and cause with saved pending progress", async () => {
+    await i18n.changeLanguage("en");
+    vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
+      chain_state: "available", generated_at: "2026-09-26T01:00:00Z",
+      segments: [{
+        key: "telemetry_last", state: "fail", code: "capture_failed", outcome: "failed",
+        comment_progress: { pending_articles: 1, net_new_comments: 38, stop_reasons: ["timeout"] },
+        diagnostics_status: "recorded", diagnostics: [{
+          occurred_at: "2026-09-26T01:00:00Z", stage: "local_persistence", reason_code: "database_write_failed",
+          target_kind: "article_comments", retryable: true, attempt_count: 1,
+        }],
+      }],
+    });
+    await renderDataSources();
+
+    const row = host!.querySelector("[data-testid='sa-health-scroll'] tbody tr")!;
+    expect(row.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("failed");
+    expect(row.textContent).toContain("Capture failed");
+    expect(row.textContent).toContain("Local database write failed");
+    expect(row.textContent).toContain("38 net new comments stored");
+    expect(row.textContent).toContain("1 article pending");
+    expect(row.textContent).not.toContain("Partial capture; comments pending");
+  });
+
   it("labels repair as historical and never as current recovery", async () => {
     vi.mocked(getSAExtensionHealth).mockResolvedValueOnce({
       chain_state: "available",

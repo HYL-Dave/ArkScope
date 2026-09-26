@@ -12,7 +12,7 @@ import type {
 
 const TASK_ROUTE_EFFORT_IDS = ["low", "medium", "high", "xhigh", "max"] as const;
 
-export type TaskRouteBlockerReason = "model_retired" | "effort_required";
+export type TaskRouteBlockerReason = "model_required" | "model_retired" | "effort_required";
 
 export function isTaskRouteEffort(value: string): value is ExplicitResearchEffort {
   return (TASK_ROUTE_EFFORT_IDS as readonly string[]).includes(value);
@@ -139,6 +139,7 @@ export function taskRouteBlocker(
   route: Pick<{ provider: ModelProvider; model: string; effort: string }, "provider" | "model" | "effort">,
   task: ModelTask,
 ): TaskRouteBlockerReason | null {
+  if (!route.model.trim()) return "model_required";
   if (taskRouteModelStatus(catalog, route.provider, route.model) === "retired") return "model_retired";
   const effort = route.effort.trim();
   const effectiveEffortIds = catalog.effective?.tasks?.[task]?.providers?.[route.provider]?.models

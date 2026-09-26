@@ -99,7 +99,7 @@ describe("Dashboard stored data-source presentation", () => {
   it("uses the canonical Content translation label in Developer Mode", async () => {
     const runtime = {
       anthropic: {
-        model: "claude-opus-5", model_advanced: "claude-opus-4-8",
+        model: "claude-opus-5-5", model_advanced: "claude-opus-4-8",
         effort: "high", thinking: true, key_set: true, credentials: [],
       },
       openai: {
@@ -107,7 +107,7 @@ describe("Dashboard stored data-source presentation", () => {
         reasoning_effort: "high", key_set: true, credentials: [],
       },
       card_synthesis: {
-        task: "card_synthesis", provider: "anthropic", model: "claude-opus-5",
+        task: "card_synthesis", provider: "anthropic", model: "claude-opus-5-5",
         effort: "high", source: "default", custom: false, warning: null,
       },
       card_translation: {

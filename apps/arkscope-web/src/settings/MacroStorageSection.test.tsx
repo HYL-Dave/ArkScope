@@ -95,6 +95,7 @@ const snapshotFixture: MacroSnapshot = {
       label: "Fed Funds",
       title: "Federal Funds Effective Rate",
       units: "Percent",
+      frequency: "Monthly",
       value: 4.33,
       observation_date: "2026-07-01",
       fetched_at: "2026-07-19T03:00:00Z",
@@ -202,7 +203,7 @@ function dispose() {
 
 function refreshButton(): HTMLButtonElement {
   const button = Array.from(host!.querySelectorAll<HTMLButtonElement>("button"))
-    .find((candidate) => candidate.textContent?.trim() === "重新讀取狀態");
+    .find((candidate) => candidate.getAttribute("aria-label") === "重新讀取狀態");
   if (!button) throw new Error("missing refresh command");
   return button;
 }
@@ -228,6 +229,28 @@ afterEach(() => {
 });
 
 describe("MacroStorageSection", () => {
+  it("separates period and units, marks empty coverage unknown, and opens a sourced guide", async () => {
+    controls.status = { ...statusFixture, tables: {
+      ...statusFixture.tables, cal_earnings_events: { row_count: 0, last_fetched_at: null },
+    } };
+    await renderMacro();
+    expect(host!.textContent).toContain("尚無資料，涵蓋範圍未知");
+    expect(host!.textContent).toContain("歷史執行結果");
+    const table = host!.querySelector(".settings-fred-table")!;
+    const cells = Array.from(table.querySelectorAll("tbody tr:first-child td"));
+    expect(cells.map(cell => cell.textContent)).toContain("4.33");
+    expect(cells.map(cell => cell.textContent)).toContain("Percent");
+    expect(cells.map(cell => cell.textContent)).toContain("2026-07");
+    const guide = host!.querySelector<HTMLButtonElement>('[aria-label="指標解讀 FEDFUNDS"]')!;
+    expect(guide).not.toBeNull();
+    act(() => guide.click());
+    const dialog = document.querySelector('[role="dialog"]')!;
+    expect(dialog.textContent).toContain("月平均");
+    expect(dialog.querySelector('a')?.getAttribute("href"))
+      .toBe("https://fred.stlouisfed.org/series/FEDFUNDS");
+    expect(getMacroSnapshot).toHaveBeenCalledTimes(1);
+  });
+
   it("caches_status_and_snapshot_independently_and_refreshes_only_requested_legs", async () => {
     const now = Date.parse("2026-08-09T02:00:00Z");
     const cache = createSettingsReadCache({ clock: () => now });
@@ -407,7 +430,7 @@ describe("MacroStorageSection", () => {
     expect(putSchedule).not.toHaveBeenCalled();
     expect(runScheduleNow).not.toHaveBeenCalled();
     expect(host!.textContent).toContain(
-      "「重新讀取狀態」只會讀取本機資料，不會向資料供應商抓取資料。",
+      "供應商權限、收集紀錄與觀測期間須分別判斷。",
     );
   });
 
@@ -443,17 +466,17 @@ describe("MacroStorageSection", () => {
     expect(host!.textContent).toContain("12 筆已儲存");
   });
 
-  it("renders bilingual manual update copy without ingestion wording", async () => {
+  it("renders bilingual schedule state separately from stored observations", async () => {
     await renderMacro();
 
     expect(host!.textContent).toContain(
-      "可在下方設定五個資料來源的自動更新排程，或按「立即更新」手動執行",
+      "上次失敗不表示正在持續重試。",
     );
     expect(host!.textContent).not.toContain("攝入");
 
     await act(async () => { await i18n.changeLanguage("en"); });
     expect(host!.textContent).toContain(
-      "Configure automatic schedules for the five sources below or choose Run now for a manual update.",
+      "a previous failure is not a running retry.",
     );
     expect(host!.textContent).not.toMatch(/ingestion|攝入/i);
   });
@@ -539,14 +562,15 @@ describe("MacroStorageSection", () => {
         `12 stored · last fetched ${formatSystemTimestamp("2026-07-19T03:00:00Z")}`,
       );
       expect.soft(host!.textContent).toContain("FEDFUNDS");
-      expect.soft(host!.textContent).toContain("Federal Funds Effective Rate");
-      expect.soft(host!.textContent).toContain("4.33 Percent");
-      expect.soft(host!.textContent).toContain("2026-07-01");
+      expect.soft(host!.querySelector('[title="Federal Funds Effective Rate"]')).not.toBeNull();
+      expect.soft(host!.textContent).toContain("4.33");
+      expect.soft(host!.textContent).toContain("Percent");
+      expect.soft(host!.textContent).toContain("2026-07");
       expect.soft(host!.textContent).toContain(
         formatSystemTimestamp("2026-07-19T03:00:00Z"),
       );
       expect.soft(Array.from(host!.querySelectorAll(".settings-fred-table th")).map((node) => node.textContent))
-        .toEqual(["Series ID", "Name", "Latest value", "Observation date", "Last fetch"]);
+        .toEqual(["Series ID", "Name", "Stored value", "Units", "Observation period", "Last fetch"]);
 
       if (scenario.expectedUnavailable === "table") {
         const ipoLabel = Array.from(host!.querySelectorAll("dt")).find((node) =>
@@ -581,6 +605,6 @@ describe("MacroStorageSection", () => {
     expect(host!.textContent).toContain("Macro Data");
     expect(host!.textContent).toContain("FEDFUNDS");
     expect(host!.textContent).toContain("12 stored");
-    expect(host!.textContent).toContain("2026-07-01");
+    expect(host!.textContent).toContain("2026-07");
   });
 });

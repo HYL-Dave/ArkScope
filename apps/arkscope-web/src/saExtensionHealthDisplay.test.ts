@@ -53,6 +53,130 @@ describe("displaySAExtensionSegments", () => {
     expect(en.copy).toContain("Waiting to capture");
     expect(zh.copy).toContain("等待擷取");
   });
+
+  it.each([0, 38])("shows %i saved comments as partial pending work in both locales", (saved) => {
+    const segment: SAExtensionHealthSegment = {
+      key: "telemetry_last", state: "warn", code: "capture_deferred", outcome: "deferred",
+      job_name: "sa_alpha_picks_refresh",
+      counts: { phase_complete: 3, phase_deferred: 1 },
+      comment_progress: { pending_articles: 1, net_new_comments: saved, stop_reasons: ["timeout"] },
+    };
+    for (const [locale, label, partial, progress, pending, stop, waiting] of [
+      ["en", "Partial", "Partial capture; comments pending", `${saved} net new comments stored`, "1 article pending", "Time budget reached", "Waiting to capture"],
+      ["zh-Hant", "部分完成", "擷取部分完成；留言仍待續抓", `已儲存 ${saved} 則新留言`, "1 篇文章待續抓", "已達時間上限", "等待擷取"],
+    ] as const) {
+      const row = displaySAExtensionSegments([segment], settingsT(locale))[0];
+      expect(row.tone).toBe("warn");
+      expect(row.statusLabel).toBe(label);
+      expect(row.copy).toContain(partial);
+      expect(row.copy).toContain(progress);
+      expect(row.copy).toContain(pending);
+      expect(row.copy).toContain(stop);
+      expect(row.copy).not.toContain(waiting);
+      expect(row.copy).not.toContain("timeout");
+    }
+  });
+
+  it.each([
+    ["timeout", "Time budget reached", "已達時間上限"],
+    ["max_scrolls", "Scroll budget reached", "已達捲動次數上限"],
+    ["controls_unresolved", "Unresolved controls", "仍有未解決的控制項"],
+    ["stable_bottom", "Backfill still pending after stable bottom", "已到穩定底部，仍有待補抓留言"],
+    ["unknown", "Stop reason unavailable", "無法確認停止原因"],
+  ] as const)("localizes partial comment stop %s without exposing protocol codes", (reason, en, zh) => {
+    const segment: SAExtensionHealthSegment = {
+      key: "telemetry_last", state: "warn", code: "capture_deferred", outcome: "deferred",
+      comment_progress: { pending_articles: 2, net_new_comments: 1, stop_reasons: [reason] },
+    };
+    const enRow = displaySAExtensionSegments([segment], settingsT("en"))[0];
+    const zhRow = displaySAExtensionSegments([segment], settingsT("zh-Hant"))[0];
+    expect(enRow.copy).toContain(en);
+    expect(enRow.copy).toContain("1 net new comment stored");
+    expect(enRow.copy).toContain("2 articles pending");
+    expect(zhRow.copy).toContain(zh);
+    expect(zhRow.copy).toContain("2 篇文章待續抓");
+  });
+
+  it.each([
+    ["failed", "fail", "database_write_failed", "Capture failed", "Local database write failed", "擷取失敗", "本機資料庫寫入失敗"],
+    ["degraded", "warn", "comment_scan_failed", "Capture degraded", "Comment scan failed", "擷取部分完成", "留言掃描失敗"],
+  ] as const)("retains %s and its cause alongside saved progress", (outcome, tone, reason, en, enCause, zh, zhCause) => {
+    const segment: SAExtensionHealthSegment = {
+      key: "telemetry_last", state: tone, code: `capture_${outcome}`, outcome,
+      comment_progress: { pending_articles: 1, net_new_comments: 38, stop_reasons: ["controls_unresolved"] },
+      diagnostics_status: "recorded",
+      diagnostics: [{
+        occurred_at: "2026-09-26T01:00:00Z", stage: outcome === "failed" ? "local_persistence" : "content_parse",
+        reason_code: reason, target_kind: "article_comments", retryable: true, attempt_count: 1,
+      }],
+    };
+    const enRow = displaySAExtensionSegments([segment], settingsT("en"))[0];
+    const zhRow = displaySAExtensionSegments([segment], settingsT("zh-Hant"))[0];
+    expect(enRow.tone).toBe(tone);
+    expect(enRow.statusLabel).toBeUndefined();
+    expect(enRow.copy).toContain(en);
+    expect(enRow.copy).toContain(enCause);
+    expect(enRow.copy).toContain("38 net new comments stored");
+    expect(enRow.copy).toContain("Unresolved controls");
+    expect(enRow.copy).not.toContain("Partial capture; comments pending");
+    expect(zhRow.copy).toContain(zh);
+    expect(zhRow.copy).toContain(zhCause);
+    expect(zhRow.copy).toContain("已儲存 38 則新留言");
+  });
+
+  it("keeps unresolved controls visible alongside another partial stop reason", () => {
+    const segment: SAExtensionHealthSegment = {
+      key: "telemetry_last", state: "warn", code: "capture_deferred", outcome: "deferred",
+      comment_progress: {
+        pending_articles: 2, net_new_comments: 38,
+        stop_reasons: ["controls_unresolved", "timeout"],
+      },
+    };
+    const en = displaySAExtensionSegments([segment], settingsT("en"))[0];
+    const zh = displaySAExtensionSegments([segment], settingsT("zh-Hant"))[0];
+    expect(en.copy).toContain("Unresolved controls");
+    expect(en.copy).toContain("Time budget reached");
+    expect(en.copy.match(/38 net new comments stored/g)).toHaveLength(1);
+    expect(en.copy).not.toMatch(/controls_unresolved|timeout/);
+    expect(zh.copy).toContain("仍有未解決的控制項");
+    expect(zh.copy).toContain("已達時間上限");
+  });
+
+  it.each([
+    null,
+    { pending_articles: 0, net_new_comments: 38, stop_reasons: ["timeout"] },
+    { pending_articles: 1, net_new_comments: -1, stop_reasons: ["timeout"] },
+    { pending_articles: 1, net_new_comments: 1.5, stop_reasons: ["timeout"] },
+    { pending_articles: true, net_new_comments: 38, stop_reasons: ["timeout"] },
+    { pending_articles: 1, net_new_comments: 38, stop_reasons: ["PLANTED_RAW_STOP"] },
+    { pending_articles: 1, net_new_comments: 38, stop_reasons: [] },
+    { pending_articles: 1, net_new_comments: 38, stop_reasons: ["timeout", "timeout"] },
+    { pending_articles: 1, net_new_comments: Number.MAX_SAFE_INTEGER + 1, stop_reasons: ["timeout"] },
+  ])("does not invent partial progress from invalid data: %j", (progress) => {
+    const row = displaySAExtensionSegments([{
+      key: "telemetry_last", state: "warn", code: "capture_deferred",
+      comment_progress: progress,
+    } as unknown as SAExtensionHealthSegment], settingsT("en"))[0];
+    expect(row.copy).toBe("Waiting to capture");
+    expect(row.statusLabel).toBeUndefined();
+    expect(row.copy).not.toContain("PLANTED_RAW_STOP");
+  });
+
+  it("keeps old complete and deferred receipts unchanged without inventing progress", () => {
+    const complete = displaySAExtensionSegments([{
+      key: "telemetry_last", state: "ok", code: "capture_complete", outcome: "complete",
+    }], settingsT("en"))[0];
+    const waiting = displaySAExtensionSegments([{
+      key: "telemetry_last", state: "warn", code: "capture_deferred", outcome: "deferred",
+    }], settingsT("en"))[0];
+    expect(complete.copy).toBe("Capture complete");
+    expect(complete.tone).toBe("ok");
+    expect(waiting.copy).toBe("Waiting to capture");
+    expect(waiting.tone).toBe("warn");
+    expect(complete.statusLabel).toBeUndefined();
+    expect(waiting.statusLabel).toBeUndefined();
+  });
+
   it("renders the fixed native-host chain order with zh labels and symbols", () => {
     const rows = displaySAExtensionSegments([
       seg("capture_readback", "warn", "尚未有第一次擷取"),

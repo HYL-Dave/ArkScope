@@ -158,8 +158,11 @@ export function ModelRoutingSection({
       </div>
       <div className="settings-grid">
         {catalog.tasks.map((task) => {
-          const row = draft[task.id];
-          if (!row) return null;
+          const savedDraft = draft[task.id];
+          if (!savedDraft) return null;
+          const row = taskRouteModelStatus(catalog, savedDraft.provider, savedDraft.model) === "retired"
+            ? { ...savedDraft, model: "", custom: false }
+            : savedDraft;
           const effectiveRoute = catalog.routes[task.id];
           const envLocked = effectiveRoute?.source === "env";
           const context = contexts[row.provider];
@@ -483,13 +486,18 @@ export function ModelRoutingSection({
               {routeBlocker === "model_retired" ? (
                 <p className="warn-text">{t(($) => $.models.route.modelRetired)}</p>
               ) : null}
+              {routeBlocker === "model_required" ? (
+                <p className="muted">{modelReasonLabel("model_required", commonT)}</p>
+              ) : null}
 
+              {row.model && row.provider === "anthropic" ? (
               <div className="model-thinking-line">
                 <span>{t(($) => $.models.fields.thinking)}</span>
                 <strong>
                   {settingsThinkingLabel(selectedEntry?.thinking_mode ?? "none", commonT)}
                 </strong>
               </div>
+              ) : null}
 
               <ModelNotes
                 models={modelsByProvider[row.provider] ?? []}

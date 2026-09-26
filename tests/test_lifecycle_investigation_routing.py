@@ -75,15 +75,15 @@ def test_investigation_route_save_reset_and_other_tasks_are_independent(stores):
         routes.set(task, "openai", "gpt-5.6-luna", "xhigh")
     before = routes.get_all()
     request = config_routes.ModelRoutesUpdate.model_validate({"routes": {
-        TASK: {"provider": "anthropic", "model": "claude-opus-5", "effort": "high"},
+        TASK: {"provider": "anthropic", "model": "claude-opus-5-5", "effort": "high"},
     }})
     saved = config_routes.update_model_routes(request, store=credentials)
     assert saved["routes"][TASK]["source"] == "db"
     assert {task: routes.get(task) for task in OTHERS} == before
     routes.set("ai_research", "anthropic", "claude-sonnet-5", "low")
-    assert config.task_route(TASK, route_store=routes).model == "claude-opus-5"
+    assert config.task_route(TASK, route_store=routes).model == "claude-opus-5-5"
     runtime = config_routes.runtime_config(store=credentials)
-    assert runtime[TASK]["model"] == "claude-opus-5"
+    assert runtime[TASK]["model"] == "claude-opus-5-5"
     assert runtime["ai_research"]["model"] == "claude-sonnet-5"
     reset = config_routes.delete_model_route(TASK, store=credentials)
     assert reset["deleted"] is True
@@ -128,7 +128,7 @@ def test_investigation_does_not_borrow_research_or_generic_model_defaults(stores
     _, routes = stores
     monkeypatch.setattr(config, "get_agent_config", lambda: config.AgentConfig(
         ai_research_provider="openai", ai_research_model="gpt-5.6-sol",
-        ai_research_effort="max", anthropic_model="claude-opus-5",
+        ai_research_effort="max", anthropic_model="claude-opus-5-5",
     ))
     monkeypatch.setenv("ARKSCOPE_AI_RESEARCH_MODEL", "gpt-5.6-terra")
     route = config.task_route(TASK, route_store=routes)

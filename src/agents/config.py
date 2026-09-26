@@ -45,12 +45,12 @@ class AgentConfig(BaseModel):
 
     # Anthropic models — default tier = everyday/cheaper, advanced = frontier
     anthropic_model: str = "claude-sonnet-5"
-    anthropic_model_advanced: str = "claude-opus-5"
+    anthropic_model_advanced: str = "claude-opus-5-5"
 
     # Per-task model routing (minimal; full Settings UI later). Empty string =
     # derive from the defaults in task_model(). Env (ARKSCOPE_CARD_*_MODEL) wins.
     card_synthesis_provider: str = "anthropic"
-    card_synthesis_model: str = "claude-opus-5"
+    card_synthesis_model: str = "claude-opus-5-5"
     card_synthesis_effort: str = "high"
     card_translation_provider: str = "anthropic"
     card_translation_model: str = "claude-sonnet-5"
@@ -399,7 +399,7 @@ def get_agent_config() -> AgentConfig:
 # chat/deep-research) route to cheaper/faster models, without a full Settings UI.
 _DEFAULT_TRANSLATION_MODEL = "claude-sonnet-5"
 _BUILTIN_TASK_DEFAULTS = {
-    "card_synthesis": ("anthropic", "claude-opus-5", "high"),
+    "card_synthesis": ("anthropic", "claude-opus-5-5", "high"),
     "card_translation": ("anthropic", "claude-sonnet-5", "medium"),
     "ai_research": ("openai", "gpt-5.6-luna", "xhigh"),
     "lifecycle_investigation": ("anthropic", "claude-sonnet-5", "high"),
@@ -536,7 +536,7 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
     if not provider:
         provider = "anthropic"
 
-    if not model:
+    if not model and not from_db:
         if task == "card_synthesis" and provider == "anthropic":
             model = config.anthropic_model_advanced
         elif task == "card_synthesis" and provider == "openai":
@@ -550,8 +550,11 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
         else:
             model = default_model_for(provider, task)
 
-    warning = None
-    if not is_valid_effort(provider, effort, model=model):
+    capability = capability_for(model)
+    if capability is not None and capability.task_route_status == "retired":
+        model = ""
+    warning = "model_required" if not model else None
+    if model and not is_valid_effort(provider, effort, model=model):
         warning = f"unsupported_effort:{effort}"
 
     return TaskRoute(
@@ -560,7 +563,7 @@ def task_route(task: TaskId, *, route_store=None) -> TaskRoute:
         model=model,
         effort=effort,
         source=source,
-        custom=capability_for(model) is None,
+        custom=bool(model) and capability_for(model) is None,
         warning=warning,
     )
 

@@ -372,6 +372,9 @@ class TestMacroSeriesRoute:
         fedfunds = next(item for item in result["items"] if item["series_id"] == "FEDFUNDS")
         assert fedfunds["observation_date"] == "2026-06-01"
         assert fedfunds["fetched_at"] == "2026-06-25T01:09:52Z"
+        assert fedfunds["frequency"] == "Monthly"
+        assert fedfunds["seasonal_adjustment"] is None
+        assert fedfunds["revision_strategy"] == "latest_only"
 
     def test_macro_series_readable_when_refresh_disabled(self):
         _seed_fred_snapshot()

@@ -39,12 +39,12 @@ class TestAgentConfig:
         assert config.openai_model == "gpt-5.6-luna"
         assert config.openai_model_advanced == "gpt-5.6-sol"
         assert config.anthropic_model == "claude-sonnet-5"
-        assert config.anthropic_model_advanced == "claude-opus-5"
+        assert config.anthropic_model_advanced == "claude-opus-5-5"
         assert (
             config.card_synthesis_provider,
             config.card_synthesis_model,
             config.card_synthesis_effort,
-        ) == ("anthropic", "claude-opus-5", "high")
+        ) == ("anthropic", "claude-opus-5-5", "high")
         assert (
             config.card_translation_provider,
             config.card_translation_model,

@@ -45,6 +45,7 @@ MODEL_REASON_CODES = frozenset(
         "model_not_in_registry",
         "model_not_visible",
         "model_output_limit_unknown",
+        "model_required",
         "model_retired",
         "model_task_unsupported",
         "protocol_incompatible",
@@ -164,16 +165,29 @@ _REGISTRY: tuple[ModelCapability, ...] = (
     ),
     ModelCapability(
         id="claude-opus-5", provider="anthropic", label="Claude Opus 5",
-        picker_visibility="default", thinking_mode="adaptive_default_on",
+        picker_visibility="pinned_only", thinking_mode="adaptive_default_on",
+        effort_options=_OPUS_EFFORTS,
+        supports_compaction=True, context_mode="ga_1m",
+        context_limit=1_000_000, max_output=128_000,
+        task_route_status="retired", in_routing_seed=False,
+        new_execution_allowed=False,
+        quality="frontier", speed="slow", cost_tier="high",
+        source_url="https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5",
+        verified_at="2026-08-28",
+        notes="Product-retired by user decision on 2026-09-26; historical provenance only.",
+    ),
+    ModelCapability(
+        id="claude-opus-5-5", provider="anthropic", label="Claude Opus 5.5",
+        picker_visibility="default", thinking_mode="adaptive_always_on",
         effort_options=_OPUS_EFFORTS,
         supports_compaction=True, context_mode="ga_1m",
         context_limit=1_000_000, max_output=128_000,
         task_route_status="current", in_routing_seed=True,
-        quality="frontier", speed="slow", cost_tier="high",
-        source_url="https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5",
-        verified_at="2026-08-28",
-        notes="Thinking default-on; effort ladder verified against "
-              "https://platform.claude.com/docs/en/build-with-claude/effort.",
+        quality="frontier", speed="medium", cost_tier="high",
+        source_url="https://platform.claude.com/docs/en/models/opus-5-5/migration-guide",
+        verified_at="2026-09-26",
+        notes="Adaptive thinking always on; no disabled/manual thinking or forced "
+              "tool choice. Use auto plus strict tools. Default effort medium.",
     ),
     ModelCapability(
         id="claude-opus-4-8", provider="anthropic", label="Claude Opus 4.8",
@@ -269,6 +283,28 @@ _REGISTRY: tuple[ModelCapability, ...] = (
         verified_at="2026-09-08",
         notes="Tool calls require Responses API. No none/minimal effort or "
               "sampling parameters. Existing task defaults remain unchanged.",
+    ),
+    ModelCapability(
+        id="gpt-6-sol", provider="openai", label="GPT-6 Sol",
+        picker_visibility="default", thinking_mode="none",
+        effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
+        context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        task_route_status="current", in_routing_seed=True,
+        quality="frontier", speed="medium", cost_tier="medium",
+        source_url="https://developers.openai.com/api/docs/models/gpt-6-sol",
+        verified_at="2026-09-26",
+        notes="Tool calls with reasoning use Responses API. Existing task defaults remain unchanged.",
+    ),
+    ModelCapability(
+        id="gpt-6-luna", provider="openai", label="GPT-6 Luna",
+        picker_visibility="default", thinking_mode="none",
+        effort_options=_OPENAI_56_EFFORTS, supports_compaction=False,
+        context_mode="standard", context_limit=1_050_000, max_output=128_000,
+        task_route_status="current", in_routing_seed=True,
+        quality="fast", speed="fast", cost_tier="low",
+        source_url="https://developers.openai.com/api/docs/models/gpt-6-luna",
+        verified_at="2026-09-26",
+        notes="Tool calls with reasoning use Responses API. Existing task defaults remain unchanged.",
     ),
     ModelCapability(
         id="gpt-5.6-sol", provider="openai", label="GPT-5.6 Sol",
@@ -435,6 +471,8 @@ def model_execution_admission_detail(
     plan_type: str | None = None,
 ) -> dict[str, str] | None:
     """Return a typed block when a model cannot execute in this context."""
+    if not (model or "").strip():
+        return {"code": "model_required", "field": "model"}
     capability = capability_for(model)
     if capability is None:
         return None

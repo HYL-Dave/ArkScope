@@ -11,6 +11,7 @@ function clone(value) {
 }
 
 function responseFor(message) {
+  if (message.action === "manual_fetch") return clone(fixture.manualResult || {fetched:0,failed:0});
   if (message.action === 'enable_sa_updates_here' && fixture.activationError) return {status:'error',error_code:fixture.activationError,activation_step:'configure'};
   if (message.action === 'preview_company_refresh') {
     const count=(message.config?.target_mode==='watchlist' ? (fixture.watchlistCount || 180) : message.config?.tickers?.length || 0)
@@ -309,6 +310,8 @@ function snapshot(document, sent) {
     recoveryStatus: text(recoveryStatus),
     recoveryStatusRole: recoveryStatus?.getAttribute("role") || null,
     lastRunStatus: text(document.getElementById("lastRunStatus")),
+    progress: text(document.getElementById("progress")),
+    progressColor: document.getElementById("progress")?.style.color,
     companyCaptureStatus: text(document.getElementById("companyCaptureStatus")),
     companyCaptureDisabled: document.getElementById("companyCaptureBtn")?.disabled,
     companyRefreshStatus: text(document.getElementById("companyRefreshStatus")),
@@ -394,6 +397,10 @@ async function runPopup() {
     } else if (scenario === 'recover_acquisition') {
       dom.window.document.getElementById('companyRecoveryConfirmed').checked = fixture.confirmStopped === true;
       dom.window.document.getElementById('companyCollectorRecover').click();
+      await settle();
+    } else if (scenario === "click_manual_fetch") {
+      dom.window.document.getElementById("manualInput").value = "TEST entry 2026-07-15 https://seekingalpha.com/alpha-picks/articles/6316639-test";
+      dom.window.document.getElementById("manualBtn").click();
       await settle();
     } else if (scenario === 'click_alpha_refresh' || scenario === 'click_news_refresh') {
       dom.window.document.getElementById(scenario === 'click_alpha_refresh' ? 'quickBtn' : 'marketNewsBtn').click();

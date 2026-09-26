@@ -62,14 +62,14 @@ def _anthropic_fixed_task_tool(
         "input_schema": schema,
     }
     capability = capability_for(model)
-    if capability is not None and capability.id == "claude-fable-5-1":
+    if capability is not None and capability.thinking_mode == "adaptive_always_on":
         tool["strict"] = True
     return tool
 
 
 def _anthropic_fixed_task_tool_choice(model: str, name: str) -> dict[str, str]:
     capability = capability_for(model)
-    if capability is not None and capability.id == "claude-fable-5-1":
+    if capability is not None and capability.thinking_mode == "adaptive_always_on":
         return {"type": "auto"}
     return {"type": "tool", "name": name}
 

@@ -135,7 +135,6 @@ export function DataStorageSection({
 
   const exists = status?.exists ?? false;
   const pr = status?.prices;
-  const nw = status?.news;
   const fd = status?.fundamentals;
   const fc = status?.financial_cache;
   const errorPresentation = err ? settingsErrorPresentation(err, t, commonT) : null;
@@ -147,9 +146,8 @@ export function DataStorageSection({
           <h2>{t(($) => $.dataStorage.title)}</h2>
           <p className="muted tiny">{t(($) => $.dataStorage.description)}</p>
         </div>
-        <button className="btn-ghost" onClick={() => void load(true)}>
-          ↻ {t(($) => $.actions.refreshStatus)}
-        </button>
+        <IconButton label={t(($) => $.actions.refreshStatus)} icon={<RefreshCw size={16} />}
+          onClick={() => void load(true)} />
       </div>
 
       {errorPresentation ? (
@@ -162,7 +160,8 @@ export function DataStorageSection({
       {!status ? (
         <p className="muted">{t(($) => $.dataStorage.loading)}</p>
       ) : (
-        <div className="settings-panel">
+        <section data-storage-summary="prices" aria-label={t(($) => $.dataStorage.storedPriceCoverage)}>
+          <h3>{t(($) => $.dataStorage.storedPriceCoverage)}</h3>
           <dl className="ds-kv">
             <dt>{t(($) => $.dataStorage.title)}</dt>
             <dd>{exists
@@ -174,32 +173,33 @@ export function DataStorageSection({
               count: pr!.ticker_count,
               timestamp: pr!.latest_datetime ?? "—",
             }) : "—"}</dd>
-            <dt>{t(($) => $.dataStorage.labels.news)}</dt>
-            <dd>{exists ? t(($) => $.dataStorage.summary.news, {
-              value: nw!.row_count.toLocaleString(),
-              count: nw!.source_count,
-              timestamp: nw!.latest_published ?? "—",
-            }) : "—"}</dd>
-            <dt>{t(($) => $.dataStorage.labels.fundamentals)}</dt>
-            <dd>{exists ? t(($) => $.dataStorage.summary.fundamentals, {
-              value: fd!.row_count.toLocaleString(),
-              count: fd!.ticker_count,
-              timestamp: fd!.latest_date ?? "—",
-            }) : "—"}</dd>
-            <dt>{t(($) => $.dataStorage.labels.financialCache)}</dt>
-            <dd>
-              {exists
-                ? t(($) => $.dataStorage.summary.financialCache, {
-                    value: fc!.row_count.toLocaleString(),
-                    count: fc!.valid_count,
-                    expiredCount: fc!.expired_count,
-                    timestamp: formatSystemTimestamp(fc!.latest_fetched_at),
-                  })
-                : "—"}
-            </dd>
           </dl>
-        </div>
+        </section>
       )}
+      {status ? <details data-cache-diagnostics>
+        <summary>{t(($) => $.dataStorage.cacheDiagnostics)}</summary>
+        <p className="muted tiny">{t(($) => $.dataStorage.cacheScope)}</p>
+        <dl className="ds-kv">
+          <dt>{t(($) => $.dataStorage.labels.fundamentals)}</dt>
+          <dd>{exists ? t(($) => $.dataStorage.summary.fundamentals, {
+            value: fd!.row_count.toLocaleString(),
+            count: fd!.ticker_count,
+            timestamp: fd!.latest_date ?? "—",
+          }) : "—"}</dd>
+          <dt>{t(($) => $.dataStorage.labels.financialCache)}</dt>
+          <dd>
+            {exists
+              ? t(($) => $.dataStorage.summary.financialCache, {
+                  value: fc!.row_count.toLocaleString(),
+                  count: fc!.valid_count,
+                  expiredCount: fc!.expired_count,
+                  timestamp: formatSystemTimestamp(fc!.latest_fetched_at),
+                })
+              : "—"}
+          </dd>
+        </dl>
+        <p className="muted tiny">{t(($) => $.dataStorage.secProjectionScope)}</p>
+      </details> : null}
 
       <SettingsSubsectionAnchor id="security_lifecycle">
         <SecurityLifecyclePanel

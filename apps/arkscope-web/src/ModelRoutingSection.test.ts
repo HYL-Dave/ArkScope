@@ -37,7 +37,7 @@ afterEach(() => {
 
 const CURRENT_MODEL_IDS = [
   "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-  "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+  "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
 ] as const;
 const TASK_EFFORT_IDS = ["low", "medium", "high", "xhigh", "max"];
 const MODELS: ModelOption[] = CURRENT_MODEL_IDS.map((id) => ({
@@ -67,7 +67,7 @@ function catalog(): ModelCatalog {
     providers: ["anthropic", "openai"],
     tasks: [
       { id: "ai_research", label: "AI 研究", description: "", default_provider: "openai", recommended_model: "gpt-5.6-luna" },
-      { id: "card_translation", label: "翻譯", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5" },
+      { id: "card_translation", label: "翻譯", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5-5" },
     ],
     models: MODELS,
     effort_options: {
@@ -78,7 +78,7 @@ function catalog(): ModelCatalog {
     retired_model_ids: ["gpt-5.4-mini", "claude-opus-4-8"],
     routes: {
       ai_research: route({ task: "ai_research", source: "db" }),
-      card_translation: route({ task: "card_translation", provider: "anthropic", model: "claude-opus-5", effort: "low", source: "profile" }),
+      card_translation: route({ task: "card_translation", provider: "anthropic", model: "claude-opus-5-5", effort: "low", source: "profile" }),
       card_synthesis: route({ task: "card_synthesis", source: "default" }),
     },
     credentials: { anthropic: [], openai: [] },
@@ -107,7 +107,7 @@ function render(
       catalog: cat,
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
-        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5-5", effort: "low", custom: false },
         card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
       modelsByProvider,
@@ -338,7 +338,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     const cat = catalog();
     cat.tasks = [
       ...cat.tasks,
-      { id: "card_synthesis", label: "卡片合成", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5" },
+      { id: "card_synthesis", label: "卡片合成", description: "", default_provider: "anthropic", recommended_model: "claude-opus-5-5" },
     ];
     cat.credentials = {
       openai: [cred("openai", "local:7", "chatgpt_oauth", "ChatGPT subscription")],
@@ -367,7 +367,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       discovered_at: null,
       models: [
         entry("claude-sonnet-5", "seed", true, null, "adaptive_default_on", null),
-        entry("claude-opus-5", "advanced", true, null, "adaptive_opt_in", null),
+        entry("claude-opus-5-5", "advanced", true, null, "adaptive_opt_in", null),
       ],
     };
     const taskBlock = (current: "openai" | "anthropic") => ({
@@ -474,7 +474,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), catalogV2(), onDraft, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "high", custom: false },
-        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5-5", effort: "low", custom: false },
         card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
@@ -519,7 +519,7 @@ describe("ModelRoutingSection provider-first UX", () => {
       .find((option) => option.value === "claude-sonnet-5")?.textContent)
       .not.toContain("未驗證");
     expect(Array.from(translationSelect.options)
-      .find((option) => option.value === "claude-opus-5")?.textContent)
+      .find((option) => option.value === "claude-opus-5-5")?.textContent)
       .toContain("進階");
   });
 
@@ -537,14 +537,15 @@ describe("ModelRoutingSection provider-first UX", () => {
 
       const translation = translationCard();
       const model = labelledControl(translation, "model") as HTMLSelectElement;
-      const spark = Array.from(model.options)
-        .find((option) => option.value === "gpt-5.3-codex-spark")!;
-      expect(spark.disabled).toBe(true);
-      expect(spark.textContent).toContain("此模型已退出新執行");
+      expect(Array.from(model.options).map((option) => option.value))
+        .not.toContain("gpt-5.3-codex-spark");
+      expect(model.value).toBe("");
+      expect(translation.textContent).not.toContain("gpt-5.3-codex-spark");
+      expect(translation.textContent).not.toContain("此模型已退出新執行");
       expect(translation.textContent?.toLowerCase()).toContain(`方案：${plan}`);
       expect(translation.textContent)
         .not.toContain("已偵測到 Spark 額度");
-      expect(translation.textContent).toContain("不可選：");
+      expect(buttonByText(translation, "實際測試")?.disabled).toBe(true);
       expect(buttonByText(translation, "重新驗證列表")).toBeTruthy();
     },
   );
@@ -601,7 +602,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), catalogV2(), undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: true },
-        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5-5", effort: "low", custom: false },
         card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
@@ -628,7 +629,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), catalogV2(), undefined, {
       draft: {
         ai_research: { provider: "anthropic", model: "claude-custom", effort: "low", custom: true },
-        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5-5", effort: "low", custom: false },
         card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
@@ -671,7 +672,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "anthropic", model: "claude-sonnet-5", effort: "low", custom: false },
-        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5-5", effort: "low", custom: false },
         card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
@@ -762,7 +763,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.6-luna", effort: "default", custom: false },
-        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5-5", effort: "low", custom: false },
         card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
@@ -775,7 +776,7 @@ describe("ModelRoutingSection provider-first UX", () => {
     expect(buttonByText(researchCard(), "實際測試").disabled).toBe(true);
   });
 
-  it("retains a retired model as read-only provenance while excluding it from discovered choices", () => {
+  it("projects a retired selection as unset without resurrecting it in discovered choices", () => {
     const cat = catalogV2();
     cat.effective!.tasks.ai_research!.providers!.openai!.models.push(
       entry("gpt-5.4-mini", "visible", true, null),
@@ -783,15 +784,16 @@ describe("ModelRoutingSection provider-first UX", () => {
     render(vi.fn(), cat, undefined, {
       draft: {
         ai_research: { provider: "openai", model: "gpt-5.4-mini", effort: "low", custom: false },
-        card_translation: { provider: "anthropic", model: "claude-opus-5", effort: "low", custom: false },
+        card_translation: { provider: "anthropic", model: "claude-opus-5-5", effort: "low", custom: false },
         card_synthesis: { provider: "openai", model: "gpt-5.6-luna", effort: "low", custom: false },
       },
     });
     const model = labelledControl(researchCard(), "model") as HTMLSelectElement;
-    expect(model.value).toBe("gpt-5.4-mini");
+    expect(model.value).toBe("");
     expect(model.disabled).toBe(false);
-    expect(model.selectedOptions[0].disabled).toBe(true);
-    expect(researchCard().textContent).toContain("已淘汰");
+    expect(Array.from(model.options).map(option => option.value)).not.toContain("gpt-5.4-mini");
+    expect(researchCard().textContent).toContain("尚未選擇模型");
+    expect(researchCard().textContent).not.toContain("gpt-5.4-mini");
     expect(buttonByText(researchCard(), "實際測試").disabled).toBe(true);
 
     disposeRender();

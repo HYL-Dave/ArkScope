@@ -34,7 +34,7 @@ const controls = vi.hoisted(() => ({
 
 const CURRENT_MODEL_IDS = [
   "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
-  "claude-fable-5-1", "claude-opus-5", "claude-sonnet-5",
+  "claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5",
 ] as const;
 const TASK_EFFORT_IDS = ["low", "medium", "high", "xhigh", "max"];
 
@@ -105,7 +105,7 @@ const catalog: ModelCatalog = {
     { id: "gpt-5.4-mini", provider: "openai", task_route_status: "retired", aliases: [] },
     { id: "claude-fable-5-1", provider: "anthropic", task_route_status: "current", aliases: [] },
     { id: "claude-fable-5", provider: "anthropic", task_route_status: "retired", aliases: [] },
-    { id: "claude-opus-5", provider: "anthropic", task_route_status: "current", aliases: [] },
+    { id: "claude-opus-5-5", provider: "anthropic", task_route_status: "current", aliases: [] },
     { id: "claude-sonnet-5", provider: "anthropic", task_route_status: "current", aliases: [] },
     { id: "claude-opus-4-8", provider: "anthropic", task_route_status: "retired", aliases: [] },
   ],
@@ -547,7 +547,7 @@ describe("Settings model route save gate", () => {
     }));
   });
 
-  it("keeps retired provenance selected while enabling same-provider recovery", async () => {
+  it("unsets a retired selection while enabling same-provider recovery", async () => {
     const retired = "gpt-5.4-mini-2026-08-01";
     controls.catalogOverride = {
       ...catalog,
@@ -581,8 +581,8 @@ describe("Settings model route save gate", () => {
     const effortSelect = route.querySelector<HTMLSelectElement>(
       '[aria-labelledby="model-route-card_synthesis-task-label model-route-card_synthesis-effort-label"]',
     )!;
-    expect(modelSelect.value).toBe(retired);
-    expect(modelSelect.selectedOptions[0].disabled).toBe(true);
+    expect(modelSelect.value).toBe("");
+    expect(Array.from(modelSelect.options).map(option => option.value)).not.toContain(retired);
     expect(modelSelect.disabled).toBe(false);
 
     const selectSetter = Object.getOwnPropertyDescriptor(
@@ -806,14 +806,14 @@ describe("Settings model route save gate", () => {
     expect(save.disabled).toBe(true);
     const blocked = host.querySelector("#route-save-blocked")!;
     expect(blocked.textContent).toBe(
-      "本次變更尚未儲存：請先到 Provider 登入與憑證完成 AI 研究所選 provider 的登入。",
+      "尚未選擇模型: AI 研究",
     );
 
     await act(async () => { await i18n.changeLanguage("en"); });
 
     expect(host.querySelector("#route-save-blocked")).toBe(blocked);
     expect(blocked.textContent).toBe(
-      "These changes were not saved. Complete the selected provider sign-in for AI Research under Provider Sign-in and Credentials first.",
+      "No model selected: AI Research",
     );
     expect(save.disabled).toBe(true);
   });
@@ -899,7 +899,7 @@ describe("Settings model route save gate", () => {
     const runtime = {
       anthropic: {
         model: "claude-sonnet-5",
-        model_advanced: "claude-opus-5",
+        model_advanced: "claude-opus-5-5",
         effort: null,
         thinking: false,
         key_set: true,
@@ -1130,16 +1130,16 @@ describe("Settings model route save gate", () => {
     });
     await click(save);
 
-    const validationOutcome = host.querySelector(".error-text")!;
+    const validationOutcome = host.querySelector("#route-save-blocked")!;
     expect(validationOutcome.textContent).toBe(
-      "儲存前，請為 AI 研究選擇或輸入模型。",
+      "尚未選擇模型: AI 研究",
     );
     expect(controls.saveModelRoutes).not.toHaveBeenCalled();
 
     await act(async () => { await i18n.changeLanguage("en"); });
-    expect(host.querySelector(".error-text")).toBe(validationOutcome);
+    expect(host.querySelector("#route-save-blocked")).toBe(validationOutcome);
     expect(validationOutcome.textContent).toBe(
-      "Select or enter a model for AI Research before saving.",
+      "No model selected: AI Research",
     );
 
     await act(async () => {
@@ -1240,7 +1240,7 @@ describe("Settings model route save gate", () => {
       .find((button) => button.textContent?.trim() === "Anthropic")!;
     expect(restoredAnthropic.getAttribute("aria-pressed")).toBe("true");
     expect(host.textContent).toContain(
-      "本次變更尚未儲存：請先到 Provider 登入與憑證完成 AI 研究所選 provider 的登入。",
+      "尚未選擇模型: AI 研究",
     );
   });
 
@@ -1606,7 +1606,7 @@ describe("Settings model route save gate", () => {
     const runtime = {
       anthropic: {
         model: "claude-sonnet-5",
-        model_advanced: "claude-opus-5",
+        model_advanced: "claude-opus-5-5",
         effort: null,
         thinking: false,
         key_set: true,

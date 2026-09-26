@@ -20,7 +20,7 @@ from tests.test_sec_research_tool_service import doc_tool
 from tests.test_task_runtime_binding import add_key, isolated, response_json
 
 
-PARENTS = {"anthropic": "claude-opus-5", "openai": "gpt-5.6-luna"}
+PARENTS = {"anthropic": "claude-opus-5-5", "openai": "gpt-5.6-luna"}
 CHILDREN = {"anthropic": "claude-sonnet-4-6", "openai": "gpt-5.6-sol"}
 CALLS = {
     "get_sec_financial_facts": dict(issuer=CIK, freshness="stored", concepts=["us-gaap:Revenues"]),
