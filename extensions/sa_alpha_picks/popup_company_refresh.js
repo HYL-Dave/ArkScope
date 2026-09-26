@@ -3,7 +3,7 @@
   var $ = function(id) {return document.getElementById(id);};
   var form=$("companyRefreshForm"), output=$("companyRefreshStatus"), target=$("companyRefreshTargetMode"), ticker=$("companyRefreshTickers");
   var dirty=false, policyDirty=false, busy=false, revision=0, readRevision=0, state=null, expectedGeneration=null;
-  var liveState=null, reloadPending=false;
+  var liveState=null, reloadPending=false, actionError=null;
   function lockForm(value) {
     busy=value;
     form.querySelectorAll('input, select, button').forEach(function(input){
@@ -103,10 +103,16 @@
     $("saAcquisitionResume").hidden=!(reason || caps.length);
     $("saAcquisitionResume").disabled=busy || !(control && control.is_owner) || !!control.active;
   }
-  function render(result) {
+  function render(result, fromRead) {
+    var valid=result && result.status === "ok" && result.config;
+    var error=(result && result.activation_step ? result.activation_step+": " : "")
+      +(result && result.error_code || "sa_company_schedule_unavailable");
+    if(!fromRead)actionError=valid ? null : error;
     output.replaceChildren();
-    if (!result || result.status !== "ok" || !result.config) {
-      line(output,(result && result.activation_step ? result.activation_step+": " : "")+(result && result.error_code || "sa_company_schedule_unavailable"));return;
+    if(actionError)line(output,"Last action: "+actionError);
+    if (!valid) {
+      if(fromRead)line(output,error);
+      return;
     }
     var firstRender=!state;
     state=result;
@@ -183,7 +189,7 @@
     if(ticket!==readRevision)return;
     if(busy) {reloadPending=true;return;}
     if(result.status!=="ok") {liveState=null;renderLifecycle();$("saAcquisitionResume").disabled=true;}
-    render(result);await preview();
+    render(result,true);await preview();
   }
   form.addEventListener("input",function(event){
     var input=event.target;
@@ -231,7 +237,7 @@
     lockForm(true);
     var result=await send("recover_sa_acquisition",{expected_generation:state.collector.generation,confirm_stopped:true});
     lockForm(false);
-    if(result.status==="ok") {$("companyRecoveryConfirmed").checked=false;await reload();}
+    if(result.status==="ok") {actionError=null;$("companyRecoveryConfirmed").checked=false;await reload();}
     else render(result);
   });
   $("saAcquisitionReviewRecovery").addEventListener("click",function(){
@@ -243,7 +249,7 @@
     var caps=Object.keys(state.collector.capability_pauses || {});
     render(await send("resume_sa_acquisition",{expected_generation:state.collector.generation,confirm_handled:true,capability:caps[0]}));
   });
-  $("companyReloadSettings").addEventListener("click",function(){dirty=false;policyDirty=false;reload();});
+  $("companyReloadSettings").addEventListener("click",function(){dirty=false;policyDirty=false;actionError=null;reload();});
   chrome.storage.onChanged.addListener(function(changes,area){
     // Persisted runtime is a wake-up signal, never evidence of liveness.
     if(area === "local" && (changes.companyFinancialRefresh || changes.saAcquisitionStatus
