@@ -673,6 +673,22 @@ This was intentionally aggressive on P0 to clear the foundation block; P1 items 
 > When adding an entry, do NOT scroll to the bottom; insert immediately
 > below this note.
 
+- **2026-09-27 (INDEPENDENT DELIVERY AND SHORT SHARED CUTOVER):** The operator
+  authorizes local merge of the verified Settings/SA/model batch and asks future
+  independent features to remain independently reviewable and recoverable.
+  Complete each feature branch through its own implementation and verification;
+  several completed branches may share one announced stop-write/deployment
+  window. A missing manual acceptance blocks only the dependent capability,
+  not unrelated completed work. Keep commits and tests aligned with feature
+  ownership, record cross-feature dependencies, and include data/artifact
+  recovery when code-only rollback is insufficient. Do not promise arbitrary
+  cherry-picks or restore an old whole-profile backup over newer unrelated data.
+  This cutover retains the already verified runtime tree rather than rewriting
+  its history. Restore the intended collection switches promptly after the
+  artifact reload and distinguish observed automatic completion from fixture
+  verification. New-model account availability requires a separate deliberate
+  selection/check; adding catalog entries does not prove entitlement.
+
 - **2026-09-26 (FINISH ACTIVE REPAIRS WITHOUT DISTURBING COLLECTION):** The
   operator approves continuous implementation of the Settings/source/storage/
   macro/model defects and saved partial-comment status. Work stays isolated
