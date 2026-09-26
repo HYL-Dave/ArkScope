@@ -85,8 +85,13 @@ def read_capture(ticker, statement, view, currency, *, observation_id=None, db_p
             conn.execute("PRAGMA query_only=ON")
             if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sa_company_observations'").fetchone():
                 return None
-            sql = "SELECT * FROM sa_company_observations WHERE ticker=? AND statement=? AND period_view=? AND currency=?"
-            parameters = [ticker, statement, view, currency]
+            ticker_clause = "ticker=?"
+            parameters = [ticker]
+            if observation_id is not None and ticker == "BRK.B":
+                ticker_clause = "ticker IN (?,?)"
+                parameters.append("BRK-B")
+            sql = f"SELECT * FROM sa_company_observations WHERE {ticker_clause} AND statement=? AND period_view=? AND currency=?"
+            parameters.extend([statement, view, currency])
             if observation_id is not None:
                 sql += " AND observation_id=?"
                 parameters.append(observation_id)
@@ -96,7 +101,7 @@ def read_capture(ticker, statement, view, currency, *, observation_id=None, db_p
             body = json.loads(row["body_json"])
             require(digest(body) == row["observation_id"], "sa_company_observation_invalid")
             require((body["ticker"], body["statement"], body["view"], body["currency"])
-                    == (ticker, statement, view, currency), "sa_company_observation_invalid")
+                    == (row["ticker"], statement, view, currency), "sa_company_observation_invalid")
             return {"observation_id": row["observation_id"], "first_captured_at": row["captured_at"],
                     "last_captured_at": row["last_captured_at"], "received_at": row["received_at"], **body}
     except (OSError, sqlite3.Error) as exc:

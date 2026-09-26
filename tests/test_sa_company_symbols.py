@@ -3,6 +3,7 @@
 import asyncio
 from copy import deepcopy
 from hashlib import sha256
+import json
 import sqlite3
 
 import pytest
@@ -12,6 +13,8 @@ from src.sa.company_store import read_capture, save_capture
 from src.tools.sa_company_tools import get_sa_company_data
 from tests.test_sa_company_data import capture, local
 from tests.test_sa_company_research import research_capture
+from tests.sa_acquisition_helpers import AUTHORITY
+from tests.test_sa_extension_popup import _run_background_probe
 
 
 PAGES = [
@@ -34,9 +37,9 @@ def no_provider_requests(monkeypatch):
     monkeypatch.setattr("requests.sessions.Session.request", forbidden)
 
 
-def provider_capture(dataset, path, view):
+def provider_capture(dataset, path, view, ticker="BRK.B"):
     if dataset == "financials":
-        payload = capture(path, ticker="BRK.B")
+        payload = capture(path, ticker=ticker)
         if view == "quarterly":
             payload["controls"]["period"] = "Quarterly"
             del payload["headers"][2]
@@ -44,11 +47,11 @@ def provider_capture(dataset, path, view):
                 del row["values"][1]
         return payload
     payload = research_capture(dataset)
-    payload.update(ticker="BRK.B", source_url=f"https://seekingalpha.com/symbol/BRK.B/{path}",
-                   title=payload["title"].replace("AMD", "BRK.B"), heading="BRK.B - Example")
+    payload.update(ticker=ticker, source_url=f"https://seekingalpha.com/symbol/{ticker}/{path}",
+                   title=payload["title"].replace("AMD", ticker), heading=f"{ticker} - Example")
     for table in payload["tables"]:
         for header in table["headers"]:
-            header.update(id=header["id"].replace("AMD", "BRK.B"), label=header["label"].replace("AMD", "BRK.B"))
+            header.update(id=header["id"].replace("AMD", ticker), label=header["label"].replace("AMD", ticker))
     return payload
 
 
@@ -142,3 +145,58 @@ def test_alias_cannot_reopen_a_different_company_observation(local):
     assert read_capture("BRK B", "income_statement", "annual", "USD", observation_id=receipt["observation_id"], db_path=local[1]) is None
     result = get_sa_company_data(local[0], "BRK B", observation_id=receipt["observation_id"])
     assert result["error_code"] == "sa_company_capture_missing"
+
+
+@pytest.mark.parametrize("dataset,path,view,currency", [PAGES[0], *PAGES[6:]])
+@pytest.mark.parametrize("ticker", ["BRK B", "BRK.B", "BRK-B"])
+def test_pinned_legacy_source_spelling_remains_reopenable(local, dataset, path, view, currency, ticker):
+    payload = provider_capture(dataset, path, view, ticker="BRK-B")
+    receipt = save_capture(payload)
+    before = sha256(local[1].read_bytes()).hexdigest()
+    statement = path.replace("-", "_") if dataset == "financials" else dataset
+    result = read_capture(ticker, statement, view, currency, observation_id=receipt["observation_id"], db_path=local[1])
+    assert result is not None
+    kwargs = {"statement": statement, "view": view} if dataset == "financials" else {"dataset": dataset}
+    tool = get_sa_company_data(local[0], ticker, observation_id=receipt["observation_id"], **kwargs)
+    assert tool["status"] == "ok"
+    assert result["ticker"] == tool["ticker"] == "BRK-B"
+    assert result["source_url"] == tool["source_url"] == payload["source_url"]
+    assert result["observation_id"] == tool["observation_id"] == receipt["observation_id"]
+    assert sha256(local[1].read_bytes()).hexdigest() == before
+
+
+def test_alias_pin_still_rejects_mismatched_row_and_body_identity(local):
+    receipt = save_capture(provider_capture(*PAGES[0][:3], ticker="BRK-B"))
+    with sqlite3.connect(local[1]) as conn:
+        conn.execute("UPDATE sa_company_observations SET ticker='BRK.B'")
+    with pytest.raises(CompanyDataFailure, match="sa_company_observation_invalid"):
+        read_capture("BRK B", "income_statement", "annual", "USD", observation_id=receipt["observation_id"], db_path=local[1])
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_manual_alias_queue_accepts_canonical_native_reuse_once(legacy):
+    result = _run_background_probe(AUTHORITY + "const legacy = " + json.dumps(legacy) + ";" + r"""
+        const requests = [];
+        chrome.alarms.create = async () => {};
+        chrome.tabs.create = async () => {throw new Error('A reused capture must not open a page');};
+        chrome.runtime.sendNativeMessage = (_host, message, callback) => callback(
+          message.action === 'sa_acquisition_control' ? admittedState : {status:'ok',persisted:true});
+        const config = {enabled:false,target_mode:'manual',tickers:['BRK-B','BRK.B'],
+          statements:['income_statement'],views:['annual'],interval_days:7};
+        if (legacy) await chrome.storage.local.set({companyFinancialRefresh:{config,records:{}}});
+        else await companyFinancialRefresh.configure(config);
+        authorityReply = async (operation, request) => {
+          if (operation !== 'begin_task') return null;
+          requests.push(request.scope);
+          return {status:'reused',ticker:'BRK.B',statement:'income_statement',view:'annual',
+            currency:'USD',observation_id:'b'.repeat(64),last_success_at:new Date(Date.now()-1000).toISOString()};
+        };
+        const state = await companyFinancialRefresh.run({force:false});
+        await companyFinancialRefresh.cancelQueue();
+        return {requests, state};
+    """)
+    assert len(result["state"]["scopes"]) == 1
+    assert result["requests"] == [{"ticker": "BRK.B", "statement": "income_statement", "view": "annual"}]
+    assert result["state"]["pending_count"] == 0
+    assert result["state"]["scopes"][0]["observation_id"] == "b" * 64
+    assert not result["state"]["scopes"][0].get("last_error")

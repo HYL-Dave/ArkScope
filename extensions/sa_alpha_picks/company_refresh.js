@@ -7,6 +7,10 @@
   var STATEMENTS = ["income_statement", "balance_sheet", "cash_flow_statement"];
   var VIEWS = ["annual", "quarterly"];
 
+  function providerSymbol(ticker) {
+    return ticker === "BRK B" || ticker === "BRK-B" ? "BRK.B" : ticker;
+  }
+
   function defaults(value) {
     return Object.assign({},value,{interval_days_by_view:value.interval_days_by_view || {
       annual:value.interval_days || 7,quarterly:value.interval_days || 7},
@@ -30,7 +34,10 @@
     }
     var targetMode = value.target_mode || "manual";
     if (!["manual", "watchlist"].includes(targetMode)) fail();
-    var tickers = targetMode === "watchlist" ? [] : list(value.tickers, function (item) { return /^[A-Z][A-Z0-9.-]{0,19}$/.test(item); });
+    var tickers = targetMode === "watchlist" ? [] : list(value.tickers, function (item) {
+      return /^[A-Z][A-Z0-9.-]{0,19}$/.test(providerSymbol(item));
+    });
+    tickers = Array.from(new Set(tickers.map(providerSymbol)));
     return { enabled: value.enabled, target_mode: targetMode, interval_days: value.interval_days || 7,
       interval_days_by_view:{annual:value.interval_days_by_view.annual,quarterly:value.interval_days_by_view.quarterly},
       financial_gap_seconds:value.financial_gap_seconds,tickers: tickers,
@@ -38,7 +45,14 @@
       views: list(value.views, function (item) { return VIEWS.includes(item); }) };
   }
   function scopes(config) {
-    return config.tickers.flatMap(function (ticker) {
+    var seen = new Set();
+    // Keep legacy local record/queue keys; requests are normalized at admission.
+    return config.tickers.filter(function (ticker) {
+      var symbol = providerSymbol(ticker);
+      if (seen.has(symbol)) return false;
+      seen.add(symbol);
+      return true;
+    }).flatMap(function (ticker) {
       return config.statements.flatMap(function (statement) {
         return config.views.map(function (view) { return {ticker: ticker, statement: statement, view: view}; });
       });
@@ -386,5 +400,5 @@
     async function resume() { await mutate(function(state){state.paused_reason=null;});return status(); }
     return {configure:configure, status:status, preview:preview, run:run, syncAlarm:syncAlarm, noteSuccess:noteSuccess, cancelQueue:cancelQueue,resume:resume};
   }
-  root.SACompanyRefresh = {create:create, alarm:ALARM,normalize:normalize};
+  root.SACompanyRefresh = {create:create, alarm:ALARM,normalize:normalize,providerSymbol:providerSymbol};
 })(globalThis);

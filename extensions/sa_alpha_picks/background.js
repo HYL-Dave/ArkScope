@@ -786,6 +786,7 @@ const companyFinancialRefresh = SACompanyRefresh.create({
   setTimer:setTimeout,clearTimer:clearTimeout,
   resolveWatchlist:function () { return sendNativeMessage2({action:"get_company_watchlist"}); },
   runScope: function (scope, mode, admitted, observeFailure, intervalDays, requestedAt, force) {
+    scope = Object.assign({}, scope, {ticker:SACompanyRefresh.providerSymbol(scope.ticker)});
     return enqueueSaSyncJob({displayName: scope.ticker + " " + scope.view + " financials",
       operation: "company_financial_capture", mode: mode,eligible:admitted,
       acquisition:{scope:scope,force:force === true,interval_days:intervalDays,requested_at:requestedAt || null}}, function (diagnostics) {
