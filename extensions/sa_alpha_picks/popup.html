@@ -443,14 +443,15 @@
           <summary>Acquisition limits and recovery</summary>
           <label>Financial gap (seconds) <input id="companyFinancialGap" type="number" min="0.001" max="2147483" step="any" value="60" list="companyGapChoices"></label>
           <datalist id="companyGapChoices"><option value="15"><option value="30"><option value="60"></datalist>
-          <div class="company-budget">
+          <label><input id="companyBudgetEnabled" type="checkbox">Limit pages per hour / day</label>
+          <div class="company-budget" id="companyPageBudget">
             <label>Total pages / hour<input type="number" name="hour_limit" min="1" step="1"></label>
             <label>Total pages / day<input type="number" name="day_limit" min="1" step="1"></label>
             <label>Routine reserve / hour<input type="number" name="hour_reserve" min="0" step="1"></label>
             <label>Routine reserve / day<input type="number" name="day_reserve" min="0" step="1"></label>
           </div>
           <div id="companyRoutineIntent"></div>
-          <label><input id="companyActivationConfirmed" type="checkbox">Other automated installations stopped or updated; accept these local limits.</label>
+          <label><input id="companyActivationConfirmed" type="checkbox">Other automated installations stopped or updated; use these acquisition settings.</label>
           <label><input id="companyRecoveryConfirmed" type="checkbox">Previous capture stopped; its acquisition tabs are closed.</label>
           <button class="action-button" id="companyCollectorRecover" type="button" hidden>Recover stopped capture</button>
           <label><input id="companyForceConfirmed" type="checkbox">Recheck all selected scopes, including reusable data.</label>

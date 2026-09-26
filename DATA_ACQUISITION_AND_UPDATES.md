@@ -1,6 +1,6 @@
 # Data Acquisition And Updates
 
-Maintained policy and implementation map. Last reconciled with source: 2026-09-25.
+Maintained policy and implementation map. Last reconciled with source: 2026-09-26.
 
 This document owns the cross-source acquisition, update-trigger, freshness and retention
 contract. It distinguishes current behavior from approved follow-up work; dated
@@ -914,13 +914,29 @@ worker remains alive; durable browser alarms/startup restore progress after
 suspension. Browser alarm granularity can make the next run later, never earlier.
 This does not promise 15-second background wakeups.
 
-Hourly and 24-hour limits plus routine reserves are explicit operator inputs.
+Hourly and 24-hour limits are optional operator inputs. The September 26 operator
+choice is no fixed page-count ceiling: a new setup leaves **Limit pages per hour /
+day** unchecked. A previously accepted numeric budget stays enabled until the
+operator explicitly changes it. The native policy represents uncapped operation
+with both limits `null` and both reserves `0`; missing/mixed policy fields are
+invalid, not an implicit unlimited grant. Turning the option off does not erase
+the navigation ledger, and later re-enabling a limit counts earlier attempts.
+
+When caps are enabled, both limits and both routine reserves must be provided.
 Financial work may use only unreserved capacity; routine work can use the reserve
 but cannot exceed the total. Every managed page create, URL change, reload and
 current-page capture admission is checked and debited before the browser action.
 A refused or repeated permission cannot become a second executable navigation.
 Lowering limits, selecting another browser or restarting does not reset spent
 capacity. First Quick Update expanding into Full remains under the same bounds.
+
+Uncapped mode removes only the rolling count rejection. Single-owner admission,
+routine-first queueing, financial/body pacing, cancellation, login/challenge pauses
+and observed-rate-limit cooldowns remain enforced. It does not accelerate any
+schedule or authorize bulk recovery. See the maintained
+[Firefox activation guide](extensions/sa_alpha_picks/FIREFOX.md#activate-or-restore-routine-collection)
+for updating the formal extension and restoring routine capture independently of
+manual historical-body recovery. Chrome uses the same controls.
 
 **These are local navigation budgets, not HTTP request quotas or SA-approved
 rates.** A page may issue many subrequests, existing user tabs and other devices

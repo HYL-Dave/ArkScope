@@ -81,3 +81,47 @@ def test_unsaved_policy_edit_is_retained_without_disabling_the_schedule():
     assert result["after"]["policyLimit"] == "12"
     assert result["after"]["data"]["companyFinancialRefresh"]["config"]["enabled"] is True
     assert not any(action["action"] == "save_company_refresh" for action in result["actions"])
+
+
+def test_new_profile_can_activate_without_filling_page_budgets():
+    result = run(scenario="activate", newProfile=True, enabled=False)
+    assert result["before"]["budgetEnabled"] is False
+    assert result["before"]["budgetInputsDisabled"] is True
+    activation = next(a for a in result["actions"] if a["action"] == "enable_sa_updates_here")
+    assert activation["policy"] == dict(hour_limit=None, day_limit=None, hour_reserve=0, day_reserve=0)
+    assert result["after"]["data"]["alphaPicksAutoSyncEnabled"] is True
+    assert result["after"]["data"]["companyFinancialRefresh"]["config"]["enabled"] is False
+    assert "Page budget: no hourly / daily cap" in result["after"]["status"]
+
+
+def test_existing_page_budget_is_not_silently_disabled():
+    result = run(scenario="activate", enabled=False)
+    assert result["before"]["budgetEnabled"] is True
+    assert result["before"]["budgetInputsDisabled"] is False
+    activation = next(a for a in result["actions"] if a["action"] == "enable_sa_updates_here")
+    assert activation["policy"] == dict(hour_limit=20, day_limit=100, hour_reserve=4, day_reserve=20)
+
+
+def test_disabling_budget_discards_stale_fields_without_changing_routine_intervals():
+    result = run(scenario="activate", enabled=False, budgetEnabled=False)
+    activation = next(a for a in result["actions"] if a["action"] == "enable_sa_updates_here")
+    assert activation["policy"] == dict(hour_limit=None, day_limit=None, hour_reserve=0, day_reserve=0)
+    assert result["after"]["alphaInterval"] == result["before"]["alphaInterval"]
+    assert result["after"]["newsInterval"] == result["before"]["newsInterval"]
+    assert result["after"]["budgetEnabled"] is False
+    assert result["after"]["budgetInputsDisabled"] is True
+
+
+def test_incomplete_budget_draft_does_not_block_due_update_under_accepted_policy():
+    result = run(scenario="due", budgetDraft=True,
+                 policy=dict(hour_limit=None, day_limit=None, hour_reserve=0, day_reserve=0))
+    assert any(a["action"] == "run_company_refresh" for a in result["actions"])
+    assert not any(a["action"] in {"save_company_refresh", "enable_sa_updates_here"}
+                   for a in result["actions"])
+
+
+def test_enabling_empty_budget_never_silently_activates_uncapped_mode():
+    result = run(scenario="activate", budgetDraft=True,
+                 policy=dict(hour_limit=None, day_limit=None, hour_reserve=0, day_reserve=0))
+    assert not any(a["action"] == "enable_sa_updates_here" for a in result["actions"])
+    assert result["after"]["data"]["alphaPicksAutoSyncEnabled"] is True

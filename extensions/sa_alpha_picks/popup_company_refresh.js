@@ -29,7 +29,13 @@
   function targetControls() {
     ticker.disabled=target.value === "watchlist";ticker.required=!ticker.disabled;ticker.parentElement.hidden=ticker.disabled;
   }
+  function budgetControls() {
+    var enabled=$("companyBudgetEnabled").checked;
+    $("companyPageBudget").hidden=!enabled;
+    form.querySelectorAll('.company-budget input').forEach(function(input){input.disabled=!enabled;});
+  }
   function policy() {
+    if(!$("companyBudgetEnabled").checked)return {hour_limit:null,day_limit:null,hour_reserve:0,day_reserve:0};
     var value={};
     ["hour_limit","day_limit","hour_reserve","day_reserve"].forEach(function(key) {
       var text=form.querySelector('[name="'+key+'"]').value;value[key]=text === "" ? null : Number(text);
@@ -83,7 +89,9 @@
       targetControls();
     }
     if (!dirty && !policyDirty) {
-      if(control.policy)Object.keys(control.policy).forEach(function(key){var input=form.querySelector('[name="'+key+'"]');if(input)input.value=control.policy[key];});
+      $("companyBudgetEnabled").checked=!!(control.policy && control.policy.hour_limit!==null);
+      if(control.policy)Object.keys(control.policy).forEach(function(key){var input=form.querySelector('[name="'+key+'"]');if(input)input.value=control.policy[key] == null ? "" : control.policy[key];});
+      budgetControls();
       $("companyAdvanced").open=!control.policy;
       expectedGeneration=control.generation == null ? 0 : control.generation;
     }
@@ -126,6 +134,8 @@
     if(result.pending_count)line(output,"Queued: "+result.pending_count+" scopes");
     if(control.active)line(output,"Current: "+(control.active.scope ? control.active.scope.ticker+" / "+control.active.scope.view : control.active.operation));
     if(control.financial_gap_seconds)line(output,"Accepted financial gap: "+control.financial_gap_seconds+" s");
+    if(control.policy)line(output,control.policy.hour_limit===null ? "Page budget: no hourly / daily cap"
+      : "Page budget: "+control.policy.hour_limit+" / hour | "+control.policy.day_limit+" / day");
     if(control.next_financial_at)line(output,"Next financial eligibility: "+control.next_financial_at);
     if(result.blocked_reason)line(output,result.blocked_reason+" | Next attempt: "+(result.deferred_until || "Pending"));
     if(result.queue && result.queue.oldest_wait_ms)line(output,"Queue wait: "+Math.round(result.queue.oldest_wait_ms/1000)+" s");
@@ -136,8 +146,8 @@
   async function reload() {var ticket=++readRevision;var result=await send("get_company_refresh");if(ticket!==readRevision || busy)return;render(result);await preview();}
   form.addEventListener("input",function(event){
     var input=event.target;
-    if(input.matches('[name="hour_limit"], [name="day_limit"], [name="hour_reserve"], [name="day_reserve"]')) {
-      policyDirty=true;return;
+    if(input.matches('#companyBudgetEnabled, [name="hour_limit"], [name="day_limit"], [name="hour_reserve"], [name="day_reserve"]')) {
+      policyDirty=true;budgetControls();return;
     }
     if(!input.matches('#companyRefreshEnabled, #companyRefreshTargetMode, #companyRefreshTickers, #companyRefreshDays, #companyRefreshQuarterlyDays, #companyFinancialGap, [name="companyRefreshStatement"], [name="companyRefreshView"]'))return;
     dirty=true;targetControls();preview();
@@ -146,7 +156,10 @@
   form.addEventListener("submit",async function(event){event.preventDefault();if(busy)return;lockForm(true);var result;try{result=await send("save_company_refresh",{config:config()});}finally{lockForm(false);}dirty=result.status!=="ok";render(result);await preview();});
   $("companyCollectorSelect").addEventListener("click",async function(){
     if(busy || !form.reportValidity())return;
-    if(!$("companyActivationConfirmed").checked){$("companyAdvanced").open=true;render({status:"error",error_code:"Confirm stopped installations and acquisition limits."});return;}
+    if($("companyBudgetEnabled").checked && Array.from(form.querySelectorAll('.company-budget input')).some(function(input){return input.value === "";})) {
+      $("companyAdvanced").open=true;render({status:"error",error_code:"Enter both page limits and routine reserves."});return;
+    }
+    if(!$("companyActivationConfirmed").checked){$("companyAdvanced").open=true;render({status:"error",error_code:"Confirm stopped installations and acquisition settings."});return;}
     lockForm(true);
     var result=await send("enable_sa_updates_here",{config:config(),policy:policy(),expected_generation:expectedGeneration,
       confirm_activation:true,confirm_schedules:true,confirm_stopped:$("companyRecoveryConfirmed").checked});

@@ -13,14 +13,15 @@ from src.sa.company_collector import CompanyCollector
 FIREFOX = {"client_id": "f" * 32, "browser": "firefox"}
 CHROME = {"client_id": "c" * 32, "browser": "chrome"}
 POLICY = dict(hour_limit=4, day_limit=8, hour_reserve=2, day_reserve=2)
+UNCAPPED = dict(hour_limit=None, day_limit=None, hour_reserve=0, day_reserve=0)
 
 
 def call(obj, operation, client=FIREFOX, **kw):
     return obj.handle(dict(operation=operation, client=client, **kw))
 
 
-def activate(obj):
-    configured = call(obj, "configure", policy=POLICY, financial_gap_seconds=15,
+def activate(obj, policy=POLICY):
+    configured = call(obj, "configure", policy=policy, financial_gap_seconds=15,
                       confirm_activation=True, expected_generation=0)
     assert configured["status"] == "ok", configured
     selected = call(obj, "select", expected_generation=0, confirm_schedules=True)
@@ -58,9 +59,10 @@ def test_initialization_is_explicit_and_readers_do_not_create_files(authority):
     assert obj.path.with_suffix(".db.identity").read_text().strip() == state["ledger_id"]
 
 
-def test_only_one_of_eight_connections_can_reserve(authority):
+@pytest.mark.parametrize("policy", [POLICY, UNCAPPED])
+def test_only_one_of_eight_connections_can_reserve(authority, policy):
     obj, clock = authority
-    activate(obj)
+    activate(obj, policy)
     with ThreadPoolExecutor(8) as workers:
         results = list(workers.map(lambda _: begin(CompanyCollector(obj.path, clock=lambda: clock[0])), range(8)))
     assert sum(r["status"] == "ok" for r in results) == 1
@@ -95,9 +97,10 @@ def test_policy_and_browser_switch_do_not_reset_navigation_budget(authority):
     assert begin(obj, other_chrome, generation=2)["error_code"] == "sa_company_collector_other_browser"
 
 
-def test_login_pause_is_durable_before_cleanup_and_not_cleared_by_selection(authority):
+@pytest.mark.parametrize("policy", [POLICY, UNCAPPED])
+def test_login_pause_is_durable_before_cleanup_and_not_cleared_by_selection(authority, policy):
     obj, _ = authority
-    activate(obj)
+    activate(obj, policy)
     permit = begin(obj)
     paused = call(obj, "observe_restriction", token=permit["token"], generation=1, reason="login_required")
     assert paused["paused_reason"] == "login_required" and paused["active"] is not None
@@ -109,12 +112,29 @@ def test_login_pause_is_durable_before_cleanup_and_not_cleared_by_selection(auth
     assert call(obj, "resume", CHROME, expected_generation=2, confirm_handled=True)["paused_reason"] is None
 
 
-def test_clock_regression_refuses_navigation(authority):
+@pytest.mark.parametrize("policy", [POLICY, UNCAPPED])
+def test_clock_regression_refuses_navigation(authority, policy):
     obj, clock = authority
-    activate(obj)
+    activate(obj, policy)
     permit = begin(obj)
     clock[0] -= 1
     assert navigation(obj, permit)["error_code"] == "sa_company_clock_regressed"
+
+
+def test_uncapped_attempts_survive_reopen_and_count_if_limits_are_enabled(authority):
+    obj, clock = authority
+    activate(obj, UNCAPPED)
+    permit = begin(obj)
+    for _ in range(12):
+        assert navigation(obj, permit)["allowed"] is True
+    reopened = CompanyCollector(obj.path, clock=lambda: clock[0])
+    assert call(reopened, "status")["policy"] == UNCAPPED
+    assert call(reopened, "status")["navigation_attempts"] == 12
+    assert begin(reopened, CHROME)["status"] == "error"
+    assert call(reopened, "configure", policy=POLICY, financial_gap_seconds=15,
+                expected_generation=1, confirm_activation=True)["status"] == "ok"
+    assert navigation(reopened, permit)["reason"] == "capacity_exhausted"
+    assert call(reopened, "status")["navigation_attempts"] == 12
 
 
 @pytest.mark.parametrize("damage", ["database", "marker", "marker_mismatch", "state", "attempts"])

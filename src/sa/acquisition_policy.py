@@ -8,6 +8,11 @@ def validate_policy(policy):
     keys = {"hour_limit", "day_limit", "hour_reserve", "day_reserve"}
     if type(policy) is not dict or set(policy) != keys:
         raise ValueError("invalid navigation policy")
+    if policy["hour_limit"] is None and policy["day_limit"] is None:
+        if any(type(policy[key]) is not int or policy[key] != 0
+               for key in ("hour_reserve", "day_reserve")):
+            raise ValueError("uncapped navigation cannot reserve capacity")
+        return dict(policy)
     for window in ("hour", "day"):
         limit, reserve = policy[window + "_limit"], policy[window + "_reserve"]
         if type(limit) is not int or type(reserve) is not int or not 0 <= reserve <= limit or limit < 1:
@@ -32,6 +37,8 @@ def navigation_eligibility(attempts, policy, priority, now):
                 expirations[at + seconds].append((index, routine))
 
     def allowed():
+        if policy["hour_limit"] is None:
+            return True
         for index, window in enumerate(("hour", "day")):
             used, routine = counts[index]
             reserve = max(0, policy[window + "_reserve"] - routine) if priority == "background" else 0

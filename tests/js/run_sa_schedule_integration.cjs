@@ -19,6 +19,8 @@ async function main() {
   const authority = {status: "ok", owner: client, is_owner: true, generation: 1,
     ledger_id: "a".repeat(32), policy: {hour_limit: 20, day_limit: 100, hour_reserve: 4, day_reserve: 20},
     capability_pauses: {}, paused_reason: null, active: null, financial_gap_seconds: 60};
+  if (options.newProfile) authority.policy = null;
+  if (options.policy) authority.policy = clone(options.policy);
   const data = {companyCollectorIdentity: client, companyFinancialRefresh: {
     config: {enabled: options.enabled !== false, target_mode: "manual", tickers: ["AMD"],
       statements: ["income_statement"], views: ["annual"], interval_days: 7,
@@ -61,6 +63,7 @@ async function main() {
       let response;
       if (msg.action === "sa_acquisition_control") {
         if (msg.operation === "configure" && options.scenario === "failure") response = {status: "error", error_code: "sa_company_collector_busy"};
+        else if (msg.operation === "configure") {authority.policy=clone(msg.policy);response=authority;}
         else if (msg.operation === "begin_task") response = {status: "deferred", reason: "capacity_exhausted", retry_after: new Date(Date.now() + 3600000).toISOString()};
         else response = authority;
       } else if (msg.action === "get_reconciliation_queue") response = {status: "ok", events: [], total: 0};
@@ -97,10 +100,20 @@ async function main() {
     companyEnabled: $("companyRefreshEnabled").checked, alphaEnabled: $("alphaPicksAutoSyncToggle").checked,
     newsEnabled: $("marketNewsAutoSyncToggle").checked, alphaInterval: $("alphaPicksAutoSyncInterval").value,
     newsInterval: $("marketNewsAutoSyncInterval").value, summary: $("companyRoutineIntent").textContent,
-    status: $("companyRefreshStatus").textContent, policyLimit: doc.querySelector('[name="hour_limit"]').value});
+    status: $("companyRefreshStatus").textContent, policyLimit: doc.querySelector('[name="hour_limit"]').value,
+    budgetEnabled: $("companyBudgetEnabled")?.checked ?? null,
+    budgetInputsDisabled: [...doc.querySelectorAll('.company-budget input')].every(input=>input.disabled)});
   const before = snapshot();
   actions.length = 0;
+  if (options.budgetDraft && $("companyBudgetEnabled")) {
+    $("companyBudgetEnabled").checked = true;
+    $("companyBudgetEnabled").dispatchEvent(new win.Event("input", {bubbles: true}));
+  }
   if (["activate", "failure", "stop"].includes(options.scenario)) {
+    if (typeof options.budgetEnabled === 'boolean' && $("companyBudgetEnabled")) {
+      $("companyBudgetEnabled").checked = options.budgetEnabled;
+      $("companyBudgetEnabled").dispatchEvent(new win.Event("input", {bubbles: true}));
+    }
     $("companyActivationConfirmed").click();
     $("companyCollectorSelect").click();
     await settle();

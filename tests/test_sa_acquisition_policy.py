@@ -6,6 +6,7 @@ import pytest
 
 
 POLICY = dict(hour_limit=4, day_limit=8, hour_reserve=2, day_reserve=2)
+UNCAPPED = dict(hour_limit=None, day_limit=None, hour_reserve=0, day_reserve=0)
 
 
 def eligibility(attempts, priority, now, policy=None):
@@ -57,3 +58,23 @@ def test_future_or_unknown_attempt_is_not_silently_ignored():
         eligibility([(101, "routine")], "routine", 100)
     with pytest.raises(ValueError):
         eligibility([(10, "other")], "routine", 100)
+
+
+@pytest.mark.parametrize("priority", ["routine", "background"])
+def test_explicit_uncapped_policy_does_not_stop_at_an_arbitrary_count(priority):
+    attempts = [(float(i), "routine" if i % 2 else "background") for i in range(10000)]
+    assert eligibility(attempts, priority, 10000, UNCAPPED) == {"allowed": True, "retry_at": None}
+
+
+@pytest.mark.parametrize("change", [dict(hour_reserve=1), dict(day_reserve=True),
+                                   dict(hour_limit=5), dict(day_limit=5)])
+def test_uncapped_policy_rejects_unused_reserves_and_partial_modes(change):
+    with pytest.raises(ValueError):
+        eligibility([], "routine", 100, {**UNCAPPED, **change})
+
+
+def test_uncapped_policy_still_validates_navigation_history():
+    assert eligibility([], "routine", 100, UNCAPPED)["allowed"] is True
+    for attempts in ([(101, "routine")], [(10, "other")]):
+        with pytest.raises(ValueError):
+            eligibility(attempts, "routine", 100, UNCAPPED)

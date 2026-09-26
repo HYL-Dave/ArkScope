@@ -50,6 +50,25 @@ def test_repeated_activation_of_current_owner_does_not_select_again():
     assert "select" not in result["actions"]
 
 
+def test_explicit_uncapped_activation_keeps_routine_intent_and_financial_schedule_off():
+    result = _run_background_probe(SETUP + """
+      await chrome.storage.local.set({alphaPicksAutoSyncEnabled:true,marketNewsAutoSyncEnabled:true});
+      let configured;
+      const control=companyCollectorControl;
+      companyCollectorControl=async(operation,message)=>{
+        if(operation==='configure')configured=message.policy;
+        return control(operation,message);
+      };
+      const result=await activateSaUpdates({...accepted,policy:{hour_limit:null,day_limit:null,hour_reserve:0,day_reserve:0}});
+      return {result,configured,saved:await chrome.storage.local.get(['alphaPicksAutoSyncEnabled','marketNewsAutoSyncEnabled','companyFinancialRefresh'])};
+    """)
+    assert result["result"]["status"] == "ok"
+    assert result["configured"] == dict(hour_limit=None, day_limit=None, hour_reserve=0, day_reserve=0)
+    assert result["saved"]["alphaPicksAutoSyncEnabled"] is True
+    assert result["saved"]["marketNewsAutoSyncEnabled"] is True
+    assert result["saved"]["companyFinancialRefresh"]["config"]["enabled"] is False
+
+
 def test_explicit_browser_switch_selects_before_changing_owner_policy():
     result = _run_background_probe(SETUP + """
       let current={...admittedState,is_owner:false,owner:{browser:'chrome'},policy:accepted.policy};

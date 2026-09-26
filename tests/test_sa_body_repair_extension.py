@@ -110,7 +110,11 @@ def test_body_repair_uses_server_background_reserve_and_manual_admission(tmp_pat
 
 
 @pytest.mark.parametrize("previous", ["alpha_picks_body_repair", "company_financial_capture"])
-def test_body_repair_obeys_shared_gap_after_body_or_financial_but_news_does_not(tmp_path, previous):
+@pytest.mark.parametrize("policy", [
+    {"hour_limit": 100, "day_limit": 1000, "hour_reserve": 10, "day_reserve": 100},
+    {"hour_limit": None, "day_limit": None, "hour_reserve": 0, "day_reserve": 0},
+])
+def test_body_repair_obeys_shared_gap_after_body_or_financial_but_news_does_not(tmp_path, previous, policy):
     clock = [1790208000]
     control = CompanyCollector(tmp_path / "control.db", clock=lambda: clock[0])
     client = {"client_id": "a" * 32, "browser": "chrome"}
@@ -119,7 +123,7 @@ def test_body_repair_obeys_shared_gap_after_body_or_financial_but_news_does_not(
         return control.handle({"client": client, "operation": operation, "generation": 1, **fields})
 
     assert call("configure", expected_generation=0, confirm_activation=True,
-                policy={"hour_limit": 100, "day_limit": 1000, "hour_reserve": 10, "day_reserve": 100},
+                policy=policy,
                 financial_gap_seconds=45)["status"] == "ok"
     assert call("select", expected_generation=0, confirm_schedules=True)["status"] == "ok"
 

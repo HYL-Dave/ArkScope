@@ -798,9 +798,13 @@ function activateSaUpdates(request) {
       if (!request || request.confirm_activation !== true || request.confirm_schedules !== true) throw new Error("sa_acquisition_confirmation_required");
       var config = SACompanyRefresh.normalize(request.config);
       var policy = request.policy;
-      if (!policy || ["hour_limit","day_limit","hour_reserve","day_reserve"].some(function(key) {return !Number.isSafeInteger(policy[key]);})
-          || policy.hour_limit<=0 || policy.day_limit<=0 || policy.hour_reserve<0 || policy.day_reserve<0
-          || policy.hour_reserve>policy.hour_limit || policy.day_reserve>policy.day_limit) throw new Error("sa_acquisition_policy_invalid");
+      var keys = ["hour_limit","day_limit","hour_reserve","day_reserve"];
+      var uncapped = policy && policy.hour_limit === null && policy.day_limit === null
+        && policy.hour_reserve === 0 && policy.day_reserve === 0;
+      var capped = policy && keys.every(function(key) {return Number.isSafeInteger(policy[key]);})
+        && policy.hour_limit>0 && policy.day_limit>0 && policy.hour_reserve>=0 && policy.day_reserve>=0
+        && policy.hour_reserve<=policy.hour_limit && policy.day_reserve<=policy.day_limit;
+      if (!policy || Object.keys(policy).length !== keys.length || (!uncapped && !capped)) throw new Error("sa_acquisition_policy_invalid");
       step = "status";
       var state = await companyCollectorControl("status");
       var upgrade = state && state.error_code === "sa_acquisition_upgrade_required" && request.confirm_stopped === true;

@@ -156,8 +156,8 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
                     ff_click("#companyRefreshEnabled")
                 if not driver.find_element("id", "companyAdvanced").get_attribute("open"):
                     ff_click("#companyAdvanced summary")
-                for selector, value in {"#companyFinancialGap": 15, '[name="hour_limit"]': 20,
-                        '[name="day_limit"]': 100, '[name="hour_reserve"]': 4, '[name="day_reserve"]': 20}.items():
+                assert not driver.find_element("id", "companyBudgetEnabled").is_selected()
+                for selector, value in {"#companyFinancialGap": 15}.items():
                     element = driver.find_element("css selector", selector)
                     element.clear(); element.send_keys(str(value))
                 ff_click("#companyActivationConfirmed")
@@ -167,6 +167,8 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
 
             assert not saved and not admissions
             ff_activate()
+            assert ff("snapshot")["collector"]["policy"] == {
+                "hour_limit": None, "day_limit": None, "hour_reserve": 0, "day_reserve": 0}
             driver.save_screenshot(str(tmp_path / "firefox-unified.png"))
             assert driver.execute_script("return document.body.scrollWidth <= innerWidth")
             assert ch("news")["reason"] == "collector_other_installation"
@@ -216,6 +218,7 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
             if not page.locator("#companyAdvanced").evaluate("element=>element.open"):
                 page.locator("#companyAdvanced summary").click()
             page.locator("#companyFinancialGap").fill("15")
+            page.locator("#companyBudgetEnabled").check()
             for key, value in {"hour_limit": 20, "day_limit": 100, "hour_reserve": 4, "day_reserve": 20}.items():
                 page.locator('[name="'+key+'"]').fill(str(value))
             page.locator("#companyActivationConfirmed").check()
@@ -248,6 +251,17 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
             assert ch("snapshot")["collector"]["active"] is None
             assert partial["extension_run"]["derived_outcome"] != "complete"
             assert ch("policy", policy={"hour_limit":40,"day_limit":100,"hour_reserve":4,"day_reserve":20})["status"] == "ok"
+            page.reload()
+            page.wait_for_function("document.querySelector('#companyBudgetEnabled').checked")
+            page.locator("#companyAdvanced summary").click()
+            page.locator("#companyBudgetEnabled").uncheck()
+            page.locator("#companyActivationConfirmed").check()
+            page.locator("#companyCollectorSelect").click()
+            wait_for(lambda _: ch("snapshot")["collector"]["policy"]["hour_limit"] is None,
+                     "Chromium disables page budget")
+            before_count = ch("snapshot")["collector"]["navigation_attempts"]
+            assert ch("news", count=3)["detail_fetched"] == 3
+            assert ch("snapshot")["collector"]["navigation_attempts"] == before_count + 3
             assert ch("schedules")["status"] == "ok"
             ch("restrict", reason="login_required")
             paused = ch("snapshot")

@@ -360,6 +360,8 @@ async function runPopup() {
       doc.getElementById('companyRefreshEnabled').checked=true;
       doc.querySelectorAll('[name="companyRefreshStatement"],[name="companyRefreshView"]').forEach(input=>input.checked=true);
       const gap=doc.getElementById('companyFinancialGap'); if(gap) gap.value='15';
+      doc.getElementById('companyBudgetEnabled').checked=true;
+      doc.getElementById('companyBudgetEnabled').dispatchEvent(new dom.window.Event('input',{bubbles:true}));
       for(const [key,value] of Object.entries({hour_limit:20,day_limit:100,hour_reserve:5,day_reserve:20})) {
         const input=doc.querySelector('[name="'+key+'"]');if(input)input.value=String(value);
       }
