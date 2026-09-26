@@ -111,6 +111,38 @@ function response(
   };
 }
 
+function macroResult(
+  id = "finnhub_economic_calendar",
+  status: "failed" | "partial" | "succeeded" = "failed",
+  errorCode = "finnhub_forbidden",
+): ScheduleRunResult {
+  const collect = {
+    status,
+    events_inserted: status === "partial" ? 1 : 0,
+    events_mutated: 0, events_unchanged: 0, events_skipped: 0,
+    error_count: 1, error_code: `macro_collection_${status}`,
+    errors: ["PRIVATE_PROVIDER_DIAGNOSTIC"],
+    requests: [{
+      dataset: id === "finnhub_earnings_calendar" ? "earnings" : id === "finnhub_ipo_calendar" ? "ipo" : "economic",
+      symbol: null, from_date: "2026-09-20", to_date: "2026-10-11",
+      checked_at: "2026-09-27T01:01:00Z", response_state: "failed",
+      rows_received: null, rows_accepted: null, rows_rejected: null, error_code: errorCode,
+    }],
+  };
+  return { source: id, status, collect };
+}
+
+function failedMacro(id = "finnhub_economic_calendar", status: "failed" | "partial" = "failed") {
+  return source(id, {
+    last_attempt_at: "2026-09-27T01:00:00Z",
+    durable_state: {
+      last_status: status, last_error: `macro_collection_${status}`, continuation: null,
+      last_attempt: "2026-09-27T01:00:00Z", updated_at: "2026-09-27T01:01:00Z",
+      last_result: macroResult(id, status),
+    },
+  });
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => { resolve = done; });
@@ -249,6 +281,155 @@ afterEach(() => {
 });
 
 describe("Data schedule controls", () => {
+  it.each([
+    ["en", "failed"], ["en", "partial"], ["zh-Hant", "failed"], ["zh-Hant", "partial"],
+  ] as const)("shows the durable Finnhub endpoint denial for %s %s without changing collection", async (locale, status) => {
+    await i18n.changeLanguage(locale);
+    controls.schedule = { sources: { finnhub_economic_calendar: failedMacro("finnhub_economic_calendar", status) } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      const detail = harness.host.querySelector(".ds-last-run-cell")!;
+      expect(detail.textContent).toContain("403");
+      expect(detail.textContent).toContain(locale === "en" ? "Finnhub economic calendar" : "Finnhub 經濟日曆");
+      expect(detail.textContent).toContain(locale === "en" ? "API key does not establish endpoint access" : "有 API 金鑰不代表具備端點權限");
+      expect(detail.textContent).not.toMatch(/PRIVATE_PROVIDER_DIAGNOSTIC|finnhub_forbidden|macro_collection_failed|premium|enterprise/i);
+      expect(harness.current().schedule.finnhub_economic_calendar.interval_minutes).toBe(60);
+      expect(getSchedule).toHaveBeenCalledOnce();
+      expect(putSchedule).not.toHaveBeenCalled();
+      expect(runScheduleNow).not.toHaveBeenCalled();
+    } finally { harness.unmount(); }
+  });
+
+  it.each([
+    ["finnhub_earnings_calendar", "Finnhub earnings calendar"],
+    ["finnhub_ipo_calendar", "Finnhub IPO calendar"],
+  ])("keeps the endpoint reason scoped to %s", async (id, label) => {
+    await i18n.changeLanguage("en");
+    controls.schedule = { sources: { [id]: failedMacro(id) } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      const detail = harness.host.querySelector(".ds-last-run-cell")!;
+      expect(detail.textContent).toContain(`${label}:`);
+      expect(detail.textContent).toContain("403");
+      expect(detail.textContent).not.toContain("economic calendar");
+    } finally { harness.unmount(); }
+  });
+
+  it.each(["live", "job envelope", "job normalized"])("reads the typed receipt from a current %s result", async (origin) => {
+    const id = "finnhub_economic_calendar";
+    const state = failedMacro();
+    state.durable_state = null;
+    state.last_result = origin === "live" ? { ...macroResult(), at: "2026-09-27T01:01:00Z" } : null;
+    controls.schedule = { sources: { [id]: state } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      if (origin !== "live") act(() => harness.current().replaceJobFacts({
+        [state.job_name]: {
+          status: "failed", finished_at: "2026-09-27T01:01:00Z",
+          result: origin === "job envelope" ? macroResult() : macroResult().collect,
+        },
+      }));
+      expect(harness.host.querySelector(".ds-last-run-cell")?.textContent).toContain("403");
+    } finally { harness.unmount(); }
+  });
+
+  it.each([
+    ["finnhub_unauthorized", "401"],
+    ["finnhub_rate_limited", "429"],
+    ["finnhub_transport_failed", "Provider connection failed"],
+    ["finnhub_calendar_response_invalid", "Invalid calendar response"],
+    ["finnhub_calendar_rows_rejected", "Calendar rows rejected"],
+    ["PRIVATE_TOKEN=secret", "Macro collection issue"],
+  ])("localizes %s without exposing raw diagnostics", async (code, expected) => {
+    await i18n.changeLanguage("en");
+    const state = failedMacro();
+    state.durable_state!.last_result = macroResult("finnhub_economic_calendar", "failed", code);
+    state.durable_state!.last_error = "PRIVATE_TOKEN=secret";
+    controls.schedule = { sources: { finnhub_economic_calendar: state } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      const text = harness.host.querySelector(".ds-last-run-cell")!.textContent;
+      expect(text).toContain(expected);
+      expect(text).not.toMatch(/PRIVATE_|finnhub_|secret/);
+    } finally { harness.unmount(); }
+  });
+
+  it.each(["durable", "live", "job"])("does not revive an older denial after a newer %s success", async (latest) => {
+    const state = failedMacro();
+    const previousResult = macroResult();
+    const success = { source: "finnhub_economic_calendar", status: "succeeded", at: "2026-09-27T02:01:00Z" };
+    if (latest === "durable") {
+      state.durable_state = {
+        ...state.durable_state!, last_status: "succeeded", last_error: null,
+        last_result: success, last_attempt: "2026-09-27T02:00:00Z", updated_at: "2026-09-27T02:01:00Z",
+      };
+      state.last_result = { ...previousResult, at: "2026-09-27T01:01:00Z" };
+    } else if (latest === "live") state.last_result = success;
+    controls.schedule = { sources: { finnhub_economic_calendar: state } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      act(() => harness.current().replaceJobFacts({
+        [state.job_name]: latest === "job"
+          ? { status: "succeeded", finished_at: "2026-09-27T02:01:00Z", result: success }
+          : { status: "failed", finished_at: "2026-09-27T01:01:00Z", result: previousResult },
+      }));
+      expect(harness.host.querySelector(".ds-last-run-cell")?.textContent).not.toContain("403");
+    } finally { harness.unmount(); }
+  });
+
+  it("replaces the displayed denial with a newer success while retaining older job facts", async () => {
+    const state = failedMacro();
+    controls.schedule = { sources: { finnhub_economic_calendar: state } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      act(() => harness.current().replaceJobFacts({
+        [state.job_name]: { status: "failed", finished_at: "2026-09-27T01:01:00Z", result: macroResult() },
+      }));
+      expect(harness.host.querySelector(".ds-last-run-cell")?.textContent).toContain("403");
+      state.durable_state = {
+        ...state.durable_state!, last_status: "succeeded", last_error: null, last_result: null,
+        last_attempt: "2026-09-27T02:00:00Z", updated_at: "2026-09-27T02:01:00Z",
+      };
+      await act(async () => { await harness.current().reloadSchedule(); });
+      expect(harness.host.querySelector(".ds-last-run-cell")?.textContent).not.toContain("403");
+    } finally { harness.unmount(); }
+  });
+
+  it.each([null, "invalid-time", "2026-09-27T01:01:00Z"])("does not assert a current denial when success cannot be ordered at %s", async (finishedAt) => {
+    const state = failedMacro();
+    controls.schedule = { sources: { finnhub_economic_calendar: state } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      act(() => harness.current().replaceJobFacts({
+        [state.job_name]: { status: "succeeded", finished_at: finishedAt, result: { status: "succeeded" } },
+      }));
+      expect(harness.host.querySelector(".ds-last-run-cell")?.textContent).not.toContain("403");
+    } finally { harness.unmount(); }
+  });
+
+  it("uses a generic reason for a newer failure instead of borrowing an older typed denial", async () => {
+    await i18n.changeLanguage("en");
+    const state = failedMacro();
+    state.last_result = { source: "finnhub_economic_calendar", status: "failed", at: "2026-09-27T02:01:00Z" };
+    controls.schedule = { sources: { finnhub_economic_calendar: state } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      const text = harness.host.querySelector(".ds-last-run-cell")!.textContent;
+      expect(text).toContain("Macro collection issue");
+      expect(text).not.toContain("403");
+    } finally { harness.unmount(); }
+  });
+
+  it.each(["succeeded", "running", "skipped"])("ignores leftover receipt details when the durable outcome is %s", async (status) => {
+    const state = failedMacro();
+    state.durable_state!.last_status = status;
+    controls.schedule = { sources: { finnhub_economic_calendar: state } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      expect(harness.host.querySelector(".ds-last-run-cell")?.textContent).not.toContain("403");
+    } finally { harness.unmount(); }
+  });
+
   it.each(["zh-Hant", "en"])("shows one live status and prevents duplicate runs in %s", async (language) => {
     await i18n.changeLanguage(language);
     controls.schedule = response([["polygon_news", {

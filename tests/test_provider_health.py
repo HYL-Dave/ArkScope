@@ -310,6 +310,11 @@ def test_sa_capture_error_and_success_merge():
                "seeking_alpha")
     assert p["status"] == "connected"            # newest success 3h ago
     assert p["last_error"] == "parse failed"     # non-ok scope surfaces its error
+    assert p["last_attempt_outcome"] == "failed"
+    assert p["last_attempt_scope"] == "current"
+    assert p["last_error_at"] == "2026-06-10T11:00:00+00:00"
+    assert p["last_error_scope"] == "current"
+    assert p["last_complete_at"] is None  # list capture is not a full job completion
     assert "FAILED" in p["detail"]
 
 
@@ -342,7 +347,7 @@ def test_sa_provider_uses_derived_complete_success_and_latest_attempt_separately
             return {"sa_market_news_refresh": degraded}
 
         def structured_extension_summary_by_name(self, job_names):
-            assert job_names == ["sa_market_news_refresh"]
+            assert set(job_names) == {"sa_alpha_picks_refresh", "sa_market_news_refresh"}
             return {
                 "sa_market_news_refresh": {
                     "latest_attempt": degraded,
@@ -363,6 +368,10 @@ def test_sa_provider_uses_derived_complete_success_and_latest_attempt_separately
     assert p["last_success_at"] == "2026-06-10T08:01:00+00:00"
     assert p["last_attempt_at"] == "2026-06-10T10:01:00+00:00"
     assert p["last_error"] == "market_news_extension_degraded"
+    assert p["last_attempt_outcome"] == "degraded"
+    assert p["last_error_at"] == "2026-06-10T10:01:00+00:00"
+    assert p["last_error_scope"] == "market_news"
+    assert p["last_complete_at"] == "2026-06-10T08:01:00+00:00"
     assert "FAILED" in p["detail"]
     assert p["signals"]["market_news_extension"] == {
         "latest_attempt_run_id": 302,
@@ -419,6 +428,171 @@ def test_sa_provider_ignores_legacy_and_skipped_success_rows(monkeypatch):
     assert p["last_attempt_at"] == "2026-06-10T10:01:00+00:00"
     assert p["status"] == "no_signal"
     assert p["signals"]["market_news_extension"]["latest_attempt_outcome"] == "skipped"
+
+
+@pytest.fixture
+def sa_summary(monkeypatch):
+    summary = {}
+
+    class _Store:
+        def latest_runs_by_name(self):
+            return {name: item["latest_attempt"] for name, item in summary.items()}
+
+        def structured_extension_summary_by_name(self, job_names):
+            return {name: summary[name] for name in job_names if name in summary}
+
+    monkeypatch.setattr("src.service.job_runs_store.get_job_runs_store", lambda dal: _Store())
+    return summary
+
+
+def _sa_run(run_id, outcome, at, *, counts=None):
+    return {
+        "id": run_id,
+        "status": "failed" if outcome in {"failed", "degraded"} else "succeeded",
+        "started_at": at,
+        "finished_at": at,
+        "result": {
+            "derived_outcome": outcome,
+            "healthy_anchor_eligible": outcome == "complete",
+            "counts": counts or {},
+        },
+    }
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_sa_error_keeps_its_scope_time_and_selects_newest_failure(sa_summary, reverse):
+    scopes = [
+        ("current", {"ok": False, "last_error": "current parse failed",
+                     "last_attempt_at": "2026-06-10T08:00:00Z"}),
+        ("closed", {"ok": False, "last_error": "closed parse failed",
+                    "last_attempt_at": "2026-06-10T09:00:00Z"}),
+    ]
+    complete = _sa_run(30738, "complete", "2026-06-10T11:00:00Z")
+    sa_summary["sa_market_news_refresh"] = {
+        "latest_attempt": complete, "latest_derived_complete": complete,
+    }
+    sa = dict(reversed(scopes) if reverse else scopes)
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend(sa=sa)), now=_WEDNESDAY),
+               "seeking_alpha")
+
+    assert p["last_error"] == "closed parse failed"
+    assert p["last_error_scope"] == "closed"
+    assert p["last_error_at"] == "2026-06-10T09:00:00+00:00"
+    assert p["last_attempt_at"] == "2026-06-10T11:00:00+00:00"
+    assert p["last_attempt_scope"] == "market_news"
+    assert p["last_attempt_outcome"] == "complete"
+
+
+def test_sa_news_30738_completion_resolves_only_news_failure(sa_summary):
+    failed = _sa_run(30734, "failed", "2026-09-26T19:23:00Z")
+    alpha = _sa_run(30735, "degraded", "2026-09-26T19:30:00Z")
+    complete = _sa_run(30738, "complete", "2026-09-26T19:59:01Z",
+                       counts={"body_complete": 1})
+    sa_summary["sa_alpha_picks_refresh"] = {
+        "latest_attempt": alpha, "latest_derived_complete": None,
+    }
+    sa_summary["sa_market_news_refresh"] = {
+        "latest_attempt": failed, "latest_derived_complete": None,
+    }
+    now = datetime(2026, 9, 26, 20, 3, tzinfo=timezone.utc)
+    dal = _FakeDAL(_FakeBackend())
+    before = _by_id(compute_provider_health(dal, now=now), "seeking_alpha")
+    assert before["signals"]["market_news_extension"]["latest_attempt_run_id"] == 30734
+    sa_summary["sa_market_news_refresh"] = {
+        "latest_attempt": complete, "latest_derived_complete": complete,
+    }
+
+    p = _by_id(compute_provider_health(dal, now=now), "seeking_alpha")
+
+    assert p["last_success_at"] == "2026-09-26T19:59:01+00:00"
+    assert p["last_complete_at"] == "2026-09-26T19:59:01+00:00"
+    assert p["last_complete_scope"] == "market_news"
+    assert p["last_attempt_outcome"] == "complete"
+    assert p["last_error"] == "alpha_picks_extension_degraded"
+    assert p["last_error_at"] == "2026-09-26T19:30:00+00:00"
+    assert p["last_error_scope"] == "alpha_picks"
+    assert p["signals"]["market_news_extension"]["latest_complete_run_id"] == 30738
+
+    del sa_summary["sa_alpha_picks_refresh"]
+    recovered = _by_id(compute_provider_health(dal, now=now), "seeking_alpha")
+    assert recovered["last_error"] is None
+    assert recovered["last_error_at"] is None
+    assert recovered["last_error_scope"] is None
+
+
+@pytest.mark.parametrize("outcome", ["deferred", "pending", "skipped"])
+def test_sa_alpha_pending_comments_preserve_success_and_do_not_become_failure(sa_summary, outcome):
+    complete = _sa_run(401, "complete", "2026-06-10T08:00:00Z")
+    pending = _sa_run(402, outcome, "2026-06-10T11:00:00Z",
+                      counts={"body_complete": 1, "phase_deferred": 1})
+    sa_summary["sa_alpha_picks_refresh"] = {
+        "latest_attempt": pending, "latest_derived_complete": complete,
+    }
+
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend()), now=_WEDNESDAY),
+               "seeking_alpha")
+
+    assert p["last_success_at"] == "2026-06-10T08:00:00+00:00"
+    assert p["last_complete_at"] == "2026-06-10T08:00:00+00:00"
+    assert p["last_complete_scope"] == "alpha_picks"
+    assert p["last_attempt_at"] == "2026-06-10T11:00:00+00:00"
+    assert p["last_attempt_outcome"] == outcome
+    assert p["last_attempt_scope"] == "alpha_picks"
+    assert p["last_error"] is None
+    assert "FAILED" not in p["detail"]
+    assert p["signals"]["alpha_picks_extension"]["latest_attempt_counts"]["body_complete"] == 1
+
+
+def test_sa_metadata_success_does_not_claim_complete_or_clear_alpha_failure(sa_summary):
+    failed = _sa_run(403, "failed", "2026-06-10T09:00:00Z")
+    sa_summary["sa_alpha_picks_refresh"] = {
+        "latest_attempt": failed, "latest_derived_complete": None,
+    }
+    sa = {"current": {"ok": True, "last_success_at": "2026-06-10T10:00:00Z",
+                       "last_attempt_at": "2026-06-10T10:00:00Z"}}
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend(sa=sa)), now=_WEDNESDAY),
+               "seeking_alpha")
+
+    assert p["last_success_at"] == "2026-06-10T10:00:00+00:00"
+    assert p["last_complete_at"] is None
+    assert p["last_error_scope"] == "alpha_picks"
+    assert p["last_error_at"] == "2026-06-10T09:00:00+00:00"
+
+
+def test_sa_legacy_list_success_is_not_complete(sa_summary):
+    sa = {"current": {"ok": True, "last_success_at": "2026-06-10T10:00:00Z",
+                       "last_attempt_at": "2026-06-10T10:00:00Z"}}
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend(sa=sa)), now=_WEDNESDAY),
+               "seeking_alpha")
+
+    assert p["last_success_at"] == "2026-06-10T10:00:00+00:00"
+    assert p["last_complete_at"] is None
+    assert p["last_attempt_outcome"] == "succeeded"
+    assert p["last_attempt_scope"] == "current"
+
+
+def test_sa_error_without_timestamp_does_not_borrow_another_scope_time(sa_summary):
+    sa = {
+        "current": {"ok": False, "last_error": "undated error"},
+        "closed": {"ok": True, "last_success_at": "2026-06-10T11:00:00Z",
+                   "last_attempt_at": "2026-06-10T11:00:00Z"},
+    }
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend(sa=sa)), now=_WEDNESDAY),
+               "seeking_alpha")
+    assert p["last_error"] == "undated error"
+    assert p["last_error_at"] is None
+    assert p["last_error_scope"] == "current"
+
+
+def test_sa_newer_same_scope_success_resolves_stale_error_metadata(sa_summary):
+    sa = {"current": {"ok": False, "last_error": "old failure",
+                       "last_attempt_at": "2026-06-10T09:00:00Z",
+                       "last_success_at": "2026-06-10T10:00:00Z"}}
+    p = _by_id(compute_provider_health(_FakeDAL(_FakeBackend(sa=sa)), now=_WEDNESDAY),
+               "seeking_alpha")
+    assert p["last_error"] is None
+    assert p["last_error_at"] is None
+    assert p["last_error_scope"] is None
 
 
 def test_section_failure_degrades_not_raises():

@@ -5283,6 +5283,13 @@ export interface ProviderHealth {
   last_success_at: string | null;
   last_attempt_at: string | null;
   last_error: string | null;
+  // SA activity is separate from freshness; legacy list captures are not full jobs.
+  last_attempt_outcome?: string | null;
+  last_attempt_scope?: string | null;
+  last_error_at?: string | null;
+  last_error_scope?: string | null;
+  last_complete_at?: string | null;
+  last_complete_scope?: string | null;
   detail: string;
   signals: Record<string, unknown>;
 }

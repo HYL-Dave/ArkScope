@@ -324,6 +324,63 @@ function jobOutcome(
   return row.status ?? "—";
 }
 
+function scheduleResultRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown> : null;
+}
+
+function finnhubMacroFailureLabels(
+  source: string,
+  state: ScheduleSourceState,
+  job: unknown,
+  t: SettingsT,
+): string[] {
+  const dataset = source === "finnhub_economic_calendar" ? "economic"
+    : source === "finnhub_earnings_calendar" ? "earnings"
+      : source === "finnhub_ipo_calendar" ? "ipo" : null;
+  if (dataset === null || state.write_target !== "macro_calendar.db" || state.running) return [];
+  const durable = state.durable_state;
+  const jobRow = scheduleResultRecord(job);
+  const candidates = [
+    { status: durable?.last_status, result: durable?.last_result,
+      at: durable?.updated_at ?? durable?.last_attempt },
+    { status: state.last_result?.status, result: state.last_result,
+      at: state.last_result?.at ?? state.last_attempt_at },
+    { status: jobRow?.status, result: jobRow?.result,
+      at: jobRow?.finished_at ?? jobRow?.started_at },
+  ].filter((candidate) => typeof candidate.status === "string")
+    .map((candidate) => ({ ...candidate, time: typeof candidate.at === "string" ? Date.parse(candidate.at) : NaN }));
+  // Prefer durable authority unless another outcome is demonstrably newer.
+  // Never fill a newer result's missing details from an older failed attempt.
+  const latest = candidates.reduce<(typeof candidates)[number] | undefined>(
+    (current, candidate) => !current || candidate.time > current.time ? candidate : current,
+    undefined,
+  );
+  if (latest?.status !== "failed" && latest?.status !== "partial") return [];
+  // An undated or simultaneous success prevents a current-denial claim.
+  if (candidates.some((candidate) => candidate.status === "succeeded"
+    && (!Number.isFinite(candidate.time) || !Number.isFinite(latest.time) || candidate.time >= latest.time))) return [];
+  const result = scheduleResultRecord(latest.result);
+  const collection = scheduleResultRecord(result?.collect) ?? result;
+  const fallback = t(($) => $.dataSources.schedule.macroErrors.generic);
+  if (collection?.status !== "failed" && collection?.status !== "partial") return [fallback];
+  const requests = Array.isArray(collection.requests) ? collection.requests : [];
+  const labels = requests.flatMap((value): string[] => {
+    const receipt = scheduleResultRecord(value);
+    if (receipt?.dataset !== dataset || !["failed", "partial", "rejected"].includes(String(receipt.response_state))) return [];
+    switch (receipt.error_code) {
+      case "finnhub_forbidden": return [t(($) => $.dataSources.schedule.macroErrors.forbidden)];
+      case "finnhub_unauthorized": return [t(($) => $.dataSources.schedule.macroErrors.unauthorized)];
+      case "finnhub_rate_limited": return [t(($) => $.dataSources.schedule.macroErrors.rateLimited)];
+      case "finnhub_transport_failed": return [t(($) => $.dataSources.schedule.macroErrors.transportFailed)];
+      case "finnhub_calendar_response_invalid": return [t(($) => $.dataSources.schedule.macroErrors.responseInvalid)];
+      case "finnhub_calendar_rows_rejected": return [t(($) => $.dataSources.schedule.macroErrors.rowsRejected)];
+      default: return [fallback];
+    }
+  });
+  return labels.length ? [...new Set(labels)] : [fallback];
+}
+
 function ScheduleStatus({
   source,
   sourceLabel,
@@ -345,6 +402,7 @@ function ScheduleStatus({
   const schedulerState = schedulerStateLabel(state.durable_state ?? null, t);
   const bodyBacklog = schedulerBodyBacklogPresentation(state.durable_state ?? null, t);
   const job = controller.jobFacts?.[state.job_name];
+  const macroFailures = finnhubMacroFailureLabels(source, state, job, t);
   const showJob = job?.status === "running"
     ? !state.running && historyState !== "running" && historyState !== "stale"
     : Boolean(job) || (!state.running && historyState === null);
@@ -387,6 +445,11 @@ function ScheduleStatus({
           </span>
         ) : null}
       </div>
+      {macroFailures.map((reason) => (
+        <div className="tiny refresh-err" key={reason}>
+          {t(($) => $.dataSources.schedule.macroErrors.scoped, { source: sourceLabel, reason })}
+        </div>
+      ))}
       {bodyBacklog ? (
         <div className={`tiny ${bodyBacklog.tone === "warn" ? "refresh-err" : "muted"}`}>
           {bodyBacklog.label}

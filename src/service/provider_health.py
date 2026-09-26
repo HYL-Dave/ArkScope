@@ -215,7 +215,7 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         job_store = get_job_runs_store(dal)
         jobs = job_store.latest_runs_by_name() or {}
         structured = job_store.structured_extension_summary_by_name(
-            ["sa_market_news_refresh"]
+            ["sa_alpha_picks_refresh", "sa_market_news_refresh"]
         )
         if structured is None:
             notes.append("structured extension job_runs summary unavailable")
@@ -310,6 +310,12 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
              signals: Optional[dict] = None,
              disabled_reason: Optional[str] = None,
              config_error: Optional[dict] = None,
+             last_attempt_outcome: Optional[str] = None,
+             last_attempt_scope: Optional[str] = None,
+             last_error_at: Optional[datetime] = None,
+             last_error_scope: Optional[str] = None,
+             last_complete: Optional[datetime] = None,
+             last_complete_scope: Optional[str] = None,
              threshold_hours: Any = _DEFAULT_THRESHOLD) -> None:
         effective_threshold = _effective_threshold(pid, threshold_hours)
         providers.append({
@@ -333,6 +339,12 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
             "last_success_at": _iso(last_success),
             "last_attempt_at": _iso(last_attempt),
             "last_error": last_error,
+            "last_attempt_outcome": last_attempt_outcome,
+            "last_attempt_scope": last_attempt_scope,
+            "last_error_at": _iso(last_error_at),
+            "last_error_scope": last_error_scope,
+            "last_complete_at": _iso(last_complete),
+            "last_complete_scope": last_complete_scope,
             "detail": detail,
             "signals": signals or {},
         })
@@ -460,64 +472,85 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     )
 
     # Seeking Alpha — extension capture path; no API key
-    sa_success: Optional[datetime] = None
-    sa_attempt: Optional[datetime] = None
-    sa_error: Optional[str] = None
-    sa_ok = True
+    # Freshness remains compatible with list captures. Only structured,
+    # healthy-anchor-eligible results establish a full job completion.
+    successes: Dict[str, datetime] = {}
+    attempts: List[dict] = []
+    errors: List[dict] = []
+    completions: List[dict] = []
     for scope, meta in (sa_meta or {}).items():
         s = _to_dt(meta.get("last_success_at"))
         a = _to_dt(meta.get("last_attempt_at"))
-        if s and (sa_success is None or s > sa_success):
-            sa_success = s
-        if a and (sa_attempt is None or a > sa_attempt):
-            sa_attempt = a
-        if not meta.get("ok", True):
-            sa_ok = False
-            sa_error = sa_error or meta.get("last_error")
+        if s:
+            successes[scope] = s
+        failed = not meta.get("ok", True)
+        if a:
+            attempts.append({"at": a, "scope": scope,
+                             "outcome": "failed" if failed else "succeeded"})
+        if s and (a is None or s > a):
+            attempts.append({"at": s, "scope": scope, "outcome": "succeeded"})
+        if failed:
+            errors.append({"at": a, "scope": scope,
+                           "error": meta.get("last_error") or "refresh_failed"})
+
+    extension_signals: Dict[str, dict] = {}
+    for scope, job_name in (
+        ("alpha_picks", "sa_alpha_picks_refresh"),
+        ("market_news", "sa_market_news_refresh"),
+    ):
+        summary = sa_extension_summary.get(job_name) or {}
+        attempt = summary.get("latest_attempt") or {}
+        complete = summary.get("latest_derived_complete") or {}
+        attempt_at = _to_dt(attempt.get("finished_at")) or _to_dt(attempt.get("started_at"))
+        complete_at = _to_dt(complete.get("finished_at")) or _to_dt(complete.get("started_at"))
+        result = attempt.get("result") if isinstance(attempt.get("result"), dict) else {}
+        outcome = result.get("derived_outcome")
+        if attempt_at:
+            attempts.append({"at": attempt_at, "scope": scope, "outcome": outcome})
+        if complete_at:
+            successes[scope] = max(successes.get(scope, complete_at), complete_at)
+            completions.append({"at": complete_at, "scope": scope})
+        if outcome in {"degraded", "failed"}:
+            errors.append({"at": attempt_at, "scope": scope,
+                           "error": f"{scope}_extension_{outcome}"})
+        extension_signals[f"{scope}_extension"] = {
+            "latest_attempt_run_id": attempt.get("id"),
+            "latest_attempt_outcome": outcome,
+            "latest_attempt_counts": result.get("counts") if isinstance(result.get("counts"), dict) else {},
+            "latest_complete_run_id": complete.get("id"),
+        }
+
+    # An error's timestamp belongs to that scope, never to the provider-wide
+    # latest attempt. Undated errors remain undated and cannot be auto-resolved.
+    unresolved = [error for error in errors if not (
+        error["at"] is not None
+        and successes.get(error["scope"]) is not None
+        and successes[error["scope"]] >= error["at"]
+    )]
+    oldest = datetime.min.replace(tzinfo=timezone.utc)
+    latest_error = max(unresolved, key=lambda e: (e["at"] or oldest, e["scope"]), default={})
+    latest_attempt = max(attempts, key=lambda e: e["at"], default={})
+    latest_complete = max(completions, key=lambda e: e["at"], default={})
+    sa_success = max(successes.values(), default=None)
+    sa_error = latest_error.get("error")
     mn = jobs.get("sa_market_news_refresh") or {}
-    structured_mn = sa_extension_summary.get("sa_market_news_refresh") or {}
-    mn_attempt = structured_mn.get("latest_attempt") or {}
-    mn_complete = structured_mn.get("latest_derived_complete") or {}
-    mn_attempt_at = _to_dt(mn_attempt.get("finished_at")) or _to_dt(
-        mn_attempt.get("started_at")
-    )
-    mn_complete_at = _to_dt(mn_complete.get("finished_at")) or _to_dt(
-        mn_complete.get("started_at")
-    )
-    if mn_attempt_at and (sa_attempt is None or mn_attempt_at > sa_attempt):
-        sa_attempt = mn_attempt_at
-    if mn_complete_at and (sa_success is None or mn_complete_at > sa_success):
-        sa_success = mn_complete_at
-    mn_attempt_result = (
-        mn_attempt.get("result")
-        if isinstance(mn_attempt.get("result"), dict)
-        else {}
-    )
-    mn_outcome = mn_attempt_result.get("derived_outcome")
-    if mn_outcome in {"degraded", "failed"}:
-        sa_ok = False
-        sa_error = sa_error or f"market_news_extension_{mn_outcome}"
-    extension_signal = {
-        "latest_attempt_run_id": mn_attempt.get("id"),
-        "latest_attempt_outcome": mn_outcome,
-        "latest_attempt_counts": (
-            mn_attempt_result.get("counts")
-            if isinstance(mn_attempt_result.get("counts"), dict)
-            else {}
-        ),
-        "latest_complete_run_id": mn_complete.get("id"),
-    }
     _add(
         "seeking_alpha", "Seeking Alpha (extension)", "capture",
         {"present": True, "source": "not_required", "vars": []},
-        last_success=sa_success, last_attempt=sa_attempt,
-        last_error=sa_error if not sa_ok else None,
+        last_success=sa_success, last_attempt=latest_attempt.get("at"),
+        last_attempt_outcome=latest_attempt.get("outcome"),
+        last_attempt_scope=latest_attempt.get("scope"),
+        last_complete=latest_complete.get("at"),
+        last_complete_scope=latest_complete.get("scope"),
+        last_error=sa_error,
+        last_error_at=latest_error.get("at"),
+        last_error_scope=latest_error.get("scope"),
         detail=f"capture last success {_iso(sa_success) or '—'}"
-               + ("" if sa_ok else " · last refresh FAILED"),
+               + (f" · {latest_error['scope']} refresh FAILED" if sa_error else ""),
         signals={
             "refresh_meta": sa_meta,
             "market_news_job": bool(mn),
-            "market_news_extension": extension_signal,
+            **extension_signals,
         },
     )
 

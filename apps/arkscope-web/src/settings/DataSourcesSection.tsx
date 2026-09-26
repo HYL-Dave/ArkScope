@@ -161,10 +161,44 @@ function ibkrClientIdChips(
 }
 
 function ProviderHealthState({ provider, t }: { provider: ProviderHealth; t: SettingsT }) {
+  if (provider.id === "seeking_alpha") {
+    if (provider.last_error || ["failed", "degraded"].includes(provider.last_attempt_outcome ?? "")) {
+      return <StatusBadge state="partial" label={t(($) => $.dataSources.providers.health.activity.refreshIssue)} />;
+    }
+    if (["pending", "deferred"].includes(provider.last_attempt_outcome ?? "")) {
+      return <StatusBadge state="partial" label={t(($) => $.dataSources.providers.health.activity.pending)} />;
+    }
+    if (provider.status === "connected") {
+      return <StatusBadge state="ready" label={t(($) => $.dataSources.providers.health.activity.recentCapture)} />;
+    }
+  }
   const state = providerCommonState(provider.status);
   return state === null
     ? <span className="muted tiny">{providerHealthStatusLabel(provider, t)}</span>
     : <StatusBadge state={state} label={providerHealthStatusLabel(provider, t)} />;
+}
+
+function providerAttemptLabel(outcome: string | null | undefined, t: SettingsT): string {
+  switch (outcome) {
+    case "complete": return t(($) => $.dataSources.providers.health.activity.outcomes.complete);
+    case "succeeded": return t(($) => $.dataSources.providers.health.activity.outcomes.succeeded);
+    case "degraded": return t(($) => $.dataSources.providers.health.activity.outcomes.degraded);
+    case "failed": return t(($) => $.dataSources.providers.health.activity.outcomes.failed);
+    case "deferred": return t(($) => $.dataSources.providers.health.activity.outcomes.deferred);
+    case "pending": return t(($) => $.dataSources.providers.health.activity.outcomes.pending);
+    case "skipped": return t(($) => $.dataSources.providers.health.activity.outcomes.skipped);
+    default: return t(($) => $.dataSources.providers.health.activity.outcomes.unknown);
+  }
+}
+
+function providerScopeLabel(scope: string | null | undefined, t: SettingsT): string {
+  switch (scope) {
+    case "alpha_picks": return t(($) => $.dataSources.providers.health.activity.scopes.alphaPicks);
+    case "market_news": return t(($) => $.dataSources.providers.health.activity.scopes.marketNews);
+    case "current": return t(($) => $.dataSources.providers.health.activity.scopes.current);
+    case "closed": return t(($) => $.dataSources.providers.health.activity.scopes.closed);
+    default: return t(($) => $.dataSources.providers.health.activity.scopes.unknown);
+  }
 }
 
 type DataSourcesOutcome = { kind: "error"; error: unknown };
@@ -249,11 +283,13 @@ export function DataSourcesSection({
 
   const load = useCallback(async (force = false) => {
     const [rh, rc] = await Promise.all([
-      settingsReadCache.load("provider_health", getProvidersHealth, { force }),
+      settingsReadCache.load("provider_health", getProvidersHealth, { force }).then((result) => {
+        if (dataSourcesMountedRef.current && result.status === "success") setHealth(result.value);
+        return result;
+      }),
       settingsReadCache.load("provider_config", getProvidersConfig, { force }),
     ]);
     if (!dataSourcesMountedRef.current) return;
-    if (rh.status === "success") setHealth(rh.value);
     if (rc.status === "success") {
       setCfg(rc.value.providers);
       setCfgSetup(rc.value.setup);
@@ -277,6 +313,25 @@ export function DataSourcesSection({
   useEffect(() => {
     void load(false);
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshHealth = async () => {
+      if (document.visibilityState === "hidden") return;
+      const result = await settingsReadCache.load("provider_health", getProvidersHealth, { force: true });
+      if (!cancelled && result.status === "success") setHealth(result.value);
+    };
+    const refresh = () => { void refreshHealth(); };
+    const timer = window.setInterval(refresh, 30_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [settingsReadCache]);
 
   useEffect(() => {
     if (health !== null) replaceJobFacts(health.jobs);
@@ -617,12 +672,14 @@ export function DataSourcesSection({
                   <th>{t(($) => $.dataSources.headings.status)}</th>
                   <th>{t(($) => $.dataSources.headings.key)}</th>
                   <th>{t(($) => $.dataSources.headings.lastSuccess)}</th>
+                  <th>{t(($) => $.dataSources.providers.health.activity.latestAttempt)}</th>
                   <th>{t(($) => $.dataSources.headings.lastError)}</th>
                 </tr>
               </thead>
               <tbody>
                 {health.providers.map((p) => {
                   const fredDetail = fredProviderDetail(p, t);
+                  const errorAt = p.last_error_at ?? (p.id === "seeking_alpha" ? null : p.last_attempt_at);
                   return (
                     <tr key={p.id}>
                       <td className="settings-wrap-text">
@@ -638,13 +695,28 @@ export function DataSourcesSection({
                           </span>
                         )}
                       </td>
-                      <td>{shortTs(p.last_success_at)}</td>
+                      <td className="settings-wrap-text">
+                        {shortTs(p.last_success_at)}
+                        {p.last_complete_at ? (
+                          <div className="muted tiny">
+                            {t(($) => $.dataSources.providers.health.activity.lastComplete)}
+                            {" · "}{providerScopeLabel(p.last_complete_scope, t)}
+                            <div>{shortTs(p.last_complete_at)}</div>
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="settings-wrap-text">
+                        {p.last_attempt_outcome ? <div>{providerAttemptLabel(p.last_attempt_outcome, t)}</div> : null}
+                        {p.last_attempt_scope ? <div className="muted tiny">{providerScopeLabel(p.last_attempt_scope, t)}</div> : null}
+                        {shortTs(p.last_attempt_at)}
+                      </td>
                       <td className="settings-wrap-text">
                         {p.last_error ? (
                           <>
                             <span className="refresh-err">{t(($) => $.dataSources.states.failed)}</span>
-                            {p.last_attempt_at ? (
-                              <div className="muted tiny">{shortTs(p.last_attempt_at)}</div>
+                            {p.last_error_scope ? <div className="muted tiny">{providerScopeLabel(p.last_error_scope, t)}</div> : null}
+                            {errorAt ? (
+                              <div className="muted tiny">{shortTs(errorAt)}</div>
                             ) : null}
                           </>
                         ) : <span className="muted">—</span>}

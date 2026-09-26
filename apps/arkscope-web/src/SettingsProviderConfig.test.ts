@@ -18,6 +18,7 @@ import {
   testProvider,
   type ModelCatalog,
   type ModelTask,
+  type ProviderHealth,
   type ProvidersHealthResponse,
   type TaskRoute,
 } from "./api";
@@ -504,6 +505,7 @@ afterEach(() => {
   mocked.priceScheduleMode = "blank";
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.mocked(getProvidersHealth).mockReset().mockImplementation(async () => health);
 });
 
 async function renderDataSources(
@@ -552,6 +554,29 @@ function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => { resolve = done; });
   return { promise, resolve };
+}
+
+function saProviderHealth(overrides: Partial<ProviderHealth> = {}): ProvidersHealthResponse {
+  return {
+    ...health,
+    providers: [{
+      id: "seeking_alpha", label: "Seeking Alpha", kind: "capture",
+      status: "connected", enabled: null, key_present: true,
+      key_source: "not_required", key_vars: [], key_import_suggested: false,
+      last_success_at: "2026-09-26T19:59:01Z",
+      last_complete_at: "2026-09-26T19:59:01Z", last_complete_scope: "market_news",
+      last_attempt_at: "2026-09-26T19:59:01Z", last_attempt_outcome: "complete",
+      last_attempt_scope: "market_news", last_error: "alpha_picks_extension_degraded",
+      last_error_at: "2026-09-26T19:23:00Z", last_error_scope: "alpha_picks",
+      detail: "", signals: {}, ...overrides,
+    }],
+  };
+}
+
+function saHealthRow(): HTMLTableRowElement {
+  const row = host!.querySelector<HTMLTableRowElement>("[data-testid='provider-health-scroll'] tbody tr");
+  if (!row) throw new Error("missing SA provider health row");
+  return row;
 }
 
 async function waitForReport(
@@ -1376,7 +1401,7 @@ describe("Settings provider config authority", () => {
     expect(host!.querySelector("[data-portfolio-capture-controls]")).toBeNull();
   });
 
-  it("polls only schedule after thirty idle seconds without a live region", async () => {
+  it("polls schedule and read-only provider health after thirty idle seconds without a live region", async () => {
     vi.useFakeTimers();
     await renderDataSources();
     clearDataSourceReadMocks();
@@ -1386,12 +1411,13 @@ describe("Settings provider config authority", () => {
 
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(getSchedule).toHaveBeenCalledTimes(1);
-    expect(getProvidersHealth).not.toHaveBeenCalled();
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
     expect(getProvidersConfig).not.toHaveBeenCalled();
+    expect(getSAExtensionHealth).not.toHaveBeenCalled();
     expect(host!.querySelector("[aria-live]")).toBeNull();
   });
 
-  it("detects a fast idle-to-idle completion and refreshes related state once", async () => {
+  it("detects a fast idle-to-idle completion alongside the independent health poll", async () => {
     vi.useFakeTimers();
     await renderDataSources();
     clearDataSourceReadMocks();
@@ -1402,7 +1428,7 @@ describe("Settings provider config authority", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
 
     expect(getSchedule).toHaveBeenCalledTimes(2);
-    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(getProvidersHealth).toHaveBeenCalledTimes(2);
     expect(getProvidersConfig).toHaveBeenCalledTimes(1);
     const row = Array.from(host!.querySelectorAll("tr")).find((node) =>
       node.textContent?.includes("IBKR 新聞"));
@@ -1437,20 +1463,21 @@ describe("Settings provider config authority", () => {
     expect(getSchedule).toHaveBeenCalledTimes(1);
   });
 
-  it("refreshes schedule on focus and full-loads only when lifecycle truth changes", async () => {
+  it("refreshes schedule and provider health on focus but config only when lifecycle truth changes", async () => {
     await renderDataSources();
     clearDataSourceReadMocks();
 
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(getSchedule).toHaveBeenCalledTimes(1);
-    expect(getProvidersHealth).not.toHaveBeenCalled();
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(getProvidersConfig).not.toHaveBeenCalled();
 
     clearDataSourceReadMocks();
     mocked.scheduleLastAttemptAt = "2026-07-17T10:30:00Z";
     mocked.scheduleUpdatedAt = "2026-07-17T10:31:00Z";
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(getSchedule).toHaveBeenCalledTimes(2);
-    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(getProvidersHealth).toHaveBeenCalledTimes(2);
     expect(getProvidersConfig).toHaveBeenCalledTimes(1);
   });
 
@@ -1473,7 +1500,7 @@ describe("Settings provider config authority", () => {
       await Promise.resolve();
     });
     expect(host!.textContent).toBe(before);
-    expect(getProvidersHealth).not.toHaveBeenCalled();
+    expect(getProvidersHealth).toHaveBeenCalled();
   });
 
   it("does not let an older full refresh replace newer schedule truth", async () => {
@@ -1528,6 +1555,7 @@ describe("Settings provider config authority", () => {
 
     await act(async () => { window.dispatchEvent(new Event("focus")); });
     expect(getSchedule).toHaveBeenCalledTimes(1);
+    const healthCallsBeforeUnmount = vi.mocked(getProvidersHealth).mock.calls.length;
 
     act(() => root!.unmount());
     root = null;
@@ -1539,7 +1567,152 @@ describe("Settings provider config authority", () => {
     await act(async () => { window.dispatchEvent(new Event("focus")); });
 
     expect(getSchedule).toHaveBeenCalledTimes(1);
+    expect(getProvidersHealth).toHaveBeenCalledTimes(healthCallsBeforeUnmount);
+  });
+
+  it.each([
+    ["en", "Refresh issue", "Complete", "Alpha Picks", "Market news", "Last complete job"],
+    ["zh-Hant", "更新異常", "完整完成", "Alpha Picks", "市場新聞", "上次完整作業"],
+  ] as const)("separates SA recent capture latest outcome and scoped error time in %s", async (
+    locale, issue, complete, alpha, news, lastComplete,
+  ) => {
+    await i18n.changeLanguage(locale);
+    vi.mocked(getProvidersHealth).mockResolvedValueOnce(saProviderHealth());
+    await renderDataSources(vi.fn());
+    const row = saHealthRow();
+    expect(row.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("partial");
+    expect(row.cells[1].textContent).toContain(issue);
+    const errorCell = row.cells[row.cells.length - 1];
+    expect(errorCell.textContent).toContain(alpha);
+    expect(errorCell.textContent).toContain(formatSystemTimestamp("2026-09-26T19:23:00Z"));
+    expect(errorCell.textContent).not.toContain(formatSystemTimestamp("2026-09-26T19:59:01Z"));
+    expect(row.cells[4].textContent).toContain(complete);
+    expect(row.cells[4].textContent).toContain(news);
+    expect(row.cells[4].textContent).toContain(formatSystemTimestamp("2026-09-26T19:59:01Z"));
+    expect(row.cells[3].textContent).toContain(lastComplete);
+    expect(row.textContent).not.toContain("alpha_picks_extension_degraded");
+  });
+
+  it.each(["pending", "deferred"])("shows SA %s without losing the last capture or calling it failure", async (outcome) => {
+    await i18n.changeLanguage("en");
+    vi.mocked(getProvidersHealth).mockResolvedValueOnce(saProviderHealth({
+      last_attempt_at: "2026-09-26T20:05:00Z", last_attempt_outcome: outcome,
+      last_attempt_scope: "alpha_picks", last_error: null, last_error_at: null, last_error_scope: null,
+    }));
+    await renderDataSources(vi.fn());
+    const row = saHealthRow();
+    expect(row.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("partial");
+    expect(row.cells[1].textContent).toContain("Pending");
+    expect(row.cells[3].textContent).toContain(formatSystemTimestamp("2026-09-26T19:59:01Z"));
+    expect(row.cells[4].textContent).toContain(outcome === "deferred" ? "Deferred" : "Pending");
+    expect(row.textContent).not.toContain("Failed");
+  });
+
+  it("does not call a legacy SA list capture a complete job or date an undated error", async () => {
+    await i18n.changeLanguage("en");
+    vi.mocked(getProvidersHealth).mockResolvedValueOnce(saProviderHealth({
+      last_complete_at: null, last_complete_scope: null, last_attempt_outcome: "succeeded",
+      last_attempt_scope: "current", last_error_at: null, last_error_scope: "closed",
+    }));
+    await renderDataSources(vi.fn());
+    const row = saHealthRow();
+    expect(row.cells[3].textContent).not.toContain("Last complete job");
+    expect(row.cells[4].textContent).toContain("Capture succeeded");
+    expect(row.cells[4].textContent).toContain("Current picks list");
+    const errorCell = row.cells[row.cells.length - 1];
+    expect(errorCell.textContent).toContain("Closed picks list");
+    expect(errorCell.textContent).not.toContain(formatSystemTimestamp("2026-09-26T19:59:01Z"));
+  });
+
+  it("updates external SA health while idle without reloading config or probing extension", async () => {
+    vi.useFakeTimers();
+    vi.mocked(getProvidersHealth).mockResolvedValueOnce(saProviderHealth());
+    await renderDataSources(vi.fn());
+    clearDataSourceReadMocks();
+    vi.mocked(getProvidersHealth).mockResolvedValueOnce(saProviderHealth({
+      last_error: null, last_error_at: null, last_error_scope: null,
+    }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(29_999); });
     expect(getProvidersHealth).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(saHealthRow().querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("ready");
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(getProvidersConfig).not.toHaveBeenCalled();
+    expect(getSAExtensionHealth).not.toHaveBeenCalled();
+    expect(getModelCatalog).not.toHaveBeenCalled();
+  });
+
+  it("coalesces health timer and focus reads and retains visible truth on failure", async () => {
+    vi.useFakeTimers();
+    vi.mocked(getProvidersHealth).mockResolvedValueOnce(saProviderHealth());
+    await renderDataSources(vi.fn());
+    const before = saHealthRow().textContent;
+    clearDataSourceReadMocks();
+    let rejectHealth!: (error: Error) => void;
+    vi.mocked(getProvidersHealth).mockImplementationOnce(() => new Promise((_, reject) => {
+      rejectHealth = reject;
+    }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    await act(async () => { rejectHealth(new Error("offline")); });
+    expect(saHealthRow().textContent).toBe(before);
+    expect(getProvidersConfig).not.toHaveBeenCalled();
+    expect(getSAExtensionHealth).not.toHaveBeenCalled();
+  });
+
+  it("does not let delayed config completion overwrite newer polled SA health", async () => {
+    vi.useFakeTimers();
+    const pendingConfig = deferred<Awaited<ReturnType<typeof getProvidersConfig>>>();
+    vi.mocked(getProvidersConfig).mockReturnValueOnce(pendingConfig.promise);
+    vi.mocked(getProvidersHealth).mockResolvedValueOnce(saProviderHealth());
+    await renderDataSources(vi.fn());
+    vi.mocked(getProvidersHealth).mockResolvedValueOnce(saProviderHealth({
+      last_error: null, last_error_at: null, last_error_scope: null,
+    }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(saHealthRow().querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("ready");
+    await act(async () => { pendingConfig.resolve(mocked.providersConfig); });
+    expect(saHealthRow().querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("ready");
+  });
+
+  it("pauses provider health reads while hidden and refreshes when visible", async () => {
+    vi.useFakeTimers();
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    await renderDataSources(vi.fn());
+    clearDataSourceReadMocks();
+    visibility.mockReturnValue("hidden");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.advanceTimersByTimeAsync(60_000);
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(getProvidersHealth).not.toHaveBeenCalled();
+    visibility.mockReturnValue("visible");
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(getProvidersConfig).not.toHaveBeenCalled();
+    expect(getSAExtensionHealth).not.toHaveBeenCalled();
+  });
+
+  it("removes provider health polling and ignores an in-flight result after unmount", async () => {
+    vi.useFakeTimers();
+    await renderDataSources(vi.fn());
+    clearDataSourceReadMocks();
+    const pending = deferred<ProvidersHealthResponse>();
+    vi.mocked(getProvidersHealth).mockReturnValueOnce(pending.promise);
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    disposeDataSources();
+    await act(async () => {
+      pending.resolve(saProviderHealth());
+      await vi.advanceTimersByTimeAsync(60_000);
+      window.dispatchEvent(new Event("focus"));
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(getProvidersHealth).toHaveBeenCalledTimes(1);
+    expect(getProvidersConfig).not.toHaveBeenCalled();
+    expect(getSAExtensionHealth).not.toHaveBeenCalled();
   });
 
   it("renders English data-source health config and schedule tables", async () => {
