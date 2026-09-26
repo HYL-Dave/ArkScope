@@ -1,6 +1,6 @@
 """Explicit, digest-approved SEC orphan cleanup; previews never recover stores."""
 
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, closing, contextmanager
 import hashlib
 import json
 import os
@@ -23,6 +23,8 @@ _PREVIEW_FIELDS = {"format", "version", "operation", "mode", "status", "code", "
 _ROOT_TABLES = {"research_threads", "research_messages", "research_runs", "research_run_events"}
 _ROOT_INDEXES = {"idx_research_threads_updated", "idx_research_messages_thread",
                  "idx_research_runs_thread", "idx_research_runs_status"}
+_NON_ROOT_TABLES = {"research_reports", "research_runtime_config"}
+_NON_ROOT_INDEXES = {"idx_reports_created"}
 _CODES = {"sec_research_preview_invalid", "sec_research_preview_stale", "sec_research_operation_busy",
           "sec_research_profile_invalid", "sec_research_profile_transaction_active", "sec_research_schema_mismatch",
           "sec_research_unknown_owned_objects", "sec_research_external_dependencies",
@@ -93,11 +95,28 @@ def _profile_roots(conn):
                                           or row[2].lower().startswith("research_"))]
     if not objects:
         return [], []
-    _require({row[1] for row in objects if row[0] == "table"} == _ROOT_TABLES,
+    tables = {row[1] for row in objects if row[0] == "table"}
+    roots = tables - _NON_ROOT_TABLES
+    _require(not roots or roots == _ROOT_TABLES, "sec_research_profile_invalid")
+    _require(all((kind == "table" and name in _ROOT_TABLES | _NON_ROOT_TABLES) or
+                 (kind == "index" and name in _ROOT_INDEXES | _NON_ROOT_INDEXES) for kind, name, _, _ in objects),
              "sec_research_profile_invalid")
-    _require(all((kind == "table" and name in _ROOT_TABLES) or
-                 (kind == "index" and name in _ROOT_INDEXES) for kind, name, _, _ in objects),
-             "sec_research_profile_invalid")
+    if tables & _NON_ROOT_TABLES:
+        from src.app_records_store import _SCHEMA as reports_schema
+        from src.research_runtime_config import _SCHEMA as runtime_schema
+
+        # These current App tables hold prose/config, not structured SEC roots.
+        # Reject future columns or relations instead of silently ignoring them.
+        with closing(sqlite3.connect(":memory:")) as expected:
+            expected.executescript(reports_schema + runtime_schema)
+            for table in tables & _NON_ROOT_TABLES:
+                for pragma in ("table_xinfo", "foreign_key_list"):
+                    query = f"PRAGMA {pragma}({_quote(table)})"
+                    _require([tuple(row) for row in conn.execute(query)] ==
+                             [tuple(row) for row in expected.execute(query)],
+                             "sec_research_profile_invalid")
+    if not roots:
+        return sorted(objects), []
     try:
         refs = list(iter_research_sec_citations(conn))
     except ValueError:

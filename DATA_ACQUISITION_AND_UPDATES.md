@@ -103,6 +103,40 @@ user-defined formulas/indicators and alerts remain pending. Calendar zero counts
 mean no local rows, not established empty upstream coverage. Disabled schedules
 keep historical outcomes without retrying merely because an old failure exists.
 
+### Financial Corpus Retirement (September 27)
+
+The operator has authorized removing the retained SEC research corpus and all
+48 legacy `financial_cache` rows, including the old Financial Datasets entries
+and their legacy file-cache copies. This is a data-retirement decision, not a
+request to hide expired rows in a diagnostic panel. Execution still requires
+the brief stop-write boundary and a verified cleanup receipt; approval alone
+does not mean the formal database has already been cleared.
+
+At that boundary, the local fundamentals route will select Financial Datasets
+only, the SEC-only detailed-financials route will be disabled, and the SEC
+research schedule will be disabled. Existing FD request limits are unchanged.
+Cleanup makes no replacement provider requests. SA financial, valuation and
+estimate captures remain available through their existing local-read routes.
+SA's common ratio-analysis adapter remains unfinished, not an implied capability
+of selecting SA in the category catalog.
+
+TTL means **time to live**: an age-based cache-reuse rule. It does not make a
+reported financial fact false when it expires, prove a provider has published a
+new period, or justify retaining this retired corpus. Future eligible SA/FD
+observations can still be reused locally. The shared cache table stays empty
+after cleanup rather than being dropped while the FD client still needs it.
+
+Preserve SA captures, market prices, news, macro data, holdings, research history,
+credentials and the separate company-identity dictionary/lifecycle records.
+The current uninstall authority requires one verified temporary recovery copy;
+remove that new copy after cleanup acceptance, rather than keeping a new permanent
+SEC archive. Existing mixed-data historical backups are not silently rewritten.
+This is application-data removal, not forensic secure erasure.
+
+The [SA/FD financial design](docs/superpowers/specs/2026-09-27-sa-fd-financial-data-and-sec-retirement-design.md)
+separates this authorized cleanup from the subsequent common-source adapter and
+replacement UI. Its new implementation details still await review.
+
 ### Saved Comment Work Is Not Complete Coverage
 
 A usable scan that successfully persisted comments but exhausted its scroll/time

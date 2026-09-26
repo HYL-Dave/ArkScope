@@ -24,6 +24,52 @@ def apply(a, p, name="receipt.json", backup="backup"):
         receipt_path=a.tmp / name, profile_connection=a.profile)
 
 
+@pytest.mark.parametrize("with_history", [False, True])
+def test_schema_uninstall_accepts_current_app_profile_without_citations(admin, with_history):
+    from src.app_records_store import AppRecordsLocalStore
+    from src.research_runtime_config import ResearchRuntimeStore
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore
+
+    a = admin
+    AppRecordsLocalStore(a.profile_path)
+    ResearchRuntimeStore(a.profile_path)
+    if with_history:
+        ResearchRunStore(a.profile_path)
+        ResearchThreadStore(a.profile_path)
+    a.captures.put(b"retired SEC capture")
+    before_profile = list(a.profile.iterdump())
+    p = preview(a, "uninstall")
+    assert p["status"] == "ready", p
+    assert p["references"]["research_citations"] == 0
+    result = apply(a, p)
+    assert result["status"] == "ok", result
+    assert list(a.profile.iterdump()) == before_profile
+    with a.store.connect(readonly=True) as conn:
+        assert not schema._owned(conn)
+
+
+@pytest.mark.parametrize("damage", ["unknown_table", "extra_reference_column"])
+def test_schema_uninstall_still_rejects_unknown_profile_shapes(admin, damage):
+    from src.app_records_store import AppRecordsLocalStore
+    from src.research_runtime_config import ResearchRuntimeStore
+    from src.research_runs import ResearchRunStore
+    from src.research_threads import ResearchThreadStore
+
+    a = admin
+    AppRecordsLocalStore(a.profile_path)
+    ResearchRuntimeStore(a.profile_path)
+    ResearchRunStore(a.profile_path)
+    ResearchThreadStore(a.profile_path)
+    with sqlite3.connect(a.profile_path) as conn:
+        if damage == "unknown_table":
+            conn.execute("CREATE TABLE research_new_citations(value TEXT)")
+        else:
+            conn.execute("ALTER TABLE research_reports ADD COLUMN sec_citations TEXT")
+    p = preview(a, "uninstall")
+    assert p["status"] == "blocked" and p["code"] == "sec_research_profile_invalid", p
+
+
 @pytest.mark.parametrize("suffix", ["", "-journal", "-wal", "-shm"])
 @pytest.mark.parametrize("output", ["receipt", "backup"])
 def test_schema_outputs_reject_profile_sqlite_namespace(admin, suffix, output):
@@ -88,9 +134,15 @@ def test_schema_reset_requires_backup_and_exclusive_lease(admin):
     assert result["backup"]["format"] == "arkscope-sec-research-raw-backup"
 
 
-def test_schema_reset_refuses_research_references(evidence, profile, tmp_path):
+@pytest.mark.parametrize("current_app_tables", [False, True])
+def test_schema_reset_refuses_research_references(evidence, profile, tmp_path, current_app_tables):
     r = evidence.rig
     runs, _ = profile
+    if current_app_tables:
+        from src.app_records_store import AppRecordsLocalStore
+        from src.research_runtime_config import ResearchRuntimeStore
+        AppRecordsLocalStore(runs.db_path)
+        ResearchRuntimeStore(runs.db_path)
     runs.append_event("roots-run", "tool_end", {"tool": "read_sec_filing", "sec_citations": [evidence.document_ref]})
     with closing(sqlite3.connect(runs.db_path)) as conn:
         conn.execute("PRAGMA query_only=ON")
