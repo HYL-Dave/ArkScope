@@ -762,7 +762,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 83,
       shell: 49,
-      settings: 1227,
+      settings: 1253,
       research: 240,
       explore: 1209,
       portfolio: 374,
@@ -848,7 +848,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3206);
+      expect(total, `${locale}.total`).toBe(3232);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([
@@ -1235,6 +1235,32 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      "dataSources.providers.health.activity.recentCapture",
+      "dataSources.providers.health.activity.refreshIssue",
+      "dataSources.providers.health.activity.pending",
+      "dataSources.providers.health.activity.latestAttempt",
+      "dataSources.providers.health.activity.lastComplete",
+      "dataSources.providers.health.activity.outcomes.complete",
+      "dataSources.providers.health.activity.outcomes.succeeded",
+      "dataSources.providers.health.activity.outcomes.degraded",
+      "dataSources.providers.health.activity.outcomes.failed",
+      "dataSources.providers.health.activity.outcomes.deferred",
+      "dataSources.providers.health.activity.outcomes.pending",
+      "dataSources.providers.health.activity.outcomes.skipped",
+      "dataSources.providers.health.activity.outcomes.unknown",
+      "dataSources.providers.health.activity.scopes.alphaPicks",
+      "dataSources.providers.health.activity.scopes.marketNews",
+      "dataSources.providers.health.activity.scopes.current",
+      "dataSources.providers.health.activity.scopes.closed",
+      "dataSources.providers.health.activity.scopes.unknown",
+      "dataSources.schedule.macroErrors.scoped",
+      "dataSources.schedule.macroErrors.forbidden",
+      "dataSources.schedule.macroErrors.unauthorized",
+      "dataSources.schedule.macroErrors.rateLimited",
+      "dataSources.schedule.macroErrors.transportFailed",
+      "dataSources.schedule.macroErrors.responseInvalid",
+      "dataSources.schedule.macroErrors.rowsRejected",
+      "dataSources.schedule.macroErrors.generic",
       "dataSources.catalog.methods.browser_page_capture",
       "dataSources.routing.datasets.saCompany",
       "dataSources.routing.datasets.saValuation",
