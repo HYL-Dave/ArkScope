@@ -117,6 +117,83 @@ describe("Settings read cache", () => {
     });
   });
 
+  it.each([0, 61_000])("withdraws_provider_config_during_revalidation_at_age_%s", async (age) => {
+    const { createSettingsReadCache } = await loadCacheModule();
+    let now = 0;
+    const cache = createSettingsReadCache({ clock: () => now });
+    cache.replace("provider_config", { configured: true });
+    cache.replace("data_source_catalog", { categories: [] });
+    now = age;
+    const pending = deferred<{ configured: boolean }>();
+    const loading = cache.load("provider_config", () => pending.promise, { force: age === 0 });
+
+    expect(cache.inspect("provider_config")).toEqual({ status: "missing" });
+    const joinedLoader = vi.fn(async () => ({ configured: true }));
+    expect(cache.load("provider_config", joinedLoader)).toBe(loading);
+    expect(joinedLoader).not.toHaveBeenCalled();
+    expect(cache.inspect("data_source_catalog")).toMatchObject({ status: "fresh", value: { categories: [] } });
+    pending.resolve({ configured: false });
+    await loading;
+    expect(cache.inspect("provider_config")).toMatchObject({ status: "fresh", value: { configured: false } });
+  });
+
+  it.each(["sync", "async"])("does_not_reuse_provider_config_after_a_%s_refresh_failure", async (mode) => {
+    const { createSettingsReadCache } = await loadCacheModule();
+    const cache = createSettingsReadCache();
+    cache.replace("provider_config", { configured: true });
+    cache.replace("news_status", { articles: 10 });
+    const error = new Error("offline");
+
+    const result = await cache.load("provider_config", () => {
+      if (mode === "sync") throw error;
+      return Promise.reject(error);
+    }, { force: true });
+
+    expect(result).toEqual({ status: "error", error });
+    expect(cache.inspect("provider_config")).toEqual({ status: "missing" });
+    expect(cache.inspect("news_status")).toMatchObject({ status: "fresh", value: { articles: 10 } });
+    const recovered = await cache.load("provider_config", async () => ({ configured: false }));
+    expect(recovered).toMatchObject({ source: "loader", value: { configured: false } });
+  });
+
+  it("preserves_noncredential_success_during_and_after_a_failed_forced_refresh", async () => {
+    const { createSettingsReadCache } = await loadCacheModule();
+    const cache = createSettingsReadCache();
+    cache.replace("provider_health", { available: true });
+    const pending = deferred<{ available: boolean }>();
+    const loading = cache.load("provider_health", () => pending.promise, { force: true });
+
+    expect(cache.inspect("provider_health")).toMatchObject({ status: "fresh", value: { available: true } });
+    pending.reject(new Error("offline"));
+    await loading;
+    expect(cache.inspect("provider_health")).toMatchObject({ status: "fresh", value: { available: true } });
+  });
+
+  it.each(["resolve", "reject"])("keeps_a_replaced_provider_config_when_an_older_request_finishes_with_%s", async (completion) => {
+    const { createSettingsReadCache } = await loadCacheModule();
+    const cache = createSettingsReadCache();
+    const pending = deferred<{ configured: boolean }>();
+    const loading = cache.load("provider_config", () => pending.promise);
+    cache.replace("provider_config", { configured: false });
+
+    if (completion === "resolve") pending.resolve({ configured: true });
+    else pending.reject(new Error("old failure"));
+    await loading;
+
+    expect(cache.inspect("provider_config")).toMatchObject({ status: "fresh", value: { configured: false } });
+  });
+
+  it("does_not_reuse_old_provider_config_when_its_replacement_cannot_be_retained", async () => {
+    const { createSettingsReadCache } = await loadCacheModule();
+    const cache = createSettingsReadCache();
+    cache.replace("provider_config", { configured: true });
+
+    const result = cache.replace("provider_config", { configured: false, payload: "x".repeat(512 * 1024) });
+
+    expect(result).toMatchObject({ status: "success", retained: false });
+    expect(cache.inspect("provider_config")).toEqual({ status: "missing" });
+  });
+
   it("does_not_resurrect_invalidated_success_after_mutation_failure", async () => {
     const { createSettingsReadCache } = await loadCacheModule();
     const cache = createSettingsReadCache();
@@ -265,6 +342,80 @@ describe("Settings read cache", () => {
 
     expect(listener).toHaveBeenCalledOnce();
     expect(listener).toHaveBeenCalledWith("macro_snapshot");
+  });
+
+  it("publishes_exact_key_changes_without_triggering_invalidation_reloads", async () => {
+    const { createSettingsReadCache } = await loadCacheModule();
+    const cache = createSettingsReadCache();
+    const snapshots: unknown[] = [];
+    const invalidated = vi.fn();
+    cache.subscribeInvalidation("provider_config", invalidated);
+    cache.subscribeChange("provider_config", () => { throw new Error("subscriber failure"); });
+    const unsubscribe = cache.subscribeChange("provider_config", () => {
+      snapshots.push(cache.inspect("provider_config"));
+    });
+    const otherKey = vi.fn();
+    cache.subscribeChange("news_status", otherKey);
+
+    cache.replace("provider_config", { configured: true });
+    expect(snapshots).toMatchObject([{ status: "fresh", value: { configured: true } }]);
+    expect(otherKey).not.toHaveBeenCalled();
+    const pending = deferred<{ configured: boolean }>();
+    const loading = cache.load("provider_config", () => pending.promise, { force: true });
+    expect(snapshots).toMatchObject([
+      { status: "fresh", value: { configured: true } },
+      { status: "missing" },
+    ]);
+    pending.resolve({ configured: false });
+    await loading;
+    expect(snapshots).toMatchObject([
+      { status: "fresh", value: { configured: true } },
+      { status: "missing" },
+      { status: "fresh", value: { configured: false } },
+    ]);
+    expect(invalidated).not.toHaveBeenCalled();
+    cache.invalidate("provider_config");
+    expect(snapshots.at(-1)).toEqual({ status: "missing" });
+    expect(invalidated).toHaveBeenCalledOnce();
+
+    unsubscribe();
+    unsubscribe();
+    cache.replace("provider_config", { configured: true });
+    expect(snapshots).toHaveLength(4);
+    expect(otherKey).not.toHaveBeenCalled();
+  });
+
+  it("publishes_clear_to_change_subscribers_even_without_a_retained_value", async () => {
+    const { createSettingsReadCache } = await loadCacheModule();
+    const cache = createSettingsReadCache();
+    const listener = vi.fn();
+    cache.subscribeChange("provider_config", listener);
+
+    cache.clear();
+
+    expect(listener).toHaveBeenCalledExactlyOnceWith("provider_config");
+  });
+
+  it.each(["capacity", "expiry"])("publishes_a_retained_entry_removed_by_%s", async (reason) => {
+    const { createSettingsReadCache, oauthAccountUsageKey } = await loadCacheModule();
+    let now = 0;
+    const cache = createSettingsReadCache({ clock: () => now });
+    cache.replace("provider_config", { configured: true });
+    const snapshots: unknown[] = [];
+    cache.subscribeChange("provider_config", () => {
+      snapshots.push(cache.inspect("provider_config"));
+    });
+
+    if (reason === "capacity") {
+      for (let index = 0; index < 32; index += 1) {
+        cache.replace(oauthAccountUsageKey(`credential-${index}`), { index });
+      }
+    } else {
+      now = 15 * 60_000 + 1;
+      cache.replace("news_status", { articles: 10 });
+    }
+
+    expect(snapshots).toEqual([{ status: "missing" }]);
   });
 
   it("maps_price_and_news_sources_to_exact_downstream_keys", async () => {

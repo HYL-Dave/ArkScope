@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import i18n from "i18next";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DataSourceCapability, DataSourceCatalog, ProvidersConfigResponse } from "../api";
+import type { DataSourceCapability, DataSourceCatalog, DataSourceRoutesResponse, ProvidersConfigResponse } from "../api";
 import { createSettingsReadCache, type SettingsReadCache } from "./settingsReadCache";
 import { settingsParentAnchor } from "./settingsRegistry";
 
@@ -69,6 +69,16 @@ let root: ReturnType<typeof createRoot> | null;
 let host: HTMLDivElement;
 const navigate = vi.fn();
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((accept, decline) => {
+    resolve = accept;
+    reject = decline;
+  });
+  return { promise, resolve, reject };
+}
+
 async function flush() {
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 }
@@ -126,6 +136,7 @@ afterEach(() => {
   if (root) act(() => root!.unmount());
   root = null;
   document.body.replaceChildren();
+  vi.useRealTimers();
 });
 
 describe("DataSourceCatalogSection", () => {
@@ -230,6 +241,164 @@ describe("DataSourceCatalogSection", () => {
     expect(host.textContent).not.toContain("PRIVATE_CONFIG_ERROR");
     await click(reload());
     expect(provider("massive").textContent).toContain("API key configured");
+  });
+
+  it("keeps an unset credential read unknown until the first response arrives", async () => {
+    const pending = deferred<ProvidersConfigResponse>();
+    vi.mocked(getProvidersConfig).mockReturnValueOnce(pending.promise);
+    await render();
+    expect(provider("massive").textContent).toContain("API key status unavailable");
+    expect(provider("massive").textContent).not.toContain("API key configured");
+    expect(provider("seeking_alpha").textContent).toContain("No API key used for this source");
+
+    await act(async () => { pending.resolve(config); });
+    expect(provider("massive").textContent).toContain("API key configured");
+  });
+
+  it("does not treat stale cached credentials as current while mount revalidation is pending", async () => {
+    vi.useFakeTimers();
+    const cache = createSettingsReadCache();
+    cache.replace("data_source_catalog", state);
+    cache.replace("provider_config", structuredClone(config));
+    vi.advanceTimersByTime(61_000);
+    const pending = deferred<ProvidersConfigResponse>();
+    vi.mocked(getProvidersConfig).mockReturnValueOnce(pending.promise);
+
+    await render(cache);
+
+    expect(provider("massive").textContent).toContain("API key status unavailable");
+    expect(provider("massive").textContent).not.toContain("API key configured");
+    expect(getDataSourceCatalog).not.toHaveBeenCalled();
+    config.providers.massive.fields[0].effective_source = "missing";
+    await act(async () => { pending.resolve(config); });
+    expect(provider("massive").textContent).toContain("API key not configured");
+  });
+
+  it.each(["catalog reload", "invalidation", "parent refresh"])(
+    "withdraws the previous credential claim during a pending %s",
+    async (trigger) => {
+      const cache = createSettingsReadCache();
+      await render(cache);
+      expect(provider("massive").textContent).toContain("API key configured");
+      const pending = deferred<ProvidersConfigResponse>();
+      vi.mocked(getProvidersConfig).mockReturnValueOnce(pending.promise);
+
+      if (trigger === "catalog reload") await click(reload());
+      else await act(async () => {
+        if (trigger === "invalidation") cache.invalidate("provider_config");
+        else void cache.load("provider_config", getProvidersConfig, { force: true });
+      });
+
+      expect(provider("massive").textContent).toContain("API key status unavailable");
+      expect(provider("massive").textContent).not.toContain("API key configured");
+      config.providers.massive.fields[0].effective_source = "missing";
+      await act(async () => { pending.resolve(config); });
+      expect(provider("massive").textContent).toContain("API key not configured");
+    },
+  );
+
+  it.each(["refresh", "replace"])("observes a parent config %s without reloading the catalog", async (update) => {
+    const cache = createSettingsReadCache();
+    await render(cache);
+    config.providers.massive.fields[0].effective_source = "missing";
+
+    await act(async () => {
+      if (update === "refresh") await cache.load("provider_config", getProvidersConfig, { force: true });
+      else cache.replace("provider_config", structuredClone(config));
+    });
+
+    expect(provider("massive").textContent).toContain("API key not configured");
+    expect(provider("massive").textContent).not.toContain("API key configured");
+    expect(getDataSourceCatalog).toHaveBeenCalledTimes(1);
+    expect(getProvidersConfig).toHaveBeenCalledTimes(update === "refresh" ? 2 : 1);
+  });
+
+  it.each(["catalog", "parent"])("does not resurrect configured credentials on remount after a failed %s refresh", async (owner) => {
+    const cache = createSettingsReadCache();
+    await render(cache);
+    vi.mocked(getProvidersConfig).mockRejectedValueOnce(new Error("PRIVATE_CONFIG_ERROR"));
+    if (owner === "catalog") await click(reload());
+    else await act(async () => { await cache.load("provider_config", getProvidersConfig, { force: true }); });
+
+    expect(provider("massive").textContent).toContain("API key status unavailable");
+    await act(async () => { root!.unmount(); root = null; });
+    const pending = deferred<ProvidersConfigResponse>();
+    vi.mocked(getProvidersConfig).mockReturnValueOnce(pending.promise);
+    await render(cache);
+
+    expect(provider("massive").textContent).toContain("API key status unavailable");
+    expect(provider("massive").textContent).not.toContain("API key configured");
+    expect(host.textContent).not.toContain("PRIVATE_CONFIG_ERROR");
+    expect(getProvidersConfig).toHaveBeenCalledTimes(3);
+    await act(async () => { pending.resolve(config); });
+    expect(provider("massive").textContent).toContain("API key configured");
+  });
+
+  it("does not adopt a fresh-looking credential snapshot when mounting during a parent refresh", async () => {
+    const cache = createSettingsReadCache();
+    cache.replace("provider_config", config);
+    const pending = deferred<ProvidersConfigResponse>();
+    vi.mocked(getProvidersConfig).mockReturnValueOnce(pending.promise);
+    const loading = cache.load("provider_config", getProvidersConfig, { force: true });
+
+    await render(cache);
+
+    expect(provider("massive").textContent).toContain("API key status unavailable");
+    expect(getProvidersConfig).toHaveBeenCalledOnce();
+    config.providers.massive.fields[0].effective_source = "missing";
+    await act(async () => { pending.resolve(config); await loading; });
+    expect(provider("massive").textContent).toContain("API key not configured");
+  });
+
+  it("expires the credential claim while mounted without probing a provider", async () => {
+    vi.useFakeTimers();
+    await render();
+    expect(provider("massive").textContent).toContain("API key configured");
+
+    await act(async () => { vi.advanceTimersByTime(60_001); });
+
+    expect(provider("massive").textContent).toContain("API key status unavailable");
+    expect(provider("massive").textContent).not.toContain("API key configured");
+    expect(getProvidersConfig).toHaveBeenCalledOnce();
+    expect(testProvider).not.toHaveBeenCalled();
+  });
+
+  it("does not let an invalidated config request replace a newer missing-key response", async () => {
+    const cache = createSettingsReadCache();
+    const pending = deferred<ProvidersConfigResponse>();
+    vi.mocked(getProvidersConfig).mockReturnValueOnce(pending.promise);
+    await render(cache);
+    const oldConfig = structuredClone(config);
+    config.providers.massive.fields[0].effective_source = "missing";
+    await act(async () => { cache.invalidate("provider_config"); });
+    expect(provider("massive").textContent).toContain("API key not configured");
+
+    await act(async () => { pending.resolve(oldConfig); });
+
+    expect(provider("massive").textContent).toContain("API key not configured");
+    expect(provider("massive").textContent).not.toContain("API key configured");
+  });
+
+  it("does not interpret a configured Financial Datasets key as enabling paid requests", async () => {
+    config.providers.financial_datasets = structuredClone(config.providers.massive);
+    const cache = createSettingsReadCache();
+    const routes: DataSourceRoutesResponse = {
+      routes: [],
+      financial_datasets_budget: {
+        enabled: false, daily_request_limit: null, requests_per_minute: null,
+        setting_source: "default", state: "disabled", error_code: null,
+      },
+    };
+    cache.replace("data_source_routes", routes);
+    await render(cache);
+
+    expect(provider("financial_datasets").textContent).toContain("API key configured");
+    expect(provider("financial_datasets").textContent).toContain("authorized request budget required");
+    expect(provider("financial_datasets").textContent).not.toContain("Paid requests allowed");
+    expect(cache.inspect("data_source_routes")).toMatchObject({ status: "fresh", value: routes });
+    expect(putDataSourceRoute).not.toHaveBeenCalled();
+    expect(runScheduleNow).not.toHaveBeenCalled();
+    expect(testProvider).not.toHaveBeenCalled();
   });
 
   it("treats an incomplete config store as unknown, not as a verified missing key", async () => {

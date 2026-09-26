@@ -21,7 +21,8 @@ export type SettingsReadKey =
   | `oauth_account_usage:${string}`
   | `trading_day_coverage:15min:${number}`;
 
-export type SettingsReadInvalidationListener = (key: SettingsReadKey) => void;
+export type SettingsReadChangeListener = (key: SettingsReadKey) => void;
+export type SettingsReadInvalidationListener = SettingsReadChangeListener;
 
 export type SettingsReadInspection<T> =
   | { status: "missing" }
@@ -205,6 +206,7 @@ export interface SettingsReadCache {
     options?: { force?: boolean },
   ): Promise<SettingsReadOutcome<T>>;
   replace<T>(key: SettingsReadKey, value: T, now?: number): SettingsReadOutcome<T>;
+  subscribeChange(key: SettingsReadKey, listener: SettingsReadChangeListener): () => void;
   subscribeInvalidation(
     key: SettingsReadKey,
     listener: SettingsReadInvalidationListener,
@@ -221,6 +223,7 @@ class MemorySettingsReadCache implements SettingsReadCache {
   private readonly generations = new Map<SettingsReadKey, number>();
   private readonly retained = new Map<SettingsReadKey, RetainedEntry>();
   private readonly inFlight = new Map<SettingsReadKey, InFlight>();
+  private readonly changeListeners = new Map<SettingsReadKey, Set<SettingsReadChangeListener>>();
   private readonly invalidationListeners = new Map<
     SettingsReadKey,
     Set<SettingsReadInvalidationListener>
@@ -271,10 +274,14 @@ class MemorySettingsReadCache implements SettingsReadCache {
       return existing.promise as Promise<SettingsReadOutcome<T>>;
     }
 
+    // Credential presence must not survive a pending or failed revalidation.
+    // Other resources intentionally keep their stale-while-revalidate behavior.
+    if (key === "provider_config") this.removeRetained(key);
     let launched: Promise<T>;
     try {
       launched = loader();
     } catch (error) {
+      if (key === "provider_config") this.notifyChanged(key);
       return Promise.resolve({ status: "error", error });
     }
 
@@ -295,28 +302,46 @@ class MemorySettingsReadCache implements SettingsReadCache {
       });
     holder.promise = promise as Promise<SettingsReadOutcome<unknown>>;
     this.inFlight.set(key, holder);
+    if (key === "provider_config") this.notifyChanged(key);
     return promise;
   }
 
   replace<T>(key: SettingsReadKey, value: T, now = this.clock()): SettingsReadOutcome<T> {
     assertSettingsReadKey(key);
+    if (key === "provider_config") {
+      this.generations.set(key, this.generation(key) + 1);
+      this.inFlight.delete(key);
+      this.removeRetained(key);
+    }
     return this.retainCurrentValue(key, value, now);
+  }
+
+  subscribeChange(key: SettingsReadKey, listener: SettingsReadChangeListener): () => void {
+    return this.subscribe(key, listener, this.changeListeners);
   }
 
   subscribeInvalidation(
     key: SettingsReadKey,
     listener: SettingsReadInvalidationListener,
   ): () => void {
+    return this.subscribe(key, listener, this.invalidationListeners);
+  }
+
+  private subscribe(
+    key: SettingsReadKey,
+    listener: SettingsReadChangeListener,
+    subscriptions: Map<SettingsReadKey, Set<SettingsReadChangeListener>>,
+  ): () => void {
     assertSettingsReadKey(key);
-    const listeners = this.invalidationListeners.get(key) ?? new Set();
+    const listeners = subscriptions.get(key) ?? new Set();
     listeners.add(listener);
-    this.invalidationListeners.set(key, listeners);
+    subscriptions.set(key, listeners);
     let subscribed = true;
     return () => {
       if (!subscribed) return;
       subscribed = false;
       listeners.delete(listener);
-      if (listeners.size === 0) this.invalidationListeners.delete(key);
+      if (listeners.size === 0) subscriptions.delete(key);
     };
   }
 
@@ -325,6 +350,7 @@ class MemorySettingsReadCache implements SettingsReadCache {
     this.generations.set(key, this.generation(key) + 1);
     this.removeRetained(key);
     this.inFlight.delete(key);
+    this.notifyChanged(key);
     this.notifyInvalidated(key);
   }
 
@@ -378,7 +404,10 @@ class MemorySettingsReadCache implements SettingsReadCache {
     this.retained.clear();
     this.inFlight.clear();
     this.retainedBytes = 0;
-    for (const key of keys) this.notifyInvalidated(key);
+    for (const key of keys) {
+      this.notifyChanged(key);
+      this.notifyInvalidated(key);
+    }
   }
 
   private generation(key: SettingsReadKey): number {
@@ -392,6 +421,7 @@ class MemorySettingsReadCache implements SettingsReadCache {
   ): SettingsReadOutcome<T> {
     const bytes = serializedByteSize(value);
     if (bytes === null || bytes > SETTINGS_READ_CACHE_MAX_ENTRY_BYTES) {
+      this.notifyChanged(key);
       return { status: "success", source: "loader", retained: false, value };
     }
     this.removeHardExpired(receivedAt);
@@ -405,6 +435,7 @@ class MemorySettingsReadCache implements SettingsReadCache {
     this.retained.set(key, entry);
     this.retainedBytes += bytes;
     this.evictToBounds();
+    this.notifyChanged(key);
     return {
       status: "success",
       source: "loader",
@@ -422,6 +453,7 @@ class MemorySettingsReadCache implements SettingsReadCache {
     for (const [key, entry] of this.retained) {
       if (Math.max(0, now - entry.receivedAt) > settingsReadPolicy(key, entry.value).hardRetentionMs) {
         this.removeRetained(key);
+        this.notifyChanged(key);
       }
     }
   }
@@ -448,6 +480,7 @@ class MemorySettingsReadCache implements SettingsReadCache {
       }
       if (oldestKey === null) break;
       this.removeRetained(oldestKey);
+      this.notifyChanged(oldestKey);
     }
   }
 
@@ -457,11 +490,23 @@ class MemorySettingsReadCache implements SettingsReadCache {
       ...this.retained.keys(),
       ...this.inFlight.keys(),
       ...this.invalidationListeners.keys(),
+      ...this.changeListeners.keys(),
     ]);
   }
 
   private notifyInvalidated(key: SettingsReadKey): void {
-    const listeners = this.invalidationListeners.get(key);
+    this.notifyListeners(key, this.invalidationListeners);
+  }
+
+  private notifyChanged(key: SettingsReadKey): void {
+    this.notifyListeners(key, this.changeListeners);
+  }
+
+  private notifyListeners(
+    key: SettingsReadKey,
+    subscriptions: Map<SettingsReadKey, Set<SettingsReadChangeListener>>,
+  ): void {
+    const listeners = subscriptions.get(key);
     if (!listeners) return;
     for (const listener of [...listeners]) {
       try {

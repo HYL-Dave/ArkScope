@@ -6,7 +6,7 @@ import { getDataSourceCatalog, getProvidersConfig, type DataCatalogControl, type
 import { IconButton, StatusBadge } from "../ui";
 import { dataSourceDatasetLabel, providerName } from "./settingsBackendCopy";
 import type { SettingsT } from "./settingsCopy";
-import type { SettingsReadCache } from "./settingsReadCache";
+import { settingsReadPolicy, type SettingsReadCache } from "./settingsReadCache";
 import type { SettingsLocationId } from "./settingsRegistry";
 
 const CONTROL_TARGETS: Record<DataCatalogControl, SettingsLocationId> = {
@@ -113,23 +113,25 @@ export function DataSourceCatalogSection({ settingsReadCache, onNavigate }: {
     return retained.status === "missing" ? null : retained.value;
   });
   const [selected, setSelected] = useState<DataCategoryId>("financial_statements");
-  const [config, setConfig] = useState<ProvidersConfigResponse | null>(() => {
-    const retained = settingsReadCache.inspect<ProvidersConfigResponse>("provider_config");
-    return retained.status === "missing" ? null : retained.value;
-  });
+  const [, setConfigRevision] = useState(0);
+  const refreshConfig = useCallback(() => setConfigRevision((revision) => revision + 1), []);
+  const currentConfig = settingsReadCache.inspect<ProvidersConfigResponse>("provider_config");
+  const config = currentConfig.status === "fresh" ? currentConfig.value : null;
+  const configReceivedAt = currentConfig.status === "fresh" ? currentConfig.receivedAt : null;
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const mounted = useRef(false);
   const sequence = useRef(0);
-  const configSequence = useRef(0);
 
-  const loadConfig = useCallback(async (force = false) => {
-    const request = ++configSequence.current;
-    const result = await settingsReadCache.load("provider_config", getProvidersConfig, { force });
-    if (!mounted.current || configSequence.current !== request) return;
-    if (result.status === "success") setConfig(result.value);
-    else if (result.status === "error") setConfig(null);
-  }, [settingsReadCache]);
+  const loadConfig = useCallback((force = false) =>
+    settingsReadCache.load("provider_config", getProvidersConfig, { force }), [settingsReadCache]);
+
+  useEffect(() => {
+    if (configReceivedAt === null) return;
+    const expiresIn = configReceivedAt + settingsReadPolicy("provider_config").freshMs + 1 - Date.now();
+    const timer = setTimeout(refreshConfig, Math.max(0, expiresIn));
+    return () => clearTimeout(timer);
+  }, [configReceivedAt, refreshConfig, settingsReadCache]);
 
   const load = useCallback(async (force = false) => {
     const request = ++sequence.current;
@@ -145,12 +147,14 @@ export function DataSourceCatalogSection({ settingsReadCache, onNavigate }: {
 
   useEffect(() => {
     mounted.current = true;
-    void load();
-    void loadConfig();
+    const unsubscribeConfigChange = settingsReadCache.subscribeChange("provider_config", refreshConfig);
     const unsubscribe = settingsReadCache.subscribeInvalidation("data_source_catalog", () => { void load(); });
     const unsubscribeConfig = settingsReadCache.subscribeInvalidation("provider_config", () => { void loadConfig(); });
-    return () => { mounted.current = false; unsubscribe(); unsubscribeConfig(); };
-  }, [load, loadConfig, settingsReadCache]);
+    refreshConfig();
+    void load();
+    void loadConfig();
+    return () => { mounted.current = false; unsubscribe(); unsubscribeConfig(); unsubscribeConfigChange(); };
+  }, [load, loadConfig, refreshConfig, settingsReadCache]);
 
   const category = data?.categories.find((row) => row.id === selected) ?? data?.categories[0];
   return (
