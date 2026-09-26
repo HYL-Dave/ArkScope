@@ -91,6 +91,11 @@ Follow `extensions/sa_alpha_picks/FIREFOX.md` for the temporary add-on steps. Ru
 health and capture history are visible in Settings. Design and implementation live
 in `docs/design/SA_EXTENSION_ROADMAP.md` and `extensions/sa_alpha_picks/`.
 
+Use the [SA collection guide](SA_COLLECTION_GUIDE.md) for routine collection,
+watchlist financial updates, result states and where to inspect article links.
+The [data acquisition policy](DATA_ACQUISITION_AND_UPDATES.md) records freshness,
+source selection and the limits of currently implemented capabilities.
+
 ## Project layout
 
 High-level only; use `docs/design/CURRENT_PROJECT_CONTEXT.md` for authority and
