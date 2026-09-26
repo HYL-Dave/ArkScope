@@ -315,9 +315,20 @@ captureArticleBodyRecovery = async function(target,run) {
             while len(saved) < 2 and time.monotonic() < deadline:
                 # Poll only the local server, never the extension background.
                 time.sleep(.2)
+            # Prove both stages ran before reopening can wake the background.
+            assert len(saved) == 2, {"saved": saved, "workload": workload}
             return_popup()
-            result = message({"action": "get_article_body_recovery_state" if workload == "body_batch" else "fixture_routine_state"})
-            assert len(saved) == 2, {"saved": saved, "result": result}
+            # Capture precedes cleanup, terminal receipt and result publication.
+            # Polling is safe here: the no-popup continuation was already proved.
+            terminal_deadline = time.monotonic() + 5
+            while True:
+                result = message({"action": "get_article_body_recovery_state" if workload == "body_batch" else "fixture_routine_state"})
+                terminal = (result.get("batch", {}).get("status") == "complete" if workload == "body_batch"
+                            else bool(result.get("fixtureRoutineResult")))
+                if terminal:
+                    break
+                assert time.monotonic() < terminal_deadline, result
+                time.sleep(.1)
             assert saved[1][1] - saved[0][1] >= gap
             assert len(admissions) == (2 if workload == "body_batch" else 1)
             if workload == "body_batch":

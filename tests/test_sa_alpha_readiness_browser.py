@@ -233,6 +233,7 @@ def test_alpha_readiness_real_browser_permissions(readiness_browser, scenario):
         assert report["initial"]["url"] == "about:blank" or (
             report["initial"]["url"] == "" and report["initial"]["pendingUrl"] == "about:blank"), report
     if scenario == "uncommitted":
+        assert report["beforeLoadingSamples"][-1]["status"] == "loading", report
         assert report["serverBeforeWait"]["header_sent"] is False, report
         assert report["initial"]["status"] == "loading", report
         assert report["initial"]["url"] in ("", "about:blank") or report["expectedUrlAlreadyPublished"], report

@@ -90,6 +90,8 @@ def test_body_repair_popup_offline_layout(width, tmp_path):
                 page.locator("#bodyRecoveryCancelBtn").click()
                 page.wait_for_function("document.querySelector('#bodyRecoveryResult').textContent.includes('cancelled')")
                 assert "Last batch" in page.locator("#bodyRecoveryResult").inner_text()
+            # DOM text can update before Chromium paints the resized popup.
+            page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
             issues = page.evaluate(r"""() => {
               const root = document.querySelector('section[aria-labelledby="bodyRecoveryHeading"]');
               const failures = [];

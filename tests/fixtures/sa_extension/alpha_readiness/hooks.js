@@ -34,6 +34,20 @@ async function readinessRun(message) {
       tab = await task.navigate({kind: "create", destinationClass: "picks"}, () =>
         chrome.tabs.create({url: scenario === "fresh_blank" ? "about:blank" : url, active: false}));
       report.created = snapshot(tab);
+      if (scenario === "uncommitted") {
+        // tabs.create can resolve while Firefox still exposes the completed
+        // about:blank document. Keep response headers withheld and wait for
+        // real navigation start; fresh_blank separately tests the earlier state.
+        const deadline = Date.now() + 3000;
+        report.beforeLoadingSamples = [];
+        while (true) {
+          const sample = snapshot(await chrome.tabs.get(tab.id));
+          report.beforeLoadingSamples.push(sample);
+          if (sample.status === "loading") break;
+          if (Date.now() > deadline) throw new Error("fixture navigation never started");
+          await pause(30);
+        }
+      }
       if (scenario === "response_started") {
         const deadline = Date.now() + 3000;
         while (!(await control("state")).header_sent) {
