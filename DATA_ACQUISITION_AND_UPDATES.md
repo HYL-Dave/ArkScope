@@ -358,7 +358,7 @@ catalog reload keeps the previous definitions visible with an error, not a
 successful refresh indication.
 
 SA articles, comments, recommendation membership and market news use the
-existing Chrome extension capture/auto-sync. The catalog links to its status;
+existing Firefox/Chrome extension capture/auto-sync. The catalog links to its status;
 capture controls remain in the extension, not a new sidecar API job. SA structured
 financial tables, valuation/peers and estimates/revisions have separate
 eligibility switches and share the explicit company-capture command. Finnhub entries describe required
@@ -367,6 +367,39 @@ endpoint access without presuming a paid subscription or certifying free access.
 Owners: [catalog](src/data_source_catalog.py),
 [metadata endpoint](src/api/routes/providers_config.py),
 [Settings catalog](apps/arkscope-web/src/settings/DataSourceCatalogSection.tsx).
+
+### Collection Outcomes and Recovery
+
+- The SA extension's top acquisition status distinguishes a live local task,
+  stopped work requiring recovery, and unavailable browser evidence. The App can
+  read an unfinished native record but cannot prove that the browser is running.
+  A missing capture tab interrupts that task; it must not wait for the full page
+  readiness timeout or try another page on the same missing tab.
+- If the extension reports **Stopped capture: recovery required**, pause its
+  schedules and close remaining automatic capture tabs first. Use **Review
+  recovery**, confirm the stopped state, then **Recover stopped capture**. Do not
+  recover while a capture is still running. Resume the existing schedules after
+  recovery; do not run a full article scan merely to test readiness.
+- Financial **Missing checks** count statement/view/currency scopes, not company
+  count. Select scope and inspect the preview before enabling **Scheduled
+  financial updates**. Leaving that checkbox off does not start the financial
+  backlog. **Article body repair** has its own preview and explicitly started
+  batch; an outstanding count is not evidence that repair is running.
+- IBKR news reports **subscription denied**, **request timed out**, and
+  **completeness unknown** separately. A missing historical completion callback
+  alone proves neither subscription denial nor successful completion. Partial
+  headlines received before timeout are retained. Old unknown records cannot be
+  retrospectively relabeled without evidence from a new attempt. Settings keeps
+  per-ticker issues collapsed until expanded.
+- Finnhub calendar status separates completed requests (including empty
+  responses), requests with issues, and stored-event counts. A failed symbol does
+  not invalidate successful symbols. HTTP 403 establishes endpoint access denial,
+  not which subscription plan would resolve it. Empty earnings responses do not
+  establish complete coverage or absence of an upcoming earnings event.
+
+Article Entry/Exit/Related LLM classification remains a separate, unimplemented
+workstream pending design confirmation. Extension manual link review is not an
+LLM classifier and does not establish complete article-body availability.
 
 ## Which Clock Means What?
 
