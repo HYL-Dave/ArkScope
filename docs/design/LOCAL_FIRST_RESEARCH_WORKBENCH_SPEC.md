@@ -56,9 +56,15 @@ Current storage is split by durability and writer shape:
 | Store | Ownership |
 |---|---|
 | `profile_state.db` | User state, credentials, routes, research runs, schedules, job history |
-| `market_data.db` | Prices, news, fundamentals cache, company events, market metadata |
+| `market_data.db` | Prices, news, company events, market metadata |
 | `macro_calendar.db` | Economic series, observations, releases, and calendar events |
 | `sa_capture.db` | Seeking Alpha captures, comments, signals, and repair state |
+
+The common financial reader uses retained SA captures and the existing FD
+financial response cache, not the retired market-store SEC projection. Financial
+coverage is independent of price/news store availability; see
+[Data Acquisition And Updates](../../DATA_ACQUISITION_AND_UPDATES.md) for current
+ownership and source-specific refresh rules.
 
 SQLite WAL mode and bounded busy timeouts support concurrent local readers. Each
 domain has one canonical writer and a fail-closed cross-process lock where separate

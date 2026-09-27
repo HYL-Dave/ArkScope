@@ -152,13 +152,13 @@ def test_current_docs_training_and_tool_copy_name_only_current_authorities():
         "docs/data/DATA_SUBSCRIPTION_GUIDE.md",
         "docs/design/LOCAL_FIRST_RESEARCH_WORKBENCH_SPEC.md",
     )
-    current_tool_copy = (
-        "src/tools/registry.py",
-        "src/agents/anthropic_agent/tools.py",
-        "src/agents/openai_agent/tools.py",
-        "src/tools/analysis_tools.py",
-        "src/tools/schemas.py",
-    )
+    current_tool_copy = {
+        "src/tools/registry.py": "Read selected SA/Financial Datasets statements",
+        "src/agents/anthropic_agent/tools.py": "Read selected SA/Financial Datasets statements",
+        "src/agents/openai_agent/tools.py": "Read selected SA/Financial Datasets statements",
+        "src/tools/analysis_tools.py": "Read selected SA/FD observations.",
+        "src/tools/schemas.py": "seeking_alpha, financial_datasets, or none",
+    }
 
     for path in current_docs:
         text = _read(path)
@@ -170,11 +170,7 @@ def test_current_docs_training_and_tool_copy_name_only_current_authorities():
     for path in current_docs:
         assert "market_data.db" in _read(path), path
 
-    expected_tool_claim = (
-        "Static SEC facts plus a qualified local completed-session price, "
-        "or typed unavailable."
-    )
-    for path in current_tool_copy:
+    for path, expected_tool_claim in current_tool_copy.items():
         text = _read(path)
         assert "IBKR real-time" not in text, path
         assert expected_tool_claim in text, path

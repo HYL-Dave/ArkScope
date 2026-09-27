@@ -3,6 +3,12 @@
 > **目的**: 記錄 AI Agent 自主發現板塊爆發模式所需的數據訂閱策略
 > **最後更新**: 2026-01-30
 
+> **2026-09-27 financial routing supersession:** Common financial reads now use
+> retained SA/Financial Datasets observations; old SEC valuation coverage is not
+> an active tool promise. The dated subscription examples below do not establish
+> the current user's entitlements. See
+> [Data Acquisition And Updates](../../DATA_ACQUISITION_AND_UPDATES.md).
+
 > **2026-07-26 current-state supersession:** 本文的訂閱與方法論分析仍保留，
 > 但舊的每日 `iv_history` snapshot、SQLite/Parquet 24-row store、排程來源與
 > store-backed IV 工具已退役。這不代表 ArkScope 放棄 IV：live option chain、

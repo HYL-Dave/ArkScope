@@ -1,5 +1,12 @@
 # Financial Metrics 計算公式說明
 
+> **Historical formula reference (2026-09-27):** The SEC calculator and FD
+> comparisons below describe an earlier implementation, not current tool
+> coverage. Current reads use retained SA/FD inputs with explicit supported
+> mappings and gaps; detailed valuation and peer operations are not ported.
+> See [Data Acquisition And Updates](../../DATA_ACQUISITION_AND_UPDATES.md)
+> for the active contract. Historical numerical examples are not newly verified.
+
 > 目標：完全複製 Financial Datasets API 的 39 個財務指標
 > 數據來源：SEC EDGAR XBRL + IBKR 價格數據
 

@@ -210,7 +210,7 @@ class FundamentalsResult(BaseModel):
     free_cash_flow: Optional[float] = None
     cash_and_equivalents: Optional[float] = None
     total_debt: Optional[float] = None
-    # SEC EDGAR structured financial statements
+    # Source-separated retained financial statements.
     income_statements: Optional[List[FinancialStatement]] = Field(
         None, description="Recent income statements (newest first)"
     )
@@ -265,9 +265,9 @@ class ValuationPriceBasis(BaseModel):
 
 
 class DetailedFinancials(BaseModel):
-    """Comprehensive metrics for valuation analysis.
+    """Legacy detailed valuation compatibility shape.
 
-    Static SEC facts plus a qualified local completed-session price, or typed unavailable.
+    The active tool returns financial_operation_not_ported without acquisition.
     """
     ticker: str
     status: ReadStatus = "unavailable"

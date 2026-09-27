@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.tools.schemas import FundamentalsResult
+from src.tools.schemas import DetailedFinancials, FundamentalsResult
 
 
 @pytest.fixture
@@ -57,3 +57,27 @@ def test_common_result_schema_does_not_advertise_retired_sources():
     assert "financial_datasets" in description
     assert "sec_edgar" not in description
     assert "ibkr" not in description
+
+
+def test_comparison_copy_matches_its_supported_sources():
+    from src.tools.registry import create_default_registry
+
+    tool = create_default_registry().get("compare_financial_sources")
+    sources = next(parameter for parameter in tool.parameters if parameter.name == "sources")
+    assert sources.items["enum"] == ["seeking_alpha", "financial_datasets"]
+    assert "SA" in tool.description and "Financial Datasets" in tool.description
+    assert "SEC" not in tool.description
+
+
+def test_legacy_detailed_schema_does_not_promise_an_active_operation():
+    description = DetailedFinancials.model_json_schema()["description"]
+    assert "legacy" in description.lower()
+    assert "financial_operation_not_ported" in description
+
+
+def test_old_formula_reference_points_to_current_financial_contract():
+    root = Path(__file__).resolve().parents[1]
+    content = (root / "docs/analysis/FINANCIAL_METRICS_FORMULAS.md").read_text()
+    header = content.split("## 1.", 1)[0]
+    assert "Historical" in header
+    assert "DATA_ACQUISITION_AND_UPDATES.md" in header

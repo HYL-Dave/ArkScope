@@ -219,7 +219,7 @@ class ToolRegistry:
         self.register(ToolDefinition(
             name="compare_financial_sources", result_policy=PUBLIC_JSON, category="analysis",
             function=compare_financial_sources,
-            description=("Compare already stored SA, SEC and/or Financial Datasets statement rows. "
+            description=("Compare already stored SA and Financial Datasets statement rows. "
                          "No network, refresh, spending or authoritative-source selection. Default sources are "
                          "those enabled in Settings. Retain labels/periods/currency/scale and show descriptive "
                          "deltas only on compatible bases. Month alignment is not exact fiscal-date equivalence; "
