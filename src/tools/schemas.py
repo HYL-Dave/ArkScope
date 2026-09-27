@@ -177,7 +177,7 @@ class FundamentalsResult(BaseModel):
     update_choices: List[dict] = Field(default_factory=list)
     pagination: dict = Field(default_factory=dict)
     snapshot_date: Optional[str] = None
-    data_source: str = Field(default="none", description="ibkr, sec_edgar, financial_datasets, or none")
+    data_source: str = Field(default="none", description="seeking_alpha, financial_datasets, or none")
     acquisition_gaps: List[Dict[str, str]] = Field(
         default_factory=list, description="Provider acquisition refusal/failure; not evidence of absent financial data"
     )
@@ -188,7 +188,7 @@ class FundamentalsResult(BaseModel):
     source_routes: List[dict] = Field(default_factory=list)
     metric_basis: Dict[str, dict] = Field(default_factory=dict)
     metric_gaps: Dict[str, str] = Field(default_factory=dict)
-    # Key metrics (derived from IBKR snapshot or SEC)
+    # Metrics supported by qualified retained inputs; missing inputs remain gaps.
     market_cap: Optional[float] = None
     pe_ratio: Optional[float] = None
     forward_pe: Optional[float] = None
