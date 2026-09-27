@@ -10,6 +10,12 @@ import {
   addTickerTag,
   deleteNote,
   getStoredFundamentals,
+  refreshFinancials,
+  getSAAcquisitionStatus,
+  ApiError,
+  type FinancialReadQuery,
+  type FinancialPeriod,
+  type SAAcquisitionStatus,
   getMarketDataCoverage,
   getMarketDataStatus,
   getTagCatalog,
@@ -23,7 +29,6 @@ import {
   type MarketDataCoverage,
   type MarketDataStatus,
   type Note,
-  type SourcePath,
   type PriceChange,
   type RuntimeConfig,
   type TagRef,
@@ -34,10 +39,15 @@ import { ExploreErrorNotice } from "./explore/ExploreErrorNotice";
 import {
   captureExploreError,
   type ExploreErrorState,
-  type ExploreT,
 } from "./explore/explorePresentation";
 import type { NavigationTarget } from "./shell/navigation";
 import { tagClass, tagKey, tagTitle } from "./tags";
+import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw, Settings2 } from "lucide-react";
+import { Button, IconButton } from "./ui/Button";
+import { ConfirmDialog } from "./ui/ConfirmDialog";
+import { financialText } from "./settings/FinancialCoverageSection";
+import { RecordedTimestamp } from "./settings/RecordedTimestamp";
+import type { SettingsReadCache } from "./settings/settingsReadCache";
 
 type Tab = "overview" | "data" | "notes" | "ai";
 
@@ -48,6 +58,7 @@ export function TickerDetailView({
   developerMode,
   onNavigateTarget,
   cardRecoveryDraftRef,
+  settingsReadCache,
 }: {
   ticker: string;
   onBack: () => void;
@@ -55,6 +66,7 @@ export function TickerDetailView({
   developerMode: boolean;
   onNavigateTarget: (target: NavigationTarget) => void;
   cardRecoveryDraftRef?: MutableRefObject<CardRecoveryDraft | null>;
+  settingsReadCache?: SettingsReadCache;
 }) {
   const { t } = useTranslation("explore");
   const [tab, setTab] = useState<Tab>("overview");
@@ -193,6 +205,7 @@ export function TickerDetailView({
         />
       ) : tab === "data" ? (
         <DataTab
+          settingsReadCache={settingsReadCache}
           ticker={ticker}
           developerMode={developerMode}
           onNavigateTarget={onNavigateTarget}
@@ -329,213 +342,283 @@ const DATA_OPERATIONS = [
 ] as const;
 
 function DataTab({
-  ticker,
-  developerMode,
-  onNavigateTarget,
+  ticker, developerMode, onNavigateTarget, settingsReadCache,
 }: {
-  ticker: string;
-  developerMode: boolean;
+  ticker: string; developerMode: boolean;
   onNavigateTarget: (target: NavigationTarget) => void;
+  settingsReadCache?: SettingsReadCache;
 }) {
   const { t } = useTranslation("explore");
+  const { t: ft } = useTranslation("settings");
+  const [source, setSource] = useState<FinancialReadQuery["source"]>("auto");
+  const [period, setPeriod] = useState<FinancialPeriod>("annual");
   const [fund, setFund] = useState<FundamentalsResult | null>(null);
   const [status, setStatus] = useState<MarketDataStatus | null>(null);
-  const [coverage, setCoverage] = useState<MarketDataCoverage | null>(null);
   const [loading, setLoading] = useState(true);
   const [errs, setErrs] = useState<ExploreErrorState[]>([]);
+  const [changed, setChanged] = useState(false);
+  const [confirmUpdate, setConfirmUpdate] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateResult, setUpdateResult] = useState<FundamentalsResult | "error" | null>(null);
+  const [collector, setCollector] = useState<SAAcquisitionStatus | null>(null);
+  const sequence = useRef(0);
+  const updateRunning = useRef(false);
+  const updateButton = useRef<HTMLButtonElement>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setErrs([]);
-    // Independent reads: one unavailable diagnostic must not blank the others.
+  const load = useCallback(async (offset = 0, readId?: string) => {
+    const request = ++sequence.current;
+    setLoading(true); setErrs([]); setChanged(false);
     const results = await Promise.allSettled([
-      getStoredFundamentals(ticker),
-      getMarketDataStatus(),
-      getMarketDataCoverage(ticker),
+      getStoredFundamentals(ticker, { source, period, currency: "USD", period_offset: offset, read_id: readId }),
+      getMarketDataStatus(), getMarketDataCoverage(ticker),
     ]);
-    const [rFund, rStatus, rCov] = results;
-    setFund(rFund.status === "fulfilled" ? rFund.value : null);
-    setStatus(rStatus.status === "fulfilled" ? rStatus.value : null);
-    setCoverage(rCov.status === "fulfilled" ? rCov.value : null);
-    setErrs(
-      results.flatMap((r, i) =>
-        r.status === "rejected"
-          ? [captureExploreError(DATA_OPERATIONS[i]!, r.reason)]
-          : [],
-      ),
-    );
+    if (request !== sequence.current) return;
+    const [financial, market] = results;
+    if (financial.status === "fulfilled") setFund(financial.value);
+    else if (financial.reason instanceof ApiError && financial.reason.status === 409) setChanged(true);
+    setStatus(market.status === "fulfilled" ? market.value : null);
+    setErrs(results.flatMap((r, i) => r.status === "rejected"
+      ? [captureExploreError(DATA_OPERATIONS[i]!, r.reason)] : []));
     setLoading(false);
-  }, [ticker]);
+  }, [ticker, source, period]);
 
   useEffect(() => {
+    setFund(null); setUpdateResult(null); setCollector(null); setConfirmUpdate(false);
     void load();
+    return () => { sequence.current += 1; };
   }, [load]);
 
-  const routingLabel = !status
-    ? "—"
-    : status.routing_enabled
-      ? t(($) => $.tickerDetail.localPreferred)
-      : status.use_local_market_setting
-        ? t(($) => $.tickerDetail.localPending)
-        : t(($) => $.tickerDetail.localDisabled);
-  return (
-    <div className="detail-data">
-      <section className="detail-col">
-        <div className="detail-pricehead">
-          <h4 className="detail-section">{t(($) => $.tickerDetail.sourceFreshness)}</h4>
-          <button className="btn-ghost" onClick={() => void load()} disabled={loading}>
-            {loading
-              ? t(($) => $.tickerDetail.reading)
-              : t(($) => $.tickerDetail.refresh)}
-          </button>
-        </div>
-        <dl className="kv">
-          <Kv k={t(($) => $.tickerDetail.localMarketData)} v={routingLabel} />
-          <Kv
-            k={t(($) => $.tickerDetail.fundamentalsCurrentSource)}
-            v={sourceLabel(fund?.source_path, t)}
-          />
-          <Kv
-            k={t(($) => $.tickerDetail.fundamentalsLocalCoverage)}
-            v={coverage ? coverageLabel(coverage.fundamentals, t) : "—"}
-          />
-        </dl>
-        <p className="muted tiny">
-          {t(($) => $.tickerDetail.sourceExplanation)}
-        </p>
-        {errs.map((error) => (
-          <ExploreErrorNotice
-            key={error.operation}
-            state={error}
-            developerMode={developerMode}
-            retryLabel={t(($) => $.tickerDetail.retry)}
-            onRetry={() => void load()}
-            onNavigate={onNavigateTarget}
-          />
-        ))}
-      </section>
+  async function update() {
+    if (source !== "financial_datasets" || updateRunning.current) return;
+    updateRunning.current = true;
+    const request = ++sequence.current;
+    setUpdating(true); setUpdateResult(null); setLoading(false);
+    try {
+      const result = await refreshFinancials(ticker, { source: "financial_datasets", period, currency: "USD" });
+      if (result.read_id) settingsReadCache?.invalidateFinancialReads();
+      if (request !== sequence.current) return;
+      setUpdateResult(result);
+      if (result.status !== "unavailable" && result.read_id) setFund(result);
+    } catch {
+      if (request === sequence.current) setUpdateResult("error");
+    } finally {
+      updateRunning.current = false;
+      setUpdating(false); setConfirmUpdate(false);
+    }
+  }
 
-      <section className="detail-col">
-        <h4 className="detail-section">
-          {t(($) => $.tickerDetail.fundamentals)}
-          {fund && fund.data_source !== "none" ? (
-            <span> {t(($) => $.tickerDetail.dataSourceSuffix, { source: fund.data_source })}</span>
-          ) : null}
-        </h4>
-        {loading && !fund && <p className="muted tiny">{t(($) => $.tickerDetail.loading)}</p>}
-        {fund && (
-          <>
+  async function inspectCollector() {
+    const request = sequence.current;
+    try {
+      const result = await getSAAcquisitionStatus();
+      if (request === sequence.current) setCollector(result);
+    } catch {
+      if (request === sequence.current) setCollector({ status: "error" });
+    }
+  }
+
+  const routingLabel = !status ? "—" : status.routing_enabled
+    ? t(($) => $.tickerDetail.localPreferred) : status.use_local_market_setting
+      ? t(($) => $.tickerDetail.localPending) : t(($) => $.tickerDetail.localDisabled);
+  const metric = (name: string) => {
+    const value = fund?.[name as keyof FundamentalsResult];
+    if (typeof value !== "number") return financialText(ft, "gaps", fund?.metric_gaps?.[name] ?? "inputs_unavailable");
+    const basis = fund?.metric_basis[name];
+    const context = basis ? [basis.report_period ?? basis.end_month, basis.currency,
+      typeof basis.precision === "string" ? financialText(ft, "precision", basis.precision) : null]
+      .filter((item): item is string => typeof item === "string").join(" / ") : "";
+    return context ? `${fmtNum(value)} (${context})` : fmtNum(value);
+  };
+  const sa = fund?.update_choices?.find((choice) => choice.provider === "seeking_alpha");
+  const fd = fund?.update_choices?.find((choice) => choice.provider === "financial_datasets");
+  const previous = updateResult === "error" || updateResult?.status === "unavailable";
+  const financialPause = collector?.capability_pauses?.financials;
+  const pauseReason = collector?.paused_reason
+    || (typeof financialPause === "string" ? financialPause : null);
+  return <div className="detail-data financial-reader">
+    <section className="detail-col">
+      <div className="detail-pricehead">
+        <h4 className="detail-section">{t(($) => $.tickerDetail.sourceFreshness)}</h4>
+        <IconButton label={t(($) => $.tickerDetail.refresh)} icon={<RefreshCw size={16} />}
+          disabled={loading || updating} onClick={() => void load()} />
+      </div>
+      <div className="financial-controls">
+        <label>{ft(($) => $.financialCoverage.source)}
+          <select aria-label={ft(($) => $.financialCoverage.source)} value={source}
+            onChange={(e) => setSource(e.target.value as FinancialReadQuery["source"])}>
+            {["auto", "seeking_alpha", "financial_datasets"].map((value) =>
+              <option key={value} value={value}>{financialText(ft, "sources", value)}</option>)}
+          </select>
+        </label>
+        <label>{ft(($) => $.financialCoverage.period)}
+          <select aria-label={ft(($) => $.financialCoverage.period)} value={period}
+            onChange={(e) => setPeriod(e.target.value as FinancialPeriod)}>
+            <option value="annual">{ft(($) => $.financialCoverage.annual)}</option>
+            <option value="quarterly">{ft(($) => $.financialCoverage.quarterly)}</option>
+          </select>
+        </label>
+      </div>
+      <dl className="kv">
+        <Kv k={t(($) => $.tickerDetail.localMarketData)} v={routingLabel} />
+        <Kv k={t(($) => $.tickerDetail.fundamentalsCurrentSource)} v={financialText(ft, "sources", fund?.data_source ?? "none")} />
+        <Kv k={t(($) => $.tickerDetail.fundamentalsLocalCoverage)} v={financialText(ft, "states", fund?.status ?? "unavailable")} />
+      </dl>
+      {fund?.source_routes?.map((route, index) => <p key={index} className="muted tiny">
+        {ft(($) => $.financialCoverage.configuredSources, { value: route.configured_sources.map((p) => financialText(ft, "sources", p)).join(", ") })}
+      </p>)}
+      {fund?.read_gaps?.filter((g) => !g.metric).map((gap, index) =>
+        <p key={index} className="refresh-err">{financialText(ft, "gaps", gap.code)}</p>)}
+      <div className="financial-actions">
+        <IconButton label={ft(($) => $.financialCoverage.settings)} icon={<Settings2 size={16} />}
+          onClick={() => onNavigateTarget({ kind: "settings_section", section: "data_sources" })} />
+        {source === "financial_datasets" && fd ? <Button ref={updateButton} icon={<RefreshCw size={14} />}
+          disabled={loading || updating} onClick={() => setConfirmUpdate(true)}>{ft(($) => $.financialCoverage.fdUpdate)}</Button> : null}
+        {sa ? <Button icon={<ExternalLink size={14} />} onClick={() => void inspectCollector()}>
+          {ft(($) => $.financialCoverage.browser)}</Button> : null}
+      </div>
+      {collector ? <div data-financial-collector>
+        <p>{collector.status === "error" ? ft(($) => $.financialCoverage.collectorUnavailable)
+          : !collector.configured ? ft(($) => $.financialCoverage.collectorUnconfigured)
+            : pauseReason ? ft(($) => $.financialCoverage.collectorPaused, { reason: pauseReason })
+              : collector.rate_limited ? ft(($) => $.financialCoverage.collectorRateLimited, { until: collector.rate_limit_until ?? ft(($) => $.financialCoverage.unknown) })
+                : ft(($) => $.financialCoverage.collectorConfigured)}</p>
+        <p className="muted tiny">{ft(($) => $.financialCoverage.collectorUnknown)}</p>
+        {sa?.capture_urls?.filter((url) => /^https:\/\/seekingalpha\.com\/symbol\/[A-Za-z0-9.%_-]+\/[a-z-]+$/.test(url)).map((url) =>
+          <p key={url}><a href={url} target="_blank" rel="noreferrer">{ft(($) => $.financialCoverage.capture)}: {url}</a></p>)}
+      </div> : null}
+      {updating ? <p role="status">{ft(($) => $.financialCoverage.updating)}</p> : null}
+      {updateResult ? <div role="status">
+        <p>{previous ? ft(($) => $.financialCoverage.updateFailed) : ft(($) => $.financialCoverage.updated)}</p>
+        {updateResult !== "error" ? updateResult.read_gaps.filter((g) => !g.metric).map((g, index) =>
+          <p key={index}>{financialText(ft, "gaps", g.code)}</p>) : null}
+      </div> : null}
+      {changed ? <p role="alert">{ft(($) => $.financialCoverage.readChanged)}</p> : null}
+      {errs.map((error) => <ExploreErrorNotice key={error.operation} state={error} developerMode={developerMode}
+        retryLabel={t(($) => $.tickerDetail.retry)} onRetry={() => void load()} onNavigate={onNavigateTarget} />)}
+      <ConfirmDialog open={confirmUpdate} title={ft(($) => $.financialCoverage.confirmTitle)}
+        consequence={ft(($) => $.financialCoverage.confirmConsequence, { ticker, period, currency: "USD" })}
+        confirmLabel={ft(($) => $.financialCoverage.confirm)} tone="primary" busy={updating}
+        onConfirm={() => void update()} onCancel={() => setConfirmUpdate(false)} returnFocusRef={updateButton} />
+    </section>
+    <section className="detail-col">
+      <h4 className="detail-section">{previous ? ft(($) => $.financialCoverage.previousRead) : t(($) => $.tickerDetail.fundamentals)}
+        {fund && fund.data_source !== "none" ? <span> {t(($) => $.tickerDetail.dataSourceSuffix, { source: fund.data_source })}</span> : null}
+      </h4>
+      {loading ? <p className="muted tiny">{t(($) => $.tickerDetail.loading)}</p> : null}
+      {fund ? <>
+        {fund.source_observations?.map((o) => <div key={o.observation_id} className="financial-period">
+          <span>{ft(($) => $.financialCoverage.captured)} / {financialText(ft, "kinds", o.dataset)}</span>
+          <RecordedTimestamp value={o.fetched_at} />
+        </div>)}
             <dl className="kv">
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.snapshotDate)}
                 v={fund.snapshot_date ?? "—"}
               />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.marketCap)} v={fmtNum(fund.market_cap)} />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.pe)} v={fmtNum(fund.pe_ratio)} />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.forwardPe)} v={fmtNum(fund.forward_pe)} />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.ps)} v={fmtNum(fund.ps_ratio)} />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.pb)} v={fmtNum(fund.pb_ratio)} />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.roe)} v={fmtNum(fund.roe)} />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.roa)} v={fmtNum(fund.roa)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.marketCap)} v={metric("market_cap")} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.pe)} v={metric("pe_ratio")} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.forwardPe)} v={metric("forward_pe")} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.ps)} v={metric("ps_ratio")} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.pb)} v={metric("pb_ratio")} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.roe)} v={metric("roe")} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.roa)} v={metric("roa")} />
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.debtToEquity)}
-                v={fmtNum(fund.debt_to_equity)}
+                v={metric("debt_to_equity")}
               />
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.currentRatio)}
-                v={fmtNum(fund.current_ratio)}
+                v={metric("current_ratio")}
               />
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.grossMargin)}
-                v={fmtNum(fund.gross_margin)}
+                v={metric("gross_margin")}
               />
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.operatingMargin)}
-                v={fmtNum(fund.operating_margin)}
+                v={metric("operating_margin")}
               />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.netMargin)} v={fmtNum(fund.net_margin)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.netMargin)} v={metric("net_margin")} />
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.revenueGrowth)}
-                v={fmtNum(fund.revenue_growth)}
+                v={metric("revenue_growth")}
               />
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.earningsGrowth)}
-                v={fmtNum(fund.earnings_growth)}
+                v={metric("earnings_growth")}
               />
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.dividendYield)}
-                v={fmtNum(fund.dividend_yield)}
+                v={metric("dividend_yield")}
               />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.beta)} v={fmtNum(fund.beta)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.beta)} v={metric("beta")} />
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.freeCashFlow)}
-                v={fmtNum(fund.free_cash_flow)}
+                v={metric("free_cash_flow")}
               />
               <Kv
                 k={t(($) => $.tickerDetail.kvLabels.cashAndEquivalents)}
-                v={fmtNum(fund.cash_and_equivalents)}
+                v={metric("cash_and_equivalents")}
               />
-              <Kv k={t(($) => $.tickerDetail.kvLabels.totalDebt)} v={fmtNum(fund.total_debt)} />
+              <Kv k={t(($) => $.tickerDetail.kvLabels.totalDebt)} v={metric("total_debt")} />
             </dl>
-            <StatementsBlock
-              title={t(($) => $.tickerDetail.incomeStatements)}
-              rows={fund.income_statements}
-            />
-            <StatementsBlock
-              title={t(($) => $.tickerDetail.balanceSheet)}
-              rows={fund.balance_sheet}
-            />
-            <StatementsBlock
-              title={t(($) => $.tickerDetail.cashFlow)}
-              rows={fund.cash_flow_statements}
-            />
-            {fund.snapshot && Object.keys(fund.snapshot).length > 0 && (
-              <details className="detail-raw">
-                <summary>{t(($) => $.tickerDetail.rawSnapshot)}</summary>
-                <pre className="raw-json">{JSON.stringify(fund.snapshot, null, 2)}</pre>
-              </details>
-            )}
-          </>
-        )}
-        {!loading && fund && fund.data_source === "none" && (
-          <p className="muted tiny">{t(($) => $.tickerDetail.noFundamentals)}</p>
-        )}
-      </section>
-    </div>
-  );
+
+        <StatementsBlock title={t(($) => $.tickerDetail.incomeStatements)} rows={fund.income_statements} />
+        <StatementsBlock title={t(($) => $.tickerDetail.balanceSheet)} rows={fund.balance_sheet} />
+        <StatementsBlock title={t(($) => $.tickerDetail.cashFlow)} rows={fund.cash_flow_statements} />
+        {fund.coverage?.missing_statements?.length ? <p className="muted tiny">{ft(($) => $.financialCoverage.missing, {
+          value: fund.coverage.missing_statements.map((kind) => financialText(ft, "kinds", kind)).join(", "),
+        })}</p> : null}
+        {fund.read_id ? <details><summary>{ft(($) => $.financialCoverage.readIdentity)}</summary><code>{fund.read_id}</code></details> : null}
+        {fund.pagination && fund.read_id ? <div className="financial-actions">
+          <IconButton label={ft(($) => $.financialCoverage.previous)} icon={<ArrowLeft size={14} />}
+            disabled={loading || updating || fund.pagination.offset === 0}
+            onClick={() => void load(Math.max(0, fund.pagination!.offset - fund.pagination!.limit), fund.read_id!)} />
+          <span>{ft(($) => $.financialCoverage.page, { start: fund.pagination.offset + 1,
+            end: Math.min(fund.pagination.offset + fund.pagination.limit, fund.pagination.total_periods) })}</span>
+          <IconButton label={ft(($) => $.financialCoverage.next)} icon={<ArrowRight size={14} />}
+            disabled={loading || updating || !fund.pagination.has_more}
+            onClick={() => void load(fund.pagination!.offset + fund.pagination!.limit, fund.read_id!)} />
+        </div> : null}
+        {fund.snapshot && Object.keys(fund.snapshot).length > 0 ? <details className="detail-raw">
+          <summary>{t(($) => $.tickerDetail.rawSnapshot)}</summary><pre className="raw-json">{JSON.stringify(fund.snapshot, null, 2)}</pre>
+        </details> : null}
+      </> : null}
+      {!loading && fund?.data_source === "none" ? <p className="muted tiny">{t(($) => $.tickerDetail.noFundamentals)}</p> : null}
+    </section>
+  </div>;
 }
 
-// One financial-statement type rendered as metric-rows × period-columns (newest
-// first). Collapsed by default; null/empty → nothing.
 function StatementsBlock({ title, rows }: { title: string; rows: FinancialStatement[] | null }) {
   const { t } = useTranslation("explore");
-  if (!rows || rows.length === 0) return null;
+  const { t: ft } = useTranslation("settings");
+  if (!rows?.length) return null;
   const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r.data))));
-  return (
-    <details className="detail-raw">
-      <summary>
-        {rows.length === 1
-          ? t(($) => $.tickerDetail.statementSummary.one, { title, count: rows.length })
-          : t(($) => $.tickerDetail.statementSummary.other, { title, count: rows.length })}
-      </summary>
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>{t(($) => $.tickerDetail.indicator)}</th>
-            {rows.map((r) => <th key={r.report_period}>{r.fiscal_period ?? r.report_period}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {keys.map((k) => (
-            <tr key={k}>
-              <td>{k}</td>
-              {rows.map((r) => <td key={r.report_period}>{fmtNum(r.data[k] ?? null)}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </details>
-  );
+  return <details className="detail-raw" open>
+    <summary>{rows.length === 1 ? t(($) => $.tickerDetail.statementSummary.one, { title, count: rows.length })
+      : t(($) => $.tickerDetail.statementSummary.other, { title, count: rows.length })}</summary>
+    <div className="financial-table-scroll" tabIndex={0}>
+      <table className="data-table"><thead><tr>
+        <th>{t(($) => $.tickerDetail.indicator)}</th>
+        {rows.map((row, index) => <th key={index}>{row.report_period ?? row.end_month ?? row.fiscal_period ?? "—"}
+          <div className="muted tiny">{financialText(ft, "precision", row.period_precision ?? "unknown")}</div>
+          <div className="muted tiny">{row.currency}</div>
+        </th>)}
+      </tr></thead><tbody>
+        {keys.map((key) => <tr key={key}><td>{key}</td>
+          {rows.map((row, index) => <td key={index}>
+            {typeof row.data[key] === "string" ? row.data[key] : fmtNum(row.data[key] as number | null)}
+            <span className="muted tiny"> {row.value_metadata?.[key]?.unit ?? row.currency}</span>
+            {row.value_metadata?.[key]?.precision ? <div className="muted tiny">
+              {financialText(ft, "precision", row.value_metadata[key]!.precision!)}
+            </div> : null}
+          </td>)}
+        </tr>)}
+      </tbody></table>
+    </div>
+    {[...new Set(rows.map((row) => row.unit_note).filter((note): note is string => typeof note === "string"))].map((note) =>
+      <p key={note} className="muted tiny">{ft(($) => $.financialCoverage.originalUnits, { value: note })}</p>)}
+  </details>;
 }
 
 type NoteAddPayload = {
@@ -876,20 +959,6 @@ function Kv({ k, v, cls }: { k: string; v: string; cls?: string }) {
 
 function fmtNum(v: number | null): string {
   return v == null ? "—" : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-function sourceLabel(s: SourcePath | string | undefined, t: ExploreT): string {
-  switch (s) {
-    case "local": return t(($) => $.tickerDetail.sourceLocal);
-    case "local_cache": return t(($) => $.tickerDetail.sourceStoredSec);
-    case "file": return t(($) => $.tickerDetail.sourceLocalFile);
-    case "none": return t(($) => $.tickerDetail.sourceNone);
-    default: return s === undefined ? "—" : String(s);
-  }
-}
-function coverageLabel(covered: boolean, t: ExploreT): string {
-  return covered
-    ? t(($) => $.tickerDetail.yes)
-    : t(($) => $.tickerDetail.no);
 }
 function fmtPct(v: number | null): string {
   return v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;

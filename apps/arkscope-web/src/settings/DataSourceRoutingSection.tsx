@@ -94,6 +94,7 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
     try {
       const saved = await putDataSourceRoute(dataset, drafts[dataset]);
       settingsReadCache.invalidate("data_source_routes");
+      settingsReadCache.invalidateFinancialReads();
       if (!mounted.current) return;
       setData((value) => value && { ...value, routes: value.routes.map((row) => row.dataset === dataset ? saved : row) });
       setDrafts((value) => { const copy = { ...value }; delete copy[dataset]; return copy; });

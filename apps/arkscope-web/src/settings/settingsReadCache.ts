@@ -19,6 +19,7 @@ type FixedSettingsReadKey =
 export type SettingsReadKey =
   | FixedSettingsReadKey
   | `oauth_account_usage:${string}`
+  | `financial_coverage:${string}`
   | `trading_day_coverage:15min:${number}`;
 
 export type SettingsReadChangeListener = (key: SettingsReadKey) => void;
@@ -72,6 +73,7 @@ const SECOND = 1_000;
 const MINUTE = 60 * SECOND;
 const COVERAGE_PREFIX = "trading_day_coverage:15min:";
 const ACCOUNT_PREFIX = "oauth_account_usage:";
+const FINANCIAL_PREFIX = "financial_coverage:";
 const COVERAGE_LOOKBACKS = [10, 15, 30, 60] as const;
 
 const FIXED_POLICIES: Readonly<Record<FixedSettingsReadKey, SettingsReadPolicy>> = {
@@ -146,8 +148,19 @@ export function tradingDayCoverageKey(
   return `${COVERAGE_PREFIX}${lookback}`;
 }
 
+export function financialCoverageKey(period: "annual" | "quarterly", source: string, currency: string,
+  offset: number, limit: number): `financial_coverage:${string}` {
+  const key = `${FINANCIAL_PREFIX}${period}:${source}:${currency}:${offset}:${limit}` as const;
+  assertSettingsReadKey(key);
+  return key;
+}
+
 function assertSettingsReadKey(key: string): asserts key is SettingsReadKey {
   if (Object.hasOwn(FIXED_POLICIES, key)) return;
+  if (/^financial_coverage:(annual|quarterly):(auto|seeking_alpha|financial_datasets):[A-Z]{3}:(0|[1-9]\d*):([1-9]\d*)$/.test(key)) {
+    const parts = key.split(":");
+    if (Number.isSafeInteger(Number(parts[4])) && Number(parts[5]) <= 100) return;
+  }
   if (key.startsWith(ACCOUNT_PREFIX)) {
     requireLocalCredentialId(key.slice(ACCOUNT_PREFIX.length));
     return;
@@ -161,6 +174,9 @@ function assertSettingsReadKey(key: string): asserts key is SettingsReadKey {
 
 export function settingsReadPolicy(key: SettingsReadKey, value?: unknown): SettingsReadPolicy {
   assertSettingsReadKey(key);
+  if (key.startsWith(FINANCIAL_PREFIX)) {
+    return { freshMs: 60 * SECOND, hardRetentionMs: 15 * MINUTE, idle: true };
+  }
   if (key.startsWith(ACCOUNT_PREFIX)) {
     return { freshMs: 5 * MINUTE, hardRetentionMs: 15 * MINUTE, idle: true };
   }
@@ -215,6 +231,7 @@ export interface SettingsReadCache {
   invalidateCredentialAccount(localCredentialId: string): void;
   invalidateDataSource(source: string, writeTarget?: string): void;
   invalidateAllDataSyncReads(): void;
+  invalidateFinancialReads(): void;
   clear(): void;
 }
 
@@ -394,6 +411,11 @@ class MemorySettingsReadCache implements SettingsReadCache {
   invalidateAllDataSyncReads(): void {
     for (const key of DATA_SYNC_FIXED_KEYS) this.invalidate(key);
     for (const key of this.coverageKeys()) this.invalidate(key);
+    this.invalidateFinancialReads();
+  }
+
+  invalidateFinancialReads(): void {
+    for (const key of this.knownKeys()) if (key.startsWith(FINANCIAL_PREFIX)) this.invalidate(key);
   }
 
   clear(): void {

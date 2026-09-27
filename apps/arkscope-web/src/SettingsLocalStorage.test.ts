@@ -14,6 +14,7 @@ import {
   type UiLocaleController,
 } from "./i18n";
 import { formatSystemTimestamp } from "./timeDisplay";
+import { coverageFixture } from "./financialReadFixtures";
 import {
   createSettingsReadCache,
   tradingDayCoverageKey,
@@ -50,11 +51,8 @@ const marketStatus: MarketDataStatus = {
   exists: true,
   prices: { row_count: 2_324_487, ticker_count: 149, latest_datetime: "2026-07-03T20:00:00+0000" },
   news: { row_count: 371_672, source_count: 3, latest_published: "2026-06-27T11:11:00+0000" },
-  fundamentals: { row_count: 130, ticker_count: 130, latest_date: "2026-06-01" },
-  financial_cache: { row_count: 24, valid_count: 7, expired_count: 17, latest_fetched_at: "2026-07-01T00:00:00+00:00" },
-  sync: { prices: null, news: null, fundamentals: null },
+  sync: { prices: null, news: null, },
   prices_authority: "local",
-  fundamentals_mode: "local_cache_refetch",
   use_local_market_setting: false,
   env_override: false,
   local_market_strict_setting: false,
@@ -173,6 +171,7 @@ vi.mock("./api", async (importOriginal) => {
       data: { last_attempt: null, last_acquisition_at: null, last_completed_batch: null },
       gaps: [{ code: "sec_schedule_unobserved" }], observed_at: null, coverage: {}, next_cursor: null })),
     getModelCatalog: vi.fn(async () => emptyCatalog),
+    getFinancialCoverage: vi.fn(async () => coverageFixture()),
     getMarketDataStatus: vi.fn(async () => {
       if (mocked.marketError) throw mocked.marketError;
       return mocked.marketStatus!;
@@ -311,7 +310,7 @@ describe("local storage panels", () => {
     expect(getTradingDayCoverage).not.toHaveBeenCalled();
     expect(host!.textContent).toContain("149");
 
-    const lookback = host!.querySelector<HTMLSelectElement>("select");
+    const lookback = host!.querySelector<HTMLSelectElement>('[data-settings-location="trading_day_coverage"] select');
     if (!lookback) throw new Error("missing coverage lookback");
     await act(async () => {
       lookback.value = "30";
@@ -410,8 +409,9 @@ describe("local storage panels", () => {
     expect(storage!.textContent).toContain("2027-12-31");
     expect(host!.textContent).toContain("價格");
     expect(storage!.textContent).not.toContain("最近增量更新");
-    expect(host!.textContent).toContain("已驗證且 TTL 未到期的 SEC 年度投影");
-    expect(host!.textContent).toContain("財務快取");
+    expect(host!.textContent).not.toContain("已驗證且 TTL 未到期的 SEC 年度投影");
+    expect(host!.textContent).not.toContain("財務快取");
+    expect(host!.textContent).toContain("本機財務資料覆蓋");
     expect(host!.textContent).toContain("市場資料");
   });
 
@@ -519,12 +519,6 @@ describe("local storage panels", () => {
           rows_added: 12,
           updated_at: "2026-07-20T02:00:01Z",
         },
-        fundamentals: {
-          last_success: "2026-07-20T04:00:00Z",
-          last_error: null,
-          rows_added: 14,
-          updated_at: "2026-07-20T04:00:01Z",
-        },
       },
     };
     mocked.coverage = {
@@ -570,7 +564,7 @@ describe("local storage panels", () => {
     expect(getMarketDataStatus).toHaveBeenCalledOnce();
     expect(getTradingDayCoverage).toHaveBeenCalledOnce();
 
-    const lookback = mountedStorage.querySelector<HTMLSelectElement>("select");
+    const lookback = mountedStorage.querySelector<HTMLSelectElement>('[data-settings-location="trading_day_coverage"] select');
     if (!lookback) throw new Error("missing coverage lookback input");
     lookback.dataset.identityMarker = "coverage-lookback";
     await act(async () => {
@@ -619,8 +613,6 @@ describe("local storage panels", () => {
       .toEqual([
         "Market Data",
         "Prices",
-        "Validated, TTL-unexpired annual SEC projections",
-        "Financial Cache",
         "Cases with source observations",
         "Cases missing source observations",
         "Universe",
@@ -633,9 +625,8 @@ describe("local storage panels", () => {
     expect(storage.textContent).toContain(
       "2,324,487 rows · 149 tickers · latest 2026-07-03T20:00:00+0000",
     );
-    expect(storage.textContent).toContain(
-      `24 cache entries (7 TTL-unexpired · 17 TTL-expired) · latest cache timestamp ${formatSystemTimestamp("2026-07-01T00:00:00+00:00")}`,
-    );
+    expect(storage.textContent).toContain("Local financial coverage");
+    expect(storage.textContent).not.toContain("TTL-expired");
     expect(storage.textContent).not.toContain("Latest Incremental Update");
     expect(storage.textContent).not.toContain("Prices +11");
     expect(storage.textContent).not.toContain("News +12");
@@ -674,7 +665,7 @@ describe("local storage panels", () => {
     expect(Array.from(storage.querySelectorAll("tbody p"), (node) => node.textContent))
       .toContain("1");
     expect(storage.textContent).not.toContain(rawUnknownTicker);
-    const switchedLookback = storage.querySelector<HTMLSelectElement>("select");
+    const switchedLookback = storage.querySelector<HTMLSelectElement>('[data-settings-location="trading_day_coverage"] select');
     expect(switchedLookback).toBe(lookback);
     expect(switchedLookback?.value).toBe("30");
     expect(switchedLookback?.dataset.identityMarker).toBe("coverage-lookback");

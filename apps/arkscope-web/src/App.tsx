@@ -129,6 +129,7 @@ export function App() {
     <TickerDetailView
       {...exploreCapabilities}
       key={detail.ticker}
+      settingsReadCache={settingsReadCache}
       ticker={detail.ticker}
       cardRecoveryDraftRef={cardRecoveryDraftRef}
       onBack={() => setDetail(null)}
@@ -183,6 +184,7 @@ export function App() {
     <HoldingsView />
   ) : view === "System" ? (
     <DashboardView
+      settingsReadCache={settingsReadCache}
       status={status}
       runtime={runtime}
       onRetry={refresh}

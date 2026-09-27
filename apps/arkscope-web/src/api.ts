@@ -2422,23 +2422,77 @@ export function getConsensus(ticker: string): Promise<ConsensusSummary> {
   return getJSON<ConsensusSummary>(`/analysis/consensus/${encodeURIComponent(ticker)}`, 20_000);
 }
 
-// --- ticker detail: stored fundamentals and local coverage ---
-// source_path reports the local source used for the read. local_cache is the
-// stored SEC financial-cache projection; file is a file-backed development
-// configuration; none means no stored data was available.
+// --- coherent local financial observations; acquisition requires a named POST ---
 export type SourcePath = "local" | "local_cache" | "file" | "none";
+export type FinancialProvider = "seeking_alpha" | "financial_datasets";
+export type FinancialPeriod = "annual" | "quarterly";
+export type FinancialKind = "income_statement" | "balance_sheet" | "cash_flow_statement";
+export interface FinancialReadQuery {
+  source?: FinancialProvider | "auto";
+  period?: FinancialPeriod;
+  currency?: string;
+  statement?: FinancialKind;
+  end_month?: string;
+  observation_id?: string;
+  read_id?: string;
+  period_offset?: number;
+  period_limit?: number;
+}
+export interface FinancialGap {
+  provider: string; code: string; dataset?: string | null; metric?: string | null; required_inputs?: string[];
+}
+export interface FinancialCell {
+  status: string; raw?: string | number | null; normalized_value?: string | null;
+  unit?: string | null; currency?: string | null; precision?: string | null;
+  label?: string | null; scale?: string | null; display_half_step?: string | null;
+}
+export interface FinancialCoveragePeriod {
+  end_month: string | null; report_period: string | null; period_precision: "day" | "month" | "unknown";
+  currency: string | null; observation_id: string | null; column_index: number | null;
+  fetched_at: string | null; unit_note: string | null; value_precision: string[];
+}
+export interface FinancialCoverage {
+  ticker: string; status: "ok" | "partial" | "unavailable"; selected_source: FinancialProvider | null;
+  period: FinancialPeriod; requested_currency: string; currency: string | null; read_id: string | null;
+  statements: Partial<Record<FinancialKind, FinancialCoveragePeriod[]>>;
+  missing_statements: string[]; supported_metrics: string[]; metric_gaps: Record<string, string>; gaps: FinancialGap[];
+}
+export interface FinancialCoveragePage {
+  status: "ok" | "partial" | "unavailable"; scope: "configured_local_candidates";
+  candidate_count: number; items: FinancialCoverage[]; offset: number; next_offset: number | null; gaps: FinancialGap[];
+}
 
 export interface FinancialStatement {
-  report_period: string;
+  report_period: string | null;
+  end_month: string | null;
+  period_precision: "day" | "month" | "unknown";
+  provider: string | null;
+  observation_id: string | null;
+  column_index: number | null;
+  unit_note: string | null;
+  currency: string | null;
+  value_metadata: Record<string, FinancialCell>;
+  raw_reference?: Record<string, unknown> | null;
   fiscal_period: string | null;
   period_type: string; // annual | quarterly
-  data: Record<string, number | null>;
+  data: Record<string, number | string | null>;
 }
 
 export interface FundamentalsResult {
   ticker: string;
+  status: "ok" | "partial" | "unavailable";
+  read_id: string | null;
+  coverage: FinancialCoverage | null;
+  read_gaps: FinancialGap[];
+  metric_gaps: Record<string, string>;
+  metric_basis: Record<string, Record<string, unknown>>;
+  source_observations: Array<{ provider: string; dataset: string; observation_id: string; fetched_at: string;
+    source_url?: string | null; freshness_mode: string; retrieval: string; persisted: boolean }>;
+  source_routes: Array<{ configured_sources: string[]; selected_source?: string | null }>;
+  update_choices: Array<{ provider: FinancialProvider; action: string; capture_urls?: string[]; requires_paid_admission?: boolean }>;
+  pagination: { offset: number; limit: number; total_periods: number; has_more: boolean } | null;
   snapshot_date: string | null;
-  data_source: string; // ibkr | sec_edgar | none
+  data_source: string;
   market_cap: number | null;
   pe_ratio: number | null;
   forward_pe: number | null;
@@ -2472,13 +2526,25 @@ export interface MarketDataCoverage {
   prices: boolean;
   news: boolean;
   fundamentals: boolean;
+  financials?: FinancialCoverage;
 }
 
-// STORED-ONLY fundamentals with no external SEC/Financial Datasets fetch
-// (?stored=true). Opening or refreshing the read-only data tab never contacts a
-// provider; the full /fundamentals/{ticker} route remains available to agents.
-export function getStoredFundamentals(ticker: string): Promise<FundamentalsResult> {
-  return getJSON<FundamentalsResult>(`/fundamentals/${encodeURIComponent(ticker)}?stored=true`);
+export function getStoredFundamentals(ticker: string, query: FinancialReadQuery = {}): Promise<FundamentalsResult> {
+  const params = new URLSearchParams({ freshness: "stored" });
+  for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, String(value));
+  return getJSON<FundamentalsResult>(`/fundamentals/${encodeURIComponent(ticker)}?${params}`);
+}
+
+export function getFinancialCoverage(query: { period?: FinancialPeriod; source?: string; currency?: string;
+  offset?: number; limit?: number } = {}): Promise<FinancialCoveragePage> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, String(value));
+  return getJSON<FinancialCoveragePage>(`/fundamentals/coverage?${params}`);
+}
+
+export function refreshFinancials(ticker: string, body: { source: FinancialProvider; period: FinancialPeriod;
+  currency: string }): Promise<FundamentalsResult> {
+  return sendJSON(`/fundamentals/${encodeURIComponent(ticker)}/refresh`, "POST", body, 120_000);
 }
 
 export function getMarketDataCoverage(ticker: string): Promise<MarketDataCoverage> {
@@ -2768,27 +2834,17 @@ export interface NewsStatus {
   sync: NewsDirectSync | null;
 }
 
-// Fundamentals are date-keyed snapshots, so latest is date-only (no time).
+// Price/news storage is independent of the common financial coverage endpoint.
 export interface MarketDataStatus {
   market_db: string;
   exists: boolean;
   prices: { row_count: number; ticker_count: number; latest_datetime: string | null };
   news: { row_count: number; source_count: number; latest_published: string | null };
-  fundamentals: { row_count: number; ticker_count: number; latest_date: string | null };
-  // Local cache validity and latest fetch time.
-  financial_cache: {
-    row_count: number;
-    valid_count: number;
-    expired_count: number;
-    latest_fetched_at: string | null;
-  };
   sync: {
     prices: SyncMeta | null;
     news: SyncMeta | null;
-    fundamentals: SyncMeta | null;
   };
   prices_authority: "local";
-  fundamentals_mode: "local_cache_refetch";
   use_local_market_setting: boolean;
   env_override: boolean;
   local_market_strict_setting: boolean;

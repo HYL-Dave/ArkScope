@@ -82,8 +82,8 @@ The category catalog reports three independent facts: the adapter for the
 selected category, integrations for other categories, and credential/access
 requirements. Massive price/news support and a configured key do not implement
 its financial adapter or establish financial endpoint entitlement. SA financial
-tables support manual and scheduled browser capture and local reads; they are
-not yet an input adapter for the common SEC/FD ratio calculator. Source switches
+tables support manual and scheduled browser capture and the common SA/FD
+financial reader, including reviewed ratios from compatible retained inputs. Source switches
 remain scoped to the named tool route, not every use of that provider.
 
 Financial provider health describes retained acquisition evidence, not a live
@@ -95,11 +95,11 @@ exposes its original fetch time without claiming a current reporting period,
 usable credentials or endpoint entitlement. Missing-key and disabled states
 retain precedence. Reading this status never fetches or repopulates data.
 
-Stored prices and financial-cache diagnostics have their own surface; news
-volume and per-provider collection outcomes belong to News Data. Financial-cache
-TTL counts are diagnostic, not proof of reuse eligibility or a command to fetch.
-The SEC summary counts valid unexpired annual cache projections only, not all
-retained filings, observations or company data. News completion uncertainty
+Stored prices and local financial coverage have separate sections; news
+volume and per-provider collection outcomes belong to News Data. The financial
+section reports the selected provider's retained periods, capture time, precision
+and missing inputs, not SEC or TTL row counts. Its candidate count is a local
+inventory, not a claim that every candidate has usable financials. News completion uncertainty
 remains partial/unknown and is not reworded as a network-request failure.
 
 FRED snapshots expose stored units, frequency, seasonal adjustment and revision
@@ -150,7 +150,56 @@ This is application-data removal, not forensic secure erasure.
 
 The [SA/FD financial design](docs/superpowers/specs/2026-09-27-sa-fd-financial-data-and-sec-retirement-design.md)
 separates this authorized cleanup from the subsequent common-source adapter and
-replacement UI. Its new implementation details still await review.
+replacement UI. The common reader and replacement UI are implemented on the
+financial-read branch; deployment and formal provider activity are separate.
+
+### Common Financial Reads
+
+`GET /fundamentals/{ticker}`, the ticker Data tab, Dashboard and Settings
+coverage are local-only. Opening, rereading, changing source/period and paging
+cannot buy data, call SEC, launch a browser or change a schedule. The deprecated
+`stored` query parameter is an alias; even `stored=false` stays local.
+
+The selected provider is one coherent result, never an automatic blend. A
+missing setting defaults to SA then FD; existing FD-only, disabled or invalid
+settings are not rewritten. Select sources in Financial Data Sources explicitly.
+SA partial data does not authorize paid FD fallback.
+
+SA's 13 reviewed direct statement mappings preserve displayed month, source row,
+decimal value, currency, unit conversion and display precision. Compatible SA
+inputs currently support gross, operating and net margins plus current ratio.
+Unreviewed debt, growth, valuation and other inputs remain named gaps, not zero.
+TTM is not an annual or quarterly reporting period. Raw SA company tables retain
+the additional provider rows outside these reviewed mappings.
+
+FD retains its existing qualified metrics and current response windows. Retained
+data remains readable after a reuse window expires; expiry controls possible
+acquisition, not whether a historical statement exists. SA observation IDs can
+reopen retained captures; FD does not yet keep all overwritten response versions.
+Pin `read_id` when paging; changed content is a typed refusal, not mixed history.
+
+For an update, select Financial Datasets by name and confirm its paid action.
+`POST /fundamentals/{ticker}/refresh` and explicit tool refresh require a named
+source and the existing budget/admission checks. Refusal keeps a separately
+labeled previous local read. SA updates remain in the extension; its status
+action reads existing collector state and exposes manual source links, but does
+not enqueue work. Per-ticker progress and future report dates remain unknown
+unless the acquisition system supplies them.
+
+Research tools retain explicit `stored`, `auto` and `refresh` modes. Historical
+and pinned reads require `stored`. In `auto`, a selected/explicit FD primary may
+update missing or stale FD inputs under admission; SA being missing or stale
+never authorizes paid substitution. UI reads always choose `stored`.
+
+Detailed legacy metrics and peer ranking have no validated replacement in this
+delivery and return `financial_operation_not_ported`, without calling SEC,
+FD or Finnhub. Optional SEC identity, lifecycle and original-filing tools remain
+separate. The Settings request cache (60 seconds, retained at most 15 minutes)
+only avoids repeated UI requests; it does not define financial fact validity.
+
+Owners: [common reader](src/fundamentals/read_service.py),
+[coverage](src/fundamentals/coverage.py),
+[HTTP entrypoints](src/api/routes/fundamentals.py).
 
 ### Saved Comment Work Is Not Complete Coverage
 
@@ -179,7 +228,7 @@ recommendation; it does not make every source selectable through one policy:
 
 | Data category | Existing ArkScope acquisition | Boundary / outstanding integration |
 | --- | --- | --- |
-| Company financial statements and facts | SEC EDGAR and Financial Datasets through existing financial tools; explicit SA statement-table capture and local reads | SA displayed tables are source observations, not a replacement for every old calculated metric. Massive financials remain a candidate. Detailed financials has narrower coverage than fundamental analysis. |
+| Company financial statements and facts | SA and Financial Datasets through the common financial reader; raw SA company tables remain available | Only reviewed mappings and metrics are supported. Massive financials remain a candidate; legacy detailed/peer operations are explicitly unavailable. |
 | Provider-supplied valuation, ratings and peer comparisons | Explicit SA valuation-table and 18-section peer-page capture | Provider judgments/peer selection stay separate from financial facts. Snapshot prices are not live quotes. |
 | Earnings estimates and revisions | Explicit SA annual EPS/revenue consensus and revision-table capture | Forecasts are not reported results or earnings-calendar events. Analyst counts, ranges and period labels remain available. |
 | Current quotes | IBKR snapshots | Account/feed access and price time determine whether the result is live. This is not a persistent streaming service. |
@@ -281,23 +330,23 @@ is still follow-up work.
 
 | Data / entrypoint | Trigger and reuse today | Important limit |
 | --- | --- | --- |
-| Legacy financial analysis and detailed financials | On-demand `auto` reuses eligible local observations from selected sources; otherwise acquire in the configured order within paid admission limits. | Age-based reuse, not a latest-period check. No explicit fiscal-period/version selector on these tools. |
-| Earnings supplements in detailed financials | Independently selected Finnhub history/upcoming responses, with a shorter reuse window | Not the earnings-calendar scheduler interval, and not an earnings-reaction monitor |
+| Common financial analysis | UI/HTTP GET is stored-only; tool `auto` may update an explicitly selected/primary FD source within admission | No paid fallback from SA; retained month/observation/read selectors do not claim latest-provider completeness |
+| Legacy detailed financials and peer comparison | Explicit `financial_operation_not_ported`; no acquisition | No validated replacement for these operations in this delivery |
 | `get_earnings_impact` | Reads retained release-calendar revisions and local daily prices; no acquisition or calendar schema installation | US exchange-session analysis, not a real-time monitor. Missing release timing, actuals or exact reaction-session prices are explicit gaps. |
 | SEC research: `list_sec_filings`, `get_sec_financial_facts`, `read_sec_filing` | Default `stored`; explicit `auto` / `refresh` can download and persist through identity, path and transport guards | Separate from legacy financial tools; the general permission hook is audit-only, not an interactive authorization engine |
 | General news | Opt-in source schedules, Run now, or the scoped `daily_update` wrapper; source-specific incremental collection | No universal query-triggered catch-up or interval-completeness guarantee |
 | SA articles / comments | Signed-in browser extension captures into local storage; research reads retained captures | Body and comment outcomes are separate. A successful body does not prove comments loaded. |
 | SA company financial tables | Explicit current-tab capture, or opt-in extension financial refresh; `get_sa_company_data` reads saved observations | Per-ticker/statement/view checks, initially every 7 days; no paid fallback or claim that displayed periods are the latest publication. Requires the browser and installed extension. |
 | SA valuation, peers, annual estimates/revisions | Explicit current-tab capture with bounded section scrolling; local reads of a pinned observation | DOM readiness polling is not a recurring provider refresh. No hidden pagination, automatic paid fallback or live-quote claim. |
-| `compare_financial_sources` | Compare already retained SA/SEC/FD statement observations from selected sources | No acquisition or spending; compatible display-period comparisons are not exact accounting equivalence or a materiality judgment. |
+| `compare_financial_sources` | Compare already retained SA/FD statement observations from selected sources | No acquisition or spending; compatible display-period comparisons are not exact accounting equivalence or a materiality judgment. |
 | FRED and Finnhub calendars | Local reads plus explicit jobs or opt-in source schedules | A release calendar is not evidence that a financial provider has processed the release. |
 | `get_current_quote` | `source=auto` tries an IBKR snapshot; `ibkr` requires that path; `local` reads stored bars | Snapshot, not streaming. Auto's local fallback is labeled historical, not live. |
 | `get_portfolio_holdings` | Pages an existing local profile snapshot in one read transaction | Does not install schema, create accounts, sync IBKR or establish current account value; missing storage is unavailable, not an empty portfolio |
 
 ### Analytical Basis And Research Access
 
-Acquisition freshness does not validate a calculation. Basic and detailed
-financial reads share debt/return/growth guards: debt is not total liabilities;
+Acquisition freshness does not validate a calculation. Qualified FD
+financial inputs use debt/return/growth guards: debt is not total liabilities;
 missing debt is not zero; annual ROE/ROA require matching statement end, period
 type and currency. The denominator is disclosed as period-end equity/assets,
 not an average, and quarterly income is not multiplied by four. Growth requires
@@ -306,7 +355,9 @@ annual, 70-110 days for quarterly). Quarterly growth is explicitly QoQ, not YoY.
 Nonstandard/stub periods remain unavailable rather than silently comparable.
 
 `metric_basis` and `metric_gaps` explain available and withheld outputs. Numeric
-provider inputs are not promoted to exact filing evidence. SEC statement inputs
+provider inputs are not promoted to exact filing evidence. The following SEC
+guards describe the retained optional compatibility calculators, not an active
+common financial provider or an instruction to keep a legacy corpus. SEC statement inputs
 must carry the current period/debt extraction contract. It anchors the shared
 report end in USD statement totals (assets/equity, revenue, net income and
 operating cash flow), not later share-count disclosures or unrelated units.
@@ -356,26 +407,26 @@ controls these implemented paths, using one policy catalog:
 
 | Dataset | Selectable sources | Runtime consumers |
 | --- | --- | --- |
-| `fundamentals_analysis` | SEC EDGAR, Financial Datasets | `get_fundamentals_analysis` and stored-only `compare_financial_sources` on all four existing research channels |
-| `detailed_financials` | SEC EDGAR | SEC calculation component of `get_detailed_financials` and existing callers |
-| `earnings_supplements` | Finnhub | History/upcoming component of `get_detailed_financials` |
+| `fundamentals_analysis` | Seeking Alpha, Financial Datasets | Common reader and stored-only comparison on all four existing research channels |
+| `detailed_financials` | None | Legacy operation explicitly unavailable; existing setting is preserved, not used for acquisition |
+| `earnings_supplements` | Finnhub setting retained | No longer fetched by the retired detailed-financial operation |
 | `sa_company_financials` | Seeking Alpha | `get_sa_company_data` and stored-only `compare_financial_sources` on all four research channels; explicit extension ingestion |
 | `sa_company_valuation` | Seeking Alpha | Same local reader with `dataset=valuation` or `peers`; explicit ingestion |
 | `sa_company_estimates` | Seeking Alpha | Same local reader with `dataset=estimates` or `revisions`; explicit ingestion |
 
 The ordered selection is an eligible set, not a command to fetch all sources.
-Automatic fundamental analysis first tries acceptable local observations in that
-order, then permitted acquisitions. Thus an eligible second source's complete
-local result may avoid a first source's network request. A missing or partial
-result remains visible as acquisition gaps; values from different providers are
-not silently combined to fill a financial statement.
+Stored mode returns the first selected source with readable retained statements,
+including partial statements. Auto first considers age-eligible retained reads;
+its acquisition decision is still limited to the explicit or primary provider.
+SA as the primary provider never authorizes a paid FD request, even when SA is
+absent and some FD statements are retained. A missing or partial result remains
+visible as gaps; values from different providers are not combined.
 
-If no complete local result is available but selected FD statements are partly
-retained, `stored` returns that partial result. `auto` keeps that provider and
-attempts only its missing statements within the budget. It does not restart the
-statement set at another provider or repurchase the already eligible statements.
+When FD itself is the explicit or primary source, auto can retain its fresh
+statement groups and acquire only missing/stale groups under the existing
+budget. It does not buy an alternate provider or repurchase fresh groups.
 
-`get_fundamentals_analysis(source="sec_edgar"|"financial_datasets")` selects one
+`get_fundamentals_analysis(source="seeking_alpha"|"financial_datasets")` selects one
 provider inside that eligible set and never silently falls back to another.
 `source="auto"` is the default. Comparing sources requires separate explicit
 reads; existing cache records remain provider-separated. `source_routes` records
@@ -411,12 +462,10 @@ the full company-data reader. Unknown/ambiguous row labels are not fuzzy-matched
   retained period; it never means a new acquisition or a claim of latest data.
   Missing requested periods remain visible. TTM/last-report columns are not
   substitutes for annual or quarterly columns.
-- SEC rows without the current input-selection contract cannot publish values
-  or deltas in this comparison. Their provider, period and acquisition receipt
-  remain visible with `statement_basis_unverified`; this does not authorize a
-  refresh, delete the source cache or silently substitute another period.
+- SEC is not a supported comparison provider in the common financial path.
+  Retired or disabled source arguments fail closed without acquisition.
 - Source values, labels, currency, unit note/scale, observation/content identity
-  and acquisition metadata remain separate. New SEC/FD statement projections
+  and acquisition metadata remain separate. FD statement projections
   retain declared currency; old projections with no currency remain unknown.
 - SA month labels are **month alignment**, not proof of the exact fiscal end
   day or duration. Two known conflicting exact end dates prohibit a delta.
@@ -441,7 +490,7 @@ The default page contains three measures and can be enlarged within the model's
 output budget. Pin `comparison_id` on subsequent pages; changed content is a
 typed refusal, not mixed-version output. This content identity is not a saved
 report or an archival promise: SA can reopen immutable observations, while the
-old SEC/FD caches may overwrite previous responses. Budget reducers preserve the
+FD caches may overwrite previous responses. Budget reducers preserve the
 whole comparison or return a smaller-page request, never clipped numeric JSON.
 
 Owners: [comparison reader](src/tools/financial_comparison_tools.py),

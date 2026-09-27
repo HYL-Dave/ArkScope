@@ -31,11 +31,11 @@ function fixture(): DataSourceRoutesResponse {
   return {
     routes: [
       {
-        dataset: "fundamentals_analysis", providers: ["sec_edgar", "financial_datasets"],
-        options: [{ provider: "sec_edgar", access: "public_identity" },
+        dataset: "fundamentals_analysis", providers: ["seeking_alpha", "financial_datasets"],
+        options: [{ provider: "seeking_alpha", access: "signed_in_browser_subscription" },
           { provider: "financial_datasets", access: "metered_requests" }],
         setting_source: "default", consumers: ["get_fundamentals_analysis"],
-        unimplemented: ["massive", "seeking_alpha"], error_code: null,
+        unimplemented: ["massive"], error_code: null,
       },
       {
         dataset: "detailed_financials", providers: ["sec_edgar"],
@@ -132,14 +132,30 @@ afterEach(() => {
 });
 
 describe("DataSourceRoutingSection", () => {
+  it("preserves an FD-only saved route and invalidates local coverage only on explicit save", async () => {
+    state.routes[0]!.providers = ["financial_datasets"];
+    state.routes[0]!.setting_source = "profile";
+    const cache = createSettingsReadCache();
+    const key = "financial_coverage:annual:auto:USD:0:25" as const;
+    cache.replace(key, { marker: "retained" });
+    await render(cache);
+    expect(source(`${FUNDAMENTALS}: Seeking Alpha`).checked).toBe(false);
+    expect(source(`${FUNDAMENTALS}: ${FD}`).checked).toBe(true);
+    expect(putDataSourceRoute).not.toHaveBeenCalled();
+    await click(source(`${FUNDAMENTALS}: Seeking Alpha`));
+    expect(cache.inspect(key).status).toBe("fresh");
+    await click(button(`Save sources: ${FUNDAMENTALS}`));
+    expect(cache.inspect(key).status).toBe("missing");
+    expect(putFinancialDatasetsBudget).not.toHaveBeenCalled();
+  });
   it("shows actual adapter scope and unverified Finnhub access without activating paid requests", async () => {
     await render();
     expect(host.textContent).toContain("Endpoint access unverified");
     expect(host.textContent).toContain("A subscription upgrade alone cannot enable financial acquisition");
-    expect(host.textContent).toContain("not a generic fundamental-ratio calculator");
+    expect(host.textContent).toContain("support the common financial read and reviewed ratios");
     expect(host.textContent).toContain("Request limits not configured");
     expect(Array.from(host.querySelectorAll("input[aria-label]")).some((item) =>
-      item.getAttribute("aria-label")?.startsWith(FUNDAMENTALS) && /Massive|Seeking Alpha/.test(item.getAttribute("aria-label")!))).toBe(false);
+      item.getAttribute("aria-label")?.startsWith(FUNDAMENTALS) && /Massive|SEC EDGAR/.test(item.getAttribute("aria-label")!))).toBe(false);
     expect(paid().checked).toBe(false);
     expect(putDataSourceRoute).not.toHaveBeenCalled();
     expect(putFinancialDatasetsBudget).not.toHaveBeenCalled();
@@ -147,7 +163,7 @@ describe("DataSourceRoutingSection", () => {
 
   it("saves selected sources only, separately from billing permission", async () => {
     await render();
-    await click(source(`${FUNDAMENTALS}: SEC EDGAR`));
+    await click(source(`${FUNDAMENTALS}: Seeking Alpha`));
     expect(guard).toHaveBeenLastCalledWith(expect.objectContaining({ dirty: true, busy: false }));
     await click(button(`Save sources: ${FUNDAMENTALS}`));
     expect(putDataSourceRoute).toHaveBeenCalledExactlyOnceWith("fundamentals_analysis", ["financial_datasets"]);
@@ -163,25 +179,25 @@ describe("DataSourceRoutingSection", () => {
     await render();
     const row = source(`${label}: Seeking Alpha`).closest(".data-route-row");
     expect(row?.textContent).toContain("manual / scheduled");
-    expect(row?.textContent).toContain("not a generic fundamental-ratio calculator");
+    expect(row?.textContent).toContain("support the common financial read and reviewed ratios");
     await click(source(`${label}: Seeking Alpha`));
     await click(button(`Save sources: ${label}`));
     expect(putDataSourceRoute).toHaveBeenCalledExactlyOnceWith(dataset, []);
     expect(putFinancialDatasetsBudget).not.toHaveBeenCalled();
-    expect(source(`${FUNDAMENTALS}: SEC EDGAR`).checked).toBe(true);
+    expect(source(`${FUNDAMENTALS}: Seeking Alpha`).checked).toBe(true);
   });
 
   it("changes the ordered fallback route with stable move controls", async () => {
     await render();
     await click(button(`Higher priority: ${FD}`));
     await click(button(`Save sources: ${FUNDAMENTALS}`));
-    expect(putDataSourceRoute).toHaveBeenCalledWith("fundamentals_analysis", ["financial_datasets", "sec_edgar"]);
+    expect(putDataSourceRoute).toHaveBeenCalledWith("fundamentals_analysis", ["financial_datasets", "seeking_alpha"]);
     expect(button(`Higher priority: ${FD}`).disabled).toBe(true);
   });
 
   it("persists an empty route instead of silently restoring defaults", async () => {
     await render();
-    await click(source(`${FUNDAMENTALS}: SEC EDGAR`));
+    await click(source(`${FUNDAMENTALS}: Seeking Alpha`));
     await click(source(`${FUNDAMENTALS}: ${FD}`));
     await click(button(`Save sources: ${FUNDAMENTALS}`));
     expect(putDataSourceRoute).toHaveBeenCalledWith("fundamentals_analysis", []);
@@ -191,23 +207,23 @@ describe("DataSourceRoutingSection", () => {
   it("keeps the draft on a rejected save and supports explicit discard", async () => {
     vi.mocked(putDataSourceRoute).mockRejectedValue(new Error("PRIVATE_BACKEND_DETAIL"));
     await render();
-    await click(source(`${FUNDAMENTALS}: SEC EDGAR`));
+    await click(source(`${FUNDAMENTALS}: Seeking Alpha`));
     await click(button(`Save sources: ${FUNDAMENTALS}`));
-    expect(source(`${FUNDAMENTALS}: SEC EDGAR`).checked).toBe(false);
+    expect(source(`${FUNDAMENTALS}: Seeking Alpha`).checked).toBe(false);
     expect(host.textContent).toContain("Changes were not saved");
     expect(host.textContent).not.toContain("PRIVATE_BACKEND_DETAIL");
     expect(guard).toHaveBeenLastCalledWith(expect.objectContaining({ dirty: true, busy: false }));
     await click(button(`Discard source changes: ${FUNDAMENTALS}`));
-    expect(source(`${FUNDAMENTALS}: SEC EDGAR`).checked).toBe(true);
+    expect(source(`${FUNDAMENTALS}: Seeking Alpha`).checked).toBe(true);
     expect(guard).toHaveBeenLastCalledWith({ dirty: false, busy: false, reason: null });
   });
 
   it("retains another row's unsaved draft when a save invalidates the shared read cache", async () => {
     await render();
-    await click(source(`${FUNDAMENTALS}: SEC EDGAR`));
+    await click(source(`${FUNDAMENTALS}: Seeking Alpha`));
     await click(source("Detailed financials: earnings supplement: Finnhub"));
     await click(button("Save sources: Detailed financials: earnings supplement"));
-    expect(source(`${FUNDAMENTALS}: SEC EDGAR`).checked).toBe(false);
+    expect(source(`${FUNDAMENTALS}: Seeking Alpha`).checked).toBe(false);
     expect(button(`Save sources: ${FUNDAMENTALS}`).disabled).toBe(false);
     expect(guard).toHaveBeenLastCalledWith(expect.objectContaining({ dirty: true }));
   });
@@ -219,7 +235,7 @@ describe("DataSourceRoutingSection", () => {
     vi.mocked(getDataSourceRoutes).mockRejectedValue(new Error("offline"));
     await click(button("Reload status"));
     expect(host.textContent).toContain("Retained values may be outdated");
-    expect(source(`${FUNDAMENTALS}: SEC EDGAR`).checked).toBe(true);
+    expect(source(`${FUNDAMENTALS}: Seeking Alpha`).checked).toBe(true);
     expect(putDataSourceRoute).not.toHaveBeenCalled();
   });
 
@@ -319,10 +335,10 @@ describe("DataSourceRoutingSection", () => {
     Object.assign(state.routes[0], { providers: null, setting_source: "profile", error_code: "data_source_policy_invalid" });
     await render();
     expect(host.textContent).toContain("Invalid configuration");
-    expect(source(`${FUNDAMENTALS}: SEC EDGAR`).checked).toBe(false);
-    await click(source(`${FUNDAMENTALS}: SEC EDGAR`));
+    expect(source(`${FUNDAMENTALS}: Seeking Alpha`).checked).toBe(false);
+    await click(source(`${FUNDAMENTALS}: Seeking Alpha`));
     await click(button(`Save sources: ${FUNDAMENTALS}`));
     expect(host.textContent).not.toContain("Invalid configuration");
-    expect(putDataSourceRoute).toHaveBeenCalledWith("fundamentals_analysis", ["sec_edgar"]);
+    expect(putDataSourceRoute).toHaveBeenCalledWith("fundamentals_analysis", ["seeking_alpha"]);
   });
 });

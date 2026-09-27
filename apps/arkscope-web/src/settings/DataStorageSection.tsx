@@ -48,6 +48,7 @@ import {
 import { SettingsSubsectionAnchor } from "./SettingsSectionAnchor";
 import { PriceCoverageRepair } from "./PriceCoverageRepair";
 import { SecResearchPanel } from "./SecResearchPanel";
+import { FinancialCoverageSection } from "./FinancialCoverageSection";
 
 export function shortTs(iso: string | null | undefined): string {
   return formatSystemTimestamp(iso);
@@ -135,8 +136,6 @@ export function DataStorageSection({
 
   const exists = status?.exists ?? false;
   const pr = status?.prices;
-  const fd = status?.fundamentals;
-  const fc = status?.financial_cache;
   const errorPresentation = err ? settingsErrorPresentation(err, t, commonT) : null;
 
   return (
@@ -176,31 +175,7 @@ export function DataStorageSection({
           </dl>
         </section>
       )}
-      {status ? <details data-cache-diagnostics>
-        <summary>{t(($) => $.dataStorage.cacheDiagnostics)}</summary>
-        <p className="muted tiny">{t(($) => $.dataStorage.cacheScope)}</p>
-        <dl className="ds-kv">
-          <dt>{t(($) => $.dataStorage.labels.fundamentals)}</dt>
-          <dd>{exists ? t(($) => $.dataStorage.summary.fundamentals, {
-            value: fd!.row_count.toLocaleString(),
-            count: fd!.ticker_count,
-            timestamp: fd!.latest_date ?? "—",
-          }) : "—"}</dd>
-          <dt>{t(($) => $.dataStorage.labels.financialCache)}</dt>
-          <dd>
-            {exists
-              ? t(($) => $.dataStorage.summary.financialCache, {
-                  value: fc!.row_count.toLocaleString(),
-                  count: fc!.valid_count,
-                  expiredCount: fc!.expired_count,
-                  timestamp: formatSystemTimestamp(fc!.latest_fetched_at),
-                })
-              : "—"}
-          </dd>
-        </dl>
-        <p className="muted tiny">{t(($) => $.dataStorage.secProjectionScope)}</p>
-      </details> : null}
-
+      <FinancialCoverageSection settingsReadCache={settingsReadCache} onNavigateTarget={onNavigateTarget} />
       <SettingsSubsectionAnchor id="security_lifecycle">
         <SecurityLifecyclePanel
           developerMode={developerMode}

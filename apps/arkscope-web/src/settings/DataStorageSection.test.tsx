@@ -16,6 +16,7 @@ import type {
   TradingDayCoverage,
 } from "../api";
 import { createSettingsReadCache } from "./settingsReadCache";
+import { coverageFixture } from "../financialReadFixtures";
 import { DataScheduleControlsProvider } from "./dataScheduleControls";
 
 const stylesCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../styles.css"), "utf8");
@@ -33,16 +34,8 @@ const EMPTY_MARKET_STATUS: MarketDataStatus = {
   exists: false,
   prices: { row_count: 0, ticker_count: 0, latest_datetime: null },
   news: { row_count: 0, source_count: 0, latest_published: null },
-  fundamentals: { row_count: 0, ticker_count: 0, latest_date: null },
-  financial_cache: {
-    row_count: 0,
-    valid_count: 0,
-    expired_count: 0,
-    latest_fetched_at: null,
-  },
-  sync: { prices: null, news: null, fundamentals: null },
+  sync: { prices: null, news: null, },
   prices_authority: "local",
-  fundamentals_mode: "local_cache_refetch",
   use_local_market_setting: true,
   env_override: false,
   local_market_strict_setting: false,
@@ -136,6 +129,7 @@ vi.mock("../api", async (importOriginal) => {
       last_attempt: null, last_acquisition_at: null, last_completed_batch: null,
     }, observed_at: null, coverage: {}, gaps: [], next_cursor: null })),
     getMarketDataStatus: vi.fn(async () => EMPTY_MARKET_STATUS),
+    getFinancialCoverage: vi.fn(async () => coverageFixture()),
     listSecurityLifecycleCases: vi.fn(async () => CASES),
     getTradingDayCoverage: vi.fn(async () => COVERAGE),
     getPriceRepairOperations: vi.fn(async () => ({ version: 1, operations: [], total: 0, offset: 0, has_more: false })),
@@ -287,16 +281,16 @@ describe("DataStorageSection lifecycle automation controls", () => {
   it.each([
     { language: "en" as const, summary: "48 cache entries (24 TTL-unexpired · 24 TTL-expired)", timestamp: "latest cache timestamp" },
     { language: "zh-Hant" as const, summary: "48 個快取項目（TTL 未到期 24 · TTL 已到期 24）", timestamp: "最新快取時間" },
-  ])("reports cache TTL without promising reusability or a scheduled refresh in $language", async ({ language, summary, timestamp }) => {
+  ])("replaces retired cache TTL summaries with source coverage in $language", async ({ language, summary, timestamp }) => {
     vi.mocked(getMarketDataStatus).mockResolvedValue({
       ...EMPTY_MARKET_STATUS, exists: true,
-      financial_cache: { row_count: 48, valid_count: 24, expired_count: 24, latest_fetched_at: "2026-09-09T18:38:00Z" },
     });
     await renderSection(language);
-    expect(host!.textContent).toContain(summary);
-    expect(host!.textContent).toContain(timestamp);
+    expect(host!.textContent).not.toContain(summary);
+    expect(host!.textContent).not.toContain(timestamp);
+    expect(host!.textContent).toContain("Seeking Alpha");
     expect(host!.textContent).not.toMatch(/24 reusable|24 refresh due|可重用 24|待重新取得 24/);
-    expect(host!.querySelector("details[data-cache-diagnostics]")?.textContent).toContain(summary);
+    expect(host!.querySelector("details[data-cache-diagnostics]")).toBeNull();
   });
 
   it.each(["en", "zh-Hant"] as const)("separates local price coverage and annual SEC projections from News in %s", async (language) => {
@@ -304,15 +298,14 @@ describe("DataStorageSection lifecycle automation controls", () => {
       ...EMPTY_MARKET_STATUS, exists: true,
       prices: { row_count: 789, ticker_count: 6, latest_datetime: "2026-09-25T20:00:00Z" },
       news: { row_count: 987654, source_count: 12, latest_published: "2026-09-26T01:00:00Z" },
-      fundamentals: { row_count: 10, ticker_count: 10, latest_date: "2025-12-31" },
     });
     await renderSection(language);
     const stored = host!.querySelector('[data-storage-summary="prices"]');
     expect(stored?.textContent).toContain("789");
     expect(stored?.textContent).not.toContain("SEC");
     const diagnostics = host!.querySelector("details[data-cache-diagnostics]");
-    expect(diagnostics?.textContent).toContain(language === "en" ? "Validated, TTL-unexpired annual SEC projections" : "已驗證且 TTL 未到期的 SEC 年度投影");
-    expect(diagnostics?.textContent).toContain(language === "en" ? "not total SEC coverage" : "不代表全部 SEC 覆蓋");
+    expect(diagnostics).toBeNull();
+    expect(host!.textContent).toContain("2025-12");
     expect(host!.textContent).not.toContain("987,654");
     expect(host!.textContent).not.toMatch(/Stored SEC Fundamentals|已儲存的 SEC 基本面/);
   });

@@ -8,6 +8,8 @@ import {
 } from "./i18n/systemPresentation";
 import type { NavigationTarget } from "./shell/navigation";
 import { Button } from "./ui";
+import { FinancialCoverageSection } from "./settings/FinancialCoverageSection";
+import type { SettingsReadCache } from "./settings/settingsReadCache";
 
 export type StatusState = SystemStatusState;
 
@@ -18,6 +20,7 @@ export function DashboardView({
   developerMode,
   onDeveloperModeChange,
   onNavigate,
+  settingsReadCache,
 }: {
   status: StatusState;
   runtime?: RuntimeConfig | null;
@@ -25,6 +28,7 @@ export function DashboardView({
   developerMode: boolean;
   onDeveloperModeChange: (enabled: boolean) => void;
   onNavigate: (target: NavigationTarget) => void;
+  settingsReadCache?: SettingsReadCache;
 }) {
   const { t } = useTranslation("system");
   const statusPresentation = presentSystemStatus(status, developerMode, t);
@@ -55,6 +59,7 @@ export function DashboardView({
         {t(($) => $.dataSourceSettings)}
       </Button>
 
+      <FinancialCoverageSection settingsReadCache={settingsReadCache} onNavigateTarget={onNavigate} />
       <section aria-labelledby="developer-mode-heading">
         <h2 id="developer-mode-heading" className="section">
           {t(($) => $.developer.heading)}
@@ -121,8 +126,7 @@ function StatusTiles({ status }: { status: ApiStatus }) {
   const knownDataSourceLabels = {
     news_tickers: t(($) => $.status.dataSourceLabels.newsTickers),
     price_tickers: t(($) => $.status.dataSourceLabels.priceTickers),
-    fundamentals_tickers: t(($) => $.status.dataSourceLabels.storedSecFundamentals),
-  } satisfies Record<"news_tickers" | "price_tickers" | "fundamentals_tickers", string>;
+  } satisfies Record<"news_tickers" | "price_tickers", string>;
 
   const dataSourceLabel = (key: string): string => {
     if (Object.prototype.hasOwnProperty.call(knownDataSourceLabels, key)) {
@@ -148,7 +152,7 @@ function StatusTiles({ status }: { status: ApiStatus }) {
 
       <h2 className="section">{t(($) => $.status.dataSourcesTickers)}</h2>
       <div className="grid">
-        {Object.entries(status.data_sources).map(([k, v]) => (
+        {Object.entries(status.data_sources).filter(([key]) => key !== "fundamentals_tickers").map(([k, v]) => (
           <Tile key={k} label={dataSourceLabel(k)} value={v} />
         ))}
       </div>

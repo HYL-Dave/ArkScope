@@ -28,6 +28,8 @@ const apiMocks = vi.hoisted(() => ({
   getNotes: vi.fn(),
   getPriceChange: vi.fn(),
   getStoredFundamentals: vi.fn(),
+  refreshFinancials: vi.fn(),
+  getSAAcquisitionStatus: vi.fn(),
   getTagCatalog: vi.fn(),
   getTickerState: vi.fn(),
   removeTickerTag: vi.fn(),
@@ -43,6 +45,86 @@ vi.mock("./AICard", () => ({
 }));
 
 import { TickerDetailView } from "./TickerDetail";
+import { financialFixture } from "./financialReadFixtures";
+
+describe("Common financial reads", () => {
+  it("reports a financial capability pause without claiming the collector is ready", async () => {
+    apiMocks.getStoredFundamentals.mockResolvedValue(financialFixture());
+    apiMocks.getSAAcquisitionStatus.mockResolvedValue({ status: "ok", configured: true,
+      capability_pauses: { financials: "subscription_required" } });
+    await mountTicker(); await switchLocale("en"); await click(buttonByText("Data"));
+    await click(buttonByText("Browser collection"));
+    expect(host!.textContent).toContain("subscription_required");
+    expect(host!.textContent).not.toContain("Collector configured");
+    expect(apiMocks.refreshFinancials).not.toHaveBeenCalled();
+  });
+
+  it("admits only one confirmed FD update while the request is running", async () => {
+    apiMocks.getStoredFundamentals.mockResolvedValue(financialFixture());
+    const pending = deferred<FundamentalsResult>();
+    apiMocks.refreshFinancials.mockReturnValue(pending.promise);
+    await mountTicker(); await switchLocale("en"); await click(buttonByText("Data"));
+    await setSelect(host!.querySelector<HTMLSelectElement>('[aria-label="Financial source"]')!, "financial_datasets");
+    await click(buttonByText("Update from FD"));
+    await click(buttonByText("Confirm paid update", document.body));
+    expect(buttonByText("Confirm paid update", document.body).disabled).toBe(true);
+    await click(buttonByText("Confirm paid update", document.body));
+    expect(apiMocks.refreshFinancials).toHaveBeenCalledOnce();
+    await act(async () => pending.resolve({ ...financialFixture(), read_id: "c".repeat(64) }));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("keeps decimal strings, month precision and missing-input reasons without paid fallback", async () => {
+    apiMocks.getStoredFundamentals.mockResolvedValue(financialFixture());
+    apiMocks.getMarketDataStatus.mockRejectedValue(new Error("market absent"));
+    await mountTicker(); await switchLocale("en"); await click(buttonByText("Data"));
+    expect(host!.textContent).toContain("12345678901234567890.12");
+    expect(host!.textContent).toContain("2025-12");
+    expect(host!.textContent).not.toContain("2025-12-31");
+    expect(host!.textContent).toContain("Provider-rounded");
+    expect(host!.textContent).toContain("Mapping not reviewed");
+    expect(apiMocks.refreshFinancials).not.toHaveBeenCalled();
+    await click(buttonByText("Browser collection"));
+    expect(apiMocks.getSAAcquisitionStatus).toHaveBeenCalledOnce();
+    expect(host!.textContent).toContain("Collector not configured");
+    expect(host!.querySelector('a[href="https://seekingalpha.com/symbol/AAPL/income-statement"]')).not.toBeNull();
+  });
+
+  it("requires a named FD confirmation and preserves the prior local read on refusal", async () => {
+    const fixture = financialFixture();
+    apiMocks.getStoredFundamentals.mockResolvedValue(fixture);
+    apiMocks.refreshFinancials.mockResolvedValue({ ...fixture, status: "unavailable", read_id: null,
+      read_gaps: [{ provider: "financial_datasets", code: "financial_datasets_paid_requests_disabled" }] });
+    await mountTicker(); await switchLocale("en"); await click(buttonByText("Data"));
+    await setSelect(host!.querySelector<HTMLSelectElement>('[aria-label="Financial source"]')!, "financial_datasets");
+    expect(apiMocks.refreshFinancials).not.toHaveBeenCalled();
+    await click(buttonByText("Update from FD"));
+    await click(buttonByText("Cancel", document.body));
+    expect(apiMocks.refreshFinancials).not.toHaveBeenCalled();
+    await click(buttonByText("Update from FD"));
+    await click(buttonByText("Confirm paid update", document.body));
+    expect(apiMocks.refreshFinancials).toHaveBeenCalledWith(TICKER, { source: "financial_datasets", period: "annual", currency: "USD" });
+    expect(host!.textContent).toContain("Previous local read");
+    expect(host!.textContent).toContain("12345678901234567890.12");
+    expect(host!.textContent).toContain("Paid requests disabled");
+  });
+
+  it("ignores delayed source/period reads and clears obsolete identity pins", async () => {
+    const delayed = deferred<FundamentalsResult>();
+    apiMocks.getStoredFundamentals.mockResolvedValue(financialFixture());
+    await mountTicker(); await switchLocale("en"); await click(buttonByText("Data"));
+    apiMocks.getStoredFundamentals.mockReturnValueOnce(delayed.promise).mockResolvedValueOnce({
+      ...financialFixture(), data_source: "financial_datasets", read_id: "c".repeat(64) });
+    await setSelect(host!.querySelector<HTMLSelectElement>('[aria-label="Financial period"]')!, "quarterly");
+    await setSelect(host!.querySelector<HTMLSelectElement>('[aria-label="Financial source"]')!, "financial_datasets");
+    await act(async () => delayed.resolve({ ...financialFixture(), data_source: "DELAYED_WRONG_SOURCE" }));
+    expect(host!.textContent).not.toContain("DELAYED_WRONG_SOURCE");
+    expect(apiMocks.getStoredFundamentals).toHaveBeenLastCalledWith(TICKER,
+      expect.objectContaining({ source: "financial_datasets", period: "quarterly", period_offset: 0 }));
+    expect(apiMocks.getStoredFundamentals.mock.calls.at(-1)?.[1]?.read_id).toBeUndefined();
+    expect(apiMocks.refreshFinancials).not.toHaveBeenCalled();
+  });
+});
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -165,6 +247,7 @@ const PRICE: PriceChange = {
 };
 
 const STATEMENT: FinancialStatement = {
+  ...financialFixture().income_statements![0]!,
   report_period: "SOURCE_REPORT_PERIOD",
   fiscal_period: "SOURCE_FISCAL_PERIOD",
   period_type: "source-period-type",
@@ -172,6 +255,7 @@ const STATEMENT: FinancialStatement = {
 };
 
 const FUNDAMENTALS: FundamentalsResult = {
+  ...financialFixture(),
   ticker: TICKER,
   snapshot_date: "SOURCE_SNAPSHOT_DATE",
   data_source: SOURCE_FUNDAMENTAL_PROVIDER,
@@ -213,11 +297,8 @@ const STATUS: MarketDataStatus = {
   exists: true,
   prices: { row_count: 1, ticker_count: 1, latest_datetime: "SOURCE_PRICE_TIME" },
   news: { row_count: 1, source_count: 1, latest_published: "SOURCE_NEWS_TIME" },
-  fundamentals: { row_count: 1, ticker_count: 1, latest_date: "SOURCE_FUND_DATE" },
-  financial_cache: { row_count: 1, valid_count: 1, expired_count: 0, latest_fetched_at: "SOURCE_FETCH_TIME" },
-  sync: { prices: null, news: null, fundamentals: null },
+  sync: { prices: null, news: null, },
   prices_authority: "local",
-  fundamentals_mode: "local_cache_refetch",
   use_local_market_setting: true,
   env_override: false,
   local_market_strict_setting: false,
@@ -328,7 +409,7 @@ function expectKvLabels(expected: readonly string[]) {
 
 function buttonByText(text: string, scope: ParentNode = host!): HTMLButtonElement {
   const match = Array.from(scope.querySelectorAll<HTMLButtonElement>("button"))
-    .find((button) => button.textContent?.includes(text));
+    .find((button) => button.textContent?.includes(text) || button.getAttribute("aria-label")?.includes(text));
   if (!match) throw new Error(`button not found: ${text}; rendered=${scope.textContent ?? ""}`);
   return match;
 }
@@ -390,6 +471,8 @@ beforeEach(async () => {
     new Error("legacy IV history request must not execute"),
   );
   apiMocks.getStoredFundamentals.mockReset().mockResolvedValue(FUNDAMENTALS);
+  apiMocks.refreshFinancials.mockReset();
+  apiMocks.getSAAcquisitionStatus.mockReset().mockResolvedValue({ status: "ok", configured: false });
   apiMocks.getMarketDataStatus.mockReset().mockResolvedValue(STATUS);
   apiMocks.getMarketDataCoverage.mockReset().mockResolvedValue(COVERAGE);
   apiMocks.getTagCatalog.mockReset().mockResolvedValue({
@@ -600,7 +683,7 @@ describe("Ticker Detail localization", () => {
     expect(host!.textContent).not.toContain(RAW_ERROR);
   });
 
-  it("maps reviewed source-path enums and preserves unknown stable IDs", async () => {
+  it("shows actual providers instead of retired storage-path labels", async () => {
     apiMocks.getStoredFundamentals.mockResolvedValueOnce({
       ...FUNDAMENTALS,
       source_path: "local_cache" as SourcePath,
@@ -608,18 +691,18 @@ describe("Ticker Detail localization", () => {
     await mountTicker();
     await click(buttonByText("數據"));
     await waitForCalls(apiMocks.getMarketDataCoverage, 1);
-    expect(host!.textContent).toContain("已儲存的 SEC 基本面");
+    expect(host!.textContent).toContain(SOURCE_FUNDAMENTAL_PROVIDER);
     expect(host!.textContent).not.toContain("local_cache");
 
     await switchLocale("en");
-    expect(host!.textContent).toContain("Stored SEC fundamentals");
+    expect(host!.textContent).toContain(SOURCE_FUNDAMENTAL_PROVIDER);
     expect(host!.textContent).not.toContain("local_cache");
 
     unmountTicker();
     await switchLocale("zh-Hant");
     apiMocks.getStoredFundamentals.mockResolvedValueOnce({
       ...FUNDAMENTALS,
-      source_path: UNKNOWN_SOURCE_PATH as SourcePath,
+      data_source: UNKNOWN_SOURCE_PATH,
     });
     await mountTicker();
     await click(buttonByText("數據"));
@@ -845,7 +928,7 @@ describe("Ticker Detail localization", () => {
     const sourceLabel = Array.from(host!.querySelectorAll("dt"))
       .find((node) => node.textContent === "基本面 · 本次來源")!;
     const sourceValue = sourceLabel.nextElementSibling;
-    expect(sourceValue?.textContent).toBe("已儲存的 SEC 基本面");
+    expect(sourceValue?.textContent).toBe(SOURCE_FUNDAMENTAL_PROVIDER);
     main.scrollTop = 411;
     refreshButton.focus();
     const before = requestCounts();
@@ -856,7 +939,7 @@ describe("Ticker Detail localization", () => {
     expect(buttonByText("Refresh")).toBe(refreshButton);
     expect(sourceLabel.textContent).toBe("Fundamentals · Source this time");
     expect(sourceLabel.nextElementSibling).toBe(sourceValue);
-    expect(sourceValue?.textContent).toBe("Stored SEC fundamentals");
+    expect(sourceValue?.textContent).toBe(SOURCE_FUNDAMENTAL_PROVIDER);
     expect(document.activeElement).toBe(refreshButton);
     expect(main.scrollTop).toBe(411);
     expect(requestCounts()).toEqual(before);

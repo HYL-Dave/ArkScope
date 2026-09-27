@@ -2,7 +2,11 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import i18n from "i18next";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { coverageFixture } from "./financialReadFixtures";
+vi.mock("./api", async (original) => ({ ...await original<typeof import("./api")>(),
+  getFinancialCoverage: vi.fn(async () => coverageFixture()),
+}));
 
 import type { ApiStatus, RuntimeConfig } from "./api";
 import { DashboardView, type StatusState } from "./Dashboard";
@@ -69,13 +73,16 @@ afterEach(async () => {
 });
 
 describe("Dashboard stored data-source presentation", () => {
-  it("renders stored SEC fundamentals in both locales without raw stable ids", async () => {
+  it("replaces retired SEC counts with independent common financial coverage", async () => {
     const zh = await renderDashboard("zh-Hant");
     expect(zh.textContent).toContain("新聞標的");
     expect(zh.textContent).toContain("價格標的");
-    expect(zh.textContent).toContain("已儲存的 SEC 基本面");
+    expect(zh.textContent).toContain("本機財務資料覆蓋");
+    expect(zh.textContent).toContain("Seeking Alpha");
+    expect(zh.textContent).toContain("2025-12");
+    expect(zh.textContent).not.toContain("已儲存的 SEC 基本面");
     expect(zh.textContent).toContain("未知資料來源（future_source_v9）");
-    for (const value of [101, 202, 303, 404]) {
+    for (const value of [101, 202, 404]) {
       expect(zh.textContent).toContain(String(value));
     }
     for (const raw of ["news_tickers", "price_tickers", "fundamentals_tickers"]) {
@@ -86,9 +93,10 @@ describe("Dashboard stored data-source presentation", () => {
     const en = await renderDashboard("en");
     expect(en.textContent).toContain("News tickers");
     expect(en.textContent).toContain("Price tickers");
-    expect(en.textContent).toContain("Stored SEC fundamentals");
+    expect(en.textContent).toContain("Local financial coverage");
+    expect(en.textContent).not.toContain("Stored SEC fundamentals");
     expect(en.textContent).toContain("Unknown data source (future_source_v9)");
-    for (const value of [101, 202, 303, 404]) {
+    for (const value of [101, 202, 404]) {
       expect(en.textContent).toContain(String(value));
     }
     for (const raw of ["news_tickers", "price_tickers", "fundamentals_tickers"]) {

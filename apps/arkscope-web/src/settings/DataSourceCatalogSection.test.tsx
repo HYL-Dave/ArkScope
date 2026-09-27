@@ -159,7 +159,7 @@ describe("DataSourceCatalogSection", () => {
     await render();
     expect(provider("seeking_alpha").textContent).toContain("Company-page capture: manual / scheduled");
     expect(provider("seeking_alpha").textContent).toContain("Captured SA financial tables");
-    expect(provider("seeking_alpha").textContent).toContain("not a generic fundamental-ratio calculator");
+    expect(provider("seeking_alpha").textContent).toContain("support the common financial read and reviewed ratios");
     await select("valuation_ratings");
     expect(provider("seeking_alpha").textContent).toContain("Company-page capture: manual / scheduled");
     await select("earnings_estimates");
