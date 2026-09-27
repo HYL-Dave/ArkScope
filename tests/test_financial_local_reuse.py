@@ -80,7 +80,7 @@ def test_default_tool_reuses_fd_before_trying_sec_or_checking_paid_access(local)
     sec.assert_not_called()
 
 
-def test_sec_default_reports_original_time_and_shared_reuse_policy(local):
+def test_retired_sec_snapshot_never_reenters_default_financial_reader(local):
     dal, http, sec = local
     fetched = datetime.now(timezone.utc) - timedelta(days=2)
     assert dal._backend.set_financial_cache(
@@ -90,8 +90,8 @@ def test_sec_default_reports_original_time_and_shared_reuse_policy(local):
         expires_at=(fetched + timedelta(days=90)).isoformat(),
     )
     result = get_fundamentals_analysis(dal, "AAPL")
-    assert result.source_observations[0]["fetched_at"] == fetched.isoformat()
-    assert result.source_observations[0]["max_age_seconds"] == 7 * 86400
+    assert result.status == "unavailable" and result.source_observations == []
+    assert result.data_source == "none"
     http.assert_not_called()
     sec.assert_not_called()
 
@@ -123,7 +123,7 @@ def test_detailed_stored_miss_never_queries_finnhub_or_sec(local, monkeypatch):
     sec.assert_not_called()
 
 
-@pytest.mark.parametrize("refresh_days,override,expected_source", [(1, None, "none"), (30, None, "financial_datasets"), (1, 3 * 86400, "financial_datasets")])
+@pytest.mark.parametrize("refresh_days,override,expected_source", [(1, None, "financial_datasets"), (30, None, "financial_datasets"), (1, 3 * 86400, "financial_datasets")])
 def test_auto_uses_operator_policy_then_explicit_override(local, refresh_days, override, expected_source):
     dal, http, _ = local
     for prefix, dataset, limit in (("income", "income_statements", 2),
@@ -135,6 +135,9 @@ def test_auto_uses_operator_policy_then_explicit_override(local, refresh_days, o
     assert result.data_source == expected_source
     if expected_source == "financial_datasets":
         assert all(item["max_age_seconds"] == (override or refresh_days * 86400) for item in result.source_observations)
+        if refresh_days == 1 and override is None:
+            assert all(item["within_max_age"] is False for item in result.source_observations)
+            assert any(g["code"] == "sa_browser_update_required" for g in result.acquisition_gaps)
     else:
         assert result.acquisition_gaps
     http.assert_not_called()
@@ -181,8 +184,8 @@ def test_refresh_failure_never_falls_back_to_a_stored_sec_result(local):
     result = get_fundamentals_analysis(dal, "AAPL", freshness="refresh")
     assert result.roe is None
     assert not result.source_observations
-    assert any(item["code"] == "sec_financials_acquisition_failed" for item in result.acquisition_gaps)
-    sec.assert_called_once()
+    assert any(item["code"] == "financial_refresh_source_required" for item in result.acquisition_gaps)
+    sec.assert_not_called()
     http.assert_not_called()
 
 

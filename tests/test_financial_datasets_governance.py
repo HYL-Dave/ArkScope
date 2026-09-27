@@ -295,7 +295,7 @@ def test_all_channels_expose_unconfigured_spend_as_a_gap(
 
     _, _, request = client_fixture
     dal = fallback_dal
-    name, arguments = "get_fundamentals_analysis", {"ticker": "TEST"}
+    name, arguments = "get_fundamentals_analysis", {"ticker": "TEST", "source": "financial_datasets"}
 
     async def invoke():
         if channel == "openai":
@@ -329,10 +329,9 @@ def test_all_channels_expose_unconfigured_spend_as_a_gap(
     result = unwrap(asyncio.run(invoke()))
     assert result["data_source"] == "none"
     assert result["acquisition_gaps"] == [
-        {"provider": "sec_edgar", "code": "sec_financials_unavailable"},
-        {"provider": "financial_datasets", "dataset": "income_statements", "code": "financial_datasets_policy_unconfigured"},
-        {"provider": "financial_datasets", "dataset": "balance_sheets", "code": "financial_datasets_not_attempted_after_refusal"},
-        {"provider": "financial_datasets", "dataset": "cash_flow_statements", "code": "financial_datasets_not_attempted_after_refusal"},
+        {"provider": "financial_datasets", "dataset": "income_statement", "code": "financial_datasets_policy_unconfigured"},
+        {"provider": "financial_datasets", "dataset": "balance_sheet", "code": "financial_datasets_not_attempted_after_refusal"},
+        {"provider": "financial_datasets", "dataset": "cash_flow_statement", "code": "financial_datasets_not_attempted_after_refusal"},
     ]
     request.assert_not_called()
 
@@ -348,14 +347,13 @@ def test_partial_paid_result_is_preserved_and_fanout_stops(
     client._request_policy = {**POLICY, "daily_request_limit": 1}
     client._cache_backend = fallback_dal._backend
     request.return_value.json.return_value = MOCK_INCOME_RESPONSE
-    monkeypatch.setattr(module, "FinancialDatasetsClient", lambda **kwargs: client)
-    result = get_fundamentals_analysis(fallback_dal, "AAPL")
+    monkeypatch.setattr("src.fundamentals.adapters.FinancialDatasetsClient", lambda **kwargs: client)
+    result = get_fundamentals_analysis(fallback_dal, "AAPL", source="financial_datasets")
     assert result.data_source == "financial_datasets"
     assert result.income_statements[0].data["revenue"] == 416161000000.0
     assert result.acquisition_gaps == [
-        {"provider": "sec_edgar", "code": "sec_financials_unavailable"},
-        {"provider": "financial_datasets", "dataset": "balance_sheets", "code": "financial_datasets_budget_exhausted"},
-        {"provider": "financial_datasets", "dataset": "cash_flow_statements", "code": "financial_datasets_not_attempted_after_refusal"},
+        {"provider": "financial_datasets", "dataset": "balance_sheet", "code": "financial_datasets_budget_exhausted"},
+        {"provider": "financial_datasets", "dataset": "cash_flow_statement", "code": "financial_datasets_not_attempted_after_refusal"},
     ]
     assert result.balance_sheet == [] and result.cash_flow_statements == []
     assert request.call_count == 1

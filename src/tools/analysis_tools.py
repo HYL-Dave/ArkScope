@@ -50,15 +50,9 @@ def _dataclass_to_dict(obj) -> dict:
 
 
 def _sec_to_financial_statement(obj) -> FinancialStatement:
-    """Convert SEC EDGAR dataclass to FinancialStatement schema."""
-    return FinancialStatement(
-        report_period=obj.report_period,
-        fiscal_period=getattr(obj, "fiscal_period", None),
-        period_type=getattr(obj, "period", "quarterly"),
-        currency=getattr(obj, "currency", None),
-        input_basis_version=getattr(obj, "input_basis_version", None),
-        data=_dataclass_to_dict(obj),
-    )
+    """Compatibility delegate for optional legacy SEC callers."""
+    from src.fundamentals.adapters import to_financial_statement
+    return to_financial_statement(obj)
 
 
 def _derive_metrics_from_sec(
@@ -82,19 +76,8 @@ def _is_fd_enabled(dal: DataAccessLayer) -> bool:
 
 
 def _get_fd_cache_days(dal: DataAccessLayer) -> Dict[str, int]:
-    """Read cache TTL settings from config."""
-    try:
-        profile = dal.get_user_profile()
-        paid = profile.get("data_preferences", {}).get("paid_sources", {})
-        fd_config = paid.get("financial_datasets", {})
-        result = {}
-        if "cache_days_annual" in fd_config:
-            result["annual"] = fd_config["cache_days_annual"]
-        if "cache_days_quarterly" in fd_config:
-            result["quarterly"] = fd_config["cache_days_quarterly"]
-        return result
-    except Exception:
-        return {}
+    from src.fundamentals.adapters import fd_cache_days
+    return fd_cache_days(dal)
 
 
 def _build_result_from_statements(
@@ -142,111 +125,33 @@ def get_fundamentals_analysis(
     freshness: str = "auto",
     max_age_seconds: Optional[int] = None,
     source: str = "auto",
+    *, currency: str = "USD", statement: Optional[str] = None, end_month: Optional[str] = None,
+    observation_id: Optional[str] = None, read_id: Optional[str] = None,
+    period_offset: int = 0, period_limit: int = 4,
 ) -> FundamentalsResult:
-    """Reuse dated local SEC/FD statements before acquiring a provider response.
-
-    Auto uses the configured financial reuse window unless explicitly overridden.
-    Stored never fetches or writes. Refresh bypasses old observations; FD still
-    requires separate paid admission. Financial period is not a freshness proof.
-    """
-    from src.fundamentals.cache import (
-        fundamentals_analysis_cache_key,
-        validate_positive_annual_sec_payload,
-    )
-    from src.data_source_routing import DataSourcePolicyFailure, load_route
-
-    ticker = ticker.strip().upper()
-    result = FundamentalsResult(ticker=ticker)
+    """Read selected SA/FD observations. Stored never acquires; refresh names a source."""
+    from pydantic import ValidationError
+    from src.fundamentals.contracts import FinancialGap, FinancialQuery
+    from src.fundamentals.read_service import read_financials
     try:
-        reuse_policy = _financial_policy(dal, freshness, max_age_seconds)
-        if period not in ("annual", "quarterly"):
-            raise ReuseFailure("financial_period_invalid")
-        route = load_route("fundamentals_analysis", dal)
-        result.source_routes = [route.describe(source)]
-        sources = route.candidates(source)
-    except (ReuseFailure, DataSourcePolicyFailure) as exc:
-        result.acquisition_gaps = [{"provider": "financials", "code": exc.code}]
-        return result
-
-    backend = getattr(dal, "_backend", None)
-    key = fundamentals_analysis_cache_key(ticker, period)
-
-    def validate(data):
-        valid = validate_positive_annual_sec_payload(data, ticker=ticker)
-        return valid.model_dump() if valid is not None else None
-
-    def sec_result(observation):
-        answer = FundamentalsResult.model_validate(observation.data)
-        answer.source_observations = [observation.describe("sec_edgar", "financial_statements", reuse_policy,
-            period=period, report_periods=[answer.snapshot_date])]
-        return answer
-
-    def finish(answer):
-        answer.source_routes = [route.describe(source, answer.data_source if answer.data_source != "none" else None)]
-        return answer
-
-    local_gaps, partial = [], None
-    if freshness != "refresh":
-        for provider in sources:
-            if provider == "sec_edgar":
-                saved = read_entry(backend, key, provider, ticker, validate, reuse_policy.max_age_seconds)
-                if saved is not None:
-                    return finish(sec_result(saved))
-                local_gaps.append({"provider": provider, "code": "financial_stored_data_unavailable"})
-            else:
-                saved_fd = _fd_financials(dal, ticker, period, reuse_policy, local_only=True)
-                if saved_fd.source_observations:
-                    if not saved_fd.acquisition_gaps:
-                        return finish(saved_fd)
-                    partial = saved_fd
-                local_gaps.extend(saved_fd.acquisition_gaps)
-        if partial is not None:
-            return finish(partial if freshness == "stored" else _fd_financials(dal, ticker, period, reuse_policy))
-        if freshness == "stored":
-            result.acquisition_gaps = local_gaps
-            return finish(result)
-
-    def fetch_sec():
-        try:
-            from data_sources.sec_edgar_financials import SECEdgarFinancials
-            sec = SECEdgarFinancials()
-            n = 4 if period == "quarterly" else 2
-            income = sec.get_income_statement(ticker, years=n, period=period)[:n]
-            balance = sec.get_balance_sheet(ticker, years=1, period=period)[:1]
-            cashflow = sec.get_cash_flow_statement(ticker, years=n, period=period)[:n]
-            if not (income or balance or cashflow):
-                raise ReuseFailure("sec_financials_unavailable")
-            return _build_result_from_statements(ticker, "sec_edgar", income, balance, cashflow).model_dump()
-        except ReuseFailure:
-            raise
-        except Exception as exc:
-            raise ReuseFailure("sec_financials_acquisition_failed") from exc
-
-    acquisition_gaps = []
-    for provider in sources:
-        if provider == "financial_datasets":
-            answer = _fd_financials(dal, ticker, period, reuse_policy)
-        else:
-            try:
-                answer = sec_result(cached_dataset(backend, key, provider, ticker, reuse_policy, validate, fetch_sec,
-                                                    ttl_days=30 if period == "quarterly" else 90))
-            except ReuseFailure as exc:
-                acquisition_gaps.append({"provider": provider, "code": exc.code})
-                continue
-        if answer.source_observations:
-            answer.acquisition_gaps = acquisition_gaps + answer.acquisition_gaps
-            return finish(answer)
-        acquisition_gaps.extend(answer.acquisition_gaps)
-    result.acquisition_gaps = acquisition_gaps
-    return finish(result)
+        query = FinancialQuery(ticker=ticker, period=period, source=source, freshness=freshness,
+            max_age_seconds=max_age_seconds, currency=currency, statement=statement, end_month=end_month,
+            observation_id=observation_id, read_id=read_id, period_offset=period_offset, period_limit=period_limit)
+    except ValidationError as exc:
+        field = exc.errors()[0]["loc"][0]
+        code = {"source": "data_source_unsupported", "period": "financial_period_invalid",
+                "freshness": "financial_freshness_invalid", "max_age_seconds": "financial_freshness_invalid"}.get(
+                    field, "financial_query_invalid")
+        return FundamentalsResult(ticker=ticker.strip().upper() if isinstance(ticker, str) else "",
+            income_statements=[], balance_sheet=[], cash_flow_statements=[],
+            read_gaps=[FinancialGap(provider="financials", code=code)],
+            acquisition_gaps=[{"provider": "financials", "code": code}])
+    return read_financials(dal, query)
 
 
 def _financial_profile(dal):
-    try:
-        profile = dal.get_user_profile()
-        return profile if isinstance(profile, dict) else {}
-    except Exception:
-        return {}
+    from src.fundamentals.adapters import financial_profile
+    return financial_profile(dal)
 
 
 def _financial_policy(dal, freshness, maximum, *, earnings=False):

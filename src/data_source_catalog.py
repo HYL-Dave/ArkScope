@@ -21,15 +21,13 @@ def _source(provider, acquisition, access_requirement, *, controls=(), schedules
 def _financial_sources():
     definition = DATASETS["fundamentals_analysis"]
     sources = [
-        _source(provider, "on_demand_api", SOURCE_ACCESS[provider], controls=("financial_sources",))
+        _source(provider, "browser_page_capture" if provider == "seeking_alpha" else "on_demand_api",
+                SOURCE_ACCESS[provider], controls=("financial_sources", "sa_extension")
+                if provider == "seeking_alpha" else ("financial_sources",),
+                routes=("fundamentals_analysis", "sa_company_financials") if provider == "seeking_alpha" else None)
         for provider in definition.providers
     ]
-    browser_sources = DATASETS["sa_company_financials"].providers
-    sources.extend(_source(provider, "browser_page_capture", SOURCE_ACCESS[provider],
-                           controls=("financial_sources", "sa_extension"), routes=("sa_company_financials",)) for provider in browser_sources)
     for provider in definition.unimplemented:
-        if provider in browser_sources:
-            continue
         requirement = "signed_in_browser_subscription" if provider == "seeking_alpha" else "endpoint_entitlement_unverified"
         sources.append(_source(provider, "not_implemented", requirement))
     return sources

@@ -25,6 +25,31 @@ STATEMENT_DATASETS = {"income_statement": "income_statements", "balance_sheet": 
 _IDENTITY_FIELDS = {"ticker", "report_period", "fiscal_period", "period", "currency", "input_basis_version"}
 
 
+def to_financial_statement(obj) -> FinancialStatement:
+    """Compatibility conversion for callers not yet using observation adapters."""
+    return FinancialStatement(report_period=obj.report_period, fiscal_period=getattr(obj, "fiscal_period", None),
+        period_type=getattr(obj, "period", "quarterly"), currency=getattr(obj, "currency", None),
+        input_basis_version=getattr(obj, "input_basis_version", None),
+        data={key: value for key, value in asdict(obj).items() if key not in _IDENTITY_FIELDS and value is not None})
+
+
+def financial_profile(dal):
+    try:
+        profile = dal.get_user_profile()
+        return profile if isinstance(profile, dict) else {}
+    except Exception:
+        return {}
+
+
+def fd_cache_days(dal):
+    try:
+        config = financial_profile(dal).get("data_preferences", {}).get("paid_sources", {}).get("financial_datasets", {})
+        return {period: config["cache_days_" + period] for period in ("annual", "quarterly")
+                if "cache_days_" + period in config}
+    except (TypeError, AttributeError):
+        return {}
+
+
 @dataclass
 class ProviderRead:
     provider: Provider
@@ -134,15 +159,23 @@ def _fd_statement(obj, kind, result, query):
 
 
 def read_fd_statements(dal, query: FinancialQuery, *, mode: Freshness = "stored",
-                       max_age_seconds: int | None = None, request_policy: dict | None = None) -> ProviderRead:
+                       max_age_seconds: int | None = None, request_policy: dict | None = None,
+                       retained: ProviderRead | None = None) -> ProviderRead:
     result = ProviderRead("financial_datasets")
-    client = FinancialDatasetsClient(cache_backend=getattr(dal, "_backend", None), request_policy=request_policy)
+    client = FinancialDatasetsClient(cache_backend=getattr(dal, "_backend", None), request_policy=request_policy,
+                                    cache_days=fd_cache_days(dal) if mode != "stored" else None)
     readers = {"income_statement": client.get_income_statements, "balance_sheet": client.get_balance_sheets,
                "cash_flow_statement": client.get_cash_flow_statements}
     pending = list(_kinds(query))
     refusal = None
     for kind in pending:
         result.statements[kind] = []
+        cached = next((o for o in retained.observations if o.dataset == kind), None) if retained else None
+        if mode == "auto" and cached and cached.within_max_age is True and retained.statements.get(kind):
+            result.statements[kind] = retained.statements[kind]
+            result.observations.append(cached)
+            result.gaps.extend(g for g in retained.gaps if g.dataset == kind)
+            continue
         if refusal:
             _gap(result, "financial_datasets_not_attempted_after_refusal", kind)
             continue

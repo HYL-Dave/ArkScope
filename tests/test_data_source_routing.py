@@ -51,61 +51,40 @@ def test_selected_fd_excludes_even_fresh_sec_cache(local):
     sec.assert_not_called()
 
 
-@pytest.mark.parametrize("providers", [["sec_edgar", "financial_datasets"], ["financial_datasets", "sec_edgar"]])
+@pytest.mark.parametrize("providers", [["seeking_alpha", "financial_datasets"], ["financial_datasets", "seeking_alpha"]])
 def test_selected_order_breaks_ties_between_complete_local_observations(local, providers):
+    from src.sa.company_store import save_capture
+    from tests.financial_read_fixtures import sa_payload
     dal, http, sec = local
-    save_sec(dal._backend)
+    for kind in ("income-statement", "balance-sheet", "cash-flow-statement"):
+        save_capture(sa_payload(kind))
     save_statements(dal._backend)
     select("fundamentals_analysis", providers)
-    result = get_fundamentals_analysis(dal, "AAPL")
+    result = get_fundamentals_analysis(dal, "AAPL", freshness="stored")
     assert result.data_source == providers[0]
     assert result.source_routes[0]["configured_sources"] == providers
     http.assert_not_called()
     sec.assert_not_called()
 
 
-def test_auto_falls_back_only_in_selected_order_and_keeps_the_failed_attempt(local, monkeypatch):
-    from types import SimpleNamespace
-    import src.tools.analysis_tools as analysis
-
+def test_refresh_auto_source_never_spends_or_falls_back(local):
     dal, http, sec = local
-    select("fundamentals_analysis", ["financial_datasets", "sec_edgar"])
-    attempts = []
-
-    def fd(*_args, **_kwargs):
-        attempts.append("financial_datasets")
-        return FundamentalsResult(ticker="AAPL", acquisition_gaps=[{
-            "provider": "financial_datasets", "code": "financial_datasets_paid_requests_disabled",
-        }])
-
-    def acquire(*_args):
-        attempts.append("sec_edgar")
-        return SimpleNamespace(
-            get_income_statement=lambda *_a, **_k: [object()],
-            get_balance_sheet=lambda *_a, **_k: [],
-            get_cash_flow_statement=lambda *_a, **_k: [],
-        )
-
-    monkeypatch.setattr(analysis, "_fd_financials", fd)
-    sec.side_effect = acquire
-    monkeypatch.setattr(analysis, "_build_result_from_statements", lambda *_args:
-        FundamentalsResult(ticker="AAPL", data_source="sec_edgar", snapshot_date="2025-12-31"))
+    select("fundamentals_analysis", ["financial_datasets", "seeking_alpha"])
     result = get_fundamentals_analysis(dal, "AAPL", freshness="refresh")
-    assert attempts == ["financial_datasets", "sec_edgar"]
-    assert result.data_source == "sec_edgar"
-    assert result.acquisition_gaps == [{"provider": "financial_datasets", "code": "financial_datasets_paid_requests_disabled"}]
-    assert result.source_routes[0]["selected_source"] == "sec_edgar"
+    assert result.data_source == "none"
+    assert result.acquisition_gaps == [{"provider": "financials", "code": "financial_refresh_source_required"}]
+    sec.assert_not_called()
     http.assert_not_called()
 
 
-def test_complete_local_sec_precedes_a_partial_fd_result_without_spending(local):
+def test_retired_sec_cache_cannot_supplement_partial_fd_result(local):
     dal, http, sec = local
-    select("fundamentals_analysis", ["financial_datasets", "sec_edgar"])
+    select("fundamentals_analysis", ["financial_datasets", "seeking_alpha"])
     save_fd(dal._backend)
     save_sec(dal._backend)
-    result = get_fundamentals_analysis(dal, "AAPL")
-    assert result.data_source == "sec_edgar"
-    assert not result.acquisition_gaps
+    result = get_fundamentals_analysis(dal, "AAPL", freshness="stored")
+    assert result.data_source == "financial_datasets" and result.status == "partial"
+    assert result.balance_sheet == [] and result.cash_flow_statements == []
     http.assert_not_called()
     sec.assert_not_called()
 
@@ -114,7 +93,7 @@ def test_partial_selected_fd_reuses_income_and_buys_only_missing_statements(loca
     from tests.test_financial_datasets import MOCK_BALANCE_RESPONSE, MOCK_CASHFLOW_RESPONSE, TEST_POLICY
 
     dal, http, sec = local
-    select("fundamentals_analysis", ["sec_edgar", "financial_datasets"])
+    select("fundamentals_analysis", ["seeking_alpha", "financial_datasets"])
     fetched = save_fd(dal._backend)
     monkeypatch.setenv("FINANCIAL_DATASETS_API_KEY", "offline-test")
     dal.get_user_profile = lambda: {"data_preferences": {"paid_sources": {"financial_datasets": TEST_POLICY}}}
@@ -125,7 +104,7 @@ def test_partial_selected_fd_reuses_income_and_buys_only_missing_statements(loca
                     MOCK_BALANCE_RESPONSE if url.endswith("/balance-sheets") else MOCK_CASHFLOW_RESPONSE)
 
     http.side_effect = response
-    result = get_fundamentals_analysis(dal, "AAPL")
+    result = get_fundamentals_analysis(dal, "AAPL", source="financial_datasets")
     assert result.data_source == "financial_datasets"
     assert len(result.source_observations) == 3
     assert result.source_observations[0]["retrieval"] == "stored"
@@ -135,15 +114,15 @@ def test_partial_selected_fd_reuses_income_and_buys_only_missing_statements(loca
     sec.assert_not_called()
 
 
-def test_disabled_fd_cannot_satisfy_sec_failure_from_cache(local):
+def test_retired_sec_selection_does_not_fall_back_or_self_repair(local):
     dal, http, sec = local
     save_statements(dal._backend)
     select("fundamentals_analysis", ["sec_edgar"])
     result = get_fundamentals_analysis(dal, "AAPL")
     assert result.data_source == "none"
     assert not result.source_observations
-    assert {gap["provider"] for gap in result.acquisition_gaps} == {"sec_edgar"}
-    sec.assert_called_once()
+    assert result.acquisition_gaps == [{"provider": "financials", "code": "data_source_policy_invalid"}]
+    sec.assert_not_called()
     http.assert_not_called()
 
 
@@ -175,8 +154,8 @@ def test_route_changes_are_observed_without_rebuilding_dal(local):
     dal, http, sec = local
     save_sec(dal._backend)
     save_statements(dal._backend)
-    select("fundamentals_analysis", ["sec_edgar"])
-    assert get_fundamentals_analysis(dal, "AAPL").data_source == "sec_edgar"
+    select("fundamentals_analysis", ["seeking_alpha"])
+    assert get_fundamentals_analysis(dal, "AAPL").data_source == "none"
     select("fundamentals_analysis", ["financial_datasets"])
     assert get_fundamentals_analysis(dal, "AAPL").data_source == "financial_datasets"
     sec.assert_not_called()
@@ -190,7 +169,7 @@ def test_route_changes_are_observed_without_rebuilding_dal(local):
 ])
 def test_explicit_source_is_not_an_authorization_override(local, source, code):
     dal, http, sec = local
-    select("fundamentals_analysis", ["sec_edgar"])
+    select("fundamentals_analysis", ["seeking_alpha"])
     result = get_fundamentals_analysis(dal, "AAPL", source=source)
     assert result.acquisition_gaps[0]["code"] == code
     sec.assert_not_called()
@@ -199,7 +178,7 @@ def test_explicit_source_is_not_an_authorization_override(local, source, code):
 
 def test_explicit_fd_failure_does_not_switch_to_sec(local):
     dal, http, sec = local
-    select("fundamentals_analysis", ["financial_datasets", "sec_edgar"])
+    select("fundamentals_analysis", ["financial_datasets", "seeking_alpha"])
     save_sec(dal._backend)
     result = get_fundamentals_analysis(dal, "AAPL", source="financial_datasets", freshness="refresh")
     assert result.data_source == "none"
@@ -250,10 +229,17 @@ def test_explicit_source_survives_all_four_channels(local, channel):
     dal, http, sec = local
     save_sec(dal._backend)
     save_statements(dal._backend)
-    select("fundamentals_analysis", ["sec_edgar", "financial_datasets"])
+    select("fundamentals_analysis", ["seeking_alpha", "financial_datasets"])
     result = unwrap(asyncio.run(invoke(channel, "get_fundamentals_analysis", {
         "ticker": "AAPL", "source": "financial_datasets", "freshness": "stored",
     }, dal)))
+    if result.get("error_code") == "financial_read_page_too_large":
+        expected = get_fundamentals_analysis(dal, "AAPL", source="financial_datasets", freshness="stored")
+        assert result["status"] == "unavailable" and result["read_id"] == expected.read_id
+        assert result["required_action"] == "repeat_same_read_with_smaller_page"
+        sec.assert_not_called()
+        http.assert_not_called()
+        return
     assert result["data_source"] == "financial_datasets"
     assert result["source_routes"][0]["requested"] == "financial_datasets"
     assert result["source_routes"][0]["selected_source"] == "financial_datasets"

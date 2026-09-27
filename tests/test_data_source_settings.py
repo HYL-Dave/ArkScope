@@ -68,7 +68,7 @@ def test_settings_save_changes_real_dispatch_without_dal_restart(settings_client
 
 
 @pytest.mark.parametrize("body", [
-    {"providers": ["massive"]}, {"providers": ["seeking_alpha"]},
+    {"providers": ["massive"]}, {"providers": ["sec_edgar"]},
     {"providers": ["sec_edgar", "sec_edgar"]}, {"providers": [True]},
     {"providers": "sec_edgar"}, {"providers": None},
     {"providers": [], "override_permissions": True},
@@ -149,7 +149,7 @@ def test_disabling_paid_requests_overrides_yaml_but_keeps_local_reads(settings_c
         "enabled": False, "daily_request_limit": None, "requests_per_minute": None,
     })
     assert response.status_code == 200
-    result = get_fundamentals_analysis(dal, "AAPL", freshness="refresh")
+    result = get_fundamentals_analysis(dal, "AAPL", source="financial_datasets", freshness="refresh")
     assert result.acquisition_gaps[0]["code"] == "financial_datasets_paid_requests_disabled"
     save_statements(dal._backend)
     assert get_fundamentals_analysis(dal, "AAPL").data_source == "financial_datasets"
@@ -169,7 +169,7 @@ def test_invalid_saved_budget_never_falls_back_to_enabled_yaml(settings_client, 
     client.put("/providers/data-routes/fundamentals_analysis", json={"providers": ["financial_datasets"]})
     store.set_setting(FD_POLICY_KEY, raw)
     assert client.get("/providers/data-routes").json()["financial_datasets_budget"]["state"] == "invalid"
-    result = get_fundamentals_analysis(dal, "AAPL", freshness="refresh")
+    result = get_fundamentals_analysis(dal, "AAPL", source="financial_datasets", freshness="refresh")
     assert result.acquisition_gaps[0]["code"] == "financial_datasets_policy_invalid"
     save_statements(dal._backend)
     assert get_fundamentals_analysis(dal, "AAPL").data_source == "financial_datasets"
@@ -190,11 +190,11 @@ def test_saved_budget_governs_the_actual_metered_request(settings_client, local,
     assert response.status_code == 200
     http.side_effect = None
     http.return_value = Mock(status_code=200, json=lambda: MOCK_INCOME_RESPONSE)
-    result = get_fundamentals_analysis(dal, "AAPL", freshness="refresh")
+    result = get_fundamentals_analysis(dal, "AAPL", source="financial_datasets", freshness="refresh")
     assert result.data_source == "financial_datasets"
     assert http.call_count == 1
     assert result.acquisition_gaps[0]["code"] == "financial_datasets_budget_exhausted"
-    get_fundamentals_analysis(dal, "AAPL", freshness="refresh")
+    get_fundamentals_analysis(dal, "AAPL", source="financial_datasets", freshness="refresh")
     assert http.call_count == 1
     sec.assert_not_called()
 
@@ -202,7 +202,7 @@ def test_saved_budget_governs_the_actual_metered_request(settings_client, local,
 def test_missing_profile_read_does_not_create_files():
     path = Path(os.environ["ARKSCOPE_PROFILE_DB"])
     assert not path.exists()
-    assert load_route("fundamentals_analysis").providers == ("sec_edgar", "financial_datasets")
+    assert load_route("fundamentals_analysis").providers == ("seeking_alpha", "financial_datasets")
     assert not path.exists()
 
 

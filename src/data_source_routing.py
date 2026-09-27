@@ -29,8 +29,8 @@ class SourceDataset:
 
 DATASETS = {
     "fundamentals_analysis": SourceDataset(
-        ("sec_edgar", "financial_datasets"), ("get_fundamentals_analysis", "compare_financial_sources"),
-        ("massive", "seeking_alpha"),
+        ("seeking_alpha", "financial_datasets"), ("get_fundamentals_analysis", "compare_financial_sources"),
+        ("massive",),
     ),
     "detailed_financials": SourceDataset(("sec_edgar",), ("get_detailed_financials",)),
     "earnings_supplements": SourceDataset(("finnhub",), ("get_detailed_financials",)),
