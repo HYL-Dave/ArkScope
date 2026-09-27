@@ -376,8 +376,8 @@ Owners: [catalog](src/data_source_catalog.py),
   A missing capture tab interrupts that task; it must not wait for the full page
   readiness timeout or try another page on the same missing tab.
 - If the extension reports **Stopped capture: recovery required**, pause its
-  schedules and close remaining automatic capture tabs first. Use **Review
-  recovery**, confirm the stopped state, then **Recover stopped capture**. Do not
+  schedules and close remaining automatic capture tabs first. Use **Review stopped
+  capture**, confirm the stopped state, then **Recover stopped capture**. Do not
   recover while a capture is still running. Resume the existing schedules after
   recovery; do not run a full article scan merely to test readiness.
 - Financial **Missing checks** count statement/view/currency scopes, not company
