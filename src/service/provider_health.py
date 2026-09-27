@@ -50,7 +50,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Heuristic "recent enough" windows (hours) per provider — v1 numbers, sized to
 # each source's collection cadence with weekend allowance. None = never judged
-# stale by age (cache-TTL-governed sources report connected while valid rows exist).
+# stale by age (financial sources report retained acquisition evidence separately).
 _THRESHOLD_HOURS: Dict[str, Optional[float]] = {
     "massive": 48,
     "finnhub": 48,
@@ -275,14 +275,29 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
     # prices rows: [(max_datetime,)] — collected via IBKR (§2)
     price_rows = (stats.get("prices") or {}).get("rows", [])
     prices_latest = _to_dt(price_rows[0][0]) if price_rows and price_rows[0] else None
-    # financial_cache rows: (source, cached, expired[, latest_fetched])
+    # TTL controls reuse, not whether a successful acquisition happened.
+    financial_stats = stats.get("financial_cache")
+    financial_readable = isinstance(financial_stats, dict) and not financial_stats.get("error")
     fin_by_src: Dict[str, Dict[str, Any]] = {}
-    for row in (stats.get("financial_cache") or {}).get("rows", []):
+    for row in (financial_stats.get("rows", []) if financial_readable else []):
         fin_by_src[row[0]] = {
             "cached": row[1] or 0,
             "expired": row[2] or 0,
             "latest_fetched": _to_dt(row[3]) if len(row) > 3 else None,
         }
+
+    def _financial_signals(source: str) -> Dict[str, Any]:
+        record = fin_by_src.get(source, {})
+        if not financial_readable:
+            evidence = "unavailable"
+        elif not (record.get("cached", 0) + record.get("expired", 0)):
+            evidence = "empty"
+        elif record.get("latest_fetched") is None:
+            evidence = "timestamp_unknown"
+        else:
+            evidence = "recorded"
+        return dict(record, latest_fetched=_iso(record.get("latest_fetched")),
+                    acquisition_evidence=evidence)
 
     def _job_signal(prefix: str) -> Dict[str, Any]:
         """Latest success + latest error across job_runs whose name starts with prefix."""
@@ -450,14 +465,15 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         disabled_reason=None,
     )
 
-    # SEC EDGAR — free, no key; TTL-governed cache, never age-judged
+    # Retained acquisition evidence is not a live connection/entitlement check
+    # or a statement about which reporting period is current.
     sec = fin_by_src.get("sec_edgar", {})
     _add(
         "sec_edgar", "SEC EDGAR", "fundamentals",
         {"present": True, "source": "not_required", "vars": []},
-        last_success=sec.get("latest_fetched") if sec.get("cached") else None,
+        last_success=sec.get("latest_fetched"),
         detail=f"cache {sec.get('cached', 0)} valid · {sec.get('expired', 0)} expired",
-        signals=dict(sec, latest_fetched=_iso(sec.get("latest_fetched"))) if sec else {},
+        signals=_financial_signals("sec_edgar"),
     )
 
     fd = fin_by_src.get("financial_datasets", {})
@@ -466,9 +482,9 @@ def compute_provider_health(dal: Any, now: Optional[datetime] = None) -> dict:
         _key_info(loaded_file_keys, app_keys, "FINANCIAL_DATASETS_API_KEY"),
         config_error=_config_error("financial_datasets"),
         enabled=fd_enabled,
-        last_success=fd.get("latest_fetched") if fd.get("cached") else None,
+        last_success=fd.get("latest_fetched"),
         detail=f"cache {fd.get('cached', 0)} valid · {fd.get('expired', 0)} expired",
-        signals=dict(fd, latest_fetched=_iso(fd.get("latest_fetched"))) if fd else {},
+        signals=_financial_signals("financial_datasets"),
     )
 
     # Seeking Alpha — extension capture path; no API key

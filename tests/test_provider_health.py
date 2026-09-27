@@ -257,6 +257,30 @@ def test_sec_edgar_ttl_governed_never_stale():
     assert "12 valid" in p["detail"]
 
 
+@pytest.mark.parametrize("provider", ["sec_edgar", "financial_datasets"])
+@pytest.mark.parametrize("kind", ["empty", "recorded", "timestamp_unknown", "unavailable"])
+def test_financial_health_reports_retained_acquisition_evidence(monkeypatch, provider, kind):
+    monkeypatch.setenv("FINANCIAL_DATASETS_API_KEY", "fixture")
+    monkeypatch.setattr("src.tools.analysis_tools._is_fd_enabled", lambda dal: True)
+    acquired = _WEDNESDAY - timedelta(days=80)
+    stats = _stats(fin_rows=[] if kind == "empty" else [
+        (provider, 0, 3, acquired if kind != "timestamp_unknown" else None)
+    ])
+    if kind == "unavailable":
+        # Unreadable stats must not become an assertion of empty history.
+        stats["financial_cache"]["error"] = "fixture read failure"
+    result = _by_id(compute_provider_health(_FakeDAL(_FakeBackend(stats)), now=_WEDNESDAY), provider)
+    assert result["signals"]["acquisition_evidence"] == kind
+    assert result["last_success_at"] == (acquired.isoformat() if kind == "recorded" else None)
+    assert result["status"] == ("connected" if kind == "recorded" else "no_signal")
+
+
+def test_financial_health_total_stats_failure_is_not_empty_history():
+    result = _by_id(compute_provider_health(
+        _FakeDAL(_FakeBackend(RuntimeError("fixture unavailable"))), now=_WEDNESDAY), "sec_edgar")
+    assert result["signals"]["acquisition_evidence"] == "unavailable"
+
+
 def test_key_source_reports_effective_origin(monkeypatch):
     # The loader is set-if-absent, so the EFFECTIVE source of a present key is:
     # loaded-by-the-loader → config/.env; otherwise → real env (env wins even when
