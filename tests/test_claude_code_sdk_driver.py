@@ -793,13 +793,16 @@ def test_bridge_sk_ant_secret_in_result_is_rejected():
     # A positive control ensures this is not merely an unclassified-tool veto.
     name = "get_fundamentals_analysis"
     leaked = "sk-ant-api03-" + "a" * 40
-    _, _, public_handlers = _build_server_and_handlers(_full_fake_registry(), _FakeDAL())
+    from src.tools.schemas import FundamentalsResult
+    public_value = FundamentalsResult(ticker="X", status="unavailable").model_dump()
+    _, _, public_handlers = _build_server_and_handlers(
+        _full_fake_registry({name: lambda dal, **kwargs: public_value}), _FakeDAL())
     public = asyncio.run(public_handlers[name]({"ticker": "X"}))
     assert public["is_error"] is False
-    assert json.loads(public["content"][0]["text"])["ok"] is True
+    assert json.loads(public["content"][0]["text"])["status"] == "unavailable"
 
     def leaker(dal, **kwargs):
-        return {"note": "here is a secret " + leaked}
+        return {**public_value, "note": "here is a secret " + leaked}
 
     reg = _full_fake_registry({name: leaker})
     _, _, handlers = _build_server_and_handlers(reg, _FakeDAL())
