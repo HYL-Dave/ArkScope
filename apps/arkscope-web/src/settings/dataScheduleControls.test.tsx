@@ -281,6 +281,54 @@ afterEach(() => {
 });
 
 describe("Data schedule controls", () => {
+  it("shows partial Finnhub request and stored counts with the failed symbol", async () => {
+    await i18n.changeLanguage("en");
+    const id = "finnhub_earnings_calendar";
+    const state = failedMacro(id, "partial");
+    const result = macroResult(id, "partial", "finnhub_transport_failed");
+    const collect = result.collect as any;
+    collect.events_inserted = 0;
+    collect.events_unchanged = 3;
+    collect.requests[0].symbol = "PLTR";
+    collect.requests.push(...Array.from({ length: 16 }, (_, i) => ({
+      dataset: "earnings", symbol: `OK${i}`, response_state: i < 13 ? "empty" : "data",
+      rows_received: i < 13 ? 0 : 1, rows_accepted: i < 13 ? 0 : 1, rows_rejected: 0,
+    })));
+    state.durable_state!.last_result = result;
+    controls.schedule = { sources: { [id]: state } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      const text = harness.host.querySelector(".ds-last-run-cell")!.textContent;
+      expect(text).toContain("16/17 requests completed");
+      expect(text).toContain("13 empty");
+      expect(text).toContain("1 with issues");
+      expect(text).toContain("3 unchanged");
+      expect(text).toContain("PLTR: Provider connection failed");
+      expect(text).not.toContain("OK0:");
+      expect(text).not.toContain("403");
+      expect(runScheduleNow).not.toHaveBeenCalled();
+    } finally { harness.unmount(); }
+  });
+
+  it("counts a successful empty Finnhub response without implying complete calendar coverage", async () => {
+    await i18n.changeLanguage("en");
+    const id = "finnhub_earnings_calendar";
+    const state = failedMacro(id);
+    const result = macroResult(id, "succeeded");
+    const collect = result.collect as any;
+    collect.requests = [{ dataset: "earnings", symbol: "AAPL", response_state: "empty", rows_received: 0 }];
+    state.durable_state!.last_status = "succeeded";
+    state.durable_state!.last_result = result;
+    controls.schedule = { sources: { [id]: state } };
+    const harness = await renderControls({ scopes: ["macro"] });
+    try {
+      const text = harness.host.querySelector(".ds-last-run-cell")!.textContent;
+      expect(text).toContain("1/1 requests completed");
+      expect(text).toContain("1 empty");
+      expect(text).not.toContain("403");
+      expect(harness.host.querySelector(".refresh-err")).toBeNull();
+    } finally { harness.unmount(); }
+  });
   it.each([
     ["en", "failed"], ["en", "partial"], ["zh-Hant", "failed"], ["zh-Hant", "partial"],
   ] as const)("shows the durable Finnhub endpoint denial for %s %s without changing collection", async (locale, status) => {

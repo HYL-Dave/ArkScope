@@ -1101,6 +1101,9 @@ const settings = {
         partialCursor: "Partially completed (more data pending follow-up)",
       },
       macroErrors: {
+        requests: "{{completed}}/{{total}} requests completed; {{empty}} empty; {{issues}} with issues.",
+        stored: "{{inserted}} added; {{mutated}} updated; {{unchanged}} unchanged; {{skipped}} not stored.",
+        symbolReason: "{{symbol}}: {{reason}}",
         scoped: "{{source}}: {{reason}}",
         forbidden: "Endpoint access denied (HTTP 403). An API key does not establish endpoint access; the required entitlement is unverified.",
         unauthorized: "Authentication rejected (HTTP 401).",
@@ -1329,6 +1332,8 @@ const settings = {
     runCounts: "{{rows}} rows added · {{tickers}} tickers scanned",
     tickerIssues: "Ticker completeness and collection issues",
     completenessUnknown: "Completeness unknown: IBKR completion was not confirmed. Stored articles may be present; this is not itself a confirmed request failure.",
+    subscriptionDenied: "News subscription denied by IBKR. This request requires API news access; retained articles are unchanged.",
+    requestTimeout: "News request timed out. Articles received before the timeout are retained; completeness is not confirmed.",
     collectionFailed: "Collection request failed. Coverage for this attempt is not confirmed.",
     lastError: "Latest error",
     neverRun: "Not run yet",

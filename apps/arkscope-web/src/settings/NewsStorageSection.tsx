@@ -39,6 +39,8 @@ function NewsIssue({ error, t }: { error: string; t: SettingsT }) {
   const incomplete = error === "ibkr_news_window_incomplete" || error === "ibkr_news_provider_window_incomplete";
   return <p data-news-issue className={unknown || incomplete ? "muted tiny" : "refresh-err tiny"}>
     {unknown ? t(($) => $.newsStorage.completenessUnknown)
+      : error === "ibkr_news_subscription_denied" ? t(($) => $.newsStorage.subscriptionDenied)
+      : error === "ibkr_news_request_timeout" ? t(($) => $.newsStorage.requestTimeout)
       : incomplete ? newsSyncStatusLabel("partial", t) : t(($) => $.newsStorage.collectionFailed)}
   </p>;
 }
@@ -154,8 +156,8 @@ export function NewsStorageSection({
                 <dd>{t(($) => $.newsStorage.runCounts, { rows: state.rows_added, tickers: state.tickers_scanned })}</dd>
               </dl>
               {error ? <NewsIssue error={error} t={t} /> : null}
-              {state.ticker_errors.length > 0 ? <div>
-                <h4>{t(($) => $.newsStorage.tickerIssues)}</h4>
+              {state.ticker_errors.length > 0 ? <details data-news-issues>
+                <summary>{t(($) => $.newsStorage.tickerIssues)} ({state.ticker_errors.length})</summary>
                 <ul>
                   {state.ticker_errors.map((issue) => <li key={issue.ticker} data-news-ticker={issue.ticker}>
                     <strong>{issue.ticker}</strong>{" "}
@@ -163,7 +165,7 @@ export function NewsStorageSection({
                     <NewsIssue error={issue.error} t={t} />
                   </li>)}
                 </ul>
-              </div> : null}
+              </details> : null}
             </section>;
           })}
           {developerMode ? <DeveloperDiagnostics diagnostics={diagnostics} t={t} /> : null}

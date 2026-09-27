@@ -69,6 +69,22 @@ afterEach(() => {
 });
 
 describe("NewsStorageSection collection evidence", () => {
+  it("collapses ticker issues and distinguishes subscription denial from timeouts", async () => {
+    state.sync = sync({ ibkr: provider({ status: "partial", ticker_errors: [
+      { ticker: "AAPL", error: "ibkr_news_subscription_denied", updated_at: "2026-09-27T14:00:00Z" },
+      { ticker: "MSFT", error: "ibkr_news_request_timeout", updated_at: "2026-09-27T14:00:00Z" },
+    ] }) });
+    await render();
+    const details = host.querySelector<HTMLDetailsElement>("details[data-news-issues]");
+    expect(details).not.toBeNull();
+    expect(details!.open).toBe(false);
+    expect(details!.querySelector("summary")?.textContent).toContain("2");
+    expect(host.querySelector('[data-news-ticker="AAPL"]')?.textContent).toContain("News subscription denied");
+    expect(host.querySelector('[data-news-ticker="MSFT"]')?.textContent).toContain("News request timed out");
+    act(() => { details!.open = true; });
+    expect(details!.open).toBe(true);
+    expect(runScheduleNow).not.toHaveBeenCalled();
+  });
   it.each(["en", "zh-Hant"])("shows each provider's latest outcome and attempt separately from any-provider success in %s", async (locale) => {
     await i18n.changeLanguage(locale);
     state.sync = sync({

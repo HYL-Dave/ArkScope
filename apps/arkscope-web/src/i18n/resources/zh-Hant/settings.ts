@@ -1100,6 +1100,9 @@ const settings = {
         partialCursor: "部分完成（尚有資料待後續處理）",
       },
       macroErrors: {
+        requests: "完成 {{completed}}／{{total}} 筆請求；{{empty}} 筆空回應；{{issues}} 筆有問題。",
+        stored: "新增 {{inserted}} 筆；更新 {{mutated}} 筆；未變更 {{unchanged}} 筆；未儲存 {{skipped}} 筆。",
+        symbolReason: "{{symbol}}：{{reason}}",
         scoped: "{{source}}：{{reason}}",
         forbidden: "端點拒絕存取（HTTP 403）。有 API 金鑰不代表具備端點權限；所需授權尚未確認。",
         unauthorized: "驗證遭拒（HTTP 401）。",
@@ -1328,6 +1331,8 @@ const settings = {
     runCounts: "新增 {{rows}} 列 · 掃描 {{tickers}} 檔",
     tickerIssues: "各標的完整性與收集問題",
     completenessUnknown: "完整性未知：IBKR 未確認收集已完整結束。可能已有文章儲存，這本身不代表要求確定失敗。",
+    subscriptionDenied: "IBKR 拒絕新聞訂閱存取。這次請求需要 API 新聞權限；既有文章仍保留。",
+    requestTimeout: "新聞請求逾時。逾時前已收到的文章仍會保留；尚未確認完整性。",
     collectionFailed: "收集要求失敗，尚未確認本次嘗試的覆蓋。",
     lastError: "最近錯誤",
     neverRun: "尚未執行",

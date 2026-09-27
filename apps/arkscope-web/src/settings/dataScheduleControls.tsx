@@ -329,16 +329,17 @@ function scheduleResultRecord(value: unknown): Record<string, unknown> | null {
     ? value as Record<string, unknown> : null;
 }
 
-function finnhubMacroFailureLabels(
+function finnhubMacroPresentation(
   source: string,
   state: ScheduleSourceState,
   job: unknown,
   t: SettingsT,
-): string[] {
+): { failures: string[]; summary: string[] } {
+  const none = { failures: [], summary: [] };
   const dataset = source === "finnhub_economic_calendar" ? "economic"
     : source === "finnhub_earnings_calendar" ? "earnings"
       : source === "finnhub_ipo_calendar" ? "ipo" : null;
-  if (dataset === null || state.write_target !== "macro_calendar.db" || state.running) return [];
+  if (dataset === null || state.write_target !== "macro_calendar.db" || state.running) return none;
   const durable = state.durable_state;
   const jobRow = scheduleResultRecord(job);
   const candidates = [
@@ -356,29 +357,48 @@ function finnhubMacroFailureLabels(
     (current, candidate) => !current || candidate.time > current.time ? candidate : current,
     undefined,
   );
-  if (latest?.status !== "failed" && latest?.status !== "partial") return [];
+  if (!latest || !["failed", "partial", "succeeded"].includes(String(latest.status))) return none;
+  const unsuccessful = latest.status !== "succeeded";
   // An undated or simultaneous success prevents a current-denial claim.
-  if (candidates.some((candidate) => candidate.status === "succeeded"
-    && (!Number.isFinite(candidate.time) || !Number.isFinite(latest.time) || candidate.time >= latest.time))) return [];
+  if (unsuccessful && candidates.some((candidate) => candidate.status === "succeeded"
+    && (!Number.isFinite(candidate.time) || !Number.isFinite(latest.time) || candidate.time >= latest.time))) return none;
   const result = scheduleResultRecord(latest.result);
   const collection = scheduleResultRecord(result?.collect) ?? result;
   const fallback = t(($) => $.dataSources.schedule.macroErrors.generic);
-  if (collection?.status !== "failed" && collection?.status !== "partial") return [fallback];
-  const requests = Array.isArray(collection.requests) ? collection.requests : [];
-  const labels = requests.flatMap((value): string[] => {
-    const receipt = scheduleResultRecord(value);
-    if (receipt?.dataset !== dataset || !["failed", "partial", "rejected"].includes(String(receipt.response_state))) return [];
+  if (!collection || collection.status !== latest.status) return unsuccessful ? { ...none, failures: [fallback] } : none;
+  const requests = (Array.isArray(collection.requests) ? collection.requests : [])
+    .map(scheduleResultRecord).filter((receipt): receipt is Record<string, unknown> => receipt?.dataset === dataset);
+  const summary: string[] = [];
+  if (requests.length) summary.push(t(($) => $.dataSources.schedule.macroErrors.requests, {
+    total: requests.length,
+    completed: requests.filter((receipt) => ["data", "empty"].includes(String(receipt.response_state))).length,
+    empty: requests.filter((receipt) => receipt.response_state === "empty").length,
+    issues: requests.filter((receipt) => !["data", "empty"].includes(String(receipt.response_state))).length,
+  }));
+  const counts = [collection.events_inserted, collection.events_mutated, collection.events_unchanged, collection.events_skipped];
+  if (counts.every((value): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0)) {
+    summary.push(t(($) => $.dataSources.schedule.macroErrors.stored, {
+      inserted: counts[0], mutated: counts[1], unchanged: counts[2], skipped: counts[3],
+    }));
+  }
+  const reason = (receipt: Record<string, unknown>): string => {
     switch (receipt.error_code) {
-      case "finnhub_forbidden": return [t(($) => $.dataSources.schedule.macroErrors.forbidden)];
-      case "finnhub_unauthorized": return [t(($) => $.dataSources.schedule.macroErrors.unauthorized)];
-      case "finnhub_rate_limited": return [t(($) => $.dataSources.schedule.macroErrors.rateLimited)];
-      case "finnhub_transport_failed": return [t(($) => $.dataSources.schedule.macroErrors.transportFailed)];
-      case "finnhub_calendar_response_invalid": return [t(($) => $.dataSources.schedule.macroErrors.responseInvalid)];
-      case "finnhub_calendar_rows_rejected": return [t(($) => $.dataSources.schedule.macroErrors.rowsRejected)];
-      default: return [fallback];
+      case "finnhub_forbidden": return t(($) => $.dataSources.schedule.macroErrors.forbidden);
+      case "finnhub_unauthorized": return t(($) => $.dataSources.schedule.macroErrors.unauthorized);
+      case "finnhub_rate_limited": return t(($) => $.dataSources.schedule.macroErrors.rateLimited);
+      case "finnhub_transport_failed": return t(($) => $.dataSources.schedule.macroErrors.transportFailed);
+      case "finnhub_calendar_response_invalid": return t(($) => $.dataSources.schedule.macroErrors.responseInvalid);
+      case "finnhub_calendar_rows_rejected": return t(($) => $.dataSources.schedule.macroErrors.rowsRejected);
+      default: return fallback;
     }
+  };
+  const labels = requests.flatMap((receipt): string[] => {
+    if (!["failed", "partial", "rejected"].includes(String(receipt.response_state))) return [];
+    const label = reason(receipt);
+    const symbol = typeof receipt.symbol === "string" && /^[A-Z0-9][A-Z0-9 .^/-]{0,19}$/.test(receipt.symbol) ? receipt.symbol : null;
+    return [symbol ? t(($) => $.dataSources.schedule.macroErrors.symbolReason, { symbol, reason: label }) : label];
   });
-  return labels.length ? [...new Set(labels)] : [fallback];
+  return { summary, failures: unsuccessful ? (labels.length ? [...new Set(labels)] : [fallback]) : [] };
 }
 
 function ScheduleStatus({
@@ -402,7 +422,7 @@ function ScheduleStatus({
   const schedulerState = schedulerStateLabel(state.durable_state ?? null, t);
   const bodyBacklog = schedulerBodyBacklogPresentation(state.durable_state ?? null, t);
   const job = controller.jobFacts?.[state.job_name];
-  const macroFailures = finnhubMacroFailureLabels(source, state, job, t);
+  const macro = finnhubMacroPresentation(source, state, job, t);
   const showJob = job?.status === "running"
     ? !state.running && historyState !== "running" && historyState !== "stale"
     : Boolean(job) || (!state.running && historyState === null);
@@ -445,7 +465,8 @@ function ScheduleStatus({
           </span>
         ) : null}
       </div>
-      {macroFailures.map((reason) => (
+      {macro.summary.map((text) => <div className="tiny muted" key={text}>{text}</div>)}
+      {macro.failures.map((reason) => (
         <div className="tiny refresh-err" key={reason}>
           {t(($) => $.dataSources.schedule.macroErrors.scoped, { source: sourceLabel, reason })}
         </div>
