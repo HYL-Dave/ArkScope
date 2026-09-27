@@ -560,7 +560,9 @@ Older shell deletion is on hold. Comments, event links, manual decisions,
 research citations and potentially useful pick history must be reviewed before
 any cleanup. Absence of a stored link is not evidence of no research value.
 LLM-assisted semantic association and commentary classification remain separate
-follow-up work after usable source prose is actually recovered.
+follow-up work after usable source prose is actually recovered. The proposed
+[article workbench and classification design](docs/superpowers/specs/2026-09-27-sa-article-workbench-and-classification-design.md)
+defines that next flow; it is not implemented or enabled by current collection.
 
 Owners: [quality assessment](src/sa/article_body_quality.py),
 [read-only recovery scope](src/sa/article_body_recovery.py),

@@ -87,6 +87,10 @@ classifies event roles/commentary, with its own model selector. Current links us
 rules and optional manual decisions. Changing the AI research or translation
 model does not turn on a classifier. A new classifier must reject missing bodies,
 validate quotations and retain model/prompt provenance before creating links.
+The proposed [App workbench and classification design](docs/superpowers/specs/2026-09-27-sa-article-workbench-and-classification-design.md)
+separates manual browsing/editing from explicit model execution and optional
+application of eligible relationships. It awaits review and is not a description
+of controls available in the current release.
 
 Article text can retain original image URLs, labels and captions. These are not
 offline image files, OCR or evidence that a text-only model inspected the chart.

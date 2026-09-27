@@ -78,6 +78,57 @@ service. The financial route will expose SA and FD as separate selectable source
 Local eligible observations are considered before acquisition. An SA loading or
 coverage gap must not silently authorize spending on FD.
 
+### Verified Existing Boundaries
+
+`src/sa/company_store.py:read_capture` already supplies retained SA observations;
+`FinancialDatasetsClient` already supplies governed FD reads/acquisition. Reuse
+the adapters and exact mappings in `src/fundamentals/source_comparison.py` and
+`src/tools/financial_comparison_tools.py`, not the comparator's result as though
+it were a complete financial analysis.
+
+The current shared mapping covers 13 named inputs: revenue, gross/operating/net
+income, basic/diluted EPS, total/current assets and liabilities, and operating,
+investing and financing cash flow. This is a demonstrated first normalization
+scope, not a cap on the original SA table or a claim that other rows are missing
+from SA. Preserve access to the original captured rows. Debt, equity, shares,
+capex, FCF and EBITDA require their own reviewed mappings before deriving metrics
+from them. Do not silently infer these from similar-looking labels.
+
+SA dated columns currently establish a displayed month, not an exact fiscal-end
+day or fiscal-quarter identity. FD can supply stronger period identity. A common
+statement representation must retain that precision difference; it must not
+create a last-day-of-month date to satisfy the old statement type. Existing FD
+statement classes live in `data_sources/sec_edgar_financials.py`; move shared
+types to a provider-neutral owner, retaining compatibility imports, before
+attempting to remove that SEC module.
+
+### Acquisition And Reuse Contract
+
+- App opening, coverage, source selection and stored tool reads are local-only.
+  A missing market DB must not hide SA observations in its independent database.
+- An explicit provider selection reads that provider only. Automatic selection
+  tries the configured local sources in order and returns one coherent source;
+  it does not fill missing statement cells from another provider.
+- Existing FD `auto` acquisition remains governed when FD is explicitly selected
+  or the primary configured financial provider. An unavailable primary SA capture
+  must not authorize an FD purchase; return the gap and available update choices.
+  Local FD reuse can still follow the configured local source order.
+- Forced acquisition names its provider. FD uses its existing admission and
+  request coalescing. SA remains browser-owned: the App shows the existing
+  collector/schedule status and an actionable browser-update requirement; this
+  slice does not invent server-side SA scraping or silently queue browser pages.
+- Historical period values remain readable independently of an acquisition-age
+  window. For latest-selection requests, disclose stored observation age and
+  reuse decision separately from statement validity. Reads never advance the
+  acquisition timestamp or financial schedule.
+- SA observations can reopen by retained observation ID. FD initially discloses
+  current-retained-version-only behavior, rejecting changed pagination identity;
+  this slice does not promise historical reopening of overwritten FD cache keys.
+
+Do not merely add SA to the routing option list: the existing analysis dispatcher
+uses SEC-versus-FD fallthrough branches that would misroute a third provider.
+Provider dispatch must be explicit and unknown providers must be rejected.
+
 The UI and tools must distinguish:
 
 - Available source observations and displayed/reporting periods.
@@ -100,14 +151,48 @@ TTL coverage counters when replacing those consumers; simply hiding them is not
 the replacement. Historical reads disclose their retained observation/version;
 they do not claim to answer which period is currently newest at the provider.
 
+### Product Surfaces And Metric Eligibility
+
+One financial read-and-coverage service supplies the tools, ticker Data tab,
+Dashboard financial tile and Settings financial coverage. Replace the current
+SEC-only `/fundamentals/{ticker}?stored=true` projection and the market-DB-only
+coverage early return in the same delivery. Show selected source, retained
+statement periods, capture time, missing statements and supported metrics.
+Retire the SEC/TTL financial counters instead of moving them to another collapsed
+panel. Price and news monitoring stay separate; their failures do not erase
+available financial observations.
+
+Derived metrics require compatible inputs from one source/statement basis. The
+initial SA surface may expose justified same-column margins/current ratio while
+leaving debt/equity, ROE/ROA and growth unavailable where required mapped inputs
+or exact period identities are absent. Preserve displayed-number precision;
+do not label SA rounded values as filing-exact or ordinary FD numeric precision.
+Existing FD-derived metrics still use the corrected debt and period guards.
+TTM, forecasts and ratings remain separate from annual/quarterly facts.
+
+The common-reader delivery does not claim every legacy detailed valuation or
+peer-comparison capability has an SA replacement. Keep unsupported operations
+explicitly unavailable, list their input gaps, and port or retire those consumers
+in a subsequent independently verified change. SEC filing/document functionality
+is separate from the retired financial projection; keep its optional character
+clear rather than presenting it as primary financial coverage.
+
+### Alternatives
+
+Keeping separate SA/FD tools has the smallest code impact but leaves the App and
+agent with different financial views. A shared read/coverage owner is selected
+because it removes that disagreement without replacing acquisition services.
+A new versioned financial warehouse could provide stronger FD history but would
+add storage/migration scope and is not required for this delivery.
+
 ## Delivery And Verification
 
-1. Finish the narrowly scoped maintenance compatibility repair and rehearse its
-   admission, reference rejection and unrelated-data preservation on disposable
-   stores. Existing removal authority and paid limits remain intact.
-2. Execute the separately authorized cleanup under the brief stop-write boundary,
-   then immediately restore ordinary SA operation. Record exact before/after
-   counts and file hashes without article prose or credentials.
+1. Completed: the narrowly scoped maintenance compatibility repair and disposable
+   rehearsal covered admission, reference rejection and unrelated-data
+   preservation. Existing removal authority and paid limits remained intact.
+2. Completed: the separately authorized cleanup ran under the brief stop-write
+   boundary, followed by restoration of ordinary SA operation. The receipt records
+   exact before/after counts and file hashes without article prose or credentials.
 3. After approval of this written design and its implementation plan, connect
    SA/FD financial reads to the common App/tool contract in a separate branch.
    Missing mappings stay explicit; coverage is not invented to make counts green.
