@@ -163,8 +163,9 @@ class IBKRRuntimeGateway:
             articles = list(page.articles)
             if page.has_more is True:
                 self._headline_saturated_tickers += 1
-            if page.error_code:
-                coverage_error = page.error_code
+            request_error = getattr(page, "error_code", None)
+            if request_error:
+                coverage_error = request_error
             elif page.has_more is None:
                 coverage_error = "ibkr_news_completion_unknown"
             elif page.has_more is True and not _page_covers_since(page, coverage_start):
@@ -182,7 +183,7 @@ class IBKRRuntimeGateway:
                     provider_pages.append(provider_page)
                     articles.extend(provider_page.articles)
                 articles = _dedupe_articles(articles)
-                request_errors = [page.error_code for page in provider_pages if page.error_code]
+                request_errors = [code for page in provider_pages if (code := getattr(page, "error_code", None))]
                 if request_errors:
                     coverage_error = request_errors[0]
                 elif any(page.has_more is None for page in provider_pages):
