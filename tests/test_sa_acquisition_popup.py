@@ -57,6 +57,17 @@ def test_stopped_capture_warning_is_visible_outside_finance_details():
     assert result["acquisitionRecoveryShortcutHidden"] is False
 
 
+def test_missing_runtime_evidence_is_not_rendered_as_idle_or_recoverable():
+    snapshot = state(recovery=True, pending=True)
+    del snapshot["acquisition_runtime_active"]
+    del snapshot["acquisition_recovery_required"]
+    result = run(companyRefresh=snapshot)
+    assert "unfinished" in result["acquisitionLive"].lower()
+    assert "unavailable" in result["acquisitionLive"].lower()
+    assert "idle" not in result["acquisitionLive"].lower()
+    assert result["acquisitionRecoverDisabled"] is True
+
+
 def test_recovery_shortcut_only_reveals_existing_confirmation():
     result = run("review_stopped_acquisition", companyRefresh=state(recovery=True, pending=True))
     assert result["companyOptionsOpen"] is True

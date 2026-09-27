@@ -2,6 +2,8 @@
 const shell = {
   saAcquisition: {
     title: "Seeking Alpha acquisition",
+    unfinishedTitle: "Unfinished capture record",
+    unfinished: "{{operation}}: started {{started}}, {{count}} navigation attempts. Browser activity is unconfirmed; check the collector extension.",
     login: "Sign-in expired. Acquisition is paused. Sign in to Seeking Alpha in the collector browser, then explicitly resume from the extension.",
     verification: "Verification required. Acquisition is paused until you complete verification and explicitly resume from the extension.",
     access: "Subscription access unavailable: {{capabilities}}. These updates are paused. Premium and Alpha Picks have separate access requirements; signing in alone does not verify either subscription.",

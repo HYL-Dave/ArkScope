@@ -741,18 +741,39 @@ function saDestination(url) {
     : parsed.pathname.indexOf("/symbol/") === 0 ? "financials" : "news";
 }
 
+function isMissingSaTab(error, tabId) {
+  var message = String(error && error.message || "").trim();
+  var match = /^(?:No tab with id:|Invalid tab ID:) (\d+)\.?$/.exec(message);
+  return !!match && Number(match[1]) === tabId;
+}
+
+function stopIfSaTabClosed(error, tabId) {
+  if (!isMissingSaTab(error, tabId)) return;
+  var task = requireAcquisitionTask();
+  task.ownedTabs.delete(tabId);
+  var detail = {status:"error",reason:"collector_unavailable",error_code:"interrupted",error:"Capture tab closed"};
+  task.interrupt(detail);
+  throw new SAAcquisition.Stop(detail);
+}
+
 var managedSaTabs = {
   create:function (options) {
     return requireAcquisitionTask().navigate({kind:"create",destinationClass:saDestination(options.url)},function () {return chrome.tabs.create(options);});
   },
   update:function (tabId, options) {
     if (!options.url) return chrome.tabs.update(tabId,options);
-    return requireAcquisitionTask().navigate({kind:"update",destinationClass:saDestination(options.url)},function () {return chrome.tabs.update(tabId,options);});
+    return requireAcquisitionTask().navigate({kind:"update",destinationClass:saDestination(options.url)},async function () {
+      try {return await chrome.tabs.update(tabId,options);}
+      catch (error) {stopIfSaTabClosed(error,tabId);throw error;}
+    });
   },
   reload:async function (tabId) {
     var task = requireAcquisitionTask();
     var tab = await chrome.tabs.get(tabId);
-    return task.navigate({kind:"reload",destinationClass:saDestination(tab.url)},function () {return chrome.tabs.reload(tabId);});
+    return task.navigate({kind:"reload",destinationClass:saDestination(tab.url)},async function () {
+      try {return await chrome.tabs.reload(tabId);}
+      catch (error) {stopIfSaTabClosed(error,tabId);throw error;}
+    });
   },
 };
 
@@ -3184,9 +3205,9 @@ async function safeRemoveTab(tabId) {
     return true;
   } catch (err) {
     var message = err && err.message ? err.message : String(err || "");
-    if (message && message.indexOf("No tab with id") >= 0) {
+    if (isMissingSaTab(err, tabId)) {
       if (saAcquisitionTask) saAcquisitionTask.ownedTabs.delete(tabId);
-      return false;
+      return true;
     }
     console.warn("[SA] Failed to remove tab", tabId, message);
     return false;
@@ -3206,6 +3227,7 @@ async function waitForAlphaPicksTableReady(tabId, expectedUrl, label, timeoutMs 
     try {
       tab = await chrome.tabs.get(tabId);
     } catch (err) {
+      stopIfSaTabClosed(err, tabId);
       lastSnapshot = { scriptError: "tab not found: " + (err && err.message ? err.message : String(err || "")) };
       await sleep(500);
       continue;

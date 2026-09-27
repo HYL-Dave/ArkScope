@@ -191,6 +191,13 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
             assert [item[1] for item in admissions[:3]] == ["financials", "news", "financials"]
             assert both["collector"]["active"] is None and not both["stored"]["saAcquisitionPending"]
 
+            for during_update in (False, True):
+                interrupted = ff("closed_picks", duringUpdate=during_update)
+                assert interrupted["acquisition_stop"]["error_code"] == "interrupted", interrupted
+                assert "acquisition" in interrupted and not interrupted.get("acquisition_uncertain")
+                stopped = ff("snapshot")
+                assert stopped["collector"]["active"] is None and not stopped["stored"]["saAcquisitionPending"]
+
             ff("run"); time.sleep(.4)
             assert len(saved) == 2
             ff("alarm"); time.sleep(1)
@@ -237,6 +244,12 @@ def test_installed_browsers_share_durable_acquisition(tmp_path, monkeypatch):
             assert page.evaluate("document.body.scrollWidth <= innerWidth")
             assert ff("news")["reason"] == "collector_other_installation"
             assert ch("news").get("detail_fetched") == 1
+            for during_update in (False, True):
+                interrupted = ch("closed_picks", duringUpdate=during_update)
+                assert interrupted["acquisition_stop"]["error_code"] == "interrupted", interrupted
+                assert "acquisition" in interrupted and not interrupted.get("acquisition_uncertain")
+                stopped = ch("snapshot")
+                assert stopped["collector"]["active"] is None and not stopped["stored"]["saAcquisitionPending"]
             if not page.locator("#companyAdvanced").evaluate("element=>element.open"):
                 page.locator("#companyAdvanced summary").click()
             page.locator("#companyForceConfirmed").check()

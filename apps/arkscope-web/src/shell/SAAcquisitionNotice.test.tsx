@@ -49,6 +49,17 @@ it("reports unavailable status without clearing it as healthy", async () => {
   vi.mocked(getSAAcquisitionStatus).mockRejectedValue(new Error("offline"));
   await mount(); expect(host.textContent).toContain("Status unavailable");
 });
+it("shows an unfinished record without claiming that the browser is running or failed", async () => {
+  vi.mocked(getSAAcquisitionStatus).mockResolvedValue({ ...clear, unfinished_task: {
+    operation: "alpha_picks_sync", started_at: "2026-09-27T11:42:15Z", navigation_attempt_count: 2,
+  } });
+  await mount();
+  expect(host.textContent).toContain("Unfinished capture record");
+  expect(host.textContent).toContain("Alpha Picks");
+  expect(host.textContent).toContain("2");
+  expect(host.textContent).not.toContain("Acquisition running");
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+});
 it("never overlaps an unfinished status read and ignores its result after unmount", async () => {
   let resolve!: (value: typeof clear) => void;
   vi.mocked(getSAAcquisitionStatus).mockReturnValue(new Promise(done => { resolve = done; }));

@@ -57,6 +57,16 @@ chrome.runtime.onMessage.addListener(function(message,sender,respond) {
       return {started:true};
     }
     if(command==='news')return fixtureNews(message.count || 1);
+    if(command==='closed_picks')return enqueueSaSyncJob({operation:'alpha_picks_sync',mode:'quick'},async()=>{
+      const target='https://seekingalpha.com/alpha-picks/picks/current';
+      const tab=await managedSaTabs.create({url:target,active:false});
+      await chrome.tabs.remove(tab.id);
+      try {
+        if(message.duringUpdate)await managedSaTabs.update(tab.id,{url:target});
+        else await waitForAlphaPicksTableReady(tab.id,target);
+        throw new Error('closed tab unexpectedly usable');
+      } finally {await safeRemoveTab(tab.id);}
+    });
     if(command==='cancel')return companyFinancialRefresh.cancelQueue();
     if(command==='lose_reply'){await chrome.storage.local.set({fixtureLoseReply:true});return fixtureNews(1);}
     if(command==='schedules') {

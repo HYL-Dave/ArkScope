@@ -80,6 +80,10 @@
       node.textContent="Stopped capture: recovery required."
         +" | Operation: "+(active.operation || "unknown")
         +" | Since: "+(liveState.acquisition_pending_since || active.started_at || "unknown");
+    } else if(control.active) {
+      node.textContent="Unfinished capture record: browser activity unavailable."
+        +" | Operation: "+(active.operation || "unknown")
+        +" | Since: "+(active.started_at || "unknown");
     } else {
       node.textContent=liveState ? "Acquisition: idle here." : "Acquisition status unavailable.";
     }
@@ -116,7 +120,7 @@
     }
     var firstRender=!state;
     state=result;
-    if(typeof result.acquisition_runtime_active === "boolean")liveState=result;
+    if(fromRead)liveState=typeof result.acquisition_runtime_active === "boolean" ? result : null;
     var control=result.collector || {}, values=result.config;
     if (!dirty) {
       target.value=values.target_mode || "manual";ticker.value=values.tickers.join(", ");

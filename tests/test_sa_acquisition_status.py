@@ -30,3 +30,19 @@ def test_local_route_uses_only_the_read_only_status(monkeypatch, tmp_path):
     result = seeking_alpha.sa_acquisition_status()
     assert result["configured"] is False
     assert not list(tmp_path.iterdir())
+
+
+def test_outstanding_task_is_visible_without_exposing_authority(tmp_path):
+    collector = CompanyCollector(tmp_path / "control.db")
+    activate(collector)
+    permit = begin(collector)
+    status = collector.public_status()
+    task = status["unfinished_task"]
+    assert set(task) == {"operation", "started_at", "navigation_attempt_count"}
+    assert task["operation"] == "market_news_sync"
+    assert task["started_at"]
+    assert task["navigation_attempt_count"] == 0
+    assert "token" not in str(status) and "client_id" not in str(status)
+    call(collector, "finish_task", FIREFOX, token=permit["token"], generation=1,
+         cleanup_confirmed=True, result={"status": "ok"})
+    assert collector.public_status()["unfinished_task"] is None

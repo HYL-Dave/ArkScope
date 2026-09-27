@@ -95,7 +95,12 @@ class CompanyCollector:
             else:
                 with closing(sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
                     state = self._read(conn)
+            active = state["active"]
+            unfinished = {key: active[key] for key in (
+                "operation", "started_at", "navigation_attempt_count"
+            )} if active else None
             return {"status": "ok", "configured": state["policy"] is not None,
+                    "unfinished_task": unfinished,
                     "observed_at": _iso(now), "paused_reason": state["paused_reason"],
                     "capability_pauses": dict(state["capability_pauses"]),
                     "rate_limited": _seconds(state["rate_limit_until"]) > now,

@@ -5291,6 +5291,7 @@ export interface SAExtensionHealthResponse {
 
 export interface SAAcquisitionStatus {
   status: "ok" | "error";
+  unfinished_task?: { operation: string; started_at: string; navigation_attempt_count: number } | null;
   configured?: boolean;
   error_code?: string;
   paused_reason?: string | null;

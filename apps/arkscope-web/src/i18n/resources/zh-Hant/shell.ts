@@ -2,6 +2,8 @@
 const shell = {
   saAcquisition: {
     title: "Seeking Alpha 擷取",
+    unfinishedTitle: "採集紀錄尚未結束",
+    unfinished: "{{operation}}：開始於 {{started}}，已記錄 {{count}} 次導航嘗試。尚不能確認瀏覽器是否仍在執行；請檢查負責採集的擴充套件。",
     login: "登入已失效，擷取已暫停。請在負責擷取的瀏覽器登入 Seeking Alpha，再從擴充套件明確恢復。",
     verification: "需要完成驗證，擷取已暫停。完成網頁驗證後，請從擴充套件明確恢復。",
     access: "無法存取訂閱內容：{{capabilities}}，相關更新已暫停。Premium 與 Alpha Picks 需要各自的存取權限；登入本身不代表已確認訂閱。",

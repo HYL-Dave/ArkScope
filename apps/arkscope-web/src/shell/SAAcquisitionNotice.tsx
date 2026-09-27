@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { getSAAcquisitionStatus, type SAAcquisitionStatus } from "../api";
 import { Button } from "../ui/Button";
 import { InlineAlert } from "../ui/Status";
+import { formatSystemTimestamp } from "../timeDisplay";
 import type { NavigationTarget } from "./navigation";
 
 export function SAAcquisitionNotice({ onNavigate }: { onNavigate: (target: NavigationTarget) => void }) {
@@ -35,7 +36,9 @@ export function SAAcquisitionNotice({ onNavigate }: { onNavigate: (target: Navig
   if (!status) return null;
   const capabilities = Object.keys(status.capability_pauses ?? {});
   const reason = status.paused_reason;
-  if (status.status === "ok" && !reason && !status.rate_limited && !capabilities.length) return null;
+  const unfinished = status.unfinished_task;
+  const restricted = status.status === "error" || !!reason || status.rate_limited || !!capabilities.length;
+  if (!restricted && !unfinished) return null;
   const capabilityText = capabilities.map(capability => {
     switch (capability) {
       case "financials": return t(($) => $.saAcquisition.financials);
@@ -49,10 +52,18 @@ export function SAAcquisitionNotice({ onNavigate }: { onNavigate: (target: Navig
     : reason === "human_verification_required" ? t(($) => $.saAcquisition.verification)
     : status.rate_limited ? t(($) => $.saAcquisition.cooldown)
     : capabilities.length ? t(($) => $.saAcquisition.access, { capabilities: capabilityText })
-    : t(($) => $.saAcquisition.paused);
+    : reason ? t(($) => $.saAcquisition.paused)
+    : t(($) => $.saAcquisition.unfinished, {
+      operation: unfinished?.operation === "alpha_picks_sync" ? t(($) => $.saAcquisition.alphaPicks)
+        : unfinished?.operation === "market_news_sync" ? t(($) => $.saAcquisition.news)
+        : t(($) => $.saAcquisition.otherContent),
+      started: formatSystemTimestamp(unfinished?.started_at),
+      count: unfinished?.navigation_attempt_count ?? 0,
+    });
   return (
     <div className="sa-acquisition-notice">
-      <InlineAlert state="blocked" title={t(($) => $.saAcquisition.title)} action={
+      <InlineAlert state={restricted ? "blocked" : "partial"} title={unfinished && !restricted
+        ? t(($) => $.saAcquisition.unfinishedTitle) : t(($) => $.saAcquisition.title)} action={
         <Button size="compact" icon={<Settings size={14} />} onClick={() => onNavigate({ kind: "settings_section", section: "data_sources" })}>
           {t(($) => $.saAcquisition.openSettings)}
         </Button>
