@@ -5,6 +5,10 @@ The operator separately authorized deleting retained SEC research data and all
 48 legacy financial-cache rows. That cleanup does not authorize new provider
 calls, subscriptions, a general news purge, or claiming the replacement UI exists.
 
+The authorized cleanup and provider-state cutover are now completed; see the
+[formal receipt](../evidence/2026-09-27-sec-retirement-cutover/README.md).
+The replacement financial-flow design below still awaits written-spec review.
+
 ## Intended Outcome
 
 Seeking Alpha captures and Financial Datasets are the primary company-financial
