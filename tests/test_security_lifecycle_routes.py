@@ -462,7 +462,12 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 230
+    assert len(rows) == 232
+    assert {row for row in rows if row[1].startswith("/fundamentals/")} == {
+        ("GET", "/fundamentals/coverage"),
+        ("GET", "/fundamentals/{ticker}"),
+        ("POST", "/fundamentals/{ticker}/refresh"),
+    }
     assert {
         ("GET", "/sa/acquisition-status"),
         ("GET", "/providers/data-catalog"),
