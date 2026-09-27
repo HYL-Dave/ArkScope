@@ -233,9 +233,10 @@ def test_stored_partial_data_survives_another_missing_dataset(fd, tmp_path, monk
     assert result.data_source == "financial_datasets"
     assert len(getattr(result, result_field)) == 1
     assert result.snapshot_date == row["report_period"]
-    assert result.source_observations[0]["dataset"] == dataset
+    kind = "balance_sheet" if prefix == "balance" else "cash_flow_statement"
+    assert result.source_observations[0]["dataset"] == kind
     assert len(result.acquisition_gaps) == 2
-    assert all(gap["dataset"] != dataset for gap in result.acquisition_gaps)
+    assert all(gap["dataset"] != kind for gap in result.acquisition_gaps)
     request.assert_not_called()
 
 
