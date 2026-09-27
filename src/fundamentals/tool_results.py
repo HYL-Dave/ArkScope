@@ -5,6 +5,9 @@ import re
 
 from src.tools.retained_read_results import canonical_json
 
+# Statement cells carry their source, units, periods and precision together.
+FINANCIAL_BRIDGE_BUDGET = 48_000
+
 
 def financial_result_reducer(payload: str, *, budget: int) -> tuple[str, dict]:
     inner, prefix, suffix = payload, "", ""

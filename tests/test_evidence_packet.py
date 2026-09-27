@@ -98,7 +98,7 @@ _CONSENSUS = {
 }
 def _gather(dal):
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual": _FUNDAMENTALS)
+        mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual", freshness="stored": _FUNDAMENTALS)
         mp.setattr("src.tools.analyst_tools.get_analyst_consensus", lambda t: _CONSENSUS)
         return gather_evidence(dal, "aapl", now_iso="2026-06-05T00:00:00Z")
 
@@ -188,7 +188,7 @@ def test_empty_analyst_degrades_to_coverage_not_evidence():
         "price_target": None,
     }
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual": _FUNDAMENTALS)
+        mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual", freshness="stored": _FUNDAMENTALS)
         mp.setattr("src.tools.analyst_tools.get_analyst_consensus", lambda t: empty_consensus)
         packet = gather_evidence(_FakeDAL(_bars(), _scored_articles()), "AAPL", now_iso="2026-06-05T00:00:00Z")
 
@@ -220,7 +220,7 @@ def test_sa_digest_extracts_correct_fields_when_enabled():
         },
     }
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual": _FUNDAMENTALS)
+        mp.setattr("src.tools.analysis_tools.get_fundamentals_analysis", lambda dal, t, period="annual", freshness="stored": _FUNDAMENTALS)
         mp.setattr("src.tools.analyst_tools.get_analyst_consensus", lambda t: _CONSENSUS)
         mp.setattr("src.tools.sa_digest_tools.get_sa_digest", lambda dal, t: fake_digest)
         packet = gather_evidence(

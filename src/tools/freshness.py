@@ -11,6 +11,7 @@ Provides:
 from __future__ import annotations
 
 import logging
+import json
 import threading
 import time
 from dataclasses import dataclass, field
@@ -84,7 +85,7 @@ class FreshnessRegistry:
             except Exception as e:
                 logger.warning("FreshnessRegistry.scan() failed: %s", e)
                 err_msg = f"query failed: {e}"
-                for src in ("news", "prices", "fundamentals_cache"):
+                for src in ("news", "prices"):
                     result[src] = SourceHealth(
                         source=src, is_stale=True, stale_reason=err_msg,
                     )
@@ -94,9 +95,6 @@ class FreshnessRegistry:
 
             result["news"] = self._parse_news(stats.get("news", {}))
             result["prices"] = self._parse_prices(stats.get("prices", {}))
-            result["fundamentals_cache"] = self._parse_financial_cache(
-                stats.get("financial_cache", {})
-            )
 
             self._cache = result
             self._cache_ts = time.time()
@@ -116,7 +114,7 @@ class FreshnessRegistry:
             return ""
 
         parts = []
-        for key in ("news", "prices", "fundamentals_cache"):
+        for key in ("news", "prices"):
             h = self._cache.get(key)
             if not h:
                 continue
@@ -124,8 +122,6 @@ class FreshnessRegistry:
                 parts.append(self._fmt_news(h))
             elif key == "prices":
                 parts.append(self._fmt_prices(h))
-            elif key == "fundamentals_cache":
-                parts.append(self._fmt_cache(h))
 
         if not parts:
             return ""
@@ -146,7 +142,7 @@ class FreshnessRegistry:
         lines = ["=== Data Freshness Report ===", ""]
         now = datetime.now(timezone.utc)
 
-        for key in ("news", "prices", "fundamentals_cache"):
+        for key in ("news", "prices"):
             h = self._cache.get(key)
             if not h:
                 continue
@@ -242,33 +238,6 @@ class FreshnessRegistry:
 
         return h
 
-    def _parse_financial_cache(self, stat: Dict[str, Any]) -> SourceHealth:
-        h = SourceHealth(source="fundamentals_cache", expected_frequency="quarterly")
-        if stat.get("error"):
-            h.is_stale = True
-            h.stale_reason = f"query failed: {stat['error']}"
-            return h
-
-        rows = stat.get("rows", [])
-        total_cached = 0
-        total_expired = 0
-        source_details = []
-
-        for row in rows:
-            src, cached, expired = row[0], row[1], row[2]
-            total_cached += cached or 0
-            total_expired += expired or 0
-            source_details.append(f"{src}: {cached or 0} cached, {expired or 0} expired")
-
-        h.record_count_recent = total_cached
-        h.details["cached"] = total_cached
-        h.details["expired"] = total_expired
-        if source_details:
-            h.details["sources"] = "; ".join(source_details)
-        # Fundamentals: don't judge stale (quarterly nature), just report counts
-
-        return h
-
     # ── Format helpers ────────────────────────────────────────
 
     @staticmethod
@@ -291,13 +260,6 @@ class FreshnessRegistry:
             return f"Prices: fresh (1d bars to {h.latest_data_at.strftime('%Y-%m-%d')})"
         return "Prices: fresh"
 
-    @staticmethod
-    def _fmt_cache(h: SourceHealth) -> str:
-        cached = h.details.get("cached", 0)
-        expired = h.details.get("expired", 0)
-        if expired > 0:
-            return f"Fundamentals: {cached} cached ({expired} expired)"
-        return f"Fundamentals: {cached} cached"
 
 
 # ── Singleton management ──────────────────────────────────────
@@ -347,10 +309,19 @@ def check_data_freshness(dal) -> str:
     try:
         registry = get_registry(local_capability=dal._backend)
         registry.scan(force=True)
-        return registry.format_detailed()
+        report = registry.format_detailed()
     except Exception as exc:
         logger.warning("Freshness check unavailable: %s", exc)
-        return "Data freshness is unavailable from the current local authority."
+        report = "Data freshness is unavailable from the current local authority."
+    from src.fundamentals.coverage import financial_coverage
+    coverage = financial_coverage(dal, limit=5)
+    financials = {**coverage, "items": [
+        {key: item[key] for key in ("ticker", "status", "selected_source", "period", "read_id", "missing_statements",
+                                   "supported_metrics", "metric_gaps")} | {
+            "periods": {kind: sorted({row["end_month"] for row in rows}) for kind, rows in item["statements"].items()},
+            "gap_codes": sorted({gap["code"] for gap in item["gaps"]})}
+        for item in coverage["items"]]}
+    return report + "\nLocal financial coverage (candidate inventory, not latest-period verification):\n" + json.dumps(financials)
 
 
 # ── Utility ───────────────────────────────────────────────────

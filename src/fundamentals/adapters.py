@@ -103,7 +103,7 @@ def read_sa_statements(dal, query: FinancialQuery) -> ProviderRead:
             if acquired is None:
                 raise CompanyDataFailure("sa_company_observation_invalid")
             desc = Observation(None, acquired, datetime.now(timezone.utc)).describe(
-                "seeking_alpha", kind, policy("stored", query.max_age_seconds))
+                "seeking_alpha", kind, policy(query.freshness, query.max_age_seconds))
             result.observations.append(FinancialObservation(**desc, observation_id=body["observation_id"],
                 source_url=body["source_url"], first_captured_at=body["first_captured_at"],
                 report_periods=[r["end_month"] for r in records], history="retained_observation"))
@@ -189,6 +189,7 @@ def read_fd_statements(dal, query: FinancialQuery, *, mode: Freshness = "stored"
                 _gap(result, error, kind)
                 continue
             desc = dict(client.observations[-1], dataset=kind)
+            desc["freshness_mode"] = query.freshness
             if mode == "stored":
                 maximum = max_age_seconds if max_age_seconds is not None else query.max_age_seconds
                 desc.update(max_age_seconds=maximum,

@@ -70,12 +70,11 @@ class TestFreshnessRegistryScan:
 
         assert "news" in result
         assert "prices" in result
-        assert "fundamentals_cache" in result
+        assert "fundamentals_cache" not in result
 
         # All should be fresh (within thresholds)
         assert result["news"].is_stale is False
         assert result["prices"].is_stale is False
-        assert result["fundamentals_cache"].is_stale is False
 
     def test_scan_stale_news(self):
         old = datetime.now(timezone.utc) - timedelta(hours=30)
@@ -156,8 +155,8 @@ class TestFreshnessRegistryScan:
         result = fr.scan(force=True)
 
         # Should have all current sources, all stale
-        assert len(result) == 3
-        for key in ("news", "prices", "fundamentals_cache"):
+        assert len(result) == 2
+        for key in ("news", "prices"):
             assert key in result
             assert result[key].is_stale is True
             assert "connection lost" in result[key].stale_reason
@@ -199,7 +198,7 @@ class TestFreshnessFormat:
         summary = fr.format_summary()
         assert "News:" in summary
         assert "Prices:" in summary
-        assert "Fundamentals:" in summary
+        assert "Fundamentals:" not in summary
 
     def test_format_summary_empty(self):
         fr = FreshnessRegistry(local_capability=None)
@@ -268,7 +267,8 @@ class TestCheckDataFreshness:
     def test_no_backend_attr(self):
         dal = MagicMock(spec=[])
         result = check_data_freshness(dal)
-        assert result == "Data freshness is unavailable from the current local authority."
+        assert result.startswith("Data freshness is unavailable from the current local authority.")
+        assert "Local financial coverage" in result
 
 
 # ── Timestamp parsing ───────────────────────────────────────

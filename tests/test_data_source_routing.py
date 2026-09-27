@@ -197,9 +197,9 @@ def test_earnings_supplements_can_be_disabled_independently(local, monkeypatch):
     finnhub = Mock(side_effect=AssertionError("disabled earnings must not call Finnhub"))
     monkeypatch.setattr("src.tools.analyst_tools._finnhub_get", finnhub)
     result = get_detailed_financials(dal, "AAPL")
-    assert result.gross_margin == 0.4
+    assert result.gross_margin is None
     assert result.earnings_surprises is None
-    assert result.acquisition_gaps[-1]["code"] == "data_source_route_disabled"
+    assert result.acquisition_gaps[-1]["code"] == "financial_operation_not_ported"
     finnhub.assert_not_called()
     http.assert_not_called()
 

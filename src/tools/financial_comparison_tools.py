@@ -7,45 +7,20 @@ import re
 from typing import Literal, Optional
 
 from src.data_source_routing import DataSourcePolicyFailure, load_route
-from src.fundamentals.cache import fundamentals_analysis_cache_key, validate_positive_annual_sec_payload
-from src.fundamentals.reuse import policy, read_entry
+from src.fundamentals.adapters import read_fd_statements
+from src.fundamentals.contracts import FinancialQuery
 from src.fundamentals.source_comparison import METRICS, comparison_rows, fd_records, sa_records
 from src.sa.company_data import CompanyDataFailure, canonical_json, query_symbol
 from src.sa.company_store import read_capture
 
 
-PROVIDERS = ("seeking_alpha", "sec_edgar", "financial_datasets")
+PROVIDERS = ("seeking_alpha", "financial_datasets")
 STATEMENTS = {"income_statement": "income_statements", "balance_sheet": "balance_sheet",
               "cash_flow_statement": "cash_flow_statements"}
 
 
 def _digest(value):
     return sha256(canonical_json(value).encode("utf-8")).hexdigest()
-
-
-def _stored_statements(dal, provider, ticker, statement, period):
-    """Read existing owners without invoking the legacy ratio calculator."""
-    backend = getattr(dal, "_backend", None)
-    if provider == "sec_edgar":
-        observation = read_entry(backend, fundamentals_analysis_cache_key(ticker, period), provider, ticker,
-                                 lambda data: validate_positive_annual_sec_payload(data, ticker=ticker), None)
-        if observation is None:
-            return [], []
-        statements = getattr(observation.data, STATEMENTS[statement]) or []
-        return statements, [observation.describe(provider, STATEMENTS[statement], policy("stored", None))]
-    from data_sources.financial_datasets_client import FinancialDatasetsClient
-    from data_sources.financial_datasets_governance import FinancialDatasetsFailure
-    from src.tools.analysis_tools import _sec_to_financial_statement
-
-    client = FinancialDatasetsClient(cache_backend=backend)
-    reader = {"income_statement": client.get_income_statements, "balance_sheet": client.get_balance_sheets,
-              "cash_flow_statement": client.get_cash_flow_statements}[statement]
-    limit = 1 if statement == "balance_sheet" else 4 if period == "quarterly" else 2
-    try:
-        statements = reader(ticker, period=period, limit=limit, freshness="stored")
-    except FinancialDatasetsFailure as exc:
-        raise DataSourcePolicyFailure(exc.code) from exc
-    return [_sec_to_financial_statement(item) for item in statements], client.observations
 
 
 def _read_source(dal, provider, ticker, statement, period, currency):
@@ -66,12 +41,16 @@ def _read_source(dal, provider, ticker, statement, period, currency):
                           unit_note=body["unit_note"])
             records = sa_records(body, period)
         else:
-            statements, descriptions = _stored_statements(dal, provider, ticker, statement, period)
+            retained = read_fd_statements(dal, FinancialQuery(ticker=ticker, source=provider,
+                statement=statement, period=period, currency=currency, freshness="stored"))
+            statements = retained.statements.get(statement, [])
+            source["source_observations"] = [item.model_dump() for item in retained.observations]
+            source["gaps"] = [item.model_dump() for item in retained.gaps]
             if not statements:
-                source["error_code"] = "financial_comparison_stored_statement_missing"
+                source["error_code"] = (retained.gaps[0].code if retained.gaps else
+                                        "financial_comparison_stored_statement_missing")
                 return source
             source["content_sha256"] = _digest([item.model_dump() for item in statements])
-            source["source_observations"] = descriptions
             source["source_url"] = None  # Old cache has no citation-level source pointer.
             records = fd_records(statements, period)
         source.update(status="ok", records=records, available_months=sorted({r["end_month"] for r in records}, reverse=True))
@@ -86,7 +65,7 @@ def compare_financial_sources(
     dal, ticker: str,
     statement: Literal["income_statement", "balance_sheet", "cash_flow_statement"] = "income_statement",
     period: Literal["annual", "quarterly"] = "annual",
-    sources: Optional[list[Literal["seeking_alpha", "sec_edgar", "financial_datasets"]]] = None,
+    sources: Optional[list[Literal["seeking_alpha", "financial_datasets"]]] = None,
     end_month: Optional[str] = None, currency: str = "USD",
     row_offset: int = 0, row_limit: int = 3, comparison_id: Optional[str] = None,
 ):
@@ -115,7 +94,8 @@ def compare_financial_sources(
         return {**base, "error_code": "financial_comparison_query_invalid"}
     if sources is None:
         try:
-            sources = list(load_route("sa_company_financials", dal).providers) + list(load_route("fundamentals_analysis", dal).providers)
+            sources = list(dict.fromkeys((*load_route("sa_company_financials", dal).providers,
+                                           *load_route("fundamentals_analysis", dal).providers)))
         except DataSourcePolicyFailure as exc:
             return {**base, "error_code": exc.code}
     observations = [_read_source(dal, p, ticker, statement, period, currency) for p in sources]

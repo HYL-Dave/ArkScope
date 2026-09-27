@@ -9,7 +9,7 @@ from unittest.mock import Mock
 import pytest
 
 
-async def invoke(channel, name, arguments, dal):
+async def invoke(channel, name, arguments, dal, *, allow_errors=False):
     from src.tools.registry import create_default_registry
 
     if channel == "openai":
@@ -27,12 +27,12 @@ async def invoke(channel, name, arguments, dal):
         from src.auth_drivers.chatgpt_oauth_driver import OpenAIChatGPTOAuthDriver
         ok, result = await OpenAIChatGPTOAuthDriver(registry=registry, dal=dal)._invoke_tool(
             name=name, args=arguments, token=None)
-        assert ok
+        assert ok or allow_errors
         return result
     from src.auth_drivers.claude_code_sdk_driver import _invoke_bridged_tool
     result = await _invoke_bridged_tool(name=name, args=arguments, registry=registry,
                                       dal=dal, token=None, per_tool_timeout_s=5)
-    assert not result["is_error"]
+    assert not result["is_error"] or allow_errors
     return result["content"][0]["text"]
 
 
@@ -133,8 +133,7 @@ def test_invalid_age_is_not_coerced_into_acquisition_authority(channel, age, nam
     acquire_quote = Mock(side_effect=AssertionError("invalid age must not request a quote"))
     read_fundamentals = Mock(side_effect=AssertionError("invalid age must not start data access"))
     monkeypatch.setattr(current_quote, "_fetch_ibkr_quote", acquire_quote)
-    monkeypatch.setattr(analysis_tools, "read_entry", read_fundamentals)
-    monkeypatch.setattr(analysis_tools, "cached_dataset", read_fundamentals)
+    monkeypatch.setattr("src.fundamentals.read_service.read_financials", read_fundamentals)
     arguments = {"ticker": "AAPL"}
     if name == "get_current_quote":
         arguments.update(source="ibkr", max_age_seconds=age)
@@ -151,7 +150,7 @@ def test_retired_fd_only_arguments_cannot_silently_enable_auto_acquisition(chann
     from src.tools import analysis_tools
 
     access = Mock(side_effect=AssertionError("an obsolete stored flag must not turn into default auto"))
-    monkeypatch.setattr(analysis_tools, "read_entry", access)
+    monkeypatch.setattr("src.fundamentals.read_service.read_financials", access)
     result = asyncio.run(invoke(channel, "get_fundamentals_analysis", {
         "ticker": "AAPL", "fd_freshness": "stored",
     }, object()))

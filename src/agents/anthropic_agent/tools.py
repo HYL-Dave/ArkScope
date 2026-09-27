@@ -502,13 +502,11 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         {
             "name": "get_fundamentals_analysis",
             "description": (
-                "Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker. "
-                "Source auto follows Settings choices; explicit source never switches providers. "
-                "Auto reuses dated local SEC/FD observations within the configured financial window. "
-                "Financial Datasets acquisition may incur charges and requires an "
-                "operator-configured request budget and account rate limit. "
-                "Acquisition refusals appear in acquisition_gaps, not as proof of absent data. "
-                "Stored never fetches or writes. Refresh bypasses old observations."
+                "Read selected SA/Financial Datasets statements and supported metrics with period/precision/input gaps. "
+                "Auto prefers eligible local observations; stored never fetches or writes. "
+                "Refresh requires a named source. Financial Datasets may incur charges and requires the configured paid budget. "
+                "SA failure never permits paid fallback. History pins require stored. Pin read_id for paging; "
+                "choose one statement and period_limit=1 for bounded pages. SA month labels are not fiscal end days."
             ),
             "input_schema": {
                 "type": "object",
@@ -516,7 +514,7 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "ticker": {"type": "string", "description": "Stock ticker symbol"},
                     "period": {"type": "string", "enum": ["annual", "quarterly"], "default": "annual"},
                     "source": {
-                        "type": "string", "enum": ["auto", "sec_edgar", "financial_datasets"], "default": "auto",
+                        "type": "string", "enum": ["auto", "seeking_alpha", "financial_datasets"], "default": "auto",
                         "description": "Provider must be selected in Settings; auto prefers eligible local observations."
                     },
                     "freshness": {
@@ -526,7 +524,14 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
                     "max_age_seconds": {
                         "type": "integer", "minimum": 0,
                         "description": "Optional acquisition-age override for auto/stored; omit for refresh."
-                    }
+                    },
+                    "currency": {"type": "string", "pattern": "^[A-Z]{3}$", "default": "USD"},
+                    "statement": {"type": "string", "enum": ["income_statement", "balance_sheet", "cash_flow_statement"]},
+                    "end_month": {"type": "string", "description": "YYYY-MM; stored only"},
+                    "observation_id": {"type": "string", "description": "Retained SA ID; explicit SA and statement required"},
+                    "read_id": {"type": "string", "description": "Pin unchanged values on later pages"},
+                    "period_offset": {"type": "integer", "minimum": 0, "default": 0},
+                    "period_limit": {"type": "integer", "minimum": 1, "maximum": 8, "default": 4}
                 },
                 "required": ["ticker"]
             }
@@ -534,13 +539,8 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         {
             "name": "get_detailed_financials",
             "description": (
-                "Get comprehensive financial metrics for valuation: "
-                "EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, "
-                "tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), "
-                "and earnings surprise. "
-                "Static SEC facts plus a qualified local completed-session price, or typed unavailable. "
-                "Auto reuses configured financial and shorter earnings observations. "
-                "Stored never fetches or writes. Refresh bypasses old observations."
+                "Unavailable: detailed valuation has not been ported. No acquisition occurs. "
+                "Use get_fundamentals_analysis for supported SA/FD statements and input gaps."
             ),
             "input_schema": {
                 "type": "object",
@@ -563,10 +563,8 @@ def get_anthropic_tools() -> List[Dict[str, Any]]:
         {
             "name": "get_peer_comparison",
             "description": (
-                "Compare a ticker vs sector peers on key metrics: PE, EV/EBITDA, "
-                "margins, growth, ROE, ROIC, Rule of 40. Returns comparison matrix, "
-                "percentile rankings, and sector medians. Provide ticker (auto-detect "
-                "sector), sector name, or explicit tickers list."
+                "Unavailable: comparable peer valuation inputs have not been ported. "
+                "No acquisition or rankings. Read individual statements with get_fundamentals_analysis."
             ),
             "input_schema": {
                 "type": "object",
@@ -1589,14 +1587,7 @@ def execute_tool(
             tool_input["ticker"],
             days=tool_input.get("days", 30)
         ),
-        "get_fundamentals_analysis": lambda: get_fundamentals_analysis(
-            dal,
-            tool_input["ticker"],
-            period=tool_input.get("period", "annual"),
-            freshness=tool_input.get("freshness", "auto"),
-            max_age_seconds=tool_input.get("max_age_seconds"),
-            source=tool_input.get("source", "auto"),
-        ),
+        "get_fundamentals_analysis": lambda: get_fundamentals_analysis(dal, **tool_input),
         "get_detailed_financials": lambda: get_detailed_financials(
             dal,
             tool_input["ticker"],

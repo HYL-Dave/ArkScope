@@ -153,28 +153,17 @@ def test_bad_config_does_not_silently_enable_acquisition(local, value):
     sec.assert_not_called()
 
 
-@pytest.mark.parametrize("failure", [True, False])
-def test_detailed_earnings_distinguishes_failed_fetch_from_valid_empty(local, monkeypatch, failure):
-    from tests.test_detailed_financials import _StaticCalculatorDouble, _price_basis
-
-    dal, http, _ = local
-    monkeypatch.setattr("data_sources.financial_metrics_calculator.FinancialMetricsCalculator", _StaticCalculatorDouble)
-    monkeypatch.setattr("src.valuation_price.get_valuation_price_basis", lambda _: _price_basis())
-    responses = {"/stock/earnings": [], "/calendar/earnings": {"earningsCalendar": []}}
-    finnhub = Mock(side_effect=lambda endpoint, params: None if failure else responses[endpoint])
+@pytest.mark.parametrize("freshness", ["stored", "auto", "refresh"])
+def test_unported_detailed_analysis_does_not_query_earnings(local, monkeypatch, freshness):
+    dal, http, sec = local
+    finnhub = Mock(side_effect=AssertionError("unported detailed operation must not query Finnhub"))
     monkeypatch.setattr("src.tools.analyst_tools._finnhub_get", finnhub)
-    first = get_detailed_financials(dal, "AAPL")
-    second = get_detailed_financials(dal, "AAPL")
-    assert first.gross_margin == second.gross_margin == 0.4
-    assert len(second.source_observations) == (1 if failure else 3)
-    assert finnhub.call_count == (4 if failure else 2)
-    if failure:
-        assert len(second.acquisition_gaps) == 2
-        assert all(item["code"] == "finnhub_earnings_unavailable" for item in second.acquisition_gaps)
-    else:
-        assert [item["max_age_seconds"] for item in second.source_observations] == [7 * 86400, 3600, 3600]
-        assert all(item["retrieval"] == "stored" for item in second.source_observations)
+    result = get_detailed_financials(dal, "AAPL", freshness=freshness)
+    assert result.status == "unavailable" and result.error_code == "financial_operation_not_ported"
+    assert result.gross_margin is None and result.source_observations == []
+    finnhub.assert_not_called()
     http.assert_not_called()
+    sec.assert_not_called()
 
 
 def test_refresh_failure_never_falls_back_to_a_stored_sec_result(local):
@@ -202,6 +191,6 @@ def test_legacy_empty_detailed_cache_is_not_a_successful_observation(local, monk
     monkeypatch.setattr("src.valuation_price.get_valuation_price_basis", lambda _: ValuationPriceBasis())
     result = get_detailed_financials(dal, "AAPL", freshness="stored")
     assert not result.source_observations
-    assert {"provider": "sec_edgar", "code": "financial_stored_data_unavailable"} in result.acquisition_gaps
+    assert {"provider": "financials", "code": "financial_operation_not_ported"} in result.acquisition_gaps
     http.assert_not_called()
     sec.assert_not_called()

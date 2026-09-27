@@ -511,28 +511,26 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         ticker: str, period: str = "annual", freshness: str = "auto",
         max_age_seconds: Annotated[Optional[int], Field(strict=True)] = None,
         source: str = "auto",
+        currency: str = "USD", statement: Optional[Literal["income_statement", "balance_sheet", "cash_flow_statement"]] = None,
+        end_month: Optional[str] = None, observation_id: Optional[str] = None, read_id: Optional[str] = None,
+        period_offset: Annotated[int, Field(strict=True)] = 0,
+        period_limit: Annotated[int, Field(strict=True)] = 4,
     ) -> str:
-        """Get fundamental analysis (P/E, ROE, market cap, margins) for a ticker.
+        """Read selected SA/Financial Datasets statements and supported metrics with input gaps.
 
-        Default auto reuses dated local SEC/FD observations within the configured
-        financial window. Financial Datasets acquisition may incur charges and
-        requires an operator-configured request budget and account rate limit.
-        Acquisition refusals appear in acquisition_gaps, not as proof of absent data.
-        Stored never fetches or writes. Refresh bypasses old observations.
-        Source auto follows Settings choices; explicit source never switches providers.
-
-        Args:
-            ticker: Stock ticker symbol
-            period: annual or quarterly
-            source: auto, sec_edgar or financial_datasets; must be selected in Settings
-            freshness: Auto local reuse (default), stored only or refresh
-            max_age_seconds: Optional acquisition-age override for auto/stored;
-                omit for refresh
-
-        Returns market_cap, pe_ratio, roe, profit_margin, etc.
+        Auto prefers eligible local observations; stored never fetches or writes.
+        Refresh requires a named source. Financial Datasets acquisition may incur
+        charges and requires the configured paid budget. SA failure never permits
+        paid fallback. History pins require stored; SA observation_id also requires
+        explicit SA and one statement. Pin read_id for subsequent pages, use one
+        statement and period_limit=1 for bounded pages (maximum 8). Currency is not
+        converted. SA month labels are not exact fiscal end days; unsupported
+        ratios and missing valuation inputs are gaps, not zero values.
         """
         result = get_fundamentals_analysis(dal, ticker, period=period,
-                                          freshness=freshness, max_age_seconds=max_age_seconds, source=source)
+            freshness=freshness, max_age_seconds=max_age_seconds, source=source, currency=currency,
+            statement=statement, end_month=end_month, observation_id=observation_id, read_id=read_id,
+            period_offset=period_offset, period_limit=period_limit)
         return _serialize_result(result, "get_fundamentals_analysis")
 
     @function_tool
@@ -540,16 +538,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         ticker: str, freshness: str = "auto",
         max_age_seconds: Annotated[Optional[int], Field(strict=True)] = None,
     ) -> str:
-        """Get comprehensive financial metrics: EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), and earnings surprise.
-
-        Static SEC facts plus a qualified local completed-session price, or typed unavailable.
-        Auto reuses configured financial and shorter earnings observations.
-        Stored never fetches or writes. Refresh bypasses old observations.
-
-        Args:
-            ticker: Stock ticker symbol
-            freshness: Auto local reuse (default), stored only or refresh
-            max_age_seconds: Optional override for both reuse windows; omit for refresh
+        """Unavailable: detailed valuation is not ported to the common SA/FD reader.
+        No acquisition occurs. Use get_fundamentals_analysis for statements and supported ratios.
         """
         result = get_detailed_financials(dal, ticker, freshness=freshness, max_age_seconds=max_age_seconds)
         return _serialize_result(result, "get_detailed_financials")
@@ -560,12 +550,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         tickers: Optional[List[str]] = None,
         sector: Optional[str] = None,
     ) -> str:
-        """Compare a ticker vs sector peers: PE, EV/EBITDA, margins, growth, ROE, ROIC, Rule of 40. Returns matrix, rankings, medians.
-
-        Args:
-            ticker: Target ticker to rank vs peers (auto-detects sector)
-            tickers: Explicit peer list (overrides sector)
-            sector: Sector from sectors.yaml (e.g. AI_CHIPS, FINTECH)
+        """Unavailable: comparable peer valuation inputs are not ported.
+        No acquisition or ranking occurs. Use the common financial reader for individual statements.
         """
         result = get_peer_comparison(dal, ticker=ticker, tickers=tickers, sector=sector)
         return _serialize_result(result, "get_peer_comparison")
@@ -1262,7 +1248,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         ticker: str,
         statement: Literal["income_statement", "balance_sheet", "cash_flow_statement"] = "income_statement",
         period: Literal["annual", "quarterly"] = "annual",
-        sources: Optional[list[Literal["seeking_alpha", "sec_edgar", "financial_datasets"]]] = None,
+        sources: Optional[list[Literal["seeking_alpha", "financial_datasets"]]] = None,
         end_month: Optional[str] = None, currency: str = "USD",
         row_offset: Annotated[int, Field(strict=True)] = 0,
         row_limit: Annotated[int, Field(strict=True)] = 3,

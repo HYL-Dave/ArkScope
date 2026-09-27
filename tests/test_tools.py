@@ -426,11 +426,11 @@ class TestAnalysisTools:
         assert provider_calls == []
         assert isinstance(result, FundamentalsResult)
         assert result.ticker == "NVDA"
-        assert result.data_source == "sec_edgar"
-        assert result.snapshot_date == "2025-12-31"
+        assert result.status == "unavailable" and result.data_source == "none"
+        assert result.snapshot_date is None
         assert result.roe is None
         assert result.revenue_growth is None
-        assert result.metric_gaps["roe"] == "income_unavailable"
+        assert result.read_gaps
         assert result.market_cap is None
         assert result.pe_ratio is None
 

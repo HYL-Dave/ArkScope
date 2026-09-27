@@ -586,6 +586,9 @@ class OpenAIChatGPTOAuthDriver:
                 raw, policy=getattr(tool_def, "result_policy", None), guard=tool_output_guard(token),
             )
             budget = _BRIDGE_RESULT_BUDGET
+            if name == "get_fundamentals_analysis":
+                from src.fundamentals.tool_results import FINANCIAL_BRIDGE_BUDGET
+                budget = FINANCIAL_BRIDGE_BUDGET
             if name in SEC_TOOL_NAMES:
                 from src.agents.shared.security import wrap_tool_result
                 result = wrap_tool_result(result, name)

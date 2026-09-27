@@ -328,7 +328,7 @@ def gather_evidence(
     try:
         from src.tools.analysis_tools import get_fundamentals_analysis
 
-        f = get_fundamentals_analysis(dal, tkr)
+        f = get_fundamentals_analysis(dal, tkr, freshness="stored")
         metrics = {
             k: getattr(f, k, None)
             for k in (
@@ -343,9 +343,11 @@ def gather_evidence(
             b.add(
                 f"fundamentals:{src_label}",
                 "institutional",
-                metrics,
+                {**metrics, "read_id": f.read_id, "metric_basis": f.metric_basis, "metric_gaps": f.metric_gaps,
+                 "source_observations": f.source_observations, "read_gaps": [g.model_dump() for g in f.read_gaps],
+                 "coverage": f.coverage.model_dump() if f.coverage else None},
                 as_of=getattr(f, "snapshot_date", None),
-                note="Normalized metrics from filings/provider; no interpretation.",
+                note="Stored same-source metrics with input basis and gaps; SA month/rounded values are not filing-exact.",
             )
             present.append("fundamentals")
         else:

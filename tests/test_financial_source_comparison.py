@@ -9,11 +9,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.fundamentals.cache import fundamentals_analysis_cache_key
-from src.fundamentals.metric_basis import SEC_STATEMENT_BASIS_VERSION
 from src.sa.company_store import save_capture
 from src.tools.financial_comparison_tools import compare_financial_sources
-from src.tools.schemas import FinancialStatement, FundamentalsResult
+from src.tools.schemas import FinancialStatement
 from tests.test_financial_local_reuse import local
 from tests.test_sa_company_data import capture
 
@@ -29,27 +27,28 @@ def sources(local, tmp_path, monkeypatch):
     payload["rows"][2]["values"][2] = "10.0"
     payload["rows"][3]["values"][2] = "2.50"
     save_capture(payload)
-    save_sec(dal)
+    save_comparison_fd(dal)
     return dal, http, sec
 
 
-def save_sec(dal, *, currency="USD", end="2025-12-27", revenue=123_440_000, period="annual",
-             input_basis_version=SEC_STATEMENT_BASIS_VERSION, ticker="AAPL"):
+def save_comparison_fd(dal, *, currency="USD", end="2025-12-27", revenue=123_440_000,
+                       period="annual", ticker="AAPL", duplicates=False):
+    from data_sources.financial_datasets_client import FinancialDatasetsClient
     fetched = datetime.now(timezone.utc) - timedelta(days=2)
-    statement = FinancialStatement(report_period=end, fiscal_period="2025-FY", period_type=period,
-                                   input_basis_version=input_basis_version,
-                                   currency=currency, data={"revenue": revenue, "net_income": 10_000_000,
-                                                            "earnings_per_share": 2.5})
-    result = FundamentalsResult(ticker=ticker, data_source="sec_edgar", snapshot_date=end,
-                                income_statements=[statement])
+    row = {"ticker": ticker, "report_period": end, "fiscal_period": "2025-FY",
+           "period": period, "currency": currency, "revenue": revenue,
+           "net_income": 10_000_000, "earnings_per_share": 2.5}
+    rows = [row, {**row, "revenue": revenue + 1}] if duplicates else [row]
+    limit = 4 if period == "quarterly" else 2
+    body = FinancialDatasetsClient._envelope({"income_statements": rows}, ticker, period, limit)
     assert dal._backend.set_financial_cache(
-        fundamentals_analysis_cache_key(ticker, period), ticker, result.model_dump(), source="sec_edgar",
+        f"fd_v1_income_{ticker}_{period}_{limit}", ticker, body, source="financial_datasets",
         fetched_at=fetched.isoformat(), expires_at=(fetched + timedelta(days=90)).isoformat(),
     )
 
 
 def compare(dal, **kwargs):
-    return compare_financial_sources(dal, "AAPL", sources=["seeking_alpha", "sec_edgar"], **kwargs)
+    return compare_financial_sources(dal, "AAPL", sources=["seeking_alpha", "financial_datasets"], **kwargs)
 
 
 def metric(result, name):
@@ -89,37 +88,24 @@ def test_scale_rounding_and_period_precision_are_explicit(sources):
 
 
 def test_larger_difference_is_not_explained_by_invented_restatement_or_gaap(sources):
-    save_sec(sources[0], revenue=140_000_000)
+    save_comparison_fd(sources[0], revenue=140_000_000)
     pair = metric(compare(sources[0]), "revenue")["comparisons"][0]
     assert pair["status"] == "difference_unexplained"
     assert pair["difference_right_minus_left"] == "16600000"
     assert pair["cause"] is None and pair["materiality_assessment"] is None
 
 
-@pytest.mark.parametrize("version", [None, "obsolete-selection-v0"])
-def test_old_sec_input_contract_cannot_publish_a_cross_source_difference(sources, monkeypatch, version):
-    dal, http, sec = sources
-    save_sec(dal, input_basis_version=version)
-    forbidden = Mock(side_effect=AssertionError("unverified input is not refresh authority"))
-    monkeypatch.setattr(dal._backend, "set_financial_cache", forbidden)
-    result = compare(dal)
-    row = metric(result, "revenue")
-    assert result["status"] == "partial"
-    assert row["values"][0]["normalized_value"] == "123400000"
-    assert row["values"][1]["status"] == "statement_basis_unverified"
-    assert row["values"][1]["normalized_value"] is None
-    assert row["comparisons"][0]["status"] == "not_comparable"
-    assert row["comparisons"][0]["difference_right_minus_left"] is None
-    assert row["comparisons"][0]["reasons"] == ["right_statement_basis_unverified"]
-    assert result["sources"][1]["source_observations"]
-    http.assert_not_called()
-    sec.assert_not_called()
+def test_retired_sec_selection_cannot_read_any_store(sources, monkeypatch):
+    forbidden = Mock(side_effect=AssertionError("retired provider must not read"))
+    monkeypatch.setattr("src.tools.financial_comparison_tools.load_route", forbidden)
+    result = compare_financial_sources(sources[0], "AAPL", sources=["seeking_alpha", "sec_edgar"])
+    assert result["error_code"] == "financial_comparison_query_invalid"
     forbidden.assert_not_called()
 
 
-@pytest.mark.parametrize("currency,reason", [(None, "currency_unknown"), ("EUR", "currency_mismatch")])
+@pytest.mark.parametrize("currency,reason", [("EUR", "currency_mismatch")])
 def test_currency_gaps_block_arithmetic_not_source_visibility(sources, currency, reason):
-    save_sec(sources[0], currency=currency)
+    save_comparison_fd(sources[0], currency=currency)
     row = metric(compare(sources[0]), "revenue")
     assert all(v["normalized_value"] is not None for v in row["values"])
     pair = row["comparisons"][0]
@@ -128,7 +114,7 @@ def test_currency_gaps_block_arithmetic_not_source_visibility(sources, currency,
 
 
 def test_different_months_never_compare_latest_against_latest(sources):
-    save_sec(sources[0], end="2025-09-27")
+    save_comparison_fd(sources[0], end="2025-09-27")
     result = compare(sources[0])
     assert result["status"] == "unavailable" and result["error_code"] == "financial_comparison_period_unavailable"
     assert result["rows"] == []
@@ -147,7 +133,7 @@ def test_ttm_is_not_a_substitute_for_a_requested_financial_period(sources):
 
 
 def test_quarterly_statements_do_not_reuse_an_annual_capture_or_cache(sources):
-    save_sec(sources[0], period="quarterly")
+    save_comparison_fd(sources[0], period="quarterly")
     result = compare(sources[0], period="quarterly", end_month="2025-12")
     row = metric(result, "revenue")
     assert row["values"][0]["status"] == "source_unavailable"
@@ -192,53 +178,49 @@ def test_disabled_source_stays_disabled_even_when_its_capture_exists(sources):
     assert all(row["values"][0]["normalized_value"] is None for row in result["rows"])
 
 
-def save_fd_statement(dal, *, end="2025-12-27", currency="USD", revenue=123_440_000, duplicates=False):
-    from data_sources.financial_datasets_client import FinancialDatasetsClient
-
-    row = {"ticker": "AAPL", "report_period": end, "fiscal_period": "2025-FY", "period": "annual",
-           "currency": currency, "revenue": revenue}
-    rows = [row, {**row, "revenue": revenue + 1}] if duplicates else [row]
-    fetched = datetime.now(timezone.utc) - timedelta(days=2)
-    body = FinancialDatasetsClient._envelope({"income_statements": rows}, "AAPL", "annual", 2)
-    assert dal._backend.set_financial_cache("fd_v1_income_AAPL_annual_2", "AAPL", body, source="financial_datasets",
-        fetched_at=fetched.isoformat(), expires_at=(fetched + timedelta(days=180)).isoformat())
-
-
 def test_fd_comparison_needs_neither_paid_authority_nor_other_statements(sources, monkeypatch):
     dal, http, sec = sources
-    save_fd_statement(dal)
+    save_comparison_fd(dal)
     forbidden = Mock(side_effect=AssertionError("comparison must not invoke ratio or acquisition paths"))
     monkeypatch.setattr("src.tools.analysis_tools.get_fundamentals_analysis", forbidden)
     monkeypatch.delenv("FINANCIAL_DATASETS_API_KEY", raising=False)
     result = compare_financial_sources(dal, "AAPL")
-    assert [s["provider"] for s in result["sources"]] == ["seeking_alpha", "sec_edgar", "financial_datasets"]
+    assert [s["provider"] for s in result["sources"]] == ["seeking_alpha", "financial_datasets"]
     revenue = metric(result, "revenue")
-    assert len(revenue["comparisons"]) == 3
-    assert revenue["comparisons"][2]["basis"] == "period_end"
-    assert revenue["comparisons"][2]["status"] == "same_displayed_value"
-    assert result["sources"][2]["source_observations"][0]["freshness_mode"] == "stored"
+    assert len(revenue["comparisons"]) == 1
+    assert revenue["comparisons"][0]["basis"] == "displayed_period_month"
+    assert revenue["comparisons"][0]["status"] == "rounding_compatible"
+    assert result["sources"][1]["source_observations"][0]["freshness_mode"] == "stored"
     assert len(json.dumps(result)) < 12000  # The default page fits the OAuth bridge.
     http.assert_not_called(); sec.assert_not_called(); forbidden.assert_not_called()
 
 
-def test_conflicting_exact_days_and_ambiguous_provider_periods_do_not_get_deltas(sources):
-    dal = sources[0]
-    save_fd_statement(dal, end="2025-12-31")
-    result = compare_financial_sources(dal, "AAPL", sources=["sec_edgar", "financial_datasets"])
-    assert metric(result, "revenue")["comparisons"][0]["reasons"] == ["period_end_mismatch"]
-    save_fd_statement(dal, duplicates=True)
-    result = compare_financial_sources(dal, "AAPL", sources=["sec_edgar", "financial_datasets"])
-    assert metric(result, "revenue")["values"][1]["status"] == "period_ambiguous"
+def test_ambiguous_provider_periods_do_not_get_deltas(sources):
+    save_comparison_fd(sources[0], duplicates=True)
+    result = compare(sources[0])
+    assert result["sources"][1]["error_code"] == "financial_period_ambiguous"
     assert metric(result, "revenue")["comparisons"][0]["difference_right_minus_left"] is None
 
 
+def exact_value(value, end="2025-12-27"):
+    from src.fundamentals.source_comparison import source_value
+    source = {"provider": "financial_datasets", "status": "ok", "records": [{
+        "end_month": "2025-12", "period_end": end, "currency": "USD",
+        "data": {"revenue": value}}]}
+    return source_value(source, "revenue", "Total Revenues", "money", "2025-12")
+
+
+def test_conflicting_exact_days_do_not_get_deltas():
+    from src.fundamentals.source_comparison import compare_values
+    pair = compare_values(exact_value(10), exact_value(10, "2025-12-31"))
+    assert pair["reasons"] == ["period_end_mismatch"]
+    assert pair["difference_right_minus_left"] is None
+
+
 @pytest.mark.parametrize("left,right", [(0, 1), (-1, -2), (1e-308, 1e308), (1e308, 1e-308)])
-def test_zero_negative_and_extreme_finite_values_do_not_break_decimal_boundary(sources, left, right):
-    dal = sources[0]
-    save_sec(dal, revenue=left)
-    save_fd_statement(dal, revenue=right)
-    result = compare_financial_sources(dal, "AAPL", sources=["sec_edgar", "financial_datasets"])
-    pair = metric(result, "revenue")["comparisons"][0]
+def test_zero_negative_and_extreme_finite_values_do_not_break_decimal_boundary(left, right):
+    from src.fundamentals.source_comparison import compare_values
+    pair = compare_values(exact_value(left), exact_value(right))
     assert pair["difference_right_minus_left"] is not None
     assert (pair["relative_difference_pct"] is None) == (left == 0)
     assert "NaN" not in json.dumps(pair) and "Infinity" not in json.dumps(pair)
@@ -274,7 +256,7 @@ def test_all_model_channels_preserve_qualified_differences(sources, channel):
     from tests.test_sec_research_tool_adapters import unwrap
 
     result = unwrap(asyncio.run(invoke(channel, "compare_financial_sources", {
-        "ticker": "AAPL", "sources": ["seeking_alpha", "sec_edgar"], "row_limit": 1,
+        "ticker": "AAPL", "sources": ["seeking_alpha", "financial_datasets"], "row_limit": 1,
     }, sources[0])))
     assert result["retrieval"] == "stored" and len(result["rows"]) == 1
     assert result["rows"][0]["comparisons"][0]["status"] == "rounding_compatible"
@@ -288,17 +270,17 @@ def test_canonical_comparison_maps_only_the_sa_source(sources, channel):
 
     dal, http, sec = sources
     receipt = save_capture(capture(ticker="BRK.B"))
-    save_sec(dal, ticker="BRK B")
+    save_comparison_fd(dal, ticker="BRK B")
     before = sha256(dal._backend._sa_db.read_bytes()).hexdigest()
     result = unwrap(asyncio.run(invoke(channel, "compare_financial_sources", {
-        "ticker": "BRK B", "sources": ["seeking_alpha", "sec_edgar"], "row_limit": 1,
+        "ticker": "BRK B", "sources": ["seeking_alpha", "financial_datasets"], "row_limit": 1,
     }, dal)))
     assert result["status"] == "partial" and result["ticker"] == "BRK B"
-    assert [source["provider"] for source in result["sources"]] == ["seeking_alpha", "sec_edgar"]
-    assert [source["status"] for source in result["sources"]] == ["ok", "ok"]
+    assert [source["provider"] for source in result["sources"]] == ["seeking_alpha", "financial_datasets"]
+    assert [source["status"] for source in result["sources"]] == ["ok", "unavailable"]
     assert result["sources"][0]["observation_id"] == receipt["observation_id"]
     assert result["sources"][0]["source_url"] == "https://seekingalpha.com/symbol/BRK.B/income-statement"
-    assert result["rows"][0]["values"][1]["normalized_value"] == "123440000"
+    assert result["rows"][0]["values"][1]["normalized_value"] is None
     assert sha256(dal._backend._sa_db.read_bytes()).hexdigest() == before
     http.assert_not_called()
     sec.assert_not_called()
@@ -308,7 +290,7 @@ def test_same_content_pagination_detects_changed_provider_cache(sources):
     first = compare(sources[0], row_limit=1)
     same = compare(sources[0], row_offset=1, row_limit=1, comparison_id=first["comparison_id"])
     assert same["comparison_id"] == first["comparison_id"]
-    save_sec(sources[0], revenue=150_000_000)
+    save_comparison_fd(sources[0], revenue=150_000_000)
     changed = compare(sources[0], row_offset=1, comparison_id=first["comparison_id"])
     assert changed["status"] == "unavailable" and changed["error_code"] == "financial_comparison_changed"
     assert not changed.get("rows")
@@ -328,3 +310,11 @@ def test_compressor_never_slices_source_or_comparability_metadata(sources, wrapp
     value = json.loads(reduced)
     assert value["error_code"] == "financial_comparison_page_too_large"
     assert "rows" not in value
+
+
+def test_unknown_fd_currency_is_unavailable_without_fabricated_usd(sources):
+    save_comparison_fd(sources[0], currency=None)
+    row = metric(compare(sources[0]), "revenue")
+    assert row["values"][1]["normalized_value"] is None
+    assert row["comparisons"][0]["difference_right_minus_left"] is None
+    assert row["comparisons"][0]["status"] == "not_comparable"

@@ -395,203 +395,26 @@ class TestFinancialCache:
 # ============================================================
 
 class TestGetDetailedFinancials:
-    """Test the tool function integration."""
-
-    @pytest.mark.parametrize("freshness", ["auto", "stored"])
-    def test_legacy_warm_result_is_withheld_without_static_reacquisition(self, monkeypatch, freshness):
+    @pytest.mark.parametrize("freshness", ["stored", "auto", "refresh"])
+    @pytest.mark.parametrize("warm", [False, True])
+    def test_unported_result_never_reads_legacy_cache_or_acquires(self, monkeypatch, freshness, warm):
         from src.tools.analysis_tools import get_detailed_financials
         payload = _static_cache_payload()
-        payload["static_metrics"].pop("calculation_version")
-        backend = _RecordingCacheBackend({"detailed_financials:v2:sec_edgar:TEST:annual:y2": payload})
+        backend = _RecordingCacheBackend(
+            {"detailed_financials:v2:sec_edgar:TEST:annual:y2": payload} if warm else {})
         original = copy.deepcopy(backend.rows)
         monkeypatch.setattr("data_sources.financial_metrics_calculator.FinancialMetricsCalculator", _ForbiddenCalculator)
-        monkeypatch.setattr("src.valuation_price.get_valuation_price_basis", lambda *_: _price_basis())
-        # This independently selected supplement is outside the static-cache repair.
-        monkeypatch.setattr("src.tools.analysis_tools._detailed_earnings", lambda *_: ({}, [], []))
         def forbidden(*args, **kwargs):
-            raise AssertionError("legacy-derived repair may not write or acquire")
+            raise AssertionError("unported operations may not acquire or write")
         monkeypatch.setattr(backend, "set_financial_cache", forbidden)
+        monkeypatch.setattr("src.tools.analyst_tools._finnhub_get", forbidden)
         monkeypatch.setattr("requests.sessions.Session.request", forbidden)
-        result = get_detailed_financials(_detailed_dal(backend), "TEST", freshness=freshness)
+        result = get_detailed_financials(_detailed_dal(backend), "test", freshness=freshness)
+        assert result.status == "unavailable" and result.error_code == "financial_operation_not_ported"
+        assert result.ticker == "TEST" and result.data_source == "none"
         assert result.roe is None and result.debt_to_equity is None and result.pe_ratio is None
-        assert result.metric_gaps["legacy_calculation"] == "retained_inputs_unavailable"
-        assert result.source_observations[0]["retrieval"] == "stored"
-        assert backend.rows == original
-
-    def test_returns_detailed_financials_type(self):
-        """Should return DetailedFinancials even with all mocked/empty data."""
-        from src.tools.schemas import DetailedFinancials
-
-        backend = _RecordingCacheBackend()
-        result = _run_detailed(_detailed_dal(backend), _price_basis())[0][0]
-
-        assert isinstance(result, DetailedFinancials)
-        assert result.ticker == "TEST"
-        assert result.gross_margin == 0.40
-        assert result.sbc_to_revenue == 0.03
-        assert result.market_cap == 20_000_000.0
-        assert result.valuation_price_basis.model_dump() == {
-            "available": True,
-            "source": "local_market_db",
-            "interval": "15min",
-            "required_market_date": "2026-07-31",
-            "market_date": "2026-07-31",
-            "timestamp": "2026-07-31T19:45:00+00:00",
-            "price": 10.0,
-            "empty_reason": None,
-        }
-
-    def test_old_metrics_cache_key_is_ignored(self):
-        old_key = "metrics_TEST_annual_y2"
-        backend = _RecordingCacheBackend({
-            old_key: {
-                "standard": {"gross_margin": 9.0, "market_cap": 999.0},
-                "tech": {"rule_of_40": 999.0},
-            }
-        })
-        _StaticCalculatorDouble.constructions.clear()
-
-        result = _run_detailed(_detailed_dal(backend), _price_basis())[0][0]
-
-        assert [key for key in backend.read_keys if not key.startswith("finnhub_earnings:")] == [
-            "detailed_financials:v2:sec_edgar:TEST:annual:y2"
-        ] * 2  # Recheck after acquiring the same-query lock.
-        assert old_key not in backend.read_keys
-        assert _StaticCalculatorDouble.constructions == [("TEST", 2)]
-        assert result.gross_margin == 0.40
-        assert result.rule_of_40 == 35.0
-        assert result.market_cap == 20_000_000.0
-
-    def test_v2_static_cache_excludes_price_and_dynamic_fields(self):
-        from src.fundamentals.cache import (
-            validate_detailed_financials_static_payload,
-        )
-
-        backend = _RecordingCacheBackend()
-        _run_detailed(_detailed_dal(backend), _price_basis())
-
-        static_writes = [item for item in backend.writes if item["source"] == "sec_edgar"]
-        assert len(static_writes) == 1
-        write = static_writes[0]
-        assert write["cache_key"] == (
-            "detailed_financials:v2:sec_edgar:TEST:annual:y2"
-        )
-        assert write["ticker"] == "TEST"
-        assert write["ttl_days"] == 90
-        assert write["source"] == "sec_edgar"
-        assert set(write["data"]) == {
-            "version",
-            "ticker",
-            "period",
-            "years_for_growth",
-            "data_source",
-            "report_date",
-            "static_metrics",
-            "tech_metrics",
-            "valuation_inputs",
-        }
-        _assert_no_forbidden_cache_keys(write["data"])
-        assert validate_detailed_financials_static_payload(
-            write["data"], ticker="TEST"
-        ) == write["data"]
-
-        for forbidden in (
-            "price",
-            "timestamp",
-            "market_date",
-            "valuation_price_basis",
-            *_PRODUCT_DYNAMIC_FIELDS,
-            *_CALCULATOR_DYNAMIC_FIELDS,
-        ):
-            invalid = copy.deepcopy(write["data"])
-            invalid["static_metrics"]["nested"] = {forbidden: 1.0}
-            assert validate_detailed_financials_static_payload(
-                invalid, ticker="TEST"
-            ) is None
-
-    def test_static_cache_hit_recomputes_dynamic_metrics_without_static_refetch(self):
-        key = "detailed_financials:v2:sec_edgar:TEST:annual:y2"
-        backend = _RecordingCacheBackend({key: _static_cache_payload()})
-        dal = _detailed_dal(backend)
-        dal.get_fundamentals.side_effect = AssertionError(
-            "legacy fundamentals must not be read"
-        )
-
-        results, selector, earnings_history, upcoming = _run_detailed(
-            dal,
-            [_price_basis(10.0), _price_basis(20.0)],
-            calculator=_ForbiddenCalculator,
-        )
-
-        assert [result.market_cap for result in results] == [
-            20_000_000.0,
-            40_000_000.0,
-        ]
-        assert [result.pe_ratio for result in results] == [10.0, 20.0]
-        assert [result.gross_margin for result in results] == [0.40, 0.40]
-        assert [item for item in backend.read_keys if item == key] == [key, key]
-        assert all(item["source"] == "finnhub" for item in backend.writes)
-        assert selector.call_count == 2
-        assert earnings_history.call_count == 1
-        assert upcoming.call_count == 1
-        dal.get_fundamentals.assert_not_called()
-
-    def test_no_qualified_price_preserves_static_and_nulls_dynamic_fields(self):
-        key = "detailed_financials:v2:sec_edgar:TEST:annual:y2"
-        backend = _RecordingCacheBackend({key: _static_cache_payload()})
-
-        result = _run_detailed(
-            _detailed_dal(backend),
-            _missing_price_basis(),
-            calculator=_ForbiddenCalculator,
-        )[0][0]
-
-        assert result.gross_margin == 0.40
-        assert result.revenue_growth == 0.25
-        assert result.cash_and_equivalents == 1_000_000.0
-        assert result.total_debt == 3_000_000.0
-        assert result.free_cash_flow == 500_000.0
-        assert result.eps == 1.0
-        assert all(getattr(result, field) is None for field in _PRODUCT_DYNAMIC_FIELDS)
-        assert result.valuation_price_basis.model_dump() == {
-            "available": False,
-            "source": None,
-            "interval": None,
-            "required_market_date": "2026-07-31",
-            "market_date": None,
-            "timestamp": None,
-            "price": None,
-            "empty_reason": "no_qualified_price",
-        }
-
-    def test_legacy_ibkr_snapshot_cannot_override_sec_or_price_basis(self):
-        backend = _RecordingCacheBackend()
-        dal = _detailed_dal(backend, snapshot={
-            "pe_ratio": 999.0,
-            "price_to_book": 999.0,
-            "price_to_sales": 999.0,
-            "market_cap": 349_866.1,
-        })
-
-        result = _run_detailed(dal, _price_basis(10.0))[0][0]
-
-        assert result.market_cap == 20_000_000.0
-        assert result.pe_ratio == 10.0
-        assert result.pb_ratio == 5.0
-        assert result.ps_ratio == 4.0
-        assert result.data_source == "sec_edgar"
-        assert result.valuation_price_basis.price == 10.0
-        dal.get_fundamentals.assert_not_called()
-
-    def test_data_source_remains_static_sec_source(self):
-        backend = _RecordingCacheBackend()
-        dal = _detailed_dal(backend, snapshot={"pe_ratio": 999.0})
-
-        result = _run_detailed(dal, _price_basis(10.0))[0][0]
-
-        assert result.data_source == "sec_edgar"
-        assert result.valuation_price_basis.source == "local_market_db"
-        assert result.pe_ratio == 10.0
+        assert result.metric_gaps and result.source_observations == []
+        assert backend.rows == original and backend.read_keys == []
 
 
 # ============================================================

@@ -115,7 +115,7 @@ def format_messages_as_transcript(messages: Iterable[ProjectedMessage]) -> str:
             tool = str(msg.get("tool_name") or "?")
             from src.sec_research.tool_results import SEC_TOOL_NAMES
             from src.tools.retained_read_results import RETAINED_READ_TOOLS
-            if tool.removeprefix("tool_") in SEC_TOOL_NAMES | RETAINED_READ_TOOLS | {"get_sa_company_data", "compare_financial_sources"}:
+            if tool.removeprefix("tool_") in SEC_TOOL_NAMES | RETAINED_READ_TOOLS | {"get_sa_company_data", "compare_financial_sources", "get_fundamentals_analysis"}:
                 from .reducers import get_reducer
                 from .summary_prompt import LAYER_5_CHAR_CAP
                 content, _meta = get_reducer(tool)(content, budget=LAYER_5_CHAR_CAP)

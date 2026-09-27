@@ -232,7 +232,7 @@ class ToolRegistry:
                 ToolParameter("period", "string", "Annual or quarterly; never mix with TTM", required=False,
                               default="annual", enum=["annual", "quarterly"]),
                 ToolParameter("sources", "array", "At least two selected providers; omit for enabled providers", required=False,
-                              items={"type": "string", "enum": ["seeking_alpha", "sec_edgar", "financial_datasets"]}),
+                              items={"type": "string", "enum": ["seeking_alpha", "financial_datasets"]}),
                 ToolParameter("end_month", "string", "YYYY-MM; omit for the latest common displayed month", required=False),
                 ToolParameter("currency", "string", "SA capture currency, default USD; never converts other providers", required=False,
                               default="USD"),
@@ -648,13 +648,11 @@ class ToolRegistry:
             name="get_fundamentals_analysis",
             result_policy=PUBLIC_JSON,
             description=(
-                "Get fundamental analysis (P/E, ROE, margins, financial statements) for a ticker. "
-                "Use period='quarterly' for recent quarterly trends (QoQ/YoY growth). "
-                "Source auto follows the selected Settings sources; an explicit source never falls back to another provider. "
-                "Default auto reuses dated local SEC/Financial Datasets observations within the configured financial window. "
-                "Stored never fetches or writes; refresh requests acquisition. max_age_seconds optionally overrides the window. "
-                "FD acquisition may incur charges and requires an operator-configured request budget and rate limit. "
-                "Acquisition refusals appear in acquisition_gaps, not as evidence that financial data does not exist."
+                "Read selected SA/Financial Datasets statements and supported metrics with period/precision/input gaps. "
+                "Auto prefers eligible local data; stored never fetches or writes. SA missing data never authorizes FD spend. "
+                "Refresh requires a named source; Financial Datasets may incur charges and requires a configured request budget. "
+                "History pins require stored. Pin read_id while paging; choose one statement and period_limit=1 for bounded pages. "
+                "SA month labels are not fiscal end days; unavailable ratios and valuation inputs remain explicit gaps."
             ),
             function=get_fundamentals_analysis,
             category="analysis",
@@ -664,11 +662,19 @@ class ToolRegistry:
                               required=False, default="annual",
                               enum=["annual", "quarterly"]),
                 ToolParameter("source", "string", "Selected provider, or auto local-first routing within Settings choices",
-                              required=False, default="auto", enum=["auto", "sec_edgar", "financial_datasets"]),
+                              required=False, default="auto", enum=["auto", "seeking_alpha", "financial_datasets"]),
                 ToolParameter("freshness", "string", "Reuse local observations by default, read stored only, or request refresh",
                               required=False, default="auto", enum=["auto", "stored", "refresh"]),
                 ToolParameter("max_age_seconds", "integer", "Optional acquisition-age override for auto/stored; omit for refresh",
                               required=False),
+                ToolParameter("currency", "string", "Requested statement currency; no conversion", required=False, default="USD"),
+                ToolParameter("statement", "string", "Limit to one statement", required=False,
+                              enum=["income_statement", "balance_sheet", "cash_flow_statement"]),
+                ToolParameter("end_month", "string", "Retained reporting month YYYY-MM; stored only", required=False),
+                ToolParameter("observation_id", "string", "Retained SA ID; explicit SA and one statement required", required=False),
+                ToolParameter("read_id", "string", "Unchanged read identity; required after page zero", required=False),
+                ToolParameter("period_offset", "integer", "Period offset, zero or greater", required=False, default=0),
+                ToolParameter("period_limit", "integer", "Periods per statement, 1..8", required=False, default=4),
             ],
         ))
 
@@ -676,13 +682,9 @@ class ToolRegistry:
             name="get_detailed_financials",
             result_policy=PUBLIC_JSON,
             description=(
-                "Get comprehensive financial metrics for valuation: "
-                "EV/EBITDA, EV/Revenue, PEG, ROIC, FCF yield, margins, growth, "
-                "tech-specific (SBC/Revenue, R&D/Revenue, Rule of 40), "
-                "and earnings surprise. "
-                "Static SEC facts plus a qualified local completed-session price, or typed unavailable. "
-                "Auto reuses configured financial and shorter earnings observations; stored never fetches or writes. "
-                "Refresh bypasses old observations; max_age_seconds overrides both reuse windows."
+                "Unavailable: the legacy SEC detailed valuation operation has not been ported. "
+                "Returns financial_operation_not_ported without acquisition. "
+                "Use get_fundamentals_analysis for supported SA/FD statements and input gaps."
             ),
             function=get_detailed_financials,
             category="analysis",
@@ -738,10 +740,8 @@ class ToolRegistry:
             name="get_peer_comparison",
             result_policy=PUBLIC_JSON,
             description=(
-                "Compare a ticker vs sector peers on key metrics: "
-                "PE, EV/EBITDA, margins, growth, ROE, ROIC, Rule of 40. "
-                "Returns comparison matrix, percentile rankings, and sector medians. "
-                "Auto-detects sector from sectors.yaml, or accepts explicit peer list."
+                "Unavailable: comparable peer valuation inputs have not been ported. "
+                "No acquisition or rankings. Read individual statements with get_fundamentals_analysis."
             ),
             function=get_peer_comparison,
             category="analysis",

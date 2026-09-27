@@ -32,7 +32,7 @@ DATASETS = {
         ("seeking_alpha", "financial_datasets"), ("get_fundamentals_analysis", "compare_financial_sources"),
         ("massive",),
     ),
-    "detailed_financials": SourceDataset(("sec_edgar",), ("get_detailed_financials",)),
+    "detailed_financials": SourceDataset((), ("get_detailed_financials",)),
     "earnings_supplements": SourceDataset(("finnhub",), ("get_detailed_financials",)),
     "sa_company_financials": SourceDataset(("seeking_alpha",), ("get_sa_company_data", "compare_financial_sources")),
     "sa_company_valuation": SourceDataset(("seeking_alpha",), ("get_sa_company_data",)),

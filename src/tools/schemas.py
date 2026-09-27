@@ -270,6 +270,8 @@ class DetailedFinancials(BaseModel):
     Static SEC facts plus a qualified local completed-session price, or typed unavailable.
     """
     ticker: str
+    status: ReadStatus = "unavailable"
+    error_code: Optional[str] = None
     report_date: Optional[str] = None
     data_source: str = Field(default="sec_edgar")
     acquisition_gaps: List[Dict[str, str]] = Field(default_factory=list)
