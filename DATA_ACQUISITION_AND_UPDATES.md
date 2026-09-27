@@ -199,9 +199,14 @@ are disclosed and require explicit repair, not silently replaced.
 - Financial result output defaults to 48,000 characters on all four research
   channels (OpenAI/Anthropic API and ChatGPT/Claude subscription bridges).
   Operators can change it or disable the additional cap (`tool_output_chars=0`).
-  Model context limits and secret/result validation still apply. An oversized
-  result is a typed smaller-page refusal, never sliced numeric JSON. The
-  Anthropic insertion compressor does not impose a second 8,000-character cap.
+  Model context limits and secret/result validation still apply. For oversized
+  pages, redundant coverage/period metadata is projected to the returned page,
+  with explicit scope and retained counts. Facts, units, metric formulas and
+  their input observations are never trimmed. If that still does not fit, the
+  result is a typed refusal: reduce the page size, or increase/disable the
+  Settings cap if already on one period. The separate coverage API remains
+  unchanged. The Anthropic insertion compressor does not impose a second
+  8,000-character cap.
 - FD acquisition periods are separate for each statement and annual/quarterly
   scope. Defaults remain annual income/balance/cash flow **2/1/2**, quarterly
   **4/1/4**. The positive int32 boundary is the provider's request type, not a
@@ -215,9 +220,17 @@ are disclosed and require explicit repair, not silently replaced.
   HTTPS cursor links are followed; duplicate/no-progress/wrong-scope pages
   fail closed. No automatic retries or unmetered navigation. A failed walk never
   replaces the previous complete response with its partial pages.
+  All four async research channels own their financial worker: timeout or
+  cancellation stops subsequent page admission and waits for the in-flight
+  synchronous request to finish or hit its transport timeout. Cancellation
+  cannot recall a request already sent. A stopped response is not persisted as
+  a complete observation; the caller cannot report finished while more pages
+  continue in an abandoned worker.
 - Changing the requested period counts does not hide retained statements.
-  Stored reads select one newest valid response, with `requested_periods` and
-  `configured_periods` disclosed per statement. A smaller retained request
+  Stored reads select one newest valid response, or the newest response that
+  contains the explicitly requested historical month, with `requested_periods`
+  and `configured_periods` disclosed per statement. Rows from different responses
+  are not spliced together. A smaller retained request
   yields `financial_datasets_history_scope_shortfall`; auto may acquire the
   larger selected FD scope only under the unchanged paid policy. A completed
   provider response with fewer available rows is not retried just to fill a

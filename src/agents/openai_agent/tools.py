@@ -507,7 +507,7 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
     # ================================================================
 
     @function_tool
-    def tool_get_fundamentals_analysis(
+    async def tool_get_fundamentals_analysis(
         ticker: str, period: str = "annual", freshness: str = "auto",
         max_age_seconds: Annotated[Optional[int], Field(strict=True)] = None,
         source: str = "auto",
@@ -527,10 +527,11 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
         converted. SA month labels are not exact fiscal end days; unsupported
         ratios and missing valuation inputs are gaps, not zero values.
         """
-        result = get_fundamentals_analysis(dal, ticker, period=period,
+        from src.fundamentals.execution import invoke_financial_tool
+        result = await invoke_financial_tool(lambda: get_fundamentals_analysis(dal, ticker, period=period,
             freshness=freshness, max_age_seconds=max_age_seconds, source=source, currency=currency,
             statement=statement, end_month=end_month, observation_id=observation_id, read_id=read_id,
-            period_offset=period_offset, period_limit=period_limit)
+            period_offset=period_offset, period_limit=period_limit))
         from src.fundamentals.tool_results import apply_financial_result_budget
         return apply_financial_result_budget(_serialize_result(result, "get_fundamentals_analysis"), dal)
 

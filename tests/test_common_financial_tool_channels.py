@@ -33,7 +33,7 @@ def test_compressed_financial_read_preserves_basis_or_returns_gap(wrapped, budge
         assert decoded == value and meta == {}
     else:
         assert decoded == {"status": "unavailable", "error_code": "financial_read_page_too_large",
-                           "read_id": value["read_id"], "required_action": "repeat_same_read_with_smaller_page"}
+                           "read_id": value["read_id"], "required_action": "increase_financial_tool_output_setting"}
         assert len(result) <= budget
 
 

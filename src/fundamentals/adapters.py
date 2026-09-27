@@ -219,7 +219,7 @@ def read_fd_statements(dal, query: FinancialQuery, *, mode: Freshness = "stored"
         try:
             retained_limit = client.retained_limit(query.ticker, query.period,
                 {"income_statement": "income", "balance_sheet": "balance", "cash_flow_statement": "cashflow"}[kind],
-                limit) if mode == "stored" else limit
+                limit, end_month=query.end_month) if mode == "stored" else limit
             objects = readers[kind](query.ticker, period=query.period, limit=retained_limit,
                                    freshness=mode, max_age_seconds=max_age_seconds if mode != "stored" else None)
             rows = [_fd_statement(obj, kind, result, query) for obj in objects]

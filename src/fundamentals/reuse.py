@@ -13,6 +13,7 @@ import stat
 import time
 
 from src.ibkr_gateway_lock import lock_dir
+from src.fundamentals.execution import check_financial_work
 
 
 FINANCIAL_REUSE_SECONDS = 7 * 86400
@@ -138,6 +139,7 @@ def acquisition_lock(scope):
                 raise OSError("unsafe lock file")
             deadline = time.monotonic() + _WAIT_SECONDS
             while True:
+                check_financial_work()
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
@@ -155,6 +157,7 @@ def acquisition_lock(scope):
 
 
 def reuse_or_acquire(reuse_policy, scope, read, acquire):
+    check_financial_work()
     started = datetime.now(timezone.utc)
     if reuse_policy.mode != "refresh":
         saved = read(reuse_policy.max_age_seconds)
@@ -163,6 +166,7 @@ def reuse_or_acquire(reuse_policy, scope, read, acquire):
         if reuse_policy.mode == "stored":
             raise ReuseFailure("financial_stored_data_unavailable")
     with acquisition_lock(scope) as waited:
+        check_financial_work()
         saved = read(reuse_policy.max_age_seconds,
                      not_before=started if reuse_policy.mode == "refresh" else None)
         if saved is not None:

@@ -280,6 +280,9 @@ async def _invoke_bridged_tool(
             # cancel_futures=True leaves the default executor untouched and never
             # blocks the loop/run on an orphaned call.
             call = (lambda: fn(dal, **args)) if requires_dal else (lambda: fn(**args))
+            if name == "get_fundamentals_analysis":
+                from src.fundamentals.execution import invoke_financial_tool
+                return await invoke_financial_tool(call)
             loop = asyncio.get_running_loop()
             pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="ark-bridge")
             try:

@@ -1367,8 +1367,12 @@ async def execute_tool_async(
     tool_input: Dict[str, Any],
     dal: "DataAccessLayer",
 ) -> str:
-    """Await SEC work and delegated children within the caller's lifetime."""
+    """Await acquisition workers and delegated children within the caller's lifetime."""
     from src.sec_research.tool_results import SEC_TOOL_NAMES
+
+    if tool_name == "get_fundamentals_analysis":
+        from src.fundamentals.execution import invoke_financial_tool
+        return await invoke_financial_tool(lambda: execute_tool(tool_name, tool_input, dal))
 
     if tool_name not in SEC_TOOL_NAMES and tool_name != "delegate_to_subagent":
         return execute_tool(tool_name, tool_input, dal)

@@ -16,6 +16,7 @@ from urllib.parse import parse_qsl, urlsplit
 
 import requests
 
+from src.fundamentals.execution import check_financial_work
 from src.fundamentals.reuse import (
     Observation, ReuseFailure, instant as _instant, policy, reuse_or_acquire, storage_scope,
 )
@@ -168,6 +169,7 @@ class FinancialDatasetsClient:
         max_age_seconds: Optional[int],
     ) -> Dict[str, Any]:
         """Honor caller freshness before consulting the separate paid policy."""
+        check_financial_work()
         if (not isinstance(ticker, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]*", ticker)
                 or period not in _DEFAULT_TTL or type(limit) is not int or not 0 < limit < 2**31):
             raise FinancialDatasetsFailure("financial_datasets_query_invalid")
@@ -182,6 +184,7 @@ class FinancialDatasetsClient:
                                    response_key, freshness, max_age, not_before=not_before)
 
         def acquire():
+            check_financial_work()
             if not self.api_key:
                 raise FinancialDatasetsFailure("financial_datasets_api_key_missing")
             ttl_days = self._cache_days[period]
@@ -196,6 +199,7 @@ class FinancialDatasetsClient:
                 raise FinancialDatasetsFailure("financial_datasets_response_invalid")
             fetched = datetime.now(timezone.utc)
             data = {**data, response_key: data[response_key][:limit]}
+            check_financial_work()
             persisted = self._set_cache(cache_key, period, ticker, self._envelope(data, ticker, period, limit), now=fetched)
             return Observation(data, fetched, fetched, "refreshed", persisted)
 
@@ -271,8 +275,8 @@ class FinancialDatasetsClient:
                 return Observation(data, fetched, checked_at)
         return None
 
-    def retained_limit(self, ticker: str, period: str, prefix: str, requested: int) -> int:
-        """Select one newest valid retained response, independent of new preferences.
+    def retained_limit(self, ticker: str, period: str, prefix: str, requested: int, *, end_month=None) -> int:
+        """Select one newest eligible retained response, independent of new preferences.
 
         This is inventory for the common stored reader, not permission for an
         undersized response to satisfy a larger auto/refresh request.
@@ -305,7 +309,8 @@ class FinancialDatasetsClient:
         candidates = []
         for limit in limits:
             observed = self._get_cache(f"{head}{limit}", legacy, ticker, period, limit, response_key, "stored", None)
-            if observed is not None:
+            if observed is not None and (end_month is None or any(
+                    row["report_period"][:7] == end_month for row in observed.data[response_key])):
                 candidates.append((observed.fetched_at, limit))
         return max(candidates)[1] if candidates else requested
 
@@ -392,6 +397,7 @@ class FinancialDatasetsClient:
         rows, seen_periods, visited = [], set(), set()
         page_params = params
         while True:
+            check_financial_work()
             visited.add(url)
             data = self._request_page(url, policy, governor, page_params)
             if not _valid_rows(data, response_key, params["ticker"], params["period"]):
@@ -425,12 +431,15 @@ class FinancialDatasetsClient:
 
     def _request_page(self, url, policy, governor, params):
         """Admit one metered dispatch. No redirects or implicit retries."""
+        check_financial_work()
         governor.reserve(self.api_key, policy)
+        check_financial_work()
         headers = {"X-API-Key": self.api_key}
 
         resp = None
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=30, allow_redirects=False)
+            check_financial_work()
             if resp.status_code == 429:
                 retry = resp.headers.get("Retry-After")
                 if isinstance(retry, str):
