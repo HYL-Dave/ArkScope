@@ -115,7 +115,10 @@
     output.replaceChildren();
     if(actionError)line(output,"Last action: "+actionError);
     if (!valid) {
-      if(fromRead)line(output,error);
+      if(fromRead) {
+        line(output,error);
+        liveState=null;renderLifecycle();$("saAcquisitionResume").disabled=true;
+      }
       return;
     }
     var firstRender=!state;
@@ -192,7 +195,6 @@
     var result=await send("get_company_refresh");
     if(ticket!==readRevision)return;
     if(busy) {reloadPending=true;return;}
-    if(result.status!=="ok") {liveState=null;renderLifecycle();$("saAcquisitionResume").disabled=true;}
     render(result,true);await preview();
   }
   form.addEventListener("input",function(event){

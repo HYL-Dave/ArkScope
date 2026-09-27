@@ -761,8 +761,8 @@ describe("bundled i18n resources", () => {
     ), "utf8")) as PortfolioOwnershipContract;
     const expectedCounts = {
       common: 83,
-      shell: 49,
-      settings: 1384,
+      shell: 51,
+      settings: 1389,
       research: 240,
       explore: 1209,
       portfolio: 374,
@@ -848,7 +848,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3363);
+      expect(total, `${locale}.total`).toBe(3370);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([
@@ -1266,6 +1266,9 @@ describe("bundled i18n resources", () => {
       "dataSources.providers.health.activity.scopes.closed",
       "dataSources.providers.health.activity.scopes.unknown",
       "dataSources.schedule.macroErrors.scoped",
+      "dataSources.schedule.macroErrors.requests",
+      "dataSources.schedule.macroErrors.stored",
+      "dataSources.schedule.macroErrors.symbolReason",
       "dataSources.schedule.macroErrors.forbidden",
       "dataSources.schedule.macroErrors.unauthorized",
       "dataSources.schedule.macroErrors.rateLimited",
@@ -1409,6 +1412,8 @@ describe("bundled i18n resources", () => {
       "newsStorage.runCounts",
       "newsStorage.tickerIssues",
       "newsStorage.completenessUnknown",
+      "newsStorage.subscriptionDenied",
+      "newsStorage.requestTimeout",
       "newsStorage.collectionFailed",
       "dataStorage.lifecycle.summary.diagnostics",
       "dataStorage.lifecycle.automation.schedule",

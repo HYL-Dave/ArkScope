@@ -68,6 +68,13 @@ def test_missing_runtime_evidence_is_not_rendered_as_idle_or_recoverable():
     assert result["acquisitionRecoverDisabled"] is True
 
 
+def test_malformed_successful_status_does_not_leave_initial_loading_message():
+    result = run(companyRefresh={"status": "ok"})
+    assert "unavailable" in result["acquisitionLive"].lower()
+    assert "checking" not in result["acquisitionLive"].lower()
+    assert result["acquisitionRecoverDisabled"] is True
+
+
 def test_recovery_shortcut_only_reveals_existing_confirmation():
     result = run("review_stopped_acquisition", companyRefresh=state(recovery=True, pending=True))
     assert result["companyOptionsOpen"] is True
