@@ -1297,9 +1297,10 @@ disable that provider. News, quotes, calendars, SA captures and other Finnhub
 tools keep their existing owners. Disabling Finnhub earnings supplements does
 not disable a calendar schedule, or vice versa. Calendar hints may eventually
 come from another selected source; missing Finnhub coverage cannot establish a
-financial refresh deadline. Detailed financials cannot use FD as a replacement
-until its own adapter is implemented. SA company tables do not silently feed the
-legacy ratio calculators; those remain separate consumers. Massive financials
+financial refresh deadline. Detailed valuation and peer ranking return
+`financial_operation_not_ported`; they do not fall through to FD or SEC. The
+common SA/FD reader supports the reviewed inputs and ratios described above,
+without treating raw SA tables as inputs to the legacy calculators. Massive financials
 remain unavailable rather than presented as working merely because a key or
 subscription exists. No external MCP server or subscription upgrade is implied.
 
@@ -1311,35 +1312,37 @@ or save policy only; neither contacts a data provider.
 
 ### Financial Read Controls
 
-`get_fundamentals_analysis` and `get_detailed_financials` accept `freshness` and
-optional `max_age_seconds`:
+`get_fundamentals_analysis` accepts `freshness` and optional `max_age_seconds`.
+These controls belong to research tools; App/HTTP GET reads always use `stored`.
+The legacy `get_detailed_financials` signature retains those arguments for
+compatibility but returns `financial_operation_not_ported` without acquisition.
 
 | Mode | Behavior |
 | --- | --- |
-| `auto` (default) | Reuse a valid matching observation inside the selected window. Acquire only when needed and permitted. |
-| `stored` | No provider acquisition or cache write. With no age bound, an older valid observation may be returned; a missing eligible observation is reported as a gap. |
-| `refresh` | Bypass observations predating this request. An identical successful acquisition already in flight may satisfy it. Failure is not silently replaced by an older success. |
+| `auto` (tool default) | Prefer eligible local observations. Only an explicit/primary FD source may acquire missing or stale inputs under admission; an SA gap never authorizes paid FD fallback. |
+| `stored` | Read retained observations without acquisition or cache writes, independently of a reuse-age window. Missing inputs and any requested age comparison remain explicit. |
+| `refresh` | Require a named source. FD uses governed acquisition/coalescing; SA returns a browser-update requirement. There is no automatic source substitution. |
 
 `max_age_seconds` must be a nonnegative integer, not a boolean or string. It
-overrides the automatic defaults and can constrain `stored`; combining it with
-`refresh` is rejected rather than silently ignored. These are tool controls,
-not a claim that every Settings screen exposes them.
+overrides the `auto` reuse age. In `stored`, it only annotates the observation's
+age comparison; it does not hide retained facts or trigger acquisition. Combining
+it with `refresh` is rejected rather than silently ignored. Historical period,
+observation and read-identity pins require `stored`.
 
 Current default authority is
 [`config/user_profile.yaml`](config/user_profile.yaml), under
 `data_preferences.fundamentals_sources`:
 
-- `refresh_days`: **7 days** for financial observations.
-- `earnings_refresh_seconds`: **3600 seconds** for detailed-financials earnings
-  history/upcoming observations, unless an explicit age overrides it.
+- `refresh_days`: **7 days** for automatic financial reuse unless explicitly
+  overridden. It is not a lifetime for a retained financial statement.
 
-These are configurable fallbacks, not the final event-aware policy. A local read
+This is a configurable fallback, not the final event-aware policy. A local read
 does not restart the acquisition-age clock; a fresh provider response currently
-does. Legacy `ttl_days` / `cache_days_*` storage metadata does not decide read
-eligibility in this path. Merely choosing annual or quarterly data does not make
-the response permanently valid: restatements and provider corrections can change
-a period. Reopening an exact retained version and asking for the latest version
-are different requests.
+does. Legacy `ttl_days` / `cache_days_*` storage metadata does not decide
+stored-read eligibility. Annual and quarterly observations can be restated or
+corrected; a successful read does not certify the newest provider version.
+Reopening an exact retained version and asking for the latest version are
+different requests. FD does not retain all overwritten response versions.
 
 Results describe source observations with provider/dataset, retrieval mode,
 `freshness_mode`, `fetched_at`, `evaluated_at`, age, selected maximum and persistence
