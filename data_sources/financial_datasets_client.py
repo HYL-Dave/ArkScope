@@ -22,7 +22,7 @@ from src.fundamentals.reuse import (
 from .financial_datasets_governance import (
     FinancialDatasetsFailure, FinancialDatasetsGovernor, FinancialDatasetsPolicy,
 )
-from .sec_edgar_financials import (
+from .financial_statements import (
     BalanceSheet,
     CashFlowStatement,
     IncomeStatement,

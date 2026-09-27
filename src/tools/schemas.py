@@ -13,6 +13,8 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from src.fundamentals.contracts import FinancialCoverage, FinancialGap, FinancialValue, ReadStatus
+
 
 # ============================================================
 # Enums
@@ -146,12 +148,20 @@ class CurrentQuoteResult(BaseModel):
 
 class FinancialStatement(BaseModel):
     """Single period financial statement (income, balance sheet, or cash flow)."""
-    report_period: str = Field(description="Period end date YYYY-MM-DD")
+    report_period: Optional[str] = Field(None, description="Exact period end YYYY-MM-DD only when evidenced")
+    end_month: Optional[str] = None
+    period_precision: Literal["day", "month", "unknown"] = "unknown"
+    provider: Optional[str] = None
+    observation_id: Optional[str] = None
+    column_index: Optional[int] = None
+    unit_note: Optional[str] = None
+    value_metadata: Dict[str, FinancialValue] = Field(default_factory=dict)
+    raw_reference: Optional[dict] = None
     fiscal_period: Optional[str] = Field(None, description="e.g. 2025-Q3")
     period_type: str = Field(description="annual or quarterly")
     currency: Optional[str] = Field(None, description="Provider-declared ISO currency; absent in legacy observations")
     input_basis_version: Optional[str] = Field(None, description="SEC period/unit/debt selection contract; not accounting or revision equivalence")
-    data: Dict[str, Optional[float]] = Field(
+    data: Dict[str, float | str | None] = Field(
         description="Metric name → value (e.g. revenue, net_income)"
     )
 
@@ -159,6 +169,13 @@ class FinancialStatement(BaseModel):
 class FundamentalsResult(BaseModel):
     """Fundamental analysis result for a ticker."""
     ticker: str
+    status: ReadStatus = "unavailable"
+    read_id: Optional[str] = None
+    period_selection: Literal["latest_stored", "explicit_month", "retained_observation"] = "latest_stored"
+    coverage: Optional[FinancialCoverage] = None
+    read_gaps: List[FinancialGap] = Field(default_factory=list)
+    update_choices: List[dict] = Field(default_factory=list)
+    pagination: dict = Field(default_factory=dict)
     snapshot_date: Optional[str] = None
     data_source: str = Field(default="none", description="ibkr, sec_edgar, financial_datasets, or none")
     acquisition_gaps: List[Dict[str, str]] = Field(
