@@ -21,7 +21,8 @@ import {
 } from "./dataScheduleControls";
 import type { SettingsT } from "./settingsCopy";
 import type { SettingsReadCache } from "./settingsReadCache";
-import { isMacroIndicator, macroIndicatorCopy, macroObservationPeriod } from "./macroIndicators";
+import { isMacroIndicator, macroFrequencyLabel, macroIndicatorCopy, macroObservationPeriod } from "./macroIndicators";
+import { RecordedTimestamp } from "./RecordedTimestamp";
 
 const MACRO_TABLE_KEYS = [
   "macro_series",
@@ -243,9 +244,9 @@ export function MacroStorageSection({
           {snapshot.items.length === 0 ? (
             <p className="muted">{t(($) => $.macroStorage.counts.zero)}</p>
           ) : (
-            <div className="settings-table-scroll" data-testid="fred-snapshot-scroll"
+            <div className="settings-table-scroll settings-records" data-testid="fred-snapshot-scroll"
               tabIndex={0} role="region" aria-label={t(($) => $.macroStorage.snapshot.title)}>
-              <table className="ds-table settings-fred-table">
+              <table className="ds-table settings-fred-table settings-responsive-table">
                 <colgroup><col /><col /><col /><col /><col /><col /></colgroup>
                 <thead>
                   <tr>
@@ -260,7 +261,7 @@ export function MacroStorageSection({
                 <tbody>
                   {snapshot.items.map((item) => (
                     <tr key={item.series_id}>
-                      <td><div className="settings-fred-series">
+                      <td data-label={t(($) => $.macroStorage.headings.seriesId)}><div className="settings-fred-series">
                         <code>{item.series_id}</code>
                         {isMacroIndicator(item.series_id) ? <IconButton
                           size="compact" tone="ghost" icon={<BookOpen size={15} />}
@@ -271,14 +272,14 @@ export function MacroStorageSection({
                           }}
                         /> : null}
                       </div></td>
-                      <td>
+                      <td data-label={t(($) => $.macroStorage.headings.name)}>
                         <strong title={item.title ?? undefined}>{item.label}</strong>
-                        <div className="muted tiny">{item.frequency}</div>
+                        <div className="muted tiny">{macroFrequencyLabel(item.frequency, t)}</div>
                       </td>
-                      <td className="settings-fred-value">{snapshotValue(item)}</td>
-                      <td>{item.units ?? "—"}</td>
-                      <td className="settings-fred-period" title={item.observation_date ?? undefined}>{macroObservationPeriod(item)}</td>
-                      <td className="settings-fred-fetched">{formatSystemTimestamp(item.fetched_at)}</td>
+                      <td className="settings-fred-value" data-label={t(($) => $.macroStorage.headings.latestValue)}>{snapshotValue(item)}</td>
+                      <td data-label={t(($) => $.macroStorage.headings.units)}>{item.units ?? "—"}</td>
+                      <td className="settings-fred-period" data-label={t(($) => $.macroStorage.headings.observationDate)} title={item.observation_date ?? undefined}>{macroObservationPeriod(item)}</td>
+                      <td className="settings-fred-fetched" data-label={t(($) => $.macroStorage.headings.lastFetch)}><RecordedTimestamp value={item.fetched_at} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -294,7 +295,7 @@ export function MacroStorageSection({
           <p>{macroIndicatorCopy(guideItem.series_id, t)}</p>
           <dl className="ds-kv">
             <FragmentKV label={t(($) => $.macroStorage.headings.units)} value={guideItem.units ?? "—"} />
-            <FragmentKV label={t(($) => $.macroStorage.guide.frequency)} value={guideItem.frequency ?? "—"} />
+            <FragmentKV label={t(($) => $.macroStorage.guide.frequency)} value={macroFrequencyLabel(guideItem.frequency, t)} />
             <FragmentKV label={t(($) => $.macroStorage.guide.adjustment)} value={guideItem.seasonal_adjustment ?? "—"} />
             <FragmentKV label={t(($) => $.macroStorage.headings.observationDate)} value={guideItem.observation_date ?? "—"} />
             <FragmentKV label={t(($) => $.macroStorage.headings.lastFetch)} value={formatSystemTimestamp(guideItem.fetched_at)} />

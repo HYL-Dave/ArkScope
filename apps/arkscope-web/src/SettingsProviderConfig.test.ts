@@ -1584,11 +1584,11 @@ describe("Settings provider config authority", () => {
     expect(row.cells[1].textContent).toContain(issue);
     const errorCell = row.cells[row.cells.length - 1];
     expect(errorCell.textContent).toContain(alpha);
-    expect(errorCell.textContent).toContain(formatSystemTimestamp("2026-09-26T19:23:00Z"));
-    expect(errorCell.textContent).not.toContain(formatSystemTimestamp("2026-09-26T19:59:01Z"));
+    expect(errorCell.querySelector("time")?.dateTime).toBe("2026-09-26T19:23:00.000Z");
+    expect(errorCell.querySelector("details")?.open).toBe(false);
     expect(row.cells[4].textContent).toContain(complete);
     expect(row.cells[4].textContent).toContain(news);
-    expect(row.cells[4].textContent).toContain(formatSystemTimestamp("2026-09-26T19:59:01Z"));
+    expect(row.cells[4].querySelector("time")?.dateTime).toBe("2026-09-26T19:59:01.000Z");
     expect(row.cells[3].textContent).toContain(lastComplete);
     expect(row.textContent).not.toContain("alpha_picks_extension_degraded");
   });
@@ -1603,7 +1603,7 @@ describe("Settings provider config authority", () => {
     const row = saHealthRow();
     expect(row.querySelector(".ui-status-badge")?.getAttribute("data-state")).toBe("partial");
     expect(row.cells[1].textContent).toContain("Pending");
-    expect(row.cells[3].textContent).toContain(formatSystemTimestamp("2026-09-26T19:59:01Z"));
+    expect(row.cells[3].querySelector("time")?.dateTime).toBe("2026-09-26T19:59:01.000Z");
     expect(row.cells[4].textContent).toContain(outcome === "deferred" ? "Deferred" : "Pending");
     expect(row.textContent).not.toContain("Failed");
   });

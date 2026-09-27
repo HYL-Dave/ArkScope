@@ -229,6 +229,28 @@ afterEach(() => {
 });
 
 describe("MacroStorageSection", () => {
+  it("shows real compact frequencies and keeps secondary time collapsed", async () => {
+    controls.snapshot = { ...snapshotFixture, items: [
+      { ...snapshotFixture.items[0], frequency: "M" },
+      { ...snapshotFixture.items[0], series_id: "GDP", frequency: "Q", observation_date: "2026-04-01" },
+      { ...snapshotFixture.items[0], series_id: "DGS10", frequency: "D" },
+    ] };
+    await renderMacro();
+    const table = host!.querySelector(".settings-fred-table")!;
+    expect(table.textContent).toContain("每月");
+    expect(table.textContent).toContain("每季");
+    expect(table.textContent).toContain("每日");
+    expect(table.textContent).toContain("2026 Q2");
+    const timestamps = table.querySelectorAll<HTMLDetailsElement>("details.settings-timestamp");
+    expect(timestamps).toHaveLength(3);
+    expect(timestamps[0].open).toBe(false);
+    const summary = timestamps[0].querySelector("summary")!;
+    expect(summary.textContent).not.toContain(" ET");
+    expect(timestamps[0].textContent).toContain(" ET");
+    act(() => summary.click());
+    expect(timestamps[0].open).toBe(true);
+  });
+
   it("separates period and units, marks empty coverage unknown, and opens a sourced guide", async () => {
     controls.status = { ...statusFixture, tables: {
       ...statusFixture.tables, cal_earnings_events: { row_count: 0, last_fetched_at: null },

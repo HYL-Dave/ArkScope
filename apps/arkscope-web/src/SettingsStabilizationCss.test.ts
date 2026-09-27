@@ -44,15 +44,24 @@ describe("Settings stabilization CSS contracts", () => {
   it("gives_wide_settings_tables_one_horizontal_scroll_owner_and_reviewed_min_widths", () => {
     expect(rule(".settings-table-scroll")).toMatch(/overflow-x:\s*auto/);
     for (const selector of [
-      ".settings-provider-health-table",
       ".settings-sa-health-table",
-      ".settings-fred-table",
       ".settings-provider-config-table",
       ".settings-schedule-table",
     ]) {
       expect(rule(selector)).toMatch(/min-width:\s*\d+px/);
       expect(rule(selector)).not.toMatch(/font-size:/);
     }
+  });
+
+  it("adapts_financial_and_macro_records_to_their_container_without_forced_horizontal_scroll", () => {
+    expect(rule(".settings-records")).toMatch(/container:\s*settings-records\s*\/\s*inline-size/);
+    for (const selector of [".settings-provider-health-table", ".settings-fred-table"]) {
+      expect(rule(selector)).toMatch(/table-layout:\s*fixed/);
+      expect(rule(selector)).not.toMatch(/min-width:/);
+    }
+    expect(css).toContain("@container settings-records (max-width: 680px)");
+    expect(rule(".settings-responsive-table tbody tr")).toContain("repeat(2, minmax(0, 1fr))");
+    expect(rule(".settings-responsive-table td::before")).toContain("attr(data-label)");
   });
 
   it("keeps_detail_cells_wrap_capable_and_normal_sections_free_of_migration_copy", () => {

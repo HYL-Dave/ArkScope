@@ -756,6 +756,10 @@ const settings = {
         stale: "過期",
         maintenance: "維護中",
         noSignal: "無訊號",
+        noAcquisition: "無本機取得紀錄",
+        localAcquired: "已取得本機資料",
+        acquisitionTimeUnknown: "取得時間不明",
+        acquisitionUnavailable: "取得紀錄無法讀取",
         notConfigured: "未設定",
         missingKey: "缺少金鑰",
         disabled: "已停用",
@@ -1216,6 +1220,7 @@ const settings = {
   },
   macroStorage: {
     title: "總經資料",
+    frequency: { daily: "每日", monthly: "每月", quarterly: "每季" },
     description: "本機總經觀測值與事件日曆。供應商權限、收集紀錄與觀測期間須分別判斷。",
     loading: "載入中…",
     availability: {

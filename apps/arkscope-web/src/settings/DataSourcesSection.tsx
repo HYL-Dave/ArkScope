@@ -51,6 +51,7 @@ import {
 import type { SettingsReadCache, SettingsReadKey } from "./settingsReadCache";
 import { DataSourceRoutingSection } from "./DataSourceRoutingSection";
 import { DataSourceCatalogSection } from "./DataSourceCatalogSection";
+import { RecordedTimestamp } from "./RecordedTimestamp";
 import type { SettingsLocationId } from "./settingsRegistry";
 
 function saChainPresentation(
@@ -664,8 +665,8 @@ export function DataSourcesSection({
         {!health ? (
           <p className="muted tiny">{t(($) => $.dataSources.loading)}</p>
         ) : (
-          <div className="settings-table-scroll" data-testid="provider-health-scroll">
-            <table className="data-table settings-provider-health-table">
+          <div className="settings-table-scroll settings-records" data-testid="provider-health-scroll">
+            <table className="data-table settings-provider-health-table settings-responsive-table">
               <thead>
                 <tr>
                   <th>{t(($) => $.dataSources.headings.provider)}</th>
@@ -682,12 +683,12 @@ export function DataSourcesSection({
                   const errorAt = p.last_error_at ?? (p.id === "seeking_alpha" ? null : p.last_attempt_at);
                   return (
                     <tr key={p.id}>
-                      <td className="settings-wrap-text">
+                      <td className="settings-wrap-text" data-label={t(($) => $.dataSources.headings.provider)}>
                         {providerName(p.id, t)}
                         {fredDetail && <div className="muted tiny">{fredDetail}</div>}
                       </td>
-                      <td><ProviderHealthState provider={p} t={t} /></td>
-                      <td>
+                      <td data-label={t(($) => $.dataSources.headings.status)}><ProviderHealthState provider={p} t={t} /></td>
+                      <td data-label={t(($) => $.dataSources.headings.key)}>
                         {providerKeySourceLabel(p.key_source, t)}
                         {p.key_import_suggested && (
                           <span className="muted tiny">
@@ -695,28 +696,28 @@ export function DataSourcesSection({
                           </span>
                         )}
                       </td>
-                      <td className="settings-wrap-text">
-                        {shortTs(p.last_success_at)}
+                      <td className="settings-wrap-text" data-label={t(($) => $.dataSources.headings.lastSuccess)}>
+                        <RecordedTimestamp value={p.last_success_at} />
                         {p.last_complete_at ? (
                           <div className="muted tiny">
                             {t(($) => $.dataSources.providers.health.activity.lastComplete)}
                             {" · "}{providerScopeLabel(p.last_complete_scope, t)}
-                            <div>{shortTs(p.last_complete_at)}</div>
+                            <RecordedTimestamp value={p.last_complete_at} />
                           </div>
                         ) : null}
                       </td>
-                      <td className="settings-wrap-text">
+                      <td className="settings-wrap-text" data-label={t(($) => $.dataSources.providers.health.activity.latestAttempt)}>
                         {p.last_attempt_outcome ? <div>{providerAttemptLabel(p.last_attempt_outcome, t)}</div> : null}
                         {p.last_attempt_scope ? <div className="muted tiny">{providerScopeLabel(p.last_attempt_scope, t)}</div> : null}
-                        {shortTs(p.last_attempt_at)}
+                        <RecordedTimestamp value={p.last_attempt_at} />
                       </td>
-                      <td className="settings-wrap-text">
+                      <td className="settings-wrap-text" data-label={t(($) => $.dataSources.headings.lastError)}>
                         {p.last_error ? (
                           <>
                             <span className="refresh-err">{t(($) => $.dataSources.states.failed)}</span>
                             {p.last_error_scope ? <div className="muted tiny">{providerScopeLabel(p.last_error_scope, t)}</div> : null}
                             {errorAt ? (
-                              <div className="muted tiny">{shortTs(errorAt)}</div>
+                              <RecordedTimestamp value={errorAt} />
                             ) : null}
                           </>
                         ) : <span className="muted">—</span>}

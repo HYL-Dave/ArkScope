@@ -12,6 +12,7 @@ import {
   type NewsStatus,
   type ObservationHealthReason,
   type ProviderSyncIssue,
+  type ProviderHealth,
   type ScheduleSourceState,
   type TradingDayRow,
 } from "./api";
@@ -25,7 +26,18 @@ import { formatSystemTimestamp } from "./timeDisplay";
 export function providerHealthStatusLabel<T extends {
   id: string;
   status: Parameters<typeof providerHealthCopy>[1];
+  signals?: ProviderHealth["signals"];
 }>(p: T, t: SettingsT): string {
+  if (p.status === "connected" && p.signals?.acquisition_evidence === "recorded") {
+    return t(($) => $.dataSources.providers.health.localAcquired);
+  }
+  if (p.status === "no_signal") {
+    switch (p.signals?.acquisition_evidence) {
+      case "empty": return t(($) => $.dataSources.providers.health.noAcquisition);
+      case "timestamp_unknown": return t(($) => $.dataSources.providers.health.acquisitionTimeUnknown);
+      case "unavailable": return t(($) => $.dataSources.providers.health.acquisitionUnavailable);
+    }
+  }
   return providerHealthCopy(p.id, p.status, t).label;
 }
 

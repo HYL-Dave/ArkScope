@@ -86,6 +86,15 @@ tables support manual and scheduled browser capture and local reads; they are
 not yet an input adapter for the common SEC/FD ratio calculator. Source switches
 remain scoped to the named tool route, not every use of that provider.
 
+Financial provider health describes retained acquisition evidence, not a live
+endpoint probe. An empty readable store reports `acquisition_evidence=empty`
+(no local acquisition record); failed reads report `unavailable`, not an empty
+history. Rows without a usable acquisition time report `timestamp_unknown`.
+An expired reuse window does not erase a recorded acquisition: `recorded` still
+exposes its original fetch time without claiming a current reporting period,
+usable credentials or endpoint entitlement. Missing-key and disabled states
+retain precedence. Reading this status never fetches or repopulates data.
+
 Stored prices and financial-cache diagnostics have their own surface; news
 volume and per-provider collection outcomes belong to News Data. Financial-cache
 TTL counts are diagnostic, not proof of reuse eligibility or a command to fetch.
@@ -102,6 +111,11 @@ changes. The eleven-series snapshot is not a complete monitoring product;
 user-defined formulas/indicators and alerts remain pending. Calendar zero counts
 mean no local rows, not established empty upstream coverage. Disabled schedules
 keep historical outcomes without retrying merely because an old failure exists.
+
+The provider-health and FRED tables use local fetch time as the primary display;
+each timestamp expands to show New York time. Narrow containers show labeled
+records instead of clipping columns. FRED `D`, `M`, and `Q` frequency codes and
+their full-name equivalents have the same observation-period interpretation.
 
 ### Financial Corpus Retirement (September 27)
 

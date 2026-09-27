@@ -27,6 +27,30 @@ function settingsT(locale: Locale) {
 
 const zhT = settingsT("zh-Hant");
 
+describe("financial acquisition evidence", () => {
+  it.each([
+    ["empty", "No local acquisition record", "無本機取得紀錄"],
+    ["recorded", "Local data acquired", "已取得本機資料"],
+    ["timestamp_unknown", "Acquisition time unknown", "取得時間不明"],
+    ["unavailable", "Acquisition records unavailable", "取得紀錄無法讀取"],
+  ])("keeps %s distinct from provider connectivity", (evidence, en, zh) => {
+    for (const id of ["sec_edgar", "financial_datasets"]) {
+      for (const [locale, expected] of [["en", en], ["zh-Hant", zh]] as const) {
+        expect(localizedProviderHealthStatusLabel({
+          id, status: evidence === "recorded" ? "connected" : "no_signal",
+          signals: { acquisition_evidence: evidence },
+        }, settingsT(locale))).toBe(expected);
+      }
+    }
+  });
+
+  it.each(["disabled", "missing_key", "not_configured"])("preserves %s over stored evidence", status => {
+    expect(localizedProviderHealthStatusLabel({ id: "financial_datasets", status,
+      signals: { acquisition_evidence: "empty" } }, zhT))
+      .toBe(localizedProviderHealthStatusLabel({ id: "financial_datasets", status }, zhT));
+  });
+});
+
 function displayFunction<T extends (...args: never[]) => unknown>(name: string): T {
   const value = (marketDataDisplay as unknown as Record<string, unknown>)[name];
   if (typeof value !== "function") throw new Error(`missing display function ${name}`);

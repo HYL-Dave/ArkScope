@@ -757,6 +757,10 @@ const settings = {
         stale: "Stale",
         maintenance: "Maintenance",
         noSignal: "No signal",
+        noAcquisition: "No local acquisition record",
+        localAcquired: "Local data acquired",
+        acquisitionTimeUnknown: "Acquisition time unknown",
+        acquisitionUnavailable: "Acquisition records unavailable",
         notConfigured: "Not configured",
         missingKey: "Missing key",
         disabled: "Disabled",
@@ -1217,6 +1221,7 @@ const settings = {
   },
   macroStorage: {
     title: "Macro Data",
+    frequency: { daily: "Daily", monthly: "Monthly", quarterly: "Quarterly" },
     description: "Local economic observations and event calendars. Provider access, collection history and observation periods are separate facts.",
     loading: "Loading...",
     availability: {

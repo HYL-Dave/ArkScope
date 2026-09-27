@@ -27,13 +27,31 @@ export function macroIndicatorCopy(id: MacroIndicatorId, t: SettingsT): string {
   }
 }
 
+function frequencyKind(frequency: string | null | undefined): string {
+  switch (frequency) {
+    case "D": case "Daily": return "daily";
+    case "M": case "Monthly": return "monthly";
+    case "Q": case "Quarterly": return "quarterly";
+    default: return "unknown";
+  }
+}
+
+export function macroFrequencyLabel(frequency: string | null | undefined, t: SettingsT): string {
+  switch (frequencyKind(frequency)) {
+    case "daily": return t(($) => $.macroStorage.frequency.daily);
+    case "monthly": return t(($) => $.macroStorage.frequency.monthly);
+    case "quarterly": return t(($) => $.macroStorage.frequency.quarterly);
+    default: return frequency || "\u2014";
+  }
+}
+
 export function macroObservationPeriod(item: MacroSnapshotItem): string {
   const day = item.observation_date;
   if (!day) return "\u2014";
   // FRED dates label the observation period, not the publication date.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
-  if (item.frequency === "Monthly") return day.slice(0, 7);
-  if (item.frequency === "Quarterly") {
+  if (frequencyKind(item.frequency) === "monthly") return day.slice(0, 7);
+  if (frequencyKind(item.frequency) === "quarterly") {
     const month = Number(day.slice(5, 7));
     if (month >= 1 && month <= 12) return `${day.slice(0, 4)} Q${Math.ceil(month / 3)}`;
   }

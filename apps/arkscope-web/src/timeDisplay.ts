@@ -18,17 +18,28 @@ function dateParts(date: Date, timeZone: string): string {
   return `${byType.month}-${byType.day} ${byType.hour}:${byType.minute}`;
 }
 
+export function systemTimestampParts(
+  iso: string | null | undefined,
+  opts: { localTimeZone?: string; marketTimeZone?: string } = {},
+): { iso: string; local: string; localTimeZone: string; market: string } | null {
+  if (!iso) return null;
+  const date = new Date(normalizeIsoOffset(iso));
+  if (Number.isNaN(date.getTime())) return null;
+
+  const localTimeZone = opts.localTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "local";
+  const marketTimeZone = opts.marketTimeZone ?? MARKET_TIME_ZONE;
+  return {
+    iso: date.toISOString(), local: dateParts(date, localTimeZone), localTimeZone,
+    market: `${dateParts(date, marketTimeZone)} ET`,
+  };
+}
+
 export function formatSystemTimestamp(
   iso: string | null | undefined,
   opts: { localTimeZone?: string; marketTimeZone?: string } = {},
 ): string {
-  if (!iso) return "—";
-  const date = new Date(normalizeIsoOffset(iso));
-  if (Number.isNaN(date.getTime())) return iso;
-
-  const localTimeZone = opts.localTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "local";
-  const marketTimeZone = opts.marketTimeZone ?? MARKET_TIME_ZONE;
-  return `${dateParts(date, localTimeZone)} ${localTimeZone} · ${dateParts(date, marketTimeZone)} ET`;
+  const parts = systemTimestampParts(iso, opts);
+  return parts ? `${parts.local} ${parts.localTimeZone} · ${parts.market}` : iso || "—";
 }
 
 export function formatMarketTimestamp(
