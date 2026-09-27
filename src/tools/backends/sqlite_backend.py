@@ -544,6 +544,22 @@ class SqliteBackend:
         except (ValueError, TypeError):
             return None
 
+    def list_financial_cache_keys(self, ticker: str, source: str) -> list[str]:
+        """Inventory retained request scopes without installing a missing database."""
+        try:
+            conn = self._connect()
+        except sqlite3.OperationalError:
+            return []
+        try:
+            return [row[0] for row in conn.execute(
+                "SELECT cache_key FROM financial_cache WHERE ticker = ? AND source = ?",
+                (ticker, source),
+            )]
+        except sqlite3.OperationalError:
+            return []
+        finally:
+            conn.close()
+
     def get_financial_cache_entry(self, cache_key: str) -> Optional[dict]:
         """Read stored bytes and original timestamps, including expired entries.
 

@@ -14,6 +14,8 @@ from src.fundamentals.contracts import (
     FinancialGap, FinancialObservation, FinancialQuery, FinancialValue, Freshness, Provider, StatementKind,
 )
 from src.fundamentals.reuse import Observation, instant, policy
+from src.fundamentals.settings import load_settings
+from src.data_source_routing import DataSourcePolicyFailure
 from src.fundamentals.source_comparison import METRICS, decimal, number, sa_records, source_value
 from src.sa.company_data import CompanyDataFailure, digest
 from src.sa.company_store import read_capture
@@ -189,6 +191,12 @@ def read_fd_statements(dal, query: FinancialQuery, *, mode: Freshness = "stored"
                        max_age_seconds: int | None = None, request_policy: dict | None = None,
                        retained: ProviderRead | None = None) -> ProviderRead:
     result = ProviderRead("financial_datasets")
+    try:
+        periods = getattr(load_settings(dal).fd_periods, query.period)
+    except DataSourcePolicyFailure as exc:
+        for kind in _kinds(query):
+            _gap(result, exc.code, kind)
+        return result
     client = FinancialDatasetsClient(cache_backend=getattr(dal, "_backend", None), request_policy=request_policy,
                                     cache_days=fd_cache_days(dal) if mode != "stored" else None)
     readers = {"income_statement": client.get_income_statements, "balance_sheet": client.get_balance_sheets,
@@ -197,8 +205,10 @@ def read_fd_statements(dal, query: FinancialQuery, *, mode: Freshness = "stored"
     refusal = None
     for kind in pending:
         result.statements[kind] = []
+        limit = getattr(periods, kind)
         cached = next((o for o in retained.observations if o.dataset == kind), None) if retained else None
-        if mode == "auto" and cached and cached.within_max_age is True and retained.statements.get(kind):
+        if (mode == "auto" and cached and cached.within_max_age is True and retained.statements.get(kind)
+                and cached.requested_periods is not None and cached.requested_periods >= limit):
             result.statements[kind] = retained.statements[kind]
             result.observations.append(cached)
             result.gaps.extend(g for g in retained.gaps if g.dataset == kind)
@@ -206,9 +216,11 @@ def read_fd_statements(dal, query: FinancialQuery, *, mode: Freshness = "stored"
         if refusal:
             _gap(result, "financial_datasets_not_attempted_after_refusal", kind)
             continue
-        limit = 1 if kind == "balance_sheet" else 4 if query.period == "quarterly" else 2
         try:
-            objects = readers[kind](query.ticker, period=query.period, limit=limit,
+            retained_limit = client.retained_limit(query.ticker, query.period,
+                {"income_statement": "income", "balance_sheet": "balance", "cash_flow_statement": "cashflow"}[kind],
+                limit) if mode == "stored" else limit
+            objects = readers[kind](query.ticker, period=query.period, limit=retained_limit,
                                    freshness=mode, max_age_seconds=max_age_seconds if mode != "stored" else None)
             rows = [_fd_statement(obj, kind, result, query) for obj in objects]
             error = _valid_records([dict(end_month=row.end_month) for row in rows])
@@ -216,6 +228,9 @@ def read_fd_statements(dal, query: FinancialQuery, *, mode: Freshness = "stored"
                 _gap(result, error, kind)
                 continue
             desc = dict(client.observations[-1], dataset=kind)
+            desc.update(requested_periods=retained_limit, configured_periods=limit)
+            if retained_limit < limit:
+                _gap(result, "financial_datasets_history_scope_shortfall", kind)
             desc["freshness_mode"] = query.freshness
             if mode == "stored":
                 maximum = max_age_seconds if max_age_seconds is not None else query.max_age_seconds

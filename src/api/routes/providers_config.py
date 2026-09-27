@@ -40,6 +40,9 @@ from src.data_provider_config import (
     unapply_env,
 )
 from src.env_keys import ensure_env_loaded, peek_env_file_value
+from src.fundamentals.settings import (
+    FINANCIAL_READ_SETTINGS_KEY, FinancialReadSettings, settings_view,
+)
 
 router = APIRouter(tags=["providers"])
 
@@ -88,6 +91,7 @@ def get_data_routes(store=Depends(get_data_provider_store), dal=Depends(get_dal)
         return {
             "routes": [route_view(name, store.get_setting(ROUTE_PREFIX + name)) for name in DATASETS],
             "financial_datasets_budget": fd_policy_view(store.get_setting(FD_POLICY_KEY), profile),
+            "financial_read_settings": settings_view(store.get_setting(FINANCIAL_READ_SETTINGS_KEY)),
         }
     except Exception as exc:
         raise HTTPException(status_code=503, detail={"code": "data_source_settings_unavailable"}) from exc
@@ -129,6 +133,17 @@ def put_financial_datasets_budget(body: FinancialDatasetsBudgetUpdate, store=Dep
     except Exception as exc:
         raise HTTPException(status_code=503, detail={"code": "data_source_settings_unavailable"}) from exc
     return fd_policy_view(raw, {})
+
+
+@router.put("/providers/financial-read-settings")
+def put_financial_read_settings(body: FinancialReadSettings, store=Depends(get_data_provider_store)):
+    require_profile_state_write("set_financial_read_settings", body.model_dump())
+    raw = body.model_dump_json()
+    try:
+        store.set_setting(FINANCIAL_READ_SETTINGS_KEY, raw)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail={"code": "data_source_settings_unavailable"}) from exc
+    return settings_view(raw)
 
 
 def get_data_provider_store_lenient() -> DataProviderConfigStore | None:

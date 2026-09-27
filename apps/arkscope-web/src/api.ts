@@ -5589,6 +5589,23 @@ export interface FinancialDatasetsBudgetUpdate {
 export interface DataSourceRoutesResponse {
   routes: DataSourceRoute[];
   financial_datasets_budget: FinancialDatasetsBudget;
+  financial_read_settings?: FinancialReadSettingsView;
+}
+
+export interface FinancialReadSettingsValues {
+  tool_output_chars: number;
+  fd_periods: Record<"annual" | "quarterly", Record<"income_statement" | "balance_sheet" | "cash_flow_statement", number>>;
+}
+
+export interface FinancialReadSettingsView {
+  values: FinancialReadSettingsValues | null;
+  defaults: FinancialReadSettingsValues;
+  setting_source: "default" | "profile";
+  error_code: string | null;
+}
+
+export function putFinancialReadSettings(body: FinancialReadSettingsValues): Promise<FinancialReadSettingsView> {
+  return sendJSON("/providers/financial-read-settings", "PUT", body, 8_000);
 }
 
 export function getDataSourceRoutes(): Promise<DataSourceRoutesResponse> {

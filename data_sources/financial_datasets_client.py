@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
+from urllib.parse import parse_qsl, urlsplit
 
 import requests
 
@@ -168,7 +169,7 @@ class FinancialDatasetsClient:
     ) -> Dict[str, Any]:
         """Honor caller freshness before consulting the separate paid policy."""
         if (not isinstance(ticker, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]*", ticker)
-                or period not in _DEFAULT_TTL or type(limit) is not int or limit < 1):
+                or period not in _DEFAULT_TTL or type(limit) is not int or not 0 < limit < 2**31):
             raise FinancialDatasetsFailure("financial_datasets_query_invalid")
         reuse_policy = validate_freshness(freshness, max_age_seconds)
         ticker = ticker.upper()
@@ -270,6 +271,44 @@ class FinancialDatasetsClient:
                 return Observation(data, fetched, checked_at)
         return None
 
+    def retained_limit(self, ticker: str, period: str, prefix: str, requested: int) -> int:
+        """Select one newest valid retained response, independent of new preferences.
+
+        This is inventory for the common stored reader, not permission for an
+        undersized response to satisfy a larger auto/refresh request.
+        """
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.:-]*", ticker):
+            raise FinancialDatasetsFailure("financial_datasets_query_invalid")
+        ticker = ticker.upper()
+        legacy = f"{prefix}_{ticker}_{period}"
+        head = f"fd_v1_{legacy}_"
+        response_key = {"income": "income_statements", "balance": "balance_sheets",
+                        "cashflow": "cash_flow_statements"}[prefix]
+        keys = set()
+        if self._cache_backend is not None:
+            try:
+                stored = self._cache_backend.list_financial_cache_keys(ticker, "financial_datasets")
+                if isinstance(stored, list):
+                    keys.update(k for k in stored if isinstance(k, str))
+            except (AttributeError, OSError):
+                pass
+        keys.update(path.stem for path in _FILE_CACHE_DIR.glob(f"{head}*.json"))
+        limits = {requested}
+        for key in keys:
+            suffix = key.removeprefix(head)
+            if key.startswith(head) and re.fullmatch(r"[1-9][0-9]{0,9}", suffix) and int(suffix) < 2**31:
+                limits.add(int(suffix))
+        for row, _ in self._cache_entries(legacy):
+            data = row.get("data")
+            if _valid_rows(data, response_key, ticker, period) and data[response_key]:
+                limits.add(len(data[response_key]))
+        candidates = []
+        for limit in limits:
+            observed = self._get_cache(f"{head}{limit}", legacy, ticker, period, limit, response_key, "stored", None)
+            if observed is not None:
+                candidates.append((observed.fetched_at, limit))
+        return max(candidates)[1] if candidates else requested
+
     def _set_cache(
         self, cache_key: str, period: str, ticker: str, data: Dict, *, now: Optional[datetime] = None,
     ) -> bool:
@@ -338,7 +377,7 @@ class FinancialDatasetsClient:
     # ------------------------------------------------------------------
 
     def _request(self, endpoint: str, **params: Any) -> Dict:
-        """Admit one metered dispatch. No redirects or implicit retries."""
+        """Consume self-contained cursors; every page has separate paid admission."""
         response_keys = {
             "/financials/income-statements": "income_statements",
             "/financials/balance-sheets": "balance_sheets",
@@ -348,8 +387,45 @@ class FinancialDatasetsClient:
             raise FinancialDatasetsFailure("financial_datasets_query_invalid")
         policy = FinancialDatasetsPolicy.from_config(self._request_policy)
         governor = self._governor or FinancialDatasetsGovernor()
-        governor.reserve(self.api_key, policy)
         url = f"{self.BASE_URL}{endpoint}"
+        response_key = response_keys[endpoint]
+        rows, seen_periods, visited = [], set(), set()
+        page_params = params
+        while True:
+            visited.add(url)
+            data = self._request_page(url, policy, governor, page_params)
+            if not _valid_rows(data, response_key, params["ticker"], params["period"]):
+                raise FinancialDatasetsFailure("financial_datasets_response_invalid")
+            page_rows = data[response_key]
+            for row in page_rows:
+                identity = row["report_period"]
+                if identity in seen_periods:
+                    raise FinancialDatasetsFailure("financial_datasets_pagination_invalid")
+                seen_periods.add(identity)
+            rows.extend(page_rows)
+            next_url = data.get("next_page_url")
+            if len(rows) >= params["limit"] or next_url is None:
+                # A cursor is ephemeral, not part of the retained observation.
+                return {response_key: rows[:params["limit"]]}
+            if not page_rows or not self._valid_page_url(next_url, endpoint) or next_url in visited:
+                raise FinancialDatasetsFailure("financial_datasets_pagination_invalid")
+            url, page_params = next_url, None
+
+    def _valid_page_url(self, url, endpoint):
+        if not isinstance(url, str) or any(ord(c) <= 32 or ord(c) == 127 for c in url):
+            return False
+        try:
+            parsed, base = urlsplit(url), urlsplit(self.BASE_URL)
+            query = parse_qsl(parsed.query, keep_blank_values=True, strict_parsing=True)
+            return (parsed.scheme == base.scheme == "https" and parsed.netloc == base.netloc
+                    and parsed.path == endpoint and not parsed.fragment
+                    and len(query) == 1 and query[0][0] == "cursor" and bool(query[0][1]))
+        except ValueError:
+            return False
+
+    def _request_page(self, url, policy, governor, params):
+        """Admit one metered dispatch. No redirects or implicit retries."""
+        governor.reserve(self.api_key, policy)
         headers = {"X-API-Key": self.api_key}
 
         resp = None
@@ -374,11 +450,7 @@ class FinancialDatasetsClient:
             if resp.status_code in (401, 403):
                 raise FinancialDatasetsFailure("financial_datasets_access_denied")
             resp.raise_for_status()
-            data = resp.json()
-            rows = data.get(response_keys[endpoint]) if isinstance(data, dict) else None
-            if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
-                raise FinancialDatasetsFailure("financial_datasets_response_invalid")
-            return data
+            return resp.json()
         except (requests.RequestException, ValueError) as exc:
             raise FinancialDatasetsFailure("financial_datasets_request_failed") from exc
         finally:

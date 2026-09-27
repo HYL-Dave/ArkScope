@@ -1812,6 +1812,9 @@ def execute_tool(
             import asyncio
             return asyncio.run(execute_tool_async(tool_name, tool_input, dal))
         result = tool_map[tool_name]()
+        if tool_name == "get_fundamentals_analysis":
+            from src.fundamentals.tool_results import apply_financial_result_budget
+            return apply_financial_result_budget(_serialize_result(result, tool_name=tool_name), dal)
         return _serialize_result(result, tool_name=tool_name)
     except Exception as e:
         from src.tools.result_policy import sanitize_tool_error

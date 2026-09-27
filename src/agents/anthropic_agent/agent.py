@@ -575,6 +575,8 @@ async def run_query_stream(
                 # — single source of truth (commit 4 reconciliation contract).
                 result, compression = ctx.compress_tool_result(
                     tool_name, tool_input, result,
+                    # The financial adapter already enforced the profile cap.
+                    **({"budget_chars": 0} if tool_name == "get_fundamentals_analysis" else {}),
                 )
                 result_str = result if isinstance(result, str) else str(result)
                 pad.log_tool_result(

@@ -14,14 +14,19 @@ vi.mock("../api", async (importOriginal) => ({
   getDataSourceRoutes: vi.fn(),
   putDataSourceRoute: vi.fn(),
   putFinancialDatasetsBudget: vi.fn(),
+  putFinancialReadSettings: vi.fn(),
 }));
 
-import { getDataSourceRoutes, putDataSourceRoute, putFinancialDatasetsBudget } from "../api";
+import { getDataSourceRoutes, putDataSourceRoute, putFinancialDatasetsBudget, putFinancialReadSettings } from "../api";
 import { DataSourceRoutingSection } from "./DataSourceRoutingSection";
 
 const FD = "Financial Datasets (paid)";
 const FUNDAMENTALS = "Fundamental analysis";
 const SAVE_BUDGET = "Save Financial Datasets request budget";
+const READ_DEFAULTS = { tool_output_chars: 48000, fd_periods: {
+  annual: { income_statement: 2, balance_sheet: 1, cash_flow_statement: 2 },
+  quarterly: { income_statement: 4, balance_sheet: 1, cash_flow_statement: 4 },
+} };
 let state: DataSourceRoutesResponse;
 let root: ReturnType<typeof createRoot> | null;
 let host: HTMLDivElement;
@@ -29,6 +34,8 @@ const guard = vi.fn();
 
 function fixture(): DataSourceRoutesResponse {
   return {
+    financial_read_settings: { values: structuredClone(READ_DEFAULTS), defaults: structuredClone(READ_DEFAULTS),
+      setting_source: "default", error_code: null },
     routes: [
       {
         dataset: "fundamentals_analysis", providers: ["seeking_alpha", "financial_datasets"],
@@ -91,7 +98,7 @@ function source(label: string): HTMLInputElement {
   return result;
 }
 
-function paid(): HTMLInputElement { return host.querySelector(".data-route-budget-toggle input")!; }
+function paid(): HTMLInputElement { return host.querySelector(".data-route-budget .data-route-budget-toggle input")!; }
 
 async function click(element: HTMLElement) {
   await act(async () => { element.click(); });
@@ -100,6 +107,15 @@ async function click(element: HTMLElement) {
 
 async function limit(index: number, value: string) {
   const input = host.querySelectorAll<HTMLInputElement>('.data-route-budget-fields input')[index];
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+async function readInput(label: string, value: string) {
+  const input = host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+  expect(input).not.toBeNull();
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -123,6 +139,10 @@ beforeEach(async () => {
     };
     return structuredClone(state.financial_datasets_budget);
   });
+  vi.mocked(putFinancialReadSettings).mockImplementation(async (values) => {
+    state.financial_read_settings = { values, defaults: structuredClone(READ_DEFAULTS), setting_source: "profile", error_code: null };
+    return structuredClone(state.financial_read_settings);
+  });
 });
 
 afterEach(() => {
@@ -132,6 +152,73 @@ afterEach(() => {
 });
 
 describe("DataSourceRoutingSection", () => {
+  it("saves unlimited output and longer statement history without changing paid authority", async () => {
+    const cache = createSettingsReadCache();
+    const key = "financial_coverage:annual:auto:USD:0:25" as const;
+    cache.replace(key, { marker: "retained" });
+    await render(cache);
+    expect(putFinancialReadSettings).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("Annual: 3 pages");
+    await click(source("Limit financial tool output"));
+    await readInput("Income statement: Annual periods", "25");
+    expect(host.textContent).toContain("Annual: 5 pages");
+    expect(guard).toHaveBeenLastCalledWith(expect.objectContaining({ dirty: true }));
+    expect(cache.inspect(key).status).toBe("fresh");
+    await click(button("Save financial read settings"));
+    expect(putFinancialReadSettings).toHaveBeenCalledExactlyOnceWith({ ...READ_DEFAULTS, tool_output_chars: 0,
+      fd_periods: { ...READ_DEFAULTS.fd_periods, annual: { ...READ_DEFAULTS.fd_periods.annual, income_statement: 25 } } });
+    expect(cache.inspect(key).status).toBe("missing");
+    expect(putDataSourceRoute).not.toHaveBeenCalled();
+    expect(putFinancialDatasetsBudget).not.toHaveBeenCalled();
+    expect(guard).toHaveBeenLastCalledWith({ dirty: false, busy: false, reason: null });
+  });
+
+  it("keeps a rejected financial settings draft and permits explicit discard", async () => {
+    vi.mocked(putFinancialReadSettings).mockRejectedValue(new Error("PRIVATE"));
+    await render();
+    await readInput("Financial tool output (characters)", "120000");
+    await click(button("Save financial read settings"));
+    expect(host.textContent).toContain("Changes were not saved");
+    expect(host.textContent).not.toContain("PRIVATE");
+    expect(guard).toHaveBeenLastCalledWith(expect.objectContaining({ dirty: true }));
+    await click(button("Discard financial read changes"));
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="Financial tool output (characters)"]')!.value).toBe("48000");
+    expect(guard).toHaveBeenLastCalledWith({ dirty: false, busy: false, reason: null });
+  });
+
+  it.each(["0", "-1", "1.5", "2147483648", ""])("rejects invalid history count %s without a request", async (value) => {
+    await render();
+    await readInput("Balance sheet: Quarterly periods", value);
+    await click(button("Save financial read settings"));
+    expect(host.textContent).toContain("Enter positive whole numbers");
+    expect(putFinancialReadSettings).not.toHaveBeenCalled();
+  });
+
+  it("shows invalid saved settings and repairs them only on explicit save", async () => {
+    state.financial_read_settings!.values = null;
+    state.financial_read_settings!.error_code = "financial_read_settings_invalid";
+    await render();
+    expect(host.textContent).toContain("Invalid financial read settings");
+    expect(source("Limit financial tool output").matches(":disabled")).toBe(true);
+    await click(button("Restore financial read defaults"));
+    expect(putFinancialReadSettings).not.toHaveBeenCalled();
+    await click(button("Save financial read settings"));
+    expect(putFinancialReadSettings).toHaveBeenCalledExactlyOnceWith(READ_DEFAULTS);
+    expect(host.textContent).not.toContain("Invalid financial read settings");
+  });
+
+  it("locks sibling settings while saving and prevents duplicate submissions", async () => {
+    let resolve!: (value: NonNullable<DataSourceRoutesResponse["financial_read_settings"]>) => void;
+    vi.mocked(putFinancialReadSettings).mockReturnValue(new Promise((done) => { resolve = done; }));
+    await render();
+    await readInput("Cash flow statement: Quarterly periods", "24");
+    await act(async () => { button("Save financial read settings").click(); button("Save financial read settings").click(); });
+    expect(putFinancialReadSettings).toHaveBeenCalledTimes(1);
+    expect(source(`${FUNDAMENTALS}: Seeking Alpha`).matches(":disabled")).toBe(true);
+    expect(guard).toHaveBeenLastCalledWith(expect.objectContaining({ busy: true }));
+    await act(async () => { resolve(state.financial_read_settings!); });
+  });
+
   it("preserves an FD-only saved route and invalidates local coverage only on explicit save", async () => {
     state.routes[0]!.providers = ["financial_datasets"];
     state.routes[0]!.setting_source = "profile";

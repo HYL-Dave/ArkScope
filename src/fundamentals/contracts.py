@@ -97,6 +97,8 @@ class FinancialObservation(ReadContract):
     source_url: str | None = None
     first_captured_at: str | None = None
     report_periods: list[str] = Field(default_factory=list)
+    requested_periods: int | None = None
+    configured_periods: int | None = None
     history: Literal["retained_observation", "current_retained_version_only", "not_retained"]
 
 

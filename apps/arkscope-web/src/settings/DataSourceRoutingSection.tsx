@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowDown, ArrowUp, RefreshCw, Save, Undo2 } from "lucide-react";
 
 import {
-  getDataSourceRoutes, putDataSourceRoute, putFinancialDatasetsBudget,
+  getDataSourceRoutes, putDataSourceRoute, putFinancialDatasetsBudget, putFinancialReadSettings,
   type DataSourceDataset, type DataSourceRoutesResponse,
   type FinancialDatasetsBudget, type FinancialDatasetsBudgetUpdate,
 } from "../api";
@@ -11,6 +11,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { IconButton } from "../ui/Button";
 import { dataSourceDatasetLabel, providerName } from "./settingsBackendCopy";
 import type { SettingsReadCache } from "./settingsReadCache";
+import { FinancialReadSettingsFields, financialReadDraft, financialReadValues, type FinancialReadDraft } from "./FinancialReadSettingsFields";
 import {
   CLEAR_SETTINGS_NAVIGATION_GUARD, type SettingsNavigationGuardReporter,
 } from "./settingsNavigationGuard";
@@ -48,12 +49,18 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
   const [loadFailed, setLoadFailed] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [invalidBudget, setInvalidBudget] = useState(false);
+  const [readEdit, setReadEdit] = useState<FinancialReadDraft | null>(null);
+  const [invalidRead, setInvalidRead] = useState(false);
+  const readSaving = useRef(false);
   const mounted = useRef(false);
   const sequence = useRef(0);
   const budgetSaveRef = useRef<HTMLButtonElement>(null);
   const currentBudget = data ? budgetEdit ?? budgetDraft(data.financial_datasets_budget) : null;
   const budgetDirty = Boolean(data && budgetEdit && JSON.stringify(budgetEdit) !== JSON.stringify(budgetDraft(data.financial_datasets_budget)));
-  const dirty = budgetDirty || Boolean(data?.routes.some((row) =>
+  const readView = data?.financial_read_settings;
+  const readDirty = Boolean(readEdit && readView && (readView.values === null
+    || JSON.stringify(readEdit) !== JSON.stringify(financialReadDraft(readView.values, readView.defaults))));
+  const dirty = readDirty || budgetDirty || Boolean(data?.routes.some((row) =>
     drafts[row.dataset] != null && JSON.stringify(drafts[row.dataset]) !== JSON.stringify(row.providers)));
   const blocked = disabled || busy !== "" || pendingBudget !== null;
 
@@ -118,6 +125,28 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
     } catch {
       if (mounted.current) setSaveFailed(true);
     } finally {
+      if (mounted.current) setBusy("");
+    }
+  }
+
+  async function saveReadSettings() {
+    if (blocked || readSaving.current || !readEdit || !readDirty) return;
+    const values = financialReadValues(readEdit);
+    if (!values) { setInvalidRead(true); return; }
+    readSaving.current = true;
+    setBusy("financial_read");
+    setSaveFailed(false);
+    try {
+      const saved = await putFinancialReadSettings(values);
+      settingsReadCache.invalidate("data_source_routes");
+      settingsReadCache.invalidateFinancialReads();
+      if (!mounted.current) return;
+      setData((value) => value && { ...value, financial_read_settings: saved });
+      setReadEdit(null);
+    } catch {
+      if (mounted.current) setSaveFailed(true);
+    } finally {
+      readSaving.current = false;
       if (mounted.current) setBusy("");
     }
   }
@@ -231,6 +260,10 @@ export function DataSourceRoutingSection({ settingsReadCache, onNavigationGuardC
             </div>
           </div>;
         })}
+        {readView ? <FinancialReadSettingsFields view={readView} draft={readEdit}
+          onChange={(value) => { setReadEdit(value); setInvalidRead(false); }} onSave={() => void saveReadSettings()}
+          onUndo={() => { setReadEdit(null); setInvalidRead(false); }}
+          dirty={readDirty} blocked={blocked} busy={busy === "financial_read"} invalid={invalidRead} /> : null}
         {currentBudget ? <div className="data-route-budget">
           <div className="settings-section-head">
             <h4>{t(($) => $.dataSources.routing.budget.title)}</h4>

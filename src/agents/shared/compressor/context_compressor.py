@@ -145,6 +145,7 @@ class ContextCompressor:
         tool_name: str,
         args: Optional[Dict[str, Any]],
         payload: str,
+        *, budget_chars: Optional[int] = None,
     ) -> Tuple[str, Optional[CompressionRecord]]:
         """Apply Layer 0 budget + overflow disk persist to one tool result.
 
@@ -160,7 +161,7 @@ class ContextCompressor:
             args=args,
             payload=payload,
             overflow_store=self._overflow_store,
-            budget_chars=self.config.layer_0_budget_chars,
+            budget_chars=self.config.layer_0_budget_chars if budget_chars is None else budget_chars,
             registry=self._reducer_registry,
         )
 

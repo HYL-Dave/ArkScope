@@ -531,7 +531,8 @@ def create_openai_tools(dal: "DataAccessLayer") -> List:
             freshness=freshness, max_age_seconds=max_age_seconds, source=source, currency=currency,
             statement=statement, end_month=end_month, observation_id=observation_id, read_id=read_id,
             period_offset=period_offset, period_limit=period_limit)
-        return _serialize_result(result, "get_fundamentals_analysis")
+        from src.fundamentals.tool_results import apply_financial_result_budget
+        return apply_financial_result_budget(_serialize_result(result, "get_fundamentals_analysis"), dal)
 
     @function_tool
     def tool_get_detailed_financials(

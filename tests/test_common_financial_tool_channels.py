@@ -4,6 +4,7 @@ import json
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import Mock
+from copy import deepcopy
 
 import pytest
 
@@ -39,6 +40,102 @@ def test_compressed_financial_read_preserves_basis_or_returns_gap(wrapped, budge
 def test_malformed_financial_output_never_becomes_truncated_numbers():
     result, _ = get_reducer("get_fundamentals_analysis")('{"revenue":123456', budget=800)
     assert json.loads(result)["error_code"] == "financial_read_result_invalid"
+
+
+def test_unlimited_output_still_validates_whole_financial_json():
+    value = json.dumps({"status": "ok", "income_statements": ["evidence " * 20000]})
+    assert get_reducer("get_fundamentals_analysis")(value, budget=0) == (value, {})
+    malformed, _ = get_reducer("get_fundamentals_analysis")('{"revenue":123456', budget=0)
+    assert json.loads(malformed)["error_code"] == "financial_read_result_invalid"
+
+
+@pytest.mark.parametrize("channel", ["openai", "anthropic", "chatgpt", "claude"])
+@pytest.mark.parametrize("budget", [800, 120000, 0])
+def test_profile_output_setting_reaches_each_model_channel(financial_local, monkeypatch, channel, budget):
+    from src.data_provider_config import DataProviderConfigStore
+    from src.tools.schemas import FundamentalsResult
+    from tests.test_financial_read_settings import KEY, DEFAULTS
+
+    settings = deepcopy(DEFAULTS)
+    settings["tool_output_chars"] = budget
+    DataProviderConfigStore().set_setting(KEY, json.dumps(settings))
+    result = FundamentalsResult(ticker="AAPL", status="ok", read_id="a" * 64,
+        metric_basis={"revenue": {"source_notes": "Observed source label. " * 3000}})
+    monkeypatch.setattr("src.fundamentals.read_service.read_financials", lambda *_: result)
+    actual = unwrap(asyncio.run(invoke(channel, "get_fundamentals_analysis", {
+        "ticker": "AAPL", "freshness": "stored"}, financial_local[0])))
+    if budget == 800:
+        assert actual["error_code"] == "financial_read_page_too_large"
+        assert actual["read_id"] == result.read_id
+    else:
+        assert actual == result.model_dump()
+
+
+@pytest.mark.parametrize("budget", [0, 120000, 800])
+def test_financial_context_budget_override_survives_layer_zero(tmp_path, budget):
+    from tests.test_compressor_observability import _make_ctx
+
+    payload = json.dumps({"status": "ok", "read_id": "a" * 64, "evidence": "source label " * 5000})
+    ctx = _make_ctx(tmp_path, layer_0_budget_chars=8000)
+    # The agent supplies its profile's financial budget; other tools keep L0.
+    actual, _ = ctx.compress_tool_result("get_fundamentals_analysis", {}, payload, budget_chars=budget)
+    if budget == 800:
+        assert json.loads(actual)["error_code"] == "financial_read_page_too_large"
+    else:
+        assert actual == payload
+    other, _ = ctx.compress_tool_result("unregistered_text_tool", {}, "other " * 2000)
+    assert len(other) < 12000
+
+
+@pytest.mark.parametrize("budget", [0, 120000])
+def test_actual_anthropic_stream_keeps_configured_financial_payload(financial_local, monkeypatch, tmp_path, budget):
+    import httpx2
+    from anthropic import Anthropic
+    from src.agents import config
+    from src.agents.anthropic_agent import agent
+    from src.agents.shared import scratchpad
+    from src.auth_drivers import live_resolver
+    from src.data_provider_config import DataProviderConfigStore
+    from src.tools.schemas import FundamentalsResult
+    from tests.test_financial_read_settings import KEY, DEFAULTS
+    from tests.test_research_output_events import anthropic_frames, collect, terminal
+
+    values = deepcopy(DEFAULTS)
+    values["tool_output_chars"] = budget
+    DataProviderConfigStore().set_setting(KEY, json.dumps(values))
+    expected = FundamentalsResult(ticker="AAPL", status="ok", read_id="a" * 64,
+        metric_basis={"revenue": {"source_notes": "Observed source label. " * 3000}})
+    monkeypatch.setattr("src.fundamentals.read_service.read_financials", lambda *_: expected)
+    settings = config.AgentConfig(compaction_enabled=True, compaction_layer_0_budget_chars=8000,
+        compaction_layer_5_enabled=False, compaction_overflow_dir=str(tmp_path / "overflow"),
+        web_openai_search=False, web_playwright=False)
+    monkeypatch.setattr(agent, "get_agent_config", lambda: settings)
+    monkeypatch.setattr(scratchpad, "_DEFAULT_BASE_DIR", tmp_path / "scratchpad")
+    monkeypatch.delenv("ARKSCOPE_REPLAY_CAPTURE", raising=False)
+    calls, returned = [], []
+
+    def reply(request):
+        payload = json.loads(request.content)
+        calls.append(payload)
+        if len(calls) == 1:
+            blocks = [{"type": "tool_use", "id": "call_financial", "name": "get_fundamentals_analysis",
+                       "input": {"ticker": "AAPL", "freshness": "stored"}}]
+            stop = "tool_use"
+        else:
+            assert len(calls) == 2
+            returned.extend(block["content"] for message in payload["messages"]
+                if isinstance(message["content"], list) for block in message["content"] if block["type"] == "tool_result")
+            blocks, stop = [{"type": "text", "text": "Complete."}], "end_turn"
+        return httpx2.Response(200, headers={"content-type": "text/event-stream"},
+            text=anthropic_frames(payload["model"], blocks, stop=stop))
+
+    with Anthropic(api_key="offline-financial-context", max_retries=0,
+            http_client=httpx2.Client(transport=httpx2.MockTransport(reply))) as client:
+        monkeypatch.setattr(live_resolver, "live_anthropic_client", lambda: client)
+        events = asyncio.run(collect(agent.run_query_stream("Read local financials.",
+            model="claude-sonnet-4-6", effort="low", dal=financial_local[0])))
+    assert terminal(events)["answer"] == "Complete."
+    assert len(returned) == 1 and unwrap(returned[0]) == expected.model_dump()
 
 
 @pytest.mark.parametrize("channel", ["openai", "anthropic", "chatgpt", "claude"])

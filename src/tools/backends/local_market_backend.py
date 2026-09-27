@@ -101,6 +101,9 @@ class LocalMarketBackend:
             logger.warning("local get_financial_cache failed (%s)", exc)
             return None
 
+    def list_financial_cache_keys(self, ticker: str, source: str):
+        return self._market.list_financial_cache_keys(ticker, source)
+
     def get_financial_cache_entry(self, cache_key: str):
         try:
             return self._market.get_financial_cache_entry(cache_key)

@@ -172,11 +172,59 @@ Unreviewed debt, growth, valuation and other inputs remain named gaps, not zero.
 TTM is not an annual or quarterly reporting period. Raw SA company tables retain
 the additional provider rows outside these reviewed mappings.
 
+This is a verified starting scope, not a permanent 13-field/4-ratio limit.
+Extend it by checking actual retained row labels and sections, scale notes,
+currency, per-share/share-count exceptions, fiscal duration and accounting basis.
+Keep the raw value, normalized value, source observation and conversion formula
+together; test ambiguous labels, shifted columns, unit changes and missing inputs
+before adding a mapping. A source being SA is not by itself proof of a field's
+meaning. Source-derived conclusions are allowed once those inputs are qualified;
+unknown units/basis must remain gaps, not an operator switch to guessed numbers.
+
 FD retains its existing qualified metrics and current response windows. Retained
 data remains readable after a reuse window expires; expiry controls possible
 acquisition, not whether a historical statement exists. SA observation IDs can
 reopen retained captures; FD does not yet keep all overwritten response versions.
 Pin `read_id` when paging; changed content is a typed refusal, not mixed history.
+
+#### Configurable Output And FD History
+
+Settings > Financial Data Sources > Financial History and Tool Output owns
+`data_sources.financial_read.settings`. The view comes from
+`GET /providers/data-routes`; `PUT /providers/financial-read-settings` only saves
+validated preferences. It does not fetch, enable paid access or change sources.
+Missing settings use defaults without writing a profile; malformed saved values
+are disclosed and require explicit repair, not silently replaced.
+
+- Financial result output defaults to 48,000 characters on all four research
+  channels (OpenAI/Anthropic API and ChatGPT/Claude subscription bridges).
+  Operators can change it or disable the additional cap (`tool_output_chars=0`).
+  Model context limits and secret/result validation still apply. An oversized
+  result is a typed smaller-page refusal, never sliced numeric JSON. The
+  Anthropic insertion compressor does not impose a second 8,000-character cap.
+- FD acquisition periods are separate for each statement and annual/quarterly
+  scope. Defaults remain annual income/balance/cash flow **2/1/2**, quarterly
+  **4/1/4**. The positive int32 boundary is the provider's request type, not a
+  chosen product ceiling. The output setting uses JavaScript-safe integers.
+- FD returns up to ten periods per statement page. `limit` requests total
+  periods; each cursor page is a separate metered request. Settings estimates
+  pages for all three statements of one ticker, not a price or guaranteed
+  response count. More periods do **not** necessarily mean one extra request
+  per period. See the [FD pagination contract](https://docs.financialdatasets.ai/guides/pagination).
+- Every page uses the existing paid governor. Only same-origin, same-endpoint
+  HTTPS cursor links are followed; duplicate/no-progress/wrong-scope pages
+  fail closed. No automatic retries or unmetered navigation. A failed walk never
+  replaces the previous complete response with its partial pages.
+- Changing the requested period counts does not hide retained statements.
+  Stored reads select one newest valid response, with `requested_periods` and
+  `configured_periods` disclosed per statement. A smaller retained request
+  yields `financial_datasets_history_scope_shortfall`; auto may acquire the
+  larger selected FD scope only under the unchanged paid policy. A completed
+  provider response with fewer available rows is not retried just to fill a
+  number. Period counts control acquisition, not the reader's paginated window.
+
+The complete-result reducer preserves tool evidence; it is not a news/archive
+retention policy. FD overwrite-history preservation is also unchanged.
 
 For an update, select Financial Datasets by name and confirm its paid action.
 `POST /fundamentals/{ticker}/refresh` and explicit tool refresh require a named

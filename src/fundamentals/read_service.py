@@ -47,7 +47,8 @@ def _fresh(read):
 
 
 def _complete(read, query):
-    return all(read.statements.get(kind) for kind in _kinds(query))
+    return (all(read.statements.get(kind) for kind in _kinds(query))
+            and not any(g.code == "financial_datasets_history_scope_shortfall" for g in read.gaps))
 
 
 def _choices(query, sources):

@@ -225,6 +225,7 @@ class ContextManager:
         tool_name: str,
         tool_input: Dict[str, Any],
         result: Any,
+        *, budget_chars: Optional[int] = None,
     ) -> Tuple[str, Dict[str, Any]]:
         """Run Layer 0 budget AND emit observability metadata.
 
@@ -271,6 +272,7 @@ class ContextManager:
 
         compressed_str, record = self._compressor.process_tool_result(
             tool_name, tool_input, raw_str,
+            **({"budget_chars": budget_chars} if budget_chars is not None else {}),
         )
         compressed_bytes_buf = compressed_str.encode("utf-8", errors="replace")
         compressed_bytes = len(compressed_bytes_buf)
