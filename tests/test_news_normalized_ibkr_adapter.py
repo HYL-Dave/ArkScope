@@ -84,6 +84,7 @@ class HistoricalNewsClient(BodyClient):
         self.end_calls = []
         self.request_calls = []
         self.wrapper = SimpleNamespace()
+        self.client = SimpleNamespace(reqHistoricalNews=lambda *args: None)
 
         def historical_news_end(req_id, has_more):
             self.end_calls.append((req_id, has_more))
@@ -93,6 +94,7 @@ class HistoricalNewsClient(BodyClient):
     def reqHistoricalNews(
         self, con_id, providers, start, end, total_results
     ):
+        self.client.reqHistoricalNews(41, con_id, providers, start, end, total_results)
         self.request_calls.append(
             (con_id, providers, start, end, total_results)
         )

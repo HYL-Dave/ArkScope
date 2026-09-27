@@ -85,6 +85,7 @@ class IBKRNewsPage:
 
     articles: tuple[NewsArticle, ...]
     has_more: Optional[bool]
+    error_code: Optional[str] = None
 
 
 class IBKRPriceDataError(RuntimeError):
@@ -622,13 +623,30 @@ class IBKRDataSource(BaseDataSource):
             else None
         )
         has_more_values: list[bool] = []
+        request_id = None
+        partial_headlines = []
+        request_error = None
+        client = getattr(self._ib, "client", None)
+        previous_send = getattr(client, "reqHistoricalNews", None)
+        had_instance_send = client is not None and "reqHistoricalNews" in getattr(client, "__dict__", {})
+        previous_raise_errors = self._ib.RaiseRequestErrors
+
+        def capture_send(req_id, *args, **kwargs):
+            nonlocal request_id, partial_headlines
+            request_id = req_id
+            partial_headlines = getattr(wrapper, "_results", {}).get(req_id, [])
+            return previous_send(req_id, *args, **kwargs)
 
         if getattr(self, "_historical_news_capture_active", False):
             raise RuntimeError("nested IBKR historical-news request")
         self._historical_news_capture_active = True
+        if callable(previous_send):
+            client.reqHistoricalNews = capture_send
+        self._ib.RaiseRequestErrors = True
         if wrapper is not None and callable(previous_callback):
             def capture_historical_news_end(req_id, has_more):
-                has_more_values.append(bool(has_more))
+                if request_id is not None and req_id == request_id:
+                    has_more_values.append(bool(has_more))
                 return previous_callback(req_id, has_more)
 
             wrapper.historicalNewsEnd = capture_historical_news_end
@@ -640,7 +658,25 @@ class IBKRDataSource(BaseDataSource):
                 end_str,
                 300,
             )
+            if headlines is None:
+                request_error = request_error or "ibkr_news_request_timeout"
+                headlines = partial_headlines
+        except RequestError as exc:
+            request_error = "ibkr_news_subscription_denied" if (
+                exc.reqId == request_id and exc.code == 321
+                and "not subscribed for" in str(exc.message).lower()
+            ) else "ibkr_news_request_failed"
+            headlines = partial_headlines
+        except (TimeoutError, ConnectionError) as exc:
+            request_error = "ibkr_news_request_timeout" if isinstance(exc, TimeoutError) else "ibkr_news_request_failed"
+            headlines = partial_headlines
         finally:
+            self._ib.RaiseRequestErrors = previous_raise_errors
+            if callable(previous_send):
+                if had_instance_send:
+                    client.reqHistoricalNews = previous_send
+                else:
+                    del client.reqHistoricalNews
             if wrapper is not None and callable(previous_callback):
                 if had_instance_callback:
                     wrapper.historicalNewsEnd = previous_instance_callback
@@ -692,7 +728,8 @@ class IBKRDataSource(BaseDataSource):
 
         return IBKRNewsPage(
             articles=tuple(articles),
-            has_more=has_more_values[-1] if has_more_values else None,
+            has_more=has_more_values[-1] if has_more_values and not request_error else None,
+            error_code=request_error,
         )
 
     def _fetch_news_single_query(
