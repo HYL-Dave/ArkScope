@@ -97,4 +97,3 @@ class CashFlowStatement:
     # Calculated
     free_cash_flow: Optional[float] = None
     input_basis_version: Optional[str] = None
-

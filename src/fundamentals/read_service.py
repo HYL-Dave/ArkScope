@@ -38,8 +38,8 @@ def _kinds(query):
     return [query.statement] if query.statement else list(_FIELDS)
 
 
-def _has_rows(read):
-    return any(read.statements.values())
+def _has_rows(read, query):
+    return any(_selected_rows(read, query).values())
 
 
 def _fresh(read):
@@ -99,6 +99,8 @@ def _assemble(read, query, route, choices, extra=()):
     selected = _selected_rows(read, query)
     gaps = [*read.gaps, *extra]
     if not any(selected.values()):
+        if query.read_id:
+            return _empty(query, [_gap("financial_read_changed", read.provider), *gaps], route, choices)
         if query.end_month:
             gaps.append(_gap("financial_period_unavailable", read.provider))
         return _empty(query, gaps, route, choices)
@@ -185,14 +187,20 @@ def read_financials(dal, query: FinancialQuery) -> FundamentalsResult:
         for source in sources:
             value = read_sa_statements(dal, observed_query) if source == "seeking_alpha" else read_fd_statements(dal, observed_query)
             retained[source] = value
-            if _has_rows(value) and (query.freshness == "stored" or _fresh(value)):
+            if _has_rows(value, query) and (query.freshness == "stored" or _fresh(value)):
                 chosen = value
                 break
         if chosen is None:
-            chosen = next((value for value in retained.values() if _has_rows(value)), None)
+            chosen = next((value for value in retained.values() if _has_rows(value, query)), None)
         if query.freshness == "stored":
-            return _assemble(chosen, query, route, choices) if chosen else _empty(
-                query, [g for value in retained.values() for g in value.gaps], route, choices)
+            if chosen:
+                return _assemble(chosen, query, route, choices)
+            gaps = [g for value in retained.values() for g in value.gaps]
+            if query.read_id:
+                gaps.insert(0, _gap("financial_read_changed"))
+            elif query.end_month:
+                gaps.append(_gap("financial_period_unavailable"))
+            return _empty(query, gaps, route, choices)
         if chosen and _fresh(chosen) and _complete(chosen, query):
             return _assemble(chosen, query, route, choices)
         if target == "seeking_alpha" or (chosen and chosen.provider != target):

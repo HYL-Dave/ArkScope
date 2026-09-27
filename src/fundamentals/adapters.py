@@ -23,6 +23,31 @@ from src.tools.schemas import FinancialStatement
 STATEMENT_DATASETS = {"income_statement": "income_statements", "balance_sheet": "balance_sheets",
                       "cash_flow_statement": "cash_flow_statements"}
 _IDENTITY_FIELDS = {"ticker", "report_period", "fiscal_period", "period", "currency", "input_basis_version"}
+FD_FIELD_UNITS = {
+    **{name: "currency" for name in (
+        "revenue", "cost_of_revenue", "gross_profit", "operating_expense",
+        "selling_general_and_administrative_expenses", "research_and_development",
+        "operating_income", "interest_expense", "ebit", "income_tax_expense",
+        "net_income", "net_income_common_stock", "total_assets", "current_assets",
+        "cash_and_equivalents", "inventory", "current_investments",
+        "trade_and_non_trade_receivables", "non_current_assets",
+        "property_plant_and_equipment", "goodwill_and_intangible_assets",
+        "investments", "non_current_investments", "total_liabilities",
+        "current_liabilities", "current_debt", "trade_and_non_trade_payables",
+        "deferred_revenue", "non_current_liabilities", "non_current_debt",
+        "shareholders_equity", "retained_earnings",
+        "accumulated_other_comprehensive_income", "total_debt",
+        "depreciation_and_amortization", "share_based_compensation",
+        "net_cash_flow_from_operations", "capital_expenditure",
+        "business_acquisitions_and_disposals", "investment_acquisitions_and_disposals",
+        "net_cash_flow_from_investing", "issuance_or_repayment_of_debt_securities",
+        "issuance_or_purchase_of_equity_shares", "dividends_and_other_cash_distributions",
+        "net_cash_flow_from_financing", "change_in_cash_and_equivalents",
+        "effect_of_exchange_rate_changes", "ending_cash_balance", "free_cash_flow",
+    )},
+    **{name: "shares" for name in ("weighted_average_shares", "weighted_average_shares_diluted", "outstanding_shares")},
+    **{name: "per_share" for name in ("earnings_per_share", "earnings_per_share_diluted", "dividends_per_common_share")},
+}
 
 
 def to_financial_statement(obj) -> FinancialStatement:
@@ -138,16 +163,18 @@ def _fd_statement(obj, kind, result, query):
     if currency is None or currency != query.currency:
         _gap(result, "currency_unknown" if currency is None else "currency_mismatch", kind)
     values, data = {}, {}
-    per_share = {m for m, _, unit in METRICS.get(kind, ()) if unit == "per_share"}
     for metric, value in raw.items():
         if metric in _IDENTITY_FIELDS:
             continue
         numeric = decimal(value) if type(value) in (int, float) else None
         finite = numeric is not None and math.isfinite(float(numeric))
         status = "value" if finite else "metric_missing" if value is None else "invalid_value"
+        unit_kind = FD_FIELD_UNITS[metric]
+        unit = "shares" if unit_kind == "shares" else (currency or "currency_unknown") + (
+            "/share" if unit_kind == "per_share" else "")
         values[metric] = FinancialValue(status=status, raw=value if finite or type(value) is str else None,
             normalized_value=number(numeric) if finite else None, scale="1" if finite else None,
-            currency=currency, unit=(currency or "currency_unknown") + ("/share" if metric in per_share else ""),
+            currency=currency, unit=unit,
             label=metric, precision="provider_numeric_float")
         data[metric] = float(numeric) if finite else None
         if status == "invalid_value":
