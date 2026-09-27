@@ -465,31 +465,10 @@ class DataAccessLayer:
         )
 
     def get_fundamentals(self, ticker: str) -> FundamentalsResult:
-        """Query fundamentals and return structured result."""
-        raw = self._backend.query_fundamentals(ticker)
-        if not raw:
-            return FundamentalsResult(ticker=ticker.upper())
-
-        snapshot = raw.get("snapshot", {})
-
-        return FundamentalsResult(
-            ticker=ticker.upper(),
-            snapshot_date=raw.get("collected_at", "")[:10] if raw.get("collected_at") else None,
-            market_cap=_safe_float(snapshot.get("market_cap")),
-            pe_ratio=_safe_float(snapshot.get("pe_ratio")),
-            forward_pe=_safe_float(snapshot.get("forward_pe")),
-            ps_ratio=_safe_float(snapshot.get("price_to_sales")),
-            pb_ratio=_safe_float(snapshot.get("price_to_book")),
-            roe=_safe_float(snapshot.get("roe")),
-            roa=_safe_float(snapshot.get("roa")),
-            debt_to_equity=_safe_float(snapshot.get("debt_to_equity")),
-            current_ratio=_safe_float(snapshot.get("current_ratio")),
-            revenue_growth=_safe_float(snapshot.get("revenue_growth")),
-            earnings_growth=_safe_float(snapshot.get("earnings_growth")),
-            dividend_yield=_safe_float(snapshot.get("dividend_yield")),
-            beta=_safe_float(snapshot.get("beta")),
-            snapshot=snapshot if snapshot else None,
-        )
+        """Read selected local statements; never acquire or read retired SEC projections."""
+        from src.fundamentals.read_service import read_financials
+        from src.fundamentals.contracts import FinancialQuery
+        return read_financials(self, FinancialQuery(ticker=ticker))
 
     def get_available_tickers(self, data_type: str) -> List[str]:
         """List tickers with available data."""

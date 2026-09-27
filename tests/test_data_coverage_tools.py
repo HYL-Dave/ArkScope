@@ -87,7 +87,8 @@ def test_ticker_data_coverage_explains_weekend_price_gap(tmp_path, monkeypatch):
     assert out["prices"]["target_date"]["status"] == "non_trading_day"
     assert out["prices"]["target_date"]["reason"] == "weekend"
     assert out["news"]["latest_published_date"] == "2026-06-18"
-    assert out["fundamentals"]["latest_date"] == "2026-06-01"
+    assert out["fundamentals"]["latest_date"] is None
+    assert out["financials"]["status"] == "unavailable"
 
 
 def test_ticker_data_coverage_explains_market_holiday(tmp_path, monkeypatch):

@@ -71,7 +71,7 @@ def test_local_ticker_coverage(tmp_path):
     out = str(tmp_path / "market_data.db")
     # missing DB → exists False, all domains False
     cov = mda.local_ticker_coverage("AAPL", out)
-    assert set(cov) == {"exists", "prices", "news", "fundamentals"}
+    assert set(cov) == {"exists", "prices", "news", "fundamentals", "financials"}
     assert cov["exists"] is False and not any(cov[d] for d in ("prices", "news", "fundamentals"))
     _create_local_market_db(out)
     from src.fundamentals.cache import fundamentals_analysis_cache_key
@@ -91,7 +91,8 @@ def test_local_ticker_coverage(tmp_path):
     )
     cov = mda.local_ticker_coverage("aapl", out)  # case-insensitive
     assert cov["exists"] is True
-    assert cov["prices"] and cov["news"] and cov["fundamentals"]
+    assert cov["prices"] and cov["news"] and not cov["fundamentals"]
+    assert cov["financials"]["status"] == "unavailable"
     absent = mda.local_ticker_coverage("ZZZZ", out)  # tracked DB, untracked ticker
     assert absent["exists"] is True
     assert not (absent["prices"] or absent["news"] or absent["fundamentals"])
@@ -112,7 +113,7 @@ def test_status_route_local_only(store, tmp_path, monkeypatch):
     out = market_data_status(store=store)
     assert out["exists"] is False
     assert out["prices"]["row_count"] == 0 and out["news"]["row_count"] == 0
-    assert out["fundamentals_mode"] == "local_cache_refetch"
+    assert not {"fundamentals_mode", "fundamentals", "financial_cache"}.intersection(out)
     assert out["use_local_market_setting"] is False
     assert out["prices_authority"] == "local"
     assert out["routing_enabled"] is True
@@ -171,7 +172,7 @@ def test_status_uses_current_news_sync_and_preserves_price_authority(store, tmp_
     monkeypatch.setattr("src.api.routes.market_data.read_sync_meta", lambda path: stored)
 
     out = market_data_status(store=store)
-    assert out["fundamentals_mode"] == "local_cache_refetch"
+    assert not {"fundamentals_mode", "fundamentals", "financial_cache"}.intersection(out)
     assert out["news"]["row_count"] == 1
     assert out["prices"]["row_count"] == 1
     assert out["sync"]["news"]["status"] == "partial"

@@ -81,13 +81,16 @@ def summarize_financials(result: FundamentalsResult, query: FinancialQuery) -> F
         return result.coverage.model_copy(deep=True)
     rows = {kind: getattr(result, _FIELDS[kind]) or [] for kind in _kinds(query)}
     currencies = {row.currency for values in rows.values() for row in values}
+    acquired = {item["observation_id"]: item["fetched_at"] for item in result.source_observations}
     return FinancialCoverage(ticker=query.ticker, status=result.status,
         selected_source=result.data_source if result.data_source in {"seeking_alpha", "financial_datasets"} else None,
         period=query.period, requested_currency=query.currency,
         currency=next(iter(currencies)) if len(currencies) == 1 else None, read_id=result.read_id,
         statements={kind: [dict(end_month=row.end_month, report_period=row.report_period,
             period_precision=row.period_precision, currency=row.currency, observation_id=row.observation_id,
-            column_index=row.column_index) for row in values] for kind, values in rows.items()},
+            column_index=row.column_index, fetched_at=acquired.get(row.observation_id), unit_note=row.unit_note,
+            value_precision=sorted({value.precision for value in row.value_metadata.values() if value.precision}))
+            for row in values] for kind, values in rows.items()},
         missing_statements=[kind for kind, values in rows.items() if not values],
         supported_metrics=list(result.metric_basis), metric_gaps=result.metric_gaps, gaps=result.read_gaps)
 

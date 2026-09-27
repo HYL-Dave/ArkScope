@@ -166,7 +166,7 @@ def test_local_runtime_lifespan_starts_scheduler_and_enumerates_routes(
 ):
     observed = _run_local_runtime_lifespan(monkeypatch, tmp_path)
 
-    assert len(observed["routes"]) == 230
+    assert len(observed["routes"]) == 232
     news_routes = {tuple(route.split("\t")[:2]) for route in observed["routes"]
                    if route.split("\t")[1].startswith("/news/")}
     assert ("PUT", "/news/settings") not in news_routes
@@ -465,7 +465,6 @@ class TestHealth:
         assert data["data_sources"] == {
             "news_tickers": 2,
             "price_tickers": 2,
-            "fundamentals_tickers": 1,
         }
 
 
@@ -597,12 +596,11 @@ class TestFundamentalsEndpoints:
         assert provider_calls == []
         data = r.json()
         assert data["ticker"] == "NVDA"
-        assert data["data_source"] == "sec_edgar"
-        assert data["snapshot_date"] == "2025-12-31"
+        assert data["data_source"] == "none"
+        assert data["snapshot_date"] is None
         assert data["roe"] is None
         assert data["revenue_growth"] is None
-        assert data["metric_gaps"]["roe"] == "income_unavailable"
-        assert data["metric_gaps"]["revenue_growth"] == "comparable_previous_period_unavailable"
+        assert data["status"] == "unavailable" and data["read_gaps"]
         assert data["market_cap"] is None
         assert data["pe_ratio"] is None
 
@@ -659,9 +657,8 @@ class TestConfigEndpoints:
 # Fundamentals: stored-only mode must NOT trigger a provider fetch
 # ============================================================
 
-def test_fundamentals_stored_mode_reads_local_cache_without_provider_fetch(monkeypatch):
-    """stored=true is read-only: it may read local financial_cache, but never enters
-    the SEC/Financial-Datasets fetch chain and never reads the retired mirror table."""
+def test_fundamentals_stored_alias_never_reads_retired_projection(monkeypatch):
+    """Both alias values use the common local reader and leave old SEC caches untouched."""
     from src.api.routes import fundamentals as fr
     from src.tools.schemas import FundamentalsResult
 
@@ -692,25 +689,19 @@ def test_fundamentals_stored_mode_reads_local_cache_without_provider_fetch(monke
             calls["dal"] += 1
             raise AssertionError("stored=true must not read retired fundamentals table")
 
-    def _spy_analysis(dal, ticker):
-        calls["analysis"] += 1
-        return FundamentalsResult(ticker=ticker.upper(), data_source="sec_edgar")
-
-    monkeypatch.setattr(fr, "get_fundamentals_analysis", _spy_analysis)
     dal = _FakeDAL()
 
     out = fr.fundamentals("AAPL", stored=True, dal=dal)
     assert calls == {"analysis": 0, "dal": 0}
-    assert out["data_source"] == "sec_edgar"
-    assert out["snapshot_date"] == "2025-12-31"
+    assert out["data_source"] == "none"
+    assert out["snapshot_date"] is None
     assert out["roe"] is None
-    assert out["metric_gaps"]["roe"] == "income_unavailable"
+    assert out["status"] == "unavailable" and out["read_gaps"]
     assert dal._backend.rows["fundamentals_analysis:sec_edgar:AAPL:annual:v1"]["roe"] == 0.22
-    assert out["source_path"] == "local_cache"
 
     out2 = fr.fundamentals("AAPL", stored=False, dal=dal)
-    assert calls["analysis"] == 1
-    assert out2["data_source"] == "sec_edgar"
+    assert calls == {"analysis": 0, "dal": 0}
+    assert out2["data_source"] == "none" and out2["coverage"] == out["coverage"]
 
 
 class _FakeDALBT:
@@ -746,8 +737,8 @@ def test_retired_market_admin_and_iv_routes_are_absent_while_greeks_remains_reac
     assert 0 <= data["delta"] <= 1
 
 
-def test_fundamentals_stored_source_path_mapping(monkeypatch):
-    """/fundamentals/{ticker}?stored=true reports local_cache or none."""
+def test_legacy_snapshot_presence_does_not_claim_financial_coverage(monkeypatch):
+    """Old snapshot-only backends cannot certify SA/FD statements."""
     from src.api.routes import fundamentals as fr
     from src.tools.schemas import FundamentalsResult
 
@@ -764,7 +755,7 @@ def test_fundamentals_stored_source_path_mapping(monkeypatch):
             ).model_dump()
 
     out = fr.fundamentals("AAPL", stored=True, dal=_CachedDAL())
-    assert out["source_path"] == "local_cache"
+    assert out["status"] == "unavailable" and out["read_gaps"]
 
     class _EmptyDAL(_FakeDALBT):
         def __init__(self):
@@ -775,18 +766,13 @@ def test_fundamentals_stored_source_path_mapping(monkeypatch):
             return None
 
     out = fr.fundamentals("AAPL", stored=True, dal=_EmptyDAL())
-    assert out["source_path"] == "none"
+    assert out["status"] == "unavailable" and out["read_gaps"]
     assert out["data_source"] == "none"
     assert out["snapshot_date"] is None
 
 
-def test_fundamentals_stored_expired_cache_is_honest_empty(tmp_path):
-    """/fundamentals/{ticker}?stored=true must respect financial_cache expiry.
-
-    SqliteBackend.get_financial_cache filters expires_at, so the route should see an
-    expired annual-analysis cache row as a miss and return honest empty rather than
-    serving stale fundamentals.
-    """
+def test_retired_sec_cache_is_ignored_regardless_of_expiry(tmp_path):
+    """Expired SEC snapshots must not reenter the selected SA/FD financial view."""
     from src.api.routes import fundamentals as fr
     from src.fundamentals.cache import fundamentals_analysis_cache_key
     from src.tools.backends.sqlite_backend import SqliteBackend
@@ -815,7 +801,7 @@ def test_fundamentals_stored_expired_cache_is_honest_empty(tmp_path):
 
     out = fr.fundamentals("AAPL", stored=True, dal=_DAL())
 
-    assert out["source_path"] == "none"
+    assert out["status"] == "unavailable" and out["read_gaps"]
     assert out["data_source"] == "none"
     assert out["snapshot_date"] is None
     assert out["roe"] is None

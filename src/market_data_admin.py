@@ -9,7 +9,6 @@ import threading
 from pathlib import Path
 from typing import Dict, Optional
 
-from src.fundamentals.cache import stored_annual_sec_fundamentals
 from src.news_identity import apply_news_identity_plan, plan_news_identity_repair
 
 logger = logging.getLogger(__name__)
@@ -287,7 +286,6 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
         "exists": False,
         "prices": {"row_count": 0, "ticker_count": 0, "latest_datetime": None},
         "news": {"row_count": 0, "source_count": 0, "latest_published": None},
-        "fundamentals": {"row_count": 0, "ticker_count": 0, "latest_date": None},
         # local-primary cache (3c-C): valid vs expired by expires_at, plus latest fetch
         "financial_cache": {"row_count": 0, "valid_count": 0, "expired_count": 0,
                             "latest_fetched_at": None},
@@ -313,17 +311,6 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
                 "latest_published": conn.execute("SELECT MAX(published_at) FROM news").fetchone()[0],
             }
         if _table_exists(conn, "financial_cache"):
-            stored_fundamentals = stored_annual_sec_fundamentals(conn)
-            snapshot_dates = [
-                row["snapshot_date"]
-                for row in stored_fundamentals.values()
-                if row.get("snapshot_date")
-            ]
-            out["fundamentals"] = {
-                "row_count": len(stored_fundamentals),
-                "ticker_count": len(stored_fundamentals),
-                "latest_date": max(snapshot_dates) if snapshot_dates else None,
-            }
             now = _now()  # same UTC ISO-seconds format the cache stores expires_at in
             total = conn.execute("SELECT COUNT(*) FROM financial_cache").fetchone()[0]
             valid = conn.execute(
@@ -343,30 +330,35 @@ def local_market_stats(out_path: Optional[str] = None) -> dict:
 
 
 def local_ticker_coverage(ticker: str, out_path: Optional[str] = None) -> dict:
-    """Whether the LOCAL market DB has any rows for ``ticker`` per domain (read-only,
-    routing-independent — a fact about the local DB, NOT a claim about where a given
-    read was served from). Powers the detail page's local-coverage hint."""
+    """Price/news presence and independently selected local financial coverage."""
+    from src.tools.backends.local_market_backend import LocalMarketBackend
+    from src.tools.data_access import DataAccessLayer
+    from src.tools.analysis_tools import get_fundamentals_analysis
+
     path = out_path or resolve_market_db_path()
-    cov = {"exists": False, "prices": False, "news": False, "fundamentals": False}
+    dal = DataAccessLayer(backend=LocalMarketBackend(market_db=path))
+    financial = get_fundamentals_analysis(dal, ticker, freshness="stored")
+    cov = {"exists": False, "prices": False, "news": False,
+           "fundamentals": financial.status in {"ok", "partial"},
+           "financials": financial.coverage.model_dump() if financial.coverage else None}
     if not Path(path).exists():
         return cov
     try:
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    except sqlite3.OperationalError:
+    except sqlite3.Error:
         return cov
     # resolve the alias spelling to canonical so coverage of e.g. 'BRK.B' reports the
     # rows that live under the canonical 'BRK B' (consistent with the read paths' _canon).
-    t = _load_ticker_aliases(conn).get(ticker.upper(), ticker.upper())
     try:
         cov["exists"] = True
+        t = _load_ticker_aliases(conn).get(ticker.upper(), ticker.upper())
         for domain, table in (("prices", "prices"), ("news", "news")):
             if _table_exists(conn, table):
                 cov[domain] = conn.execute(
                     f"SELECT 1 FROM {table} WHERE ticker = ? LIMIT 1", (t,)
                 ).fetchone() is not None
-        cov["fundamentals"] = t in stored_annual_sec_fundamentals(conn)
-    except sqlite3.OperationalError:
-        pass
+    except sqlite3.Error:
+        cov["market_error"] = "market_data_unavailable"
     finally:
         conn.close()
     return cov

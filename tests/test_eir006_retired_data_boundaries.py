@@ -75,6 +75,7 @@ _TEST_FIXTURES = {
     "tests/test_daily_update_wrapper.py",
     "tests/test_data_access.py",
     "tests/test_data_coverage_tools.py",
+    "tests/test_common_financial_coverage.py",
     "tests/test_detailed_financials.py",
     "tests/test_eir006_retired_data_boundaries.py",
     "tests/test_financial_metrics_calculator.py",

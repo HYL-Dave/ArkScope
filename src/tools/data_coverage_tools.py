@@ -13,7 +13,6 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-from src.fundamentals.cache import stored_annual_sec_fundamentals
 from src.market_data_admin import resolve_market_db_path
 from src.news_sync_status import overlay_news_sync_status
 
@@ -200,17 +199,6 @@ def _sync_meta(conn: sqlite3.Connection) -> dict:
     return out
 
 
-def _stored_sec_summary(conn: sqlite3.Connection, ticker: str) -> dict:
-    payload = stored_annual_sec_fundamentals(conn).get(ticker)
-    snapshot_date = payload.get("snapshot_date") if payload else None
-    return {
-        "available": payload is not None,
-        "row_count": 1 if payload is not None else 0,
-        "earliest_date": snapshot_date,
-        "latest_date": snapshot_date,
-    }
-
-
 def get_ticker_data_coverage(ticker: str, target_date: Optional[str] = None) -> dict:
     """Explain local market-data coverage for one ticker.
 
@@ -223,17 +211,23 @@ def get_ticker_data_coverage(ticker: str, target_date: Optional[str] = None) -> 
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     if not t:
         return {"ticker": "", "error": "ticker is required", "generated_at": generated_at}
+    from src.tools.analysis_tools import get_fundamentals_analysis
+    financial = get_fundamentals_analysis(None, t, freshness="stored")
+    rows = [*(financial.income_statements or []), *(financial.balance_sheet or []), *(financial.cash_flow_statements or [])]
+    days = [row.report_period for row in rows if row.report_period]
+    financials = {"financials": financial.coverage.model_dump() if financial.coverage else None,
+                  "fundamentals": {"available": financial.status in {"ok", "partial"}, "row_count": len(rows),
+                                   "earliest_date": min(days) if days else None, "latest_date": max(days) if days else None}}
+    base = {"ticker": t, "generated_at": generated_at,
+            "market_db": {"path": path, "exists": Path(path).exists()},
+            "note": "local-only diagnostic; no provider fetch attempted", **financials}
     if not Path(path).exists():
-        return {
-            "ticker": t,
-            "generated_at": generated_at,
-            "market_db": {"path": path, "exists": False},
-            "note": "local-only diagnostic; no provider fetch attempted",
-        }
+        return base
 
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
+    conn = None
     try:
+        conn = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
         prices = {"available": False, "intervals": {}, "target_date": None}
         if _table_exists(conn, "prices"):
             intervals = {
@@ -260,14 +254,13 @@ def get_ticker_data_coverage(ticker: str, target_date: Optional[str] = None) -> 
             if target is not None:
                 prices["target_date"] = _target_price_status(conn, t, target)
         return {
-            "ticker": t,
-            "generated_at": generated_at,
-            "market_db": {"path": path, "exists": True},
+            **base,
             "prices": prices,
             "news": _news_summary(conn, t),
-            "fundamentals": _stored_sec_summary(conn, t),
             "sync": overlay_news_sync_status(_sync_meta(conn), path),
-            "note": "local-only diagnostic; no provider fetch attempted",
         }
+    except (OSError, sqlite3.Error):
+        return {**base, "market_error": "market_data_unavailable"}
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()

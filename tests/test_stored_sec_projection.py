@@ -213,7 +213,7 @@ def test_legacy_fundamentals_row_does_not_project_as_stored(
     }
 
 
-def test_positive_annual_sec_cache_is_the_shared_projection_authority(
+def test_old_sec_projection_remains_low_level_only_not_current_financial_authority(
     stored_sec_db, monkeypatch,
 ):
     monkeypatch.setenv("ARKSCOPE_MARKET_DB", str(stored_sec_db))
@@ -224,22 +224,18 @@ def test_positive_annual_sec_cache_is_the_shared_projection_authority(
     dal = DataAccessLayer(base_path=stored_sec_db.parent, backend=local_backend)
 
     stats = mda.local_market_stats(str(stored_sec_db))
-    assert stats["fundamentals"] == {
-        "row_count": 1,
-        "ticker_count": 1,
-        "latest_date": "2025-12-31",
-    }
+    assert "fundamentals" not in stats
     assert stats["financial_cache"]["row_count"] == 10
-    assert mda.local_ticker_coverage("AAPL", str(stored_sec_db))["fundamentals"] is True
+    assert mda.local_ticker_coverage("AAPL", str(stored_sec_db))["fundamentals"] is False
     assert sqlite_backend.get_available_tickers("fundamentals") == ["AAPL"]
     assert local_backend.get_available_tickers("fundamentals") == ["AAPL"]
 
     coverage = get_ticker_data_coverage("AAPL")
     assert coverage["fundamentals"] == {
-        "available": True,
-        "row_count": 1,
-        "earliest_date": "2025-12-31",
-        "latest_date": "2025-12-31",
+        "available": False,
+        "row_count": 0,
+        "earliest_date": None,
+        "latest_date": None,
     }
 
     class _Registry:
@@ -266,21 +262,17 @@ def test_positive_annual_sec_cache_is_the_shared_projection_authority(
 
     status_response = _api_get(app, "/status")
     assert status_response.status_code == 200
-    assert status_response.json()["data_sources"]["fundamentals_tickers"] == 1
+    assert "fundamentals_tickers" not in status_response.json()["data_sources"]
 
     stored_response = _api_get(app, "/fundamentals/AAPL?stored=true")
     assert stored_response.status_code == 200
-    assert stored_response.json()["source_path"] == "local_cache"
-    assert stored_response.json()["snapshot_date"] == "2025-12-31"
+    assert stored_response.json()["status"] == "unavailable"
+    assert stored_response.json()["snapshot_date"] is None
 
 
 def test_nonpositive_and_nonannual_cache_rows_do_not_project_as_stored(stored_sec_db):
     assert SqliteBackend(stored_sec_db).get_available_tickers("fundamentals") == ["AAPL"]
-    assert mda.local_market_stats(str(stored_sec_db))["fundamentals"] == {
-        "row_count": 1,
-        "ticker_count": 1,
-        "latest_date": "2025-12-31",
-    }
+    assert "fundamentals" not in mda.local_market_stats(str(stored_sec_db))
 
 
 def test_fundamentals_sync_is_null_with_price_and_current_news_telemetry(
