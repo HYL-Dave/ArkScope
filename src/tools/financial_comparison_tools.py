@@ -9,7 +9,7 @@ from typing import Literal, Optional
 from src.data_source_routing import DataSourcePolicyFailure, load_route
 from src.fundamentals.cache import fundamentals_analysis_cache_key, validate_positive_annual_sec_payload
 from src.fundamentals.reuse import policy, read_entry
-from src.fundamentals.source_comparison import METRICS, comparison_rows
+from src.fundamentals.source_comparison import METRICS, comparison_rows, fd_records, sa_records
 from src.sa.company_data import CompanyDataFailure, canonical_json, query_symbol
 from src.sa.company_store import read_capture
 
@@ -64,9 +64,7 @@ def _read_source(dal, provider, ticker, statement, period, currency):
             source.update(observation_id=body["observation_id"], content_sha256=body["observation_id"],
                           source_url=body["source_url"], fetched_at=body["last_captured_at"],
                           unit_note=body["unit_note"])
-            records = [dict(end_month=column["end_month"], period_end=None, currency=body["currency"],
-                            rows=body["rows"], column_index=i, unit_note=body["unit_note"])
-                       for i, column in enumerate(body["columns"]) if column["kind"] == period and column["end_month"]]
+            records = sa_records(body, period)
         else:
             statements, descriptions = _stored_statements(dal, provider, ticker, statement, period)
             if not statements:
@@ -75,14 +73,7 @@ def _read_source(dal, provider, ticker, statement, period, currency):
             source["content_sha256"] = _digest([item.model_dump() for item in statements])
             source["source_observations"] = descriptions
             source["source_url"] = None  # Old cache has no citation-level source pointer.
-            records = []
-            for item in statements:
-                if item.period_type != period or date.fromisoformat(item.report_period).isoformat() != item.report_period:
-                    continue
-                declared_currency = item.currency if isinstance(item.currency, str) and re.fullmatch(r"[A-Z]{3}", item.currency) else None
-                records.append(dict(end_month=item.report_period[:7], period_end=item.report_period,
-                                    currency=declared_currency, data=item.data,
-                                    input_basis_version=item.input_basis_version))
+            records = fd_records(statements, period)
         source.update(status="ok", records=records, available_months=sorted({r["end_month"] for r in records}, reverse=True))
     except (CompanyDataFailure, DataSourcePolicyFailure) as exc:
         source["error_code"] = exc.code

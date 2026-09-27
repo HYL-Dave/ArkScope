@@ -1,5 +1,6 @@
 """Descriptive source comparisons, not a financial truth or materiality verdict."""
 
+from datetime import date
 from decimal import Decimal, InvalidOperation, localcontext
 from itertools import combinations
 import re
@@ -47,6 +48,23 @@ def number(value):
         return "0"
     text = format(value, "f")
     return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def sa_records(body, period):
+    return [dict(end_month=column["end_month"], period_end=None, currency=body["currency"],
+                 rows=body["rows"], column_index=i, unit_note=body["unit_note"])
+            for i, column in enumerate(body["columns"]) if column["kind"] == period and column["end_month"]]
+
+
+def fd_records(statements, period):
+    records = []
+    for item in statements:
+        if item.period_type != period or date.fromisoformat(item.report_period).isoformat() != item.report_period:
+            continue
+        declared = item.currency if isinstance(item.currency, str) and re.fullmatch(r"[A-Z]{3}", item.currency) else None
+        records.append(dict(end_month=item.report_period[:7], period_end=item.report_period,
+                            currency=declared, data=item.data, input_basis_version=item.input_basis_version))
+    return records
 
 
 def source_value(source, metric, label, kind, month):
