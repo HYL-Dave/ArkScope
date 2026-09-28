@@ -520,9 +520,10 @@ async function popup() {
   const store = storage({alphaPicksAutoSyncEnabled:true,marketNewsAutoSyncEnabled:true});
   const sent = [];
   let startCallback;
+  let popupState = {status:'ok',state:'not_started'};
   const reply = message => {
-    if (message.action === 'get_article_body_recovery_state') return {status:'ok',batch:null};
-    if (message.action === 'preview_article_body_recovery') return {...manifest,targets:targets.slice(0,5),remaining_count:8};
+    if (message.action === 'get_article_body_recovery_state') return popupState;
+    if (message.action === 'preview_article_body_recovery') return {...manifest,protocol_version:2,counts:{targets:8,held:0,excluded:0},settings:{max_articles_per_job:0}};
     if (message.action === 'get_company_refresh') return {status:'ok',config:{enabled:false,target_mode:'watchlist',tickers:[],statements:['income_statement'],views:['annual'],interval_days:7},collector:{status:'ok',generation:0,owner:null,policy:null},scopes:[],running:false};
     if (message.action === 'preview_company_refresh') return {status:'error'};
     return {status:'ok',events:[],total:0};
@@ -543,8 +544,8 @@ async function popup() {
   assert.ok(preview && start, 'body repair controls must exist');
   // Reopening an idle popup previews local targets, never starts capture.
   assert.equal(start.disabled,false);
-  assert.match(start.textContent,/Start next.*5/i);
-  assert.match(document.getElementById('bodyRecoveryPreview').textContent,/8 remaining/);
+  assert.match(start.textContent,/Start repair/i);
+  assert.match(document.getElementById('bodyRecoveryPreview').textContent,/8 selected/);
   assert.equal(document.querySelectorAll('#bodyRecoveryTargets li').length,5);
   assert.ok(!document.getElementById('bodyRecoveryTargets').textContent.includes('Article 6'));
   assert.equal(sent.filter(value => value.action === 'start_article_body_recovery').length,0);
@@ -553,19 +554,23 @@ async function popup() {
   assert.equal(start.disabled,true);
   assert.deepEqual(sent.find(value => value.action === 'start_article_body_recovery'),
     {action:'start_article_body_recovery',manifest_id:manifest.manifest_id});
-  startCallback({status:'ok',batch:{batch_id:'batch',status:'running',items:[],counts:{saved:0,failed:0,skipped:0}}});
+  startCallback({status:'ok',job_id:'job',state:'running',items:[],counts:{selected:8,saved:0,failed:0,skipped:0,pending:8}});
   await tick();
-  await store.local.set({saArticleBodyRecovery:{batch_id:'batch',status:'running',next_page_at:new Date(Date.now()+60000).toISOString(),items:[
+  popupState = {status:'ok',job_id:'job',state:'waiting',reason_code:'site_pacing',next_eligible_at:new Date(Date.now()+60000).toISOString(),items:[
     {article_id:'1000',title:'Article 1',state:'saved'},
     {article_id:'1001',title:'Article 2',state:'queued'},
-  ],counts:{saved:1,failed:0,skipped:0,pending:1}}});
-  assert.match(document.getElementById('bodyRecoveryTiming').textContent,/Waiting \d+ s.*local page interval/);
+  ],counts:{selected:8,saved:1,failed:0,skipped:0,pending:7}};
+  await store.local.set({saArticleBodyRecoveryV2:{job_id:'job'}});
+  await tick();
+  assert.match(document.getElementById('bodyRecoveryTiming').textContent,/Waiting until.*site_pacing/);
   assert.equal(document.getElementById('bodyRecoveryProgress').value,1);
-  assert.equal(document.getElementById('bodyRecoveryProgress').max,2);
+  assert.equal(document.getElementById('bodyRecoveryProgress').max,8);
   assert.equal(start.disabled,true);
-  await store.local.set({saArticleBodyRecovery:{batch_id:'batch',status:'partial',items:[
-    {article_id:'1000',title:'Article 1',state:'failed',reason:'detail_save_failed',attempt_count:1},
-  ],counts:{saved:0,failed:1,skipped:0}}});
+  popupState = {status:'ok',job_id:'job',state:'partial',items:[
+    {article_id:'1000',title:'Article 1',state:'failed',reason_code:'detail_save_failed'},
+  ],counts:{selected:8,saved:7,failed:1,skipped:0,pending:0}};
+  await store.local.set({saArticleBodyRecoveryV2:{job_id:'job'}});
+  await tick();
   assert.match(document.getElementById('bodyRecoveryResult').textContent,/detail_save_failed/);
   assert.equal(document.getElementById('bodyRecoveryTiming').hidden,true);
   assert.equal(start.disabled,true, 'new preview is required after any attempt');

@@ -49,151 +49,143 @@ function initializeArticleBodyRecovery() {
   if (!previewButton) return;
   var startButton = document.getElementById("bodyRecoveryStartBtn");
   var cancelButton = document.getElementById("bodyRecoveryCancelBtn");
+  var resumeButton = document.getElementById("bodyRecoveryResumeBtn");
   var previewText = document.getElementById("bodyRecoveryPreview");
   var targets = document.getElementById("bodyRecoveryTargets");
   var resultText = document.getElementById("bodyRecoveryResult");
   var progress = document.getElementById("bodyRecoveryProgress");
   var timing = document.getElementById("bodyRecoveryTiming");
-  var preview = null, batch = null, pending = false;
-  var timingTimer = null;
-
-  function reasonText(reason) {
-    var descriptions = {
-      sa_article_body_comment_thread:"Comment content, not article text",
-      sa_article_body_disclosure_only:"Disclosure only; article text missing",
-      sa_article_body_metadata_only:"Title and metadata only; article text missing",
-      sa_article_body_missing:"Article text missing",
-      parser_empty:"No usable article text extracted",
-      site_pacing:"Local page interval",
-      interrupted:"Batch interrupted",
-      batch_timeout:"Manual batch time limit reached",
-    };
-    return descriptions[reason] ? descriptions[reason] + " (" + reason + ")" : reason;
-  }
-
-  function renderTiming() {
-    clearTimeout(timingTimer);
-    var running = batch && ["running","cancelling"].includes(batch.status);
-    timing.hidden = !running;
-    if (!running) return;
-    var remaining = Math.ceil((Date.parse(batch.next_page_at) - Date.now()) / 1000);
-    var current = (batch.items || []).find(function (item) {return item.state === "running";});
-    var phases = {opening:"Opening page",loading:"Loading article",extracting:"Reading article text",saving:"Saving article text"};
-    timing.textContent = batch.status === "cancelling" ? "Stopping batch..."
-      : remaining > 0 ? "Waiting " + remaining + " s before the next article (local page interval)"
-      : current ? (phases[current.phase] || "Processing article") + ": " + (current.title || current.article_id)
-      : "Preparing next article...";
-    if (remaining > 0) timingTimer = setTimeout(renderTiming, 1000);
-  }
-  window.addEventListener("pagehide", function () {clearTimeout(timingTimer);});
-
+  var preview = null, job = null, pending = false, unavailable = false;
+  var pollTimer = null, closed = false, version = 0;
+  var terminal = ["not_started", "complete", "partial", "cancelled"];
+  function active() { return job && job.state && !terminal.includes(job.state); }
   function controls() {
-    var running = batch && ["running","cancelling"].includes(batch.status);
-    targets.hidden = Boolean(running);
-    previewText.hidden = Boolean(running);
+    var running = active();
+    targets.hidden = !!running;
+    previewText.hidden = !!running;
     previewButton.disabled = pending || !!running;
-    startButton.disabled = pending || !!running || !preview || !preview.targets.length;
-    cancelButton.disabled = pending || !running || batch.status === "cancelling";
-    startButton.textContent = "Start next up to " + (preview ? preview.targets.length : 5);
+    startButton.disabled = pending || unavailable || !!running || !preview || preview.selected === 0;
+    cancelButton.disabled = pending || !running || job.state === "cancelling";
+    resumeButton.hidden = !running || job.state !== "paused" && !job.reconnect_required;
+    resumeButton.disabled = pending || !!(job && job.cancel_pending);
   }
-  function renderBatch(value) {
-    batch = value;
+  function render() {
     resultText.replaceChildren();
-    progress.hidden = !batch;
-    if (batch) {
-      var counts = batch.counts || {};
-      var processed = (counts.saved || 0) + (counts.failed || 0) + (counts.skipped || 0);
-      progress.max = (batch.items || []).length || 1;
-      progress.value = processed;
+    var counts = job && job.counts;
+    progress.hidden = !counts;
+    if (counts) {
+      progress.max = Math.max(1, counts.selected);
+      progress.value = counts.saved + counts.failed + counts.skipped;
       var summary = document.createElement("p");
-      var running = ["running", "cancelling"].includes(batch.status);
-      var stamp = Date.parse(batch.started_at);
-      var heading = document.createElement("p");
-      heading.textContent = (running ? "Current batch" : "Last batch")
-        + (Number.isFinite(stamp) ? " | " + new Date(stamp).toLocaleString() : "");
-      summary.textContent = batch.status + ": " + (counts.saved || 0) + " saved, "
-        + (counts.failed || 0) + " failed, " + (counts.skipped || 0) + " skipped"
-        + ", " + (counts.pending || 0) + " pending, " + (counts.deferred || 0) + " deferred, "
-        + (counts.cancelled || 0) + " cancelled"
-        + (batch.stop_reason ? " | " + reasonText(batch.stop_reason) : "");
+      summary.textContent = job.state + ": " + counts.selected + " selected, " + counts.saved + " saved, "
+        + counts.skipped + " skipped, " + counts.failed + " failed, " + counts.pending + " pending";
       var list = document.createElement("ol");
-      (batch.items || []).slice(0,5).forEach(function (item) {
+      (job.items || []).slice(0,5).forEach(function (item) {
         var row = document.createElement("li");
         row.textContent = (item.title || item.article_id) + ": " + item.state
-          + (item.reason ? " | " + reasonText(item.reason) : "");
-        var refs = item.references;
-        if (refs && refs.image_storage === "remote_references_only" && refs.links && refs.images) {
-          var resources = document.createElement("div");
-          resources.textContent = refs.links.retained + "/" + refs.links.observed + " source links; "
-            + refs.images.retained + "/" + refs.images.observed + " online image references; "
-            + refs.unsupported_embeds + " unsupported media";
-          row.appendChild(resources);
-        }
+          + (item.reason_code ? " | " + item.reason_code : "");
         list.appendChild(row);
       });
-      resultText.append(heading,summary,list);
-    } else resultText.textContent = "No attempts.";
-    renderTiming();
+      resultText.append(summary, list);
+    } else if (job && job.legacy_history) {
+      resultText.textContent = "Legacy history: " + (job.legacy_history.status || "unknown");
+    } else resultText.textContent = job && job.state || "No job.";
+    if (unavailable) {
+      var error = document.createElement("p");
+      error.textContent = "Status unavailable: " + (job && job.error_code || "native_host_unavailable");
+      resultText.appendChild(error);
+    }
+    timing.hidden = !active();
+    if (active()) {
+      var date = job.next_eligible_at && new Date(job.next_eligible_at);
+      timing.textContent = job.cancel_pending ? "Cancellation pending; native confirmation unavailable"
+        : job.state === "cancelling" ? "Stopping job..."
+        : job.state === "paused" ? "Paused: " + (job.reason_code || "Attention required")
+        : job.state === "waiting" ? "Waiting" + (date && Number.isFinite(date.getTime()) ? " until " + date.toLocaleString() : "")
+          + (job.reason_code ? " | " + job.reason_code : "")
+        : job.state === "running" ? "Processing article"
+        : "Pending";
+      if (job.reconnect_required) timing.textContent += " | Resume required";
+    }
     controls();
+  }
+  function receive(reply) {
+    if (!reply || reply.status !== "ok") {
+      unavailable = true;
+      job = Object.assign({}, job, {error_code: reply && reply.error_code});
+    } else {
+      unavailable = false;
+      job = reply;
+      if (reply.job_id || active()) preview = null;
+    }
+    render();
+  }
+  function schedulePoll() {
+    clearTimeout(pollTimer);
+    if (!closed && active()) pollTimer = setTimeout(refresh, 3000);
+  }
+  async function refresh() {
+    var stamp = ++version;
+    var reply = await sendRuntimeMessage({action:"get_article_body_recovery_state"});
+    if (closed || stamp !== version) return;
+    receive(reply);
+    schedulePoll();
   }
   async function loadPreview() {
     if (previewButton.disabled) return;
-    preview = null;
-    pending = true;
-    targets.replaceChildren();
+    preview = null; pending = true;
     previewText.textContent = "Loading preview...";
-    controls();
+    targets.replaceChildren(); controls();
     var reply = await sendRuntimeMessage({action:"preview_article_body_recovery"});
     pending = false;
-    if (reply && reply.status === "ok" && typeof reply.manifest_id === "string"
-        && Array.isArray(reply.targets) && Number.isSafeInteger(reply.remaining_count)) {
-      preview = {manifest_id:reply.manifest_id,targets:reply.targets.slice(0,5)};
-      previewText.textContent = reply.remaining_count + " remaining | " + reply.as_of;
-      preview.targets.forEach(function (item) {
+    if (reply && reply.status === "ok" && reply.protocol_version === 2
+        && typeof reply.manifest_id === "string" && Array.isArray(reply.targets)
+        && reply.counts && Number.isSafeInteger(reply.counts.targets) && reply.settings) {
+      var limit = reply.settings.max_articles_per_job;
+      var selected = limit > 0 ? Math.min(limit, reply.counts.targets) : reply.counts.targets;
+      preview = {manifest_id:reply.manifest_id,selected:selected};
+      unavailable = false;
+      previewText.textContent = selected + " selected / " + reply.counts.targets + " eligible | "
+        + reply.counts.held + " held | " + reply.counts.excluded + " excluded | " + reply.as_of;
+      reply.targets.slice(0,Math.min(5,selected)).forEach(function (item) {
         var row = document.createElement("li");
         row.textContent = item.title || item.article_id;
         targets.appendChild(row);
       });
-    } else previewText.textContent = "Preview unavailable.";
+    } else previewText.textContent = "Preview unavailable: " + (reply && reply.error_code || "sa_body_upgrade_required");
     controls();
   }
-  previewButton.addEventListener("click", loadPreview);
-  startButton.addEventListener("click", async function () {
-    if (startButton.disabled || !preview) return;
-    var manifestId = preview.manifest_id;
-    preview = null;
-    pending = true;
-    controls();
-    var reply = await sendRuntimeMessage({action:"start_article_body_recovery",manifest_id:manifestId});
-    pending = false;
-    if (reply && reply.status === "ok" && reply.batch) renderBatch(reply.batch);
-    else {
-      previewText.textContent = "Batch not started. Preview required.";
-      controls();
-    }
-  });
-  cancelButton.addEventListener("click", async function () {
-    if (cancelButton.disabled || !batch) return;
-    pending = true;
-    controls();
-    var reply = await sendRuntimeMessage({action:"cancel_article_body_recovery",batch_id:batch.batch_id});
-    pending = false;
-    if (reply && reply.batch) renderBatch(reply.batch);
-    else controls();
-  });
-  chrome.storage.onChanged.addListener(function (changes, area) {
-    if (area === "local" && changes.saArticleBodyRecovery) {
+  async function command(action) {
+    if (pending) return;
+    var message = {action:action};
+    if (action === "start_article_body_recovery") {
+      if (startButton.disabled || !preview) return;
+      message.manifest_id = preview.manifest_id;
       preview = null;
-      renderBatch(changes.saArticleBodyRecovery.newValue || null);
+    } else {
+      if (!job || action === "cancel_article_body_recovery" && cancelButton.disabled
+          || action === "resume_article_body_recovery" && resumeButton.disabled) return;
+      message.job_id = job.job_id;
     }
+    ++version;
+    pending = true; controls();
+    var reply = await sendRuntimeMessage(message);
+    pending = false;
+    if (reply && reply.cancel_pending) reply = Object.assign({}, job, reply, {status:"ok"});
+    receive(reply);
+    schedulePoll();
+  }
+  previewButton.addEventListener("click", loadPreview);
+  startButton.addEventListener("click", function () { return command("start_article_body_recovery"); });
+  cancelButton.addEventListener("click", function () { return command("cancel_article_body_recovery"); });
+  resumeButton.addEventListener("click", function () { return command("resume_article_body_recovery"); });
+  chrome.storage.onChanged.addListener(function (changes, area) {
+    if (area === "local" && changes.saArticleBodyRecoveryV2 && !pending) void refresh();
   });
-  sendRuntimeMessage({action:"get_article_body_recovery_state"}).then(async function (reply) {
-    if (!batch && reply && reply.status === "ok") renderBatch(reply.batch || null);
-    if (!batch || !["running","cancelling"].includes(batch.status)) await loadPreview();
-    else {
-      var heading = document.getElementById("bodyRecoveryHeading");
-      if (heading && typeof heading.scrollIntoView === "function") heading.scrollIntoView({block:"start"});
-    }
+  window.addEventListener("pagehide", function () { closed = true; clearTimeout(pollTimer); });
+  refresh().then(async function () {
+    if (!unavailable && !active()) await loadPreview();
+    else if (active()) document.getElementById("bodyRecoveryHeading").scrollIntoView({block:"start"});
   });
   controls();
 }

@@ -924,6 +924,15 @@ const settings = {
         guardConfirm: "套用變更",
       },
     },
+    articles: {
+      title: "文章採集", refresh: "重新整理文章設定與進度", save: "儲存文章設定", undo: "還原文章設定", defaults: "使用文章預設值",
+      limit: "每次工作篇數（0 為不限）", age: "文章年齡天數（0 為不限）", bodyScope: "正文補抓範圍", commentScope: "討論區更新範圍",
+      allRetained: "所有保留文章", current: "目前持股", tracked: "目前與歷史持股",
+      unavailable: "文章設定無法讀取", invalidSaved: "已儲存的文章設定無效，採集已受阻。", saveError: "文章設定未能儲存。",
+      progress: "正文補抓", progressUnavailable: "正文補抓狀態無法讀取", next: "下次可執行：{{time}}",
+      counts: "選定 {{selected}} · 已存 {{saved}} · 略過 {{skipped}} · 失敗 {{failed}} · 待處理 {{pending}}",
+      states: { not_started: "尚無工作", pending: "待處理", running: "處理中", waiting: "等待中", paused: "需處理", cancelling: "取消中", cancelled: "已取消", partial: "部分完成", complete: "已完成" },
+    },
     extension: {
       title: "SA Extension 健康",
       description: "檢查瀏覽器 extension、native host、sidecar 回報與資料接收狀態。",

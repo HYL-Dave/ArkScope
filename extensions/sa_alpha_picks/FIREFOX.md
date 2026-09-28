@@ -169,11 +169,17 @@ An **Audit pending** state is not proof that saving failed, nor proof that a run
 was recorded. Reopen the App for delivery; advanced news recovery also needs it.
 
 **Article body repair** is separate from restoring routine collection. Its
-**Preview body repair** reads local candidates; **Start next up to 5** manually
-queues one small batch through the same owner, pacing, restriction and priority
-checks. Routine jobs take priority between background pages. Leaving historical
-body repair unfinished does not stop news or Alpha Picks collection. The old
-isolated test kit's five-pages-per-day ceiling is not a production policy.
+**Preview body repair** reads local candidates; **Start repair** starts one durable
+job through the same owner, pacing, restriction and priority checks. It runs one
+article per shared-queue turn and continues without reopening the popup. Settings
+controls article count and age (both default to zero/unlimited), body scope (all
+retained) and discussion scope (Current). The preview title sample is not a limit.
+Routine jobs take priority between background pages. There is no whole-job timer.
+Cooldown resumes automatically; login/challenge/access pauses need handling and
+explicit **Resume**. **Cancel job** cancels durable intent, not just the open popup.
+Firefox temporary add-ons disappear on browser exit: reload the same add-on ID to
+recover its stored intent. Do not uninstall or clear storage as a pause method.
+The old isolated test kit's five-pages-per-day ceiling is not a production policy.
 
 ## Native Connection And Desktop Consent
 

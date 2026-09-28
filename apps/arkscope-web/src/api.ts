@@ -5308,6 +5308,38 @@ export function getSAExtensionHealth(): Promise<SAExtensionHealthResponse> {
   return getJSON<SAExtensionHealthResponse>("/sa/extension-health", 8_000);
 }
 
+export interface SAArticleAcquisitionValues {
+  max_articles_per_job: number;
+  body_lookback_days: number;
+  body_scope: "all_retained" | "current";
+  comment_scope: "current" | "tracked";
+}
+export interface SAArticleAcquisitionView {
+  values: SAArticleAcquisitionValues | null;
+  defaults: SAArticleAcquisitionValues;
+  setting_source: "default" | "profile";
+  error_code: string | null;
+}
+export interface SABodyRecoveryStatus {
+  status: "ok";
+  state: "not_started" | "pending" | "running" | "waiting" | "paused" | "cancelling" | "cancelled" | "partial" | "complete";
+  job_id?: string;
+  revision?: number;
+  settings?: SAArticleAcquisitionValues;
+  counts?: { selected: number; saved: number; skipped: number; failed: number; pending: number };
+  next_eligible_at?: string | null;
+  reason_code?: string | null;
+}
+export function getSAArticleAcquisitionSettings(): Promise<SAArticleAcquisitionView> {
+  return getJSON<SAArticleAcquisitionView>("/sa/article-acquisition-settings", 8_000);
+}
+export function putSAArticleAcquisitionSettings(values: SAArticleAcquisitionValues): Promise<SAArticleAcquisitionView> {
+  return sendJSON<SAArticleAcquisitionView>("/sa/article-acquisition-settings", "PUT", values, 8_000);
+}
+export function getSABodyRecoveryStatus(): Promise<SABodyRecoveryStatus> {
+  return getJSON<SABodyRecoveryStatus>("/sa/body-recovery-status", 8_000);
+}
+
 // --- provider health (slice 3e-A; PURE READ — no provider fetch) ---
 // Per-provider DTO is ProviderRun-compatible (Slice 5's per-call telemetry plugs
 // in without reshaping). maintenance = derived (e.g. IBKR weekend); disabled is a

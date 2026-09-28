@@ -604,3 +604,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.sa-article-settings { margin-block: 16px; padding-block: 16px; border-top: 1px solid var(--border); min-width: 0; }
+.sa-article-settings .settings-section-head { flex-wrap: wrap; gap: 8px; }
+.sa-article-fields { border: 0; padding: 0; margin: 12px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 12px 20px; min-width: 0; }
+.sa-article-fields label { display: grid; gap: 6px; min-width: 0; font-size: 13px; }
+.sa-article-fields input, .sa-article-fields select { width: 100%; min-width: 0; box-sizing: border-box; }
+.sa-body-progress { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; overflow-wrap: anywhere; }
+.sa-body-progress progress { width: 100%; height: 8px; }
+.sa-body-progress code { overflow-wrap: anywhere; }

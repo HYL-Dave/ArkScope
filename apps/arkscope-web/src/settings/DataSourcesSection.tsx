@@ -53,6 +53,7 @@ import { DataSourceRoutingSection } from "./DataSourceRoutingSection";
 import { DataSourceCatalogSection } from "./DataSourceCatalogSection";
 import { RecordedTimestamp } from "./RecordedTimestamp";
 import type { SettingsLocationId } from "./settingsRegistry";
+import { SAArticleAcquisitionSection } from "./SAArticleAcquisitionSection";
 
 function saChainPresentation(
   state: SAExtensionHealthResponse["chain_state"],
@@ -242,6 +243,7 @@ export function DataSourcesSection({
   const [outcome, setOutcome] = useState<DataSourcesOutcome | null>(null);
   const [busy, setBusy] = useState<string>("");
   const [routingGuard, setRoutingGuard] = useState(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  const [articleGuard, setArticleGuard] = useState(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({}); // "provider.field"
   const [testResults, setTestResults] = useState<Record<string, ProviderTestState>>({});
   const [pendingGuardedEdit, setPendingGuardedEdit] = useState<{
@@ -252,11 +254,11 @@ export function DataSourcesSection({
   } | null>(null);
   const guardedEditTriggerRef = useRef<HTMLButtonElement>(null);
   const dataSourcesMountedRef = useRef(true);
-  const combinedBusy = scheduleController.busy || busy || (routingGuard.busy ? "data-source-routing" : "");
+  const combinedBusy = scheduleController.busy || busy || (routingGuard.busy || articleGuard.busy ? "data-source-routing" : "");
   const dirty = scheduleController.hasDrafts
     || Object.values(keyDrafts).some((value) => value !== "")
     || pendingGuardedEdit !== null
-    || routingGuard.dirty;
+    || routingGuard.dirty || articleGuard.dirty;
   const navigationBusy = combinedBusy !== "";
 
   useEffect(() => {
@@ -796,6 +798,8 @@ export function DataSourcesSection({
         )}
         </div>
       </SettingsSubsectionAnchor>
+
+      <SAArticleAcquisitionSection onNavigationGuardChange={setArticleGuard} />
 
       <SettingsSubsectionAnchor id="provider_connections">
         <div className="settings-panel" style={{ marginTop: 16 }}>

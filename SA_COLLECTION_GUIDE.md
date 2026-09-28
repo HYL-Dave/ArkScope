@@ -33,7 +33,7 @@ For acquisition policy and technical limits, see
 | Immediate market news | **Sync Latest News** | Refreshes the list and eligible details. Existing items may need no new detail page. |
 | Financial tables for the App watchlist | **Financial statement updates** | Select **All App watchlist targets**, statements and periods; inspect supported/unsupported targets and estimated work before enabling **Scheduled financial updates**. |
 | Save financial settings without starting work | **Save only** | Saves the selected scope with the financial schedule off. It does not start a one-time update; use **Enable updates here** to enable the selected schedule. |
-| Repair missing article bodies | **Article body repair**: **Preview body repair**, then **Start next up to 5** | Preview is local-only. Starting explicitly queues a bounded repair batch; it does not run the whole historical corpus. |
+| Repair missing article bodies | **Article body repair**: **Preview body repair**, then **Start repair** | Preview is local-only. One explicit start repairs the selected missing bodies over successive background turns. |
 
 The watchlist comes from the App, not a hardcoded two-company test list. Unsupported
 symbols must remain visible; they are not silently mapped to another company.
@@ -45,6 +45,51 @@ It is a local pacing preference, not an SA-approved safe rate or a completion
 promise. Routine work takes priority between background pages. Restrictions,
 login pauses and shared cooldown still apply. Optional page-count limits are
 separate: an uncapped installation remains uncapped unless explicitly changed.
+
+## Body Repair And Discussion Scope
+
+In **Settings > Data sources > Article acquisition**, the defaults are:
+
+| Setting | Default |
+| --- | --- |
+| Articles per job | 0, unlimited |
+| Article age in days | 0, unlimited |
+| Article body scope | All retained articles, including Former history |
+| Discussion scope | Current holdings only |
+
+Saving settings does not start collection or delete content. Preview reports
+selected, eligible, held and excluded counts; its short title list is a sample,
+not a five-article limit. Start freezes the selected IDs. A changed preview
+requires a new preview, not a silent replacement of the target list. Changes to
+scope while running can skip newly ineligible work, but never expand that job.
+To select a new set, cancel the old job, preview, and explicitly start again.
+
+One article runs per shared queue turn; news and financial work can run between
+articles. There is no whole-job 30-minute deadline. Individual page deadlines,
+accepted page spacing, optional shared quotas and cooldown still apply. Closing
+the popup does not cancel work. Browser restart preserves intent, but Firefox
+temporary add-ons must be loaded again with the same identity before continuing.
+
+`saved` requires a stored body and native receipt. `skipped` can mean already
+present or out of scope; it is not a new save. `partial` means terminal work
+includes failures. `waiting` includes pacing, cooldown and an occupied collector.
+Cooldown resumes automatically; login, challenge and access pauses need the user
+to handle the source and explicitly **Resume**. **Cancel job** is durable, not a
+temporary pause. Offline cancellation remains pending until native confirmation;
+do not clear browser storage to get past it. A stopped page with uncertain cleanup
+must use the existing stopped-capture recovery, never a guessed timeout release.
+
+A valid nonstale Current position wins ordinary Closed history for the same
+established security: partial sales and re-entry still receive discussion updates.
+Stale Current rows do not win. Former discussions stop by default, but existing
+articles, associations, entry dates and comments stay stored. Permanent exclusions
+and distinct companies reusing a ticker remain separate. This release does not
+delete permanently retired content or perform LLM Entry/Exit classification.
+
+With a nonzero age limit, current entry candidates retain priority; undated
+non-entry articles are held rather than assigned an invented publication date.
+All retained scope plus zero age can recover older retained original articles,
+without claiming that their Entry/Exit roles have already been verified.
 
 ## Check The Result
 

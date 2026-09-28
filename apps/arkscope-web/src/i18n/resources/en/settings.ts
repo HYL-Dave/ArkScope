@@ -925,6 +925,15 @@ const settings = {
         guardConfirm: "Apply change",
       },
     },
+    articles: {
+      title: "Article acquisition", refresh: "Refresh article settings and progress", save: "Save article settings", undo: "Undo article settings", defaults: "Use default article settings",
+      limit: "Articles per job (0 = unlimited)", age: "Article age in days (0 = unlimited)", bodyScope: "Article body scope", commentScope: "Discussion scope",
+      allRetained: "All retained articles", current: "Current holdings", tracked: "Current and Former holdings",
+      unavailable: "Article settings unavailable", invalidSaved: "Saved article settings are invalid. Acquisition is blocked.", saveError: "Article settings could not be saved.",
+      progress: "Body repair", progressUnavailable: "Body repair status unavailable", next: "Next eligible: {{time}}",
+      counts: "{{selected}} selected · {{saved}} saved · {{skipped}} skipped · {{failed}} failed · {{pending}} pending",
+      states: { not_started: "No job", pending: "Pending", running: "Processing", waiting: "Waiting", paused: "Needs attention", cancelling: "Cancelling", cancelled: "Cancelled", partial: "Partially completed", complete: "Completed" },
+    },
     extension: {
       title: "SA Extension Health",
       description: "Check browser extension, native host, sidecar reporting, and data-receipt status.",

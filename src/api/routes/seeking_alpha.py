@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.agents.config import get_agent_config
-from src.api.dependencies import get_dal
+from src.api.dependencies import get_dal, get_data_provider_store
+from src.api.permissions import require_profile_state_write
+from src.sa.article_acquisition_settings import (
+    ARTICLE_SETTINGS_KEY, ArticleAcquisitionSettings, article_settings_view,
+)
 from src.service.sa_extension_health import collect_sa_extension_health
 from src.service.sa_market_news_health import compute_market_news_health
 from src.service.job_runs_store import get_job_runs_store
@@ -27,6 +31,40 @@ from src.tools.sa_tools import (
 )
 
 router = APIRouter(prefix="/sa", tags=["seeking-alpha"])
+
+
+@router.get("/article-acquisition-settings")
+def article_acquisition_settings():
+    from src.data_source_routing import DataSourcePolicyFailure, read_setting
+    try:
+        return article_settings_view(read_setting(ARTICLE_SETTINGS_KEY))
+    except DataSourcePolicyFailure as exc:
+        raise HTTPException(503, detail={"code": exc.code}) from exc
+
+
+@router.put("/article-acquisition-settings")
+def put_article_acquisition_settings(body: ArticleAcquisitionSettings, store=Depends(get_data_provider_store)):
+    require_profile_state_write("set_sa_article_acquisition_settings", body.model_dump())
+    raw = body.model_dump_json()
+    try:
+        store.set_setting(ARTICLE_SETTINGS_KEY, raw)
+    except Exception as exc:
+        raise HTTPException(503, detail={"code": "data_source_settings_unavailable"}) from exc
+    return article_settings_view(raw)
+
+
+@router.get("/body-recovery-status")
+def body_recovery_status():
+    from pathlib import Path
+    from src.app_records_store import resolve_profile_state_db_path
+    from src.sa.article_body_recovery_jobs import BodyRecoveryJobs
+    from src.sa_capture_store import resolve_sa_db_path
+    path = Path(resolve_sa_db_path())
+    result = BodyRecoveryJobs(path.with_name("sa_company_refresh.db"), sa_db=path,
+                              profile_db=resolve_profile_state_db_path()).public_status()
+    if result["status"] != "ok":
+        raise HTTPException(503, detail={"code": result["error_code"]})
+    return result
 
 
 class _RecoveryRequest(BaseModel):
