@@ -58,5 +58,5 @@ Files: `DataSourcesSection.tsx`, `MacroStorageSection.tsx`, settings CSS, locale
 - [x] Update acquisition documentation and evidence with exact findings and remaining limitations.
 - [x] Independent branch review, targeted corrections and re-verification, including the final `4b4d2c9d` compatibility fix.
 - [x] Freeze product commits at `4b4d2c9d`; complete offline backend (13,842 passed / 11 live skips), frontend (2,097), desktop (8), browser (24 + 16), build and i18n gates passed.
-- [ ] Request fresh pause only when ready; latest backup and integrity checks precede local integration and extension rebuild.
+- [x] Fresh operator pause, latest backup/integrity checks and local fast-forward integration completed; formal Firefox rebuilt and post-merge smoke passed. See the 2026-09-28 cutover receipt.
 - [ ] Restore collection promptly and distinguish local verification from observed production completion.
