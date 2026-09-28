@@ -262,6 +262,7 @@ def test_native_host_projects_numeric_action_limits_without_faking_defaults(
 
     assert result == {
         "status": "ok",
+        "body_recovery_protocol": 2,
         "limits": {
             "alpha_picks_full_comment_recovery_batch": 17,
             "alpha_picks_deep_comment_recovery_batch": None,

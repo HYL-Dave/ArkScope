@@ -462,7 +462,7 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
         ),
     }
     assert expected <= rows
-    assert len(rows) == 233
+    assert len(rows) == 236
     assert {row for row in rows if row[1].startswith("/fundamentals/")} == {
         ("GET", "/fundamentals/coverage"),
         ("GET", "/fundamentals/{ticker}"),
@@ -470,6 +470,9 @@ def test_app_mounts_the_exact_lifecycle_route_surface_and_retires_old_review_rou
     }
     assert {
         ("GET", "/sa/acquisition-status"),
+        ("GET", "/sa/article-acquisition-settings"),
+        ("PUT", "/sa/article-acquisition-settings"),
+        ("GET", "/sa/body-recovery-status"),
         ("GET", "/providers/data-catalog"),
         ("GET", "/sec-research/issuer/resolve"),
         ("POST", "/sec-research/issuer/refresh"),

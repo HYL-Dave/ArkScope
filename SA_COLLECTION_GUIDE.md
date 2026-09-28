@@ -133,6 +133,14 @@ failed articles. The current article is displayed separately from the selected p
 | Audit pending | The browser has not delivered its receipt to the App. Check again with the App running. |
 | Login or verification required | Stop automatic attempts and resolve the signed-in page or challenge yourself. Do not repeatedly click update. |
 
+**Paused: sa_company_layout_unrecognized** means the financial table did not
+pass the current layout validation and the financial queue is paused. That code
+alone does not prove missing company data or insufficient subscription access.
+Report the ticker, statement, Annual/Quarterly view, error time and a screenshot
+including headers, units and row names. Preserve the queue while diagnosing it;
+do not cancel it, reselect the collector or restart the entire watchlist to clear
+the error. Stored observation counts do not prove the fill is complete.
+
 For an older interrupted task, first stop its work and close its capture tabs.
 If the popup reports stopped work, click **Review stopped capture**, check
 **Previous capture stopped; its acquisition tabs are closed.**, then click

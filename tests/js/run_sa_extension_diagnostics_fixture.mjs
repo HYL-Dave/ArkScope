@@ -186,6 +186,13 @@ async function runAlphaFailureBranch(context, kind) {
   context.scrollToComments = async function () { return {}; };
   context.injectCommentsScraper = async function () { return {comments: []}; };
   context.sendNativeMessage2 = async function (message) {
+    if (message.action === "get_article_acquisition_eligibility") {
+      if (message.article_id !== "alpha-opaque-1" || !["body", "comments"].includes(message.operation)) {
+        throw new Error("Unexpected diagnostic fixture scope request");
+      }
+      return {status: "ok", allowed: true, reason_code: null,
+        effective_membership: "current", context_id: "diagnostics-current-fixture"};
+    }
     if (message.action === "save_articles_meta") {
       return {
         status: "ok",
@@ -232,6 +239,13 @@ async function runCommentFailure(context) {
   context.scrollToComments = async function () { return {}; };
   context.injectCommentsScraper = async function () { return {comments: []}; };
   context.sendNativeMessage2 = async function (message) {
+    if (message.action === "get_article_acquisition_eligibility") {
+      if (message.article_id !== "alpha-opaque-1" || !["body", "comments"].includes(message.operation)) {
+        throw new Error("Unexpected diagnostic fixture scope request");
+      }
+      return {status: "ok", allowed: true, reason_code: null,
+        effective_membership: "current", context_id: "diagnostics-current-fixture"};
+    }
     if (message.action === "save_articles_meta") {
       return {
         status: "ok",

@@ -42,6 +42,7 @@ function backgroundFixtureResults() {
               && !!context.SACompanyRefresh
               && !!context.SAQueue
               && !!context.SAAcquisition
+              && !!context.SAArticleBodyRecovery
               && !!context.SACommentCapture;
           },
         },
