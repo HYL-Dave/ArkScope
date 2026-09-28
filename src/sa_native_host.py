@@ -97,7 +97,14 @@ def handle_message(msg):
     if action in _MARKET_NEWS_RECOVERY_PATHS:
         return _handle_market_news_recovery_action(action, msg)
     if action in {"preview_article_body_recovery", "check_article_body_recovery_target", "save_article_body_recovery"}:
-        return _handle_article_body_recovery(action, msg)
+        from src.sa.company_data import CompanyDataFailure
+        from src.data_source_routing import DataSourcePolicyFailure
+        try:
+            return _handle_article_body_recovery(action, msg)
+        except (CompanyDataFailure, DataSourcePolicyFailure) as exc:
+            return {"status": "error", "error_code": exc.code, "body_saved": False}
+    if action == "article_body_recovery_control":
+        return _body_recovery_jobs().handle(msg, client=msg.get("client"))
     if action == "get_company_watchlist":
         from src.sa.company_collector import watchlist_targets
 
@@ -202,36 +209,46 @@ def handle_message(msg):
     return {"status": "error", "error": f"unknown action: {action}"}
 
 
-def _handle_article_body_recovery(action, msg):
-    """The browser chooses a bounded batch, not arbitrary URLs or old captures."""
-    from contextlib import closing
-    from src import sa_capture_store as store
-    from src.sa.article_body_quality import assess_body
-    from src.sa.article_body_recovery import build_recovery_manifest
+def _body_recovery_jobs():
+    from pathlib import Path
+    from src.app_records_store import resolve_profile_state_db_path
+    from src.sa.article_body_recovery_jobs import BodyRecoveryJobs
+    from src.sa_capture_store import resolve_sa_db_path
+    path = Path(resolve_sa_db_path())
+    return BodyRecoveryJobs(path.with_name("sa_company_refresh.db"), sa_db=path, profile_db=resolve_profile_state_db_path())
 
+
+def _handle_article_body_recovery(action, msg):
+    """A frozen native job authorizes writes; the preview is bounded transport."""
+    from src import sa_capture_store as store
+    from src.sa.article_body_recovery import build_recovery_manifest
+    from src.sa.article_body_recovery_jobs import BODY_PROTOCOL, REPLY_BYTES, _target_view
+
+    if type(msg.get("protocol_version")) is not int or msg["protocol_version"] != BODY_PROTOCOL:
+        return {"status": "error", "error_code": "sa_body_upgrade_required", "body_saved": False}
     path = store.resolve_sa_db_path()
-    manifest = build_recovery_manifest(path)
-    if manifest.get("status") != "ok":
-        return manifest
     if action == "preview_article_body_recovery":
-        # Native Messaging responses are bounded independently of corpus size.
-        return {key: manifest[key] for key in ("status", "manifest_id", "as_of", "scope", "counts")} | {
-            "targets": manifest["targets"][:5],
-        }
+        manifest = build_recovery_manifest(path)
+        if manifest.get("status") != "ok":
+            return manifest
+        reply = {key: manifest[key] for key in ("status", "manifest_id", "as_of", "scope", "counts", "settings")}
+        reply.update(protocol_version=BODY_PROTOCOL, targets=[])
+        for item in manifest["targets"]:
+            target = _target_view(item)
+            if len(json.dumps(reply | {"targets": [*reply["targets"], target]}).encode("utf8")) > REPLY_BYTES - 1024:
+                break
+            reply["targets"].append(target)
+        reply["sample_count"] = len(reply["targets"])
+        return reply
     article_id = msg.get("article_id")
     digest = msg.get("expected_body_sha256" if action == "save_article_body_recovery" else "body_sha256")
     if (not isinstance(article_id, str) or not re.fullmatch(r"[0-9]{1,20}", article_id)
             or not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest)):
         return {"status": "error", "error_code": "sa_article_body_recovery_target_invalid", "body_saved": False}
-    target = next((t for t in manifest["targets"] if t["article_id"] == article_id), None)
-    if target is None:
-        try:
-            with closing(store.connect(path, read_only=True)) as conn:
-                row = conn.execute("SELECT title, body_markdown FROM sa_articles WHERE article_id=?", (article_id,)).fetchone()
-                available = row is not None and assess_body(row["body_markdown"], title=row["title"])["status"] == "available"
-        except (sqlite3.Error, OSError):
-            return {"status": "unavailable", "error_code": "sa_article_store_unavailable", "body_saved": False}
-        return {"status": "skipped", "reason": "already_present" if available else "out_of_scope", "body_saved": False}
+    admitted = _body_recovery_jobs().capture_target(msg)
+    if admitted["status"] != "ok":
+        return admitted
+    target = admitted["target"]
     if target["body_sha256"] != digest:
         return {"status": "skipped", "reason": "source_changed", "body_saved": False}
     if action == "check_article_body_recovery_target":
@@ -1215,6 +1232,7 @@ def _handle_get_extension_action_limits():
         deep = None
     return {
         "status": "ok",
+        "body_recovery_protocol": 2,
         "limits": {
             "alpha_picks_full_comment_recovery_batch": full,
             "alpha_picks_deep_comment_recovery_batch": deep,

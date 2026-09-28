@@ -391,6 +391,11 @@ class CompanyCollector:
                 self._restriction(state, reason, now, msg.get("retry_after"))
                 return {}
             if operation == "admit_navigation":
+                if active.get("body_recovery_job_id"):
+                    from src.sa.article_body_recovery_jobs import body_navigation_allowed
+                    body_blocked = body_navigation_allowed(conn, active)
+                    if body_blocked:
+                        return body_blocked
                 nav_id, kind, destination = msg.get("navigation_id"), msg.get("kind"), msg.get("destination_class")
                 require(type(nav_id) is str and _ID.fullmatch(nav_id)
                         and kind in {"create", "update", "reload", "current_tab"}
@@ -422,6 +427,9 @@ class CompanyCollector:
                         "sa_company_receipt_unverified")
                 state["failures"].pop("/".join(scope.values()), None)
                 state["rate_limit_failures"] = 0
+            elif result["status"] == "ok" and active.get("body_recovery_job_id"):
+                from src.sa.article_body_recovery_jobs import verify_stored_body
+                require(verify_stored_body(conn, active), "sa_company_receipt_unverified")
             elif result["status"] == "error":
                 self._failure(state, result.get("error_code"), now)
             return {"acquisition": self._terminal(conn, state, result, now)}
@@ -439,8 +447,6 @@ class CompanyCollector:
         task_operation, mode = msg.get("task_operation"), msg.get("mode")
         contract = OPERATION_CONTRACTS.get(task_operation) if type(task_operation) is str else None
         require(contract is not None and mode in contract["modes"], "sa_company_control_invalid")
-        if task_operation == "alpha_picks_body_repair":
-            require(msg.get("trigger") == "manual", "sa_company_control_invalid")
         request_id = msg.get("request_id")
         require(type(request_id) is str and _ID.fullmatch(request_id)
                 and msg.get("trigger") in {"manual", "alarm", "startup", "continuation"}
@@ -470,6 +476,10 @@ class CompanyCollector:
         if capacity:
             return capacity
         task_id, token = uuid4().hex, uuid4().hex
+        body = {}
+        if task_operation == "alpha_picks_body_repair":
+            from src.sa.article_body_recovery_jobs import bind_body_task
+            body = bind_body_task(conn, state, msg, client, task_id)
         queue_wait = msg.get("queue_wait_ms", 0)
         require(type(queue_wait) in (int, float) and math.isfinite(queue_wait) and queue_wait >= 0, "sa_company_control_invalid")
         state["active"] = {"task_id": task_id, "token": token, "client": client, "scope": scope,
@@ -477,7 +487,7 @@ class CompanyCollector:
                            "trigger": msg["trigger"], "build": msg["build"], "protocol_version": 2,
                            "generation": state["generation"], "batch_id": request_id,
                            "queue_wait_ms": queue_wait, "navigation_attempt_count": 0,
-                           "started_at": _iso(now), "failure_reported": False, "request_fingerprint": fingerprint}
+                           "started_at": _iso(now), "failure_reported": False, "request_fingerprint": fingerprint, **body}
         conn.execute("INSERT INTO acquisition_tasks VALUES (?,?,?,?,?,NULL,NULL)",
                      (task_id, request_key, state["generation"], state["policy_revision"], json.dumps(state["active"])))
         state["task_count"] += 1
@@ -510,6 +520,8 @@ class CompanyCollector:
                                                    "priority", "trigger", "navigation_attempt_count", "queue_wait_ms")},
                    "acquisition_duration_ms": round((now - _seconds(active["started_at"])) * 1000),
                    "identity_basis": "native_task_admission"}
+        if active.get("body_recovery_job_id"):
+            receipt.update({key: active[key] for key in ("body_recovery_job_id", "body_job_revision", "article_id")})
         conn.execute("UPDATE acquisition_tasks SET payload=?, finished_at=?, receipt=? WHERE task_id=?",
                      (json.dumps({**active, "result": result}), now, json.dumps(receipt), active["task_id"]))
         if active["priority"] == "background" and active["navigation_attempt_count"] > 0:

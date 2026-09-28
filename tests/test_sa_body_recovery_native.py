@@ -13,18 +13,38 @@ from datetime import datetime, timezone
 import pytest
 
 from src import sa_capture_store as store
-from src.sa_native_host import handle_message
+from src.sa_native_host import handle_message as native_handle_message
 from src.tools.backends.sa_capture_backend import SACaptureBackend
 
 
 BAD = "Analyst's Disclosure: no positions.\n\nSeeking Alpha's Disclosure: investing involves risk."
 GOOD = "Demand and free cash flow improved following the company's cost reduction program."
+handle_message = native_handle_message
+
+
+@pytest.fixture(autouse=True)
+def admitted_messages(monkeypatch):
+    auth = {}
+    monkeypatch.setattr(sys.modules[__name__], "handle_message", lambda message: native_handle_message(
+        {"protocol_version": 2, **auth, **message}))
+    return auth
 
 
 @pytest.fixture
-def db(tmp_path, monkeypatch):
+def db(tmp_path, monkeypatch, admitted_messages):
+    from src.profile_state import ProfileStateStore
+    from src.sa_tracking_memberships import SaTrackingMembershipStore
+    from src.sa.article_acquisition_settings import ARTICLE_SETTINGS_KEY
+    from src.sa.company_collector import CompanyCollector
+    from tests.test_sa_acquisition_authority import activate, call, FIREFOX, UNCAPPED
+
     path = tmp_path / "sa.db"
     monkeypatch.setenv("ARKSCOPE_SA_DB", str(path))
+    profile = tmp_path / "profile.db"
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(profile))
+    ProfileStateStore(profile).set_setting(ARTICLE_SETTINGS_KEY, '{"body_lookback_days":365}')
+    with sqlite3.connect(profile) as conn:
+        SaTrackingMembershipStore.install(conn)
     backend = SACaptureBackend(sa_db=str(path), market_db=str(tmp_path / "market.db"))
     today = datetime.now(timezone.utc).date().isoformat()
     backend.upsert_sa_articles_meta([{
@@ -36,6 +56,17 @@ def db(tmp_path, monkeypatch):
     }])
     with store.connect(str(path)) as conn:
         conn.execute("UPDATE sa_articles SET body_markdown=?", (BAD,))
+    collector = CompanyCollector(path.with_name("sa_company_refresh.db"))
+    activate(collector, UNCAPPED)
+    preview = handle_message({"action": "preview_article_body_recovery"})
+    job = handle_message({"action": "article_body_recovery_control", "operation": "start", "client": FIREFOX,
+                          "request_id": "native-test", "manifest_id": preview["manifest_id"],
+                          "expected_generation": 1, "trigger": "manual"})
+    permit = call(collector, "begin_task", generation=1, request_id="body-task", task_operation="alpha_picks_body_repair",
+                  mode="manual", trigger="manual", intent_revision=job["revision"], build="test", protocol_version=2,
+                  body_job_id=job["job_id"], body_job_revision=job["revision"], article_id="123")
+    assert permit["status"] == "ok", permit
+    admitted_messages.update(client=FIREFOX, token=permit["token"], generation=1, task_id=permit["task_id"], body_job_id=job["job_id"])
     return path
 
 
@@ -65,7 +96,8 @@ def test_preview_bounds_native_payload_but_preserves_total_count(db):
             for i in range(1000, 1020)
         ])
     result = handle_message({"action": "preview_article_body_recovery"})
-    assert len(result["targets"]) == 5
+    assert len(result["targets"]) == 21
+    assert len(json.dumps(result).encode("utf8")) <= 65536
     assert result["counts"]["targets"] == 21
     assert "held" not in result
     assert "excluded" not in result
@@ -85,15 +117,15 @@ def test_native_repair_revalidates_scope_and_then_skips_already_saved_body(db):
 
 
 @pytest.mark.parametrize("article_id,digest,reason", [
-    ("456", hashlib.sha256(BAD.encode()).hexdigest(), "out_of_scope"),
+    ("456", hashlib.sha256(BAD.encode()).hexdigest(), "sa_body_target_invalid"),
     ("123", "0" * 64, "source_changed"),
 ])
 def test_native_save_cannot_expand_frozen_scope_or_overwrite_changed_input(db, article_id, digest, reason):
     before = db.read_bytes()
     result = handle_message({"action": "save_article_body_recovery", "article_id": article_id,
                              "expected_body_sha256": digest, "body_markdown": GOOD})
-    assert result["status"] == "skipped"
-    assert result["reason"] == reason
+    assert result["status"] == ("error" if article_id == "456" else "skipped")
+    assert result.get("reason", result.get("error_code")) == reason
     assert not result.get("body_saved")
     assert db.read_bytes() == before
 

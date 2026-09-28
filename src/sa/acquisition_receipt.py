@@ -9,6 +9,7 @@ from src.sa.extension_run_protocol import ProtocolError
 _KEYS = {"schema_version", "ledger_id", "browser", "client_id", "build", "protocol_version", "generation",
          "task_id", "batch_id", "priority", "trigger", "navigation_attempt_count", "queue_wait_ms",
          "acquisition_duration_ms", "identity_basis"}
+_BODY_KEYS = {"body_recovery_job_id", "body_job_revision", "article_id"}
 
 
 def project_acquisition(value):
@@ -16,7 +17,11 @@ def project_acquisition(value):
         if not condition:
             raise ProtocolError("acquisition_unverified")
 
-    require(type(value) is dict and set(value) == _KEYS)
+    require(type(value) is dict and set(value) in (_KEYS, _KEYS | _BODY_KEYS))
+    if "body_recovery_job_id" in value:
+        require(type(value["body_recovery_job_id"]) is str and re.fullmatch(r"[a-f0-9]{32}", value["body_recovery_job_id"])
+                and type(value["body_job_revision"]) is int and value["body_job_revision"] > 0
+                and type(value["article_id"]) is str and re.fullmatch(r"[0-9]{1,20}", value["article_id"]))
     require(type(value["schema_version"]) is int and value["schema_version"] == 1
             and type(value["protocol_version"]) is int and value["protocol_version"] == 2)
     for key in ("ledger_id", "task_id"):

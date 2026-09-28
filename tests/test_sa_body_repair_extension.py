@@ -10,6 +10,10 @@ import pytest
 
 from src.sa.company_collector import CompanyCollector
 from src.sa.extension_run_protocol import ProtocolError, derive_run_result
+from tests.test_sa_body_recovery_jobs import journal_case
+from tests.test_sa_article_acquisition_scope import scope_case
+from tests.test_sa_acquisition_authority import FIREFOX
+from tests.test_sa_article_body_recovery import NARRATIVE
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,22 +83,21 @@ def test_body_repair_protocol_parity(tmp_path, kind, outcome):
     assert json.loads(js.stdout) == [{"name": kind, **expected}]
 
 
-def test_body_repair_uses_server_background_reserve_and_manual_admission(tmp_path):
-    client = {"client_id": "c" * 32, "browser": "chrome"}
-    clock = [1790208000]
-    control = CompanyCollector(tmp_path / "control.db", clock=lambda: clock[0])
+def test_body_repair_uses_server_background_reserve_and_manual_admission(journal_case):
+    client, clock, control = FIREFOX, journal_case.now, journal_case.collector
+    job = journal_case.start()
 
     def call(operation, **fields):
         return control.handle({"client": client, "operation": operation, "generation": 1, **fields})
 
-    assert call("configure", expected_generation=0, confirm_activation=True,
+    assert call("configure", expected_generation=1, confirm_activation=True,
                 policy={"hour_limit": 2, "day_limit": 10, "hour_reserve": 1, "day_reserve": 1},
                 financial_gap_seconds=60)["status"] == "ok"
-    assert call("select", expected_generation=0, confirm_schedules=True)["status"] == "ok"
 
     def begin(operation="alpha_picks_body_repair", trigger="manual"):
         return call("begin_task", task_operation=operation, mode="manual" if operation.endswith("repair") else "quick",
-                    request_id=uuid4().hex, trigger=trigger, intent_revision=0, build="test", protocol_version=2)
+                    request_id=uuid4().hex, trigger=trigger, intent_revision=job["revision"], build="test", protocol_version=2,
+                    body_job_id=job["job_id"], body_job_revision=job["revision"], article_id="1000")
 
     assert begin(trigger="alarm")["status"] == "error"
     permit = begin()
@@ -102,6 +105,8 @@ def test_body_repair_uses_server_background_reserve_and_manual_admission(tmp_pat
     assert permit["active"]["priority"] == "background"
     assert call("admit_navigation", token=permit["token"], navigation_id=uuid4().hex,
                 kind="create", destination_class="article")["allowed"] is True
+    journal_case.conn.execute("UPDATE sa_articles SET body_markdown=? WHERE article_id='1000'", (NARRATIVE,))
+    journal_case.conn.commit()
     assert call("finish_task", token=permit["token"], cleanup_confirmed=True,
                 result={"status": "ok"})["active"] is None
     clock[0] += 60
@@ -114,27 +119,30 @@ def test_body_repair_uses_server_background_reserve_and_manual_admission(tmp_pat
     {"hour_limit": 100, "day_limit": 1000, "hour_reserve": 10, "day_reserve": 100},
     {"hour_limit": None, "day_limit": None, "hour_reserve": 0, "day_reserve": 0},
 ])
-def test_body_repair_obeys_shared_gap_after_body_or_financial_but_news_does_not(tmp_path, previous, policy):
-    clock = [1790208000]
-    control = CompanyCollector(tmp_path / "control.db", clock=lambda: clock[0])
-    client = {"client_id": "a" * 32, "browser": "chrome"}
+def test_body_repair_obeys_shared_gap_after_body_or_financial_but_news_does_not(journal_case, previous, policy):
+    clock, control, client = journal_case.now, journal_case.collector, FIREFOX
+    job = journal_case.start()
+    next_aid = ["1000"]
 
     def call(operation, **fields):
         return control.handle({"client": client, "operation": operation, "generation": 1, **fields})
 
-    assert call("configure", expected_generation=0, confirm_activation=True,
+    assert call("configure", expected_generation=1, confirm_activation=True,
                 policy=policy,
                 financial_gap_seconds=45)["status"] == "ok"
-    assert call("select", expected_generation=0, confirm_schedules=True)["status"] == "ok"
 
     def begin(operation, mode="manual"):
         return call("begin_task", task_operation=operation, mode=mode,
-                    request_id=uuid4().hex, trigger="manual", intent_revision=0, build="test", protocol_version=2)
+                    request_id=uuid4().hex, trigger="manual", intent_revision=job["revision"], build="test", protocol_version=2,
+                    body_job_id=job["job_id"], body_job_revision=job["revision"], article_id=next_aid[0])
 
     permit = begin(previous, "current_tab" if previous == "company_financial_capture" else "manual")
     assert permit["status"] == "ok"
     assert call("admit_navigation", token=permit["token"], navigation_id=uuid4().hex,
                 kind="create", destination_class="article" if previous.endswith("repair") else "company")["allowed"]
+    if previous == "alpha_picks_body_repair":
+        journal_case.conn.execute("UPDATE sa_articles SET body_markdown=? WHERE article_id='1000'", (NARRATIVE,))
+        journal_case.conn.commit()
     finished = call("finish_task", token=permit["token"], cleanup_confirmed=True, result={"status":"ok"})
     deadline = finished["next_navigation_at"]
     clock[0] += 44
@@ -147,30 +155,31 @@ def test_body_repair_obeys_shared_gap_after_body_or_financial_but_news_does_not(
     assert news["status"] == "ok"
     assert call("finish_task", token=news["token"], cleanup_confirmed=True, result={"status":"ok"})["next_navigation_at"] == deadline
     clock[0] += 1
+    next_aid[0] = journal_case.control("next", job_id=job["job_id"], revision=job["revision"])["target"]["article_id"]
     assert begin("alpha_picks_body_repair")["status"] == "ok"
 
 
 @pytest.mark.parametrize("operation,mode", [
     ("alpha_picks_body_repair", "manual"), ("company_financial_capture", "current_tab"),
 ])
-def test_cancellation_without_navigation_does_not_restart_the_page_gap(tmp_path, operation, mode):
-    clock = [1790208000]
-    control = CompanyCollector(tmp_path / "control.db", clock=lambda: clock[0])
-    client = {"client_id": "a" * 32, "browser": "firefox"}
+def test_cancellation_without_navigation_does_not_restart_the_page_gap(journal_case, operation, mode):
+    clock, control, client = journal_case.now, journal_case.collector, FIREFOX
+    job = journal_case.start()
 
     def call(action, **fields):
         return control.handle({"client": client, "operation": action, "generation": 1, **fields})
 
-    assert call("configure", expected_generation=0, confirm_activation=True,
+    assert call("configure", expected_generation=1, confirm_activation=True,
                 policy={"hour_limit": 10, "day_limit": 10, "hour_reserve": 0, "day_reserve": 0},
                 financial_gap_seconds=60)["status"] == "ok"
-    assert call("select", expected_generation=0, confirm_schedules=True)["status"] == "ok"
     request = {"task_operation": operation, "mode": mode, "trigger": "manual",
-               "intent_revision": 0, "build": "test", "protocol_version": 2}
+               "intent_revision": job["revision"], "build": "test", "protocol_version": 2,
+               "body_job_id": job["job_id"], "body_job_revision": job["revision"], "article_id": "1000"}
     first = call("begin_task", **request, request_id=uuid4().hex)
     assert first["status"] == "ok"
     cancelled = call("finish_task", token=first["token"], cleanup_confirmed=True,
                      result={"status": "cancelled"})
     assert cancelled["next_navigation_at"] == first["next_navigation_at"]
     assert cancelled["acquisition"]["navigation_attempt_count"] == 0
+    request["article_id"] = journal_case.control("next", job_id=job["job_id"], revision=job["revision"])["target"]["article_id"]
     assert call("begin_task", **request, request_id=uuid4().hex)["status"] == "ok"
