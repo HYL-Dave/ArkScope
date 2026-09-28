@@ -848,7 +848,7 @@ const companyFinancialRefresh = SACompanyRefresh.create({
   alarms: chrome.alarms,
   control:companyCollectorControl,
   shouldPause:function () {return acquisitionPaused("financials");},
-  setTimer:setTimeout,clearTimer:clearTimeout,
+  setTimer:(callback,delay)=>setTimeout(callback,delay),clearTimer:id=>clearTimeout(id),
   resolveWatchlist:function () { return sendNativeMessage2({action:"get_company_watchlist"}); },
   runScope: function (scope, mode, admitted, observeFailure, intervalDays, requestedAt, force) {
     scope = Object.assign({}, scope, {ticker:SACompanyRefresh.providerSymbol(scope.ticker)});

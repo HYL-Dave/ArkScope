@@ -12,7 +12,7 @@
 
 **Status:** Approved September 28; inline implementation in `feat/sa-body-continuation-20260928`, then one independent whole-branch review and complete regression. Formal acquisition remains unchanged until the cutover gates.
 
-**Progress:** Tasks 1-5 implemented in isolation. Scope/native/comment/Alpha regression: 554 passed; extension/packaging/queue: 97 passed; real Firefox/Chromium body/routine and cross-browser authority: 5 passed. Settings/routes/popup/browser: 91 passed; full frontend: 2103 passed, build and i18n scan passed. Tasks 6-7 and all formal cutover gates remain open. RCL/VISN historical Current rows are stale and their accepted tracking is former-only; they are negative cases, not additional valid mixed-current examples.
+**Progress:** Tasks 1-6 implemented in isolation. Scope/native/comment/Alpha regression: 554 passed; extension/packaging/queue: 97 passed; real Firefox/Chromium body/routine and cross-browser authority: 5 passed. Settings/routes/popup/browser: 91 passed; full frontend: 2103 passed, build and i18n scan passed. Mid-fill exact preservation, negative controls, installed Firefox/Chromium disable/reload/rollback and financial regression: 112 passed. Task 7 and all formal cutover gates remain open. RCL/VISN historical Current rows are stale and their accepted tracking is former-only; they are negative cases, not additional valid mixed-current examples.
 
 ## Global Constraints
 

@@ -93,6 +93,29 @@ without claiming that their Entry/Exit roles have already been verified.
 
 ## Check The Result
 
+### Updating During A Financial Fill
+
+Use this maintenance procedure only after the isolated upgrade gate passes and
+the operator approves the interruption. Disable the selected add-on in the
+browser's extension manager without uninstalling it. Do not use Save only,
+Cancel queued update or collector activation as a pause: they can change intent.
+Confirm capture tabs are closed and native ownership is idle, then close the App.
+
+Back up the stores and extension state. Compare ordered pending IDs, successful
+captures, intent revisions, collector identity, policies and schedules before
+and after replacing the same-path, same-ID package. Firefox temporary-addon
+Reload may also enable it, so prepare the new native version and backup first.
+Immediately restore operation after equality is confirmed. Require a stored
+financial receipt for a previously pending scope, followed by a new body-job
+receipt after explicit preview/start; counts and green badges are insufficient.
+
+For rollback, cancel the new body job and confirm cleanup before loading the
+old same-ID package. Keep newer captures and journal history; do not overwrite
+them with an older whole-database backup. The baseline has a browser timer-call
+defect fixed in this version, so verify actual continuation after rollback.
+
+### Reading Outcomes
+
 Inspect the popup's running task, saved/pending/failed counts and next attempt,
 then the App's source health and job history. A tab closing alone proves nothing.
 
