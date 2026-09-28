@@ -1,5 +1,9 @@
 # Firefox Collector Setup
 
+For everyday operation, recovery checkboxes and backfill choices, use the
+[Traditional Chinese step-by-step guide](../../SA_COLLECTION_GUIDE.zh-Hant.md).
+This document covers installation and technical setup.
+
 The Chrome extension remains the default build:
 
 - `manifest.json`

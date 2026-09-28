@@ -59,4 +59,12 @@ Files: `DataSourcesSection.tsx`, `MacroStorageSection.tsx`, settings CSS, locale
 - [x] Independent branch review, targeted corrections and re-verification, including the final `4b4d2c9d` compatibility fix.
 - [x] Freeze product commits at `4b4d2c9d`; complete offline backend (13,842 passed / 11 live skips), frontend (2,097), desktop (8), browser (24 + 16), build and i18n gates passed.
 - [x] Fresh operator pause, latest backup/integrity checks and local fast-forward integration completed; formal Firefox rebuilt and post-merge smoke passed. See the 2026-09-28 cutover receipt.
-- [ ] Restore collection promptly and distinguish local verification from observed production completion.
+- [x] Restore collection and verify new production results: automatic news 30956, manual news 30957 and manual Alpha Picks 30958 all complete on 2026-09-28. See the cutover receipt for timestamps and actual stored-data readback.
+- [x] Publish the Traditional Chinese operator guide and verify documented control contracts (227 focused offline tests passed). No runtime/settings changes during live restoration checks.
+
+## Post-Cutover Follow-Up
+
+- [ ] Observe a new automatic Alpha Picks completion; the manual success does not prove its next automatic trigger.
+- [ ] Add the reviewer's exact IBKR partial-headline-then-error-321 regression and mutation check in a separate test-only change.
+- [ ] Correct obsolete popup Quick Update cap wording from authoritative native limits and simplify historical-result/current-activity presentation in a separately verified UI change.
+- [ ] Operator-selected body and company-financial backfill: dated gaps are in the cutover receipt; no bulk work was automatically started. LLM classification remains deferred.

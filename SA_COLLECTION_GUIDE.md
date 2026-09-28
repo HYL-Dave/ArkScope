@@ -1,5 +1,8 @@
 # Seeking Alpha Collection Guide
 
+For button-by-button instructions in Traditional Chinese, see the
+[Traditional Chinese guide](SA_COLLECTION_GUIDE.zh-Hant.md).
+
 This guide describes the implemented controls, not future functionality.
 For acquisition policy and technical limits, see
 [Data Acquisition And Updates](DATA_ACQUISITION_AND_UPDATES.md).
@@ -29,7 +32,7 @@ For acquisition policy and technical limits, see
 | Routine market news | **Auto-sync Market News** | Independent recurring schedule, using the shared collector and restrictions. |
 | Immediate market news | **Sync Latest News** | Refreshes the list and eligible details. Existing items may need no new detail page. |
 | Financial tables for the App watchlist | **Financial statement updates** | Select **All App watchlist targets**, statements and periods; inspect supported/unsupported targets and estimated work before enabling **Scheduled financial updates**. |
-| Save financial settings without starting work | **Save only** | Saves the selected scope and schedule switch as shown. It does not start a one-time update. |
+| Save financial settings without starting work | **Save only** | Saves the selected scope with the financial schedule off. It does not start a one-time update; use **Enable updates here** to enable the selected schedule. |
 | Repair missing article bodies | **Article body repair**: **Preview body repair**, then **Start next up to 5** | Preview is local-only. Starting explicitly queues a bounded repair batch; it does not run the whole historical corpus. |
 
 The watchlist comes from the App, not a hardcoded two-company test list. Unsupported
@@ -57,8 +60,12 @@ then the App's source health and job history. A tab closing alone proves nothing
 | Login or verification required | Stop automatic attempts and resolve the signed-in page or challenge yourself. Do not repeatedly click update. |
 
 For an older interrupted task, first stop its work and close its capture tabs.
-Then use the explicitly acknowledged **Recover stopped capture** control if
-needed. Do not clear acquisition storage, quotas or browser permissions to make
+If the popup reports stopped work, click **Review stopped capture**, check
+**Previous capture stopped; its acquisition tabs are closed.**, then click
+**Recover stopped capture**. The checkbox acknowledges what you have already
+stopped; it does not close tabs. Do not check **Recheck all selected scopes,
+including reusable data.** merely for recovery. Do not clear acquisition
+storage, quotas or browser permissions to make
 a blocked task disappear. Follow the
 [routine recovery procedure](extensions/sa_alpha_picks/FIREFOX.md#activate-or-restore-routine-collection).
 

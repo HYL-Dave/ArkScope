@@ -93,6 +93,8 @@ in `docs/design/SA_EXTENSION_ROADMAP.md` and `extensions/sa_alpha_picks/`.
 
 Use the [SA collection guide](SA_COLLECTION_GUIDE.md) for routine collection,
 watchlist financial updates, result states and where to inspect article links.
+The [Traditional Chinese step-by-step guide](SA_COLLECTION_GUIDE.zh-Hant.md)
+separates everyday sync, body repair, watchlist financials and stopped-task recovery.
 The [data acquisition policy](DATA_ACQUISITION_AND_UPDATES.md) records freshness,
 source selection and the limits of currently implemented capabilities.
 
