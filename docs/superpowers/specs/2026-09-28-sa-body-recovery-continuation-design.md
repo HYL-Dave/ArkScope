@@ -1,7 +1,8 @@
 # SA Body Recovery Continuation
 
 Status: direction approved; this written design awaits operator review.
-September 28 review adds configurable scope and a retired-content boundary.
+September 28: the operator confirmed retaining Closed/Former history and limiting
+cleanup to permanently removed targets. Configurable scope remains in this design.
 No runtime changes, production migration, or collector restart are authorized by
 this document alone. Review the implementation plan separately after this spec.
 
@@ -74,8 +75,8 @@ cohort; an old cohort exclusion must not suppress a legitimate new one. General
 market news and company-financial acquisition are outside this retention policy.
 
 The operator permits deleting unneeded analysis bodies and discussions belonging
-exclusively to removed Alpha Picks targets. Keep this as a separately reviewed
-cleanup operation, not an automatic side effect of refresh or a new purge timer.
+exclusively to permanently removed Alpha Picks targets. Keep this as a separately
+reviewed cleanup operation, not an automatic side effect of refresh or a new purge timer.
 Before applying it, preview exact targets, article/comment counts, reference
 dependencies and shared/unresolved exclusions; revalidate that preview under the
 stop-write boundary and take a recovery backup. Do not delete shared content or
@@ -85,12 +86,23 @@ jobs cannot silently reacquire purged content. Update affected local indexes and
 owned raw copies; retained links/readers must report deliberate removal rather
 than a broken reference or missing capture. Do not purge unrelated research output.
 
-Cleanup scope still needs one operator decision: retain Closed/Former history and
-purge only permanently removed targets, or also purge former-only content once it
-leaves Current. Until that decision, preserve Closed/Former content. The first
-delivery implements eligibility and stops unwanted acquisition; destructive
-cleanup has its own inventory, verification and approval, independent of SEC
-retirement. ARCH/LTHM/TA permanent exclusion facts survive either choice.
+Confirmed retention policy: preserve Closed/Former article bodies and existing
+discussions. Leaving Current stops discussion updates by default; it never implies
+content deletion. Missing historical bodies can still be repaired under the chosen
+body scope, without re-enabling discussion acquisition.
+
+For the later permanent-retirement cleanup preview, protect already retained,
+confirmed Entry/Exit article bodies and their provenance. Their discussions may
+still be cleanup candidates. Hold ambiguous/unclassified bodies for explicit
+review rather than deleting an unidentified decision article. This protection is
+not permission to fetch missing articles for permanently excluded targets or to
+label guessed candidates as confirmed Entry/Exit. At the September 28 inspection,
+ARCH/LTHM/TA had neither accepted article links nor canonical article IDs; there
+is no verified pair of retained decision articles to claim preserved for them.
+
+The first delivery implements eligibility and stops unwanted acquisition;
+destructive cleanup has its own inventory, verification and approval, independent
+of SEC retirement. ARCH/LTHM/TA permanent exclusion facts always survive cleanup.
 
 ## Chosen Ownership
 
@@ -188,6 +200,9 @@ remain unresolved; a broad scope setting cannot override integrity guards. With 
 age limit, undated non-entry articles are held; with no age limit their missing
 date is disclosed and does not itself block capture. Selecting former content
 does not classify its articles as Entry/Exit or restart its discussions.
+`body_scope` controls recovery acquisition, not retention: choosing `current`
+does not delete Former history, and `all_retained` neither overrides permanent
+exclusions nor proves that a missing original entry article has been identified.
 
 Invalid saved settings block start with a repairable error, not an unlimited
 fallback. Saving settings performs no navigation. A job snapshots its selected
@@ -227,6 +242,10 @@ Do not reset collector configuration, existing queues, schedules or ownership.
   age limits and missing dates without inventing Entry/Exit associations. Cover
   current-to-closed changes, permanent exclusions, re-entry, shared articles and
   unresolved ownership across all comment acquisition paths and queued work.
+- Leaving Current or selecting current-only recovery preserves existing Former
+  bodies/comments. Known historical body repair never silently restarts discussions.
+- The separate permanent-retirement cleanup preview protects confirmed Entry/Exit
+  bodies, holds ambiguous candidates and retains exclusions without new acquisition.
 - Prove that purged/excluded targets cannot be silently requeued; leave destructive
   cleanup unapplied until its exact content scope and reference handling are reviewed.
 - Rehearse a mid-fill upgrade with financial pending scopes, intent revisions,
