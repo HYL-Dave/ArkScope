@@ -245,10 +245,23 @@ These are **required gates**, not optional operator guidance. Do not start the p
 | G1: Queue preservation | Task 6 old-to-new/reload/rollback tests and all negative controls pass on the frozen candidate, including installed Firefox. Confirm the exact non-destructive pause method; no generic Cancel or configuration reset. |
 | G2: Quiescent backup | Operator pauses the selected extension using that verified method, closes acquisition tabs and App. Read back no unknown/active native task; back up affected DBs/identity marker and selected extension queue/settings state privately. Record exact pending IDs, success records, intent, schedules and collector identity hashes. If quiescence cannot be proved, stop before replacement. |
 | G3: Post-upgrade equality | The one-time persisted upgrade admission hold must remain active, including after pacing deadlines expire and repeated Reload. Before pressing Resume after upgrade check, compare against the G2 checkpoint using the same field assertions as G1. Owner, policies, schedules, successes and pending identities must match. Any mismatch blocks restoration/verification until repaired under the stopped boundary. |
-| G4: Financial continuation | Immediately request Resume after upgrade check and App restoration, then observe a new successful financial acquisition receipt for a previously pending scope (or verified reuse followed by the next pending acquisition), its stored observation and corresponding pending removal. Already saved scopes must not be restarted. A green badge or aggregate count alone is insufficient. |
-| G5: New body receipt | After operator preview/start, observe a v2 journal job, a new terminal body acquisition receipt and stored body outcome linked by job/article/task IDs. Confirm financial/news progress alongside it. This proves a new workflow ran, not that the entire body backlog has finished. |
+| G4: Financial continuation | Immediately request Resume after upgrade check and App restoration, then observe a new successful financial acquisition receipt for a previously pending scope (or verified reuse followed by the next pending acquisition), its stored observation and corresponding pending removal. Already saved scopes must not be restarted. A green badge or aggregate count alone is insufficient. The pre-existing BAC financial-local pause may leave this gate open under the separate-delivery decision below; it is not a passing result. |
+| G5: New body receipt | After operator preview/start, observe a v2 journal job, a new terminal body acquisition receipt and stored body outcome linked by job/article/task IDs. Confirm news progress alongside it; report financial progress or its recorded pre-existing pause separately. This proves a new workflow ran, not that the entire body backlog has finished. |
 
 If G4/G5 waits on a real login/access/rate-limit restriction, report the actual reason and leave live acceptance open; do not declare complete or bypass the restriction. Failure after restoration uses the rehearsed rollback and immediate state readback, preserving new retained data. Never leave collection silently stopped while waiting for a report or review.
+
+### Separate Delivery Decision, September 28
+
+The operator selected delivery of body continuation independently of BAC financial
+capture repair. G1-G3 remain mandatory, including exact preservation of pending
+scope IDs, successes, intent, settings, ownership and the pre-existing local pause.
+Do not clear that pause, cancel/rebuild the queue or change pacing during this
+cutover. Record BAC's pre-upgrade failed task and unchanged pause at G2/G3. Its
+known failure can leave G4 open for the separate financial repair batch without
+blocking body delivery and G5. This exception does not cover a new financial
+regression, an unexpected state change or a shared access/cooldown restriction.
+Resume eligible routine work promptly; never label financial first fill complete.
+The operator performs push; this delivery does not create a PR or push a branch.
 
 ## Verification Receipt
 
@@ -314,6 +327,30 @@ existing popup misses a financial-local pause when deciding whether to show Resu
 Keep the queue; obtain headers/units/row names and repair the diagnosed cause and
 recovery UI before claiming financial continuation. G4 is not satisfied by counts
 or these old-version routine successes.
+
+Readonly follow-up at 11:19 UTC still finds BAC as the last financial task, with
+no native active task, shared pause, capability pause or rate-limit deadline.
+The 143 September 28 financial attempts comprise 142 successes and this one
+failure. Median admitted capture duration is 33.143 seconds; median adjacent
+financial start interval is 100.725 seconds. The configured 60-second gap starts
+after terminal cleanup, not at the previous page start. For 126 pairs without an
+intervening routine task, the median completion-to-next-start interval is 66.273
+seconds. Longer intervals include routine Alpha Picks/news work. Before/after
+the approximately 03:58 UTC start of isolated development, median start intervals
+are 100.974/100.154 seconds; these receipts do not establish resource contention
+as the main cause, nor do they exclude transient effects without CPU telemetry.
+
+Two isolated existing-harness probes reproduce the separate financial defects:
+one layout failure prevents the next ticker from executing across restart; a
+gap-only configuration change clears three pending scopes and increments intent
+revision while retaining successful records. No formal setting or queue was
+modified by these probes. Do not recommend changing the gap mid-fill until the
+queue-preserving settings path is repaired and verified separately.
+
+Routine receipts also remain distinct from body acceptance: Alpha job 31166 is
+complete at 10:35 UTC; news job 31167 is degraded at 11:05 UTC, with four phases
+complete and detail_fetch failed/unknown_failure. These old-version results do
+not prove candidate G5 or justify reporting all current acquisition healthy.
 
 ## Implementation Rulings
 
