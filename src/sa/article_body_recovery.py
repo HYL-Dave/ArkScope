@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from contextlib import closing
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -21,7 +21,6 @@ from src.sa.article_body_quality import assess_body
 from src.tools.retained_read_results import content_id
 
 
-_RECENT_DAYS = 365
 _ENTRY_CANDIDATE_DAYS = 3
 _PREFIX = "sa_article_body_recovery_"
 _REQUIRED_COLUMNS = {
@@ -235,7 +234,7 @@ def _memberships(article: dict, cohorts: dict, links: list[dict]) -> tuple[list[
     return members, ["ticker_metadata_conflict"] if "ticker_metadata_conflict" in provider_codes else []
 
 
-def _item(article: dict, cohorts: dict, links: list[dict], as_of: date, cutoff: date) -> dict:
+def _item(article: dict, cohorts: dict, links: list[dict], as_of: date, cutoff: date | None) -> dict:
     body = article["body_markdown"]
     assessment = assess_body(body, title=article["title"])
     members, reasons = _memberships(article, cohorts, links)
@@ -256,11 +255,13 @@ def _item(article: dict, cohorts: dict, links: list[dict], as_of: date, cutoff: 
     elif candidates:
         priority = 1
         reasons.append("current_cohort_entry_candidate")
-    elif published and cutoff <= published <= as_of:
+    elif published and (cutoff is None or cutoff <= published) and published <= as_of:
         priority = 2 if followups else 3
         reasons.append("recent_current_pick_followup" if followups else "recent_article")
     elif published is None:
         reasons.append("published_date_unknown")
+        if cutoff is None:
+            priority = 3
     else:
         reasons.append("older_article_outside_recovery_scope")
     url = _safe_url(article["url"], article["article_id"])
@@ -287,14 +288,25 @@ def _item(article: dict, cohorts: dict, links: list[dict], as_of: date, cutoff: 
 
 
 def _manifest(articles: list[dict], lineages: list[dict], picks: list[dict],
-              links: list[dict], as_of: date) -> dict:
-    cutoff = as_of - timedelta(days=_RECENT_DAYS)
+              links: list[dict], as_of: date, settings, scope_context: dict) -> dict:
+    from src.sa.article_acquisition_scope import decide_article_acquisition
+
+    days = settings.body_lookback_days
+    cutoff = date.fromordinal(max(1, as_of.toordinal() - days)) if days else None
     cohorts = _cohorts(lineages, picks, links)
     by_article = defaultdict(list)
     for link in links:
         by_article[link["article_id"]].append(link)
     items = [_item(article, cohorts, by_article[article["article_id"]], as_of, cutoff)
              for article in articles]
+    for item in items:
+        decision = decide_article_acquisition(item["article_id"], operation="body",
+                                              settings=settings, context=scope_context)
+        item["acquisition"] = decision
+        if not decision["allowed"] and item["disposition"] != "exclude":
+            item["disposition"] = "hold"
+            item["reason_code"] = decision["reason_code"]
+            item["reasons"] = sorted(set([*item["reasons"], decision["reason_code"]]))
     targets = sorted((i for i in items if i["disposition"] == "recover"),
                      key=lambda i: (i["priority"],
                                     "current_cohort_entry_candidate" in i["reasons"],
@@ -306,13 +318,15 @@ def _manifest(articles: list[dict], lineages: list[dict], picks: list[dict],
     statuses = Counter(i["body_assessment"]["status"] for i in items)
     result = {
         "status": "ok", "schema_version": 1, "provider": "seeking_alpha", "retrieval": "stored",
-        "as_of": as_of.isoformat(), "cutoff": cutoff.isoformat(),
+        "as_of": as_of.isoformat(), "cutoff": cutoff.isoformat() if cutoff else None,
+        "settings": settings.model_dump(), "context_id": scope_context["context_id"],
         "scope": {
-            "mode": "preview_only", "recent_days": _RECENT_DAYS,
+            "mode": "preview_only", "recent_days": days,
+            "body_scope": settings.body_scope, "max_articles_per_job": settings.max_articles_per_job,
             "entry_candidate_days": _ENTRY_CANDIDATE_DAYS,
             "recent_bounds": "inclusive", "current_entry_age_limit": None,
             "membership_basis": "retained_snapshot_not_historical_reconstruction",
-            "available_bodies": "preserve", "older_unrelated_bodies": "hold",
+            "available_bodies": "preserve", "older_unrelated_bodies": "hold" if days else "eligible",
         },
         "body_hash_algorithm": "sha256", "body_hash_version": 1,
         "body_hash_encoding": "utf8_null_as_empty",
@@ -330,50 +344,71 @@ def _manifest(articles: list[dict], lineages: list[dict], picks: list[dict],
     return result
 
 
-def build_recovery_manifest(db_path, *, as_of=None) -> dict:
+def _read_inventory(db_path) -> tuple[list, list, list, list]:
+    path = Path(db_path)
+    if not path.is_file():
+        raise ValueError("capture_missing")
+    with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=5)) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA query_only=ON")
+        conn.execute("BEGIN")
+        snapshot_column = "NULL AS last_seen_snapshot"
+        for table, required in _REQUIRED_COLUMNS.items():
+            columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+            if not required <= columns:
+                raise ValueError("schema_unavailable")
+            if table == "sa_alpha_picks" and "last_seen_snapshot" in columns:
+                snapshot_column = "last_seen_snapshot"
+        articles = [dict(row) for row in conn.execute(
+            "SELECT article_id, url, title, published_date, body_markdown, ticker, list_ticker, detail_ticker "
+            "FROM sa_articles ORDER BY article_id")]
+        lineages = [dict(row) for row in conn.execute(
+            "SELECT lineage_id, symbol_key, picked_date FROM sa_pick_lineages ORDER BY lineage_id")]
+        picks = [dict(row) for row in conn.execute(
+            "SELECT id, lineage_id, symbol, company, picked_date, closed_date, portfolio_status, "
+            f"is_stale, canonical_article_id, {snapshot_column} FROM sa_alpha_picks ORDER BY id")]
+        links = [dict(row) for row in conn.execute(
+            "SELECT k.link_id, k.lineage_id, k.article_id, k.role, k.event_anchor_date, "
+            "k.link_source, k.evidence_codes FROM sa_pick_article_links k "
+            "JOIN sa_pick_lineages l ON l.lineage_id=k.lineage_id "
+            "JOIN sa_articles a ON a.article_id=k.article_id "
+            "WHERE k.revoked_at IS NULL ORDER BY k.link_id")]
+    return articles, lineages, picks, links
+
+
+def build_recovery_manifest(db_path, *, as_of=None, settings=None, scope_context=None) -> dict:
     """Return a source-prose-free preview; unavailable stores are never created.
 
     ``as_of`` is a date or YYYY-MM-DD (default: today's UTC date). The hash
     includes the complete manifest except itself, using canonical JSON. Bodies
     are hashed as retained UTF-8, with NULL treated as empty, before assessment.
     Priority 1 is a current entry or explicitly unproven entry candidate, 2 a
-    recent current-pick follow-up, 3 any other recent invalid article. Only
+    selected current-pick follow-up, 3 any other selected invalid article. Only
     ``targets`` are recovery candidates; ``held`` and ``excluded`` are retained.
     """
     try:
         day = _as_of_date(as_of)
-        day - timedelta(days=_RECENT_DAYS)
     except (ValueError, OverflowError):
         return _unavailable("as_of_invalid")
     try:
-        path = Path(db_path)
-        if not path.is_file():
-            return _unavailable("capture_missing")
-        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=5)) as conn:
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA query_only=ON")
-            conn.execute("BEGIN")
-            snapshot_column = "NULL AS last_seen_snapshot"
-            for table, required in _REQUIRED_COLUMNS.items():
-                columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
-                if not required <= columns:
-                    return _unavailable("schema_unavailable")
-                if table == "sa_alpha_picks" and "last_seen_snapshot" in columns:
-                    snapshot_column = "last_seen_snapshot"
-            articles = [dict(row) for row in conn.execute(
-                "SELECT article_id, url, title, published_date, body_markdown, ticker, list_ticker, detail_ticker "
-                "FROM sa_articles ORDER BY article_id")]
-            lineages = [dict(row) for row in conn.execute(
-                "SELECT lineage_id, symbol_key, picked_date FROM sa_pick_lineages ORDER BY lineage_id")]
-            picks = [dict(row) for row in conn.execute(
-                "SELECT id, lineage_id, symbol, company, picked_date, closed_date, portfolio_status, "
-                f"is_stale, canonical_article_id, {snapshot_column} FROM sa_alpha_picks ORDER BY id")]
-            links = [dict(row) for row in conn.execute(
-                "SELECT k.link_id, k.lineage_id, k.article_id, k.role, k.event_anchor_date, "
-                "k.link_source, k.evidence_codes FROM sa_pick_article_links k "
-                "JOIN sa_pick_lineages l ON l.lineage_id=k.lineage_id "
-                "JOIN sa_articles a ON a.article_id=k.article_id "
-                "WHERE k.revoked_at IS NULL ORDER BY k.link_id")]
-        return _manifest(articles, lineages, picks, links, day)
+        articles, lineages, picks, links = _read_inventory(db_path)
+        from src.app_records_store import resolve_profile_state_db_path
+        from src.data_source_routing import DataSourcePolicyFailure
+        from src.sa.article_acquisition_settings import load_article_settings
+        from src.sa.article_acquisition_scope import read_article_scope_context
+        try:
+            settings = settings if settings is not None else load_article_settings()
+        except DataSourcePolicyFailure as exc:
+            return _unavailable("settings_unavailable") | {"error_code": exc.code}
+        if scope_context is None:
+            scope_context = read_article_scope_context(sa_db=db_path, profile_db=resolve_profile_state_db_path())
+        if scope_context.get("status") != "ok":
+            return _unavailable("scope_unavailable")
+        if (scope_context.get("inventory_id") is not None and
+                scope_context["inventory_id"] != content_id((articles, lineages, picks, links))):
+            return _unavailable("source_changed")
+        return _manifest(articles, lineages, picks, links, day, settings, scope_context)
+    except ValueError as exc:
+        return _unavailable(str(exc))
     except (sqlite3.Error, OSError):
         return _unavailable("store_unavailable")

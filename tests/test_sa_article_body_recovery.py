@@ -29,8 +29,21 @@ NARRATIVE = (
 
 def build(path, **kwargs):
     from src.sa.article_body_recovery import build_recovery_manifest
+    from src.sa.article_acquisition_settings import ArticleAcquisitionSettings
 
-    return build_recovery_manifest(path, **kwargs)
+    return build_recovery_manifest(path, settings=ArticleAcquisitionSettings(body_lookback_days=365),
+        scope_context={"status": "ok", "context_id": "manifest-unit-authority"}, **kwargs)
+
+
+@pytest.fixture(autouse=True)
+def accepted_scope_for_manifest_unit_tests(monkeypatch):
+    # This module isolates body quality, URL, age and snapshot assembly. Real
+    # cross-store authority, defaults and rejection paths have their own suite.
+    from src.sa import article_acquisition_scope
+    monkeypatch.setattr(article_acquisition_scope, "decide_article_acquisition", lambda *a, **kw: {
+        "allowed": True, "reason_code": None, "effective_membership": "unknown",
+        "context_id": "manifest-unit-authority",
+    })
 
 
 @pytest.fixture

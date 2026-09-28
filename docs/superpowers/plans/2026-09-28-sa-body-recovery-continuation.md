@@ -10,7 +10,9 @@
 
 **Spec:** [Approved design](../specs/2026-09-28-sa-body-recovery-continuation-design.md).
 
-**Status:** Awaiting written-plan review. Preserve the operator's selected method: inline implementation, then one independent whole-branch review and complete regression. Do not start product edits, create an implementation worktree or change formal acquisition until that review.
+**Status:** Approved September 28; inline implementation in `feat/sa-body-continuation-20260928`, then one independent whole-branch review and complete regression. Formal acquisition remains unchanged until the cutover gates.
+
+**Progress:** Task 1 implemented and focused regression passed (192 tests). Tasks 2-7 and all formal cutover gates remain open. RCL/VISN historical Current rows are stale and their accepted tracking is former-only; they are negative cases, not additional valid mixed-current examples.
 
 ## Global Constraints
 
