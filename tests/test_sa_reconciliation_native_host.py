@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import src.sa_native_host as host
 from src.tools.backends.sa_capture_backend import SACaptureBackend
 from src.tools.data_access import DataAccessLayer
+from tests.sa_scope_fixtures import accepted_article_scope
 
 
 _V1_MINIMAL_SCHEMA = """
@@ -67,7 +68,7 @@ def _dal_with_backend(backend) -> DataAccessLayer:
     return dal
 
 
-def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconciliation():
+def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconciliation(accepted_article_scope):
     pick_calls = []
 
     class PickDal:
@@ -105,6 +106,9 @@ def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconcilia
     class MetaBackend:
         def __init__(self):
             self.captured = False
+
+        def article_acquisition_context(self):
+            return {"status": "ok"}
 
         def query_sa_articles(self, **kwargs):
             old = {

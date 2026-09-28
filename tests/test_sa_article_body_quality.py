@@ -6,6 +6,7 @@ import sqlite3
 from unittest.mock import MagicMock
 
 import pytest
+from tests.sa_scope_fixtures import accepted_article_scope
 
 from src import sa_capture_store as store
 from src.tools.backends.sa_capture_backend import SACaptureBackend
@@ -236,7 +237,7 @@ def test_repair_rejects_disclosures_without_setting_success(backend):
 
 
 @pytest.mark.parametrize("old_body", [DISCLOSURES, "", None])
-def test_regular_sync_does_not_turn_new_quality_detection_into_mass_backfill(backend, old_body):
+def test_regular_sync_does_not_turn_new_quality_detection_into_mass_backfill(backend, old_body, accepted_article_scope):
     from src.tools.data_access import DataAccessLayer
 
     with store.connect(backend._sa_db) as conn:
@@ -254,7 +255,7 @@ def test_regular_sync_does_not_turn_new_quality_detection_into_mass_backfill(bac
     assert result["body_recovery_pending"] == 1
 
 
-def test_legacy_blank_body_does_not_disable_existing_comment_updates(backend):
+def test_legacy_blank_body_does_not_disable_existing_comment_updates(backend, accepted_article_scope):
     from src.tools.data_access import DataAccessLayer
 
     backend.save_article_with_comments("123", PROSE, [{

@@ -9,7 +9,7 @@ SCHEMA_VERSION = 2
 COMMENT_PENDING_REASONS = frozenset({"comment_backfill_pending", "controls_unresolved"})
 COMMENT_STOP_REASONS = frozenset({"timeout", "max_scrolls", "stable_bottom", "controls_unresolved", "unknown"})
 DEFERRED_REASONS = frozenset({"capacity_exhausted", "site_pacing", "waiting_for_priority_work", "collector_unavailable",
-                              "collector_other_installation", "site_paused"}) | COMMENT_PENDING_REASONS
+                              "collector_other_installation", "site_paused", "article_scope_unavailable"}) | COMMENT_PENDING_REASONS
 _V2_FAILURE_REASONS = frozenset({"human_verification_required", "rate_limited"})
 
 REASON_CODES = frozenset(

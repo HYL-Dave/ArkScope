@@ -10,10 +10,11 @@ from src import sa_capture_store as store
 from src.sa.article_reader import read_article
 from src.tools.backends.sa_capture_backend import SACaptureBackend
 from src.tools.data_access import DataAccessLayer
+from tests.sa_scope_fixtures import accepted_article_scope
 
 
 @pytest.fixture
-def backend(tmp_path):
+def backend(tmp_path, accepted_article_scope):
     return SACaptureBackend(sa_db=str(tmp_path / "sa.db"), market_db=str(tmp_path / "market.db"))
 
 

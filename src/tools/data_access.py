@@ -787,6 +787,33 @@ class DataAccessLayer:
             a["article_id"]: a for a in all_articles if a.get("article_id")
         }
 
+        from collections import Counter
+        from src.data_source_routing import DataSourcePolicyFailure
+        from src.sa.article_acquisition_settings import load_article_settings
+        from src.sa.article_acquisition_scope import decide_article_acquisition
+
+        try:
+            scope_settings = load_article_settings()
+            scope_context = self._backend.article_acquisition_context()
+            scope_error = None if scope_context.get("status") == "ok" else "sa_article_scope_unavailable"
+        except DataSourcePolicyFailure as exc:
+            scope_error = exc.code
+        if scope_error:
+            return {"status": "deferred", "reason": "article_scope_unavailable", "error_code": scope_error,
+                    "saved": saved, "need_content": [], "need_comments": [], "unresolved_symbols": [],
+                    "auto_upgrade": False, "reconciliation": {"status": "skipped", "enrichment": []}}
+        decisions = {operation: {aid: decide_article_acquisition(aid, operation=operation,
+                      settings=scope_settings, context=scope_context) for aid in articles_by_id}
+                     for operation in ("body", "comments")}
+
+        def allowed(article_id, operation="comments"):
+            return decisions[operation].get(article_id, {}).get("allowed") is True
+
+        excluded_reasons = Counter(d["reason_code"] for d in decisions["comments"].values() if not d["allowed"])
+        comment_scope = {"scope": scope_settings.comment_scope, "excluded_count": sum(excluded_reasons.values()),
+                         "eligible_count": sum(d["allowed"] for d in decisions["comments"].values()),
+                         "excluded_reasons": dict(sorted(excluded_reasons.items()))}
+
         def article_order(article_id):
             article = articles_by_id.get(article_id, {})
             published = article.get("published_date")
@@ -853,6 +880,8 @@ class DataAccessLayer:
 
         def comment_work_item(a: Dict[str, Any], *, backfill: bool = False) -> Dict[str, Any]:
             item = {"article_id": a["article_id"], "url": a.get("url", "")}
+            if not allowed(a["article_id"]):
+                item["comments_allowed"] = False
             if backfill or first_capture(a):
                 item["comment_scan_mode"] = "backfill"
             if a["article_id"] in scanned_ids:
@@ -884,10 +913,10 @@ class DataAccessLayer:
 
         for article_id in scanned_article_ids:
             article = articles_by_id.get(article_id)
-            if article is not None and not article.get("has_content"):
+            if article is not None and allowed(article_id, "body") and not article.get("has_content"):
                 if body_recovery_required(article):
                     continue  # Historical invalid captures require the bounded repair action.
-                if article.get("comment_backfill_pending") and not admit_pending(article):
+                if allowed(article_id) and article.get("comment_backfill_pending") and not admit_pending(article):
                     continue
                 need_content.append(comment_work_item(
                     article, backfill=bool(article.get("comment_backfill_pending"))
@@ -902,6 +931,7 @@ class DataAccessLayer:
             article = articles_by_id.get(article_id)
             if (
                 article is None
+                or not allowed(article_id)
                 or article_id in need_content_ids
                 or not comment_refresh_eligible(article)
                 or article.get("comment_backfill_pending")
@@ -924,6 +954,8 @@ class DataAccessLayer:
             recovery_candidates = []
             ttl_candidates = []
             for a in all_articles:
+                if not allowed(a["article_id"]):
+                    continue
                 if a["article_id"] in need_content_ids:
                     continue  # Mutual exclusion: need_content takes priority
                 if a["article_id"] in need_comment_ids:
@@ -1009,11 +1041,15 @@ class DataAccessLayer:
                     eligible_enrichment.append(item)
                     continue
                 article = articles_by_id.get(item.get("article_id"))
+                if not allowed(item.get("article_id"), "body"):
+                    continue
+                if not allowed(item.get("article_id")):
+                    item["comments_allowed"] = False
                 if article:
                     if body_recovery_required(article):
                         continue
                     pending = acquisition_pending(article)
-                    if pending and not admit_pending(article):
+                    if item.get("comments_allowed", True) and pending and not admit_pending(article):
                         continue
                     if first_capture(article) or pending:
                         item["comment_scan_mode"] = "backfill"
@@ -1029,7 +1065,8 @@ class DataAccessLayer:
             "need_comments": need_comments,
             "unresolved_symbols": unresolved,
             "auto_upgrade": False,
-            "body_recovery_pending": sum(body_recovery_required(a) for a in all_articles),
+            "comment_scope": comment_scope,
+            "body_recovery_pending": sum(body_recovery_required(a) and allowed(a["article_id"], "body") for a in all_articles),
             "reconciliation": reconciliation,
         }
         if mode == "quick":
@@ -1084,6 +1121,7 @@ class DataAccessLayer:
         comment_scan_stop_reason=None,
         comment_scan_stable_bottom_rounds=0,
         comment_scan_policy=None,
+        capture_comments=True,
     ) -> Dict:
         """Capture body/comments first, then reconcile in a separate transaction."""
         captured = self._backend.save_article_with_comments(
@@ -1098,6 +1136,7 @@ class DataAccessLayer:
             comment_scan_stop_reason=comment_scan_stop_reason,
             comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
             comment_scan_policy=comment_scan_policy,
+            **({"capture_comments": False} if capture_comments is False else {}),
         )
         try:
             reconciliation = self._backend.reconcile_sa_articles(

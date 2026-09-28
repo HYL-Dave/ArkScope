@@ -105,6 +105,24 @@ def handle_message(msg):
             return {"status": "error", "error_code": exc.code, "body_saved": False}
     if action == "article_body_recovery_control":
         return _body_recovery_jobs().handle(msg, client=msg.get("client"))
+    if action == "get_article_acquisition_eligibility":
+        from src.app_records_store import resolve_profile_state_db_path
+        from src.sa_capture_store import resolve_sa_db_path
+        from src.sa.article_acquisition_scope import read_article_scope_context, decide_article_acquisition
+        from src.sa.article_acquisition_settings import load_article_settings
+        from src.data_source_routing import DataSourcePolicyFailure
+
+        aid = msg.get("article_id")
+        if msg.get("operation") != "comments" or type(aid) is not str or not re.fullmatch(r"[0-9]{1,20}", aid):
+            return {"status": "error", "allowed": False, "error_code": "sa_article_scope_request_invalid"}
+        try:
+            settings = load_article_settings()
+            context = read_article_scope_context(sa_db=resolve_sa_db_path(), profile_db=resolve_profile_state_db_path())
+            if context["status"] != "ok":
+                return {"status": "deferred", "allowed": False, "error_code": "sa_article_scope_unavailable"}
+            return {"status": "ok", **decide_article_acquisition(aid, operation="comments", settings=settings, context=context)}
+        except DataSourcePolicyFailure as exc:
+            return {"status": "deferred", "allowed": False, "error_code": exc.code}
     if action == "get_company_watchlist":
         from src.sa.company_collector import watchlist_targets
 
@@ -877,6 +895,7 @@ def _handle_save_article_content(dal, msg):
             comment_scan_stable_bottom_rounds=msg.get(
                 "comment_scan_stable_bottom_rounds", 0
             ),
+            **({"capture_comments": False} if msg.get("comments_scope_skipped") is True else {}),
         )
         if _native_save_result_failed(result):
             return _native_save_failure()

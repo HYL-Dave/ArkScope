@@ -4,7 +4,7 @@
   var SCHEMA_VERSION = 2;
   var COMMENT_PENDING_REASONS = ["comment_backfill_pending", "controls_unresolved"];
   var COMMENT_STOP_REASONS = Object.freeze(["timeout", "max_scrolls", "stable_bottom", "controls_unresolved", "unknown"]);
-  var DEFERRED_REASONS = ["capacity_exhausted", "site_pacing", "waiting_for_priority_work", "collector_unavailable", "collector_other_installation", "site_paused"].concat(COMMENT_PENDING_REASONS);
+  var DEFERRED_REASONS = ["capacity_exhausted", "site_pacing", "waiting_for_priority_work", "collector_unavailable", "collector_other_installation", "site_paused", "article_scope_unavailable"].concat(COMMENT_PENDING_REASONS);
   var V2_FAILURE_REASONS = ["human_verification_required", "rate_limited"];
   var REASON_CODES = Object.freeze([
     "body_saved",

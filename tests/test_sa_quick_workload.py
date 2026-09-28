@@ -9,10 +9,11 @@ from src import sa_native_host as host
 from src.tools.backends.sa_capture_backend import SACaptureBackend
 from src.tools.data_access import DataAccessLayer
 from tests.test_sa_article_reconciliation_backend import _article, _pick, _refresh
+from tests.sa_scope_fixtures import accepted_article_scope
 
 
 @pytest.fixture
-def dal(tmp_path):
+def dal(tmp_path, accepted_article_scope):
     backend = SACaptureBackend(
         sa_db=str(tmp_path / "sa.db"), market_db=str(tmp_path / "market.db")
     )

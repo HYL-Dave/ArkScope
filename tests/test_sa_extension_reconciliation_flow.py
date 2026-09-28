@@ -67,8 +67,11 @@ Promise.resolve(vm.runInContext("(async function () {" + body + "})()", context)
 """
 
 
-def _run_background(body: str):
-    encoded = base64.b64encode((ADMITTED_TASK + AUTHORITY + body).encode("utf-8")).decode("ascii")
+def _run_background(body: str, *, real_scope=False):
+    # Extraction/retry tests declare a current article; scope-boundary tests
+    # opt into the production native eligibility call and explicit replies.
+    scope = "" if real_scope else "articleCommentEligibility=async()=>({status:'ok',allowed:true,effective_membership:'current'});\n"
+    encoded = base64.b64encode((ADMITTED_TASK + AUTHORITY + scope + body).encode("utf-8")).decode("ascii")
     completed = subprocess.run(
         ["node", "-e", _NODE_RUNNER, str(BACKGROUND), encoded],
         cwd=ROOT,

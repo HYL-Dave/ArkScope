@@ -36,6 +36,9 @@ def build(output: Path):
         + "const ARTICLE_INITIAL_SETTLE_MS=" + str(payload["settle"]) + ";\n"
         + "const CAPTURE_SOURCE_HASH=" + json.dumps(source_hash) + ";\n"
         + "function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}\n"
+        # This standalone harness captures only an explicitly selected article;
+        # it has no App, native host or automatic source-membership policy.
+        + "async function articleCommentEligibility(){return {status:'ok',allowed:true,basis:'manual_acceptance_target'};}\n"
         + "\n\n".join(payload["functions"]) + "\n", encoding="utf-8")
     manifest = {
         "manifest_version":3,"name":"ArkScope Comment Test","version":"1.0.5",

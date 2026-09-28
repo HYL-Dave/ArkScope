@@ -5,6 +5,87 @@ import pytest
 from tests.test_sa_extension_reconciliation_flow import _DETAIL_FLOW_SETUP, _run_background
 
 
+@pytest.mark.parametrize("include_body", [False, True])
+@pytest.mark.parametrize("allowed", [False, True])
+def test_scope_is_read_again_immediately_before_traversal(include_body, allowed):
+    result = _run_background(r"""
+      let scrolled=0,scraped=0,bodies=0,closed=0,scopeReads=0;
+      beginArticleCapture=async()=>({assert:async()=>{},close:async()=>{closed++;}});
+      settleArticleBeforeScroll=async()=>{};
+      injectDetailScraper=async()=>{bodies++;return {body_markdown:'body'};};
+      injectCommentsScraper=async()=>{scraped++;return {comments:[]};};
+      scrollToComments=async()=>{scrolled++;return {mode:'quick',stop_reason:'stable_bottom'};};
+      sendNativeMessage2=async message=>{
+        if(message.action==='get_article_acquisition_eligibility'){
+          scopeReads++;return {status:'ok',allowed:ALLOWED,reason_code:ALLOWED?null:'sa_article_former_out_of_scope'};
+        }
+        throw Error('unexpected native mutation');
+      };
+      const captured=await captureArticle(1,{article_id:'1001',comments_allowed:!ALLOWED},'quick',INCLUDE_BODY);
+      return {captured,scrolled,scraped,bodies,closed,scopeReads};
+    """.replace("ALLOWED", str(allowed).lower()).replace("INCLUDE_BODY", str(include_body).lower()), real_scope=True)
+    assert result["scopeReads"] == 1
+    assert result["scrolled"] == int(allowed)
+    assert result["scraped"] == 2 * int(allowed)
+    assert result["bodies"] == int(include_body)
+    assert result["closed"] == 1
+    assert bool(result["captured"]["scroll"].get("scope_skipped")) is not allowed
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_comments_only_race_stops_before_navigation_without_false_pending(available):
+    result = _run_background(_DETAIL_FLOW_SETUP + r"""
+      let navigations=0,commentWrites=0;
+      managedSaTabs.update=async(_tab,options)=>{if(options.url.includes('/article/'))navigations++;};
+      sendNativeMessage2=async message=>{
+        if(message.action==='save_articles_meta')return {status:'ok',saved:1,need_content:[],
+          need_comments:[{article_id:'1001',url:'https://seekingalpha.com/article/1001-old',comments_allowed:true}],
+          reconciliation:{status:'ok',enrichment:[]}};
+        if(message.action==='get_article_acquisition_eligibility')return AVAILABLE
+          ? {status:'ok',allowed:false,reason_code:'sa_article_former_out_of_scope'}
+          : {status:'deferred',allowed:false,error_code:'sa_article_scope_unavailable'};
+        if(message.action==='save_comments_only')commentWrites++;
+        return {status:'ok'};
+      };
+      const details=await doDetailFetch(1,[],'quick');
+      const run=attachExtensionRunProtocol('alpha_picks_sync','quick',{current:{status:'ok'},closed:{status:'ok'},details,
+        acquisition_stop:details.acquisition_stop,completed_phases:['current_picks','closed_picks']});
+      return {navigations,commentWrites,details,run:run.extension_run};
+    """.replace("AVAILABLE", str(available).lower()), real_scope=True)
+    assert result["navigations"] == result["commentWrites"] == 0
+    assert result["details"]["failed"] == 0
+    assert not result["details"].get("comment_progress", {}).get("pending_articles")
+    if available:
+        assert result["details"]["comment_scope_skipped"] == 1
+        assert result["run"]["derived_outcome"] == "complete"
+    else:
+        assert result["run"]["derived_outcome"] == "deferred"
+        from src.sa.extension_run_protocol import derive_run_result
+        wire = {key:value for key,value in result["run"].items() if key not in {"job_name","db_status"}}
+        assert derive_run_result(wire) == result["run"]
+
+
+def test_former_first_detail_keeps_body_without_a_comment_receipt():
+    result = _run_background(_DETAIL_FLOW_SETUP + r"""
+      let saved=null,scrolls=0;
+      scrollToComments=async()=>{scrolls++;return {};};
+      sendNativeMessage2=async message=>{
+        if(message.action==='save_articles_meta')return {status:'ok',saved:1,need_comments:[],
+          need_content:[{article_id:'1001',url:'https://seekingalpha.com/article/1001-old'}],reconciliation:{status:'ok',enrichment:[]}};
+        if(message.action==='get_article_acquisition_eligibility')return {status:'ok',allowed:false,reason_code:'sa_article_former_out_of_scope'};
+        if(message.action==='save_article_content') {saved=message;return {status:'ok',ok:true,body_saved:true,comments_scope_skipped:true};}
+        return {status:'ok'};
+      };
+      const details=await doDetailFetch(1,[],'quick');
+      return {details,saved,scrolls};
+    """, real_scope=True)
+    assert result["details"]["fetched"] == 1
+    assert result["details"]["failed"] == result["scrolls"] == 0
+    assert result["saved"]["comments_scope_skipped"] is True
+    assert result["saved"]["comments"] == []
+    assert not result["details"].get("comment_progress")
+
+
 def test_quick_fetch_respects_global_order_and_does_not_silently_upgrade():
     result = _run_background(_DETAIL_FLOW_SETUP + r"""
       const visits=[],rounds=[];

@@ -10,6 +10,8 @@ from src.news_content_availability import ContentFilter
 
 
 class LocalDataCapabilities(Protocol):
+    def article_acquisition_context(self) -> dict: ...
+
     def accept_sa_article_link(self, **kwargs) -> dict: ...
 
     def apply_sa_refresh(
@@ -140,6 +142,7 @@ class LocalDataCapabilities(Protocol):
         comments: list,
         *,
         body_capture: dict | None = None,
+        capture_comments: bool = True,
         detail_ticker: Optional[str] = None,
         detail_ticker_observed_at: Any = None,
         provider_comments_count: Any = None,

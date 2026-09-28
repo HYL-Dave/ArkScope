@@ -362,6 +362,12 @@ class SACaptureBackend(LocalMarketBackend):
     def _sa_read(self) -> sqlite3.Connection:
         return store.connect(self._sa_db, read_only=True)
 
+    def article_acquisition_context(self) -> dict:
+        from src.app_records_store import resolve_profile_state_db_path
+        from src.sa.article_acquisition_scope import read_article_scope_context
+
+        return read_article_scope_context(sa_db=self._sa_db, profile_db=resolve_profile_state_db_path())
+
     def _sa_recovery_read(self) -> sqlite3.Connection:
         """Recovery cannot treat a missing capture DB as a verified empty set."""
 
@@ -1661,8 +1667,11 @@ class SACaptureBackend(LocalMarketBackend):
         comment_scan_stop_reason=None,
         comment_scan_stable_bottom_rounds=0,
         comment_scan_policy=None,
+        capture_comments=True,
     ) -> dict:
         """Capture article content, detail ticker evidence, and comments atomically."""
+        if type(capture_comments) is not bool or (not capture_comments and comments):
+            raise ValueError("sa_article_comment_intent_invalid")
         conn = self._sa_conn()
         try:
             now = store.now_ts()
@@ -1720,7 +1729,7 @@ class SACaptureBackend(LocalMarketBackend):
                 comment_scan_stable_bottom_rounds=comment_scan_stable_bottom_rounds,
                 comment_scan_policy=comment_scan_policy,
                 now=now,
-            )
+            ) if capture_comments else {"comments_scope_skipped": True}
             if body_saved:
                 self._repair_pick_body_copies(conn, article_id, body_markdown, now)
             conn.commit()

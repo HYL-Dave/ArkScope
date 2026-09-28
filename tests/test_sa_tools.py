@@ -37,6 +37,7 @@ from src.tools.backends.sa_capture_backend import (
     _prepare_comments_for_upsert,
 )
 from src.tools.registry import create_default_registry
+from tests.sa_scope_fixtures import accepted_article_scope
 
 
 # ============================================================
@@ -1420,10 +1421,12 @@ class TestArticleTools:
             assert result["error_code"] == "sa_article_capture_missing"
 
 
+@pytest.mark.usefixtures("accepted_article_scope")
 class TestDataAccessArticleMeta:
     def _make_dal(self):
         dal = DataAccessLayer.__new__(DataAccessLayer)
         dal._backend = MagicMock(spec=LocalDataCapabilities)
+        dal._backend.article_acquisition_context.return_value = {"status":"ok"}
         dal._backend.sanitize_corrupted_sa_comments_counts = MagicMock(return_value=0)
         dal._compute_unresolved_symbols = MagicMock(return_value=[])
         return dal

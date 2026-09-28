@@ -416,6 +416,7 @@ function failedProtocolPhases(operation, failedPhase, reasonCode) {
 }
 
 function recordCommentScan(progress, receipt, scroll) {
+  if (scroll.scope_skipped || receipt.comments_scope_skipped === true) return "scope_skipped";
   if (Number.isSafeInteger(receipt.net_new_comments) && receipt.net_new_comments > 0) {
     progress.net_new_comments += receipt.net_new_comments;
   }
@@ -610,7 +611,7 @@ function attachExtensionRunProtocol(operation, mode, legacyResult) {
     var complete = result.completed_phases || [];
     var skipped = !stop && result.status !== "deferred";
     var reason = stop && stop.reason || result.reason || "collector_unavailable";
-    if (["capacity_exhausted","site_pacing","waiting_for_priority_work","collector_unavailable","collector_other_installation","site_paused"].indexOf(reason) === -1) reason = "collector_unavailable";
+    if (["capacity_exhausted","site_pacing","waiting_for_priority_work","collector_unavailable","collector_other_installation","site_paused","article_scope_unavailable"].indexOf(reason) === -1) reason = "collector_unavailable";
     var failed = stop && stop.status === "error";
     var failureSet = false;
     var prior = operation === "market_news_sync" ? buildMarketNewsProtocolResult(mode,Object.assign({},result,{status:"ok"}))
@@ -3447,6 +3448,10 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     articles: articleList,
   });
 
+  if (metaResult && metaResult.status === "deferred" && metaResult.reason === "article_scope_unavailable") {
+    return {articles_saved:metaResult.saved || 0,fetched:0,failed:0,comment_scope_skipped:0,
+      acquisition_stop:{status:"deferred",reason:"article_scope_unavailable",error_code:metaResult.error_code}};
+  }
   if (!metaResult || metaResult.status !== "ok") {
     recordNativeExtensionFailure(diagnostics, metaResult, "phase", null);
     var metaError = (metaResult && metaResult.error) || "save_articles_meta failed";
@@ -3463,6 +3468,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
 
   // ── Step 3: Fetch article content + comments for need_content ──
   var fetched = 0, failed = 0, commentsRefreshed = 0;
+  var commentScopeSkipped = 0;
   var commentProgress = {pending_articles:0,net_new_comments:0,stop_reasons:[]};
   var commentScanFailed = false;
   var reconciliationFailed = 0;
@@ -3490,6 +3496,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
       comment_progress:commentProgress.pending_articles ? commentProgress : undefined,
       reason_code:commentScanFailed ? "comment_scan_failed" : undefined,
       reconciliation_failed:reconciliationFailed,quick_workload:metaResult.quick_workload || null,
+      comment_scope_skipped:commentScopeSkipped,comment_scope:metaResult.comment_scope || null,
       acquisition_stop:error.detail};
   }
 
@@ -3532,6 +3539,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
       }
 
       var bodyScrollStats = captured.scroll;
+      if (bodyScrollStats.scope_skipped) commentScopeSkipped++;
       var comments = captured.comments;
 
       var report = formatDetailReport(detail);
@@ -3541,6 +3549,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         body_markdown: report,
         body_capture: detail.body_capture || null,
         comments: comments,
+        comments_scope_skipped:bodyScrollStats.scope_skipped || undefined,
         detail_ticker: detail.detail_ticker || null,
         detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
         provider_comments_count: item.provider_comments_count,
@@ -3610,6 +3619,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     sendProgress("Comments " + (i + 1) + "/" + total + ": " + cItem.article_id);
 
     try {
+      if (!(await articleCommentEligibility(cItem)).allowed) {commentScopeSkipped++;return;}
       await managedSaTabs.update(tabId, { url: cItem.url, active: true });
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(cItem.url));
       var commentsReady = await waitForArticleReady(tabId);
@@ -3627,6 +3637,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
       }
       var commentCapture = await captureArticle(tabId, cItem, scrollMode, false);
       var commentScrollStats = commentCapture.scroll;
+      if (commentScrollStats.scope_skipped) {commentScopeSkipped++;return;}
       var cComments = commentCapture.comments;
 
       var saveCommentsOnlyResult = await sendNativeMessage2({
@@ -3700,6 +3711,8 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     fetched: fetched,
     failed: failed,
     comments_refreshed: commentsRefreshed,
+    comment_scope_skipped: commentScopeSkipped,
+    comment_scope: metaResult.comment_scope || null,
     net_new_comments: commentProgress.net_new_comments,
     comment_progress: commentProgress.pending_articles ? commentProgress : undefined,
     reason_code: commentScanFailed ? "comment_scan_failed" : undefined,
@@ -3836,6 +3849,7 @@ async function doManualFetch(items, diagnostics) {
           body_markdown: report,
           body_capture: detail.body_capture || null,
           comments: comments,
+          comments_scope_skipped:manualScrollStats.scope_skipped || undefined,
           detail_ticker: detail.detail_ticker || null,
           detail_ticker_observed_at: detail.detail_ticker_observed_at || null,
           provider_comments_count: null,
@@ -4020,6 +4034,18 @@ async function beginArticleCapture(tabId, item) {
   };
 }
 
+async function articleCommentEligibility(item) {
+  var decision;
+  try {
+    decision = await sendNativeMessage2({action:"get_article_acquisition_eligibility",operation:"comments",article_id:item.article_id});
+  } catch (_) {}
+  if (!decision || decision.status !== "ok" || typeof decision.allowed !== "boolean") {
+    throw new SAAcquisition.Stop({status:"deferred",reason:"article_scope_unavailable",
+      error_code:decision && decision.error_code || "sa_article_scope_unavailable"});
+  }
+  return decision;
+}
+
 async function captureArticle(tabId, item, mode, includeBody, options) {
   options = options || {};
   var scope = options.scope || item.comment_scan_scope || (mode === "backfill" ? "history" : "recent");
@@ -4034,6 +4060,9 @@ async function captureArticle(tabId, item, mode, includeBody, options) {
     var detail = includeBody ? await injectDetailScraper(tabId) : null;
     await guard.assert(detail && !detail.error ? detail.url || null : undefined);
     if (includeBody && (!detail || detail.error)) return {detail:detail};
+    var eligibility = await articleCommentEligibility(item);
+    if (!eligibility.allowed) return {detail:detail,comments:[],
+      scroll:{mode:mode,scope_skipped:true,scope_reason:eligibility.reason_code}};
     await injectCommentsScraper(tabId);
     await guard.assert();
     var scroll = await scrollToComments(tabId, {mode:mode,articleId:item.article_id,
