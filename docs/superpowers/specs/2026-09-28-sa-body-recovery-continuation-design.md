@@ -1,8 +1,10 @@
 # SA Body Recovery Continuation
 
-Status: direction approved; this written design awaits operator review.
-September 28: the operator confirmed retaining Closed/Former history and limiting
-cleanup to permanently removed targets. Configurable scope remains in this design.
+Status: approved by the operator on September 28, including Current precedence
+when a previously closed security is selected again. The implementation plan
+requires review before product changes begin.
+The operator confirmed retaining Closed/Former history and limiting cleanup to
+permanently removed targets. Configurable scope remains in this design.
 No runtime changes, production migration, or collector restart are authorized by
 this document alone. Review the implementation plan separately after this spec.
 
@@ -73,6 +75,18 @@ membership. Match article/lineage identities and established aliases, not ticker
 prefixes or title guesses. Re-entry of the same ticker can create a different
 cohort; an old cohort exclusion must not suppress a legitimate new one. General
 market news and company-financial acquisition are outside this retention policy.
+
+For a resolved security, a valid currently tracked membership takes precedence
+over historical Closed/Former memberships, both within one cohort (partially
+closed holdings) and across different entry dates (re-entry). In particular,
+`portfolio_status='closed'` with `current_tracking=1` is not former-only. Its
+eligible articles/discussions must not be suppressed merely because an older
+article link points to a closed cohort. Preserve those historical links and dates;
+do not rewrite them as a new entry. A delayed/stale closed observation cannot
+erase newer current evidence. Explicit removal/terminal-exclusion records still
+require their established restoration/identity rules, not automatic resurrection
+from a ticker string. Retained mixed-state examples on September 28 include AGX,
+APP, CAAP, CLS, GM and POWL; the mixed rows alone do not prove every case is re-entry.
 
 The operator permits deleting unneeded analysis bodies and discussions belonging
 exclusively to permanently removed Alpha Picks targets. Keep this as a separately
@@ -242,6 +256,9 @@ Do not reset collector configuration, existing queues, schedules or ownership.
   age limits and missing dates without inventing Entry/Exit associations. Cover
   current-to-closed changes, permanent exclusions, re-entry, shared articles and
   unresolved ownership across all comment acquisition paths and queued work.
+- Current wins over historical Closed within/across cohorts, including a closed
+  tracking row with `current_tracking=1`. Old links/dates remain unchanged and
+  out-of-order closed observations cannot stop a newer current source.
 - Leaving Current or selecting current-only recovery preserves existing Former
   bodies/comments. Known historical body repair never silently restarts discussions.
 - The separate permanent-retirement cleanup preview protects confirmed Entry/Exit
@@ -259,6 +276,9 @@ Implement on an isolated branch. Never replace the formal native host or extensi
 during active acquisition. It is not necessary to wait for the entire financial
 first-fill to finish: after review and regression, an operator-approved brief
 pause may be used if queue-preserving upgrade/rollback has passed rehearsal.
+This is a mandatory pre-cutover gate, with before/after queue identities, intent,
+configuration, success records and collector authority compared and continuation
+executed, not merely a written assurance that storage is persistent.
 The existing financial Cancel and configuration-change paths clear pending scopes;
 they are not interchangeable with a non-destructive pause. Back up the affected
 native stores, settings and extension queue/intent state at a confirmed idle
