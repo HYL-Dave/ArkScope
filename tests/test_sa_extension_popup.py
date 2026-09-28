@@ -81,6 +81,7 @@ const listener = {addListener() {}, removeListener() {}};
 const storage = {};
 const context = {
   URL, Date, Math, Promise, Set, TextEncoder, crypto: require("node:crypto").webcrypto,
+  mountFinancialPopup: dispatch => require('./tests/js/sa_financial_popup_harness.cjs')(path.dirname(sourcePath), dispatch),
   console: {info() {}, warn() {}, error() {}, log() {}},
   setTimeout, clearTimeout, queueMicrotask,
   chrome: {

@@ -355,6 +355,11 @@
             if (paused(code)) current.paused_reason = code;
             if (parserFailure(code)) {
               current.records[key(scope)].review_required = true;
+              // Persist rejection and dequeue together; worker loss must not authorize another attempt.
+              if ((current.intent_revision || 0) === intentRevision) {
+                current.pending_scopes = (current.pending_scopes || []).filter(function(id) {return id !== key(scope);});
+                if (!current.pending_scopes.length) current.pending_requested_at = null;
+              }
               current.parser_failures = current.parser_failures || {};
               var tickers = current.parser_failures[kind(scope)] || [];
               var symbol = providerSymbol(scope.ticker);

@@ -18,6 +18,12 @@ sendNativeMessage2=async request=>request.action==='get_company_watchlist'
   ? {status:'ok',tickers:['AAPL','AMD'],total_count:2,unsupported:[]} : {status:'ok'};
 """
 
+MOUNTED_SETUP = SETUP + """
+const nativeReply=sendNativeMessage2;
+sendNativeMessage2=request=>request.action==='sa_acquisition_control'
+  ? companyCollectorControl(request.operation,request) : nativeReply(request);
+"""
+
 
 def test_activation_requires_explicit_confirmation_and_matching_generation():
     result = _run_background_probe(SETUP + """
@@ -90,6 +96,64 @@ def test_failed_gap_only_activation_preserves_saved_queue_and_routine_switches()
     """)
     assert result["result"]["error_code"] == "sa_company_collector_busy"
     assert result["before"] == result["after"]
+
+
+def test_mounted_gap_save_rejection_and_retry_preserve_schedule_and_first_fill():
+    result = _run_background_probe(MOUNTED_SETUP + """
+      const initial={...selection,enabled:true,financial_gap_seconds:60};
+      await companyFinancialRefresh.configure(initial);
+      await chrome.storage.local.set({companyFinancialRefresh:{
+        ...(await chrome.storage.local.get('companyFinancialRefresh')).companyFinancialRefresh,
+        pending_scopes:['AAPL/income_statement/annual','AMD/income_statement/annual'],
+        pending_requested_at:'2026-09-27T00:00:00Z',pending_force:false}});
+      let reject=true;
+      authorityReply=async operation=>operation==='configure' && reject
+        ? {status:'error',error_code:'sa_company_collector_busy'}
+        : {...admittedState,policy:accepted.policy,financial_gap_seconds:60};
+      const popup=await mountFinancialPopup(handleAcquisitionControl);
+      try {
+        const before=JSON.parse(JSON.stringify((await chrome.storage.local.get('companyFinancialRefresh')).companyFinancialRefresh));
+        const doc=popup.document, gap=doc.getElementById('companyFinancialGap');
+        gap.value='15';gap.dispatchEvent(new popup.Event('input',{bubbles:true}));
+        doc.getElementById('companyActivationConfirmed').checked=true;
+        await popup.settle();
+        doc.getElementById('companyCollectorSelect').click();await popup.settle();
+        const rejected={enabled:doc.getElementById('companyRefreshEnabled').checked,
+          error:doc.getElementById('companyRefreshStatus').textContent};
+        reject=false;
+        doc.getElementById('companyCollectorSelect').click();await popup.settle();
+        return {before,rejected,after:(await chrome.storage.local.get('companyFinancialRefresh')).companyFinancialRefresh};
+      } finally {popup.close();}
+    """)
+    assert "sa_company_collector_busy" in result["rejected"]["error"]
+    assert result["rejected"]["enabled"] is True
+    assert result["after"]["config"]["enabled"] is True
+    assert result["after"]["config"]["financial_gap_seconds"] == 15
+    for field in ("pending_scopes", "pending_requested_at", "pending_force", "intent_revision", "records"):
+        assert result["after"].get(field) == result["before"].get(field), field
+
+
+def test_mounted_financial_resume_retains_unrelated_alpha_access_pause():
+    result = _run_background_probe(MOUNTED_SETUP + """
+      await companyFinancialRefresh.configure(selection);
+      await chrome.storage.local.set({companyFinancialRefresh:{
+        ...(await chrome.storage.local.get('companyFinancialRefresh')).companyFinancialRefresh,
+        paused_reason:'sa_company_layout_unrecognized',pending_scopes:['AMD/income_statement/annual']}});
+      const control={...admittedState,policy:accepted.policy,capability_pauses:{alpha_picks:'access_restricted'}};
+      authorityReply=async()=>control;
+      const popup=await mountFinancialPopup(handleAcquisitionControl);
+      try {
+        const button=popup.document.getElementById('saAcquisitionResume');
+        const before={text:button.textContent,hidden:button.hidden,disabled:button.disabled};
+        button.click();await popup.settle();
+        return {before,actions,status:await companyFinancialRefresh.status()};
+      } finally {popup.close();}
+    """)
+    assert result["before"] == {"text": "Continue other financial scopes", "hidden": False, "disabled": False}
+    assert "resume" not in result["actions"]
+    assert result["status"]["paused_reason"] is None
+    assert result["status"]["pending_count"] == 1
+    assert result["status"]["collector"]["capability_pauses"] == {"alpha_picks": "access_restricted"}
 
 
 def test_explicit_uncapped_activation_keeps_routine_intent_and_financial_schedule_off():

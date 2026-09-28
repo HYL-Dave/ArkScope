@@ -966,7 +966,8 @@ function activateSaUpdates(request) {
         await setMarketNewsAutoSyncEnabled(false).catch(function () {});
         if (config) await companyFinancialRefresh.configure(Object.assign({},config,{enabled:false})).catch(function () {});
       }
-      return {status:"error",error_code:error.message || "sa_acquisition_activation_failed",activation_step:step};
+      return {status:"error",error_code:error.message || "sa_acquisition_activation_failed",activation_step:step,
+        schedules_disabled:disabled};
     }
   });
   saActivationChain = work.catch(function () {});

@@ -12,7 +12,7 @@ function clone(value) {
 
 function responseFor(message) {
   if (message.action === "manual_fetch") return clone(fixture.manualResult || {fetched:0,failed:0});
-  if (message.action === 'enable_sa_updates_here' && fixture.activationError) return {status:'error',error_code:fixture.activationError,activation_step:'configure'};
+  if (message.action === 'enable_sa_updates_here' && fixture.activationError) return {status:'error',error_code:fixture.activationError,activation_step:'configure',schedules_disabled:true};
   if (message.action === 'preview_company_refresh') {
     const count=(message.config?.target_mode==='watchlist' ? (fixture.watchlistCount || 180) : message.config?.tickers?.length || 0)
       * (message.config?.statements?.length || 0) * (message.config?.views?.length || 0);

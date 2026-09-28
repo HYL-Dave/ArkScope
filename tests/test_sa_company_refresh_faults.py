@@ -107,6 +107,35 @@ def test_parser_failures_are_not_silently_retried_by_maintenance():
     assert result["preview"]["counts"]["blocked"] == 1
 
 
+def test_restart_after_parser_failure_write_does_not_requeue_failed_scope():
+    result = probe(WATCHLIST + """
+      await api.configure({...saved.companyFinancialRefresh.config,views:['annual']});
+      let failed;
+      const failureSaved=new Promise(resolve=>{failed=resolve;});
+      deps.runScope=async(scope,_mode,_admitted,observeFailure)=>{
+        calls.push(scope.ticker);
+        await observeFailure('sa_company_layout_unrecognized');
+        failed();
+        await new Promise(()=>{});
+      };
+      api.run({force:false});
+      await failureSaved;
+      const checkpoint=structuredClone(saved.companyFinancialRefresh);
+      clock+=7*3600000;
+      deps.runScope=async scope=>{calls.push(scope.ticker);return {status:'ok',currency:'USD',observation_id:'b'.repeat(64)};};
+      const restarted=SACompanyRefresh.create(deps);
+      await restarted.run({scheduled:true});
+      const continued=await restarted.status();
+      await restarted.run({force:false});
+      return {checkpoint,continued,calls};
+    """)
+    assert result["checkpoint"]["records"]["AMD/income_statement/annual"]["review_required"] is True
+    assert result["checkpoint"]["pending_scopes"] == ["AAPL/income_statement/annual"]
+    assert result["continued"]["pending_count"] == 0
+    assert result["continued"]["scopes"][0]["review_required"] is True
+    assert result["calls"] == ["AMD", "AAPL", "AMD"]
+
+
 def test_gap_only_change_keeps_pending_order_intent_and_successes():
     result = probe(WATCHLIST + """
       await api.run({force:false});

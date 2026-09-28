@@ -103,6 +103,10 @@
   function parserPaused() {
     return state && /^sa_company_(parser_failures|layout_unrecognized|structure_changed|identity_mismatch|units_unrecognized|value_unrecognized)$/.test(state.paused_reason || "");
   }
+  function parserContinuation(control) {
+    return parserPaused() && control && !control.paused_reason
+      && !(control.capability_pauses && control.capability_pauses.financials);
+  }
   function warning(control) {
     var node=$("saAcquisitionWarning"), caps=Object.keys(control && control.capability_pauses || {});
     var reason=control && control.paused_reason;
@@ -113,8 +117,9 @@
       : caps.length ? "Subscription access unavailable: "+caps.join(", ")+". Premium and Alpha Picks require separate access."
       : cooling ? "Seeking Alpha cooldown until "+(control.rate_limit_until || state.rate_limit_until)
       : reason || (parser ? "Financial table review required: "+state.paused_reason : "");
+    if (parser && (reason || caps.length || cooling)) node.textContent+=" | Financial table review required: "+state.paused_reason;
     $("saAcquisitionResume").hidden=!(reason || caps.length || parser);
-    $("saAcquisitionResume").textContent=parser && !reason && !caps.length
+    $("saAcquisitionResume").textContent=parserContinuation(control)
       ? "Continue other financial scopes" : "Resume after sign-in / access check";
     $("saAcquisitionResume").disabled=busy || !(control && control.status === "ok" && control.is_owner) || !!control.active
       || !!cooling || !!(state && (state.running || state.acquisition_pending || state.upgrade_hold));
@@ -231,8 +236,8 @@
     var result=await send("enable_sa_updates_here",{config:config(),policy:policy(),expected_generation:expectedGeneration,
       confirm_activation:true,confirm_schedules:true,confirm_stopped:$("companyRecoveryConfirmed").checked});
     lockForm(false);
-    if(result.status!=="ok")$("companyRefreshEnabled").checked=false;
-    else {dirty=false;policyDirty=false;}
+    if(result.status==="ok") {dirty=false;policyDirty=false;}
+    else if(result.schedules_disabled===true)$("companyRefreshEnabled").checked=false;
     render(result);
     if(result.status==='ok')await preview();
   });
@@ -274,7 +279,7 @@
   $("saAcquisitionResume").addEventListener("click",async function(){
     if(busy || !state || $("saAcquisitionResume").disabled)return;
     var caps=Object.keys(state.collector.capability_pauses || {});
-    var local=parserPaused() && !state.collector.paused_reason && !caps.length;
+    var local=parserContinuation(state.collector);
     lockForm(true);
     var result=await send(local ? "resume_company_parser" : "resume_sa_acquisition",local
       ? {expected_generation:state.collector.generation}

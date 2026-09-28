@@ -149,7 +149,7 @@ App 的 Provider 健康表也會同時顯示「最近成功」、「最近嘗試
 
 App **Settings → 資料來源 → SA 財報擷取** 可調「解析異常暫停：不同標的數」。預設為 3，0 表示不因解析失敗自動暫停整批；0 不會放行無效資料。計數依報表與 Annual／Quarterly 分開，只有不同代號才累加，同類型成功才歸零。修改門檻不會清除已經發生的暫停，也不會修改間隔、採集來源、排程或付費設定。
 
-舊版留下的 **Paused: sa_company_layout_unrecognized**，或新版跨多標的失敗的 **sa_company_parser_failures**，會在頂端顯示 **Continue other financial scopes**。它保留失敗紀錄，略過待檢查項目、接續原本其他待處理範圍，不會重建全清單。登入、驗證、限流、其他採集者或尚未清理的工作存在時，不能用這個入口繞過限制；共用存取恢復也不會順便清掉解析暫停。
+舊版留下的 **Paused: sa_company_layout_unrecognized**，或新版跨多標的失敗的 **sa_company_parser_failures**，會在頂端顯示 **Continue other financial scopes**。它保留失敗紀錄，略過待檢查項目、接續原本其他待處理範圍，不會重建全清單。登入、驗證、限流、財報權限、其他採集者或尚未清理的工作存在時，不能用這個入口繞過限制；共用存取恢復也不會順便清掉解析暫停。只有 Alpha Picks 權限被擋時，仍可接續財報，且不會解除 Alpha Picks 的限制。
 
 版面錯誤本身不能證明公司沒有財報或訂閱不足。請提供標的、報表、Annual／Quarterly、錯誤時間，以及含表頭、單位和列名的截圖，供核對解析器。接續其他範圍不代表 BAC 等失敗項目已修好，也不代表整輪完成。
 
