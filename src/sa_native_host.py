@@ -122,7 +122,12 @@ def handle_message(msg):
                 load_route("sa_company_financials").candidates("seeking_alpha")
             except DataSourcePolicyFailure as exc:
                 return {"status": "error", "error_code": exc.code}
-        return CompanyCollector().handle(msg)
+        result = CompanyCollector().handle(msg)
+        if msg.get("operation") == "status" and result.get("status") == "ok":
+            from src.sa.financial_acquisition_settings import native_financial_settings
+
+            result["financial_settings"] = native_financial_settings()
+        return result
     if action in {"get_company_capture_admission", "save_company_data"}:
         from src.data_source_routing import DataSourcePolicyFailure, load_route
         from src.sa.company_data import CompanyDataFailure

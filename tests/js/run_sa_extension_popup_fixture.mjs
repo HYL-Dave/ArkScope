@@ -327,6 +327,9 @@ function snapshot(document, sent) {
     acquisitionLiveInDetails: !!document.getElementById('saAcquisitionLive')?.closest('details'),
     acquisitionWarning: text(document.getElementById('saAcquisitionWarning')),
     acquisitionWarningHidden: document.getElementById('saAcquisitionWarning')?.hidden,
+    acquisitionResumeHidden: document.getElementById('saAcquisitionResume')?.hidden,
+    acquisitionResumeDisabled: document.getElementById('saAcquisitionResume')?.disabled,
+    acquisitionResumeText: text(document.getElementById('saAcquisitionResume')),
     acquisitionRecoveryShortcutHidden: document.getElementById('saAcquisitionReviewRecovery')?.hidden,
     acquisitionRecoverDisabled: document.getElementById('companyCollectorRecover')?.disabled,
     companyAdvancedOpen: document.getElementById('companyAdvanced')?.open,
@@ -388,6 +391,9 @@ async function runPopup() {
     if (scenario === 'acquisition_runtime_wakeup') {
       fixture.companyRefresh = fixture.nextCompanyRefresh;
       await mocks.chrome.storage.local.set({saAcquisitionRuntime: fixture.runtimeSignal});
+      await settle();
+    } else if (scenario === 'resume_financial_parser') {
+      dom.window.document.getElementById('saAcquisitionResume').click();
       await settle();
     } else if (scenario === 'review_stopped_acquisition') {
       dom.window.document.getElementById('companyRefreshOptions').open = false;

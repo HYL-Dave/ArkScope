@@ -762,7 +762,7 @@ describe("bundled i18n resources", () => {
     const expectedCounts = {
       common: 83,
       shell: 51,
-      settings: 1417,
+      settings: 1426,
       research: 240,
       explore: 1209,
       portfolio: 374,
@@ -848,7 +848,7 @@ describe("bundled i18n resources", () => {
           total += actual;
         }
       }
-      expect(total, `${locale}.total`).toBe(3398);
+      expect(total, `${locale}.total`).toBe(3407);
       const research = flattenResource(localeResources.research as ResourceTree);
       expect([...research.keys()].filter((path) => /^errors\.(?:persistence|completionUnverified)/u.test(path)).sort())
         .toEqual([
@@ -1235,6 +1235,8 @@ describe("bundled i18n resources", () => {
       "reasons.modelEntitlementUnverified",
     ] as const;
     const postSliceSettingsPaths = [
+      ...["title", "refresh", "save", "undo", "defaults", "threshold", "unavailable", "invalidSaved", "saveError"]
+        .map((key) => `dataSources.financialCapture.${key}`),
       ...["title", "refresh", "save", "undo", "defaults", "limit", "age", "bodyScope", "commentScope",
         "allRetained", "current", "tracked", "unavailable", "invalidSaved", "saveError", "progress",
         "progressUnavailable", "next", "counts", "states.not_started", "states.pending", "states.running",

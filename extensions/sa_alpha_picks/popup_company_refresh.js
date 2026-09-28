@@ -50,7 +50,7 @@
     var count=result.counts;
     line(node,(result.first_fill ? "Initial fill" : "Maintenance")+": "+result.total_scopes+" scopes");
     line(node,"Missing checks "+count.missing+" | Due "+count.due+" | Reusable "+count.reusable+" | Blocked "+count.blocked);
-    line(node,"Minimum pacing wait: "+Math.ceil(result.pacing_lower_bound_seconds/60)+" min | "+config().financial_gap_seconds+" s gap");
+    line(node,"Minimum pacing wait: "+Math.ceil(result.pacing_lower_bound_seconds/60)+" min | "+config().financial_gap_seconds+" s after cleanup");
     if (result.active_delay_seconds>0) line(node,"Current pacing delay: "+Math.ceil(result.active_delay_seconds)+" s");
     if (result.observed_duration && result.observed_duration.sample_count) line(node,"Observed capture: "+Math.round(result.observed_duration.mean_ms/1000)+" s average / "+result.observed_duration.sample_count+" scopes");
     else line(node,"Capture-duration coverage: not measured");
@@ -100,17 +100,24 @@
     $("companyCollectorRecover").hidden=!(stopped || running && (control.active || state.acquisition_pending));
     $("companyCollectorRecover").disabled=!recoveryAllowed();
   }
+  function parserPaused() {
+    return state && /^sa_company_(parser_failures|layout_unrecognized|structure_changed|identity_mismatch|units_unrecognized|value_unrecognized)$/.test(state.paused_reason || "");
+  }
   function warning(control) {
     var node=$("saAcquisitionWarning"), caps=Object.keys(control && control.capability_pauses || {});
     var reason=control && control.paused_reason;
-    node.hidden=!reason && !caps.length && !(control && control.rate_limited);
+    var parser=parserPaused(), cooling=control && control.rate_limited || state && state.rate_limited;
+    node.hidden=!reason && !caps.length && !cooling && !parser;
     node.textContent=reason === "login_required" ? "Seeking Alpha sign-in expired. Acquisition paused."
       : reason === "human_verification_required" ? "Seeking Alpha verification required. Acquisition paused."
       : caps.length ? "Subscription access unavailable: "+caps.join(", ")+". Premium and Alpha Picks require separate access."
-      : control && control.rate_limited ? "Seeking Alpha cooldown until "+control.rate_limit_until
-      : reason || "";
-    $("saAcquisitionResume").hidden=!(reason || caps.length);
-    $("saAcquisitionResume").disabled=busy || !(control && control.is_owner) || !!control.active;
+      : cooling ? "Seeking Alpha cooldown until "+(control.rate_limit_until || state.rate_limit_until)
+      : reason || (parser ? "Financial table review required: "+state.paused_reason : "");
+    $("saAcquisitionResume").hidden=!(reason || caps.length || parser);
+    $("saAcquisitionResume").textContent=parser && !reason && !caps.length
+      ? "Continue other financial scopes" : "Resume after sign-in / access check";
+    $("saAcquisitionResume").disabled=busy || !(control && control.status === "ok" && control.is_owner) || !!control.active
+      || !!cooling || !!(state && (state.running || state.acquisition_pending || state.upgrade_hold));
   }
   function render(result, fromRead) {
     var valid=result && result.status === "ok" && result.config;
@@ -184,14 +191,16 @@
       : denied ? "Waiting for collector / access" : result.config.enabled ? "Scheduled" : "Schedule off");
     if(result.pending_count)line(output,"Queued: "+result.pending_count+" scopes");
     if(control.active)line(output,"Current: "+(control.active.scope ? control.active.scope.ticker+" / "+control.active.scope.view : control.active.operation));
-    if(control.financial_gap_seconds)line(output,"Accepted financial gap: "+control.financial_gap_seconds+" s");
+    if(control.financial_gap_seconds)line(output,"Accepted financial gap: "+control.financial_gap_seconds+" s after cleanup");
+    if(control.financial_settings && control.financial_settings.values)line(output,"Parser pause threshold: "+control.financial_settings.values.parser_failure_ticker_threshold+" different tickers (0 = off)");
+    if(result.parser_pause)line(output,"Affected: "+result.parser_pause.statement+" / "+result.parser_pause.view+" | "+result.parser_pause.tickers.join(", "));
     if(control.policy)line(output,control.policy.hour_limit===null ? "Page budget: no hourly / daily cap"
       : "Page budget: "+control.policy.hour_limit+" / hour | "+control.policy.day_limit+" / day");
     if(control.next_financial_at)line(output,"Next financial eligibility: "+control.next_financial_at);
     if(result.blocked_reason)line(output,result.blocked_reason+" | Next attempt: "+(result.deferred_until || "Pending"));
     if(result.queue && result.queue.oldest_wait_ms)line(output,"Queue wait: "+Math.round(result.queue.oldest_wait_ms/1000)+" s");
     var records=document.createElement("details"), summary=document.createElement("summary");summary.textContent="Scope status";records.appendChild(summary);
-    (result.scopes || []).forEach(function(scope){line(records,scope.ticker+" / "+scope.statement+" / "+scope.view+" / USD | Last success: "+(scope.last_success_at || "Never")+" | Next attempt: "+(scope.next_due_at || "Due")+(scope.last_error ? " | "+scope.last_error : ""));});
+    (result.scopes || []).forEach(function(scope){line(records,scope.ticker+" / "+scope.statement+" / "+scope.view+" / USD | Last success: "+(scope.last_success_at || "Never")+" | "+(scope.review_required ? "Review required" : "Next attempt: "+(scope.next_due_at || "Due"))+(scope.last_error ? " | "+scope.last_error : ""));});
     output.appendChild(records);
   }
   async function reload() {
@@ -263,8 +272,14 @@
     $("companyRecoveryConfirmed").focus();
   });
   $("saAcquisitionResume").addEventListener("click",async function(){
+    if(busy || !state || $("saAcquisitionResume").disabled)return;
     var caps=Object.keys(state.collector.capability_pauses || {});
-    render(await send("resume_sa_acquisition",{expected_generation:state.collector.generation,confirm_handled:true,capability:caps[0]}));
+    var local=parserPaused() && !state.collector.paused_reason && !caps.length;
+    lockForm(true);
+    var result=await send(local ? "resume_company_parser" : "resume_sa_acquisition",local
+      ? {expected_generation:state.collector.generation}
+      : {expected_generation:state.collector.generation,confirm_handled:true,capability:caps[0]});
+    lockForm(false);render(result);await reload();
   });
   $("companyReloadSettings").addEventListener("click",function(){dirty=false;policyDirty=false;actionError=null;reload();});
   chrome.storage.onChanged.addListener(function(changes,area){

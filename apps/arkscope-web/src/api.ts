@@ -5314,6 +5314,21 @@ export interface SAArticleAcquisitionValues {
   body_scope: "all_retained" | "current";
   comment_scope: "current" | "tracked";
 }
+export interface SAFinancialAcquisitionValues {
+  parser_failure_ticker_threshold: number;
+}
+export interface SAFinancialAcquisitionView {
+  values: SAFinancialAcquisitionValues | null;
+  defaults: SAFinancialAcquisitionValues;
+  setting_source: "default" | "profile";
+  error_code: string | null;
+}
+export function getSAFinancialAcquisitionSettings(): Promise<SAFinancialAcquisitionView> {
+  return getJSON<SAFinancialAcquisitionView>("/sa/financial-acquisition-settings", 8_000);
+}
+export function putSAFinancialAcquisitionSettings(values: SAFinancialAcquisitionValues): Promise<SAFinancialAcquisitionView> {
+  return sendJSON<SAFinancialAcquisitionView>("/sa/financial-acquisition-settings", "PUT", values, 8_000);
+}
 export interface SAArticleAcquisitionView {
   values: SAArticleAcquisitionValues | null;
   defaults: SAArticleAcquisitionValues;

@@ -54,6 +54,7 @@ import { DataSourceCatalogSection } from "./DataSourceCatalogSection";
 import { RecordedTimestamp } from "./RecordedTimestamp";
 import type { SettingsLocationId } from "./settingsRegistry";
 import { SAArticleAcquisitionSection } from "./SAArticleAcquisitionSection";
+import { SAFinancialAcquisitionSection } from "./SAFinancialAcquisitionSection";
 
 function saChainPresentation(
   state: SAExtensionHealthResponse["chain_state"],
@@ -244,6 +245,7 @@ export function DataSourcesSection({
   const [busy, setBusy] = useState<string>("");
   const [routingGuard, setRoutingGuard] = useState(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [articleGuard, setArticleGuard] = useState(CLEAR_SETTINGS_NAVIGATION_GUARD);
+  const [financialCaptureGuard, setFinancialCaptureGuard] = useState(CLEAR_SETTINGS_NAVIGATION_GUARD);
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({}); // "provider.field"
   const [testResults, setTestResults] = useState<Record<string, ProviderTestState>>({});
   const [pendingGuardedEdit, setPendingGuardedEdit] = useState<{
@@ -254,11 +256,11 @@ export function DataSourcesSection({
   } | null>(null);
   const guardedEditTriggerRef = useRef<HTMLButtonElement>(null);
   const dataSourcesMountedRef = useRef(true);
-  const combinedBusy = scheduleController.busy || busy || (routingGuard.busy || articleGuard.busy ? "data-source-routing" : "");
+  const combinedBusy = scheduleController.busy || busy || (routingGuard.busy || articleGuard.busy || financialCaptureGuard.busy ? "data-source-routing" : "");
   const dirty = scheduleController.hasDrafts
     || Object.values(keyDrafts).some((value) => value !== "")
     || pendingGuardedEdit !== null
-    || routingGuard.dirty || articleGuard.dirty;
+    || routingGuard.dirty || articleGuard.dirty || financialCaptureGuard.dirty;
   const navigationBusy = combinedBusy !== "";
 
   useEffect(() => {
@@ -800,6 +802,7 @@ export function DataSourcesSection({
       </SettingsSubsectionAnchor>
 
       <SAArticleAcquisitionSection onNavigationGuardChange={setArticleGuard} />
+      <SAFinancialAcquisitionSection onNavigationGuardChange={setFinancialCaptureGuard} />
 
       <SettingsSubsectionAnchor id="provider_connections">
         <div className="settings-panel" style={{ marginTop: 16 }}>

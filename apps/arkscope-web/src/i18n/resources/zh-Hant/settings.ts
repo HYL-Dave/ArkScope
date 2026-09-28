@@ -924,6 +924,13 @@ const settings = {
         guardConfirm: "套用變更",
       },
     },
+    financialCapture: {
+      title: "SA 財報擷取", refresh: "重新整理財報擷取設定", save: "儲存財報擷取設定",
+      undo: "還原財報擷取設定", defaults: "使用財報擷取預設值",
+      threshold: "解析異常暫停：不同標的數（0 為不暫停）",
+      unavailable: "財報擷取設定無法讀取", invalidSaved: "已儲存的財報擷取設定無效。",
+      saveError: "財報擷取設定未能儲存。",
+    },
     articles: {
       title: "文章採集", refresh: "重新整理文章設定與進度", save: "儲存文章設定", undo: "還原文章設定", defaults: "使用文章預設值",
       limit: "每次工作篇數（0 為不限）", age: "文章年齡天數（0 為不限）", bodyScope: "正文補抓範圍", commentScope: "討論區更新範圍",

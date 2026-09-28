@@ -57,6 +57,32 @@ def test_stopped_capture_warning_is_visible_outside_finance_details():
     assert result["acquisitionRecoveryShortcutHidden"] is False
 
 
+@pytest.mark.parametrize("reason", ["sa_company_layout_unrecognized", "sa_company_parser_failures"])
+def test_financial_local_parser_pause_is_visible_and_has_non_access_resume(reason):
+    snapshot = state()
+    snapshot["paused_reason"] = reason
+    snapshot["pending_count"] = 3
+    result = run(companyRefresh=snapshot)
+    assert result["acquisitionWarningHidden"] is False
+    assert reason in result["acquisitionWarning"]
+    assert result["acquisitionResumeHidden"] is False
+    assert result["acquisitionResumeDisabled"] is False
+    assert "financial" in result["acquisitionResumeText"].lower()
+    result = run("resume_financial_parser", companyRefresh=snapshot)
+    actions = [m for m in result["sent"] if m["action"].startswith("resume_")]
+    assert actions == [{"action": "resume_company_parser", "expected_generation": 7}]
+
+
+def test_shared_cooldown_disables_parser_resume_and_remains_visible():
+    snapshot = state()
+    snapshot["paused_reason"] = "sa_company_parser_failures"
+    snapshot["collector"].update(rate_limited=True, rate_limit_until="2026-09-29T00:00:00Z")
+    result = run("resume_financial_parser", companyRefresh=snapshot)
+    assert "cooldown" in result["acquisitionWarning"].lower()
+    assert result["acquisitionResumeDisabled"] is True
+    assert not any(m["action"].startswith("resume_") for m in result["sent"])
+
+
 def test_missing_runtime_evidence_is_not_rendered_as_idle_or_recoverable():
     snapshot = state(recovery=True, pending=True)
     del snapshot["acquisition_runtime_active"]

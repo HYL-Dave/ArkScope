@@ -13,6 +13,9 @@ from src.api.permissions import require_profile_state_write
 from src.sa.article_acquisition_settings import (
     ARTICLE_SETTINGS_KEY, ArticleAcquisitionSettings, article_settings_view,
 )
+from src.sa.financial_acquisition_settings import (
+    FINANCIAL_SETTINGS_KEY, FinancialAcquisitionSettings, financial_settings_view, read_financial_settings,
+)
 from src.service.sa_extension_health import collect_sa_extension_health
 from src.service.sa_market_news_health import compute_market_news_health
 from src.service.job_runs_store import get_job_runs_store
@@ -31,6 +34,26 @@ from src.tools.sa_tools import (
 )
 
 router = APIRouter(prefix="/sa", tags=["seeking-alpha"])
+
+
+@router.get("/financial-acquisition-settings")
+def financial_acquisition_settings():
+    from src.data_source_routing import DataSourcePolicyFailure
+    try:
+        return read_financial_settings()
+    except DataSourcePolicyFailure as exc:
+        raise HTTPException(503, detail={"code": exc.code}) from exc
+
+
+@router.put("/financial-acquisition-settings")
+def put_financial_acquisition_settings(body: FinancialAcquisitionSettings, store=Depends(get_data_provider_store)):
+    require_profile_state_write("set_sa_financial_acquisition_settings", body.model_dump())
+    raw = body.model_dump_json()
+    try:
+        store.set_setting(FINANCIAL_SETTINGS_KEY, raw)
+    except Exception as exc:
+        raise HTTPException(503, detail={"code": "data_source_settings_unavailable"}) from exc
+    return financial_settings_view(raw)
 
 
 @router.get("/article-acquisition-settings")

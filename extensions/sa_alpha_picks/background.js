@@ -915,6 +915,16 @@ function activateSaUpdates(request) {
       if (!upgrade && (!state || state.status !== "ok")) throw new Error(state && state.error_code || "sa_company_collector_unavailable");
       if (!upgrade && state.generation !== request.expected_generation) throw new Error("sa_acquisition_generation_stale");
       if (!upgrade && state.active) throw new Error("sa_company_collector_busy");
+      var current = (await companyFinancialRefresh.status()).config;
+      if (!upgrade && state.is_owner && SACompanyRefresh.sameIntent(current,config)
+          && keys.every(function(key){return state.policy && state.policy[key] === policy[key];})) {
+        step = "configure";
+        var updated = await companyCollectorControl("configure",{policy:policy,financial_gap_seconds:config.financial_gap_seconds,
+          expected_generation:state.generation,confirm_activation:true,require_idle:true});
+        if (!updated || updated.status !== "ok") throw new Error(updated && updated.error_code || "sa_company_collector_unavailable");
+        // Pacing-only edits retain the active fill intent and routine schedules.
+        return await companyFinancialRefresh.configure(config);
+      }
       var routine = await chrome.storage.local.get(["alphaPicksAutoSyncEnabled","alphaPicksAutoSyncIntervalMinutes","alphaPicksAutoSyncRevision",
         "marketNewsAutoSyncEnabled","marketNewsAutoSyncIntervalMinutes","marketNewsAutoSyncRevision"]);
       step = "disable";
@@ -1196,6 +1206,7 @@ async function handleAcquisitionControl(msg) {
   }
   if (msg.action === "preview_company_refresh") return companyFinancialRefresh.preview(msg.config);
   if (msg.action === "save_company_refresh") return companyFinancialRefresh.configure(Object.assign({},msg.config,{enabled:false}));
+  if (msg.action === "resume_company_parser") return companyFinancialRefresh.resumeParser(msg.expected_generation);
   if (msg.action === "cancel_company_refresh") return companyFinancialRefresh.cancelQueue();
   if (msg.action === "run_company_refresh") {
     if (msg.force === true && msg.confirm_force !== true) return {status:"error",error_code:"sa_acquisition_confirmation_required"};
@@ -1253,7 +1264,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (["get_company_refresh","preview_company_refresh","save_company_refresh","enable_sa_updates_here",
-      "run_company_refresh","cancel_company_refresh","recover_sa_acquisition","resume_sa_acquisition","resume_sa_upgrade"].includes(msg.action)) {
+      "run_company_refresh","cancel_company_refresh","recover_sa_acquisition","resume_sa_acquisition","resume_company_parser","resume_sa_upgrade"].includes(msg.action)) {
     if (!sender || sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("popup.html")) {
       sendResponse({status:"error",error_code:"extension_request_rejected"});
       return false;

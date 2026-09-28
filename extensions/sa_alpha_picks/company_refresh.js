@@ -71,7 +71,22 @@
     return Math.min(6 * 3600000 * Math.pow(2, failures - 1), 7 * DAY);
   }
   function paused(code) {
-    return /human_verification|access_restricted|login_required|layout_unrecognized|structure_changed|identity_mismatch|units_unrecognized|value_unrecognized/.test(code);
+    return /human_verification|access_restricted|login_required/.test(code);
+  }
+  function parserFailure(code) {
+    return /^sa_company_(layout_unrecognized|structure_changed|identity_mismatch|units_unrecognized|value_unrecognized)$/.test(code);
+  }
+  function kind(scope) { return scope.statement + "/" + scope.view; }
+  function financialPolicy(control) {
+    var view = control && control.financial_settings;
+    if (!view) return {threshold:3,error:null};
+    var threshold = view.values && view.values.parser_failure_ticker_threshold;
+    return !view.error_code && Number.isSafeInteger(threshold) && threshold>=0
+      ? {threshold:threshold,error:null} : {threshold:null,error:view.error_code || "sa_financial_settings_invalid"};
+  }
+  function sameIntent(left, right) {
+    return JSON.stringify(Object.assign({},left,{financial_gap_seconds:0}))
+      === JSON.stringify(Object.assign({},right,{financial_gap_seconds:0}));
   }
   function create(deps) {
     var now = deps.now || Date.now;
@@ -121,7 +136,7 @@
     }
     function blocked(control) {
       return control && (control.status !== "ok" || !control.is_owner || control.rate_limited || control.paused_reason
-        || control.capability_pauses && control.capability_pauses.financials || control.active);
+        || control.capability_pauses && control.capability_pauses.financials || control.active || financialPolicy(control).error);
     }
     async function status() {
       var state = await read();
@@ -132,13 +147,14 @@
         : (state.pending_scopes || []).filter(function (id) { return ids.has(id); });
       return {status:"ok", config:state.config, paused_reason:state.paused_reason, running:!!pending,
         collector:control, target_info:resolved.info, pending_count:queue.length,
-        blocked_reason:state.blocked_reason || null, deferred_until:state.deferred_until || null,
+        blocked_reason:financialPolicy(control).error || state.blocked_reason || null, deferred_until:state.deferred_until || null,
+        parser_pause:state.parser_pause || null,
         rate_limited:rateLimitDeadline(state) > now(), rate_limit_until:state.rate_limit_until || null,
         scopes:resolved.scopes.map(function (scope) {
           var record = state.records[key(scope)] || {};
           var due = Math.max(deadline(record, state.config.interval_days_by_view[scope.view]), rateLimitDeadline(state));
           return Object.assign({}, scope, {last_success_at:null, last_attempt_at:null, last_error:null}, record,
-            {next_due_at:due ? new Date(due).toISOString() : null, due:due <= now()});
+            {next_due_at:due ? new Date(due).toISOString() : null, due:due <= now() && !record.review_required});
         })};
     }
     async function preview(value) {
@@ -150,7 +166,7 @@
       var rows = resolved.scopes.map(function (scope) {
         var record = state.records[key(scope)] || {};
         var due = deadline(record,config.interval_days_by_view[scope.view]);
-        var kind = Date.parse(record.retry_after || "") > now() ? "blocked"
+        var kind = record.review_required || Date.parse(record.retry_after || "") > now() ? "blocked"
           : !record.last_success_at ? "missing" : due <= now() ? "due" : "reusable";
         counts[kind]++;
         if (Number.isFinite(record.duration_ms) && record.duration_ms>=0) samples.push(record.duration_ms);
@@ -163,7 +179,7 @@
         active_delay_seconds:Math.max(0,((control && Date.parse(control.next_financial_at)) || now())-now())/1000,
         observed_duration:{sample_count:samples.length,total_scopes:rows.length,
           mean_ms:samples.length ? samples.reduce(function(a,b){return a+b;},0)/samples.length : null},
-        collector:control,blocked_reason:control && (control.error_code || control.paused_reason
+        collector:control,blocked_reason:financialPolicy(control).error || control && (control.error_code || control.paused_reason
           || control.capability_pauses && control.capability_pauses.financials || (!control.is_owner ? "collector_other_installation" : null)) || state.paused_reason || state.blocked_reason || null};
     }
     async function syncAlarm() {
@@ -200,7 +216,7 @@
       }
       var queuedIds = new Set(state.pending_scopes || []);
       var times = resolved.scopes.filter(function (scope) {
-        return state.config.enabled || queuedIds.has(key(scope));
+        return queuedIds.has(key(scope)) || state.config.enabled && !(state.records[key(scope)] || {}).review_required;
       }).map(function (scope) {
         var record = state.records[key(scope)] || {};
         var due = queuedIds.has(key(scope)) ? Date.parse(record.retry_after || "") || 0
@@ -214,7 +230,7 @@
     async function configure(value) {
       var config = normalize(value);
       await mutate(function (state) {
-        if (JSON.stringify(state.config) !== JSON.stringify(config)) {
+        if (!sameIntent(state.config,config)) {
           cancellationEpoch++;
           state.intent_revision = (state.intent_revision || 0) + 1;
           state.pending_scopes = [];
@@ -247,12 +263,13 @@
       if (!resolved.scopes.some(function (item) { return key(item) === key(scope); })) return false;
       var updated = false;
       await mutate(function (state) {
-        if (JSON.stringify(state.config) !== JSON.stringify(current.config)) return;
+        if (!sameIntent(state.config,current.config)) return;
         updated = true;
         var previous = state.records[key(scope)] || {};
         state.records[key(scope)] = {last_success_at:receipt.last_success_at || new Date(now()).toISOString(), last_attempt_at:new Date(now()).toISOString(),
           duration_ms:receipt.acquisition ? receipt.acquisition.acquisition_duration_ms : previous.duration_ms,
           last_error:null, failures:0, retry_after:null, observation_id:receipt.observation_id};
+        if (state.parser_failures) delete state.parser_failures[kind(scope)];
       });
       return updated;
     }
@@ -260,6 +277,7 @@
       var force = request.force === true, manual = request.scheduled !== true;
       var control = await readCollector();
       if (blocked(control && Object.assign({},control,{active:null}))) return status();
+      var policy = financialPolicy(control);
       if (deps.shouldPause && await deps.shouldPause()) return status();
       // Refresh overrides source-age policy, never the financial-batch cooldown.
       if (rateLimitDeadline(await read()) > now()) return status();
@@ -293,6 +311,7 @@
       var selected = resolved.scopes.filter(function (scope) {
         if (Date.parse((state.records[key(scope)] || {}).retry_after || "") > now()) return false;
         if (queued) return state.pending_scopes.includes(key(scope));
+        if (!manual && (state.records[key(scope)] || {}).review_required) return false;
         return force || deadline(state.records[key(scope)] || {}, state.config.interval_days_by_view[scope.view]) <= now();
       });
       // One overdue scope per alarm. Missed browser sessions never produce a catch-up burst.
@@ -334,6 +353,18 @@
               current.rate_limit_until = new Date(now() + retryDelay(current.rate_limit_failures)).toISOString();
             }
             if (paused(code)) current.paused_reason = code;
+            if (parserFailure(code)) {
+              current.records[key(scope)].review_required = true;
+              current.parser_failures = current.parser_failures || {};
+              var tickers = current.parser_failures[kind(scope)] || [];
+              var symbol = providerSymbol(scope.ticker);
+              if (!tickers.includes(symbol)) tickers.push(symbol);
+              current.parser_failures[kind(scope)] = tickers;
+              if (policy.threshold>0 && tickers.length>=policy.threshold) {
+                current.paused_reason = "sa_company_parser_failures";
+                current.parser_pause = {statement:scope.statement,view:scope.view,tickers:tickers.slice()};
+              }
+            }
           });
           return failureWrite;
         };
@@ -397,8 +428,34 @@
       });
       return pending;
     }
-    async function resume() { await mutate(function(state){state.paused_reason=null;});return status(); }
-    return {configure:configure, status:status, preview:preview, run:run, syncAlarm:syncAlarm, noteSuccess:noteSuccess, cancelQueue:cancelQueue,resume:resume};
+    async function resume() {
+      await mutate(function(state){if (paused(state.paused_reason)) state.paused_reason=null;});
+      return status();
+    }
+    async function resumeParser(expectedGeneration) {
+      var control = await readCollector(), state = await read();
+      if (pending || blocked(control) || rateLimitDeadline(state)>now()
+          || deps.shouldPause && await deps.shouldPause()) {
+        return {status:"error",error_code:"sa_company_parser_resume_blocked"};
+      }
+      if (control && control.generation !== expectedGeneration) return {status:"error",error_code:"sa_acquisition_generation_stale"};
+      if (!parserFailure(state.paused_reason) && state.paused_reason !== "sa_company_parser_failures") {
+        return {status:"error",error_code:"sa_company_parser_resume_unavailable"};
+      }
+      await mutate(function(current) {
+        Object.keys(current.records).forEach(function(id) {
+          if (parserFailure(current.records[id].last_error)) current.records[id].review_required=true;
+        });
+        current.pending_scopes=(current.pending_scopes || []).filter(function(id){return !(current.records[id] || {}).review_required;});
+        if (!current.pending_scopes.length) current.pending_requested_at=null;
+        current.paused_reason=null;
+        current.parser_pause=null;
+        current.parser_failures={};
+      });
+      await syncAlarm();
+      return status();
+    }
+    return {configure:configure, status:status, preview:preview, run:run, syncAlarm:syncAlarm, noteSuccess:noteSuccess, cancelQueue:cancelQueue,resume:resume,resumeParser:resumeParser};
   }
-  root.SACompanyRefresh = {create:create, alarm:ALARM,normalize:normalize,providerSymbol:providerSymbol};
+  root.SACompanyRefresh = {create:create, alarm:ALARM,normalize:normalize,providerSymbol:providerSymbol,sameIntent:sameIntent};
 })(globalThis);

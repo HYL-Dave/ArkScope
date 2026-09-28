@@ -925,6 +925,13 @@ const settings = {
         guardConfirm: "Apply change",
       },
     },
+    financialCapture: {
+      title: "SA financial capture", refresh: "Refresh financial capture settings", save: "Save financial capture settings",
+      undo: "Undo financial capture settings", defaults: "Use default financial capture settings",
+      threshold: "Parser failure pause: different tickers (0 = off)",
+      unavailable: "Financial capture settings unavailable", invalidSaved: "Saved financial capture settings are invalid.",
+      saveError: "Financial capture settings could not be saved.",
+    },
     articles: {
       title: "Article acquisition", refresh: "Refresh article settings and progress", save: "Save article settings", undo: "Undo article settings", defaults: "Use default article settings",
       limit: "Articles per job (0 = unlimited)", age: "Article age in days (0 = unlimited)", bodyScope: "Article body scope", commentScope: "Discussion scope",

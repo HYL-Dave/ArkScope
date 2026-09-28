@@ -50,6 +50,48 @@ def test_repeated_activation_of_current_owner_does_not_select_again():
     assert "select" not in result["actions"]
 
 
+@pytest.mark.parametrize("enabled", [True, False])
+def test_gap_only_activation_preserves_first_fill_and_routine_settings(enabled):
+    result = _run_background_probe(SETUP + """
+      const initial={...selection,enabled:ENABLED,financial_gap_seconds:60};
+      await companyFinancialRefresh.configure(initial);
+      await chrome.storage.local.set({alphaPicksAutoSyncEnabled:true,marketNewsAutoSyncEnabled:true,
+        companyFinancialRefresh:{...(await chrome.storage.local.get('companyFinancialRefresh')).companyFinancialRefresh,
+          pending_scopes:['AAPL/income_statement/annual','AMD/income_statement/annual'],pending_requested_at:'2026-09-27T00:00:00Z',pending_force:false}});
+      authorityReply=async()=>({...admittedState,policy:accepted.policy,financial_gap_seconds:60});
+      const before=JSON.parse(JSON.stringify(await chrome.storage.local.get(['companyFinancialRefresh','alphaPicksAutoSyncEnabled','marketNewsAutoSyncEnabled'])));
+      const result=await activateSaUpdates({...accepted,config:{...initial,financial_gap_seconds:15}});
+      const after=await chrome.storage.local.get(['companyFinancialRefresh','alphaPicksAutoSyncEnabled','marketNewsAutoSyncEnabled']);
+      return {before,after,result,actions};
+    """.replace("ENABLED", str(enabled).lower()))
+    assert result["result"]["status"] == "ok"
+    assert len(result["before"]["companyFinancialRefresh"]["pending_scopes"]) == 2
+    for field in ("pending_scopes", "pending_requested_at", "pending_force", "intent_revision", "records"):
+        assert result["after"]["companyFinancialRefresh"].get(field) == result["before"]["companyFinancialRefresh"].get(field), field
+    assert result["after"]["companyFinancialRefresh"]["config"]["financial_gap_seconds"] == 15
+    assert result["after"]["alphaPicksAutoSyncEnabled"] is True
+    assert result["after"]["marketNewsAutoSyncEnabled"] is True
+    assert "select" not in result["actions"]
+
+
+def test_failed_gap_only_activation_preserves_saved_queue_and_routine_switches():
+    result = _run_background_probe(SETUP + """
+      const initial={...selection,enabled:true,financial_gap_seconds:60};
+      await companyFinancialRefresh.configure(initial);
+      await chrome.storage.local.set({alphaPicksAutoSyncEnabled:true,marketNewsAutoSyncEnabled:true,
+        companyFinancialRefresh:{...(await chrome.storage.local.get('companyFinancialRefresh')).companyFinancialRefresh,
+          pending_scopes:['AAPL/income_statement/annual','AMD/income_statement/annual'],pending_requested_at:'2026-09-27T00:00:00Z'}});
+      const before=JSON.stringify(await chrome.storage.local.get(['companyFinancialRefresh','alphaPicksAutoSyncEnabled','marketNewsAutoSyncEnabled']));
+      authorityReply=async operation=>operation==='configure' ? {status:'error',error_code:'sa_company_collector_busy'}
+        : {...admittedState,policy:accepted.policy,financial_gap_seconds:60};
+      const result=await activateSaUpdates({...accepted,config:{...initial,financial_gap_seconds:15}});
+      const after=JSON.stringify(await chrome.storage.local.get(['companyFinancialRefresh','alphaPicksAutoSyncEnabled','marketNewsAutoSyncEnabled']));
+      return {before,after,result};
+    """)
+    assert result["result"]["error_code"] == "sa_company_collector_busy"
+    assert result["before"] == result["after"]
+
+
 def test_explicit_uncapped_activation_keeps_routine_intent_and_financial_schedule_off():
     result = _run_background_probe(SETUP + """
       await chrome.storage.local.set({alphaPicksAutoSyncEnabled:true,marketNewsAutoSyncEnabled:true});
