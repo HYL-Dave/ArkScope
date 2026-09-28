@@ -151,7 +151,8 @@ def test_pick_refresh_and_article_meta_capture_commit_before_separate_reconcilia
     assert "secret database detail" not in json.dumps(meta_result)
 
 
-def test_save_article_content_commits_before_reconciliation_failure_and_stays_ok():
+def test_save_article_content_commits_before_reconciliation_failure_and_stays_ok(monkeypatch):
+    monkeypatch.setattr(host, "_article_scope_decision", lambda msg: {"status":"ok", "allowed":True})
     calls = []
 
     class Backend:
@@ -216,7 +217,8 @@ def test_save_article_content_commits_before_reconciliation_failure_and_stays_ok
     assert "synthetic sql failure" not in json.dumps(response)
 
 
-def test_save_article_content_passes_detail_ticker_without_manual_symbol_injection():
+def test_save_article_content_passes_detail_ticker_without_manual_symbol_injection(monkeypatch):
+    monkeypatch.setattr(host, "_article_scope_decision", lambda msg: {"status":"ok", "allowed":True})
     class Dal:
         def __init__(self):
             self.capture_kwargs = None

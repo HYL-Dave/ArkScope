@@ -17,6 +17,7 @@ from src.sa.article_body_quality import assess_body, narrative_text
 from src.sa.article_reader import read_article
 from src.tools.backends.sa_capture_backend import SACaptureBackend
 from tests.test_sa_extension_article_body import BODY, COMMENTS, EXTENSION, ROOT, _scrape
+from tests.test_sa_article_acquisition_scope import scope_case
 
 
 def manifest(**updates):
@@ -299,8 +300,10 @@ def test_linked_prose_remains_prose_but_destinations_and_image_labels_are_not_ev
     assert "ticker_text_symbol" in evaluate('We initiated a position in [AMD](<https://issuer.example/report>) shares.').evidence_codes
 
 
-def test_normal_native_dal_path_preserves_capture_observations(captured):
+def test_normal_native_dal_path_preserves_capture_observations(captured, scope_case, monkeypatch):
     path, backend = captured
+    monkeypatch.setenv("ARKSCOPE_SA_DB", str(path))
+    monkeypatch.setenv("ARKSCOPE_PROFILE_DB", str(scope_case[1]))
     from src.sa_native_host import _handle_save_article_content
     from src.tools.data_access import DataAccessLayer
 

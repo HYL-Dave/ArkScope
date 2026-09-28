@@ -727,7 +727,41 @@ async function syncAcquisitionBadge(state, persistStatus) {
 var saAcquisition = SAAcquisition.create({control:function (operation,extra) {return companyCollectorControl(operation,extra);},storage:chrome.storage.local,now:Date.now,
   onStatus:function (state) {return syncAcquisitionBadge(state).catch(function () {});}});
 
+var saUpgradeCheck = null;
+function acquisitionUpgradeState() {
+  if (!saUpgradeCheck) saUpgradeCheck = (async function () {
+    var data = await chrome.storage.local.get(["saBodyV2Upgrade", "companyFinancialRefresh", "saAcquisitionPending",
+      "alphaPicksAutoSyncEnabled", "marketNewsAutoSyncEnabled", "saArticleBodyRecovery"]);
+    var state = data.saBodyV2Upgrade;
+    if (state && state.version === 1 && typeof state.held === "boolean") return state;
+    // A one-time admission hold keeps an existing installation unchanged until
+    // its upgrade checkpoint is checked, even after all pacing delays expire.
+    state = {version:1,held:!!(state || data.companyFinancialRefresh || data.saAcquisitionPending
+      || data.saArticleBodyRecovery || data.alphaPicksAutoSyncEnabled || data.marketNewsAutoSyncEnabled)};
+    await chrome.storage.local.set({saBodyV2Upgrade:state});
+    return state;
+  })();
+  return saUpgradeCheck;
+}
+
+async function acquisitionUpgradeHeld() { return (await acquisitionUpgradeState()).held; }
+function upgradeDeferred() { return {status:"deferred",reason:"upgrade_verification_required",error_code:"upgrade_verification_required"}; }
+
+async function releaseAcquisitionUpgrade(msg) {
+  if (msg.confirm_checked !== true) return {status:"error",error_code:"sa_acquisition_confirmation_required"};
+  var control = await companyCollectorControl("status");
+  var pending = (await chrome.storage.local.get("saAcquisitionPending")).saAcquisitionPending;
+  if (!control || control.status !== "ok" || pending || control.active
+      || saSyncJobInFlight || saAcquisition.running) return {status:"error",error_code:"sa_acquisition_upgrade_not_idle"};
+  var state = {version:1,held:false};
+  await chrome.storage.local.set({saBodyV2Upgrade:state});
+  saUpgradeCheck = Promise.resolve(state);
+  await syncAllAutoSyncAlarms();
+  return handleAcquisitionControl({action:"get_company_refresh"});
+}
+
 async function acquisitionPaused(capability) {
+  if (await acquisitionUpgradeHeld()) return true;
   var saved = await chrome.storage.local.get(["saAcquisitionRestriction","saAcquisitionStatus"]);
   var local = saved.saAcquisitionRestriction, shared = saved.saAcquisitionStatus || {};
   return !!(shared.paused_reason || shared.rate_limited || shared.capability_pauses && shared.capability_pauses[capability]
@@ -1036,6 +1070,9 @@ var articleBodyRecovery = SAArticleBodyRecovery.create({
 });
 
 async function handleArticleBodyRecovery(msg) {
+  if (["start_article_body_recovery", "cancel_article_body_recovery", "resume_article_body_recovery"].includes(msg.action)
+      && await acquisitionUpgradeHeld()) return upgradeDeferred();
+  if (msg.action === "get_article_body_recovery_items") return articleBodyRecovery.items(msg.job_id,msg.cursor);
   if (msg.action === "preview_article_body_recovery") return articleBodyRecovery.preview();
   if (msg.action === "start_article_body_recovery") return articleBodyRecovery.start(msg.manifest_id);
   if (msg.action === "cancel_article_body_recovery") return articleBodyRecovery.cancel(msg.job_id);
@@ -1142,6 +1179,9 @@ async function captureArticleBodyRecovery(target, run, diagnostics) {
 }
 
 async function handleAcquisitionControl(msg) {
+  if (msg.action === "resume_sa_upgrade") return releaseAcquisitionUpgrade(msg);
+  var upgradeHold = await acquisitionUpgradeHeld();
+  if (upgradeHold && !["get_company_refresh", "preview_company_refresh", "recover_sa_acquisition"].includes(msg.action)) return upgradeDeferred();
   if (msg.action === "enable_sa_updates_here") return activateSaUpdates(msg);
   if (msg.action === "get_company_refresh") {
     var pendingState = await saAcquisition.reconcilePending();
@@ -1152,7 +1192,7 @@ async function handleAcquisitionControl(msg) {
     await syncAcquisitionBadge(status.collector, false).catch(function () {});
     return Object.assign({},status,{acquisition_pending:!!pending,acquisition_runtime_active:active,
       acquisition_recovery_required:recovery,acquisition_pending_since:pending && pending.started_at || null,
-      queue:saAcquisitionQueue.status()});
+      queue:saAcquisitionQueue.status(),upgrade_hold:upgradeHold});
   }
   if (msg.action === "preview_company_refresh") return companyFinancialRefresh.preview(msg.config);
   if (msg.action === "save_company_refresh") return companyFinancialRefresh.configure(Object.assign({},msg.config,{enabled:false}));
@@ -1196,7 +1236,7 @@ async function applyAcquisitionControl(msg, operation) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (["preview_article_body_recovery", "start_article_body_recovery",
-      "get_article_body_recovery_state", "cancel_article_body_recovery", "resume_article_body_recovery"].includes(msg.action)) {
+      "get_article_body_recovery_state", "get_article_body_recovery_items", "cancel_article_body_recovery", "resume_article_body_recovery"].includes(msg.action)) {
     if (!sender || sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("popup.html")) {
       sendResponse({status:"error",error_code:"extension_request_rejected"});
       return false;
@@ -1213,7 +1253,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (["get_company_refresh","preview_company_refresh","save_company_refresh","enable_sa_updates_here",
-      "run_company_refresh","cancel_company_refresh","recover_sa_acquisition","resume_sa_acquisition"].includes(msg.action)) {
+      "run_company_refresh","cancel_company_refresh","recover_sa_acquisition","resume_sa_acquisition","resume_sa_upgrade"].includes(msg.action)) {
     if (!sender || sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("popup.html")) {
       sendResponse({status:"error",error_code:"extension_request_rejected"});
       return false;
@@ -1549,8 +1589,9 @@ chrome.runtime.onStartup.addListener(function () {
   extensionTelemetryController.flush("startup");
 });
 
-chrome.alarms.onAlarm.addListener(function (alarm) {
+chrome.alarms.onAlarm.addListener(async function (alarm) {
   if (!alarm) return;
+  if (await acquisitionUpgradeHeld()) return;
   if (alarm.name === SAArticleBodyRecovery.alarm) {
     articleBodyRecovery.wake().catch(function () {});
     return;
@@ -1597,7 +1638,8 @@ chrome.alarms.onAlarm.addListener(function (alarm) {
   }
 });
 
-function enqueueSaSyncJob(opts, jobFn) {
+async function enqueueSaSyncJob(opts, jobFn) {
+  if (await acquisitionUpgradeHeld()) return upgradeDeferred();
   // The server derives the durable job identity from operation + mode.
   if (typeof opts === "string") {
     opts = { displayName: opts };
@@ -1610,6 +1652,7 @@ function enqueueSaSyncJob(opts, jobFn) {
   return saAcquisitionQueue.enqueue({key:opts.key || crypto.randomUUID(),priority:
     operation === "company_financial_capture" || operation === "alpha_picks_body_repair" ? "background" : "routine",
     eligible:opts.eligible,run:async function (timing) {
+    if (await acquisitionUpgradeHeld()) return upgradeDeferred();
     await extensionTelemetryController.flush("next_job");
     if (saSyncJobInFlight) {
       sendProgress("Queued: " + displayName);
@@ -2572,6 +2615,7 @@ async function setMarketNewsAutoSyncEnabled(enabled, intervalMinutes, expectedRe
 }
 
 async function syncAllAutoSyncAlarms() {
+  if (await acquisitionUpgradeHeld()) return;
   await syncAlphaPicksAutoSyncAlarm();
   await syncMarketNewsAutoSyncAlarm();
   await companyFinancialRefresh.syncAlarm();
@@ -2584,6 +2628,7 @@ async function refreshAcquisitionStatus() {
 }
 
 async function ensureAutoSyncAlarms() {
+  if (await acquisitionUpgradeHeld()) return upgradeDeferred();
   var data = await chrome.storage.local.get([
     "alphaPicksAutoSyncEnabled",
     "marketNewsAutoSyncEnabled",
@@ -3469,6 +3514,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
   // ── Step 3: Fetch article content + comments for need_content ──
   var fetched = 0, failed = 0, commentsRefreshed = 0;
   var commentScopeSkipped = 0;
+  var bodyScopeSkipped = 0;
   var commentProgress = {pending_articles:0,net_new_comments:0,stop_reasons:[]};
   var commentScanFailed = false;
   var reconciliationFailed = 0;
@@ -3496,7 +3542,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
       comment_progress:commentProgress.pending_articles ? commentProgress : undefined,
       reason_code:commentScanFailed ? "comment_scan_failed" : undefined,
       reconciliation_failed:reconciliationFailed,quick_workload:metaResult.quick_workload || null,
-      comment_scope_skipped:commentScopeSkipped,comment_scope:metaResult.comment_scope || null,
+      comment_scope_skipped:commentScopeSkipped,body_scope_skipped:bodyScopeSkipped,comment_scope:metaResult.comment_scope || null,
       acquisition_stop:error.detail};
   }
 
@@ -3508,6 +3554,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     sendProgress("Article " + (i + 1) + "/" + total + ": " + item.article_id);
 
     try {
+      if (!(await articleBodyEligibility(item)).allowed) {bodyScopeSkipped++;return;}
       // Navigate to article (tab must be active for comment scroll)
       await managedSaTabs.update(tabId, { url: item.url, active: true });
       await waitForTabLoad(tabId, 30000, expectedPathFromUrl(item.url));
@@ -3559,6 +3606,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
         comment_scan_stable_bottom_rounds:
           (bodyScrollStats && bodyScrollStats.stable_bottom_rounds) || 0,
       });
+      if (saveResult && saveResult.scope_skipped) {bodyScopeSkipped++;return;}
       var bodyCommentState = saveResult && saveResult.ok
         ? recordCommentScan(commentProgress, saveResult, bodyScrollStats) : null;
       if (saveResult && saveResult.ok && saveResult.body_saved !== false) {
@@ -3712,6 +3760,7 @@ async function doDetailFetch(tabId, currentPicks, mode, diagnostics) {
     failed: failed,
     comments_refreshed: commentsRefreshed,
     comment_scope_skipped: commentScopeSkipped,
+    body_scope_skipped: bodyScopeSkipped,
     comment_scope: metaResult.comment_scope || null,
     net_new_comments: commentProgress.net_new_comments,
     comment_progress: commentProgress.pending_articles ? commentProgress : undefined,
@@ -4035,9 +4084,17 @@ async function beginArticleCapture(tabId, item) {
 }
 
 async function articleCommentEligibility(item) {
+  return articleAcquisitionEligibility(item, "comments");
+}
+
+async function articleBodyEligibility(item) {
+  return articleAcquisitionEligibility(item, "body");
+}
+
+async function articleAcquisitionEligibility(item, operation) {
   var decision;
   try {
-    decision = await sendNativeMessage2({action:"get_article_acquisition_eligibility",operation:"comments",article_id:item.article_id});
+    decision = await sendNativeMessage2({action:"get_article_acquisition_eligibility",operation:operation,article_id:item.article_id});
   } catch (_) {}
   if (!decision || decision.status !== "ok" || typeof decision.allowed !== "boolean") {
     throw new SAAcquisition.Stop({status:"deferred",reason:"article_scope_unavailable",

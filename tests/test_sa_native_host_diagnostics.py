@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import src.sa_native_host as host
 
@@ -73,7 +73,10 @@ def _invoke(case, *, result=None, error: Exception | None = None):
         method.side_effect = error
     else:
         method.return_value = default_result if result is None else result
-    return handler(dal, json.loads(json.dumps(message)))
+    # These are persistence-envelope unit cases. Real membership/write guards
+    # are exercised against private stores in test_sa_comment_acquisition_scope.
+    with patch.object(host, "_article_scope_decision", return_value={"status":"ok", "allowed":True}):
+        return handler(dal, json.loads(json.dumps(message)))
 
 
 def _diagnostics() -> dict:

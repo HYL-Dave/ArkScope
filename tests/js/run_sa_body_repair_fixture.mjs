@@ -59,6 +59,7 @@ async function until(predicate) {
 
 function background(options = {}) {
   const store = storage({alphaPicksAutoSyncEnabled: true, marketNewsAutoSyncEnabled: true,
+    saBodyV2Upgrade:{version:1,held:false},
     ...options.initial});
   const native = [], events = [], tabs = new Map(), sent = [], alarms = [], ports = [];
   let listener, batchDeadline, nextTab = 1, now = Date.parse('2026-09-25T00:00:00Z');
@@ -595,6 +596,7 @@ async function combinedSaveRejected() {
   const calls = [];
   c.sendNativeMessage2 = async message => {
     calls.push(message.action);
+    if (message.action === 'get_article_acquisition_eligibility') return {status:'ok',allowed:true,effective_membership:'current'};
     if (message.action === 'save_articles_meta') return {status:'ok',need_content:[targets[0]]};
     if (message.action === 'save_article_content') return {status:'ok',ok:true,body_saved:false,
       comment_scan_usable:true,comment_backfill_pending:false,net_new_comments:2};

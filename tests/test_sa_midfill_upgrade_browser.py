@@ -20,6 +20,31 @@ pytestmark = pytest.mark.skipif(os.environ.get('ARKSCOPE_BROWSER_ACCEPTANCE') !=
 
 
 @pytest.mark.parametrize('browser', ['firefox', 'chrome'])
+def test_overdue_upgrade_holds_queue_until_explicit_release(scope_case, tmp_path, monkeypatch, browser):
+    with UpgradeRig(scope_case, tmp_path, monkeypatch, browser) as rig:
+        rig.now = round(time.time(), 3)
+        with InstalledUpgrade(rig, browser) as installed:
+            installed.call('initialize', scheduled=False)
+            installed.call('run')
+            before = {'browser':installed.call('snapshot')['browser'], 'native':rig.native_checkpoint()}
+            ids = before['browser']['companyFinancialRefresh']['pending_scopes']
+            assert len(ids) == 3
+            rig.now += 61
+            state = installed.replace('candidate', snapshot_delay=3)
+            assert_financial_checkpoint_preserved(before, {'browser':state['browser'], 'native':rig.native_checkpoint()})
+            state = installed.replace('candidate', snapshot_delay=3)
+            assert_financial_checkpoint_preserved(before, {'browser':state['browser'], 'native':rig.native_checkpoint()})
+            released = installed.call('release_upgrade')
+            assert released['status'] == 'ok', released
+            installed.call('run')
+            assert installed.call('snapshot')['browser']['companyFinancialRefresh']['pending_scopes'] == ids[1:]
+            rig.now += 61; installed.call('clock', now=rig.now*1000)
+            job = installed.call('body_start')
+            installed.call('body_wake')
+            assert rig.body_is_saved(), job
+
+
+@pytest.mark.parametrize('browser', ['firefox', 'chrome'])
 @pytest.mark.parametrize('scheduled', [False, True])
 def test_installed_midfill_disable_replace_enable(scope_case, tmp_path, monkeypatch, browser, scheduled):
     with UpgradeRig(scope_case, tmp_path, monkeypatch, browser) as rig:
@@ -41,7 +66,8 @@ def test_installed_midfill_disable_replace_enable(scope_case, tmp_path, monkeypa
             state = installed.replace('candidate')
             after = {'browser':state['browser'], 'native':rig.native_checkpoint()}
             assert_financial_checkpoint_preserved(before, after)
-            wake = after['browser']['companyFinancialRefresh']['next_wake_at']
+            assert installed.call('release_upgrade')['status'] == 'ok'
+            wake = installed.call('snapshot')['browser']['companyFinancialRefresh']['next_wake_at']
             assert wake >= datetime.fromisoformat(after['native']['next_navigation_at']).timestamp() * 1000
             job = installed.call('body_start')
             assert job['status'] == 'ok', json.dumps([job, state, rig.messages[-20:]], indent=2)

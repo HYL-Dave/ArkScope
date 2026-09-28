@@ -72,7 +72,12 @@
     var active=control.active || {};
     node.className=stopped ? "partial" : "empty";
     node.setAttribute("role",stopped ? "alert" : "status");
-    if(running) {
+    var upgradeHold=state && state.upgrade_hold === true;
+    $("saUpgradeResume").hidden=!upgradeHold;
+    $("saUpgradeResume").disabled=busy || running || stopped || control.status !== "ok" || !!control.active;
+    if(upgradeHold) {
+      node.textContent="Upgrade paused: queue verification pending.";
+    } else if(running) {
       node.textContent="Acquisition running: "+(active.operation || "operation pending")
         +" | Started: "+(active.started_at || liveState && liveState.acquisition_pending_since || "unknown")
         +" | Navigation attempts: "+(Number.isInteger(active.navigation_attempt_count) ? active.navigation_attempt_count : "unknown");
@@ -236,6 +241,12 @@
     await preview();
   }
   $("companyRefreshNow").addEventListener("click",function(){update(false);});
+  $("saUpgradeResume").addEventListener("click",async function(){
+    if(busy || $("saUpgradeResume").disabled)return;
+    lockForm(true);
+    var result=await send("resume_sa_upgrade",{confirm_checked:true});
+    lockForm(false);render(result);
+  });
   $("companyRefreshForce").addEventListener("click",function(){update(true);});
   $("companyRefreshCancel").addEventListener("click",async function(){render(await send("cancel_company_refresh"));await preview();});
   $("companyCollectorRecover").addEventListener("click",async function(){

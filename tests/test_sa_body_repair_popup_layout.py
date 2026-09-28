@@ -15,6 +15,9 @@ INIT = r"""
     counts:{selected:129,saved:1,failed:0,skipped:0,pending:128},items:targets.map(t=>({...t,state:'pending'})),...more});
   function reply(message) {
     if (message.action === 'get_article_body_recovery_state') return fixtureReply;
+    if (message.action === 'get_article_body_recovery_items') return {...fixtureReply,
+      items:fixtureReply.all_items.slice(message.cursor ? 5 : 0,message.cursor ? 10 : 5),
+      next_cursor:message.cursor ? null : 'page-two'};
     if (message.action === 'preview_article_body_recovery') return {status:'ok',protocol_version:2,manifest_id:'offline',
       as_of:'2026-09-28',counts:{targets:129,held:4,excluded:3},settings:{max_articles_per_job:0},targets};
     if (message.action === 'start_article_body_recovery') return fixtureReply=job('waiting',{
@@ -112,6 +115,20 @@ def test_body_repair_popup_offline_layout(width, tmp_path):
         assert page.locator("#alphaPicksAutoSyncToggle").is_checked()
         assert page.locator("#marketNewsAutoSyncToggle").is_checked()
         assert errors == []
+        page.evaluate("""() => {
+          const items=job('partial').items.map((item,i)=>({...item,state:i===7?'failed':'saved',reason_code:i===7?'detail_save_failed':null}));
+          return showJob('partial',{items:items.slice(0,5),all_items:items,next_cursor:'page-two',
+            counts:{selected:8,saved:7,failed:1,skipped:0,pending:0},current_item:items[7]});
+        }""")
+        page.locator('#bodyRecoveryNextBtn').click(timeout=3000)
+        assert 'Article 8 with a retained title: failed | detail_save_failed' in page.locator('#bodyRecoveryResult').inner_text()
+        assert page.locator('#bodyRecoveryNextBtn').is_disabled()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        page.locator('[aria-labelledby="bodyRecoveryHeading"]').screenshot(path=str(tmp_path / f"popup-{width}-later-failure.png"))
+        page.locator('#bodyRecoveryPreviousBtn').click()
+        assert 'Article 2 with a retained title' in page.locator('#bodyRecoveryResult').inner_text()
+        assert page.locator('#bodyRecoveryPreviousBtn').is_disabled()
+        assert page.evaluate("sent.some(x=>x.action==='get_article_body_recovery_items'&&x.cursor==='page-two')")
         page.evaluate("""() => {fixtureReply={status:'ok',state:'not_started',legacy_history:{status:'partial'}};
           return chrome.storage.local.set({saArticleBodyRecoveryV2:{}}); }""")
         page.wait_for_function("document.querySelector('#bodyRecoveryResult').textContent.includes('Legacy history')")

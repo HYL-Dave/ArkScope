@@ -1992,9 +1992,10 @@ class TestNativeHostArticles:
         })
         assert result["saved"] == 5
 
-    def test_save_article_content(self):
+    def test_save_article_content(self, monkeypatch):
         """save_article_content forwards provider-owned detail evidence."""
         from src.sa_native_host import _handle_save_article_content
+        monkeypatch.setattr("src.sa_native_host._article_scope_decision", lambda msg: {"status":"ok", "allowed":True})
         dal = MagicMock()
         dal.save_sa_article_with_comments.return_value = {
             "ok": True,

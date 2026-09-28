@@ -72,7 +72,7 @@ def test_former_first_detail_keeps_body_without_a_comment_receipt():
       sendNativeMessage2=async message=>{
         if(message.action==='save_articles_meta')return {status:'ok',saved:1,need_comments:[],
           need_content:[{article_id:'1001',url:'https://seekingalpha.com/article/1001-old'}],reconciliation:{status:'ok',enrichment:[]}};
-        if(message.action==='get_article_acquisition_eligibility')return {status:'ok',allowed:false,reason_code:'sa_article_former_out_of_scope'};
+        if(message.action==='get_article_acquisition_eligibility')return {status:'ok',allowed:message.operation==='body',reason_code:'sa_article_former_out_of_scope'};
         if(message.action==='save_article_content') {saved=message;return {status:'ok',ok:true,body_saved:true,comments_scope_skipped:true};}
         return {status:'ok'};
       };
@@ -84,6 +84,31 @@ def test_former_first_detail_keeps_body_without_a_comment_receipt():
     assert result["saved"]["comments_scope_skipped"] is True
     assert result["saved"]["comments"] == []
     assert not result["details"].get("comment_progress")
+
+
+@pytest.mark.parametrize("available", [False, True])
+def test_body_exclusion_after_queueing_stops_before_navigation(available):
+    result = _run_background(_DETAIL_FLOW_SETUP + r"""
+      let navigations=0,writes=0;
+      managedSaTabs.update=async(_tab,options)=>{if(options.url.includes('/article/'))navigations++;};
+      sendNativeMessage2=async message=>{
+        if(message.action==='save_articles_meta')return {status:'ok',saved:1,need_comments:[],
+          need_content:[{article_id:'1001',url:'https://seekingalpha.com/article/1001-retired'}],reconciliation:{status:'ok',enrichment:[]}};
+        if(message.action==='get_article_acquisition_eligibility')return AVAILABLE
+          ? {status:'ok',allowed:false,reason_code:'sa_article_permanently_excluded'}
+          : {status:'deferred',allowed:false,error_code:'sa_article_scope_unavailable'};
+        if(message.action==='save_article_content')writes++;
+        return {status:'ok'};
+      };
+      const details=await doDetailFetch(1,[],'quick');
+      return {details,navigations,writes};
+    """.replace("AVAILABLE", str(available).lower()), real_scope=True)
+    assert result["navigations"] == result["writes"] == 0
+    assert result["details"]["failed"] == 0
+    if available:
+        assert result["details"]["body_scope_skipped"] == 1
+    else:
+        assert result["details"]["acquisition_stop"]["reason"] == "article_scope_unavailable"
 
 
 def test_quick_fetch_respects_global_order_and_does_not_silently_upgrade():

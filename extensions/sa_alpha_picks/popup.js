@@ -55,6 +55,10 @@ function initializeArticleBodyRecovery() {
   var resultText = document.getElementById("bodyRecoveryResult");
   var progress = document.getElementById("bodyRecoveryProgress");
   var timing = document.getElementById("bodyRecoveryTiming");
+  var pages = document.getElementById("bodyRecoveryPages");
+  var previousButton = document.getElementById("bodyRecoveryPreviousBtn");
+  var nextButton = document.getElementById("bodyRecoveryNextBtn");
+  var cursors = [null], pageIndex = 0;
   var preview = null, job = null, pending = false, unavailable = false;
   var pollTimer = null, closed = false, version = 0;
   var terminal = ["not_started", "complete", "partial", "cancelled"];
@@ -66,8 +70,12 @@ function initializeArticleBodyRecovery() {
     previewButton.disabled = pending || !!running;
     startButton.disabled = pending || unavailable || !!running || !preview || preview.selected === 0;
     cancelButton.disabled = pending || !running || job.state === "cancelling";
-    resumeButton.hidden = !running || job.state !== "paused" && !job.reconnect_required;
+    resumeButton.hidden = !running || job.owner_changed || job.state !== "paused" && !job.reconnect_required;
     resumeButton.disabled = pending || !!(job && job.cancel_pending);
+    pages.hidden = !job || !job.counts;
+    previousButton.disabled = pending || pageIndex === 0;
+    nextButton.disabled = pending || !job || !job.next_cursor;
+    document.getElementById("bodyRecoveryPageNumber").textContent = "Page " + (pageIndex + 1);
   }
   function render() {
     resultText.replaceChildren();
@@ -80,7 +88,7 @@ function initializeArticleBodyRecovery() {
       summary.textContent = job.state + ": " + counts.selected + " selected, " + counts.saved + " saved, "
         + counts.skipped + " skipped, " + counts.failed + " failed, " + counts.pending + " pending";
       var list = document.createElement("ol");
-      (job.items || []).slice(0,5).forEach(function (item) {
+      (job.items || []).forEach(function (item) {
         var row = document.createElement("li");
         row.textContent = (item.title || item.article_id) + ": " + item.state
           + (item.reason_code ? " | " + item.reason_code : "");
@@ -106,6 +114,7 @@ function initializeArticleBodyRecovery() {
         : job.state === "running" ? "Processing article"
         : "Pending";
       if (job.reconnect_required) timing.textContent += " | Resume required";
+      if (job.current_item) timing.textContent += " | " + (job.current_item.title || job.current_item.article_id);
     }
     controls();
   }
@@ -115,6 +124,9 @@ function initializeArticleBodyRecovery() {
       job = Object.assign({}, job, {error_code: reply && reply.error_code});
     } else {
       unavailable = false;
+      if (!job || job.job_id !== reply.job_id || job.revision !== reply.revision) {
+        cursors = [null]; pageIndex = 0;
+      }
       job = reply;
       if (reply.job_id || active()) preview = null;
     }
@@ -125,11 +137,34 @@ function initializeArticleBodyRecovery() {
     if (!closed && active()) pollTimer = setTimeout(refresh, 3000);
   }
   async function refresh() {
+    if (pending) { schedulePoll(); return; }
     var stamp = ++version;
     var reply = await sendRuntimeMessage({action:"get_article_body_recovery_state"});
     if (closed || stamp !== version) return;
+    if (pageIndex && job && reply && reply.job_id === job.job_id && reply.revision === job.revision) {
+      var page = await sendRuntimeMessage({action:"get_article_body_recovery_items",job_id:job.job_id,cursor:cursors[pageIndex]});
+      if (closed || stamp !== version) return;
+      if (page && page.status === "ok") reply = Object.assign({},reply,page);
+      else { cursors = [null]; pageIndex = 0; }
+    }
     receive(reply);
     schedulePoll();
+  }
+  async function loadPage(index) {
+    if (pending || !job || index < 0 || index > pageIndex && !job.next_cursor) return;
+    var cursor = index > pageIndex ? job.next_cursor : cursors[index];
+    var stamp = ++version, id = job.job_id, revision = job.revision;
+    pending = true; controls();
+    var reply = await sendRuntimeMessage({action:"get_article_body_recovery_items",job_id:id,cursor:cursor});
+    if (closed || stamp !== version) return;
+    pending = false;
+    if (reply && reply.status === "ok" && reply.job_id === id && reply.revision === revision) {
+      cursors[index] = cursor; pageIndex = index;
+      receive(Object.assign({},job,reply));
+    } else {
+      cursors = [null]; pageIndex = 0;
+      await refresh();
+    }
   }
   async function loadPreview() {
     if (previewButton.disabled) return;
@@ -179,6 +214,8 @@ function initializeArticleBodyRecovery() {
   startButton.addEventListener("click", function () { return command("start_article_body_recovery"); });
   cancelButton.addEventListener("click", function () { return command("cancel_article_body_recovery"); });
   resumeButton.addEventListener("click", function () { return command("resume_article_body_recovery"); });
+  previousButton.addEventListener("click", function () { return loadPage(pageIndex - 1); });
+  nextButton.addEventListener("click", function () { return loadPage(pageIndex + 1); });
   chrome.storage.onChanged.addListener(function (changes, area) {
     if (area === "local" && changes.saArticleBodyRecoveryV2 && !pending) void refresh();
   });

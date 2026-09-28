@@ -43,6 +43,7 @@ def test_local_capability_protocol_matches_inventory_method_set():
     assert public_callables == {
         "accept_sa_article_link",
         "apply_sa_refresh",
+        "article_acquisition_context",
         "audit_unresolved_symbols",
         "get_available_tickers",
         "get_sa_article_with_comments",

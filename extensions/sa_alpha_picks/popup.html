@@ -408,6 +408,7 @@
 <body>
   <h2>SA Alpha Picks</h2>
   <div id="saAcquisitionLive" role="status" aria-live="polite">Checking acquisition status...</div>
+  <button id="saUpgradeResume" class="action-button" type="button" hidden>Resume after upgrade check</button>
   <button class="action-button" id="saAcquisitionReviewRecovery" type="button" hidden>Review stopped capture</button>
   <div id="saAcquisitionWarning" role="alert" hidden></div>
   <button class="action-button" id="saAcquisitionResume" type="button" hidden>Resume after sign-in / access check</button>
@@ -521,6 +522,11 @@
     <progress id="bodyRecoveryProgress" value="0" max="1" aria-label="Articles processed" style="width: 100%;" hidden></progress>
     <div id="bodyRecoveryTiming" role="status" style="overflow-wrap: anywhere;" hidden></div>
     <div id="bodyRecoveryResult" role="status" style="overflow-wrap: anywhere;">No attempts.</div>
+    <div id="bodyRecoveryPages" class="recovery-actions" hidden>
+      <button id="bodyRecoveryPreviousBtn" type="button" title="Previous articles" aria-label="Previous articles">&larr;</button>
+      <span id="bodyRecoveryPageNumber"></span>
+      <button id="bodyRecoveryNextBtn" type="button" title="Next articles" aria-label="Next articles">&rarr;</button>
+    </div>
   </section>
 
   <section class="action-group" data-action-group="market-news">

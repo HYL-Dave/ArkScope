@@ -86,6 +86,7 @@ def _context(articles, lineages, picks, links, tracked, bindings, identities):
         if not direct and provider:
             identity = _identity(provider, identities)
             direct = set(securities.get(identity, []))
+        candidate_only = not direct
         if not direct:
             direct = {m["lineage_id"] for m in memberships if m["basis"] == "entry_candidate"}
         states = {cohorts[lid]["effective_membership"] for lid in direct}
@@ -100,6 +101,7 @@ def _context(articles, lineages, picks, links, tracked, bindings, identities):
                  "terminal" if "terminal" in states else "removed" if "removed" in states else "unknown")
         decisions[article["article_id"]] = {
             "effective_membership": state, "conflict": bool(conflicts),
+            "candidate_only": candidate_only,
             "lineage_ids": sorted(direct),
         }
     result = {"status": "ok", "articles": decisions, "cohorts": cohorts,
@@ -128,6 +130,8 @@ def decide_article_acquisition(article_id: str, *, operation: Literal["body", "c
         return result | {"reason_code": "sa_article_identity_conflict"}
     if state in {"terminal", "removed"}:
         return result | {"reason_code": "sa_article_permanently_excluded" if state == "terminal" else "sa_article_membership_removed"}
+    if operation == "comments" and item.get("candidate_only"):
+        return result | {"reason_code": "sa_article_membership_unresolved"}
     allowed = (state == "current" or operation == "body" and settings.body_scope == "all_retained"
                or operation == "comments" and settings.comment_scope == "tracked" and state == "former")
     return result | {"allowed": allowed, "reason_code": None if allowed else

@@ -104,8 +104,12 @@ Confirm capture tabs are closed and native ownership is idle, then close the App
 Back up the stores and extension state. Compare ordered pending IDs, successful
 captures, intent revisions, collector identity, policies and schedules before
 and after replacing the same-path, same-ID package. Firefox temporary-addon
-Reload may also enable it, so prepare the new native version and backup first.
-Immediately restore operation after equality is confirmed. Require a stored
+Reload may also enable it. On first adoption of an existing installation, the new
+version holds acquisition at **Upgrade paused: queue verification pending**, even
+when pacing deadlines expire or the extension reloads again. After equality is
+confirmed, reopen the App and press **Resume after upgrade check** immediately.
+This releases only the maintenance hold, not restrictions, cooldowns or saved
+schedules. Require a stored
 financial receipt for a previously pending scope, followed by a new body-job
 receipt after explicit preview/start; counts and green badges are insufficient.
 
@@ -118,6 +122,8 @@ defect fixed in this version, so verify actual continuation after rollback.
 
 Inspect the popup's running task, saved/pending/failed counts and next attempt,
 then the App's source health and job history. A tab closing alone proves nothing.
+Use the arrow buttons under body-job outcomes to inspect later pages, including
+failed articles. The current article is displayed separately from the selected page.
 
 | State | Meaning |
 | --- | --- |

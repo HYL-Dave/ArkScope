@@ -86,9 +86,13 @@ def _summary(conn, job):
     items = _items(conn, job["job_id"])
     counts = {state: sum(i["state"] == state for i in items) for state in ("saved", "skipped", "failed")}
     counts.update(selected=len(items), pending=sum(i["state"] in {"pending", "running"} for i in items))
+    current = next((item for item in items if item["state"] == "running"), None)
+    if current is None and job["state"] not in _TERMINAL:
+        current = next((item for item in items if item["state"] == "pending"), None)
     return {"status": "ok", "protocol_version": BODY_PROTOCOL,
             **{key: job.get(key) for key in ("job_id", "manifest_id", "revision", "state", "settings", "created_at",
-                                             "reason_code", "next_eligible_at")}, "counts": counts}
+                                             "reason_code", "next_eligible_at")}, "counts": counts,
+            "current_item": (_target_view(current["target"]) | {"state": current["state"]}) if current else None}
 
 
 def _manifest_for(job):
@@ -231,13 +235,18 @@ class BodyRecoveryJobs:
                     job = _job(conn, job_id)
                     # The selected owner may explicitly discard old intent, never
                     # inherit it. Selection itself requires confirmed native idle.
-                    require(operation == "cancel" or job["owner"] == client and job["generation"] == state["generation"],
+                    require(operation in {"state", "items", "cancel"} or job["owner"] == client and job["generation"] == state["generation"],
                             "sa_body_owner_changed")
                 require(job["capture_path"] == str(self.sa_db.resolve()) and job["profile_path"] == str(self.profile_db.resolve()),
                         "sa_body_store_changed")
                 extra = {}
+                owner_changed = job["owner"] != client or job["generation"] != state["generation"]
+                if not write and owner_changed:
+                    extra["owner_changed"] = True
+                    if job["state"] not in _TERMINAL:
+                        extra.update(state="paused", reason_code="sa_body_owner_changed")
                 if operation == "items":
-                    return self._page(conn, job, message.get("cursor"))
+                    return self._page(conn, job, message.get("cursor")) | extra
                 if operation in {"next", "checkpoint", "cancel", "resume"}:
                     duplicate_cancel = operation == "cancel" and job["state"] in {"cancelling", "cancelled"}
                     require(duplicate_cancel or type(message.get("revision")) is int and message["revision"] == job["revision"],
@@ -316,7 +325,9 @@ class BodyRecoveryJobs:
                     item.update(state="saved", reason_code=None)
                 elif cancelling:
                     item.update(state="skipped", reason_code="operator_cancelled")
-                elif (task.get("failure_reported") and self.collector._blocked(state, "alpha_picks_body_repair", self.clock())) or status == "deferred":
+                elif (task.get("restriction_reason") in {"rate_limited", "login_required", "human_verification_required", "access_restricted"}
+                      or task.get("rate_limit_reported") or status == "deferred"
+                      or task.get("failure_reported") and self.collector._blocked(state, "alpha_picks_body_repair", self.clock())):
                     item.update(state="pending", reason_code=None)
                 else:
                     item.update(state="skipped" if status == "cancelled" else "failed",
@@ -372,7 +383,7 @@ class BodyRecoveryJobs:
         items = _items(conn, job["job_id"])
         require(offset <= len(items), "sa_body_cursor_invalid")
         response = _summary(conn, job) | {"items": [], "next_cursor": None}
-        for item in items[offset:]:
+        for item in items[offset:offset + 25]:
             view = _target_view(item["target"]) | {k: item.get(k) for k in ("state", "reason_code", "task_id")}
             if len(json.dumps(response | {"items": [*response["items"], view]}).encode("utf8")) > REPLY_BYTES - 1024:
                 break

@@ -139,10 +139,49 @@ def test_wrong_owner_and_generation_cannot_mutate_job(journal_case):
     assert journal_case.control("state", job_id=job["job_id"])["state"] == "pending"
 
 
+@pytest.mark.parametrize("reason", ["rate_limited", "login_required", "human_verification_required", "access_restricted"])
+def test_reconciliation_after_cooldown_still_retries_restricted_item(journal_case, reason):
+    case = journal_case
+    job = case.start()
+    permit = case.begin(job)
+    call(case.collector, "observe_restriction", token=permit["token"], generation=1, reason=reason)
+    call(case.collector, "finish_task", token=permit["token"], generation=1,
+         cleanup_confirmed=True, result={"status": "error", "error_code": reason})
+    case.now[0] += 6 * 3600 + 1
+    if reason != "rate_limited":
+        resumed = call(case.collector, "resume", expected_generation=1, confirm_handled=True, capability="alpha_picks")
+        assert resumed["status"] == "ok", resumed
+    ready = case.control("next", job_id=job["job_id"], revision=job["revision"])
+    assert ready["counts"]["failed"] == 0
+    assert ready["target"]["article_id"] == "1000"
+
+
 def test_read_only_status_does_not_install_journal(journal_case):
     assert journal_case.jobs.public_status()["state"] == "not_started"
     with sqlite3.connect(journal_case.collector.path) as conn:
         assert not conn.execute("SELECT name FROM sqlite_master WHERE name LIKE 'sa_body_recovery_%'").fetchall()
+
+
+@pytest.mark.parametrize("terminal", [False, True])
+def test_selected_collector_can_discard_old_intent_or_start_after_terminal_history(journal_case, terminal):
+    case = journal_case
+    job = case.start()
+    if terminal:
+        job = case.control("cancel", job_id=job["job_id"], revision=job["revision"])
+    away = call(case.collector, "select", client=CHROME, expected_generation=1, confirm_schedules=True)
+    back = call(case.collector, "select", expected_generation=away["generation"], confirm_schedules=True)
+    view = case.control("state", job_id=job["job_id"])
+    assert view["status"] == "ok", view
+    assert view["owner_changed"] is True
+    assert case.control("next", job_id=job["job_id"], revision=job["revision"], expected_generation=back["generation"])["status"] == "error"
+    if not terminal:
+        assert case.control("start", request_id="fresh", trigger="manual", manifest_id=case.preview["manifest_id"],
+            expected_generation=back["generation"])["error_code"] == "sa_body_job_exists"
+        discarded = case.control("cancel", job_id=job["job_id"], revision=job["revision"], expected_generation=back["generation"])
+        assert discarded["state"] == "cancelled", discarded
+    fresh = case.control("start", request_id="fresh", trigger="manual", manifest_id=case.preview["manifest_id"],
+        expected_generation=back["generation"])
+    assert fresh["status"] == "ok" and fresh["job_id"] != job["job_id"], fresh
 
 
 def test_pagination_is_byte_bounded_and_frozen_after_body_save(journal_case):
@@ -174,6 +213,28 @@ def test_unknown_schema_is_not_reinstalled(journal_case):
     assert journal_case.start()["status"] == "error"
     with sqlite3.connect(journal_case.collector.path) as db:
         assert [r[1] for r in db.execute("PRAGMA table_info(sa_body_recovery_items)")] == ["wrong"]
+
+
+def test_read_pages_are_bounded_and_expose_the_current_item(journal_case):
+    from src.sa.article_acquisition_settings import ArticleAcquisitionSettings
+    from src.sa.article_acquisition_scope import read_article_scope_context
+    from src.sa.article_body_recovery import build_recovery_manifest
+
+    for index in range(8, 40):
+        article(journal_case.conn, str(1000 + index), published="2020-01-01")
+    journal_case.conn.commit()
+    manifest = build_recovery_manifest(journal_case.capture, settings=ArticleAcquisitionSettings(),
+        scope_context=read_article_scope_context(sa_db=journal_case.capture, profile_db=journal_case.jobs.profile_db))
+    job = journal_case.control("start", request_id="pages", manifest_id=manifest["manifest_id"], trigger="manual")
+    journal_case.begin(job)
+    first = journal_case.control("items", job_id=job["job_id"])
+    assert first["current_item"]["article_id"] == "1000"
+    assert first["current_item"]["state"] == "running"
+    assert len(first["items"]) == 25 and first["next_cursor"]
+    second = journal_case.control("items", job_id=job["job_id"], cursor=first["next_cursor"])
+    assert second["current_item"] == first["current_item"]
+    assert len(second["items"]) == 15 and second["next_cursor"] is None
+    assert len({item["article_id"] for item in first["items"] + second["items"]}) == 40
 
 
 def test_native_v2_save_requires_admitted_frozen_target(journal_case):

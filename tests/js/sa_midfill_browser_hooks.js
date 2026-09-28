@@ -51,6 +51,7 @@ chrome.runtime.onMessage.addListener(function(message,sender,respond) {
         statements:['income_statement','balance_sheet'],views:['annual'],
         interval_days_by_view:{annual:30,quarterly:30},financial_gap_seconds:60});
     } else if(message.command === 'run') await companyFinancialRefresh.run({scheduled:false});
+    else if(message.command === 'release_upgrade') return handleAcquisitionControl({action:'resume_sa_upgrade',confirm_checked:true});
     else if(message.command === 'clock') ARK_FIXTURE_CLOCK = message.now;
     else if(message.command === 'body_start') {
       const preview = await articleBodyRecovery.preview();

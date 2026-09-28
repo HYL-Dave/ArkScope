@@ -21,7 +21,7 @@ async function main() {
     capability_pauses: {}, paused_reason: null, active: null, financial_gap_seconds: 60};
   if (options.newProfile) authority.policy = null;
   if (options.policy) authority.policy = clone(options.policy);
-  const data = {companyCollectorIdentity: client, companyFinancialRefresh: {
+  const data = {saBodyV2Upgrade:{version:1,held:options.scenario === 'upgrade'},companyCollectorIdentity: client, companyFinancialRefresh: {
     config: {enabled: options.enabled !== false, target_mode: "manual", tickers: ["AMD"],
       statements: ["income_statement"], views: ["annual"], interval_days: 7,
       interval_days_by_view: {annual: 7, quarterly: 7}, financial_gap_seconds: 60},
@@ -97,6 +97,7 @@ async function main() {
   for (const script of doc.querySelectorAll("script[src]")) vm.runInContext(source(script.src.split("/").pop()), dom.getInternalVMContext());
   await settle();
   const snapshot = () => ({data: clone(data), alarms: Array.from(alarms.keys()),
+    upgradeVisible:!$("saUpgradeResume").hidden,liveStatus:$("saAcquisitionLive").textContent,
     companyEnabled: $("companyRefreshEnabled").checked, alphaEnabled: $("alphaPicksAutoSyncToggle").checked,
     newsEnabled: $("marketNewsAutoSyncToggle").checked, alphaInterval: $("alphaPicksAutoSyncInterval").value,
     newsInterval: $("marketNewsAutoSyncInterval").value, summary: $("companyRoutineIntent").textContent,
@@ -128,6 +129,9 @@ async function main() {
       releaseActivation();
       await settle();
     }
+  } else if (options.scenario === "upgrade") {
+    $("saUpgradeResume").click();
+    await settle();
   } else if (options.scenario === "storage") {
     await local.set({alphaPicksAutoSyncEnabled: false, marketNewsAutoSyncEnabled: false,
       alphaPicksAutoSyncIntervalMinutes: 60, marketNewsAutoSyncIntervalMinutes: "15"});

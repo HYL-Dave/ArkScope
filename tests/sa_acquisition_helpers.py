@@ -11,6 +11,8 @@ chrome.alarms.clear = async () => {};
 """
 
 AUTHORITY = """
+// Extractor/authority unit cases model an already verified installation.
+saUpgradeCheck = Promise.resolve({version:1,held:false});
 if (!chrome.runtime.connectNative) chrome.runtime.connectNative = () => {
   const messages=new Set();
   return {onMessage:{addListener:fn=>messages.add(fn),removeListener:fn=>messages.delete(fn)},

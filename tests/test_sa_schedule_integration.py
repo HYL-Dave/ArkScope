@@ -27,6 +27,19 @@ def test_force_confirmation_never_changes_the_schedule(enabled):
                for action in result["actions"])
 
 
+def test_upgrade_popup_explicit_resume_preserves_saved_settings_and_successes():
+    result = run(scenario="upgrade")
+    assert result["before"]["upgradeVisible"] is True
+    assert "Upgrade paused" in result["before"]["liveStatus"]
+    assert result["after"]["upgradeVisible"] is False
+    before, after = result["before"]["data"], result["after"]["data"]
+    for key in ("config", "records"):
+        assert before["companyFinancialRefresh"][key] == after["companyFinancialRefresh"][key]
+    assert before["companyCollectorIdentity"] == after["companyCollectorIdentity"]
+    assert any(action == {"action":"resume_sa_upgrade", "confirm_checked":True} for action in result["actions"])
+    assert not any(action["action"] in {"save_company_refresh", "enable_sa_updates_here", "resume_sa_acquisition"} for action in result["actions"])
+
+
 @pytest.mark.parametrize("consent", [None, "companyRecoveryConfirmed", "companyActivationConfirmed"])
 def test_due_update_and_unrelated_consent_do_not_save_settings(consent):
     result = run(scenario="due", consent=consent)

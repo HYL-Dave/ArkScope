@@ -101,6 +101,16 @@ def test_unknown_ownership_is_body_only_without_source_conflict(scope_case):
     assert decide(scope_case, operation="body", body_scope="current")["allowed"] is False
 
 
+def test_title_candidate_does_not_authorize_discussion_collection(scope_case):
+    _, _, conn = scope_case
+    pick(conn, 1, "LIVE")
+    article(conn, "1001", title="LIVE: Stock Buy", published="2024-01-10")
+    accept(scope_case)
+    assert decide(scope_case, operation="body", body_scope="current")["allowed"] is True
+    assert decide(scope_case, operation="comments")["allowed"] is False
+    assert decide(scope_case, operation="comments", comment_scope="tracked")["allowed"] is False
+
+
 def test_conflicting_source_identity_is_not_overridden_by_wide_scope(scope_case):
     _, _, conn = scope_case
     article(conn, "1001", listed="AAA", detail="BBB")

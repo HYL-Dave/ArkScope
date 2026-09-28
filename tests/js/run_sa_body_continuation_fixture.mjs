@@ -7,7 +7,7 @@ const source = fs.readFileSync('extensions/sa_alpha_picks/article_body_recovery.
 const key = 'saArticleBodyRecoveryV2';
 const alarm = 'saArticleBodyRecoveryContinuation';
 const data = {}, alarms = new Map(), events = [], saved = new Set();
-let now = Date.parse('2026-09-28T00:00:00Z'), seq = 0, starts = 0, navigations = 0;
+let now = Date.parse('2026-09-28T00:00:00Z'), seq = 0, starts = 0, navigations = 0, generation = 1;
 let job = null, pending = null, worker, hook = null, offline = false;
 let deadline = 0, restricted = false, ownerChanged = false, loseStart = false, loseCheckpoint = false;
 const owner = {client_id: 'f'.repeat(32), browser: 'firefox'};
@@ -28,9 +28,14 @@ async function control(operation, fields={}) {
   if (ownerChanged) return {status:'error',error_code:'sa_body_owner_changed'};
   if (operation === 'start') {
     starts++;
-    if (!job) job = {id:'c'.repeat(32),revision:1,state:'pending',failed:new Set(),skipped:new Set(),request_id:fields.request_id};
+    if (!job || scenario==='reselect_terminal' && job.state==='cancelled') job = {id:(starts===1?'c':'e').repeat(32),revision:1,state:'pending',failed:new Set(),skipped:new Set(),request_id:fields.request_id};
     else assert.equal(fields.request_id,job.request_id);
-    if (loseStart) {loseStart=false; throw Error('reply lost');}
+    if (loseStart) {
+      loseStart=false;
+      if(scenario==='lost_start_returned') return {status:'error',error_code:'native_host_unavailable'};
+      if(scenario==='empty_start_returned') return {status:'error',error_code:'invalid_native_response'};
+      throw Error('reply lost');
+    }
   }
   if (!job) return {status:'ok',protocol_version:2,state:'not_started'};
   if (operation === 'cancel') {
@@ -66,7 +71,7 @@ function make() {
     alarms:{create:async(name,value)=>alarms.set(name,value),clear:async name=>alarms.delete(name)},
     now:()=>now,uuid:()=>`request-${++seq}`,
     native:async message=>{assert.equal(message.protocol_version,2);return structuredClone(manifest);},control,
-    collector:async()=>({status:'ok',is_owner:!ownerChanged,owner,generation:1,ledger_id:'d'.repeat(32)}),
+    collector:async()=>({status:'ok',is_owner:!ownerChanged,owner,generation,ledger_id:'d'.repeat(32)}),
     reconcilePending:async()=>({pending}),
     enqueue:(opts,callback)=>queue.enqueue({...opts,priority:'background',run:async()=>{
       assert.equal(opts.trigger,'continuation');assert.equal(opts.acquisition.body_job_id,job.id);
@@ -109,9 +114,16 @@ if(scenario==='no_intent') {
   if(scenario==='legacy')data.saArticleBodyRecovery={status:'running',items:[{article_id:'1000'}]};
   else data[key]={schema_version:999,job_id:'x'};
   await worker.syncAlarm();await worker.wake();assert.equal(starts,0);assert.equal(navigations,0);
-} else if(scenario==='lost_start') {
+} else if(['lost_start','lost_start_returned','empty_start_returned'].includes(scenario)) {
   loseStart=true;await start();worker=make();await worker.syncAlarm();await turns();
   assert.equal(saved.size,8);assert.equal(starts,2);assert.equal(job.request_id,'request-1');
+} else if(scenario==='reselect_terminal') {
+  await start();const old=job.id;await worker.cancel(old);generation=3;
+  const fresh=await start();assert.equal(fresh.status,'ok');assert.notEqual(fresh.job_id,old);assert.equal(starts,2);
+} else if(scenario==='cancel_missing_ref') {
+  await start();const id=job.id;delete data[key];generation=3;worker=make();
+  const cancelled=await worker.cancel(id);assert.equal(cancelled.state,'cancelled');
+  assert.equal(navigations,0);assert.equal(starts,1);
 } else {
   await start();assert.equal(starts,1);
   if(scenario==='cancel_read') hook=()=>worker.cancel(job.id);

@@ -132,6 +132,18 @@ def test_native_body_only_receipt_never_advances_comment_checkpoint(scope_captur
     assert scope_capture.history() == before
 
 
+def test_permanent_exclusion_after_selection_rejects_initial_body_write(scope_capture):
+    from src.sa_native_host import _handle_save_article_content
+    scope_capture.setup("current", "first_detail")
+    assert scope_capture.select_comments("quick", "first_detail")["need_content"]
+    with sqlite3.connect(scope_capture.profile) as conn:
+        conn.execute("UPDATE sa_tracking_memberships SET reason='terminal_delisting',removed_at=?,current_tracking=0", (AT,))
+    reply = _handle_save_article_content(scope_capture.dal, {"article_id":"1001", "body_markdown":NARRATIVE,
+        "comments":[], "comments_scope_skipped":True})
+    assert reply.get("body_saved") is False, reply
+    assert scope_capture.conn.execute("SELECT body_markdown FROM sa_articles WHERE article_id='1001'").fetchone()[0] is None
+
+
 def test_native_observes_full_exit_then_reentry_without_moving_old_link(scope_capture):
     from src.sa_native_host import handle_message
     from src.sa_tracking_memberships import SaTrackingMembershipStore, read_sa_tracking_observations

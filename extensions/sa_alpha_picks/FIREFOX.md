@@ -181,6 +181,12 @@ Firefox temporary add-ons disappear on browser exit: reload the same add-on ID t
 recover its stored intent. Do not uninstall or clear storage as a pause method.
 The old isolated test kit's five-pages-per-day ceiling is not a production policy.
 
+When this version first adopts an existing installation, collection stays at
+**Upgrade paused: queue verification pending** until the maintenance checkpoint
+is verified and **Resume after upgrade check** is pressed. This survives Reload;
+it does not reset financial intent, schedules, owner selection or site cooldowns.
+See the maintenance procedure in `SA_COLLECTION_GUIDE.md` before updating mid-fill.
+
 ## Native Connection And Desktop Consent
 
 On Snap Firefox, desktop-portal permission is separate from the add-on permission

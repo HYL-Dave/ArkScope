@@ -52,7 +52,7 @@
       return state;
     }
     async function call(operation, ref, fields) {
-      const state = await owned(ref);
+      const state = await owned(["state", "items", "cancel"].includes(operation) ? null : ref);
       return deps.control(operation, Object.assign({protocol_version:2,expected_generation:state.generation,
         job_id:ref && ref.job_id,revision:ref && ref.revision},fields || {}));
     }
@@ -86,7 +86,8 @@
       if (!jobReply(reply)) {
         // A lost response keeps its idempotency key; a definitive rejection
         // requires a new preview and explicit Start, never an alarm retry.
-        if (reply && reply.status === "error") {
+        if (reply && reply.status === "error"
+            && !["native_host_unavailable", "invalid_native_response"].includes(reply.error_code)) {
           await update(current=>({...current,pending_start:null,next_wake:null}));
           await deps.alarms.clear(ALARM);
         }
@@ -121,7 +122,7 @@
       try {
         const existing = await read();
         if (existing && (existing.pending_start || existing.cancel_requested)) return error("already_pending");
-        const collector = await owned(existing);
+        const collector = await owned(null);
         const current = await call("state",existing);
         if (jobReply(current) && !TERMINAL.includes(current.state)) return error("sa_body_job_exists");
         if (!current || current.status !== "ok") return current || error("native_host_unavailable");
@@ -147,10 +148,18 @@
         const reply = await call("state",ref);
         if (jobReply(reply)) {
           const page = await call("items",ref,{job_id:reply.job_id});
+          if (!jobReply(page)) return page || error("native_host_unavailable");
           return {...reply,items:page.items || [],next_cursor:page.next_cursor || null,reconnect_required:!ref};
         }
         const legacy = (await deps.storage.get("saArticleBodyRecovery")).saArticleBodyRecovery;
         return {...reply,legacy_history:legacy || null};
+      } catch (err) { return error(err && err.error_code || "native_host_unavailable"); }
+    }
+    async function items(jobId, cursor) {
+      try {
+        const ref = await read();
+        const page = await call("items",ref,{job_id:jobId,cursor:cursor || null});
+        return {...page,reconnect_required:!ref};
       } catch (err) { return error(err && err.error_code || "native_host_unavailable"); }
     }
     async function step(run) {
@@ -197,8 +206,19 @@
     }
     async function cancel(jobId) {
       try {
-        const ref = await read();
-        if (!ref || jobId && ref.job_id !== jobId) return error("sa_body_job_not_found");
+        let ref = await read();
+        if (!ref || jobId && ref.job_id !== jobId) {
+          if (ref && (ref.pending_start || ref.cancel_requested)) return error("already_pending");
+          if (!/^[a-f0-9]{32}$/.test(jobId || "")) return error("sa_body_job_not_found");
+          const collector = await owned(null);
+          const state = await call("state",null,{job_id:jobId});
+          if (!jobReply(state) || state.job_id !== jobId) return state || error("sa_body_job_not_found");
+          // Explicit discard by the selected collector is not a transfer of
+          // acquisition intent. This reference can only cancel the old job.
+          ref = {schema_version:2,owner:identity(collector),job_id:state.job_id,revision:state.revision,
+            cancel_requested:true,pending_start:null,next_wake:now()+1000};
+          await update(()=>ref);
+        }
         if (active) {
           active.cancelled = true;
           if (active.lifetime) {
@@ -219,6 +239,7 @@
         if (ref && ref.cancel_requested) return error("sa_body_cancel_pending");
         const state = await call("state",ref,{job_id:jobId});
         if (!jobReply(state) || TERMINAL.includes(state.state)) return error("sa_body_job_not_active");
+        if (state.owner_changed) return error("sa_body_owner_changed");
         if (!ref) {
           const collector = await owned(null);
           ref = {schema_version:2,owner:identity(collector),job_id:state.job_id,revision:state.revision,
@@ -241,7 +262,7 @@
         await deps.alarms.create(ALARM,{when:Math.max(now()+1000,ref.next_wake || 0)});
       } catch (_) { await deps.alarms.clear(ALARM); }
     }
-    return {preview,start,status,wake,cancel,resume,syncAlarm,get running() {return !!waking;}};
+    return {preview,start,status,items,wake,cancel,resume,syncAlarm,get running() {return !!waking;}};
   }
   root.SAArticleBodyRecovery = Object.freeze({create,alarm:ALARM,storageKey:KEY});
 }(globalThis));

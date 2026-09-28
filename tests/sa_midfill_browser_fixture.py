@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import time
 
 from tests.sa_midfill_fixture import BASELINE, ROOT, baseline_source
 from tests.test_sa_extension_packaging import _load_builder
@@ -155,7 +156,7 @@ class InstalledUpgrade(ExitStack):
             return result
         finally: self.driver.set_context('content')
 
-    def replace(self, version):
+    def replace(self, version, *, snapshot_delay=0):
         if self.browser == 'firefox':
             self.driver.get('about:blank')
             state = self._addon('await addon.disable()')
@@ -175,6 +176,9 @@ class InstalledUpgrade(ExitStack):
             self.manager.evaluate('id=>chrome.management.setEnabled(id,true)', self.addon_id)
             assert self.manager.evaluate('id=>chrome.management.get(id)', self.addon_id)['enabled']
             self.page.goto(self.url)
+        if snapshot_delay:
+            if self.browser == 'chrome': self.page.wait_for_timeout(snapshot_delay * 1000)
+            else: time.sleep(snapshot_delay)
         state = self.call('snapshot')
         assert state['version'] == version, state
         return state

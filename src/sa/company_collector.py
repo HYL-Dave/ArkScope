@@ -530,6 +530,7 @@ class CompanyCollector:
         return receipt
 
     def _restriction(self, state, reason, now, retry_after=None):
+        state["active"]["restriction_reason"] = reason
         if reason == "rate_limited":
             if not state["active"].get("rate_limit_reported"):
                 state["rate_limit_failures"] = min(state["rate_limit_failures"] + 1, 6)
