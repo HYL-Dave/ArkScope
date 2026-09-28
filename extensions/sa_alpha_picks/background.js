@@ -21,6 +21,9 @@ if (typeof SAQueue === "undefined" && typeof importScripts === "function") {
 if (typeof SAAcquisition === "undefined" && typeof importScripts === "function") {
   importScripts("acquisition_client.js");
 }
+if (typeof SAArticleBodyRecovery === "undefined" && typeof importScripts === "function") {
+  importScripts("article_body_recovery.js");
+}
 if (typeof SACommentCapture === "undefined" && typeof importScripts === "function") {
   importScripts("comment_capture.js");
 }
@@ -683,7 +686,7 @@ async function forwardReconciliationNative(payload, sender) {
 }
 
 var companyCollectorIdentity = null;
-async function companyCollectorControl(operation, extra) {
+async function getCompanyCollectorIdentity() {
   if (!companyCollectorIdentity) companyCollectorIdentity = (async function () {
     var existing = (await chrome.storage.local.get("companyCollectorIdentity")).companyCollectorIdentity;
     if (existing) return existing;
@@ -692,8 +695,11 @@ async function companyCollectorControl(operation, extra) {
     await chrome.storage.local.set({companyCollectorIdentity:client});
     return client;
   })();
+  return companyCollectorIdentity;
+}
+async function companyCollectorControl(operation, extra) {
   return sendNativeMessage2(Object.assign({}, extra || {}, {
-    action:"sa_acquisition_control", operation:operation, client:await companyCollectorIdentity,
+    action:"sa_acquisition_control", operation:operation, client:await getCompanyCollectorIdentity(),
   }));
 }
 
@@ -922,14 +928,6 @@ function activateSaUpdates(request) {
   return work;
 }
 
-const ARTICLE_BODY_RECOVERY_STORAGE_KEY = "saArticleBodyRecovery";
-const ARTICLE_BODY_RECOVERY_LIMIT = 5;
-const ARTICLE_BODY_RECOVERY_MAX_MS = 30 * 60 * 1000;
-var articleBodyRecoveryPreview = null;
-var articleBodyRecoveryPreviewRevision = 0;
-var articleBodyRecoveryActive = null;
-var articleBodyRecoveryWrites = Promise.resolve();
-
 function bodyRecoveryTarget(value) {
   if (!value || typeof value.article_id !== "string" || !/^\d+$/.test(value.article_id)
       || typeof value.body_sha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.body_sha256)) return null;
@@ -1024,198 +1022,31 @@ function holdSaAcquisitionLifetime(run, maxMilliseconds) {
     ? navigator.locks.request("arkscope-native-messaging:" + NATIVE_HOST, open) : Promise.resolve(open());
 }
 
-function holdArticleBodyRecoveryLifetime(run) {
-  run.onInterrupted = function (reason) {
-    run.batch.status = "cancelling";
-    run.batch.stop_reason = reason;
-    persistArticleBodyRecovery(run.batch).catch(function () {});
-  };
-  return holdSaAcquisitionLifetime(run, ARTICLE_BODY_RECOVERY_MAX_MS);
-}
-
-function persistArticleBodyRecovery(batch) {
-  batch.counts = {saved:0, failed:0, skipped:0, deferred:0, cancelled:0, pending:0};
-  batch.items.forEach(function (item) {
-    var name = Object.prototype.hasOwnProperty.call(batch.counts,item.state) ? item.state : "pending";
-    batch.counts[name]++;
-  });
-  var snapshot = JSON.parse(JSON.stringify(batch));
-  var write = articleBodyRecoveryWrites.then(function () {
-    return chrome.storage.local.set({[ARTICLE_BODY_RECOVERY_STORAGE_KEY]:snapshot});
-  });
-  articleBodyRecoveryWrites = write.catch(function () {});
-  return write;
-}
-
-async function articleBodyRecoveryState() {
-  if (articleBodyRecoveryActive) return {status:"ok",batch:articleBodyRecoveryActive.batch};
-  var saved = await chrome.storage.local.get(ARTICLE_BODY_RECOVERY_STORAGE_KEY);
-  var batch = saved[ARTICLE_BODY_RECOVERY_STORAGE_KEY] || null;
-  // A suspended worker never resumes a preview or automatically retries a page.
-  if (batch && ["running","cancelling"].includes(batch.status)) {
-    batch.status = "interrupted";
-    batch.items.forEach(function (item) {
-      if (item.state === "running") {item.state = "failed"; item.reason = "interrupted";}
-      else if (item.state === "queued") {item.state = "cancelled"; item.reason = "interrupted";}
-    });
-    await persistArticleBodyRecovery(batch);
-  }
-  return {status:"ok",batch:batch};
-}
+var articleBodyRecovery = SAArticleBodyRecovery.create({
+  storage:chrome.storage.local, alarms:chrome.alarms, now:Date.now,
+  native:message=>sendNativeMessage2(message),
+  collector:()=>companyCollectorControl("status"),
+  control:async (operation,fields)=>sendNativeMessage2(Object.assign({},fields,{
+    action:"article_body_recovery_control",operation,protocol_version:2,client:await getCompanyCollectorIdentity(),
+  })),
+  reconcilePending:()=>saAcquisition.reconcilePending(),
+  enqueue:(options,capture)=>enqueueSaSyncJob(options,capture),
+  capture:(target,run,diagnostics)=>captureArticleBodyRecovery(target,run,diagnostics),
+});
 
 async function handleArticleBodyRecovery(msg) {
-  if (msg.action === "get_article_body_recovery_state") return articleBodyRecoveryState();
-  if (msg.action === "cancel_article_body_recovery") {
-    var active = articleBodyRecoveryActive;
-    if (!active || active.batch.batch_id !== msg.batch_id) return {status:"skipped",reason:"not_running"};
-    active.cancelled = true;
-    if (active.wake) active.wake();
-    active.batch.status = "cancelling";
-    await persistArticleBodyRecovery(active.batch);
-    return {status:"ok",batch:active.batch};
-  }
-  if (articleBodyRecoveryActive) return {status:"error",error_code:"already_pending"};
-  if (msg.action === "preview_article_body_recovery") {
-    articleBodyRecoveryPreview = null;
-    var revision = ++articleBodyRecoveryPreviewRevision;
-    var response = await sendNativeMessage2({action:"preview_article_body_recovery"});
-    if (revision !== articleBodyRecoveryPreviewRevision || articleBodyRecoveryActive) {
-      return {status:"error",error_code:"preview_stale"};
-    }
-    if (!response || response.status !== "ok" || typeof response.manifest_id !== "string"
-        || !response.manifest_id || typeof response.as_of !== "string"
-        || !/^\d{4}-\d{2}-\d{2}$/.test(response.as_of) || !Array.isArray(response.targets)) {
-      return {status:"error",error_code:"body_recovery_preview_unavailable"};
-    }
-    var targets = response.targets.slice(0,ARTICLE_BODY_RECOVERY_LIMIT).map(bodyRecoveryTarget);
-    if (targets.some(function (item) {return !item;})
-        || new Set(targets.map(function (item) {return item.article_id;})).size !== targets.length) {
-      return {status:"error",error_code:"manifest_invalid"};
-    }
-    var remaining = response.counts && response.counts.targets;
-    articleBodyRecoveryPreview = {status:"ok",manifest_id:response.manifest_id,as_of:response.as_of,
-      targets:targets,remaining_count:Number.isSafeInteger(remaining) && remaining >= response.targets.length
-        ? remaining : response.targets.length};
-    return articleBodyRecoveryPreview;
-  }
-  var preview = articleBodyRecoveryPreview;
-  if (!preview || msg.manifest_id !== preview.manifest_id || !preview.targets.length) {
-    return {status:"error",error_code:"preview_required"};
-  }
-  articleBodyRecoveryPreview = null;
-  articleBodyRecoveryPreviewRevision++;
-  var batch = {batch_id:crypto.randomUUID(),manifest_id:preview.manifest_id,as_of:preview.as_of,
-    status:"running",started_at:new Date().toISOString(),items:preview.targets.map(function (item) {
-      return {article_id:item.article_id,title:item.title,state:"queued",reason:null,attempt_count:0};
-    })};
-  var run = {batch:batch,cancelled:false};
-  articleBodyRecoveryActive = run;
-  try {await persistArticleBodyRecovery(batch);}
-  catch (error) {articleBodyRecoveryActive = null; throw error;}
-  run.promise = holdArticleBodyRecoveryLifetime(run).then(function () {
-    return runArticleBodyRecovery(run,preview.targets);
-  }).catch(async function () {
-    batch.status = run.cancelled && !run.interruption ? "cancelled" : "interrupted";
-    batch.stop_reason = run.interruption || (run.cancelled ? "operator_cancelled" : "interrupted");
-    batch.items.forEach(function (item) {
-      if (item.state === "running") {item.state = "failed"; item.reason = "interrupted";}
-      else if (item.state === "queued") {item.state = "cancelled"; item.reason = "interrupted";}
-    });
-    await persistArticleBodyRecovery(batch).catch(function () {});
-  }).finally(function () {
-    if (run.closeLifetime) run.closeLifetime();
-    if (articleBodyRecoveryActive === run) articleBodyRecoveryActive = null;
-  });
-  return {status:"ok",batch:batch};
-}
-
-async function runArticleBodyRecovery(run, targets) {
-  var batch = run.batch, stopped = false;
-  for (var index = 0; index < targets.length && !run.cancelled && !stopped; index++) {
-    await waitForArticleBodyRecoveryGap(run);
-    if (run.cancelled) break;
-    var item = batch.items[index], target = targets[index];
-    var result = await enqueueSaSyncJob({key:batch.batch_id + ":" + target.article_id,
-      displayName:"Article body repair",operation:"alpha_picks_body_repair",mode:"manual",
-      eligible:function () {return !run.cancelled;}}, async function (diagnostics) {
-      if (run.cancelled) return run.interruption
-        ? {status:"error",failure_phase:"extraction",reason:run.interruption,reason_code:"interrupted"}
-        : {status:"cancelled",reason:"operator_cancelled"};
-      item.state = "running";
-      item.attempt_count = 1;
-      item.phase = "opening";
-      await persistArticleBodyRecovery(batch);
-      return captureArticleBodyRecovery(target,run,diagnostics);
-    });
-    var stop = result.acquisition_stop;
-    var pacingUntil = result.retry_after || stop && stop.retry_after;
-    if (result.status === "deferred" && result.reason === "site_pacing"
-        && !result.acquisition_uncertain && (!result.acquisition || result.acquisition.navigation_attempt_count === 0)
-        && Date.parse(pacingUntil) > Date.now() && !run.cancelled) {
-      // Admission was denied before any page request. Wait for the same item;
-      // never retry a page that was opened or had an uncertain outcome.
-      run.waitUntil = pacingUntil;
-      item.state = "queued"; item.attempt_count = 0; delete item.phase;
-      await persistArticleBodyRecovery(batch);
-      index--;
-      continue;
-    }
-    if (result.status === "ok" && result.body_saved === true) {
-      item.state = "saved"; item.reason = null;
-      item.references = result.body_references || null;
-    } else if (result.status === "cancelled" || result.reason === "operator_cancelled") {
-      item.state = "cancelled"; item.reason = run.interruption || "operator_cancelled";
-    } else if (result.status === "skipped") {
-      item.state = "skipped"; item.reason = bodyRecoveryReason(result.reason,"unknown_failure");
-    } else if (result.status === "deferred") {
-      item.state = "deferred"; item.reason = bodyRecoveryReason(result.reason,"collector_unavailable");
-    } else {
-      item.state = "failed";
-      item.reason = bodyRecoveryReason(stop && stop.error_code || result.reason || result.reason_code,"unknown_failure");
-    }
-    stopped = !!stop || !!result.acquisition_uncertain || result.status === "deferred";
-    if (result.acquisition_uncertain) batch.stop_reason = "cleanup_unconfirmed";
-    else if (stopped) batch.stop_reason = bodyRecoveryReason(stop && stop.error_code || result.reason,"collector_unavailable");
-    delete item.phase;
-    await persistArticleBodyRecovery(batch);
-  }
-  batch.items.forEach(function (item) {
-    if (item.state === "queued") {
-      item.state = "cancelled";
-      item.reason = run.interruption || (run.cancelled ? "operator_cancelled" : batch.stop_reason || "interrupted");
-    }
-  });
-  batch.status = run.interruption ? "interrupted" : run.cancelled ? "cancelled" : stopped ? "stopped"
-    : batch.items.some(function (item) {return item.state === "failed";}) ? "partial" : "complete";
-  batch.finished_at = new Date().toISOString();
-  await persistArticleBodyRecovery(batch);
-}
-
-async function waitForArticleBodyRecoveryGap(run) {
-  while (!run.cancelled) {
-    var state = await companyCollectorControl("status");
-    var deadline = Math.max(state && Date.parse(state.next_navigation_at) || 0, Date.parse(run.waitUntil) || 0);
-    if (!state || state.status !== "ok" || !state.is_owner || state.paused_reason || state.rate_limited
-        || state.capability_pauses && state.capability_pauses.alpha_picks
-        || !Number.isFinite(deadline) || deadline <= Date.now()) break;
-    run.batch.next_page_at = new Date(deadline).toISOString();
-    await persistArticleBodyRecovery(run.batch);
-    // Keep this explicit batch responsive to shared state while its port lives.
-    // Waiting holds neither a queue slot nor the native acquisition reservation.
-    await new Promise(function (resolve) {
-      var timer;
-      run.wake = function () {clearTimeout(timer); run.wake = null; resolve();};
-      timer = setTimeout(run.wake,Math.min(20000,Math.max(0,deadline - Date.now())));
-      if (run.cancelled) run.wake();
-    });
-  }
-  delete run.batch.next_page_at;
-  delete run.waitUntil;
+  if (msg.action === "preview_article_body_recovery") return articleBodyRecovery.preview();
+  if (msg.action === "start_article_body_recovery") return articleBodyRecovery.start(msg.manifest_id);
+  if (msg.action === "cancel_article_body_recovery") return articleBodyRecovery.cancel(msg.job_id);
+  if (msg.action === "resume_article_body_recovery") return articleBodyRecovery.resume(msg.job_id);
+  return articleBodyRecovery.status();
 }
 
 async function captureArticleBodyRecovery(target, run, diagnostics) {
   var tabId = null, guard = null, phase = "extraction";
-  var item = run.batch.items.find(function (value) {return value.article_id === target.article_id;});
+  var auth = Object.assign({},requireAcquisitionTask().bodyCaptureContext(),{
+    client:await getCompanyCollectorIdentity(),body_job_id:run.body_job_id,protocol_version:2,
+  });
   function cancelled() {return run.cancelled;}
   function cancelledResult() {
     return run.interruption
@@ -1223,8 +1054,7 @@ async function captureArticleBodyRecovery(target, run, diagnostics) {
       : {status:"cancelled"};
   }
   async function progress(value) {
-    if (item) item.phase = value;
-    await persistArticleBodyRecovery(run.batch);
+    if (run.onProgress) await run.onProgress(value);
   }
   async function checkpoint() {
     requireAcquisitionTask();
@@ -1245,8 +1075,8 @@ async function captureArticleBodyRecovery(target, run, diagnostics) {
   }
   try {
     if (!await checkpoint()) return cancelledResult();
-    var check = await sendNativeMessage2({action:"check_article_body_recovery_target",
-      article_id:target.article_id,body_sha256:target.body_sha256});
+    var check = await sendNativeMessage2(Object.assign({},auth,{action:"check_article_body_recovery_target",
+      article_id:target.article_id,body_sha256:target.body_sha256}));
     if (cancelled()) return cancelledResult();
     if (check.status === "skipped" && ["already_present","out_of_scope","source_changed"].includes(check.reason)) {
       return {status:"skipped",reason:check.reason};
@@ -1285,10 +1115,10 @@ async function captureArticleBodyRecovery(target, run, diagnostics) {
     phase = "persistence";
     if (!await checkpoint()) return cancelledResult();
     await progress("saving");
-    var saved = await sendNativeMessage2({action:"save_article_body_recovery",article_id:target.article_id,
+    var saved = await sendNativeMessage2(Object.assign({},auth,{action:"save_article_body_recovery",article_id:target.article_id,
       expected_body_sha256:target.body_sha256,body_markdown:report,
       body_capture:detail.body_capture || null,
-      detail_ticker:detail.detail_ticker || null,detail_ticker_observed_at:detail.detail_ticker_observed_at || null});
+      detail_ticker:detail.detail_ticker || null,detail_ticker_observed_at:detail.detail_ticker_observed_at || null}));
     if (saved.status === "skipped" && ["already_present","out_of_scope","source_changed"].includes(saved.reason)) {
       return {status:"skipped",reason:saved.reason};
     }
@@ -1331,7 +1161,7 @@ async function handleAcquisitionControl(msg) {
     return companyFinancialRefresh.run({force:msg.force === true});
   }
   var operation = msg.action === "recover_sa_acquisition" ? "recover" : "resume";
-  if (operation === "recover" && (saSyncJobInFlight || saAcquisition.running || articleBodyRecoveryActive)) {
+  if (operation === "recover" && (saSyncJobInFlight || saAcquisition.running || articleBodyRecovery.running)) {
     return {status:"error",error_code:"sa_company_collector_busy"};
   }
   if (operation === "recover") return saAcquisitionQueue.enqueue({key:"operator-acquisition-recovery",
@@ -1340,7 +1170,7 @@ async function handleAcquisitionControl(msg) {
 }
 
 async function applyAcquisitionControl(msg, operation) {
-  if (operation === "recover" && (saSyncJobInFlight || saAcquisition.running || articleBodyRecoveryActive)) {
+  if (operation === "recover" && (saSyncJobInFlight || saAcquisition.running || articleBodyRecovery.running)) {
     return {status:"error",error_code:"sa_company_collector_busy"};
   }
   var pending = (await chrome.storage.local.get("saAcquisitionPending")).saAcquisitionPending;
@@ -1365,7 +1195,7 @@ async function applyAcquisitionControl(msg, operation) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (["preview_article_body_recovery", "start_article_body_recovery",
-      "get_article_body_recovery_state", "cancel_article_body_recovery"].includes(msg.action)) {
+      "get_article_body_recovery_state", "cancel_article_body_recovery", "resume_article_body_recovery"].includes(msg.action)) {
     if (!sender || sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL("popup.html")) {
       sendResponse({status:"error",error_code:"extension_request_rejected"});
       return false;
@@ -1720,6 +1550,10 @@ chrome.runtime.onStartup.addListener(function () {
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
   if (!alarm) return;
+  if (alarm.name === SAArticleBodyRecovery.alarm) {
+    articleBodyRecovery.wake().catch(function () {});
+    return;
+  }
   if (alarm.name === SA_ACQUISITION_COOLDOWN_ALARM) {
     refreshAcquisitionStatus().then(syncAllAutoSyncAlarms);
     return;
@@ -1789,11 +1623,10 @@ function enqueueSaSyncJob(opts, jobFn) {
       saAcquisitionTask.interrupt({status:"error",reason:"collector_unavailable",error_code:reason});
       Array.from(saAcquisitionTask.ownedTabs).forEach(function (tabId) {safeRemoveTab(tabId).catch(function () {});});
     }};
+    if (opts.onLifetime) opts.onLifetime(lifetime);
     try {
       if (!operation) return await jobFn(diagnostics);
-      var borrowedLifetime = operation === "alpha_picks_body_repair" && articleBodyRecoveryActive
-        && !articleBodyRecoveryActive.cancelled && articleBodyRecoveryActive.closeLifetime;
-      if (!borrowedLifetime && !await holdSaAcquisitionLifetime(lifetime)) {
+      if (!await holdSaAcquisitionLifetime(lifetime)) {
         capturedResult = attachExtensionRunProtocol(operation,mode,{status:"deferred",
           reason:"collector_unavailable",error_code:lifetime.interruption || "native_host_unavailable"});
         return capturedResult;
@@ -2741,6 +2574,7 @@ async function syncAllAutoSyncAlarms() {
   await syncAlphaPicksAutoSyncAlarm();
   await syncMarketNewsAutoSyncAlarm();
   await companyFinancialRefresh.syncAlarm();
+  await articleBodyRecovery.syncAlarm();
 }
 
 async function refreshAcquisitionStatus() {
@@ -2771,6 +2605,7 @@ async function ensureAutoSyncAlarms() {
     repaired.push(MARKET_NEWS_AUTO_SYNC_ALARM);
   }
   if (!names[SACompanyRefresh.alarm]) await companyFinancialRefresh.syncAlarm();
+  if (!names[SAArticleBodyRecovery.alarm]) await articleBodyRecovery.syncAlarm();
   return {
     status: "ok",
     repaired: repaired,

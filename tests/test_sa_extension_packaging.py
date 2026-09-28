@@ -40,11 +40,11 @@ def _copy_fixture(tmp_path: Path) -> Path:
 def test_both_builds_include_acquisition_modules_before_registration(tmp_path):
     builder = _load_builder()
     graph = builder.discover_dependency_graph(EXT_DIR)
-    assert {"acquisition_queue.js", "acquisition_client.js"} <= set(graph.files)
+    assert {"acquisition_queue.js", "acquisition_client.js", "article_body_recovery.js"} <= set(graph.files)
     output = tmp_path / "firefox"
     builder.build_firefox(EXT_DIR, output)
     scripts = json.loads((output / "manifest.json").read_text())["background"]["scripts"]
-    for name in ("acquisition_queue.js", "acquisition_client.js"):
+    for name in ("acquisition_queue.js", "acquisition_client.js", "article_body_recovery.js"):
         assert scripts.index(name) < scripts.index("background.js")
         assert (output / name).read_bytes() == (EXT_DIR / name).read_bytes()
     background = (EXT_DIR / "background.js").read_text()

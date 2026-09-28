@@ -22,6 +22,7 @@
       "company_refresh.js",
       "acquisition_queue.js",
       "acquisition_client.js",
+      "article_body_recovery.js",
       "comment_capture.js",
       "background.js"
     ]

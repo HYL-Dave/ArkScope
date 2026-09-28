@@ -95,6 +95,10 @@
       }
       var task = {
         operation:descriptor.operation,
+        bodyCaptureContext:function () {
+          if (descriptor.operation !== "alpha_picks_body_repair" || terminal) throw new Stop(deferred());
+          return Object.assign({task_id:permit.task_id},auth);
+        },
         get stop() {return stopped;},
         get uncertain() {return uncertain;},
         ownedTabs:ownedTabs,
@@ -145,6 +149,9 @@
               : status === "deferred" ? "deferred" : status === "skipped" || status === "cancelled" ? "cancelled" : "error"};
             if (result.observation_id) projection.observation_id = result.observation_id;
             if (result.error_code) projection.error_code = result.error_code;
+            else if (descriptor.operation === "alpha_picks_body_repair" && /^[a-z][a-z0-9_]{0,95}$/.test(result.reason_code || "")) {
+              projection.error_code = result.reason_code;
+            }
             var reply = await control("finish_task", Object.assign({},auth,{result:projection,cleanup_confirmed:true}));
             if (!reply || reply.status !== "ok" || !reply.acquisition) return deferred();
             await storage.set({saAcquisitionPending:null});

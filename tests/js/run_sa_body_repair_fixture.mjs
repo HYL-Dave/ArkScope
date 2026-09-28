@@ -7,7 +7,7 @@ import {JSDOM} from 'jsdom';
 
 const dir = path.resolve('extensions/sa_alpha_picks');
 const scenario = process.argv[2];
-const key = 'saArticleBodyRecovery';
+const key = 'saArticleBodyRecoveryV2';
 const clone = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const targets = Array.from({length: 8}, (_, index) => ({
@@ -15,8 +15,8 @@ const targets = Array.from({length: 8}, (_, index) => ({
   title: `Article ${index + 1}`, published_date: '2026-09-24', body_sha256: 'a'.repeat(64),
   priority: index, reasons: ['body_missing'],
 }));
-const manifest = {status: 'ok', manifest_id: 'manifest-one', as_of: '2026-09-25',
-  targets: targets.slice(0,5), counts: {targets: 8}};
+const manifest = {status:'ok',protocol_version:2,manifest_id:'a'.repeat(64),as_of:'2026-09-25',
+  targets,counts:{targets:8},settings:{max_articles_per_job:0,body_lookback_days:0,body_scope:'all_retained',comment_scope:'current'}};
 const bodyCapture = {schema_version:1, extractor_version:2,
   links:{observed:2,retained:2}, images:{observed:1,retained:1}, unsupported_embeds:0};
 const bodyReferences = {status:'observed_references_retained',basis:'selected_article_dom',
@@ -62,14 +62,47 @@ function background(options = {}) {
     ...options.initial});
   const native = [], events = [], tabs = new Map(), sent = [], alarms = [], ports = [];
   let listener, batchDeadline, nextTab = 1, now = Date.parse('2026-09-25T00:00:00Z');
+  let job=null, admitted=null, turn=null;
+  const receipts=new Map(), storedBodies=new Set();
+  const collectorIdentity={client_id:'f'.repeat(32),browser:'chrome'};
+  store.data.companyCollectorIdentity=collectorIdentity;
   class Clock extends Date {
     constructor(...args) {super(...(args.length ? args : [now]));}
     static now() {return now;}
   }
   const shared = {status: 'ok', policy: {hour_limit: 100, day_limit: 1000, hour_reserve: 10, day_reserve: 100},
-    ledger_id: 'ledger', generation: 1, is_owner: !options.otherOwner,
+    ledger_id: 'ledger', generation: 1, is_owner: !options.otherOwner,owner:collectorIdentity,
     paused_reason: options.paused || null, capability_pauses: {}, rate_limited: false,
     financial_gap_seconds:60, next_navigation_at:options.initialPacing ? new Clock(now + 60000).toISOString() : null};
+  function summary() {
+    if(!job)return {status:'ok',protocol_version:2,state:'not_started'};
+    const counts={selected:job.items.length,saved:0,failed:0,skipped:0,pending:0};
+    for(const item of job.items)counts[['running','pending'].includes(item.state)?'pending':item.state]++;
+    if(!counts.pending)job.state=job.state==='cancelling'||job.state==='cancelled'?'cancelled':counts.failed?'partial':'complete';
+    return {status:'ok',protocol_version:2,job_id:job.job_id,revision:job.revision,state:job.state,
+      manifest_id:manifest.manifest_id,counts,settings:manifest.settings,reason_code:job.reason_code||null,next_eligible_at:null};
+  }
+  function bodyControl(message) {
+    if(!shared.is_owner)return {status:'error',error_code:'sa_body_owner_changed'};
+    if(message.operation==='start')job={job_id:'e'.repeat(32),revision:1,state:'pending',items:clone(targets).map(t=>({...t,state:'pending'}))};
+    if(!job)return summary();
+    if(message.operation==='cancel') {
+      if(!['cancelling','cancelled'].includes(job.state))job.revision++;
+      job.state=admitted?'cancelling':'cancelled';
+      job.items.filter(i=>i.state==='pending').forEach(i=>{i.state='skipped';i.reason_code='operator_cancelled';});
+    }
+    if(message.operation==='items')return {...summary(),items:clone(job.items),next_cursor:null};
+    if(message.operation==='next'&&!['complete','partial','paused','cancelling','cancelled'].includes(summary().state)) {
+      if(admitted){job.state='running';return summary();}
+      if(shared.paused_reason){job.state='paused';return {...summary(),reason_code:shared.paused_reason};}
+      if(Date.parse(shared.next_navigation_at)>now||options.capacity||options.pacing) {
+        job.state='waiting';events.push('gap_wait');
+        return {...summary(),reason_code:options.capacity?'capacity_exhausted':'site_pacing',next_eligible_at:shared.next_navigation_at};
+      }
+      job.state='pending';return {...summary(),target:clone(job.items.find(i=>i.state==='pending'))};
+    }
+    return summary();
+  }
   const chrome = {
     runtime: {
       id: 'test-extension', getURL: name => `chrome-extension://test-extension/${name}`,
@@ -95,16 +128,19 @@ function background(options = {}) {
             if (value !== undefined) return value;
           }
           if (message.action === 'preview_article_body_recovery') return clone(options.manifest || manifest);
+          if (message.action === 'article_body_recovery_control') return bodyControl(message);
           if (message.action === 'check_article_body_recovery_target') {
             return {status: 'ok', target: clone(targets.find(item => item.article_id === message.article_id))};
           }
           if (message.action === 'save_article_body_recovery') {
             events.push(`save:${message.article_id}`);
+            storedBodies.add(message.article_id);
             return {status: 'ok', body_saved: true, body_quality: {state: 'usable'}, body_references:bodyReferences};
           }
           if (message.action === 'record_extension_job') return {status: 'ok', persisted: true, run_id:native.length};
           if (message.action === 'sa_acquisition_control') {
             events.push(message.operation);
+            if(message.operation==='reconcile_task')return {...shared,pending_task:{...message,state:admitted?'active':'terminal'}};
             if (message.operation === 'begin_task' && options.pacingRace) {
               options.pacingRace = false;
               shared.next_navigation_at = new Clock(now + 60000).toISOString();
@@ -114,17 +150,29 @@ function background(options = {}) {
                 && (Date.parse(shared.next_navigation_at) > now || options.pacing)) {
               return {status:'deferred',reason:'site_pacing',error_code:'sa_company_pacing',retry_after:shared.next_navigation_at};
             }
-            if (message.operation === 'begin_task') return options.capacity
-              ? {status: 'deferred', reason: 'capacity_exhausted'}
-              : {...shared, token: 'b'.repeat(32), task_id: 'c'.repeat(32)};
-            if (message.operation === 'admit_navigation') return options.navDenied
+            if (message.operation === 'begin_task') {
+              if(options.capacity)return {status:'deferred',reason:'capacity_exhausted'};
+              admitted=message;const item=job?.items.find(i=>i.article_id===message.article_id);
+              if(item)item.state='running';
+              return {...shared,token:'b'.repeat(32),task_id:'c'.repeat(32)};
+            }
+            if (message.operation === 'admit_navigation') return options.navDenied || job?.state==='cancelling'
               ? {status: 'deferred', reason: 'capacity_exhausted'}
               : {...shared, allowed: true, replayed: false, attempt_id: 'd'.repeat(32)};
             if (message.operation === 'observe_restriction') shared.paused_reason = message.reason;
             if (message.operation === 'finish_task') {
               assert.equal(tabs.size, 0, 'gate cannot release while the active tab is open');
               shared.next_navigation_at = new Clock(now + 60000).toISOString();
-              return {...shared, acquisition: {task_id: 'c'.repeat(32)}};
+              const item=job?.items.find(i=>i.article_id===admitted?.article_id);
+              if(item) {
+                item.state=storedBodies.has(item.article_id)?'saved':job.state==='cancelling'?'skipped'
+                  :shared.paused_reason||message.result.status==='deferred'?'pending'
+                  :message.result.status==='cancelled'?'skipped':'failed';
+                item.reason_code=message.result.error_code||null;
+              }
+              const receipt={task_id:'c'.repeat(32),body_recovery_job_id:admitted?.body_job_id,article_id:admitted?.article_id};
+              receipts.set(receipt.task_id,receipt);admitted=null;
+              return {...shared,acquisition:receipt};
             }
             return clone(shared);
           }
@@ -133,7 +181,9 @@ function background(options = {}) {
       },
     },
     storage: {local: store.local, onChanged: store.changed},
-    alarms: {onAlarm: event(), create: async (...args) => alarms.push(args), clear: async () => true},
+    alarms: {onAlarm: event(), create: async (...args) => alarms.push(args), clear: async name => {
+      for(let i=alarms.length-1;i>=0;i--)if(alarms[i][0]===name)alarms.splice(i,1);return true;
+    }},
     tabs: {
       onUpdated: event(), onRemoved: event(), onCreated: event(),
       async create(value) {
@@ -189,7 +239,7 @@ function background(options = {}) {
       if (delay === 15000 && options.handshakeTimeout) return setTimeout(fn,0);
       if (delay === 60000 || delay === 20000) {
         events.push('gap_wait');
-        if (options.idleGap) assert.ok(ports.some(port=>!port.closed),'a real native port must cover the idle wait');
+        if (options.idleGap) assert.ok(ports.every(port=>port.closed),'no lifetime port may cover idle waits');
         if (options.disconnectGap) {
           options.disconnectGap=false;
           queueMicrotask(()=>ports[0].onDisconnect.emit());
@@ -215,10 +265,21 @@ function background(options = {}) {
     if (!asyncReply) resolve({status:'unhandled'});
   });
   const terminal = async () => {
-    await until(() => store.data[key] && !['running','cancelling'].includes(store.data[key].status));
-    return clone(store.data[key]);
+    for(let i=0;i<25;i++) {
+      if(turn)await turn;
+      const state=await context.articleBodyRecovery.status();
+      if(['complete','partial','cancelled','paused'].includes(state.state)||state.status==='error'||store.data.saAcquisitionPending)return state;
+      if(options.capacity||options.pacing||options.navDenied||options.lifetimeUnavailable||options.handshakeTimeout)return state;
+      now=Math.max(now,Date.parse(state.next_eligible_at)||0,Date.parse(shared.next_navigation_at)||0);
+      if(options.expireGap)now+=31*60000;
+      if(options.idleGap)assert.ok(ports.every(p=>p.closed),'idle work holds no lifetime');
+      turn=context.articleBodyRecovery.wake();
+    }
+    assert.fail('job did not become terminal');
   };
-  return {context, chrome, store, native, events, tabs, sent, alarms, ports, message, terminal};
+  const wake=()=>{turn=context.articleBodyRecovery.wake();return turn;};
+  return {context,chrome,store,native,events,tabs,sent,alarms,ports,message,terminal,wake,
+    summary,hasBatchTimeout:()=>!!batchDeadline,advance:ms=>{now+=ms;}};
 }
 
 async function start(app) {
@@ -227,6 +288,7 @@ async function start(app) {
   const result = await app.message({action:'start_article_body_recovery', manifest_id:preview.manifest_id,
     targets:[...targets].reverse(), limit:100});
   assert.equal(result.status, 'ok', 'explicit start should be accepted');
+  app.wake();
   return result;
 }
 
@@ -240,9 +302,9 @@ async function runBackground() {
     assert.equal(app.native.length, 0);
     const preview = await app.message({action:'preview_article_body_recovery',as_of:'1990-01-01'});
     assert.equal(preview.status, 'ok', 'readonly preview must be supported');
-    assert.equal(preview.targets.length, 5);
-    assert.equal(preview.remaining_count, 8);
-    assert.deepEqual(app.native, [{action:'preview_article_body_recovery'}]);
+    assert.equal(preview.targets.length, 8);
+    assert.equal(preview.counts.targets, 8);
+    assert.deepEqual(app.native, [{action:'preview_article_body_recovery',protocol_version:2}]);
     assert.equal(app.tabs.size, 0);
     assert.notEqual((await app.message({action:'start_article_body_recovery',manifest_id:'stale'})).status, 'ok');
     assert.equal(app.alarms.length, 0);
@@ -266,8 +328,11 @@ async function runBackground() {
   if (scenario === 'lifetime_handshake_timeout') options.handshakeTimeout = true;
   if (scenario === 'lifetime_deadline') options.expireGap = true;
   if (scenario === 'lifetime_cancel_setup') options.holdHandshake = true;
-  if (scenario === 'lifetime_disconnect_active') options.detail = async () => app.ports[0].onDisconnect.emit();
-  if (scenario === 'interrupted') options.initial = {[key]: {status:'running',batch_id:'lost',items:[
+  if (['lifetime_disconnect','lifetime_disconnect_active'].includes(scenario)) {
+    let disconnected=false;
+    options.detail=async()=>{if(!disconnected){disconnected=true;app.ports.find(p=>!p.closed).onDisconnect.emit();}};
+  }
+  if (scenario === 'interrupted') options.initial = {saArticleBodyRecovery: {status:'running',batch_id:'lost',items:[
     {article_id:'1000',title:'Article 1',state:'running',attempt_count:1},
     {article_id:'1001',title:'Article 2',state:'queued',attempt_count:0},
   ]}};
@@ -298,10 +363,15 @@ async function runBackground() {
   app = background(options);
   if (scenario === 'interrupted') {
     const state = await app.message({action:'get_article_body_recovery_state'});
-    assert.equal(state.batch.status, 'interrupted');
-    assert.equal(state.batch.items[0].reason, 'interrupted');
-    assert.equal(app.native.length, 0);
+    assert.equal(state.state,'not_started');
+    assert.equal(state.legacy_history.batch_id,'lost');
+    assert.equal(app.store.data[key],undefined);
+    assert.equal(app.ports.length,0);
     return;
+  }
+  if(scenario==='owner_gate') {
+    const result=await app.message({action:'start_article_body_recovery',manifest_id:manifest.manifest_id});
+    assert.equal(result.status,'error');assert.equal(app.tabs.size,0);assert.equal(app.ports.length,0);return;
   }
   if (scenario === 'cancel_queued' || scenario === 'lane_priority') {
     held = new Promise(resolve => {release = resolve;});
@@ -311,7 +381,7 @@ async function runBackground() {
   const started = await start(app);
   if (scenario === 'lifetime_cancel_setup') {
     await until(()=>app.ports.length===1);
-    await app.message({action:'cancel_article_body_recovery',batch_id:started.batch.batch_id});
+    await app.message({action:'cancel_article_body_recovery',job_id:started.job_id});
   }
   if (scenario === 'lane_priority') {
     const preferred = app.context.enqueueSaSyncJob({key:'newer-routine'}, async () => {app.events.push('routine');return {};});
@@ -319,10 +389,11 @@ async function runBackground() {
     await preferred;
   }
   if (scenario === 'cancel_gap' || scenario === 'gap_priority') {
-    await until(() => app.events.includes('gap_wait'));
+    await app.wake();
+    assert.ok(app.events.includes('gap_wait'));
     assert.equal(app.store.data.saAcquisitionPending,null,'gap wait holds no gate');
     if (scenario === 'cancel_gap') {
-      await app.message({action:'cancel_article_body_recovery',batch_id:started.batch.batch_id});
+      await app.message({action:'cancel_article_body_recovery',job_id:started.job_id});
     } else {
       await app.context.enqueueSaSyncJob({key:'routine-during-gap'}, async () => {
         app.events.push('routine'); return {};
@@ -335,40 +406,42 @@ async function runBackground() {
     release();
   }
   if (['cancel_active','cancel_queued'].includes(scenario)) {
-    const cancelled = await app.message({action:'cancel_article_body_recovery',batch_id:started.batch.batch_id});
+    const cancelled = await app.message({action:'cancel_article_body_recovery',job_id:started.job_id});
     assert.equal(cancelled.status, 'ok');
     release();
   }
   const batch = await app.terminal();
   await tick();
-  assert.equal(app.ports.length,1,'one native lifetime per explicitly started batch');
-  assert.ok(app.ports.every(port=>port.closed),'native lifetime ends with the batch');
+  assert.ok(app.ports.every(port=>port.closed),'native lifetime ends with each page, never spans an idle wait');
+  assert.equal(app.hasBatchTimeout(),false,'no whole-job lifetime deadline');
   if (routine) await routine;
   const saves = actions(app, 'save_article_body_recovery');
   const checks = actions(app, 'check_article_body_recovery_target');
   const telemetry = actions(app, 'record_extension_job');
   assert.equal(app.store.data.alphaPicksAutoSyncEnabled, true);
   assert.equal(app.store.data.marketNewsAutoSyncEnabled, true);
-  assert.equal(app.alarms.length, 0);
   assert.ok(!JSON.stringify(telemetry).includes('PRIVATE'), 'telemetry cannot contain body or native prose');
   assert.ok(!JSON.stringify(app.store.data[key]).includes('PRIVATE'), 'local result is metadata only');
   assert.ok(app.native.every(value => !['save_article_content','save_comments_only','accept_reconciliation_link'].includes(value.action)));
-  if (['repair_success','priority','gap_priority','lane_priority','idle_gap','initial_pacing','pacing_race'].includes(scenario)) {
-    assert.equal(saves.length, 5);
-    assert.equal(checks.length, 5);
-    assert.deepEqual(saves.map(value => value.article_id), ['1000','1001','1002','1003','1004']);
-    assert.equal(batch.status, 'complete');
-    assert.equal(batch.counts.saved, 5);
+  if (['repair_success','priority','gap_priority','lane_priority','idle_gap','initial_pacing','pacing_race','lifetime_deadline'].includes(scenario)) {
+    assert.equal(saves.length, 8);
+    assert.equal(checks.length, 8);
+    assert.deepEqual(saves.map(value => value.article_id),targets.map(t=>t.article_id));
+    assert.equal(batch.state, 'complete');
+    assert.equal(batch.counts.saved, 8);
+    assert.equal(app.alarms.length,0);
+    assert.equal(app.ports.length,scenario==='pacing_race'?9:8);
     for (const save of saves) assert.deepEqual(Object.keys(save).sort(), [
       'action','article_id','expected_body_sha256','body_markdown','body_capture','detail_ticker','detail_ticker_observed_at',
+      'protocol_version','client','token','generation','task_id','body_job_id',
     ].sort());
     for (const save of saves) assert.deepEqual(save.body_capture,bodyCapture);
-    for (const item of batch.items) assert.deepEqual(item.references,bodyReferences);
+    for (const save of saves)assert.equal(save.body_job_id,started.job_id);
     assert.ok(saves.every(value => value.expected_body_sha256 === 'a'.repeat(64)));
-    assert.equal(app.events.filter(value => value === 'guard:end').length, 5);
-    assert.equal(app.events.filter(value => value === 'finish_task').length, 5);
+    assert.equal(app.events.filter(value => value === 'guard:end').length, 8);
+    assert.equal(app.events.filter(value => value === 'finish_task').length, 8);
     assert.ok(telemetry.every(value => value.result.healthy_anchor_eligible === false));
-    assert.equal(telemetry.length, scenario === 'pacing_race' ? 6 : 5);
+    assert.equal(telemetry.length, scenario === 'pacing_race' ? 9 : 8);
     if (scenario === 'pacing_race') assert.equal(telemetry[0].result.derived_outcome,'deferred');
     assert.ok(app.events.filter(value => value === 'gap_wait').length >= 4);
     assert.ok(app.events.indexOf('guard:begin') < app.events.indexOf('settle'));
@@ -380,64 +453,62 @@ async function runBackground() {
     }
     if (scenario === 'lane_priority') assert.ok(app.events.indexOf('routine') < app.events.indexOf('create'));
     if (scenario === 'initial_pacing') assert.ok(app.events.indexOf('gap_wait') < app.events.indexOf('create'));
-    if (scenario === 'pacing_race') assert.equal(app.events.filter(value=>value==='create').length,5);
-    assert.notEqual((await app.message({action:'start_article_body_recovery',manifest_id:'manifest-one'})).status,'ok');
+    if (scenario === 'pacing_race') assert.equal(app.events.filter(value=>value==='create').length,8);
+    assert.notEqual((await app.message({action:'start_article_body_recovery',manifest_id:'invalid'})).status,'ok');
   } else if (scenario === 'cancel_gap') {
-    assert.equal(batch.status,'cancelled');
+    assert.equal(batch.state,'cancelled');
     assert.equal(saves.length,1);
     assert.equal(app.tabs.size,0);
   } else if (['cancel_active','cancel_queued','lifetime_cancel_setup'].includes(scenario)) {
-    assert.equal(batch.status, 'cancelled');
+    assert.equal(batch.state, 'cancelled');
     assert.equal(saves.length, 0);
     assert.equal(app.tabs.size, 0);
     assert.equal(app.events.filter(value => value === 'create').length, scenario === 'cancel_active' ? 1 : 0);
-  } else if (['owner_gate','pause_gate','capacity_gate','navigation_gate','pacing_stop'].includes(scenario)) {
-    assert.equal(batch.status, 'stopped');
+  } else if (['pause_gate','capacity_gate','navigation_gate','pacing_stop'].includes(scenario)) {
+    assert.ok(['waiting','paused'].includes(batch.state));
     assert.equal(saves.length, 0);
     assert.equal(app.tabs.size, 0);
-    assert.ok(batch.items.some(value => value.state === 'deferred'));
+    assert.equal(batch.counts.pending,8);
   } else if (scenario === 'site_stop') {
-    assert.equal(batch.status, 'stopped');
+    assert.equal(batch.state, 'paused');
     assert.equal(app.events.filter(value => value === 'create').length, 1);
     assert.equal(saves.length, 0);
-    assert.ok(batch.items.some(value => value.reason === 'human_verification_required'));
+    assert.equal(batch.counts.pending,8);
     assert.equal(app.tabs.size, 0);
   } else if (scenario === 'revalidate') {
-    assert.equal(checks.length, 5);
-    assert.equal(batch.counts.skipped, 5);
+    assert.equal(checks.length, 8);
+    assert.equal(batch.counts.skipped, 8);
     assert.equal(batch.counts.saved, 0);
     assert.equal(saves.length, 0);
     assert.equal(app.events.filter(value => value === 'create').length, 0);
-  } else if (['lifetime_disconnect','lifetime_unavailable','lifetime_handshake_timeout','lifetime_deadline','lifetime_disconnect_active'].includes(scenario)) {
-    assert.equal(batch.status,'interrupted');
-    assert.equal(batch.stop_reason,scenario==='lifetime_deadline' ? 'batch_timeout' : 'native_host_unavailable');
-    assert.equal(saves.length,['lifetime_disconnect','lifetime_deadline'].includes(scenario) ? 1 : 0);
+  } else if (['lifetime_disconnect','lifetime_unavailable','lifetime_handshake_timeout','lifetime_disconnect_active'].includes(scenario)) {
+    assert.equal(saves.length,['lifetime_disconnect','lifetime_disconnect_active'].includes(scenario)?7:0);
     assert.equal(app.tabs.size,0);
     if (scenario === 'lifetime_disconnect_active') {
-      assert.equal(telemetry.length,1);
+      assert.equal(telemetry.length,8);
       assert.equal(telemetry[0].result.derived_outcome,'failed');
       assert.equal(telemetry[0].result.phases.extraction.reason_code,'native_host_unavailable');
       assert.equal(batch.counts.failed,1);
     }
   } else if (scenario === 'save_rejected' || scenario === 'save_comment_thread') {
-    assert.equal(saves.length, 5);
-    assert.equal(batch.counts.failed, 5);
+    assert.equal(saves.length, 8);
+    assert.equal(batch.counts.failed, 8);
     assert.equal(batch.counts.saved, 0);
-    assert.equal(batch.status, 'partial');
+    assert.equal(batch.state, 'partial');
     assert.ok(telemetry.every(value => value.result.derived_outcome === 'failed'));
     const reason = scenario === 'save_rejected' ? 'parser_empty' : 'sa_article_body_comment_thread';
-    assert.ok(batch.items.every(item=>item.reason===reason));
+    assert.ok(batch.items.every(item=>item.reason_code===reason));
     assert.ok(telemetry.every(value => value.extension_diagnostics.entries.some(entry =>
       entry.stage === 'content_parse' && entry.reason_code === reason)));
     assert.ok(telemetry.every(value=>value.result.phases.extraction.reason_code===reason));
     await app.message({action:'preview_article_body_recovery'});
-    assert.equal(app.store.data[key].counts.failed, 5, 'new preview retains previous attempt results');
+    assert.equal((await app.context.articleBodyRecovery.status()).counts.failed,8,'preview retains native attempt results');
   } else if (scenario === 'navigation_changed') {
     assert.equal(saves.length, 0);
-    assert.ok(batch.items.some(value => value.reason === 'article_context_changed'));
+    assert.ok(telemetry.some(value=>value.extension_diagnostics.entries.some(entry=>entry.reason_code==='article_context_changed')));
     assert.equal(app.tabs.size, 0);
   } else if (scenario === 'cleanup_failed') {
-    assert.equal(batch.status, 'stopped');
+    assert.equal(batch.state, 'running');
     assert.equal(saves.length, 1);
     assert.equal(app.events.filter(value => value === 'finish_task').length, 0);
     assert.ok(app.store.data.saAcquisitionPending);
@@ -481,10 +552,10 @@ async function popup() {
   assert.equal(sent.filter(value => value.action === 'start_article_body_recovery').length,1);
   assert.equal(start.disabled,true);
   assert.deepEqual(sent.find(value => value.action === 'start_article_body_recovery'),
-    {action:'start_article_body_recovery',manifest_id:'manifest-one'});
+    {action:'start_article_body_recovery',manifest_id:manifest.manifest_id});
   startCallback({status:'ok',batch:{batch_id:'batch',status:'running',items:[],counts:{saved:0,failed:0,skipped:0}}});
   await tick();
-  await store.local.set({[key]:{batch_id:'batch',status:'running',next_page_at:new Date(Date.now()+60000).toISOString(),items:[
+  await store.local.set({saArticleBodyRecovery:{batch_id:'batch',status:'running',next_page_at:new Date(Date.now()+60000).toISOString(),items:[
     {article_id:'1000',title:'Article 1',state:'saved'},
     {article_id:'1001',title:'Article 2',state:'queued'},
   ],counts:{saved:1,failed:0,skipped:0,pending:1}}});
@@ -492,7 +563,7 @@ async function popup() {
   assert.equal(document.getElementById('bodyRecoveryProgress').value,1);
   assert.equal(document.getElementById('bodyRecoveryProgress').max,2);
   assert.equal(start.disabled,true);
-  await store.local.set({[key]:{batch_id:'batch',status:'partial',items:[
+  await store.local.set({saArticleBodyRecovery:{batch_id:'batch',status:'partial',items:[
     {article_id:'1000',title:'Article 1',state:'failed',reason:'detail_save_failed',attempt_count:1},
   ],counts:{saved:0,failed:1,skipped:0}}});
   assert.match(document.getElementById('bodyRecoveryResult').textContent,/detail_save_failed/);

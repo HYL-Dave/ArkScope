@@ -20,6 +20,15 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "tests/js/run_sa_body_repair_fixture.mjs"
 
 
+@pytest.mark.parametrize("scenario", ["complete", "restart", "duplicates", "lost_start", "checkpoint_loss",
+    "cancel_read", "cancel_admission", "cancel_save", "cancel_offline", "uncertain", "owner_change",
+    "cooldown", "login", "partial", "no_intent", "legacy", "corrupt"])
+def test_body_repair_durable_worker(scenario):
+    result = subprocess.run(["node", str(ROOT / "tests/js/run_sa_body_continuation_fixture.mjs"), scenario],
+                            cwd=ROOT, capture_output=True, text=True, timeout=25)
+    assert result.returncode == 0, result.stderr
+
+
 @pytest.mark.parametrize("scenario", [
     "preview_bound", "repair_success", "priority", "cancel_active", "cancel_queued",
     "owner_gate", "pause_gate", "capacity_gate", "navigation_gate", "site_stop",

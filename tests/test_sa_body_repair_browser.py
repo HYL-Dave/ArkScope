@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import shlex
+import sqlite3
 import tempfile
 import threading
 import time
@@ -15,15 +16,25 @@ from uuid import uuid4
 import pytest
 
 from tests.test_sa_extension_packaging import EXT_DIR, _load_builder
+from tests.test_sa_article_acquisition_scope import scope_case
+from tests.test_sa_article_body_recovery import article, NARRATIVE
 
 
 @pytest.mark.skipif(os.environ.get("ARKSCOPE_BROWSER_ACCEPTANCE") != "1",
                     reason="installed browser acceptance is an explicit isolated gate")
 @pytest.mark.parametrize("browser_name", ["firefox", "chromium"])
 @pytest.mark.parametrize("workload", ["body_batch", "routine"])
-def test_acquisition_continues_with_popup_closed(tmp_path, browser_name, workload):
+def test_acquisition_continues_with_popup_closed(tmp_path, scope_case, browser_name, workload):
     from src.sa.company_collector import CompanyCollector
+    from src.sa.article_body_recovery_jobs import BodyRecoveryJobs
+    from src.sa.article_body_recovery import build_recovery_manifest
+    from src.sa.article_acquisition_settings import ArticleAcquisitionSettings
+    from src.sa.article_acquisition_scope import read_article_scope_context
 
+    capture, profile, capture_conn = scope_case
+    for aid in ("1000", "1001"):
+        article(capture_conn, aid)
+    capture_conn.commit()
     client = {"client_id": "f" * 32, "browser": "firefox" if browser_name == "firefox" else "chrome"}
     collector = CompanyCollector(tmp_path / "control.db")
     gap = 7 if browser_name == "firefox" else 35
@@ -34,6 +45,7 @@ def test_acquisition_continues_with_popup_closed(tmp_path, browser_name, workloa
     selected = collector.handle({"operation": "select", "client": client,
         "expected_generation": configured["generation"], "confirm_schedules": True})
     assert selected["is_owner"]
+    jobs = BodyRecoveryJobs(collector.path, sa_db=capture, profile_db=profile)
     saved, admissions = [], []
 
     class Handler(BaseHTTPRequestHandler):
@@ -48,8 +60,16 @@ def test_acquisition_continues_with_popup_closed(tmp_path, browser_name, workloa
         def do_POST(self):
             message = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             if message.get("operation") == "fixture_capture":
+                with sqlite3.connect(capture) as conn:
+                    conn.execute("UPDATE sa_articles SET body_markdown=? WHERE article_id=?", (NARRATIVE, message["article_id"]))
                 saved.append((message["article_id"], time.time()))
                 result = {"status": "ok", "body_saved": True}
+            elif message.get("action") == "article_body_recovery_control":
+                assert message["client"] == client
+                result = jobs.handle(message, client=client)
+            elif message.get("action") == "preview_article_body_recovery":
+                result = {**build_recovery_manifest(capture, settings=ArticleAcquisitionSettings(),
+                    scope_context=read_article_scope_context(sa_db=capture, profile_db=profile)), "protocol_version": 2}
             else:
                 result = collector.handle({**message, "client": client})
                 if message["operation"] == "admit_navigation" and result.get("allowed"):
@@ -135,14 +155,13 @@ async function fixtureRpc(message) {
   return (await fetch(ARK_BODY_FIXTURE_URL+'/rpc',{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(message)})).json();
 }
+companyCollectorIdentity = Promise.resolve(FIXTURE_CLIENT);
+chrome.storage.local.set({companyCollectorIdentity:FIXTURE_CLIENT});
 companyCollectorControl = (operation,extra) => fixtureRpc({...extra,operation});
 async function fixtureNative(message) {
   if(message.action==='record_extension_job')return {status:'ok',persisted:true,run_id:1};
   if(message.action==='sa_acquisition_control')return companyCollectorControl(message.operation,message);
-  if(message.action==='preview_article_body_recovery')return {
-    status:'ok',manifest_id:'offline-body',as_of:'2026-09-25',counts:{targets:2},
-    targets:[1000,1001].map(id=>({article_id:String(id),title:'Offline article '+id,
-      url:'https://seekingalpha.com/alpha-picks/articles/'+id+'-fixture',body_sha256:'a'.repeat(64)}))};
+  if(['preview_article_body_recovery','article_body_recovery_control'].includes(message.action))return fixtureRpc(message);
   return {status:'error',error_code:'offline_fixture_disabled'};
 }
 sendNativeMessage2 = fixtureNative;
@@ -176,7 +195,7 @@ captureArticleBodyRecovery = async function(target,run) {
     return await fixtureRpc({operation:'fixture_capture',article_id:target.article_id});
   } finally {if(tab)await safeRemoveTab(tab.id);}
 };
-""".replace("FIXTURE_GAP_MS", str(gap * 1000)))
+""".replace("FIXTURE_GAP_MS", str(gap * 1000)).replace("FIXTURE_CLIENT", json.dumps(client)))
             registry = {"name": host, "description": "Offline body lifecycle ping only",
                         "path": str(native_launcher), "type": "stdio"}
 
@@ -323,7 +342,7 @@ captureArticleBodyRecovery = async function(target,run) {
             terminal_deadline = time.monotonic() + 5
             while True:
                 result = message({"action": "get_article_body_recovery_state" if workload == "body_batch" else "fixture_routine_state"})
-                terminal = (result.get("batch", {}).get("status") == "complete" if workload == "body_batch"
+                terminal = (result.get("state") == "complete" if workload == "body_batch"
                             else bool(result.get("fixtureRoutineResult")))
                 if terminal:
                     break
@@ -332,8 +351,8 @@ captureArticleBodyRecovery = async function(target,run) {
             assert saved[1][1] - saved[0][1] >= gap
             assert len(admissions) == (2 if workload == "body_batch" else 1)
             if workload == "body_batch":
-                assert result["batch"]["status"] == "complete", result
-                assert result["batch"]["counts"]["saved"] == 2
+                assert result["state"] == "complete", result
+                assert result["counts"]["saved"] == 2
             else:
                 assert result["fixtureRoutineResult"].get("acquisition"), result
                 assert not result["saAcquisitionPending"]
