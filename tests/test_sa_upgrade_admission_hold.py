@@ -5,6 +5,18 @@ import json
 import pytest
 
 from tests.test_sa_extension_reconciliation_flow import _run_background
+from tests.test_sa_extension_popup import _run_background_probe
+from tests.test_sa_auto_sync_admission import SETUP
+
+
+@pytest.mark.parametrize("setter", ["setAlphaPicksAutoSyncEnabled", "setMarketNewsAutoSyncEnabled"])
+def test_first_schedule_toggle_is_not_mistaken_for_an_existing_upgrade(setter):
+    result = _run_background_probe(SETUP + f"""
+      const result=await {setter}(true,30);
+      return {{result,upgrade:await acquisitionUpgradeState()}};
+    """)
+    assert result["result"]["status"] == "ok"
+    assert result["upgrade"] == {"version":1,"held":False}
 
 
 @pytest.mark.parametrize("initial,held", [

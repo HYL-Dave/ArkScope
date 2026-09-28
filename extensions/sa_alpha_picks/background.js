@@ -2563,6 +2563,9 @@ var autoSyncSettingWrites = Promise.resolve();
 
 function writeAutoSyncSettings(jobKey, enabled, intervalMinutes, expectedRevision) {
   var run = autoSyncSettingWrites.catch(function () {}).then(async function () {
+    // Classify the existing installation before its first explicit toggle can
+    // make fresh storage look like an installation awaiting upgrade checks.
+    await acquisitionUpgradeState();
     var intent = await readAutoSyncIntent(jobKey);
     // The comparison belongs inside the write queue, not before awaiting it.
     if (expectedRevision !== undefined && intent.revision !== expectedRevision) {
