@@ -3,14 +3,17 @@
 from contextlib import AbstractContextManager
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import select
 import sqlite3
+import stat
 import subprocess
 import threading
 import time
 from uuid import uuid4
+import zipfile
 
 from src.sa.company_collector import CompanyCollector
 from src.sa.company_store import read_capture, save_capture
@@ -20,11 +23,58 @@ from tests.test_sa_company_data import capture
 from tests.test_sa_article_body_recovery import article, NARRATIVE
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE = "b24a2c1d"
+BASELINE = "b24a2c1dfac740fde8e4b491684b7ff9b58a6b7e"
+_BASELINE_DIR = ROOT / "tests/fixtures/sa_midfill_baseline"
 
 
-def baseline_source(path):
-    return subprocess.check_output(["git", "show", f"{BASELINE}:{path}"], cwd=ROOT, text=True)
+def _baseline_files():
+    manifest = json.loads((_BASELINE_DIR / "manifest.json").read_text(encoding="utf-8"))
+    if manifest.get("schema_version") != 1 or manifest.get("origin_commit") != BASELINE:
+        raise ValueError("invalid baseline provenance")
+    records = manifest.get("files")
+    if not isinstance(records, list) or not records:
+        raise ValueError("invalid baseline file manifest")
+    entries = {}
+    for record in records:
+        name = record.get("path")
+        if not isinstance(name, str) or "\\" in name:
+            raise ValueError("invalid baseline path")
+        path = PurePosixPath(name)
+        allowed = name == "src/sa/company_collector.py" or (
+            len(path.parts) == 3 and path.parts[:2] == ("extensions", "sa_alpha_picks")
+            and path.suffix in {".js", ".json", ".css", ".html"}
+        )
+        if not allowed or path.as_posix() != name or name in entries:
+            raise ValueError("invalid or duplicate baseline path")
+        entries[name] = record
+    contents = {}
+    with zipfile.ZipFile(_BASELINE_DIR / "baseline.zip") as archive:
+        names = archive.namelist()
+        if len(names) != len(set(names)) or set(names) != set(entries):
+            raise ValueError("baseline archive entries differ from manifest")
+        for name, record in entries.items():
+            mode = stat.S_IFMT(archive.getinfo(name).external_attr >> 16)
+            if mode not in (0, stat.S_IFREG):
+                raise ValueError("baseline entry is not a regular file")
+            content = archive.read(name)
+            blob = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
+            if (len(content) != record.get("bytes")
+                    or hashlib.sha256(content).hexdigest() != record.get("sha256")
+                    or blob != record.get("blob_id")):
+                raise ValueError("baseline content integrity mismatch")
+            contents[name] = content
+    return contents
+
+
+def baseline_source(path: str) -> str:
+    contents = _baseline_files()
+    if path not in contents:
+        raise ValueError("unknown baseline path")
+    return contents[path].decode("utf-8")
+
+
+def baseline_extension_paths() -> tuple[str, ...]:
+    return tuple(sorted(name for name in _baseline_files() if name.startswith("extensions/")))
 
 
 class UpgradeRig(AbstractContextManager):

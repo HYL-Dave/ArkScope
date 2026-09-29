@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 import time
 
-from tests.sa_midfill_fixture import BASELINE, ROOT, baseline_source
+from tests.sa_midfill_fixture import ROOT, baseline_extension_paths, baseline_source
 from tests.test_sa_extension_packaging import _load_builder
 
 
@@ -16,8 +16,12 @@ def package(rig, browser, version):
     source = rig.root / (version + '-source')
     source.mkdir(exist_ok=True)
     prefix = 'extensions/sa_alpha_picks/'
-    files = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', BASELINE if version == 'baseline' else 'HEAD', prefix], cwd=ROOT, text=True)
-    for name in files.splitlines():
+    files = baseline_extension_paths() if version == 'baseline' else subprocess.check_output(
+        ['git', 'ls-files', '-z', '--', prefix], cwd=ROOT, text=True,
+    ).split('\0')
+    for name in files:
+        if not name:
+            continue
         relative = Path(name.removeprefix(prefix))
         if len(relative.parts) != 1 or relative.suffix not in {'.js', '.json', '.css', '.html'}:
             continue
