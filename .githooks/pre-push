@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+repo_root=$(git rev-parse --show-toplevel)
+exec python3 -I -S "$repo_root/tests/repository_hygiene.py" --pre-push

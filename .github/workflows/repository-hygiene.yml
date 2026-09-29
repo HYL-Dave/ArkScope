@@ -14,9 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Reject tracked local artifacts
         run: python3 -I -S tests/repository_hygiene.py --all-tracked
+      - name: Reject local artifacts in ancestry
+        run: python3 -I -S tests/repository_hygiene.py --history-ref HEAD
