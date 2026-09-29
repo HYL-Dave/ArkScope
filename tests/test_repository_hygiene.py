@@ -78,13 +78,14 @@ def seed(repo, env, *names):
     git(repo, env, "commit", "--quiet", "-m", "Seed fixture")
 
 
-def guard(repo, env, *args):
+def guard(repo, env, *args, stdin=None):
     # -I -S proves the command needs neither application imports nor site packages.
     return subprocess.run(
         [sys.executable, "-I", "-S", str(CHECKER), *args],
         cwd=repo,
         env=env,
         capture_output=True,
+        input=stdin,
         text=True,
         encoding="utf-8",
         errors="backslashreplace",
@@ -437,3 +438,187 @@ def test_ci_runs_full_guard_on_push_and_pull_request(repo, git_env):
 
     for name in FORBIDDEN:
         assert_blocked(result, name)
+
+
+def remove_artifacts(repo, env, *names):
+    git(repo, env, "rm", "--", *names)
+    git(repo, env, "commit", "--quiet", "-m", "Remove legacy artifacts")
+
+
+@pytest.mark.parametrize("name", (*FORBIDDEN, ".superpowers", "docs/superpowers/evidence", "data/verification"))
+def test_history_rejects_artifacts_even_after_deletion(repo, git_env, name):
+    seed(repo, git_env, name)
+    remove_artifacts(repo, git_env, name)
+    assert guard(repo, git_env, "--all-tracked").returncode == 0
+
+    result = guard(repo, git_env, "--history-ref", "HEAD")
+
+    assert result.returncode == 1, result.stderr
+    assert "history" in result.stderr.lower()
+
+
+@pytest.mark.parametrize("name", [".superpowers", "docs/superpowers/evidence", "data/verification"])
+def test_history_checks_root_symlinks(repo, git_env, name):
+    target = write(repo, "src/target.py")
+    link = repo / name
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(target)
+    git(repo, git_env, "add", "--", name)
+    git(repo, git_env, "commit", "--quiet", "-m", "Link fixture")
+    remove_artifacts(repo, git_env, name)
+    assert guard(repo, git_env, "--history-ref", "HEAD").returncode == 1
+
+
+def test_history_checks_second_parent_even_when_merge_keeps_clean_tree(repo, git_env):
+    seed(repo, git_env, "src/allowed.py")
+    main = git(repo, git_env, "branch", "--show-current").stdout.strip()
+    git(repo, git_env, "checkout", "--quiet", "-b", "old-artifacts")
+    seed(repo, git_env, FORBIDDEN[0])
+    remove_artifacts(repo, git_env, FORBIDDEN[0])
+    git(repo, git_env, "checkout", "--quiet", main)
+    seed(repo, git_env, "src/another.py")
+    git(repo, git_env, "merge", "--quiet", "--no-ff", "-s", "ours", "old-artifacts", "-m", "Merge old history")
+    assert guard(repo, git_env, "--all-tracked").returncode == 0
+    assert guard(repo, git_env, "--history-ref", "HEAD").returncode == 1
+
+
+def test_history_does_not_deduplicate_blob_path_names(repo, git_env):
+    seed(repo, git_env, "src/allowed.py")
+    seed(repo, git_env, FORBIDDEN[1])
+    assert git(repo, git_env, "rev-parse", "HEAD:src/allowed.py").stdout == git(
+        repo, git_env, "rev-parse", "HEAD:" + FORBIDDEN[1],
+    ).stdout
+    remove_artifacts(repo, git_env, FORBIDDEN[1])
+    assert guard(repo, git_env, "--history-ref", "HEAD").returncode == 1
+
+
+def test_history_allows_similar_prefixes_and_ignores_unoffered_refs(repo, git_env):
+    seed(repo, git_env, ".superpowers-notes/a", "docs/superpowers/evidence-notes/a",
+         "data/verification-notes/a", "src/.superpowers/a", "docs/superpowers/plans/a")
+    clean = git(repo, git_env, "rev-parse", "HEAD").stdout.strip()
+    seed(repo, git_env, FORBIDDEN[0])
+    result = guard(repo / "src", git_env, "--history-ref", clean)
+    assert result.returncode == 0, result.stderr
+
+
+def test_history_checks_all_explicit_refs(repo, git_env):
+    seed(repo, git_env, "src/a.py")
+    clean = git(repo, git_env, "rev-parse", "HEAD").stdout.strip()
+    seed(repo, git_env, FORBIDDEN[0])
+    remove_artifacts(repo, git_env, FORBIDDEN[0])
+    assert guard(repo, git_env, "--history-ref", clean, "--history-ref", "HEAD").returncode == 1
+
+
+def test_history_refuses_shallow_history(repo, git_env, tmp_path):
+    seed(repo, git_env, FORBIDDEN[0])
+    remove_artifacts(repo, git_env, FORBIDDEN[0])
+    clone = tmp_path / "shallow"
+    git(tmp_path, git_env, "clone", "--quiet", "--depth=1", repo.as_uri(), str(clone))
+    assert guard(clone, git_env, "--all-tracked").returncode == 0
+    result = guard(clone, git_env, "--history-ref", "HEAD")
+    assert result.returncode == 2, result.stderr
+    assert "shallow" in result.stderr.lower()
+
+
+@pytest.mark.parametrize("revision", ["missing-ref", "--all", "HEAD:src/a.py"])
+def test_history_refuses_unresolvable_or_noncommit_refs(repo, git_env, revision):
+    seed(repo, git_env, "src/a.py")
+    result = guard(repo, git_env, "--history-ref=" + revision)
+    assert result.returncode == 2, result.stderr
+    assert "git command failed" in result.stderr.lower()
+
+
+def test_history_does_not_allow_replace_refs_to_hide_artifacts(repo, git_env):
+    seed(repo, git_env, "src/a.py")
+    clean = git(repo, git_env, "rev-parse", "HEAD").stdout.strip()
+    seed(repo, git_env, FORBIDDEN[0])
+    remove_artifacts(repo, git_env, FORBIDDEN[0])
+    git(repo, git_env, "replace", "HEAD", clean)
+    assert guard(repo, git_env, "--history-ref", "HEAD").returncode == 1
+
+
+def test_history_missing_ancestor_is_not_a_pass(repo, git_env):
+    seed(repo, git_env, "src/a.py")
+    parent = git(repo, git_env, "rev-parse", "HEAD").stdout.strip()
+    seed(repo, git_env, "src/b.py")
+    (repo / ".git" / "objects" / parent[:2] / parent[2:]).unlink()
+    result = guard(repo, git_env, "--history-ref", "HEAD")
+    assert result.returncode == 2, result.stderr
+    assert "git command failed" in result.stderr.lower()
+
+
+def push_line(local_oid, remote_oid=None, ref="refs/heads/master"):
+    return f"{ref} {local_oid} {ref} {remote_oid or '0' * 40}\n"
+
+
+def test_pre_push_allows_empty_and_deletion_only_pushes_without_head(repo, git_env):
+    assert guard(repo, git_env, "--pre-push", stdin="").returncode == 0
+    result = guard(repo, git_env, "--pre-push", stdin=push_line("0" * 40, "1" * 40))
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("tag", [False, True])
+def test_pre_push_checks_every_offered_ref_including_annotated_tags(repo, git_env, tag):
+    seed(repo, git_env, "src/a.py")
+    clean = git(repo, git_env, "rev-parse", "HEAD").stdout.strip()
+    seed(repo, git_env, FORBIDDEN[2])
+    remove_artifacts(repo, git_env, FORBIDDEN[2])
+    ref = "refs/heads/legacy"
+    if tag:
+        git(repo, git_env, "tag", "-a", "legacy", "-m", "Old history")
+        ref = "refs/tags/legacy"
+    tip = git(repo, git_env, "rev-parse", ref if tag else "HEAD").stdout.strip()
+    result = guard(repo, git_env, "--pre-push", stdin=push_line(clean) + push_line(tip, ref=ref))
+    assert result.returncode == 1, result.stderr
+
+
+def test_pre_push_allows_clean_commit_tags(repo, git_env):
+    seed(repo, git_env, "src/a.py")
+    git(repo, git_env, "tag", "-a", "clean", "-m", "Clean history")
+    tip = git(repo, git_env, "rev-parse", "refs/tags/clean").stdout.strip()
+    result = guard(repo, git_env, "--pre-push", stdin=push_line(tip, ref="refs/tags/clean"))
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("data", ["invalid\n", "HEAD not-an-oid refs/heads/a " + "0" * 40,
+    "HEAD " + "1" * 40 + " refs/heads/a invalid\n"])
+def test_pre_push_rejects_malformed_input(repo, git_env, data):
+    result = guard(repo, git_env, "--pre-push", stdin=data)
+    assert result.returncode == 2, result.stderr
+    assert "pre-push" in result.stderr.lower()
+
+
+def test_pre_push_noncommit_tip_is_not_a_pass(repo, git_env):
+    seed(repo, git_env, "src/a.py")
+    blob = git(repo, git_env, "rev-parse", "HEAD:src/a.py").stdout.strip()
+    result = guard(repo, git_env, "--pre-push", stdin=push_line(blob, ref="refs/tags/blob"))
+    assert result.returncode == 2, result.stderr
+
+
+def test_pre_push_hook_blocks_dirty_ancestry_before_remote_changes(repo, git_env, tmp_path):
+    seed(repo, git_env, "src/a.py")
+    remote = tmp_path / "remote.git"
+    git(tmp_path, git_env, "init", "--quiet", "--bare", "--template=", str(remote))
+    git(repo, git_env, "remote", "add", "fixture", str(remote))
+    hook = write(repo, ".githooks/pre-push", '#!/bin/sh\nset -eu\nrepo_root=$(git rev-parse --show-toplevel)\nexec python3 -I -S "$repo_root/tests/repository_hygiene.py" --pre-push\n')
+    hook.chmod(0o755)
+    (repo / "tests").mkdir()
+    shutil.copy2(CHECKER, repo / "tests/repository_hygiene.py")
+    git(repo, git_env, "config", "core.hooksPath", ".githooks")
+    clean = git(repo, git_env, "push", "fixture", "HEAD:refs/heads/main", check=False)
+    assert clean.returncode == 0, clean.stderr
+    before = git(remote, git_env, "rev-parse", "refs/heads/main").stdout
+    seed(repo, git_env, FORBIDDEN[0])
+    remove_artifacts(repo, git_env, FORBIDDEN[0])
+
+    result = git(repo, git_env, "push", "fixture", "HEAD:refs/heads/main", check=False)
+
+    assert result.returncode != 0
+    assert "forbidden" in result.stderr.lower()
+    assert git(remote, git_env, "rev-parse", "refs/heads/main").stdout == before
+
+
+@pytest.mark.parametrize("args", [("--all-tracked", "--history-ref", "HEAD"),
+    ("--pre-push", "--history-ref", "HEAD"), ("--pre-push", "--all-tracked")])
+def test_history_modes_are_mutually_exclusive(repo, git_env, args):
+    assert guard(repo, git_env, *args, stdin="").returncode == 2
