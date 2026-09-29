@@ -1,5 +1,4 @@
 import {
-  createContext,
   useCallback,
   useContext,
   useEffect,
@@ -33,12 +32,12 @@ import {
 import { SourceRunProgress } from "../SourceRunProgress";
 import { formatSystemTimestamp } from "../timeDisplay";
 import { Button, IconButton, StatusBadge } from "../ui";
-import { shortTs } from "./DataStorageSection";
 import {
   scheduleSourceCopy,
 } from "./settingsBackendCopy";
 import type { SettingsT } from "./settingsCopy";
 import type { SettingsReadCache } from "./settingsReadCache";
+import { DataScheduleControlsContext } from "./dataScheduleContext";
 
 type ScheduleResponse = Awaited<ReturnType<typeof getSchedule>>;
 
@@ -73,8 +72,6 @@ export type DataScheduleController = {
   pollSchedule(): Promise<void>;
   replaceJobFacts(jobs: ProvidersHealthResponse["jobs"]): void;
 };
-
-const DataScheduleControlsContext = createContext<DataScheduleController | null>(null);
 
 function retainedSchedule(cache: SettingsReadCache): ScheduleResponse | null {
   const inspected = cache.inspect<ScheduleResponse>("data_schedule");
@@ -317,7 +314,7 @@ function jobOutcome(
     | { status?: string; finished_at?: string; error?: string }
     | undefined;
   if (!row) return "—";
-  const timestamp = shortTs(row.finished_at ?? null);
+  const timestamp = formatSystemTimestamp(row.finished_at ?? null);
   if (row.status === "succeeded") return `✓ ${timestamp}`;
   if (row.status === "failed") return `✗ ${timestamp}`;
   if (row.status === "running") return t(($) => $.actions.running);
