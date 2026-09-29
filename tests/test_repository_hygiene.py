@@ -537,14 +537,40 @@ def test_history_does_not_allow_replace_refs_to_hide_artifacts(repo, git_env):
     assert guard(repo, git_env, "--history-ref", "HEAD").returncode == 1
 
 
-def test_history_missing_ancestor_is_not_a_pass(repo, git_env):
+@pytest.mark.parametrize("cached", [False, True], ids=["uncached", "commit-graph"])
+@pytest.mark.parametrize("pre_push", [False, True], ids=["history", "pre-push"])
+def test_history_missing_ancestor_is_not_a_pass(repo, git_env, cached, pre_push):
     seed(repo, git_env, "src/a.py")
     parent = git(repo, git_env, "rev-parse", "HEAD").stdout.strip()
     seed(repo, git_env, "src/b.py")
+    tip = git(repo, git_env, "rev-parse", "HEAD").stdout.strip()
+    if cached:
+        git(repo, git_env, "commit-graph", "write", "--reachable")
     (repo / ".git" / "objects" / parent[:2] / parent[2:]).unlink()
-    result = guard(repo, git_env, "--history-ref", "HEAD")
+    result = guard(repo, git_env, "--pre-push", stdin=push_line(tip)) if pre_push else guard(
+        repo, git_env, "--history-ref", "HEAD",
+    )
     assert result.returncode == 2, result.stderr
     assert "git command failed" in result.stderr.lower()
+
+
+@pytest.mark.parametrize("settings,name,expected", [
+    ({"GIT_LITERAL_PATHSPECS": "1"}, FORBIDDEN[0], 1),
+    ({"GIT_GLOB_PATHSPECS": "1"}, FORBIDDEN[1], 1),
+    ({"GIT_NOGLOB_PATHSPECS": "1"}, FORBIDDEN[2], 1),
+    ({"GIT_LITERAL_PATHSPECS": "1", "GIT_GLOB_PATHSPECS": "1"}, FORBIDDEN[0], 1),
+    ({"GIT_ICASE_PATHSPECS": "1"}, ".SUPERPOWERS/allowed", 0),
+])
+@pytest.mark.parametrize("pre_push", [False, True], ids=["history", "pre-push"])
+def test_history_normalizes_inherited_pathspec_modes(repo, git_env, settings, name, expected, pre_push):
+    seed(repo, git_env, name)
+    remove_artifacts(repo, git_env, name)
+    tip = git(repo, git_env, "rev-parse", "HEAD").stdout.strip()
+    inherited = dict(git_env, **settings)
+    result = guard(repo, inherited, "--pre-push", stdin=push_line(tip)) if pre_push else guard(
+        repo, inherited, "--history-ref", "HEAD",
+    )
+    assert result.returncode == expected, result.stderr
 
 
 def push_line(local_oid, remote_oid=None, ref="refs/heads/master"):
@@ -595,7 +621,8 @@ def test_pre_push_noncommit_tip_is_not_a_pass(repo, git_env):
     assert result.returncode == 2, result.stderr
 
 
-def test_pre_push_hook_blocks_dirty_ancestry_before_remote_changes(repo, git_env, tmp_path):
+@pytest.mark.parametrize("literal", [False, True], ids=["default-pathspecs", "inherited-literal"])
+def test_pre_push_hook_blocks_dirty_ancestry_before_remote_changes(repo, git_env, tmp_path, literal):
     seed(repo, git_env, "src/a.py")
     remote = tmp_path / "remote.git"
     git(tmp_path, git_env, "init", "--quiet", "--bare", "--template=", str(remote))
@@ -611,7 +638,8 @@ def test_pre_push_hook_blocks_dirty_ancestry_before_remote_changes(repo, git_env
     seed(repo, git_env, FORBIDDEN[0])
     remove_artifacts(repo, git_env, FORBIDDEN[0])
 
-    result = git(repo, git_env, "push", "fixture", "HEAD:refs/heads/main", check=False)
+    inherited = dict(git_env, GIT_LITERAL_PATHSPECS="1") if literal else git_env
+    result = git(repo, inherited, "push", "fixture", "HEAD:refs/heads/main", check=False)
 
     assert result.returncode != 0
     assert "forbidden" in result.stderr.lower()

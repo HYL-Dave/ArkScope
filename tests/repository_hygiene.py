@@ -17,8 +17,12 @@ FORBIDDEN_ROOTS = (b".superpowers", b"docs/superpowers/evidence", b"data/verific
 
 
 def git_output(*args: str, cwd: str | None = None) -> bytes:
+    # Caller pathspec modes must not change policy matching.
+    env = dict(os.environ)
+    for mode in ("LITERAL", "GLOB", "NOGLOB", "ICASE"):
+        env[f"GIT_{mode}_PATHSPECS"] = "0"
     return subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True,
+        ["git", *args], cwd=cwd, env=env, check=True, capture_output=True,
     ).stdout
 
 
@@ -48,8 +52,10 @@ def check_history(root: str, refs: list[str]) -> int:
         for ref in refs
     })
     paths = [":(top,literal)" + path.decode("ascii") for path in FORBIDDEN_ROOTS]
+    # Cached commit metadata must not hide missing ancestor objects.
     found = git_output(
-        "--no-replace-objects", "log", "--full-history", "--format=%H", "--max-count=1",
+        "--no-replace-objects", "-c", "core.commitGraph=false",
+        "log", "--full-history", "--format=%H", "--max-count=1",
         *tips, "--", *paths, cwd=root,
     ).strip()
     if not found:
