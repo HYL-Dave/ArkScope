@@ -1,0 +1,781 @@
+{
+  "authorization": {
+    "ibkr_sessions_consumed": 1,
+    "rerun_authorized": false,
+    "scope": "four_exact_sec_documents_and_one_ibkr_read_only_shape",
+    "sec_acquisitions_consumed": 1
+  },
+  "completed_at": "2026-08-25T10:27:43.271225Z",
+  "config_read": {
+    "field_names": [
+      "ibkr.client_id",
+      "ibkr.host",
+      "ibkr.port",
+      "sec_edgar.user_agent"
+    ],
+    "main_file_after": {
+      "inode": 127284276,
+      "mtime_ns": 1787653386907265948,
+      "size": 55402496
+    },
+    "main_file_before": {
+      "inode": 127284276,
+      "mtime_ns": 1787653386907265948,
+      "size": 55402496
+    },
+    "main_file_equal": true,
+    "query_only": true,
+    "rows_read": 4,
+    "sidecars_after": {
+      "-shm": {
+        "inode": 127283968,
+        "mtime_ns": 1787653661540227014,
+        "size": 32768
+      },
+      "-wal": {
+        "inode": 127283967,
+        "mtime_ns": 1787653661539227011,
+        "size": 0
+      }
+    },
+    "sidecars_before": {
+      "-shm": null,
+      "-wal": null
+    },
+    "sqlite_total_changes": 0,
+    "values_persisted": false
+  },
+  "git": {
+    "branch": "trusted-lifecycle-automation-stages3-5",
+    "head": "f6a7e12987f3614d1be1fb17afd8ecc0f1c9f96f",
+    "worktree_clean": true
+  },
+  "ibkr": {
+    "blockers": [],
+    "contract_status": "found",
+    "corroboration_family_count": 1,
+    "error_type": null,
+    "evidence": [
+      {
+        "adapter": "ibkr_contract",
+        "content_sha256": "ca7f8f5df6a906531818adfc3801aa128deb05a42d2dd1e04a7468bdd60fb51e",
+        "domain": null,
+        "evidence_dedupe_key": "ibkr_contract:ca7f8f5df6a906531818adfc3801aa128deb05a42d2dd1e04a7468bdd60fb51e",
+        "evidence_id": "sle_ca7f8f5df6a906531818adfc3801aa12",
+        "excerpt": "{\"conId\":373514246,\"currency\":\"USD\",\"localSymbol\":\"HAPN\",\"primaryExchange\":\"NASDAQ\",\"retrieved_at\":\"2026-08-25T10:27:41.545726Z\",\"secType\":\"STK\",\"symbol\":\"HAPN\",\"validExchanges\":[\"AMEX\",\"ARCA\",\"BATS\",\"BEX\",\"BYX\",\"CBOE\",\"CHX\",\"DRCTEDGE\",\"EDGEA\",\"EDGX\",\"FOXRIVER\",\"IBEOS\",\"IEX\",\"ISE\",\"LTSE\",\"MEMX\",\"NASDAQ\",\"NYSE\",\"NYSENAT\",\"OVERNIGHT\",\"PEARL\",\"PHLX\",\"PSX\",\"SMART\",\"T24X\",\"TPLUS0\",\"TXSE\"]}",
+        "kind": "market_infrastructure_snapshot",
+        "publisher": "Interactive Brokers",
+        "retrieved_at": "2026-08-25T10:27:41.545726Z",
+        "source_document_sha256": null,
+        "source_family": "market_infrastructure",
+        "source_locator": {
+          "snapshot": {
+            "conId": 373514246,
+            "currency": "USD",
+            "localSymbol": "HAPN",
+            "primaryExchange": "NASDAQ",
+            "retrieved_at": "2026-08-25T10:27:41.545726Z",
+            "secType": "STK",
+            "symbol": "HAPN",
+            "validExchanges": [
+              "AMEX",
+              "ARCA",
+              "BATS",
+              "BEX",
+              "BYX",
+              "CBOE",
+              "CHX",
+              "DRCTEDGE",
+              "EDGEA",
+              "EDGX",
+              "FOXRIVER",
+              "IBEOS",
+              "IEX",
+              "ISE",
+              "LTSE",
+              "MEMX",
+              "NASDAQ",
+              "NYSE",
+              "NYSENAT",
+              "OVERNIGHT",
+              "PEARL",
+              "PHLX",
+              "PSX",
+              "SMART",
+              "T24X",
+              "TPLUS0",
+              "TXSE"
+            ]
+          }
+        },
+        "source_published_at": null,
+        "source_url": null,
+        "title": "IBKR contract snapshot: HAPN"
+      }
+    ],
+    "facts": [
+      {
+        "cited_text_sha256": "eca0cbd04ed7a485cccdf023f810f2a782fd5929180966befce2e8592a9a8fb9",
+        "evidence_id": "sle_ca7f8f5df6a906531818adfc3801aa12",
+        "fact_type": "destination_venue",
+        "rule_id": "ibkr.contract_snapshot.destination_venue",
+        "rule_version": "1",
+        "span_end_byte": 83,
+        "span_start_byte": 75,
+        "value": "NASDAQ"
+      },
+      {
+        "cited_text_sha256": "59049ef22a47423f853a3f24c00cb73db4e5a34a068431a5a645e96ebfdf7821",
+        "evidence_id": "sle_ca7f8f5df6a906531818adfc3801aa12",
+        "fact_type": "security_class",
+        "rule_id": "ibkr.contract_snapshot.security_class",
+        "rule_version": "1",
+        "span_end_byte": 144,
+        "span_start_byte": 139,
+        "value": "common_stock"
+      },
+      {
+        "cited_text_sha256": "a1106470c25c21f16c6631ffdc7cb417831680cb62ef200c117658831aa801b4",
+        "evidence_id": "sle_ca7f8f5df6a906531818adfc3801aa12",
+        "fact_type": "successor_ticker",
+        "rule_id": "ibkr.contract_snapshot.successor_ticker",
+        "rule_version": "1",
+        "span_end_byte": 160,
+        "span_start_byte": 154,
+        "value": "HAPN"
+      }
+    ],
+    "integrated_hapn_decision": {
+      "action_readiness": "action_blocked",
+      "cash_per_security_decimal": null,
+      "conclusion": "Available evidence does not establish the tracked security outcome.",
+      "confidence": "unknown",
+      "consideration_currency": null,
+      "counterparty_cik": null,
+      "counterparty_name": null,
+      "counterparty_ticker": null,
+      "decision_issues": [
+        "regulator_identity_facts_missing"
+      ],
+      "decision_tier": "review_suggested",
+      "destination_venue": null,
+      "effective_date": null,
+      "exchange_ratio_decimal": null,
+      "impact_summary": "Review the cited evidence and missing identity facts.",
+      "outcomes": [
+        "undetermined"
+      ],
+      "relevance": "undetermined",
+      "rule_id": "lifecycle.insufficient_identity_facts",
+      "rule_version": "1",
+      "successor_ticker": null,
+      "transition_requested": false
+    },
+    "readonly": true,
+    "requests_made": 2,
+    "source_families": [
+      "market_infrastructure"
+    ],
+    "symbols_max": [
+      "LC",
+      "HAPN"
+    ]
+  },
+  "operations": {
+    "app_cutovers": 0,
+    "general_web_search_calls": 0,
+    "merges": 0,
+    "news_provider_calls": 0,
+    "production_database_migrations": 0,
+    "production_database_writes": 0,
+    "production_profile_config_queries": 2,
+    "production_profile_config_rows": 8,
+    "pushes": 0,
+    "sec_document_attempts": 4,
+    "sec_logical_documents": 4,
+    "sec_submissions_network_calls": 0
+  },
+  "product_test_authority": "7cb479a8058793dc29cbb75bb4ab98b9d6a6f231",
+  "retrieved_at": "2026-08-25T10:27:41.545726Z",
+  "schema_version": 1,
+  "sec": {
+    "budget": {
+      "attempt_count": 4,
+      "body_bytes": 165873,
+      "document_count": 4
+    },
+    "cases": {
+      "BLBD": {
+        "accession": "0001589526-26-000044",
+        "blockers": [],
+        "conflicts": {},
+        "decision_without_market": {
+          "action_readiness": "action_blocked",
+          "cash_per_security_decimal": null,
+          "conclusion": "Available evidence does not establish the tracked security outcome.",
+          "confidence": "unknown",
+          "consideration_currency": null,
+          "counterparty_cik": null,
+          "counterparty_name": null,
+          "counterparty_ticker": null,
+          "decision_issues": [
+            "regulator_identity_facts_missing"
+          ],
+          "decision_tier": "review_suggested",
+          "destination_venue": null,
+          "effective_date": null,
+          "exchange_ratio_decimal": null,
+          "impact_summary": "Review the cited evidence and missing identity facts.",
+          "outcomes": [
+            "undetermined"
+          ],
+          "relevance": "undetermined",
+          "rule_id": "lifecycle.insufficient_identity_facts",
+          "rule_version": "1",
+          "successor_ticker": null,
+          "transition_requested": false
+        },
+        "diagnostics": {
+          "attempt_count": 4,
+          "body_bytes": 165873,
+          "document_count": 4
+        },
+        "document_bytes": 43663,
+        "document_calls": 1,
+        "document_sha256": "14bc650057c6d857e8fee1eb9402aa7645bd9edb82a9bb10eba76d98d913298e",
+        "evidence": [
+          {
+            "adapter": "sec_edgar",
+            "content_sha256": "07a60b82da66aa3fd0b9f561f58be11a0153201453d441c20c4d5f537f06fb98",
+            "document_sha256": "14bc650057c6d857e8fee1eb9402aa7645bd9edb82a9bb10eba76d98d913298e",
+            "evidence_id": "sle_29e20d74042271e28547105691f9f95d",
+            "excerpt": "blbd-20260731 0001589526 false 0001589526 2026-07-31 2026-07-31 UNITED STATES SECURITIES AND EXCHANGE COMMISSION Washington, D.C. below): ☐ Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425) ☐ Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12) ☐ Pre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b)) ☐ Pre-commencement communications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c)) Securities registered pursuant to Section 12(b) of the Act: Title of each class Trading Symbol(s) Name of each exchange on which registered Common stock, $0.0001 par value BLBD NASDAQ Global Market Indicate by check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (§230.405 of this chapter) or Rule 12b-2 of the Securities Exchange Act of 1934 (§240.12b-2 of this chapter). Also on August 3, 2026, effective July 31, 2026, BBBC entered into a Master Collaboration Agreement with Ford, pursuant to which Blue Bird will assume responsibility from Ford for the design and manufacture of the next generation F-53 and F-59 chassis, which will be paired with Ford’s powertrain solutions. The Master Collaboration Agreement with Ford On August 3, 2026, effective July 31, 2026, BBBC entered into a Master Collaboration Agreement (“MCA”) with Ford, that is intended to further expand and strengthen the long-standing collaboration between the parties, and which will result in BBBC taking over the F-53/F-59 stripped chassis business from Ford.",
+            "kind": "regulator_excerpt",
+            "publisher": "SEC EDGAR",
+            "retrieved_at": "2026-08-25T10:27:41.545726Z",
+            "source_family": "regulator",
+            "source_locator": {
+              "accession": "0001589526-26-000044",
+              "filing_chain_complete": true,
+              "form": "8-K",
+              "items": [
+                "1.01",
+                "7.01",
+                "9.01"
+              ],
+              "primary_document": "blbd-20260731.htm",
+              "rendered_text_ranges": [
+                [
+                  0,
+                  129
+                ],
+                [
+                  884,
+                  1715
+                ],
+                [
+                  2622,
+                  2929
+                ],
+                [
+                  7935,
+                  8289
+                ]
+              ],
+              "rule_id": "sec.visible_text_excerpt",
+              "rule_version": "1"
+            },
+            "source_published_at": "2026-08-05",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/1589526/000158952626000044/blbd-20260731.htm",
+            "title": "8-K"
+          }
+        ],
+        "extractor_error_type": null,
+        "extractor_status": "succeeded",
+        "facts": [
+          {
+            "cited_text": "Also on August 3, 2026, effective July 31, 2026, BBBC entered into a Master Collaboration Agreement with Ford, pursuant to which Blue Bird will assume responsibility from Ford for the design and manufacture of the next generation F-53 and F-59 chassis, which will be paired with Ford’s powertrain solutions.",
+            "cited_text_sha256": "ec4bce7acd42b8560964644f0e629a57e0f48b612614806369fbdab9b00f34d4",
+            "evidence_id": "sle_29e20d74042271e28547105691f9f95d",
+            "fact_type": "effective_date",
+            "rule_id": "sec.explicit_effective_date",
+            "rule_version": "1",
+            "span_end_byte": 1281,
+            "span_start_byte": 972,
+            "value": "2026-08-03"
+          },
+          {
+            "cited_text": "The Master Collaboration Agreement with Ford On August 3, 2026, effective July 31, 2026, BBBC entered into a Master Collaboration Agreement (“MCA”) with Ford, that is intended to further expand and strengthen the long-standing collaboration between the parties, and which will result in BBBC taking over the F-53/F-59 stripped chassis business from Ford.",
+            "cited_text_sha256": "129f4980745a66d21e58c9157bd0083e6262c78fdbf15cf101df2204ffcf3001",
+            "evidence_id": "sle_29e20d74042271e28547105691f9f95d",
+            "fact_type": "effective_date",
+            "rule_id": "sec.explicit_effective_date",
+            "rule_version": "1",
+            "span_end_byte": 1640,
+            "span_start_byte": 1282,
+            "value": "2026-08-03"
+          },
+          {
+            "cited_text": "below): ☐ Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425) ☐ Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12) ☐ Pre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b)) ☐ Pre-commencement communications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c)) Securities registered pursuant to Section 12(b) of the Act: Title of each class Trading Symbol(s) Name of each exchange on which registered Common stock, $0.0001 par value BLBD NASDAQ Global Market Indicate by check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (§230.405 of this chapter) or Rule 12b-2 of the Securities Exchange Act of 1934 (§240.12b-2 of this chapter).",
+            "cited_text_sha256": "046aa3a4df29e4009f3cbb70e0ea1279e6c710020b4a4c5f420f0fd436cc40f8",
+            "evidence_id": "sle_29e20d74042271e28547105691f9f95d",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 971,
+            "span_start_byte": 130,
+            "value": "common_stock"
+          }
+        ],
+        "filing_chain_complete": true,
+        "http_status": 200,
+        "source_file": "BLBD-0001589526-26-000044.html",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1589526/000158952626000044/blbd-20260731.htm",
+        "submissions_network_calls": 0,
+        "symbol_transitions": []
+      },
+      "CCL": {
+        "accession": "0001104659-26-057200",
+        "blockers": [],
+        "conflicts": {},
+        "decision_without_market": {
+          "action_readiness": "action_blocked",
+          "cash_per_security_decimal": null,
+          "conclusion": "Available evidence does not establish the tracked security outcome.",
+          "confidence": "unknown",
+          "consideration_currency": null,
+          "counterparty_cik": null,
+          "counterparty_name": null,
+          "counterparty_ticker": null,
+          "decision_issues": [
+            "regulator_identity_facts_missing"
+          ],
+          "decision_tier": "review_suggested",
+          "destination_venue": null,
+          "effective_date": null,
+          "exchange_ratio_decimal": null,
+          "impact_summary": "Review the cited evidence and missing identity facts.",
+          "outcomes": [
+            "undetermined"
+          ],
+          "relevance": "undetermined",
+          "rule_id": "lifecycle.insufficient_identity_facts",
+          "rule_version": "1",
+          "successor_ticker": null,
+          "transition_requested": false
+        },
+        "diagnostics": {
+          "attempt_count": 3,
+          "body_bytes": 122210,
+          "document_count": 3
+        },
+        "document_bytes": 59857,
+        "document_calls": 1,
+        "document_sha256": "892bb9f6cf6f9547006d1c6e4514d34afea644651cfced8025f65d8a30ed39a8",
+        "evidence": [
+          {
+            "adapter": "sec_edgar",
+            "content_sha256": "cd41e84f625e305a6e898dd86f843ae8ef5de384eb0f111a7e5c25d9ffaad83c",
+            "document_sha256": "892bb9f6cf6f9547006d1c6e4514d34afea644651cfced8025f65d8a30ed39a8",
+            "evidence_id": "sle_25b9cf2f126ac043fcd82518e525816b",
+            "excerpt": "false --11-30 0000815097 0001125259 false 8-K 2026-05-07 false false false false false 0000815097 2026-05-07 2026-05-07 0000815097 ccl:CarnivalPublicLimitedCompanyMember 2026-05-07 2026-05-07 iso4217:USD xbrli:shares iso4217:USD xbrli:shares UNITED STATES SECURITIES AND EXCHANGE COMMISSION Washington, D.C. 87th Avenue Miami , Florida 33178-2428 Carnival House , 100 Harbour Parade Southampton SO15 1ST , United Kingdom (Address of principal executive offices) (Zip Code) (Address of principal executive offices) (Zip Code) ( 305 ) 599-2600 011 44 23 8065 5000 (Registrant’s telephone number, including area code) (Registrant’s telephone number, including area code) None None (Former name or former address, if changed since last report.) (Former name or former address, if changed since last report.) Check the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrants under any of the following provisions: ¨ Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425) ¨ Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12) ¨ Pre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b)) ¨ Pre-commencement communications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c)) Securities registered pursuant to Section 12(b) of the Act: Title of each class Trading Symbol(s) Name of each exchange on which registered Common Shares ($0.01 par value) CCL New York Stock Exchange , Inc. ¨ Co-Registrant CIK 0001125259 Co-Registrant Amendment Flag false Co-Registrant Form Type 8-K Co-Registrant DocumentPeriodEndDate 2026-05-07 Co-Registrant Written Communications false Co-Registrant Solicitating Materials false Co-Registrant PreCommencement Tender Offer false Co-Registrant PreCommencement Issuer Tender Offer false Co-Registrant Emerging growth company false Introductory Note On May 7, 2026, Carnival Corporation and Carnival plc completed the unification of their dual listed company structure under a single company, Carnival Corporation Ltd., with Carnival plc as a UK subsidiary of Carnival Corporation Ltd. As a result of the Redomiciliation, the shares of common stock of Carnival Corporation held by Carnival Corporation stockholders prior to the DLC Unification and Redomiciliation Transactions represent the same number of common shares, par value $0.01 per share, of Carnival Corporation Ltd. The Common Shares are listed on the New York Stock Exchange (the “NYSE”) under the trading symbol “CCL.” The listing of Carnival plc’s ordinary shares, $1.66 par value per share (the “Carnival plc Shares”), on the Official List of the UK Financial Conduct Authority (the “FCA”) and the admission to trading of the Carnival plc Shares on the London Stock Exchange (the “LSE”) were cancelled on May 7, 2026. On May 6, 2026, Carnival Corporation and Carnival plc entered into an agreement (the “Termination Agreement”) to terminate the equalization and governance agreement, dated April 17, 2003, between Carnival Corporation and Carnival plc (the “Equalization Agreement”) upon the Scheme of Arrangement becoming effective.",
+            "kind": "regulator_excerpt",
+            "publisher": "SEC EDGAR",
+            "retrieved_at": "2026-08-25T10:27:41.545726Z",
+            "source_family": "regulator",
+            "source_locator": {
+              "accession": "0001104659-26-057200",
+              "filing_chain_complete": true,
+              "form": "8-K",
+              "items": [
+                "1.02",
+                "2.01",
+                "3.01",
+                "3.02",
+                "3.03",
+                "5.01",
+                "5.03",
+                "7.01",
+                "9.01"
+              ],
+              "primary_document": "tm2613680d1_8k.htm",
+              "rendered_text_ranges": [
+                [
+                  0,
+                  307
+                ],
+                [
+                  908,
+                  2170
+                ],
+                [
+                  2691,
+                  3320
+                ],
+                [
+                  3800,
+                  4090
+                ],
+                [
+                  4117,
+                  4522
+                ],
+                [
+                  7377,
+                  7692
+                ]
+              ],
+              "rule_id": "sec.visible_text_excerpt",
+              "rule_version": "1"
+            },
+            "source_published_at": "2026-05-07",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/815097/000110465926057200/tm2613680d1_8k.htm",
+            "title": "FORM 8-K"
+          }
+        ],
+        "extractor_error_type": null,
+        "extractor_status": "succeeded",
+        "facts": [
+          {
+            "cited_text": "On May 6, 2026, Carnival Corporation and Carnival plc entered into an agreement (the “Termination Agreement”) to terminate the equalization and governance agreement, dated April 17, 2003, between Carnival Corporation and Carnival plc (the “Equalization Agreement”) upon the Scheme of Arrangement becoming effective.",
+            "cited_text_sha256": "8b42169f1f08bc4c4c8d85e20ac03079ff93af38d72c96a5e67bef7a8892157b",
+            "evidence_id": "sle_25b9cf2f126ac043fcd82518e525816b",
+            "fact_type": "effective_date",
+            "rule_id": "sec.explicit_effective_date",
+            "rule_version": "1",
+            "span_end_byte": 3252,
+            "span_start_byte": 2929,
+            "value": "2026-05-06"
+          },
+          {
+            "cited_text": "As a result of the Redomiciliation, the shares of common stock of Carnival Corporation held by Carnival Corporation stockholders prior to the DLC Unification and Redomiciliation Transactions represent the same number of common shares, par value $0.01 per share, of Carnival Corporation Ltd.",
+            "cited_text_sha256": "465e15f3eeb725f51f65189c2c094882106e13e0318c2927867f92232f1a44dc",
+            "evidence_id": "sle_25b9cf2f126ac043fcd82518e525816b",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 2500,
+            "span_start_byte": 2210,
+            "value": "common_stock"
+          }
+        ],
+        "filing_chain_complete": true,
+        "http_status": 200,
+        "source_file": "CCL-0001104659-26-057200.html",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/815097/000110465926057200/tm2613680d1_8k.htm",
+        "submissions_network_calls": 0,
+        "symbol_transitions": []
+      },
+      "HAPN": {
+        "accession": "0001409970-26-000087",
+        "blockers": [],
+        "conflicts": {},
+        "decision_without_market": {
+          "action_readiness": "action_blocked",
+          "cash_per_security_decimal": null,
+          "conclusion": "Available evidence does not establish the tracked security outcome.",
+          "confidence": "unknown",
+          "consideration_currency": null,
+          "counterparty_cik": null,
+          "counterparty_name": null,
+          "counterparty_ticker": null,
+          "decision_issues": [
+            "regulator_identity_facts_missing"
+          ],
+          "decision_tier": "review_suggested",
+          "destination_venue": null,
+          "effective_date": null,
+          "exchange_ratio_decimal": null,
+          "impact_summary": "Review the cited evidence and missing identity facts.",
+          "outcomes": [
+            "undetermined"
+          ],
+          "relevance": "undetermined",
+          "rule_id": "lifecycle.insufficient_identity_facts",
+          "rule_version": "1",
+          "successor_ticker": null,
+          "transition_requested": false
+        },
+        "diagnostics": {
+          "attempt_count": 1,
+          "body_bytes": 31285,
+          "document_count": 1
+        },
+        "document_bytes": 31285,
+        "document_calls": 1,
+        "document_sha256": "48ebd4ef3533760ecbc807f0342dfddf934da5bc686237d742568379c20b732f",
+        "evidence": [
+          {
+            "adapter": "sec_edgar",
+            "content_sha256": "55f0dc04d9c2e3b4d9b1910b6c5bd217627e0fad3f09a002577e9f163f5e53d4",
+            "document_sha256": "48ebd4ef3533760ecbc807f0342dfddf934da5bc686237d742568379c20b732f",
+            "evidence_id": "sle_ea3cffd7d2cdeec23117e06c9e68f699",
+            "excerpt": "lc-20260602 0001409970 FALSE 0001409970 2026-06-02 2026-06-02 UNITED STATES SECURITIES AND EXCHANGE COMMISSION Washington, D.C. Employer Identification No.) 88 Kearny Street, Suite 600, San Francisco, CA 94108 (Address of principal executive offices and zip code) Registrant’s telephone number, including area code: 415 930-7440 Former name or former address, if changed since last report: N/A Check the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under any of the following provisions: ☐ Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425) ☐ Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12) ☐ Pre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b)) ☐ Pre-commencement communications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c)) Securities registered pursuant to Section 12(b) of the Act: Title of each class Trading Symbol Name of each exchange on which registered Common stock, par value $0.01 per share LC New York Stock Exchange Indicate by check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (§230.405 of this chapter) or Rule 12b-2 of the Securities Exchange Act of 1934 (§240.12b-2 of this chapter). ☐ Item 3.01 Notice of Delisting or Failure to Satisfy a Continued Listing Rule or Standard; Transfer of Listing On June 2, 2026, LendingClub Corporation (the “Company”), acting pursuant to authorization from its Board of Directors, notified the New York Stock Exchange (the “NYSE”) of its intention to voluntarily withdraw the listing of its common stock, par value $0.01 per share (“Common Stock”), from the NYSE and transfer the listing to The Nasdaq Stock Market LLC (“Nasdaq”). The Company expects that the listing and trading of its Common Stock on the NYSE will end at market close on June 18, 2026 and that trading will begin on Nasdaq at market open on June 22, 2026 under the “HAPN” ticker symbol, which coincides with and reflects the upcoming launch of the Company’s Happen Bank brand and renaming of the Company to Happen, Inc. Item 7.01 Regulation FD Disclosure On June 2, 2026 , the Company issued a press release (the “Press Release”) in connection with the transfer of the listing of its Common Stock to Nasdaq.",
+            "kind": "regulator_excerpt",
+            "publisher": "SEC EDGAR",
+            "retrieved_at": "2026-08-25T10:27:41.545726Z",
+            "source_family": "regulator",
+            "source_locator": {
+              "accession": "0001409970-26-000087",
+              "filing_chain_complete": true,
+              "form": "8-K",
+              "items": [
+                "3.01",
+                "7.01",
+                "9.01"
+              ],
+              "primary_document": "lc-20260602.htm",
+              "rendered_text_ranges": [
+                [
+                  0,
+                  127
+                ],
+                [
+                  496,
+                  1763
+                ],
+                [
+                  2041,
+                  2522
+                ],
+                [
+                  2523,
+                  2880
+                ],
+                [
+                  2881,
+                  3068
+                ]
+              ],
+              "rule_id": "sec.visible_text_excerpt",
+              "rule_version": "1"
+            },
+            "source_published_at": "2026-06-02",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/1409970/000140997026000087/lc-20260602.htm",
+            "title": "8-K"
+          }
+        ],
+        "extractor_error_type": null,
+        "extractor_status": "succeeded",
+        "facts": [
+          {
+            "cited_text": "Employer Identification No.) 88 Kearny Street, Suite 600, San Francisco, CA 94108 (Address of principal executive offices and zip code) Registrant’s telephone number, including area code: 415 930-7440 Former name or former address, if changed since last report: N/A Check the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under any of the following provisions: ☐ Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425) ☐ Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12) ☐ Pre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b)) ☐ Pre-commencement communications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c)) Securities registered pursuant to Section 12(b) of the Act: Title of each class Trading Symbol Name of each exchange on which registered Common stock, par value $0.01 per share LC New York Stock Exchange Indicate by check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (§230.405 of this chapter) or Rule 12b-2 of the Securities Exchange Act of 1934 (§240.12b-2 of this chapter).",
+            "cited_text_sha256": "08125d2becf213b8244617df1f0824d3418b80d3f9ef3d5a6772bc01ee1fcee9",
+            "evidence_id": "sle_ea3cffd7d2cdeec23117e06c9e68f699",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 1407,
+            "span_start_byte": 128,
+            "value": "common_stock"
+          },
+          {
+            "cited_text": "☐ Item 3.01 Notice of Delisting or Failure to Satisfy a Continued Listing Rule or Standard; Transfer of Listing On June 2, 2026, LendingClub Corporation (the “Company”), acting pursuant to authorization from its Board of Directors, notified the New York Stock Exchange (the “NYSE”) of its intention to voluntarily withdraw the listing of its common stock, par value $0.01 per share (“Common Stock”), from the NYSE and transfer the listing to The Nasdaq Stock Market LLC (“Nasdaq”).",
+            "cited_text_sha256": "1ba164994bc1fc2270357991b89c90dd552f69e5473234ba852c80d45d286b89",
+            "evidence_id": "sle_ea3cffd7d2cdeec23117e06c9e68f699",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 1907,
+            "span_start_byte": 1408,
+            "value": "common_stock"
+          },
+          {
+            "cited_text": "The Company expects that the listing and trading of its Common Stock on the NYSE will end at market close on June 18, 2026 and that trading will begin on Nasdaq at market open on June 22, 2026 under the “HAPN” ticker symbol, which coincides with and reflects the upcoming launch of the Company’s Happen Bank brand and renaming of the Company to Happen, Inc.",
+            "cited_text_sha256": "6095e8e148df12b81d5cd176cc787d0e2e13ebf69989b047c76834a1f3ecacdc",
+            "evidence_id": "sle_ea3cffd7d2cdeec23117e06c9e68f699",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 2271,
+            "span_start_byte": 1908,
+            "value": "common_stock"
+          },
+          {
+            "cited_text": "Item 7.01 Regulation FD Disclosure On June 2, 2026 , the Company issued a press release (the “Press Release”) in connection with the transfer of the listing of its Common Stock to Nasdaq.",
+            "cited_text_sha256": "87c2da14753cddf735f2efaae69e8caef9d189e3818217c42acff20bce592ccd",
+            "evidence_id": "sle_ea3cffd7d2cdeec23117e06c9e68f699",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 2463,
+            "span_start_byte": 2272,
+            "value": "common_stock"
+          }
+        ],
+        "filing_chain_complete": true,
+        "http_status": 200,
+        "source_file": "HAPN-0001409970-26-000087.html",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1409970/000140997026000087/lc-20260602.htm",
+        "submissions_network_calls": 0,
+        "symbol_transitions": []
+      },
+      "QBTS": {
+        "accession": "0001907982-26-000099",
+        "blockers": [],
+        "conflicts": {},
+        "decision_without_market": {
+          "action_readiness": "action_blocked",
+          "cash_per_security_decimal": null,
+          "conclusion": "Available evidence does not establish the tracked security outcome.",
+          "confidence": "unknown",
+          "consideration_currency": null,
+          "counterparty_cik": null,
+          "counterparty_name": null,
+          "counterparty_ticker": null,
+          "decision_issues": [
+            "regulator_identity_facts_missing"
+          ],
+          "decision_tier": "review_suggested",
+          "destination_venue": null,
+          "effective_date": null,
+          "exchange_ratio_decimal": null,
+          "impact_summary": "Review the cited evidence and missing identity facts.",
+          "outcomes": [
+            "undetermined"
+          ],
+          "relevance": "undetermined",
+          "rule_id": "lifecycle.insufficient_identity_facts",
+          "rule_version": "1",
+          "successor_ticker": null,
+          "transition_requested": false
+        },
+        "diagnostics": {
+          "attempt_count": 2,
+          "body_bytes": 62353,
+          "document_count": 2
+        },
+        "document_bytes": 31068,
+        "document_calls": 1,
+        "document_sha256": "bf1046a33ed9a67e555a483d5f640bbe59e24417bce3805bfe64b89fabf5bc43",
+        "evidence": [
+          {
+            "adapter": "sec_edgar",
+            "content_sha256": "a9843e1b37e1070b0a321f336c8bf8e1e3ea47a4b4429fe377649ff1da36cd90",
+            "document_sha256": "bf1046a33ed9a67e555a483d5f640bbe59e24417bce3805bfe64b89fabf5bc43",
+            "evidence_id": "sle_87af115b03653261a79dbd3dbd4e6510",
+            "excerpt": "qbts-20260714 0001907982 FALSE 0001907982 2026-07-14 2026-07-14 UNITED STATES SECURITIES AND EXCHANGE COMMISSION Washington, D.C. Employer Identification No.) 2650 East Bayshore Road Palo Alto , California 94303 (Address of principal executive offices) ( 650 ) 285-2881 (Registrant’s telephone number, including area code) N/A (Former name or former address, if changed since last report) _____________________________________________________________ Check the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under any of the following provisions: o Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425) o Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12) o Pre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b)) o Pre-commencement communications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c)) Securities registered pursuant to Section 12(b) of the Act: Title of each class Trading Symbol(s) Name of each exchange on which registered Common stock, par value $0.0001 per share QBTS New York Stock Exchange Indicate by check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (§230.405 of this chapter) or Rule 12b-2 of the Securities Exchange Act of 1934 (§240.12b-2 of this chapter). (the \" Company \"), acting pursuant to authorization from its Board of Directors, notified the New York Stock Exchange (the “ NYSE ”) of its intention to voluntarily withdraw the listing of its common stock, par value $0.0001 per share (the “ Common Stock ”) from the NYSE and transfer the listing to The Nasdaq Stock Market LLC (“ Nasdaq ”). The Company expects that the listing and trading of the Common Stock on the NYSE will end at market close on July 24, 2026 and that trading will begin on Nasdaq at market open on July 27, 2026. The Common Stock has been approved for listing on Nasdaq, where it will continue to trade under its current ticker symbol, \"QBTS\". On July 14, 2026, the Company issued the press release attached hereto as Exhibit 99.1 in connection with the transfer of the listing of the Common Stock to Nasdaq.",
+            "kind": "regulator_excerpt",
+            "publisher": "SEC EDGAR",
+            "retrieved_at": "2026-08-25T10:27:41.545726Z",
+            "source_family": "regulator",
+            "source_locator": {
+              "accession": "0001907982-26-000099",
+              "filing_chain_complete": true,
+              "form": "8-K",
+              "items": [
+                "3.01",
+                "7.01",
+                "9.01"
+              ],
+              "primary_document": "qbts-20260714.htm",
+              "rendered_text_ranges": [
+                [
+                  0,
+                  129
+                ],
+                [
+                  744,
+                  2073
+                ],
+                [
+                  2502,
+                  2843
+                ],
+                [
+                  2844,
+                  3037
+                ],
+                [
+                  3038,
+                  3168
+                ],
+                [
+                  3205,
+                  3369
+                ]
+              ],
+              "rule_id": "sec.visible_text_excerpt",
+              "rule_version": "1"
+            },
+            "source_published_at": "2026-07-14",
+            "source_url": "https://www.sec.gov/Archives/edgar/data/1907982/000190798226000099/qbts-20260714.htm",
+            "title": "8-K"
+          }
+        ],
+        "extractor_error_type": null,
+        "extractor_status": "succeeded",
+        "facts": [
+          {
+            "cited_text": "Employer Identification No.) 2650 East Bayshore Road Palo Alto , California 94303 (Address of principal executive offices) ( 650 ) 285-2881 (Registrant’s telephone number, including area code) N/A (Former name or former address, if changed since last report) _____________________________________________________________ Check the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under any of the following provisions: o Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425) o Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12) o Pre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b)) o Pre-commencement communications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c)) Securities registered pursuant to Section 12(b) of the Act: Title of each class Trading Symbol(s) Name of each exchange on which registered Common stock, par value $0.0001 per share QBTS New York Stock Exchange Indicate by check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (§230.405 of this chapter) or Rule 12b-2 of the Securities Exchange Act of 1934 (§240.12b-2 of this chapter).",
+            "cited_text_sha256": "fd2a5a0ce17979dd933c8474ca282dab85363f2153867ac595f012df182b3e26",
+            "evidence_id": "sle_87af115b03653261a79dbd3dbd4e6510",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 1463,
+            "span_start_byte": 130,
+            "value": "common_stock"
+          },
+          {
+            "cited_text": "(the \" Company \"), acting pursuant to authorization from its Board of Directors, notified the New York Stock Exchange (the “ NYSE ”) of its intention to voluntarily withdraw the listing of its common stock, par value $0.0001 per share (the “ Common Stock ”) from the NYSE and transfer the listing to The Nasdaq Stock Market LLC (“ Nasdaq ”).",
+            "cited_text_sha256": "2285e2506d46494991981b2ba8ea681757e7488a2ad86c67bdfcdf775bde3279",
+            "evidence_id": "sle_87af115b03653261a79dbd3dbd4e6510",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 1817,
+            "span_start_byte": 1464,
+            "value": "common_stock"
+          },
+          {
+            "cited_text": "The Company expects that the listing and trading of the Common Stock on the NYSE will end at market close on July 24, 2026 and that trading will begin on Nasdaq at market open on July 27, 2026.",
+            "cited_text_sha256": "1c36e531f8c2d77d1430168257a6c766e814553da747339f864c0363a1ff41b4",
+            "evidence_id": "sle_87af115b03653261a79dbd3dbd4e6510",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 2011,
+            "span_start_byte": 1818,
+            "value": "common_stock"
+          },
+          {
+            "cited_text": "The Common Stock has been approved for listing on Nasdaq, where it will continue to trade under its current ticker symbol, \"QBTS\".",
+            "cited_text_sha256": "c42e21ae86d699c6d7485fed5a596e32411d3d26e889638facaa2dac07ff73ec",
+            "evidence_id": "sle_87af115b03653261a79dbd3dbd4e6510",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 2142,
+            "span_start_byte": 2012,
+            "value": "common_stock"
+          },
+          {
+            "cited_text": "On July 14, 2026, the Company issued the press release attached hereto as Exhibit 99.1 in connection with the transfer of the listing of the Common Stock to Nasdaq.",
+            "cited_text_sha256": "27d9e58a045abbfc496138fb8236151749152cebe9d0a115c581f18128b47265",
+            "evidence_id": "sle_87af115b03653261a79dbd3dbd4e6510",
+            "fact_type": "security_class",
+            "rule_id": "sec.explicit_security_class",
+            "rule_version": "1",
+            "span_end_byte": 2307,
+            "span_start_byte": 2143,
+            "value": "common_stock"
+          }
+        ],
+        "filing_chain_complete": true,
+        "http_status": 200,
+        "source_file": "QBTS-0001907982-26-000099.html",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1907982/000190798226000099/qbts-20260714.htm",
+        "submissions_network_calls": 0,
+        "symbol_transitions": []
+      }
+    },
+    "shared_transport": {
+      "attempt_count": 4,
+      "body_bytes": 165873,
+      "document_count": 4,
+      "governor_wait_ms": 228,
+      "rate_limit_retries": 0
+    }
+  }
+}

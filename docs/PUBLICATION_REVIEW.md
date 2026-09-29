@@ -63,3 +63,25 @@ the `filter=git-crypt` line from `.gitattributes` and `git add --renormalize`.
   treated as permanently compromised because Git retains prior blobs. It is not
   used by any current service. Publication review must reject any reintroduction
   of that value or any credential derived from it.
+
+## 6. Verification artifacts
+
+- Do not commit `.superpowers/`, `docs/superpowers/evidence/`, or
+  `data/verification/`. This includes raw logs, screenshots, result XML/JSON,
+  review transcripts, source snapshots, and operator receipts. Do not use force
+  staging to bypass ignore rules.
+- Keep reusable runners in `tests/`, `tests/support/`, or `tests/live/`, and
+  small reviewed input fixtures in `tests/fixtures/`. Tests must not import
+  private verification output. Prefer synthetic inputs to operator statistics.
+- New verification output belongs in ignored `data/verification/` or a private
+  external directory. Report results in the work conversation; retain public
+  documentation only for current behavior and reproducible commands.
+- Enable the tracked pre-commit check with `git config --local core.hooksPath
+  .githooks`. Run `python3 tests/repository_hygiene.py --all-tracked` before
+  publication. The repository workflow runs the same full-tree check.
+- Removing a file from the current tree does not remove its older commits.
+  History rewriting, remote deletion, and credential rotation are separate
+  decisions; a clean latest tree is not proof of clean history.
+- Evidence links in historical plans and specs refer to their original Git
+  revisions, not required files in the current checkout. Do not recreate those
+  directories to satisfy an old document. Maintained tests use reviewed fixtures.

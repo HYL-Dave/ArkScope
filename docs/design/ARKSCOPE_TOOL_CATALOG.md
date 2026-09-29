@@ -11,7 +11,7 @@ facts belong to `ARKSCOPE_PROVIDER_CATALOG.md`.
 Registration and an intended role do not certify correct calculations, source
 coverage, channel availability or execution authorization. Current repair
 priorities and observed use are in
-[`2026-09-20-research-usage.md`](../data/2026-09-20-research-usage.md).
+[historical research usage inventory](https://github.com/HYL-Dave/ArkScope/blob/220fe6d26fb366e421336ecba9e17b47f7d255da/docs/data/2026-09-20-research-usage.md).
 
 ## 0. Rules
 

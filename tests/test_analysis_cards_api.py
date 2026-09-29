@@ -136,8 +136,7 @@ def test_translation_works_after_clearing_spark_results(store, stub_generation, 
 
     from src.card_execution import ExecutionReceipt
 
-    path = (Path(__file__).resolve().parents[1] / "docs/superpowers/evidence/"
-            "2026-09-19-card-translation-retirement/checks/dispose.py")
+    path = Path(__file__).parent / "support/translation_cleanup/dispose.py"
     spec = importlib.util.spec_from_file_location("translation_record_cleanup", path)
     cleanup = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cleanup)

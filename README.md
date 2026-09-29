@@ -42,6 +42,7 @@ python -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
 npm install
+git config --local core.hooksPath .githooks
 
 # desktop app: starts Vite, Electron, and its own FastAPI sidecar
 npm run dev:desktop
@@ -118,6 +119,27 @@ compatibility surfaces.
 
 The project includes research datasets and evidence generated from public market
 data. Published datasets must follow `docs/PUBLICATION_REVIEW.md`.
+
+## Verification hygiene
+
+Raw verification output and local agent reports stay outside tracked source.
+Reusable test helpers live under `tests/`; reviewed inputs live under
+`tests/fixtures/`. The pre-commit hook and repository workflow reject files in
+the retired evidence tree, `.superpowers/`, and `data/verification/`.
+
+```bash
+python3 tests/repository_hygiene.py --all-tracked
+# Isolated offline regression; FORMAL_DATA points at the live data directory.
+ARKSCOPE_VERIFICATION_WORK="$PWD/data/verification/regression" \
+ARKSCOPE_FORMAL_DATA="${FORMAL_DATA:?Set FORMAL_DATA to the live data directory}" \
+python tests/offline_runner.py -q tests
+```
+
+Set `FORMAL_DATA` to the absolute live-data path before running the offline
+entrypoint from an isolated worktree. It blocks that database boundary and
+external Python networking, and enables the installed browser acceptance gates.
+It does not grant permission to run live canaries. See the
+[publication policy](docs/PUBLICATION_REVIEW.md) for the historical-data boundary.
 
 ## License
 

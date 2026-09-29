@@ -13,8 +13,18 @@ must not contain files named `test_*.py`.
 | `sdk_driver_smoke.py` | The admitted SDK/CLI pair passes two bounded sessions: one positive in-process MCP control and one locked tool/config surface check. Hostile `.mcp.json`, `CLAUDE.md`, and settings fixtures emulate developer-local inputs that the App must not consume. Output is a closed, non-secret evidence object. | Explicit provider-call authorization, profile DB path, stored Anthropic `claude_code_oauth` token, network, and provider entitlement. |
 | `sdk_route_smoke.py` | The `/query/stream` Anthropic subscription helper drives the real driver through the route's exact path. | Same Anthropic requirements; one real subscription call. |
 | `smoke_fred.py` | FRED metadata, release dates, vintage reads, catalog loading, and an in-memory ingestion dry run work against the live API. | FRED API key, network, and provider availability. |
+| `fixed_output_api_canary.py` | Fixed-output request and credential boundaries; retained for offline contract tests. | Explicit paid API authorization and an isolated profile/work directory. |
+| `lifecycle_claude_canary.py` | Lifecycle investigation isolation; retained for offline contract tests. | Explicit subscription authorization and an isolated journal/work directory. |
 
 The scripts load credentials at runtime and must not embed or print them.
+
+Running a script against a provider requires fresh authorization for its
+account, billing channel, model, and scope. Historical dates or authorization
+strings inside a helper are not permission for another run. Do not use live
+credentials to check whether a fixture migration works.
+
+Store new output in ignored `data/verification/` or a private external directory.
+Do not commit execution receipts, provider responses, credentials, or screenshots.
 
 Run only by explicit manual choice from the repository root:
 

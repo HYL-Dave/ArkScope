@@ -6,7 +6,7 @@ import pytest
 
 
 def harness():
-    path = Path(__file__).resolve().parents[1] / "docs/superpowers/evidence/2026-09-08-lifecycle-investigation/claude_canary.py"
+    path = Path(__file__).parent / "live/lifecycle_claude_canary.py"
     spec = importlib.util.spec_from_file_location("investigation_canary_harness", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

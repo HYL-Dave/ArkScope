@@ -9,8 +9,7 @@ from urllib.parse import urlsplit
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "security_lifecycle_automation_sec.json"
 _REAL_SOURCE_ROOT = (
-    Path(__file__).parent.parent
-    / "docs/superpowers/evidence/2026-08-25-trusted-lifecycle-automation-real-source-canary"
+    Path(__file__).parent / "fixtures/lifecycle_sec_source"
 )
 _REAL_CASE_ACCESSIONS = {
     "HAPN": "0001409970-26-000087",

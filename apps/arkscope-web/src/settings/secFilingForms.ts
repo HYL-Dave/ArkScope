@@ -6,7 +6,7 @@ type Name = keyof typeof enSettings.secResearch.formNames;
 type Choice = { form: string; description: string; rank: number };
 
 // Presentation metadata only, never an allowlist. Sources and historical codes:
-// docs/superpowers/evidence/2026-09-15-sec-form-labels/README.md
+// Regression inputs: tests/fixtures/sec_form_options.json
 const GROUPS = [
   { id: "reports", forms: [
     ["10-K", "annual"], ["10-Q", "quarterly"], ["20-F", "foreignAnnual"], ["40-F", "canadianAnnual"],

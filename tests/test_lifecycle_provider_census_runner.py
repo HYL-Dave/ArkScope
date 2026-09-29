@@ -27,7 +27,7 @@ from src.data_provider_config import ProviderConfigMissing
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER_PATH = (
     ROOT
-    / "docs/superpowers/evidence/2026-09-04-lifecycle-provider-authority-shadow-census"
+    / "tests/support/lifecycle_provider_census"
     / "run_census.py"
 )
 
@@ -721,8 +721,8 @@ def test_read_admission_addendum_binds_scope_and_override_reason_without_tickers
 
 
 def test_retained_read_admission_addendum_binds_original_sealed_attestation() -> None:
-    source_dir = runner.PACKET_DIR / "universe-manifest"
-    admission_dir = runner.PACKET_DIR / "universe-manifest-read-admission"
+    source_dir = runner.FIXTURE_DIR / "universe-manifest"
+    admission_dir = runner.FIXTURE_DIR / "universe-manifest-read-admission"
     runner.verify_seal(output_dir=source_dir)
     runner.verify_seal(output_dir=admission_dir)
     attestation_path = source_dir / runner.UNIVERSE_ATTESTATION_NAME
@@ -1442,7 +1442,7 @@ def test_event_revalidation_executes_only_one_massive_request_and_seals_packet(
 
 
 def test_retained_event_revalidation_packet_preserves_the_stale_oracle() -> None:
-    packet_dir = runner.PACKET_DIR / "attempt-2-event-revalidation"
+    packet_dir = runner.FIXTURE_DIR / "attempt-2-event-revalidation"
     runner.verify_seal(output_dir=packet_dir)
     packet = json.loads((packet_dir / runner.SUMMARY_NAME).read_bytes())
 
@@ -1728,3 +1728,20 @@ def test_readme_states_lane_and_negative_result_contracts() -> None:
     assert "successful experiment outcome" in text.lower()
     for provider in ("Massive", "EODHD", "Nasdaq"):
         assert provider in text
+
+
+def test_default_census_output_is_private_not_tracked_test_support(monkeypatch, capsys):
+    import inspect
+
+    expected = ROOT / "data/verification/lifecycle_provider_census"
+    assert inspect.signature(runner.run_census).parameters["output_dir"].default == expected
+    calls = []
+
+    def fake_run(**kwargs):
+        calls.append(kwargs)
+        return {"mode": kwargs["mode"]}
+
+    monkeypatch.setattr(runner, "run_census", fake_run)
+    assert runner._main(["--mode", "universe-manifest"]) == 0
+    assert calls[0]["output_dir"] == expected / "universe-manifest"
+    assert json.loads(capsys.readouterr().out) == {"mode": "universe-manifest"}

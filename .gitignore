@@ -23,6 +23,10 @@ secrets/
 .codex
 .codex/
 
+# Local agent work and raw verification output are never release sources.
+/.superpowers/
+/docs/superpowers/evidence/
+
 # -----------------------------------------------------------------------------
 # Python
 # -----------------------------------------------------------------------------
@@ -172,7 +176,7 @@ pip-delete-this-directory.txt
 .serena/
 
 # -----------------------------------------------------------------------------
-# Local Documentation (commit locally, don't push to remote)
+# Local Documentation (untracked; local commits would still be pushed)
 # These files contain project-specific instructions for Claude Code
 # -----------------------------------------------------------------------------
 CLAUDE.md

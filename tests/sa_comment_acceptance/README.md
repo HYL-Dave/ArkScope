@@ -134,7 +134,7 @@ normal collection only when no test capture is running.
   The 79 shared comments have identical text and parent relationships; that does
   not compensate for missing comments. Investigate traversal before another
   live pair; do not extend time limits, add retries or merge the exports to
-  manufacture acceptance. See [the observation record](../../docs/superpowers/evidence/2026-09-24-sa-comment-observation.md).
+  manufacture acceptance. See [the historical observation record](https://github.com/HYL-Dave/ArkScope/blob/220fe6d26fb366e421336ecba9e17b47f7d255da/docs/superpowers/evidence/2026-09-24-sa-comment-observation.md).
 - The later 120-second small-thread pair kept all 81 baseline comments and
   added 26, but used more work/time: supporting evidence, not blanket acceptance.
 - The large-thread 1.0.4 pair is **not accepted**: 259 legacy vs 218 guarded,
@@ -149,7 +149,7 @@ normal collection only when no test capture is running.
   Its 12-second probe captures 105 rows, stops partial, and preserves all 107
   previously stored rows in isolated replay with zero comment row writes.
   This is not a complete capture or live new-reply test. See
-  [the recent/routine evidence](../../docs/superpowers/evidence/2026-09-24-sa-comment-recent-and-routine-acceptance.md).
+  [the historical recent/routine evidence](https://github.com/HYL-Dave/ArkScope/blob/220fe6d26fb366e421336ecba9e17b47f7d255da/docs/superpowers/evidence/2026-09-24-sa-comment-recent-and-routine-acceptance.md).
   No existing failures are relabeled; raw subscribed artifacts stay outside Git.
 - A final code freeze, complete backend/frontend/typecheck/build run and review
   are **pending**. Earlier revision results cannot stand in for these.

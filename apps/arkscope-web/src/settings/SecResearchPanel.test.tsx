@@ -282,7 +282,7 @@ describe("SEC filing form selection", () => {
 
   it.each(["en", "zh-Hant"])("names all 52 observed filing codes in %s, retaining historical forms and aliases", async (locale) => {
     const fixture = JSON.parse(readFileSync(resolve(import.meta.dirname,
-      "../../../../docs/superpowers/evidence/2026-09-15-sec-form-selector/checks/browser.json"), "utf8"));
+      "../../../../tests/fixtures/sec_form_options.json"), "utf8"));
     const codes: string[] = fixture.options;
     expect(codes).toHaveLength(52);
     handler = (url) => url.pathname.endsWith("/filing-forms") ? envelope("ok", codes) : fallback(url);

@@ -11,7 +11,7 @@ import pytest
 
 @pytest.fixture
 def harness():
-    path = Path(__file__).resolve().parents[1] / "docs/superpowers/evidence/2026-09-08-sdk152-fixed-output/live_api_canary.py"
+    path = Path(__file__).parent / "live/fixed_output_api_canary.py"
     spec = importlib.util.spec_from_file_location("fixed_output_canary", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

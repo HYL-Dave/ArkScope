@@ -12,7 +12,7 @@ from src.tools.schemas import DetailedFinancials, FundamentalsResult
 def offline_guard(monkeypatch, tmp_path):
     monkeypatch.setenv("ARKSCOPE_VERIFICATION_WORK", str(tmp_path / "verification"))
     monkeypatch.setenv("ARKSCOPE_FORMAL_DATA", str(tmp_path / "synthetic-formal"))
-    path = Path(__file__).resolve().parents[1] / "docs/superpowers/evidence/2026-09-27-provider-state/offline_tests.py"
+    path = Path(__file__).parent / "offline_runner.py"
     spec = importlib.util.spec_from_file_location("financial_delivery_guard", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

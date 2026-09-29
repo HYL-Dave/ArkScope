@@ -9,8 +9,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EVIDENCE = ROOT / "docs/superpowers/evidence/2026-09-20-research-usage"
-spec = importlib.util.spec_from_file_location("research_usage_audit", EVIDENCE / "summarize.py")
+spec = importlib.util.spec_from_file_location("research_usage_audit", ROOT / "tests/support/research_usage.py")
 audit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit)
 
@@ -121,13 +120,21 @@ def test_readonly_verification_does_not_create_or_modify_databases(tmp_path):
     assert path.read_bytes() == before
 
 
-def test_published_totals_match_the_dated_inventory():
-    names = json.loads((EVIDENCE / "registered-tools.json").read_text())
-    result = json.loads((EVIDENCE / "summary.json").read_text())
-    assert names == sorted({row["tool"] for row in result["tools"] if row["registered"]})
-    assert sum(row["messages"] for row in result["topics"]) == result["counts"]["user_messages"] == 54
-    assert sum(row["starts"] for row in result["tools"]) == result["event_types"]["tool_start"] == 1242
-    assert sum(row["message_records"] for row in result["tools"]) == 1603
-    assert len(result["unobserved_registered_tools"]) == 28
+def test_summary_totals_match_a_synthetic_inventory():
+    data = corpus([
+        ("tool_start", {"tool": "get_data", "input": {}}),
+        ("tool_end", {"tool": "get_data", "is_error": False}),
+        ("tool_start", {"tool": "retired_tool", "input": {}}),
+        ("tool_end", {"tool": "retired_tool", "is_error": True}),
+    ])
+    data["research_messages"].append(dict(data["research_messages"][0], id=2,
+        role="assistant", content="synthetic answer", run_id="r",
+        tool_calls_json=[{"name": "get_data", "input": {}, "result_preview": "synthetic result"}]))
+    result = audit.summarize(data, {"by_message_id": {"1": "synthetic topic"}}, ["get_data", "unseen_tool"])
+    assert {row["tool"] for row in result["tools"] if row["registered"]} == {"get_data", "unseen_tool"}
+    assert sum(row["messages"] for row in result["topics"]) == result["counts"]["user_messages"] == 1
+    assert sum(row["starts"] for row in result["tools"]) == result["event_types"]["tool_start"] == 2
+    assert sum(row["message_records"] for row in result["tools"]) == 1
+    assert result["unobserved_registered_tools"] == ["unseen_tool"]
     for row in result["tools"]:
         assert sum(row[key] for key in ("reported_success", "reported_error", "reported_unavailable", "reported_partial", "unknown")) == row["starts"]
